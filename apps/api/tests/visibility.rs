@@ -126,6 +126,7 @@ async fn password_list_unlock_and_tokens(pool: PgPool) {
     assert_eq!(get(&pool, &slug, &[("x-list-access", "bogus".into())]).await.2["code"], "PASSWORD_REQUIRED");
     // 錯密碼 / 缺密碼
     let u = format!("/public/wishlists/{slug}/unlock");
+    assert_eq!(call(&pool, "POST", &u, &[], Some(json!({}))).await.0, StatusCode::UNPROCESSABLE_ENTITY); // 缺 password 欄位
     let (s, _, v) = call(&pool, "POST", &u, &[], Some(json!({ "password": "wrong-password" }))).await;
     assert_eq!((s, v["code"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("WRONG_PASSWORD")));
     let (s, _, v) = call(&pool, "POST", &u, &[], Some(json!({ "password": "correct-horse" }))).await;

@@ -1,4 +1,5 @@
-//! GET /public/wishlists/{slug}（契約第 5 章；訪客視角，不讀 cookie，可被 CDN 快取）
+//! GET /public/wishlists/{slug}（契約第 5 章；訪客視角）。public/link 清單可被 CDN 快取；
+//! friends/selected/password 依觀看者（可選 ws_session、X-List-Access）判斷，回 private, no-store。
 use crate::{error::AppError, AppState};
 use axum::{
     extract::{Path, State},
@@ -24,7 +25,8 @@ async fn unlock(State(st): State<AppState>, Path(slug): Path<String>, peer: crat
     let w: Option<(Uuid, Option<String>)> = sqlx::query_as(
         "SELECT id, access_password_hash FROM wishlists WHERE slug = $1 AND deleted_at IS NULL AND visibility::text = 'password' AND status IN ('active', 'closed')")
         .bind(&slug).fetch_optional(&st.pool).await?;
-    let (Some((id, Some(hash))), Some(pw)) = (w, b["password"].as_str().map(str::to_owned)) else { return Err(AppError::NotFound) };
+    let Some((id, Some(hash))) = w else { return Err(AppError::NotFound) };
+    let Some(pw) = b["password"].as_str().map(str::to_owned) else { return Err(AppError::invalid("/password", "REQUIRED", "請輸入密碼")) };
     let h = hash.clone();
     let ok = tokio::task::spawn_blocking(move || crate::auth_ext::verify_pw(&pw, &h)).await.unwrap_or(false);
     if !ok { return Err(AppError::problem(422, "WRONG_PASSWORD", "密碼錯誤")); }
