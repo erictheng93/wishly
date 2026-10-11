@@ -92,12 +92,15 @@ const me = ref<any>(null) // 已登入使用者：認領以帳號名稱進行，
 const masked = computed(() => isOwner.value && !!data.value?.surprise_mode)
 
 let live: ReturnType<typeof createLiveRefresh> | undefined
+// 認領 sheet 在建立時決定訪客/登入模式：開啟前先等 /me 回來，避免登入者手快點到而被當成訪客（不問可見性、改問暱稱）
+let meReady: Promise<void> = Promise.resolve()
+async function openClaim(it: any) { await meReady; sheetItem.value = it }
 onMounted(async () => {
   online.value = navigator.onLine
   addEventListener('online', () => { online.value = true; reload() }); addEventListener('offline', () => (online.value = false))
   lineHint.value = isLineBrowser() && !getPref('ws_hint_dismissed')
   loadMine()
-  $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include' }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(() => {})
+  meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include' }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(() => {})
   if (hold(st.value) || st.value === 404) await loadClient()
   startLive()
 })
@@ -192,7 +195,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       </template>
       <p v-if="!items.length" class="g-center g-mute">建立者還在準備清單，晚點再回來看看</p>
       <ul class="c-list">
-        <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" :closed="closed" :online="online" @claim="sheetItem = it" @fund="onFund(it)" />
+        <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" :closed="closed" :online="online" @claim="openClaim(it)" @fund="onFund(it)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
