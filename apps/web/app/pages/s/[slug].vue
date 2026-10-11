@@ -26,7 +26,8 @@ watch([fetched, error], ([v, e]) => {
 async function loadClient() {
   try {
     const acc = getListAccess(slug)
-    const r = await $fetch<any>(listUrl, { credentials: 'include', cache: 'no-cache', headers: acc ? { 'X-List-Access': acc } : {} })
+    // 受限清單 / 擁有者：帶憑證打不走 CDN 快取的路徑（公開路徑永遠只回 public / link 內容）
+    const r = await fetchListWithCreds(apiBase, slug, acc)
     data.value = r; st.value = null; gate.value = null; restricted.value = isRestricted(r.visibility)
     setActiveAccess(acc); startLive()
   } catch (e: any) {
