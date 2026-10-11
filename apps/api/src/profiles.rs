@@ -28,46 +28,57 @@ async fn profile(State(st): State<AppState>, Path(handle): Path<String>, parts: 
     };
 
     // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private/link/password 不列）
-    let lists: Vec<(String, String, String, String, String, Option<String>, String, Option<NaiveDate>, i64, i64, i64)> = sqlx::query_as(
+    // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）
+    let lists: Vec<(String, String, String, String, String, Option<String>, String, Option<NaiveDate>, i64, i64, i64)> = sqlx::query_as(&format!(
         "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum(qty_claimed), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum(qty_needed), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+                (SELECT COALESCE(sum({claimed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
+                (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          FROM wishlists w
          WHERE w.owner_id = $1 AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND (w.visibility::text = 'public'
                 OR (w.visibility::text IN ('friends', 'selected') AND $3)
                 OR (w.visibility::text = 'friends' AND $4)
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $2)))
-         ORDER BY w.created_at DESC, w.id DESC")
+         ORDER BY w.created_at DESC, w.id DESC", claimed = crate::wishlists::CLAIMED_SQL))
         .bind(uid).bind(viewer).bind(is_self).bind(friend).fetch_all(&st.pool).await?;
     let wishlists: Vec<Value> = lists.into_iter().map(|(slug, title, ty, status, vis, ck, cs, ev, n, got, need)| json!({
         "slug": slug, "title": title, "type": ty, "status": status, "visibility": vis,
         "cover_image_url": crate::public::image_url(ck.as_deref(), &cs), "event_date": ev,
         "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })).collect();
 
-    // 捐助：認領可見性（本人 / public / friends+好友）∩ 清單對觀看者可存取（public/link；friends/selected 依觀看者或擁有者），排除驚喜鎖定。
-    // 與 access::claim_visible 同語意，這裡以 SQL 一次過濾（$3=本人、$4=與認領者為好友）。
-    let rows: Vec<(String, i32, String, DateTime<Utc>, Option<String>, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT i.title, c.qty, c.status::text, c.created_at,
+    // 捐助 = 認領 ∪ 點數認捐。可見性（$3=本人、$4=與捐助者為好友，與 access::claim_visible 同語意）：
+    //   認領看 c.visibility；認捐沒有逐筆設定，依捐助者帳號 default_claim_visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
+    // ponytail: 認捐用查詢當下的帳號預設，改預設會連帶影響舊認捐；需要逐筆設定時比照 claims 加 visibility 欄位 + trigger。
+    // 清單條件兩者共用：對觀看者可存取（public/link；friends/selected 依觀看者或擁有者）、排除驚喜鎖定；link 清單不給 slug。
+    let rows: Vec<(String, String, Option<i32>, Option<i64>, String, DateTime<Utc>, Option<String>, String, String, Option<String>)> = sqlx::query_as(
+        "WITH d AS (
+           SELECT 'claim' AS kind, c.id, c.item_id, c.qty, NULL::bigint AS points, c.status::text AS status, c.created_at
+           FROM claims c
+           WHERE c.user_id = $1 AND c.status IN ('reserved', 'purchased', 'delivered')
+             AND (c.visibility::text = 'public' OR $3 OR (c.visibility::text = 'friends' AND $4))
+           UNION ALL
+           SELECT 'pledge', k.id, k.item_id, NULL, k.points, k.status::text, k.created_at
+           FROM contributions k JOIN users u ON u.id = k.user_id
+           WHERE k.user_id = $1 AND k.status IN ('pledged', 'captured')
+             AND ($3 OR (NOT k.is_anonymous AND (u.default_claim_visibility::text = 'public' OR (u.default_claim_visibility::text = 'friends' AND $4)))))
+         SELECT d.kind, i.title, d.qty, d.points, d.status, d.created_at,
                 CASE WHEN w.visibility::text = 'link' THEN NULL ELSE w.slug::text END, w.title, o.display_name, o.handle
-         FROM claims c
-         JOIN wishlist_items i ON i.id = c.item_id
+         FROM d
+         JOIN wishlist_items i ON i.id = d.item_id
          JOIN wishlists w ON w.id = i.wishlist_id
          JOIN users o ON o.id = w.owner_id
-         WHERE c.user_id = $1 AND c.status IN ('reserved', 'purchased', 'delivered')
-           AND (c.visibility::text = 'public' OR $3 OR (c.visibility::text = 'friends' AND $4))
-           AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
+         WHERE w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND NOT (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')))
            AND (w.visibility::text IN ('public', 'link')
                 OR w.owner_id = $2
                 OR (w.visibility::text = 'friends' AND $2::uuid IS NOT NULL
                     AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST($2::uuid, w.owner_id) AND f.user_b = GREATEST($2::uuid, w.owner_id)))
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $2)))
-         ORDER BY c.created_at DESC, c.id DESC LIMIT 50")
+         ORDER BY d.created_at DESC, d.id DESC LIMIT 50")
         .bind(uid).bind(viewer).bind(is_self).bind(friend).fetch_all(&st.pool).await?;
-    let donations: Vec<Value> = rows.into_iter().map(|(it, qty, status, at, slug, wt, on, oh)| json!({
-        "item_title": it, "qty": qty, "status": status, "created_at": at,
+    let donations: Vec<Value> = rows.into_iter().map(|(kind, it, qty, points, status, at, slug, wt, on, oh)| json!({
+        "kind": kind, "item_title": it, "qty": qty, "points": points, "status": status, "created_at": at,
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
     Ok(Json(json!({ "user": { "id": uid, "handle": handle.to_lowercase(), "display_name": name }, "relation": relation,

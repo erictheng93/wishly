@@ -6,7 +6,7 @@ const { user, fetchMe } = useAuth()
 const p = ref<any>(null), state = ref<'loading' | 'ok' | 'gone' | 'error'>('loading')
 const busy = ref(false), err = ref('')
 const vis: Record<string, string> = { public: '公開', friends: '僅好友', selected: '指定好友', link: '連結' }
-const status: Record<string, string> = { reserved: '已認領', purchased: '已購買', delivered: '已送達' }
+const status: Record<string, string> = { reserved: '已認領', purchased: '已購買', delivered: '已送達', ...CONTRIBUTION_STATUS }
 useHead(() => ({ title: p.value ? `${p.value.user.display_name} 的心願` : '個人頁', meta: [{ name: 'robots', content: 'noindex' }] }))
 
 // 匿名也要能看：不走 useApi 的 401 轉址，直接帶 cookie 呼叫
@@ -70,7 +70,7 @@ const accept = () => run(async () => {
         <h2 class="c-h2">捐助紀錄</h2>
         <p v-if="!p.donations.length" class="c-mute">目前沒有可看的捐助紀錄。</p>
         <article v-for="(d, i) in p.donations" :key="i" class="c-card">
-          <strong>{{ d.item_title }} × {{ d.qty }}</strong>
+          <strong>{{ d.item_title }}{{ d.kind === 'pledge' ? `・${d.points} 點` : ` × ${d.qty}` }}</strong>
           <span class="c-badge">{{ status[d.status] ?? d.status }}</span>
           <div class="c-mute">
             送給 {{ d.wishlist.owner.display_name }}・

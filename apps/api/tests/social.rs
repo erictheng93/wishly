@@ -327,3 +327,56 @@ async fn public_page_masks_non_public_user_claims(pool: PgPool) {
     let names: Vec<&str> = v["items"][0]["claimers"].as_array().unwrap().iter().map(|c| c["display_name"].as_str().unwrap()).collect();
     assert_eq!(names, ["小明", "匿名"]);
 }
+
+/// 直接寫入點數認捐（不經點數記帳；只測個人頁可見性）
+async fn pledge_row(pool: &PgPool, wl: Uuid, user: Uuid, points: i64, anon: bool, status: &str) {
+    let item: Uuid = sqlx::query_scalar(
+        "INSERT INTO wishlist_items (wishlist_id, title, qty_needed, funding_mode, target_points, funding_status, funding_deadline, fulfillment_type)
+         VALUES ($1, '推車', 1, 'crowdfund', 10000, 'open', now() + interval '7 days', 'concierge') RETURNING id").bind(wl).fetch_one(pool).await.unwrap();
+    let wallet: Uuid = sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id RETURNING id")
+        .bind(user).fetch_one(pool).await.unwrap();
+    sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, is_anonymous, status, released_at, captured_at)
+                 VALUES ($1, $2, $3, $4, 'x', $5, $6, $7::text::contribution_status, CASE WHEN $7 = 'released' THEN now() END, CASE WHEN $7 = 'captured' THEN now() END)")
+        .bind(item).bind(wl).bind(user).bind(wallet).bind(points).bind(anon).bind(status).execute(pool).await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn profile_includes_pledges_by_account_default(pool: PgPool) {
+    let (o, _, _) = user(&pool, "O", None).await;
+    let (d, td, _) = user(&pool, "D", Some("donor")).await;
+    let (f, tf, _) = user(&pool, "F", None).await;
+    let (_, ts, _) = user(&pool, "S", None).await;
+    befriend(&pool, d, f).await;
+    let (wl, _) = list(&pool, o, "public", false).await;
+    pledge_row(&pool, wl, d, 300, false, "pledged").await;
+    pledge_row(&pool, wl, d, 200, true, "captured").await;   // 匿名：只有本人看得到
+    pledge_row(&pool, wl, d, 100, false, "released").await;  // 已退回：不列
+    let pts = |v: &Value| -> Vec<i64> { v["donations"].as_array().unwrap().iter().filter(|x| x["kind"] == "pledge").map(|x| x["points"].as_i64().unwrap()).collect() };
+    let set = |vis: &'static str| { let pool = pool.clone(); async move {
+        sqlx::query("UPDATE users SET default_claim_visibility = $2::text::share_level WHERE id = $1").bind(d).bind(vis).execute(&pool).await.unwrap(); } };
+
+    set("private").await;
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&ts), None).await.1), Vec::<i64>::new());
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&tf), None).await.1), Vec::<i64>::new());
+    let (_, me) = call(&pool, "GET", "/users/donor", Some(&td), None).await;
+    let mut mine = pts(&me); mine.sort();
+    assert_eq!(mine, [200, 300]);
+    set("friends").await;
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&tf), None).await.1), [300]);
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&ts), None).await.1), Vec::<i64>::new());
+    set("public").await;
+    let (_, v) = call(&pool, "GET", "/users/donor", None, None).await;
+    assert_eq!(pts(&v), [300]);
+    let p = v["donations"].as_array().unwrap().iter().find(|x| x["kind"] == "pledge").unwrap();
+    assert_eq!((p["qty"].clone(), p["status"].as_str()), (Value::Null, Some("pledged")));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn profile_completion_counts_funded_crowdfund_item(pool: PgPool) {
+    let (o, _, _) = user(&pool, "O", Some("owner")).await;
+    let (wl, _) = list(&pool, o, "public", false).await; // 數量品項 0/3
+    sqlx::query("INSERT INTO wishlist_items (wishlist_id, title, qty_needed, funding_mode, target_points, pledged_points, funding_status, funding_deadline, fulfillment_type)
+                 VALUES ($1, '推車', 1, 'crowdfund', 500, 500, 'funded', now() + interval '7 days', 'concierge')").bind(wl).execute(&pool).await.unwrap();
+    let (_, v) = call(&pool, "GET", "/users/owner", None, None).await;
+    assert_eq!(v["wishlists"][0]["completion_pct"], 25); // 已達標眾籌算 1/1：1 / (3 + 1)
+}
