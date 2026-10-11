@@ -17,6 +17,9 @@ pub struct Config {
     pub cf_email_api_token: Option<String>,
     /// Cloudflare API 根（測試指向 mock）
     pub cf_api_base: String,
+    /// CDN 快取清除（cdn.rs）：TRUSTED_PROXY=cloudflare 的 production 必填
+    pub cf_zone_id: Option<String>,
+    pub cf_purge_token: Option<String>,
     pub trusted_proxy_cloudflare: bool,
     /// 監聽位址（預設回送；容器內需明確設 0.0.0.0:8080）
     pub bind: String,
@@ -61,6 +64,8 @@ impl Config {
             cf_account_id: var("CF_ACCOUNT_ID"),
             cf_email_api_token: var("CF_EMAIL_API_TOKEN"),
             cf_api_base: v("CF_API_BASE", "https://api.cloudflare.com/client/v4"),
+            cf_zone_id: var("CF_ZONE_ID"),
+            cf_purge_token: var("CF_CACHE_PURGE_TOKEN"),
             trusted_proxy_cloudflare: var("TRUSTED_PROXY").as_deref() == Some("cloudflare"),
             bind: v("BIND", "127.0.0.1:8080"),
             turnstile_secret: var("TURNSTILE_SECRET"),
@@ -94,7 +99,12 @@ impl Config {
         need("CF_ACCOUNT_ID")?; need("CF_EMAIL_API_TOKEN")?; need("MAIL_FROM")?; need("APP_URL")?; need("API_BASE_URL")?;
         // 不設會讓所有使用者看起來來自同一 IP（反向代理的位址），使每 IP 限流變成全域限流。
         match var("TRUSTED_PROXY").as_deref() {
-            Some("cloudflare") => c.trusted_proxy_cloudflare = true,
+            Some("cloudflare") => {
+                c.trusted_proxy_cloudflare = true;
+                // 經 Cloudflare 時公開清單會被邊緣快取：清單收緊 / 封存 / 下架要能立即清除（cdn.rs）。
+                // 沒有自己 zone 的快速通道（README〈臨時公開測試〉）才可明確設 CDN_PURGE=off 略過。
+                if var("CDN_PURGE").as_deref() != Some("off") { need("CF_ZONE_ID")?; need("CF_CACHE_PURGE_TOKEN")?; }
+            }
             Some("none") => c.trusted_proxy_cloudflare = false,
             _ => return Err("production 必須明確設定 TRUSTED_PROXY=cloudflare|none（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）".into()),
         }

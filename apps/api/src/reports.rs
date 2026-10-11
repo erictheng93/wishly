@@ -151,5 +151,6 @@ async fn moderate(State(st): State<AppState>, Staff(sid): Staff, Path(id): Path<
     }
     dashboard::notify(&mut *tx, id).await?; // commit 時才送出，SSE 收到後關閉連線
     tx.commit().await?;
+    if hidden { crate::cdn::purge_wishlists(vec![slug.clone()]); } // 下架：邊緣快取的公開副本立即清掉
     Ok(Json(json!({ "id": id, "slug": slug, "moderation_status": ms, "moderation_reason": mr, "moderated_at": at })))
 }

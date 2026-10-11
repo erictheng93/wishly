@@ -1,5 +1,6 @@
 pub mod access;
 pub mod account;
+pub mod cdn;
 pub mod friends;
 pub mod profiles;
 pub mod config;
@@ -64,6 +65,12 @@ async fn security_headers(mut res: axum::response::Response) -> axum::response::
     let h = res.headers_mut();
     for (k, v) in [(header::X_CONTENT_TYPE_OPTIONS, "nosniff"), (header::REFERRER_POLICY, "no-referrer"), (header::CACHE_CONTROL, "no-store")] {
         h.entry(k).or_insert(HeaderValue::from_static(v));
+    }
+    // CDN 防線：不是明確 public 的回應（受限清單、403/404、所有登入 API）再加 CDN 專用標頭。
+    // Cloudflare-CDN-Cache-Control 只有 Cloudflare 讀、優先於 Cache-Control，可擋掉多數「忽略來源標頭」的快取規則設定。
+    let public = h.get(header::CACHE_CONTROL).and_then(|v| v.to_str().ok()).is_some_and(|v| v.starts_with("public"));
+    if !public {
+        for k in ["cloudflare-cdn-cache-control", "cdn-cache-control"] { h.insert(k, HeaderValue::from_static("no-store")); }
     }
     res
 }

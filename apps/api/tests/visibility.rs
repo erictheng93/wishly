@@ -55,7 +55,13 @@ async fn mk(pool: &PgPool, c: &Ctx, vis: &str, pw: Option<&str>) -> (Uuid, Strin
     (id, w["slug"].as_str().unwrap().into(), it)
 }
 
+/// 受限內容路徑（依 cookie / X-List-Access 判斷）
 async fn get(pool: &PgPool, slug: &str, hdr: &[(&str, String)]) -> (StatusCode, axum::http::HeaderMap, Value) {
+    call(pool, "GET", &format!("/restricted/wishlists/{slug}"), hdr, None).await
+}
+
+/// 可被 CDN 快取的公開路徑
+async fn get_pub(pool: &PgPool, slug: &str, hdr: &[(&str, String)]) -> (StatusCode, axum::http::HeaderMap, Value) {
     call(pool, "GET", &format!("/public/wishlists/{slug}"), hdr, None).await
 }
 
@@ -64,12 +70,16 @@ async fn public_and_link_open_and_cacheable(pool: PgPool) {
     let c = ctx(&pool).await;
     for vis in ["public", "link"] {
         let (_, slug, _) = mk(&pool, &c, vis, None).await;
-        let (s, h, v) = get(&pool, &slug, &[]).await;
+        let (s, h, v) = get_pub(&pool, &slug, &[]).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(v["visibility"], vis);
         assert!(h["cache-control"].to_str().unwrap().starts_with("public"));
+        assert!(h.get("cloudflare-cdn-cache-control").is_none());
         let etag = h["etag"].to_str().unwrap().to_string();
-        assert_eq!(get(&pool, &slug, &[("if-none-match", etag)]).await.0, StatusCode::NOT_MODIFIED);
+        assert_eq!(get_pub(&pool, &slug, &[("if-none-match", etag)]).await.0, StatusCode::NOT_MODIFIED);
+        // 受限路徑也能讀，但永遠 no-store
+        let (s, h, _) = get(&pool, &slug, &[]).await;
+        assert_eq!((s, h["cache-control"].to_str().unwrap()), (StatusCode::OK, "private, no-store"));
     }
 }
 
@@ -238,4 +248,28 @@ async fn allowed_users_only_friends(pool: PgPool) {
     // 非擁有者 → 404
     assert_eq!(call(&pool, "GET", &u, &ck(&c.friend.1), None).await.0, StatusCode::NOT_FOUND);
     assert_eq!(call(&pool, "PUT", &u, &ck(&c.friend.1), Some(json!({ "user_ids": [] }))).await.0, StatusCode::NOT_FOUND);
+}
+
+/// CDN 防線：公開（可快取）路徑不論帶什麼憑證，都不會回受限清單內容；擋下的回應帶 CDN 專用 no-store。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn public_path_never_serves_restricted_content(pool: PgPool) {
+    let c = ctx(&pool).await;
+    let (_, pw_slug, _) = mk(&pool, &c, "password", Some("correct-horse")).await;
+    let v = call(&pool, "POST", &format!("/public/wishlists/{pw_slug}/unlock"), &[], Some(json!({ "password": "correct-horse" }))).await.2;
+    let tok = v["access_token"].as_str().unwrap().to_string();
+    let cases: Vec<(&str, Vec<(&str, String)>)> = vec![
+        ("friends", ck(&c.friend.1)), ("friends", ck(&c.owner.1)), ("selected", ck(&c.allowed.1)), ("private", ck(&c.owner.1)),
+    ];
+    for (vis, hdr) in cases {
+        let (_, slug, _) = mk(&pool, &c, vis, None).await;
+        assert_eq!(get(&pool, &slug, &hdr).await.0, StatusCode::OK, "{vis} 受限路徑可讀");
+        let (s, h, v) = get_pub(&pool, &slug, &hdr).await;
+        assert!(matches!(s, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND), "{vis}: {s}");
+        assert!(v.get("items").is_none() && v.get("slug").is_none(), "{vis} 公開路徑不得含清單內容：{v}");
+        assert_eq!((h["cloudflare-cdn-cache-control"].to_str().unwrap(), h["cdn-cache-control"].to_str().unwrap()), ("no-store", "no-store"));
+    }
+    let (s, h, v) = get_pub(&pool, &pw_slug, &[("x-list-access", tok.clone())]).await;
+    assert_eq!((s, v["code"].as_str()), (StatusCode::FORBIDDEN, Some("PASSWORD_REQUIRED")));
+    assert_eq!(h["cloudflare-cdn-cache-control"], "no-store");
+    assert_eq!(get(&pool, &pw_slug, &[("x-list-access", tok)]).await.0, StatusCode::OK);
 }

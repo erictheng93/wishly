@@ -127,8 +127,9 @@ async fn delete_me(State(st): State<AppState>, u: CurrentUser, Json(b): Json<Val
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM otp_challenges WHERE email = (SELECT email FROM users WHERE id = $1)").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM auth_identities WHERE user_id = $1").bind(id).execute(&mut *tx).await?;
-    let archived: Vec<Uuid> = sqlx::query_scalar("UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(closed_at, now()) WHERE owner_id = $1 AND status <> 'archived' RETURNING id")
+    let rows: Vec<(Uuid, String)> = sqlx::query_as("UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(closed_at, now()) WHERE owner_id = $1 AND status <> 'archived' RETURNING id, slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
+    let (archived, slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().unzip();
     crate::wishlists::release_pledged(&mut tx, &archived).await?; // 別人捐在這些清單上、尚未達標的點數退回各自錢包
     // F-08：取消他人清單上的 reserved 認領並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE user_id = $1 AND status = 'reserved') ORDER BY id FOR UPDATE")
@@ -153,6 +154,7 @@ async fn delete_me(State(st): State<AppState>, u: CurrentUser, Json(b): Json<Val
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.delete', 'users', $1)")
         .bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
+    crate::cdn::purge_wishlists(slugs); // 已封存為 private：邊緣快取的公開副本立即清掉
     let mut res = Json(json!({ "deleted": true, "anonymized_at": at })).into_response();
     res.headers_mut().insert(header::SET_COOKIE, HeaderValue::from_static("ws_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"));
     Ok(res)
