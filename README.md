@@ -93,6 +93,7 @@ npx playwright show-report                                      # 開啟上次�
   - `TRUSTED_PROXY`：`cloudflare` 或 `none`。dev 預設 `none`；**production 必須明確設定**，未設或其他值會拒絕啟動（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）。設 `cloudflare` 時信任 `CF-Connecting-IP`，所以 API 不可被直接存取，否則該標頭可被偽造；若 `BIND` 不是回送位址，啟動時會印出 WARN。
   - `TURNSTILE_SECRET`：production 必填；檢舉的 `turnstile_token` 會送 siteverify 驗證，失敗回 403 `FORBIDDEN`。dev/test 不設則略過驗證（接受任何 token，含前端的 `dev-bypass`）。`TURNSTILE_VERIFY_URL` 僅測試時覆寫。
   - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。
+  - `CF_ZONE_ID`、`CF_CACHE_PURGE_TOKEN`：`TRUSTED_PROXY=cloudflare` 的 production **必填**（token 只需 Zone → Cache Purge 權限）。清單改成好友 / 指定 / 密碼 / 私人、封存、下架、刪帳號時，後端立即清除該清單公開網址的邊緣快取。沒有自己 zone 的快速通道才可明確設 `CDN_PURGE=off` 略過。見下方〈CDN 快取與受限清單〉。
   - `SHIPPING_ENC_KEY`：收件資訊加密金鑰，**production 必填**，必須是 base64 編碼的 32 bytes，否則拒絕啟動。dev / test 不設時使用固定的開發金鑰。詳見下方〈收件資訊加密金鑰〉。
 
 ### 收件資訊加密金鑰（`SHIPPING_ENC_KEY`）
@@ -120,11 +121,32 @@ npx playwright show-report                                      # 開啟上次�
 - 本機驗證：`npm run build` 後 `npx wrangler pages dev dist`（示範用 `npm run build:demo`）。
 
 
+### CDN 快取與受限清單
+
+分享頁資料分兩條路徑，**受限清單的內容永遠不會出現在可快取的路徑上**：
+
+| 路徑 | 讀身分 | 回應 | CDN |
+|---|---|---|---|
+| `GET /api/v1/public/wishlists/{slug}` | 不讀 cookie / 權杖 | public、link 的內容；其餘只回不含內容的 403 / 404 | 可快取（`public, s-maxage=10, stale-while-revalidate=60`） |
+| `GET /api/v1/restricted/wishlists/{slug}` | `ws_session`、`X-List-Access` | 依可見性判斷 | 永不快取（`private, no-store`） |
+
+- 所有非 `public` 的回應另帶 `Cloudflare-CDN-Cache-Control: no-store` 與 `CDN-Cache-Control: no-store`。
+- **Cloudflare 後台設定**：`/api/v1/public/*` 的 Edge TTL 用「Use cache-control header if present」，**不要**用「Cache Everything + 覆寫來源 TTL」；`/api/v1/restricted/*` 不要套任何快取規則。
+- **部署順序**：先前端、再後端（前端讀 `/restricted` 拿到 404 時會退回舊路徑，所以前端可單獨先上）。後端上線後用好友帳號實際開一次好友限定清單確認。
+- **金絲雀**：用營運帳號建一份 friends 金絲雀清單、另一個帳號加為好友，部署後（或排程）跑：
+
+  ```sh
+  API_BASE=https://api.wishsync.tw CANARY_SLUG=<friends 清單> CANARY_FRIEND_COOKIE='ws_session=<好友 session>' \
+  CANARY_PUBLIC_SLUG=<public 清單> node scripts/cdn-canary.mjs   # 失敗 exit 1
+  ```
+
+  它模擬「好友先載入、陌生人再開同一網址」，檢查匿名請求拿不到清單內容且不是快取命中。
+
 ### 臨時公開測試（本機後端 + 快速通道 + Pages 預覽分支）
 
 用來在手機或 LINE 上測試本機的後端。**這會把你電腦上的 API 經臨時網址公開**，請用獨立的資料庫與隨機機密，測完就關。
 
-1. 後端：用獨立資料庫、隨機的 `OTP_PEPPER` / `OAUTH_SECRET` / `UNSUB_SECRET`，`TRUSTED_PROXY=cloudflare`、`BIND=127.0.0.1:8090`、`APP_URL=https://qa.wishsync-web.pages.dev`。
+1. 後端：用獨立資料庫、隨機的 `OTP_PEPPER` / `OAUTH_SECRET` / `UNSUB_SECRET`，`TRUSTED_PROXY=cloudflare`、`CDN_PURGE=off`（快速通道沒有自己的 zone）、`BIND=127.0.0.1:8090`、`APP_URL=https://qa.wishsync-web.pages.dev`。
 2. 通道：`cloudflared tunnel --url http://127.0.0.1:8090`，取得 `https://xxx.trycloudflare.com`。
 3. 前端：`NUXT_API_PROXY=https://xxx.trycloudflare.com npm run deploy:preview`（部署到 `qa` 預覽分支，不動正式網址；前端以同源代理連後端，cookie 才是第一方）。
 4. 限制：**快速通道不支援 SSE**，即時更新會自動退回每 15 秒輪詢；通道網址每次重開都會變，需要重新部署。要驗證 SSE 需使用有網域的具名通道。

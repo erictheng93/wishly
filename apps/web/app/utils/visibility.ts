@@ -21,3 +21,16 @@ export function getListAccess(slug: string): string | null {
 export function setListAccess(slug: string, token: string | null) {
   try { token ? sessionStorage.setItem(sk(slug), token) : sessionStorage.removeItem(sk(slug)) } catch { /* 無痕/停用儲存：本次頁面重載後需重輸入密碼 */ }
 }
+
+/** 帶憑證讀受限清單：先打 /restricted（不走 CDN 快取），404 時退回舊的 /public（帶憑證）。
+ *  退回只為了「前端先上線、後端還是舊版」時好友仍看得到；新後端的 /public 永遠不回受限內容，退回不會外洩。
+ *  ponytail: 前後端都上線後拿掉 404 退回（多一次請求只發生在真的 404 時）。 */
+export async function fetchListWithCreds<T = any>(apiBase: string, slug: string, access: string | null): Promise<T> {
+  const headers: Record<string, string> = access ? { 'X-List-Access': access } : {}
+  const opt = { credentials: 'include' as const, cache: 'no-cache' as const, headers }
+  try { return await $fetch<any>(`${apiBase}/api/v1/restricted/wishlists/${slug}`, opt) as T }
+  catch (e: any) {
+    if ((e?.statusCode ?? e?.response?.status) !== 404) throw e
+    return await $fetch<any>(`${apiBase}/api/v1/public/wishlists/${slug}`, opt) as T
+  }
+}

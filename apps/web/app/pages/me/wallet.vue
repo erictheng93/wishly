@@ -40,7 +40,8 @@ const re = ref<any>(null), reTargets = ref<any[]>([]), reTarget = ref(''), reBus
 async function openRe(row: any) {
   re.value = row; reTargets.value = []; reTarget.value = ''; reErr.value = ''; reKey.value = crypto.randomUUID()
   try {
-    const w = await $fetch<any>(`${base}/public/wishlists/${row.wishlist.slug}`, { credentials: 'omit' })
+    // 受限路徑：好友 / 指定 / 密碼清單也讀得到（公開路徑只回 public / link）
+    const w = await fetchListWithCreds(useRuntimeConfig().public.apiBase, row.wishlist.slug, getListAccess(row.wishlist.slug))
     reTargets.value = (w.items || []).filter((i: any) => i.funding_mode === 'crowdfund' && i.id !== row.item.id && deriveDisplayStatus(i) === 'open')
     reTarget.value = reTargets.value[0]?.id ?? ''
   } catch { reErr.value = '讀取同清單的其他品項失敗，請稍後再試' }

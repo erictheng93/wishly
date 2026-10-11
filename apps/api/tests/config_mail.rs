@@ -6,7 +6,7 @@ use wishsync_api::config::{client_ip, Config};
 
 #[test]
 fn production_fails_closed() {
-    let all = ["APP_ENV", "OTP_PEPPER", "OAUTH_SECRET", "UNSUB_SECRET", "CF_ACCOUNT_ID", "CF_EMAIL_API_TOKEN", "MAIL_FROM", "APP_URL", "API_BASE_URL", "TRUSTED_PROXY", "TURNSTILE_SECRET", "S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_PUBLIC_BASE", "BIND", "SHIPPING_ENC_KEY"];
+    let all = ["APP_ENV", "OTP_PEPPER", "OAUTH_SECRET", "UNSUB_SECRET", "CF_ACCOUNT_ID", "CF_EMAIL_API_TOKEN", "MAIL_FROM", "APP_URL", "API_BASE_URL", "TRUSTED_PROXY", "TURNSTILE_SECRET", "S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_PUBLIC_BASE", "BIND", "SHIPPING_ENC_KEY", "CF_ZONE_ID", "CF_CACHE_PURGE_TOKEN", "CDN_PURGE"];
     for k in all { std::env::remove_var(k); }
     // 未設 APP_ENV => production => 缺 OTP_PEPPER
     assert!(Config::try_from_env().unwrap_err().contains("OTP_PEPPER"));
@@ -44,6 +44,14 @@ fn production_fails_closed() {
     assert!(c.bind_warning().is_none());
     std::env::set_var("TRUSTED_PROXY", "cloudflare");
     std::env::set_var("BIND", "0.0.0.0:8080");
+    // 經 Cloudflare：公開清單會被邊緣快取，必須能清除
+    assert!(Config::try_from_env().unwrap_err().contains("CF_ZONE_ID"));
+    std::env::set_var("CDN_PURGE", "off"); // 快速通道：明確關閉才放行
+    assert!(Config::try_from_env().unwrap().cf_zone_id.is_none());
+    std::env::remove_var("CDN_PURGE");
+    std::env::set_var("CF_ZONE_ID", "zone1");
+    assert!(Config::try_from_env().unwrap_err().contains("CF_CACHE_PURGE_TOKEN"));
+    std::env::set_var("CF_CACHE_PURGE_TOKEN", "purge-token");
     let c = Config::try_from_env().unwrap();
     assert!(c.trusted_proxy_cloudflare && c.bind_warning().unwrap().contains("0.0.0.0:8080"));
     std::env::set_var("BIND", "127.0.0.1:9000");
@@ -137,4 +145,36 @@ async fn turnstile_verification() {
     c.turnstile_verify_url = "http://127.0.0.1:1/verify".into();
     let e = wishsync_api::reports::verify_turnstile(&c, Some("good"), "1.2.3.4").await.unwrap_err();
     assert!(matches!(e, wishsync_api::error::AppError::Problem { status: 503, .. }));
+}
+
+#[tokio::test]
+async fn cloudflare_purge_request_format() {
+    let seen: Arc<Mutex<Vec<(String, String, Value)>>> = Default::default();
+    let s2 = seen.clone();
+    let mock = Router::new().route("/zones/{zone}/purge_cache", post(move |axum::extract::Path(zone): axum::extract::Path<String>, h: HeaderMap, Json(b): Json<Value>| {
+        let s = s2.clone();
+        async move {
+            let ok = zone == "zone1";
+            s.lock().unwrap().push((zone, h["authorization"].to_str().unwrap().to_string(), b));
+            Json(json!({ "success": ok, "errors": if ok { json!([]) } else { json!([{ "code": 7003, "message": "bad zone" }]) } }))
+        }
+    }));
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = l.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(l, mock).await.unwrap() });
+    let mut c = Config::dev();
+    c.cf_api_base = format!("http://{addr}");
+    // 未設定 → 不打 API
+    c.cf_zone_id = None; c.cf_purge_token = None;
+    wishsync_api::cdn::purge(&c, &["https://api.x.tw/api/v1/public/wishlists/abc".into()]).await.unwrap();
+    assert!(seen.lock().unwrap().is_empty());
+    c.cf_zone_id = Some("zone1".into()); c.cf_purge_token = Some("purge-secret".into());
+    let urls = vec!["https://api.x.tw/api/v1/public/wishlists/abc".to_string()];
+    wishsync_api::cdn::purge(&c, &urls).await.unwrap();
+    c.cf_zone_id = Some("other".into());
+    let e = wishsync_api::cdn::purge(&c, &urls).await.unwrap_err();
+    assert!(e.contains("7003") && !e.contains("purge-secret"), "{e}");
+    let v = seen.lock().unwrap();
+    assert_eq!((v[0].0.as_str(), v[0].1.as_str()), ("zone1", "Bearer purge-secret"));
+    assert_eq!(v[0].2, json!({ "files": urls }));
 }

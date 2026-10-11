@@ -317,6 +317,7 @@ async fn get_one(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid
 async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<Value>) -> R<Json<Value>> {
     let m = obj(&b)?;
     let mut w = load_owned(&st.pool, id, u.id).await?;
+    let was_servable = crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status);
     if w.status == "archived" {
         // 重複封存為冪等（FR-15）：只帶 status=archived（與 expected_updated_at）時直接回目前狀態
         if m.get("status").is_some_and(|v| v == "archived") && m.keys().all(|k| k == "status" || k == "expected_updated_at") { return Ok(Json(w.json())); }
@@ -378,15 +379,18 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
     if res.rows_affected() == 0 { return Err(stale()); }
     if w.status == "archived" { release_pledged(&mut tx, &[id]).await?; }
     tx.commit().await?;
+    // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
+    if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) { crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]); }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
 }
 
 async fn archive(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>) -> R<StatusCode> {
-    load_owned(&st.pool, id, u.id).await?;
+    let w = load_owned(&st.pool, id, u.id).await?;
     let mut tx = st.pool.begin().await?;
     sqlx::query("UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) WHERE id=$1 AND status<>'archived'").bind(id).execute(&mut *tx).await?;
     release_pledged(&mut tx, &[id]).await?;
     tx.commit().await?;
+    crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     Ok(StatusCode::NO_CONTENT)
 }
 

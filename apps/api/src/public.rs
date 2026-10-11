@@ -1,5 +1,5 @@
-//! GET /public/wishlists/{slug}（契約第 5 章；訪客視角）。public/link 清單可被 CDN 快取；
-//! friends/selected/password 依觀看者（可選 ws_session、X-List-Access）判斷，回 private, no-store。
+//! GET /public/wishlists/{slug}（契約第 5 章；訪客視角，可被 CDN 快取，只出 public / link 內容）
+//! GET /restricted/wishlists/{slug}（好友 / 指定 / 密碼 / 擁有者，依 ws_session 與 X-List-Access，永遠 no-store）
 use crate::{error::AppError, AppState};
 use axum::{
     extract::{Path, State},
@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/public/wishlists/{slug}", get(wishlist)).route("/public/wishlists/{slug}/unlock", post(unlock))
+        .route("/restricted/wishlists/{slug}", get(restricted))
 }
 
 /// POST /public/wishlists/{slug}/unlock：密碼清單換存取權杖（同 slug+IP 每 15 分鐘 10 次）
@@ -53,8 +54,23 @@ struct It {
     target_points: Option<i64>, pledged_points: i64, funding_status: Option<String>, display_status: Option<String>, funding_deadline: Option<DateTime<Utc>>,
 }
 
+/// 可被 CDN 快取的路徑：**不讀 cookie、不讀 X-List-Access**，只會回 public / link 清單內容；
+/// 受限清單（friends / selected / password / private）在這裡一律以匿名身分判斷 → 只會得到不含清單內容的 403 / 404。
+/// 這樣即使 Cloudflare 被設成強制快取這個路徑，也只可能快取到公開資料或空的門檻回應。
 async fn wishlist(State(st): State<AppState>, Path(slug): Path<String>, parts: Parts) -> Result<Response, AppError> {
-    if !crate::validate::slug_ok(&slug) { return Err(AppError::NotFound); }
+    render(&st, &slug, None, &parts).await
+}
+
+/// 受限清單內容：依 ws_session 與 X-List-Access 判斷，任何清單都回 private, no-store（不走 CDN 快取）。
+async fn restricted(State(st): State<AppState>, Path(slug): Path<String>, parts: Parts) -> Result<Response, AppError> {
+    let viewer = crate::access::viewer(&parts, &st).await?;
+    let acc = parts.headers.get("x-list-access").and_then(|v| v.to_str().ok());
+    render(&st, &slug, Some((viewer, acc)), &parts).await
+}
+
+/// who = None：公開（可快取）路徑，匿名判斷；Some((登入者, 密碼權杖))：受限路徑。
+async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&str>)>, parts: &Parts) -> Result<Response, AppError> {
+    if !crate::validate::slug_ok(slug) { return Err(AppError::NotFound); }
     let w: W = sqlx::query_as(
         "SELECT w.id, w.slug::text AS slug, w.type::text AS type, w.status::text AS status, w.visibility::text AS visibility,
                 w.moderation_status::text AS moderation, w.title, w.description, w.cover_image_key,
@@ -64,15 +80,14 @@ async fn wishlist(State(st): State<AppState>, Path(slug): Path<String>, parts: P
                 GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
          FROM wishlists w JOIN users u ON u.id = w.owner_id
          WHERE w.slug = $1 AND w.deleted_at IS NULL")
-        .bind(&slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
+        .bind(slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
     if w.status == "draft" || w.status == "archived" { return Err(AppError::NotFound); }
-    let viewer = crate::access::viewer(&parts, &st).await?;
-    let acc = parts.headers.get("x-list-access").and_then(|v| v.to_str().ok());
+    let (viewer, acc) = who.unwrap_or((None, None));
     crate::access::check_wishlist(&st.pool, &crate::access::ListAccess { wishlist_id: w.id, owner_id: w.owner_id, visibility: &w.visibility, pw_hash: w.pw_hash.as_deref() }, viewer, acc).await?;
     if w.moderation == "hidden" { return Err(AppError::WishlistRemoved); }
 
-    // friends/selected/password 依觀看者而異：不可被共用快取，也不出 ETag
-    let restricted = !matches!(w.visibility.as_str(), "public" | "link");
+    // 只有公開路徑上的 public / link 可被共用快取；受限路徑一律 no-store、不出 ETag（依觀看者而異）
+    let restricted = who.is_some() || !matches!(w.visibility.as_str(), "public" | "link");
     let etag = format!("\"w-{}-{}{}\"", w.slug, w.updated_at.timestamp_millis(), if w.locked { "-l" } else { "" });
     let cache = [(header::CACHE_CONTROL, if restricted { "private, no-store" } else { "public, s-maxage=10, stale-while-revalidate=60" }.to_string())];
     if !restricted && parts.headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) == Some(etag.as_str()) {
