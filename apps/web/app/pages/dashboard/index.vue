@@ -26,9 +26,9 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
 <template>
   <main class="c-page">
     <CreatorHeader title="我的清單">
-      <NuxtLink v-if="user?.is_staff" to="/admin" class="c-btn">後台</NuxtLink>
-      <NuxtLink to="/me/wallet" class="c-btn">點數</NuxtLink>
-      <NuxtLink to="/settings" class="c-btn" aria-label="設定">設定</NuxtLink>
+      <NuxtLink v-if="user?.is_staff" to="/admin" class="c-btn c-nav-dup">後台</NuxtLink>
+      <NuxtLink to="/me/wallet" class="c-btn c-nav-dup">點數</NuxtLink>
+      <NuxtLink to="/settings" class="c-btn c-nav-dup" aria-label="設定">設定</NuxtLink>
     </CreatorHeader>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">重試</button></p>
     <p v-else-if="loading && !list.length" class="c-mute" role="status">載入中…</p>
@@ -36,6 +36,7 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
       <p class="c-mute">還沒有清單，建立第一份吧</p>
       <NuxtLink to="/lists/new" class="c-btn primary">＋ 建立清單</NuxtLink>
     </div>
+    <div class="c-grid">
     <article v-for="w in visible" :key="w.id" class="c-card" :class="{ bad: w.moderation_status === 'hidden' }">
       <div class="c-row">
         <img v-if="w.cover_image_url" class="c-thumb" :src="w.cover_image_url" alt="">
@@ -57,6 +58,7 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
         <button class="c-btn danger" @click="del = w; delErr = ''">封存</button>
       </div>
     </article>
+    </div>
     <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">載入更多</button>
     <NuxtLink v-if="visible.length" to="/lists/new" class="c-btn primary c-fab">＋ 新建</NuxtLink>
     <CreatorConfirm :open="!!del" title="封存清單" :text="`封存「${del?.title}」後，公開頁會立即失效，朋友無法再開啟（既有認領仍保留）。`" ok="確認封存" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />

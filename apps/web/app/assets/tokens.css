@@ -7,7 +7,10 @@
   --ok:#1b7a3a;--bad:#c8102e;--bad-bg:#fbe9ec;--ok-bg:#e8f5ee;--glass:#fff;--scrim:rgba(0,0,0,.5);
   --stripe:repeating-linear-gradient(45deg,var(--red) 0 8px,var(--red-dark) 8px 16px);
   --ease:cubic-bezier(.25,.1,.25,1);--t:.2s;color-scheme:light dark;
+  --c-w:480px;--g-w:560px; /* 內容欄寬：手機 → 平板 → 桌面，c- 創建者 / g- 訪客共用斷點 */
 }
+@media (min-width:768px){:root{--c-w:720px;--g-w:720px}}
+@media (min-width:1100px){:root{--c-w:1000px;--g-w:880px}}
 @media (prefers-color-scheme:dark){:root{
   --red:#e5334f;--red-dark:#b82840;--red-text:#f0566e;
   --bg:#0e0e0e;--bg-alt:#242424;--card:#181818;--fg:#f2f2f2;--mute:#a8a8a8;--line:#333;--fill:#242424;
@@ -15,7 +18,7 @@
 }}
 *{-webkit-tap-highlight-color:transparent;border-radius:0}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--font);letter-spacing:.02em;-webkit-font-smoothing:antialiased}
+body{margin:0;padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left);background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--font);letter-spacing:.02em;-webkit-font-smoothing:antialiased}
 h1{font-size:30px;line-height:1.2;font-weight:800;letter-spacing:.01em;margin:8px 0}
 h2{font-weight:800;letter-spacing:.02em}
 a{color:var(--link);text-decoration:none}

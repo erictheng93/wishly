@@ -69,7 +69,7 @@ test('好友：邀請連結 + QR → 未登入開連結帶 redirect → 登入�
     await pa.goto('/friends')
     await pa.locator('.c-row', { hasText: c.name }).getByRole('button', { name: '接受' }).click()
     await expect(pa.getByRole('heading', { name: '我的好友（2）' })).toBeVisible()
-    await pc.reload(); await expect(pc.getByText('好友', { exact: true })).toBeVisible()
+    await pc.reload(); await expect(pc.locator('.c-badge', { hasText: '好友' })).toBeVisible()
   })
   await closeAll([a, b, c])
 })

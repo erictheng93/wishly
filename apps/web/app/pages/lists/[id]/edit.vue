@@ -106,7 +106,9 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <p v-if="closed" class="c-mute">清單已{{ w.status === 'closed' ? '結束' : '封存' }}，品項無法修改。</p>
       <ul v-if="pubErrs.length" class="c-err"><li v-for="x in pubErrs" :key="x">{{ x }}</li></ul>
 
+      <div class="c-split"><div>
       <p v-if="!items.length && !loading" class="c-center c-mute">還沒有品項，先新增第一個吧</p>
+      <div class="c-grid">
       <article v-for="(i, k) in items" :key="i.id" class="c-card">
         <div class="c-row">
           <img v-if="i.image_url" class="c-thumb" :src="i.image_url" alt="">
@@ -126,7 +128,10 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <button class="c-btn danger" @click="del = { ...i }; delErr = ''">刪除</button>
         </div>
       </article>
+      </div>
       <button v-if="!closed" class="c-btn block c-mb16" @click="openItem()">＋ 新增品項</button>
+      </div>
+      <aside>
 
       <details ref="addrEl" class="c-card" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
         <summary>收件資訊（點數眾籌用）<span v-if="w.has_shipping_address" class="c-badge active">已填寫</span></summary>
@@ -150,6 +155,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <button v-if="w.status === 'closed'" class="c-btn c-grow" @click="patchList({ status: 'active' }, '已重新開放')">重新開放</button>
         </div>
       </details>
+      </aside></div>
 
       <div class="c-bottom"><div>
         <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? '發佈中…' : '發佈並分享' }}</button>

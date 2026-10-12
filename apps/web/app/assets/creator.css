@@ -1,8 +1,8 @@
 /* 創建者 / 後台（c- 前綴，款式二紅白實驗室，手機優先，480px 置中）：token 見 tokens.css */
-.c-page{max-width:480px;margin:0 auto;padding:0 20px 112px}
-.c-admin{max-width:880px}
-.c-head{display:flex;align-items:center;gap:4px;min-height:52px;position:sticky;top:0;z-index:20;margin:0 -20px 16px;padding:0 20px;background:var(--glass);border-bottom:3px solid var(--red)}
-.c-head h1{flex:1;min-width:0;overflow-wrap:anywhere;font-size:18px;line-height:1.2;margin:0;letter-spacing:.1em;color:var(--red-text);text-transform:uppercase;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.c-page{max-width:var(--c-w);margin:0 auto;padding:0 20px 112px}
+.c-admin{max-width:max(var(--c-w),880px)}
+.c-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-height:52px;position:sticky;top:0;z-index:20;margin:0 -20px 16px;padding:env(safe-area-inset-top) 20px 0;background:var(--glass);border-bottom:3px solid var(--red)}
+.c-head h1{flex:1 1 8em;min-width:0;overflow-wrap:anywhere;font-size:18px;line-height:1.2;margin:0;letter-spacing:.1em;color:var(--red-text);text-transform:uppercase;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .c-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--red);padding:16px;margin:0 0 12px}
 .c-card.bad{border-left-color:var(--bad);background:var(--bad-bg)}
 .c-card>h2:first-child,.c-h2{font-size:18px;margin:0 0 12px}
@@ -44,10 +44,10 @@
 .c-bar>i{display:block;height:100%;background:var(--stripe)}
 .c-big{font-size:44px;font-weight:800;line-height:1.05;color:var(--red-text)}
 .c-mask{text-align:center;padding:20px;border:1px dashed var(--line);color:var(--mute);margin:0 0 12px}
-.c-fab{position:fixed;right:max(20px,calc(50% - 220px));bottom:calc(20px + env(safe-area-inset-bottom))}
-.c-bottom{position:fixed;left:0;right:0;bottom:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--glass);border-top:1px solid var(--line);z-index:4}
-.c-bottom>div{max-width:480px;margin:0 auto;display:flex;gap:8px}
-dialog.c-sheet{border:0;border-top:3px solid var(--red);padding:24px 20px;width:100%;max-width:480px;margin:auto auto 0;background:var(--card);color:var(--fg);box-sizing:border-box;max-height:92vh}
+.c-fab{position:fixed;right:max(20px,calc(50% - var(--c-w) / 2 + 20px));bottom:calc(20px + env(safe-area-inset-bottom))}
+.c-bottom{position:fixed;left:0;right:0;bottom:0;padding:12px max(20px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));background:var(--glass);border-top:1px solid var(--line);z-index:4}
+.c-bottom>div{max-width:var(--c-w);margin:0 auto;display:flex;gap:8px}
+dialog.c-sheet{border:0;border-top:3px solid var(--red);padding:24px 20px calc(24px + env(safe-area-inset-bottom));width:100%;max-width:480px;margin:auto auto 0;background:var(--card);color:var(--fg);box-sizing:border-box;max-height:92vh;max-height:92dvh}
 dialog.c-sheet[open]{animation:rise .25s var(--ease)}
 dialog.c-sheet::backdrop{background:var(--scrim)}
 dialog.c-sheet h2{margin:0 0 16px;font-size:20px;line-height:1.2}
@@ -79,6 +79,7 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-card summary{display:flex;align-items:center;min-height:44px;cursor:pointer}
 .c-list a,.c-card a:not(.c-btn){display:inline-flex;align-items:center;min-height:44px}
 .c-switch,.c-switch span{cursor:pointer}
+.c-mute a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}
 /* P2-A 眾籌 / 錢包 / 採購單 */
 .c-badge.funded,.c-badge.fulfilled,.c-badge.ordered,.c-badge.placed,.c-badge.shipped,.c-badge.captured{color:var(--ok);border-color:var(--ok)}
 .c-badge.failed,.c-badge.expired,.c-badge.frozen{color:var(--bad);border-color:var(--bad)}
@@ -87,3 +88,23 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-sub{border-top:1px dashed var(--line);margin-top:12px;padding-top:8px}
 .c-sub .c-list>li{padding:8px 0;border-bottom:1px solid var(--line)}
 .c-pos{color:var(--ok)}.c-neg{color:var(--bad)}
+/* 平板 / 桌面：清單改格線、底部面板改置中 modal */
+@media (min-width:768px){
+  .c-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0 16px;align-items:start}
+  dialog.c-sheet{margin:auto;border:1px solid var(--line);border-top:3px solid var(--red)}
+  .c-bottom>div .c-btn{max-width:480px;margin:0 auto}
+}
+/* 桌面 ≥1100：編輯頁品項在左、設定在右 */
+@media (min-width:1100px){
+  .c-split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0 24px;align-items:start}
+  .c-split>aside{position:sticky;top:76px}
+}
+/* 桌面 ≥1280：側欄導覽，取代 header 內重複的導覽按鈕 */
+.c-rail{display:none}
+@media (min-width:1280px){
+  :root{--c-w:900px}
+  .c-rail{display:flex;flex-direction:column;position:fixed;top:76px;left:max(16px,calc(50% - var(--c-w) / 2 - 184px));width:168px;z-index:5;border-left:3px solid var(--red)}
+  .c-rail a{display:flex;align-items:center;min-height:44px;padding:0 14px;color:var(--fg);font-weight:700;letter-spacing:.1em}
+  .c-rail a.router-link-active{color:var(--red-text);background:var(--bg-alt)}
+  .c-nav-dup{display:none}
+}

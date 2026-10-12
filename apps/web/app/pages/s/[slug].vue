@@ -195,7 +195,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
       </template>
       <p v-if="!items.length" class="g-center g-mute">建立者還在準備清單，晚點再回來看看</p>
-      <ul class="c-list">
+      <ul class="c-list g-grid">
         <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" :closed="closed" :online="online" @claim="openClaim(it)" @fund="onFund(it)" />
       </ul>
       <div class="g-foot">
