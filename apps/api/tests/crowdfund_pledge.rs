@@ -358,6 +358,8 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     let (_, _, r) = pledge(&app, src, &ta, 200).await;
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
     let uri = format!("/contributions/{cid}/reallocate");
+    assert_eq!(call(&app, "PATCH", &format!("/contributions/{cid}"), Some(&ta), None,
+        Some(json!({ "visibility": "friends" }))).await.0, StatusCode::OK);
     let go = |tok: &str, target: Uuid| {
         let (app, uri, tok) = (app.clone(), uri.clone(), tok.to_string());
         async move { call(&app, "POST", &uri, Some(&tok), Some(Uuid::new_v4()), Some(json!({ "target_item_id": target }))).await }
@@ -383,6 +385,8 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     assert_eq!(st, StatusCode::CREATED, "{b}");
     assert_eq!(b["funded"], true);   // 200 點剛好填滿 dst
     assert_eq!(b["original"]["status"], "reallocated");
+    assert_eq!(b["original"]["visibility"], "friends");
+    assert_eq!(b["contribution"]["visibility"], "friends");
     assert_eq!(b["contribution"]["status"], "captured");
     assert_eq!(b["item"]["funding_status"], "funded");
     assert_eq!(item_row(&pool, src).await.0, 0);
@@ -581,4 +585,94 @@ async fn pledge_respects_list_visibility(pool: PgPool) {
     assert_eq!((st, b["code"].as_str()), (StatusCode::FORBIDDEN, Some("FRIENDS_ONLY")));
     assert_eq!(balance(&pool, stranger).await, 1000);
     assert_eq!(pledge(&app, item, &tf, 100).await.0, StatusCode::CREATED);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
+    let app = test_app(&pool);
+    let (owner, owner_tok) = user(&pool, "O").await;
+    let (donor, tok) = user(&pool, "D").await;
+    grant(&pool, donor, 1000).await;
+    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    sqlx::query("UPDATE users SET default_claim_visibility = 'friends' WHERE id = $1").bind(donor).execute(&pool).await.unwrap();
+    let r = pledge(&app, item, &tok, 100).await;
+    assert_eq!(r.0, StatusCode::CREATED, "{}", r.2);
+    assert_eq!(r.2["contribution"]["visibility"], "friends");
+    let cid = r.2["contribution"]["id"].as_str().unwrap();
+    let uri = format!("/contributions/{cid}");
+    sqlx::query("UPDATE users SET default_claim_visibility = 'public' WHERE id = $1").bind(donor).execute(&pool).await.unwrap();
+    let rows = call(&app, "GET", "/wallet/contributions", Some(&tok), None, None).await;
+    assert_eq!(rows.2["data"][0]["contribution"]["visibility"], "friends");
+    assert_eq!(pledge(&app, item, &tok, 100).await.2["contribution"]["visibility"], "public");
+    let r = call(&app, "POST", &format!("/items/{item}/contributions"), Some(&tok), Some(Uuid::new_v4()),
+        Some(json!({ "points": 100, "visibility": "private" }))).await;
+    assert_eq!(r.2["contribution"]["visibility"], "private");
+    for bad in [json!("bogus"), json!(42)] {
+        assert_eq!(call(&app, "POST", &format!("/items/{item}/contributions"), Some(&tok), Some(Uuid::new_v4()),
+            Some(json!({ "points": 1, "visibility": bad }))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(call(&app, "PATCH", &uri, Some(&tok), None, Some(json!({ "visibility": bad }))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    for empty in [json!({}), json!({ "visibility": null })] {
+        assert_eq!(call(&app, "PATCH", &uri, Some(&tok), None, Some(empty)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    assert_eq!(call(&app, "PATCH", &uri, None, None, Some(json!({ "visibility": "public" }))).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(call(&app, "PATCH", &uri, Some(&owner_tok), None, Some(json!({ "visibility": "public" }))).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(call(&app, "PATCH", &format!("/contributions/{}", Uuid::new_v4()), Some(&tok), None,
+        Some(json!({ "visibility": "public" }))).await.0, StatusCode::NOT_FOUND);
+    let rows = call(&app, "GET", "/wallet/contributions", Some(&tok), None, None).await;
+    let unchanged = rows.2["data"].as_array().unwrap().iter().find(|r| r["contribution"]["id"] == cid).unwrap();
+    assert_eq!(unchanged["contribution"]["visibility"], "friends");
+    let before = balance(&pool, donor).await;
+    for vis in ["private", "friends", "public"] {
+        let r = call(&app, "PATCH", &uri, Some(&tok), None, Some(json!({ "visibility": vis }))).await;
+        assert_eq!(r.0, StatusCode::OK, "{}", r.2);
+        assert!(r.1["cache-control"].to_str().unwrap().contains("no-store"));
+        assert_eq!(r.2["contribution"]["visibility"], vis);
+    }
+    assert_eq!(balance(&pool, donor).await, before);
+    // 已退回的歷史紀錄仍可調整隱私；不得異動點數。
+    assert_eq!(call(&app, "DELETE", &uri, Some(&tok), None, None).await.0, StatusCode::OK);
+    let r = call(&app, "PATCH", &uri, Some(&tok), None, Some(json!({ "visibility": "private" }))).await;
+    assert_eq!(r.0, StatusCode::OK);
+    assert_eq!(r.2["contribution"]["status"], "released");
+    assert_eq!(balance(&pool, donor).await, before + 100);
+    assert_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = false)]
+async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool) {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../db/migrations");
+    for name in ["0001_mvp.sql", "0002_password.sql", "0003_ratelimit.sql", "0004_crowdfund.sql", "0005_social.sql"] {
+        sqlx::raw_sql(&std::fs::read_to_string(dir.join(name)).unwrap()).execute(&pool).await.unwrap();
+    }
+    let (owner, _) = user(&pool, "O").await;
+    let wl = wishlist(&pool, owner).await;
+    let item = cf_item(&pool, wl, 1000).await;
+    for vis in ["public", "friends", "private"] {
+        let (donor, _) = user(&pool, vis).await;
+        sqlx::query("UPDATE users SET default_claim_visibility = $2::text::share_level WHERE id = $1").bind(donor).bind(vis).execute(&pool).await.unwrap();
+        grant(&pool, donor, 100).await;
+        sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points)
+            SELECT $1, $2, user_id, id, 'x', 10 FROM point_wallets WHERE user_id = $3")
+            .bind(item).bind(wl).bind(donor).execute(&pool).await.unwrap();
+    }
+    let before: Value = sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(c) ORDER BY c.id) FROM contributions c").fetch_one(&pool).await.unwrap();
+    sqlx::raw_sql(&std::fs::read_to_string(dir.join("0006_contribution_visibility.sql")).unwrap()).execute(&pool).await.unwrap();
+    let after: Value = sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(c) - 'visibility' ORDER BY c.id) FROM contributions c").fetch_one(&pool).await.unwrap();
+    assert_eq!(after, before, "回填不得改動認捐原有欄位（含 updated_at）");
+    let timestamp: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("SELECT max(updated_at) FROM contributions").fetch_one(&pool).await.unwrap();
+    let timestamp_updates: bool = sqlx::query_scalar("UPDATE contributions SET message = '更新留言' WHERE id = (SELECT id FROM contributions LIMIT 1) RETURNING updated_at > $1")
+        .bind(timestamp).fetch_one(&pool).await.unwrap();
+    assert!(timestamp_updates, "回填後正常更新仍須觸發 updated_at");
+    let scopes: Vec<(String, String)> = sqlx::query_as("SELECT u.default_claim_visibility::text, c.visibility::text FROM contributions c JOIN users u ON u.id = c.user_id ORDER BY u.default_claim_visibility")
+        .fetch_all(&pool).await.unwrap();
+    assert_eq!(scopes, [("public".into(), "public".into()), ("friends".into(), "friends".into()), ("private".into(), "private".into())]);
+    sqlx::query("UPDATE users SET default_claim_visibility = 'private'").execute(&pool).await.unwrap();
+    let preserved: Vec<String> = sqlx::query_scalar("SELECT visibility::text FROM contributions ORDER BY visibility").fetch_all(&pool).await.unwrap();
+    assert_eq!(preserved, ["friends", "private", "public"]);
+    assert!(sqlx::query("UPDATE contributions SET visibility = NULL").execute(&pool).await.is_err());
+    let fresh: String = sqlx::query_scalar("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points)
+        SELECT item_id, wishlist_id, user_id, wallet_id, donor_name, 1 FROM contributions LIMIT 1 RETURNING visibility::text")
+        .fetch_one(&pool).await.unwrap();
+    assert_eq!(fresh, "private");
 }

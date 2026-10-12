@@ -48,8 +48,7 @@ async fn profile(State(st): State<AppState>, Path(handle): Path<String>, parts: 
         "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })).collect();
 
     // 捐助 = 認領 ∪ 點數認捐。可見性（$3=本人、$4=與捐助者為好友，與 access::claim_visible 同語意）：
-    //   認領看 c.visibility；認捐沒有逐筆設定，依捐助者帳號 default_claim_visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
-    // ponytail: 認捐用查詢當下的帳號預設，改預設會連帶影響舊認捐；需要逐筆設定時比照 claims 加 visibility 欄位 + trigger。
+    //   認領看 c.visibility；認捐看 k.visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
     // 清單條件兩者共用：對觀看者可存取（public/link；friends/selected 依觀看者或擁有者）、排除驚喜鎖定；link 清單不給 slug。
     let rows: Vec<(String, String, Option<i32>, Option<i64>, String, DateTime<Utc>, Option<String>, String, String, Option<String>)> = sqlx::query_as(
         "WITH d AS (
@@ -59,9 +58,9 @@ async fn profile(State(st): State<AppState>, Path(handle): Path<String>, parts: 
              AND (c.visibility::text = 'public' OR $3 OR (c.visibility::text = 'friends' AND $4))
            UNION ALL
            SELECT 'pledge', k.id, k.item_id, NULL, k.points, k.status::text, k.created_at
-           FROM contributions k JOIN users u ON u.id = k.user_id
+           FROM contributions k
            WHERE k.user_id = $1 AND k.status IN ('pledged', 'captured')
-             AND ($3 OR (NOT k.is_anonymous AND (u.default_claim_visibility::text = 'public' OR (u.default_claim_visibility::text = 'friends' AND $4)))))
+             AND ($3 OR (NOT k.is_anonymous AND (k.visibility::text = 'public' OR (k.visibility::text = 'friends' AND $4)))))
          SELECT d.kind, i.title, d.qty, d.points, d.status, d.created_at,
                 CASE WHEN w.visibility::text = 'link' THEN NULL ELSE w.slug::text END, w.title, o.display_name, o.handle
          FROM d

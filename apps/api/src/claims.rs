@@ -78,7 +78,7 @@ fn full(remaining: i32, want: i32) -> AppError {
 #[derive(Deserialize)]
 struct CreateReq { qty: i32, display_name: Option<String>, contact: Option<String>, email: Option<String>, note: Option<String>, visibility: Option<String> }
 
-fn share_level(v: &Option<String>) -> Result<(), AppError> {
+pub(crate) fn share_level(v: &Option<String>) -> Result<(), AppError> {
     match v.as_deref() { None | Some("public" | "friends" | "private") => Ok(()), _ => Err(AppError::invalid("/visibility", "ENUM", "visibility 只能是 public / friends / private")) }
 }
 

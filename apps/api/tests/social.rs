@@ -341,7 +341,7 @@ async fn pledge_row(pool: &PgPool, wl: Uuid, user: Uuid, points: i64, anon: bool
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn profile_includes_pledges_by_account_default(pool: PgPool) {
+async fn profile_pledge_visibility_is_per_record(pool: PgPool) {
     let (o, _, _) = user(&pool, "O", None).await;
     let (d, td, _) = user(&pool, "D", Some("donor")).await;
     let (f, tf, _) = user(&pool, "F", None).await;
@@ -352,8 +352,8 @@ async fn profile_includes_pledges_by_account_default(pool: PgPool) {
     pledge_row(&pool, wl, d, 200, true, "captured").await;   // 匿名：只有本人看得到
     pledge_row(&pool, wl, d, 100, false, "released").await;  // 已退回：不列
     let pts = |v: &Value| -> Vec<i64> { v["donations"].as_array().unwrap().iter().filter(|x| x["kind"] == "pledge").map(|x| x["points"].as_i64().unwrap()).collect() };
-    let set = |vis: &'static str| { let pool = pool.clone(); async move {
-        sqlx::query("UPDATE users SET default_claim_visibility = $2::text::share_level WHERE id = $1").bind(d).bind(vis).execute(&pool).await.unwrap(); } };
+    let set = |vis: &'static str| { let (pool, tok) = (pool.clone(), td.clone()); async move {
+        assert_eq!(call(&pool, "PATCH", "/me", Some(&tok), Some(json!({ "default_claim_visibility": vis }))).await.0, StatusCode::OK); } };
 
     set("private").await;
     assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&ts), None).await.1), Vec::<i64>::new());
@@ -362,13 +362,28 @@ async fn profile_includes_pledges_by_account_default(pool: PgPool) {
     let mut mine = pts(&me); mine.sort();
     assert_eq!(mine, [200, 300]);
     set("friends").await;
+    // 改預設不回溯舊認捐。
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&tf), None).await.1), Vec::<i64>::new());
+    let cid: Uuid = sqlx::query_scalar("SELECT id FROM contributions WHERE user_id = $1 AND points = 300").bind(d).fetch_one(&pool).await.unwrap();
+    let uri = format!("/contributions/{cid}");
+    assert_eq!(call(&pool, "PATCH", &uri, Some(&td), Some(json!({ "visibility": "friends" }))).await.0, StatusCode::OK);
     assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&tf), None).await.1), [300]);
     assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&ts), None).await.1), Vec::<i64>::new());
     set("public").await;
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", None, None).await.1), Vec::<i64>::new());
+    // 匿名即使逐筆設為公開仍只給本人看。
+    sqlx::query("UPDATE contributions SET visibility = 'public' WHERE user_id = $1 AND is_anonymous").bind(d).execute(&pool).await.unwrap();
+    assert_eq!(call(&pool, "PATCH", &uri, Some(&td), Some(json!({ "visibility": "public" }))).await.0, StatusCode::OK);
     let (_, v) = call(&pool, "GET", "/users/donor", None, None).await;
     assert_eq!(pts(&v), [300]);
     let p = v["donations"].as_array().unwrap().iter().find(|x| x["kind"] == "pledge").unwrap();
     assert_eq!((p["qty"].clone(), p["status"].as_str()), (Value::Null, Some("pledged")));
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&tf), None).await.1), [300]);
+    assert_eq!(pts(&call(&pool, "GET", "/users/donor", Some(&ts), None).await.1), [300]);
+    assert_eq!(call(&pool, "PATCH", &uri, Some(&td), Some(json!({ "visibility": "private" }))).await.0, StatusCode::OK);
+    assert!(pts(&call(&pool, "GET", "/users/donor", None, None).await.1).is_empty());
+    let mut mine = pts(&call(&pool, "GET", "/users/donor", Some(&td), None).await.1); mine.sort();
+    assert_eq!(mine, [200, 300]);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

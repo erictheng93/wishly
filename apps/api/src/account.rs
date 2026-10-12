@@ -97,7 +97,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
            FROM point_ledger l JOIN point_wallets w ON w.id = l.wallet_id WHERE w.user_id = $1 ORDER BY l.seq").bind(u.id).fetch_all(&st.pool).await?;
     let contributions: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', id, 'item_id', item_id, 'wishlist_id', wishlist_id, 'points', points, 'refunded_points', refunded_points, 'status', status::text,
-                'message', message, 'is_anonymous', is_anonymous, 'captured_at', captured_at, 'released_at', released_at, 'created_at', created_at)
+                'message', message, 'is_anonymous', is_anonymous, 'visibility', visibility::text, 'captured_at', captured_at, 'released_at', released_at, 'created_at', created_at)
            FROM contributions WHERE user_id = $1 ORDER BY id").bind(u.id).fetch_all(&st.pool).await?;
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.export', 'users', $1)").bind(u.id).execute(&st.pool).await?;
     let now = chrono::Utc::now();

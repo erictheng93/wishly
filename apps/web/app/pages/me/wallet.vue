@@ -22,6 +22,18 @@ async function load() {
 onMounted(load)
 const more = (f: () => Promise<void>) => f().catch((e) => { err.value = errMsg(e) })
 
+const visBusy = ref(false)
+async function setVis(row: any, ev: Event) {
+  const select = ev.target as HTMLSelectElement
+  visBusy.value = true; err.value = ''; msg.value = ''
+  try {
+    const r = await api(`/contributions/${row.contribution.id}`, { method: 'PATCH', body: { visibility: select.value } })
+    Object.assign(row.contribution, r.contribution)
+    msg.value = '可見度已更新'
+  } catch (e) { err.value = errMsg(e) }
+  finally { select.value = row.contribution.visibility; visBusy.value = false }
+}
+
 // 撤回
 const wd = ref<any>(null), wdBusy = ref(false), wdErr = ref('')
 async function withdraw() {
@@ -89,6 +101,12 @@ async function reallocate() {
         <div v-if="r.contribution.message" class="c-mute">「{{ r.contribution.message }}」{{ r.contribution.is_anonymous ? '（匿名）' : '' }}</div>
         <div class="c-mute c-small">認捐 {{ fmtTime(r.contribution.created_at) }}<template v-if="r.contribution.captured_at">・達標 {{ fmtTime(r.contribution.captured_at) }}</template></div>
         <div v-if="r.contribution.refunded_points" class="c-mute c-small">已退回差額 {{ fmtPts(r.contribution.refunded_points) }} 點</div>
+        <label class="c-field c-mt"><span>誰看得到</span>
+          <select :value="r.contribution.visibility" :disabled="visBusy" @change="setVis(r, $event)">
+            <option value="public">公開</option><option value="friends">僅好友</option><option value="private">私人</option>
+          </select>
+        </label>
+        <p v-if="r.contribution.is_anonymous" class="c-mute c-small">匿名認捐在個人頁僅本人可見。</p>
         <div v-if="r.item.display_status === 'expired' && r.item.reallocation_deadline && (r.can_withdraw || r.can_reallocate)" class="c-err c-small">募集已截止，請在 {{ fmtTime(r.item.reallocation_deadline) }} 前撤回或轉投，逾期會自動退回。</div>
         <div v-if="r.can_withdraw || r.can_reallocate" class="c-row wrap c-mt">
           <button v-if="r.can_reallocate" class="c-btn c-grow" @click="openRe(r)">轉投其他品項</button>

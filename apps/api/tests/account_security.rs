@@ -135,3 +135,19 @@ async fn unsubscribe_post_allowed_in_read_only(pool: PgPool) {
     assert_eq!(call(&pool, "POST", "/unsubscribe", None, &[], Some(json!({"token": tok}))).await.0, StatusCode::NO_CONTENT);
     assert_eq!(call(&pool, "POST", "/unsubscribe", None, &[], Some(json!({"token": "x"}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn export_includes_contribution_visibility(pool: PgPool) {
+    let (me, tok) = user(&pool).await;
+    let wid: Uuid = sqlx::query_scalar("INSERT INTO wishlists (owner_id, type, status, slug, title) VALUES ($1, 'registry', 'active', $2, 'L') RETURNING id")
+        .bind(me).bind(Uuid::new_v4().simple().to_string()[..10].to_string()).fetch_one(&pool).await.unwrap();
+    let item: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed, funding_mode, target_points, funding_status, funding_deadline, fulfillment_type)
+        VALUES ($1, '推車', 1, 'crowdfund', 100, 'open', now() + interval '7 days', 'concierge') RETURNING id")
+        .bind(wid).fetch_one(&pool).await.unwrap();
+    let wallet: Uuid = sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) RETURNING id").bind(me).fetch_one(&pool).await.unwrap();
+    sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, visibility) VALUES ($1, $2, $3, $4, 'u', 10, 'friends')")
+        .bind(item).bind(wid).bind(me).bind(wallet).execute(&pool).await.unwrap();
+    let (status, _, export) = call(&pool, "GET", "/me/export", None, &[("cookie", format!("ws_session={tok}"))], None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(export["contributions"][0]["visibility"], "friends");
+}

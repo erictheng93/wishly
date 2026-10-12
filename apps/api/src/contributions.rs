@@ -1,4 +1,4 @@
-//! 點數認捐（P2-A 捐贈者端）：POST /items/{id}/contributions、DELETE /contributions/{id}、POST /contributions/{id}/reallocate，
+//! 點數認捐（P2-A 捐贈者端）：POST /items/{id}/contributions、PATCH / DELETE /contributions/{id}、POST /contributions/{id}/reallocate，
 //! 以及背景 `tick_funding`（到期 → expired、選擇期結束 → 自動退點）。
 //! 鎖序：wishlists（FOR SHARE）→ point_wallets（FOR UPDATE）→ wishlist_items → contributions；所有 balance 異動都走 `points::post`。
 use crate::{error::AppError, idempotency, notify, points::{self, Entry}, ratelimit, session::CurrentUser, wishlists::completion_pct, AppState};
@@ -20,13 +20,13 @@ type Tx<'a> = Transaction<'a, Postgres>;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/items/{id}/contributions", post(create))
-        .route("/contributions/{id}", delete(withdraw))
+        .route("/contributions/{id}", delete(withdraw).patch(update))
         .route("/contributions/{id}/reallocate", post(reallocate))
 }
 
 /// 認捐的 JSON 形狀 C（別名 `c` = contributions）；wallet.rs 共用
 pub const C_JSON: &str = "jsonb_build_object('id', c.id, 'item_id', c.item_id, 'wishlist_id', c.wishlist_id, 'points', c.points,
-    'refunded_points', c.refunded_points, 'status', c.status, 'message', c.message, 'is_anonymous', c.is_anonymous,
+    'refunded_points', c.refunded_points, 'status', c.status, 'message', c.message, 'is_anonymous', c.is_anonymous, 'visibility', c.visibility,
     'reallocated_to_item_id', c.reallocated_to_item_id, 'captured_at', c.captured_at, 'released_at', c.released_at,
     'created_at', c.created_at, 'updated_at', c.updated_at)";
 
@@ -76,11 +76,12 @@ async fn on_funded(tx: &mut Tx<'_>, item_id: Uuid, wishlist_id: Uuid) -> Result<
 // ---------- POST /items/{id}/contributions ----------
 
 #[derive(Deserialize)]
-struct CreateReq { points: i64, message: Option<String>, is_anonymous: Option<bool> }
+struct CreateReq { points: i64, message: Option<String>, is_anonymous: Option<bool>, visibility: Option<String> }
 
 async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, user: CurrentUser, headers: HeaderMap, body: Bytes) -> Result<Response, AppError> {
     let key = idempotency::key(&headers)?;
     let req: CreateReq = parse(&body)?;
+    crate::claims::share_level(&req.visibility)?;
     if !(1..=10_000_000).contains(&req.points) { return Err(AppError::invalid("/points", "RANGE", "points 必須介於 1 與 10000000")); }
     let message = match req.message.as_deref() {
         Some(m) => Some(crate::validate::text(m, "/message", true)?).filter(|m| !m.is_empty()),
@@ -135,9 +136,9 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, user: Cur
     // ③ 認捐紀錄 ④ 扣點（post 於餘額不足回 409 INSUFFICIENT_POINTS，整筆 rollback）
     let donor: String = sqlx::query_scalar("SELECT display_name FROM users WHERE id = $1").bind(user.id).fetch_one(&mut *tx).await?;
     let cid: Uuid = sqlx::query_scalar(
-        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id")
-        .bind(item_id).bind(wl).bind(user.id).bind(wallet).bind(&donor).bind(req.points).bind(&message).bind(anon).fetch_one(&mut *tx).await?;
+        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text::share_level) RETURNING id")
+        .bind(item_id).bind(wl).bind(user.id).bind(wallet).bind(&donor).bind(req.points).bind(&message).bind(anon).bind(&req.visibility).fetch_one(&mut *tx).await?;
     let bal = points::post(&mut tx, wallet, -req.points, Entry::contribution("pledge", cid)).await?;
 
     // ⑤ 剛好達標
@@ -177,7 +178,28 @@ async fn diagnose(pool: &PgPool, item_id: Uuid, want: i64) -> Result<Option<AppE
     }))
 }
 
-// ---------- DELETE /contributions/{id} ----------
+// ---------- PATCH / DELETE /contributions/{id} ----------
+
+#[derive(Deserialize)]
+struct PatchReq { visibility: String }
+
+async fn update(State(st): State<AppState>, Path(id): Path<Uuid>, user: CurrentUser, body: Bytes) -> Result<Response, AppError> {
+    let req: PatchReq = parse(&body)?;
+    crate::claims::share_level(&Some(req.visibility.clone()))?;
+    let mut tx = st.pool.begin().await?;
+    let c: Option<(Uuid, String)> = sqlx::query_as("SELECT user_id, visibility::text FROM contributions WHERE id = $1 FOR UPDATE")
+        .bind(id).fetch_optional(&mut *tx).await?;
+    let (owner, old) = c.ok_or(AppError::NotFound)?;
+    if owner != user.id { return Err(AppError::problem(403, "FORBIDDEN", "只有認捐者本人可以修改可見度")); }
+    sqlx::query("UPDATE contributions SET visibility = $2::text::share_level WHERE id = $1")
+        .bind(id).bind(&req.visibility).execute(&mut *tx).await?;
+    if old != req.visibility {
+        audit(&mut tx, Some(user.id), "contribution.update", id, json!({ "visibility": [old, req.visibility] })).await?;
+    }
+    let resp = json!({ "contribution": contribution_json(&mut tx, id).await? });
+    tx.commit().await?;
+    Ok(json_resp(200, &resp, false))
+}
 
 fn locked() -> AppError { AppError::problem(409, "CONTRIBUTION_LOCKED", "此筆認捐已達標或已過選擇期，無法撤回") }
 
@@ -253,8 +275,8 @@ async fn reallocate(State(st): State<AppState>, Path(id): Path<Uuid>, user: Curr
     sqlx::query("UPDATE wishlist_items SET pledged_points = pledged_points - $2 WHERE id = $1").bind(src).bind(pts).execute(&mut *tx).await?;
     sqlx::query("UPDATE contributions SET status = 'reallocated', reallocated_to_item_id = $2 WHERE id = $1").bind(id).bind(tgt).execute(&mut *tx).await?;
     let new_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous)
-         SELECT $2, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous FROM contributions WHERE id = $1 RETURNING id")
+        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility)
+         SELECT $2, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility FROM contributions WHERE id = $1 RETURNING id")
         .bind(id).bind(tgt).fetch_one(&mut *tx).await?;
     let funded = fs == "funded";
     if funded { on_funded(&mut tx, tgt, wl).await?; }
