@@ -4,6 +4,7 @@ import { API, WEB } from './e2e/support/env'
 const CI = !!process.env.CI
 // iPhone 13 裝置參數（390 寬、觸控、行動 UA），但只裝了 chromium，所以拿掉 webkit 的 defaultBrowserType
 const { defaultBrowserType: _ignored, ...iphone } = devices['iPhone 13']
+const { defaultBrowserType: _ignored2, ...ipad } = devices['iPad (gen 7)']
 
 // 啟動順序：webServer 先於 globalSetup，所以「重置 e2e 資料庫」必須在 API 啟動前完成（API 啟動時才會套 migration）。
 // 因此重置寫在 API 的啟動指令裡（reset-db.mjs），而不是 globalSetup。
@@ -35,8 +36,10 @@ export default defineConfig({
     { name: 'desktop-chromium', testIgnore: /admin\.spec\.ts$/, use: { ...devices['Desktop Chrome'] } },
     // 行動版只跑與版面 / 觸控最相關的案例，其餘流程與桌面相同，避免重複消耗時間
     { name: 'mobile', testMatch: /(guest-journey|smoke|line-browser)\.spec\.ts/, use: { ...iphone, browserName: 'chromium' } },
+    // 平板（觸控、820 級寬度）：同樣只跑版面 / 觸控相關案例
+    { name: 'tablet', testMatch: /(guest-journey|smoke)\.spec\.ts/, use: { ...ipad, browserName: 'chromium' } },
     // 後台測試會切換全站唯讀旗標：等其他 project 完成，再依序執行。
-    { name: 'admin', testMatch: /admin\.spec\.ts$/, dependencies: ['desktop-chromium', 'mobile'], fullyParallel: false, use: { ...devices['Desktop Chrome'] } },
+    { name: 'admin', testMatch: /admin\.spec\.ts$/, dependencies: ['desktop-chromium', 'mobile', 'tablet'], fullyParallel: false, use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: [
     {

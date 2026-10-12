@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { createList, guestClaim, loginBrowser, makeStaff, registerUser } from './helpers'
 
 // RWD：手機 / 平板 / 桌面三種寬度的版面行為（斷點見 app/assets/tokens.css）
-const SIZES = { phone: { width: 390, height: 844 }, tablet: { width: 820, height: 1180 }, desktop: { width: 1440, height: 900 } } as const
+const SIZES = { small320: { width: 320, height: 568 }, phone: { width: 390, height: 844 }, tablet: { width: 820, height: 1180 }, desktop: { width: 1440, height: 900 } } as const
 
 for (const [name, vp] of Object.entries(SIZES)) {
   test(`版面 @${name} ${vp.width}`, async ({ page, context }) => {
@@ -30,6 +30,26 @@ for (const [name, vp] of Object.entries(SIZES)) {
       expect(await noOverflow()).toBe(true)
       const split = await cols('.c-split')
       expect(split).toBe(vp.width >= 1100 ? 2 : 1)
+      if (vp.width >= 1100) { // sticky 側欄不得被 header 蓋住，捲動後亦然
+        await page.evaluate(() => scrollTo(0, 400))
+        const head = (await page.locator('.c-head').boundingBox())!
+        const aside = (await page.locator('.c-split>aside').boundingBox())!
+        expect(aside.y).toBeGreaterThanOrEqual(head.y + head.height)
+      }
+    })
+    if (vp.width >= 1280) await test.step('rail 與內容不重疊', async () => {
+      await page.goto('/dashboard')
+      const rail = (await page.locator('.c-rail').boundingBox())!
+      const main = (await page.locator('.c-page').boundingBox())!
+      expect(rail.x + rail.width).toBeLessThanOrEqual(main.x)
+    })
+    await test.step('滑鼠 hover 有視覺回饋', async () => {
+      await page.goto(`/lists/${list.id}/edit`)
+      const btn = page.locator('.c-btn.primary').first()
+      const bg = () => btn.evaluate(el => getComputedStyle(el).backgroundColor)
+      const before = await bg()
+      await btn.hover()
+      await expect.poll(bg).not.toBe(before) // 有 .2s transition，需輪詢
     })
     await test.step('分享頁：品項欄數與無溢出', async () => {
       await page.goto(`/s/${list.slug}`)
@@ -48,3 +68,31 @@ for (const [name, vp] of Object.entries(SIZES)) {
     await owner.api.dispose()
   })
 }
+
+test('App 模式標記：standalone 時 html 帶 data-app 並停用橡皮筋', async ({ page }) => {
+  await page.emulateMedia({ media: 'screen' })
+  await page.addInitScript(() => {
+    const mm = window.matchMedia.bind(window)
+    window.matchMedia = (q: string) => (q.includes('display-mode') ? ({ matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false } as any) : mm(q))
+  })
+  await page.goto('/login')
+  await expect(page.locator('html[data-app]')).toHaveCount(1)
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).toBe('none')
+})
+
+test('橫放手機（844×390）：header / 底欄不固定、無溢出', async ({ page, context }) => {
+  await page.setViewportSize({ width: 844, height: 390 })
+  const owner = await registerUser()
+  const list = await createList(owner, { items: [{ title: '奶瓶', qty: 2 }] })
+  await loginBrowser(context, owner)
+  const pos = (sel: string) => page.locator(sel).first().evaluate(el => getComputedStyle(el).position)
+  await page.goto(`/lists/${list.id}/edit`)
+  await expect(page.locator('.c-head h1')).toBeVisible()
+  expect(await pos('.c-head')).toBe('static')
+  expect(await pos('.c-bottom')).toBe('static')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.goto(`/s/${list.slug}`)
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  expect(await pos('.g-top')).toBe('static')
+  await owner.api.dispose()
+})
