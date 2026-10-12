@@ -14,6 +14,7 @@ pub mod uploads;
 pub mod validate;
 pub mod auth;
 pub mod auth_ext;
+pub mod identities;
 pub mod public;
 pub mod guest;
 pub mod claims;

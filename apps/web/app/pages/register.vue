@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useHead({ title: '建立帳號' })
 const route = useRoute()
-const { register, verifyRegister } = useAuth()
+const { register, verifyRegister, oauth } = useAuth()
 const raw = String(route.query.redirect || '')
 const redirect = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
 const step = ref<'form' | 'otp'>('form')
@@ -45,7 +45,12 @@ async function verify() {
       <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? '寄送中…' : '寄送驗證碼' }}</button>
       <p class="c-center c-mute">已有帳號？<NuxtLink :to="{ path: '/login', query: route.query.redirect ? { redirect } : {} }">登入</NuxtLink></p>
     </form>
-    <template v-else>
+    <template v-if="step === 'form' && !isNative()">
+      <p class="c-center c-mute">或</p>
+      <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">使用 Google 繼續</button>
+      <button type="button" class="c-btn block c-mb" @click="oauth('line', redirect)">使用 LINE 繼續</button>
+    </template>
+    <template v-if="step === 'otp'">
       <p>驗證碼已寄到 {{ email }}</p>
       <CreatorOtpInput ref="otp" v-model="code" @complete="verify" />
       <p v-if="err" class="c-err c-center" role="alert">{{ err }}</p>

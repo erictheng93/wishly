@@ -28,10 +28,14 @@ impl FromRequestParts<AppState> for CurrentUser {
     type Rejection = AppError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
         let tok = session_token(&parts.headers).ok_or(AppError::Unauthorized)?;
-        let row: Option<(Uuid, bool)> = sqlx::query_as(
-            "SELECT u.id, u.is_staff FROM sessions s JOIN users u ON u.id = s.user_id
-             WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.deleted_at IS NULL")
+        let row: Option<(Uuid, bool, bool, bool)> = sqlx::query_as(
+            "SELECT u.id, u.is_staff, u.blocked_at IS NOT NULL, s.revoked_at IS NULL FROM sessions s JOIN users u ON u.id = s.user_id
+             WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL")
             .bind(hash_token(&tok)).fetch_optional(&st.pool).await?;
-        row.map(|(id, is_staff)| CurrentUser { id, is_staff }).ok_or(AppError::Unauthorized)
+        match row {
+            Some((_, _, true, _)) => Err(AppError::problem(403, "ACCOUNT_BLOCKED", "帳號已停權，請聯絡客服")),
+            Some((id, is_staff, false, true)) => Ok(CurrentUser { id, is_staff }),
+            _ => Err(AppError::Unauthorized),
+        }
     }
 }

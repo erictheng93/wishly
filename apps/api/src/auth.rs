@@ -1,7 +1,7 @@
 //! Auth：Email OTP、LINE OAuth2（code flow + PKCE）、登出、GET/PATCH /me。簽發 session（DB 只存 SHA-256(token)）。
 use crate::{error::AppError, session::{hash_token, CurrentUser}, AppState};
 use axum::{
-    extract::{Path, Query, State},
+    extract::{FromRequestParts, Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{AppendHeaders, IntoResponse, Response},
     routing::{get, post},
@@ -10,7 +10,7 @@ use axum::{
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 use hmac::{Hmac, Mac};
 use rand::{Rng, RngCore};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/oauth/{provider}/callback", get(oauth_callback))
         .route("/auth/logout", post(logout))
         .merge(crate::auth_ext::routes())
+        .merge(crate::identities::routes())
         .route("/me", get(me).patch(patch_me))
 }
 
@@ -47,41 +48,78 @@ pub(crate) fn session_cookie(token: &str) -> String {
 
 // ---------- session / identity ----------
 pub(crate) async fn new_session(pool: &PgPool, user_id: Uuid, ua: Option<&str>) -> Result<String, AppError> {
+    let mut tx = pool.begin().await?;
+    let blocked: bool = sqlx::query_scalar("SELECT blocked_at IS NOT NULL FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE")
+        .bind(user_id).fetch_optional(&mut *tx).await?.ok_or(AppError::Unauthorized)?;
+    if blocked { return Err(AppError::problem(403, "ACCOUNT_BLOCKED", "帳號已停權，請聯絡客服")); }
     let mut b = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut b);
     let token = B64.encode(b);
     sqlx::query("INSERT INTO sessions (user_id, token_hash, user_agent, expires_at) VALUES ($1,$2,$3, now() + make_interval(days => $4))")
-        .bind(user_id).bind(hash_token(&token)).bind(ua).bind(SESSION_DAYS as i32).execute(pool).await?;
+        .bind(user_id).bind(hash_token(&token)).bind(ua).bind(SESSION_DAYS as i32).execute(&mut *tx).await?;
+    tx.commit().await?;
     Ok(token)
 }
 
 /// 以 (provider, uid) 找或建 user；回傳 (user_id, is_new)。
 pub async fn upsert_identity(pool: &PgPool, provider: &str, uid: &str, email: Option<&str>, name: &str, avatar: Option<&str>) -> Result<(Uuid, bool), AppError> {
     let mut tx = pool.begin().await?;
-    let found: Option<Uuid> = sqlx::query_scalar(
-        "SELECT i.user_id FROM auth_identities i JOIN users u ON u.id = i.user_id
-         WHERE i.provider = $1::auth_provider AND i.provider_uid = $2 AND u.deleted_at IS NULL")
-        .bind(provider).bind(uid).fetch_optional(&mut *tx).await?;
-    let (uid_, is_new) = if let Some(id) = found { (id, false) } else {
-        let existing: Option<Uuid> = match email {
-            Some(e) => sqlx::query_scalar("SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL").bind(e).fetch_optional(&mut *tx).await?,
-            None => None,
-        };
-        let (id, new) = match existing {
-            Some(id) => (id, false),
-            None => {
-                let dn: String = name.chars().take(50).collect();
-                let dn = if dn.trim().is_empty() { "user".to_string() } else { dn };
-                (sqlx::query_scalar("INSERT INTO users (display_name, email, avatar_key) VALUES ($1,$2,$3) RETURNING id")
-                    .bind(dn).bind(email).bind(avatar).fetch_one(&mut *tx).await?, true)
-            }
-        };
-        sqlx::query("INSERT INTO auth_identities (user_id, provider, provider_uid, email) VALUES ($1,$2::auth_provider,$3,$4)")
-            .bind(id).bind(provider).bind(uid).bind(email).execute(&mut *tx).await?;
-        (id, new)
-    };
+    let result = upsert_identity_in_tx(&mut tx, provider, uid, email, name).await?;
     tx.commit().await?;
-    Ok((uid_, is_new))
+    crate::uploads::import_avatar(pool, result.0, provider, avatar).await;
+    Ok(result)
+}
+
+pub(crate) async fn upsert_identity_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, provider: &str, uid: &str, email: Option<&str>, name: &str) -> Result<(Uuid, bool), AppError> {
+    crate::identities::lock_identity(tx, provider, uid, email).await?;
+    let mut found: Option<Uuid> = sqlx::query_scalar(
+        "SELECT u.id FROM auth_identities i JOIN users u ON u.id=i.user_id
+         WHERE i.provider=$1::auth_provider AND i.provider_uid=$2 AND u.deleted_at IS NULL FOR UPDATE OF u")
+        .bind(provider).bind(uid).fetch_optional(&mut **tx).await?;
+    // 等待 user 鎖時 identity 可能已被解除；用新 statement 重新核對 READ COMMITTED 的快照。
+    if let Some(id) = found {
+        found = sqlx::query_scalar("SELECT user_id FROM auth_identities WHERE provider=$1::auth_provider AND provider_uid=$2 AND user_id=$3")
+            .bind(provider).bind(uid).bind(id).fetch_optional(&mut **tx).await?;
+    }
+    let mut existing: Vec<Uuid> = if found.is_none() {
+        match email {
+            Some(e) => sqlx::query_scalar("SELECT u.id FROM users u WHERE u.deleted_at IS NULL AND
+                (u.email=$1 OR EXISTS(SELECT 1 FROM auth_identities i WHERE i.user_id=u.id AND i.email=$1)) FOR UPDATE OF u")
+                .bind(e).fetch_all(&mut **tx).await?,
+            None => vec![],
+        }
+    } else { vec![] };
+    if !existing.is_empty() {
+        // 供應商的不同信箱可能在等待 user 鎖期間被解除；取得鎖後再次檢查實際所有權。
+        existing = sqlx::query_scalar("SELECT u.id FROM users u WHERE u.id=ANY($1) AND u.deleted_at IS NULL AND
+            (u.email=$2 OR EXISTS(SELECT 1 FROM auth_identities i WHERE i.user_id=u.id AND i.email=$2))")
+            .bind(&existing).bind(email).fetch_all(&mut **tx).await?;
+    }
+    if existing.len() > 1 { return Err(crate::identities::in_use()); }
+    let (id, is_new) = match found.or(existing.first().copied()) {
+        Some(id) => (id, false),
+        None => {
+            let dn: String = name.chars().take(50).collect();
+            let dn = if dn.trim().is_empty() { "user".to_string() } else { dn };
+            (sqlx::query_scalar("INSERT INTO users (display_name,email) VALUES ($1,$2) RETURNING id")
+                .bind(dn).bind(email).fetch_one(&mut **tx).await?, true)
+        }
+    };
+    let blocked: bool = sqlx::query_scalar("SELECT blocked_at IS NOT NULL FROM users WHERE id=$1").bind(id).fetch_one(&mut **tx).await?;
+    if blocked { return Err(AppError::problem(403, "ACCOUNT_BLOCKED", "帳號已停權，請聯絡客服")); }
+    let contact: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id=$1").bind(id).fetch_one(&mut **tx).await?;
+    if provider == "email" {
+        if contact.as_deref().is_some_and(|c| Some(c) != email) { return Err(crate::identities::email_mismatch()); }
+        sqlx::query("UPDATE users SET email=coalesce(email,$2) WHERE id=$1").bind(id).bind(email).execute(&mut **tx).await?;
+    }
+    if found.is_none() {
+        sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,$2::auth_provider,$3,$4)")
+            .bind(id).bind(provider).bind(uid).bind(email).execute(&mut **tx).await?;
+        if !is_new {
+            crate::identities::notify(tx, id, "auth.identity_linked", provider, contact.as_deref().or(email)).await?;
+        }
+    }
+    Ok((id, is_new))
 }
 
 // ---------- Email OTP ----------
@@ -108,17 +146,44 @@ async fn send_mail(to: String, code: String, subject: &'static str) {
 /// 限流 + 寫入挑戰 + 寄信。login / register / reset 共用同一組限流（每 email 每小時 5 封、60 秒間隔）。
 /// 60 秒間隔只看「尚未使用」的驗證碼：剛驗證成功（例如註冊完）立刻重設密碼是正常操作，不應被擋；沒有信箱存取權的人無法消耗驗證碼，所以不影響防濫用。
 pub(crate) async fn issue_otp(pool: &PgPool, email: &str, purpose: &str, pw_hash: Option<&str>, name: Option<&str>) -> Result<(), AppError> {
+    issue_otp_scoped(pool, email, purpose, pw_hash, name, None, None).await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn issue_otp_scoped(pool: &PgPool, email: &str, purpose: &str, pw_hash: Option<&str>, name: Option<&str>, owner: Option<Uuid>, session_hash: Option<&[u8]>) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    let code = issue_otp_in_tx(&mut tx, email, purpose, pw_hash, name, owner, session_hash).await?;
+    tx.commit().await?;
+    send_otp(email, code, purpose);
+    Ok(())
+}
+
+/// 共用交易：回傳驗證碼，呼叫者提交後才可寄信。鎖順序為 OTP → user。
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn issue_otp_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, email: &str, purpose: &str, pw_hash: Option<&str>, name: Option<&str>, owner: Option<Uuid>, session_hash: Option<&[u8]>) -> Result<String, AppError> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))").bind(format!("otp:{email}")).execute(&mut **tx).await?;
+    if let Some(id) = owner {
+        let live_user: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL AND blocked_at IS NULL FOR SHARE")
+            .bind(id).fetch_optional(&mut **tx).await?;
+        if live_user.is_none() { return Err(AppError::Unauthorized); }
+        let live_session: Option<Uuid> = sqlx::query_scalar("SELECT id FROM sessions WHERE user_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at>now() FOR SHARE")
+            .bind(id).bind(session_hash).fetch_optional(&mut **tx).await?;
+        if live_session.is_none() { return Err(AppError::Unauthorized); }
+    }
     let (cnt, last_age): (i64, Option<i64>) = sqlx::query_as(
         "SELECT count(*), (min(extract(epoch FROM now() - created_at)) FILTER (WHERE consumed_at IS NULL))::bigint FROM otp_challenges
-         WHERE email = $1 AND created_at > now() - interval '1 hour'").bind(email).fetch_one(pool).await?;
+         WHERE email = $1 AND created_at > now() - interval '1 hour'").bind(email).fetch_one(&mut **tx).await?;
     if cnt >= 5 { return Err(rate_limited(600)); }
     if let Some(age) = last_age { if age < 60 { return Err(rate_limited(60 - age)); } }
     let code = format!("{:06}", rand::thread_rng().gen_range(0..1_000_000u32));
-    sqlx::query("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, pending_password_hash, pending_display_name) VALUES ($1,$2, now() + make_interval(secs => $3),$4,$5,$6)")
-        .bind(email).bind(code_hash(&code, &pepper())).bind(OTP_TTL_SECS as f64).bind(purpose).bind(pw_hash).bind(name).execute(pool).await?;
-    let subject = match purpose { "register" => "WishSync 註冊驗證碼", "reset" => "WishSync 重設密碼驗證碼", _ => "WishSync 登入驗證碼" };
+    sqlx::query("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, pending_password_hash, pending_display_name, link_user_id, link_session_hash) VALUES ($1,$2, now() + make_interval(secs => $3),$4,$5,$6,$7,$8)")
+        .bind(email).bind(code_hash(&code, &pepper())).bind(OTP_TTL_SECS as f64).bind(purpose).bind(pw_hash).bind(name).bind(owner).bind(session_hash).execute(&mut **tx).await?;
+    Ok(code)
+}
+
+pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
+    let subject = match purpose { "register" => "WishSync 註冊驗證碼", "reset" => "WishSync 重設密碼驗證碼", "link" => "WishSync 綁定 Email 驗證碼", _ => "WishSync 登入驗證碼" };
     tokio::spawn(send_mail(email.to_string(), code, subject)); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
-    Ok(())
 }
 
 async fn otp_request(State(st): State<AppState>, Json(r): Json<EmailReq>) -> Result<(StatusCode, Json<Value>), AppError> {
@@ -128,30 +193,38 @@ async fn otp_request(State(st): State<AppState>, Json(r): Json<EmailReq>) -> Res
 }
 
 #[derive(Deserialize)]
-pub(crate) struct VerifyReq { email: String, code: String }
+pub(crate) struct VerifyReq { pub email: String, pub code: String }
 
 pub(crate) fn otp_invalid() -> AppError { AppError::problem(400, "OTP_INVALID", "驗證碼錯誤或已過期，請重新取得。") }
 
 /// 驗證並消耗指定用途的 OTP；回傳 (pending_password_hash, pending_display_name)。
 pub(crate) async fn consume_otp(pool: &PgPool, email: &str, code: &str, purpose: &str) -> Result<(Option<String>, Option<String>), AppError> {
+    consume_otp_scoped(pool, email, code, purpose, None, None).await
+}
+
+pub(crate) async fn consume_otp_scoped(pool: &PgPool, email: &str, code: &str, purpose: &str, owner: Option<Uuid>, session_hash: Option<&[u8]>) -> Result<(Option<String>, Option<String>), AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))").bind(format!("otp:{email}")).execute(&mut *tx).await?;
     if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) { return Err(AppError::invalid("/code", "FORMAT", "驗證碼為 6 位數字")); }
     // 每 email 每小時最多 10 次驗證嘗試
     let tries: i64 = sqlx::query_scalar("SELECT coalesce(sum(attempts),0)::bigint FROM otp_challenges WHERE email=$1 AND created_at > now() - interval '1 hour'")
-        .bind(email).fetch_one(pool).await?;
+        .bind(email).fetch_one(&mut *tx).await?;
     if tries >= 10 { return Err(rate_limited(600)); }
     let ch: Option<(Uuid, Vec<u8>, i16, Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT id, code_hash, attempts, pending_password_hash, pending_display_name FROM otp_challenges
-         WHERE email=$1 AND purpose=$2 AND consumed_at IS NULL AND expires_at > now()
-         ORDER BY created_at DESC LIMIT 1").bind(email).bind(purpose).fetch_optional(pool).await?;
+         WHERE email=$1 AND purpose=$2 AND link_user_id IS NOT DISTINCT FROM $3 AND link_session_hash IS NOT DISTINCT FROM $4 AND consumed_at IS NULL AND expires_at > now()
+         ORDER BY created_at DESC LIMIT 1").bind(email).bind(purpose).bind(owner).bind(session_hash).fetch_optional(&mut *tx).await?;
     let (cid, hash, attempts, pw, name) = ch.ok_or_else(otp_invalid)?;
     if attempts >= OTP_MAX_ATTEMPTS { return Err(otp_invalid()); }
     if !crate::config::ct_eq(&hash, &code_hash(code, &pepper())) {
-        sqlx::query("UPDATE otp_challenges SET attempts = attempts + 1 WHERE id=$1").bind(cid).execute(pool).await?;
+        sqlx::query("UPDATE otp_challenges SET attempts = attempts + 1 WHERE id=$1").bind(cid).execute(&mut *tx).await?;
+        tx.commit().await?;
         return Err(otp_invalid());
     }
     // 一次性：只有第一個成功 UPDATE 的請求能通過
-    let used = sqlx::query("UPDATE otp_challenges SET consumed_at = now() WHERE id=$1 AND consumed_at IS NULL").bind(cid).execute(pool).await?;
+    let used = sqlx::query("UPDATE otp_challenges SET consumed_at = now() WHERE id=$1 AND consumed_at IS NULL").bind(cid).execute(&mut *tx).await?;
     if used.rows_affected() != 1 { return Err(otp_invalid()); }
+    tx.commit().await?;
     Ok((pw, name))
 }
 
@@ -186,8 +259,7 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
         sqlx::query_as("SELECT display_name, email, avatar_key, is_staff, notification_prefs, handle, default_claim_visibility::text FROM users WHERE id=$1 AND deleted_at IS NULL")
             .bind(id).fetch_optional(pool).await?.ok_or(AppError::Unauthorized)?;
     let idents: Vec<String> = sqlx::query_scalar("SELECT provider::text FROM auth_identities WHERE user_id=$1 ORDER BY created_at").bind(id).fetch_all(pool).await?;
-    // avatar_key：LINE 頭像存完整 URL；其餘暫無公開網址規則
-    let avatar_url = avatar.filter(|a| a.starts_with("http"));
+    let avatar_url = crate::uploads::avatar_url(avatar.as_deref());
     Ok(json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
                "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
                "orgs": [] })) // orgs 為 P2-D，MVP 恆空
@@ -275,14 +347,25 @@ pub(crate) fn safe_redirect(r: &str) -> bool { r.starts_with('/') && !r.starts_w
 pub(crate) fn rand_b64(n: usize) -> String { let mut b = vec![0u8; n]; rand::thread_rng().fill_bytes(&mut b); B64.encode(b) }
 
 #[derive(Deserialize)]
-struct StartQ { redirect: Option<String> }
+struct StartQ { redirect: Option<String>, #[serde(default)] link: bool }
 
-async fn oauth_start(Path(provider): Path<String>, Query(q): Query<StartQ>) -> Result<Response, AppError> {
+#[derive(Deserialize, Serialize)]
+struct OAuthState {
+    state: String, verifier: String, redirect: String, provider: String, issued_at: i64,
+    link_user: Option<Uuid>, session_hash: Option<String>,
+}
+
+async fn oauth_start(State(st): State<AppState>, Path(provider): Path<String>, Query(q): Query<StartQ>, mut parts: axum::http::request::Parts) -> Result<Response, AppError> {
     if provider != "line" && provider != "google" { return Err(AppError::invalid("/provider", "ENUM", "provider 須為 line 或 google")); }
-    let redirect = q.redirect.unwrap_or_else(|| "/dashboard".into());
+    let (link_user, session_hash) = if q.link {
+        let u = CurrentUser::from_request_parts(&mut parts, &st).await?;
+        crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
+        (Some(u.id), crate::session::session_token(&parts.headers).map(|t| hex::encode(hash_token(&t))))
+    } else { (None, None) };
+    let redirect = if q.link { "/settings".into() } else { q.redirect.unwrap_or_else(|| "/dashboard".into()) };
     if !safe_redirect(&redirect) { return Err(AppError::invalid("/redirect", "FORMAT", "redirect 必須是以 / 開頭的相對路徑")); }
     // 未設憑證：瀏覽器是整頁導向進來的，回 302 到登入頁讓前端顯示提示，而不是一頁 JSON
-    let unavailable = || (StatusCode::FOUND, [(header::LOCATION, format!("{}/login?error=oauth_unavailable", app_url()))]).into_response();
+    let unavailable = || (StatusCode::FOUND, [(header::LOCATION, format!("{}/{}?error=oauth_unavailable", app_url(), if q.link { "settings" } else { "login" }))]).into_response();
     let (state, verifier) = (rand_b64(16), rand_b64(32));
     let challenge = B64.encode(Sha256::digest(verifier.as_bytes()));
     let (auth_url, params): (String, Vec<(&str, String)>) = if provider == "line" {
@@ -296,7 +379,7 @@ async fn oauth_start(Path(provider): Path<String>, Query(q): Query<StartQ>) -> R
     all.extend(params);
     let url = reqwest::Url::parse_with_params(&auth_url, all)
         .map_err(|e| AppError::problem(502, "OAUTH_PROVIDER_ERROR", e.to_string()))?;
-    let payload = format!("{state}.{verifier}.{}", B64.encode(&redirect));
+    let payload = B64.encode(serde_json::to_vec(&OAuthState { state, verifier, redirect, provider, issued_at: chrono::Utc::now().timestamp(), link_user, session_hash }).unwrap());
     let ck = format!("ws_oauth_state={payload}.{}; Path=/api/v1/auth/oauth; Max-Age=600; HttpOnly; SameSite=Lax{}", sign(&payload), secure());
     Ok((StatusCode::FOUND, [(header::LOCATION, url.to_string()), (header::SET_COOKIE, ck)]).into_response())
 }
@@ -304,34 +387,76 @@ async fn oauth_start(Path(provider): Path<String>, Query(q): Query<StartQ>) -> R
 #[derive(Deserialize)]
 struct CbQ { code: Option<String>, state: Option<String>, error: Option<String> }
 
-/// 驗證 ws_oauth_state cookie 與 query state；回傳 (verifier, redirect)。
-fn check_state(cookie_val: Option<&str>, state: Option<&str>) -> Option<(String, String)> {
-    let c = cookie_val?;
-    let (payload, sig) = c.rsplit_once('.')?;
+/// 簽章保護供應商、期限、用途、帳號與發起 session，不依賴瀏覽器 cookie 的 Max-Age。
+fn check_state(cookie_val: Option<&str>, state: Option<&str>) -> Option<OAuthState> {
+    let (payload, sig) = cookie_val?.rsplit_once('.')?;
     if !crate::config::ct_eq(sign(payload).as_bytes(), sig.as_bytes()) { return None; }
-    let mut it = payload.split('.');
-    let (s, v, r) = (it.next()?, it.next()?, it.next()?);
-    if !crate::config::ct_eq(s.as_bytes(), state?.as_bytes()) { return None; }
-    let redir = String::from_utf8(B64.decode(r).ok()?).ok()?;
-    safe_redirect(&redir).then(|| (v.to_string(), redir))
+    let s: OAuthState = serde_json::from_slice(&B64.decode(payload).ok()?).ok()?;
+    let age = chrono::Utc::now().timestamp() - s.issued_at;
+    if !(0..=600).contains(&age) || !crate::config::ct_eq(s.state.as_bytes(), state?.as_bytes()) || !safe_redirect(&s.redirect) { return None; }
+    Some(s)
+}
+
+fn oauth_error(error: AppError) -> &'static str {
+    match error {
+        AppError::Problem { code: "ACCOUNT_BLOCKED", .. } => "account_blocked",
+        AppError::Problem { code: "IDENTITY_IN_USE", .. } => "identity_in_use",
+        AppError::Problem { code: "PROVIDER_ALREADY_LINKED", .. } => "provider_already_linked",
+        error => { tracing::warn!(?error, "oauth callback failed"); "oauth_failed" }
+    }
 }
 
 async fn oauth_callback(State(st): State<AppState>, Path(provider): Path<String>, Query(q): Query<CbQ>, headers: HeaderMap) -> Result<Response, AppError> {
     let clear = format!("ws_oauth_state=; Max-Age=0; Path=/api/v1/auth/oauth; HttpOnly; SameSite=Lax{}", secure());
-    let fail = || (StatusCode::FOUND, AppendHeaders([(header::LOCATION, format!("{}/login?error=oauth_failed", app_url())), (header::SET_COOKIE, clear.clone())])).into_response();
-    if (provider != "line" && provider != "google") || q.error.is_some() { return Ok(fail()); }
-    let (Some(code), Some((verifier, redirect))) = (q.code.as_deref(), check_state(cookie(&headers, "ws_oauth_state").as_deref(), q.state.as_deref())) else { return Ok(fail()) };
-    let (uid, _) = if provider == "line" {
-        let cfg = LineCfg::from_env().ok_or_else(|| AppError::problem(502, "OAUTH_PROVIDER_ERROR", "LINE 登入尚未設定"))?;
-        let p = line_fetch_profile(&cfg, code, &verifier).await?;
-        upsert_identity(&st.pool, "line", &p.user_id, None, &p.display_name, p.picture_url.as_deref()).await?
-    } else {
-        // id_token 驗證失敗（簽章 / iss / aud / exp / email_verified）→ 與 state 失敗同樣 302 login?error=oauth_failed
-        let Some(g) = crate::auth_ext::google_identity(code, &verifier).await? else { return Ok(fail()) };
-        upsert_identity(&st.pool, "google", &g.sub, g.email.as_deref(), &g.name, g.picture.as_deref()).await?
+    let state = check_state(cookie(&headers, "ws_oauth_state").as_deref(), q.state.as_deref());
+    let linking = state.as_ref().is_some_and(|s| s.link_user.is_some());
+    let fail = |error: &str| {
+        let mut response = (StatusCode::FOUND, AppendHeaders([(header::LOCATION, format!("{}/{}?error={error}", app_url(), if linking && error != "account_blocked" { "settings" } else { "login" })), (header::SET_COOKIE, clear.clone())])).into_response();
+        if error == "account_blocked" {
+            response.headers_mut().append(header::SET_COOKIE, format!("ws_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{}", secure()).parse().unwrap());
+        }
+        response
     };
-    let token = new_session(&st.pool, uid, headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok())).await?;
-    Ok((StatusCode::FOUND, AppendHeaders([(header::LOCATION, format!("{}{redirect}", app_url())), (header::SET_COOKIE, session_cookie(&token)), (header::SET_COOKIE, clear)])).into_response())
+    let (Some(code), Some(s)) = (q.code.as_deref(), state) else { return Ok(fail("oauth_failed")) };
+    if s.provider != provider || q.error.is_some() || !["line", "google"].contains(&provider.as_str()) { return Ok(fail("oauth_failed")); }
+    let session_hash = crate::session::session_token(&headers).map(|t| hash_token(&t));
+    if let Some(id) = s.link_user {
+        if session_hash.as_ref().map(hex::encode) != s.session_hash { return Ok(fail("oauth_failed")); }
+        let live: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.user_id=$1 AND s.token_hash=$2 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.deleted_at IS NULL AND u.blocked_at IS NULL)")
+            .bind(id).bind(&session_hash).fetch_one(&st.pool).await?;
+        if !live { return Ok(fail("oauth_failed")); }
+    }
+    let identity = if provider == "line" {
+        let Some(cfg) = LineCfg::from_env() else { return Ok(fail("oauth_unavailable")) };
+        match line_fetch_profile(&cfg, code, &s.verifier).await {
+            Ok(p) => (p.user_id, None, p.display_name, p.picture_url),
+            Err(_) => return Ok(fail("oauth_failed")),
+        }
+    } else {
+        match crate::auth_ext::google_identity(code, &s.verifier).await {
+            Ok(Some(g)) => (g.sub, g.email, g.name, g.picture),
+            _ => return Ok(fail("oauth_failed")),
+        }
+    };
+    let (sub, email, name, picture) = identity;
+    if let Some(id) = s.link_user {
+        match crate::identities::link(&st.pool, id, session_hash.as_deref().unwrap_or_default(), &provider, &sub, email.as_deref()).await {
+            Ok(()) => {
+                crate::uploads::import_avatar(&st.pool, id, &provider, picture.as_deref()).await;
+                return Ok((StatusCode::FOUND, AppendHeaders([(header::LOCATION, format!("{}/settings?linked={provider}", app_url())), (header::SET_COOKIE, clear)])).into_response());
+            }
+            Err(error) => return Ok(fail(oauth_error(error))),
+        }
+    }
+    let login = async {
+        let (uid, _) = upsert_identity(&st.pool, &provider, &sub, email.as_deref(), &name, picture.as_deref()).await?;
+        new_session(&st.pool, uid, headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok())).await
+    }.await;
+    let token = match login {
+        Ok(token) => token,
+        Err(error) => return Ok(fail(oauth_error(error))),
+    };
+    Ok((StatusCode::FOUND, AppendHeaders([(header::LOCATION, format!("{}{}", app_url(), s.redirect)), (header::SET_COOKIE, session_cookie(&token)), (header::SET_COOKIE, clear)])).into_response())
 }
 
 #[cfg(test)]
@@ -339,11 +464,12 @@ mod tests {
     use super::*;
     #[test]
     fn state_cookie_roundtrip_and_tamper() {
-        let payload = format!("st1.ver1.{}", B64.encode("/dashboard"));
+        let payload = B64.encode(serde_json::to_vec(&OAuthState { state: "st1".into(), verifier: "ver1".into(), redirect: "/dashboard".into(), provider: "google".into(), issued_at: chrono::Utc::now().timestamp(), link_user: None, session_hash: None }).unwrap());
         let c = format!("{payload}.{}", sign(&payload));
-        assert_eq!(check_state(Some(&c), Some("st1")), Some(("ver1".into(), "/dashboard".into())));
+        let state = check_state(Some(&c), Some("st1")).unwrap();
+        assert_eq!((state.verifier.as_str(), state.redirect.as_str()), ("ver1", "/dashboard"));
         assert!(check_state(Some(&c), Some("other")).is_none());
-        assert!(check_state(Some(&c.replace("ver1", "verX")), Some("st1")).is_none());
+        assert!(check_state(Some(&format!("x{c}")), Some("st1")).is_none());
         assert!(check_state(None, Some("st1")).is_none());
         assert!(!safe_redirect("//evil.com") && !safe_redirect("https://x") && safe_redirect("/a/b"));
     }

@@ -59,6 +59,7 @@ impl FromRequestParts<AppState> for MaybeActor {
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
         match CurrentUser::from_request_parts(parts, st).await {
             Ok(u) => return Ok(MaybeActor(Some(Actor::User(u.id)))),
+            Err(e @ AppError::Problem { code: "ACCOUNT_BLOCKED", .. }) => return Err(e),
             Err(AppError::Db(e)) => return Err(e.into()),
             Err(_) => {}
         }

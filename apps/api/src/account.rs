@@ -125,7 +125,7 @@ async fn delete_me(State(st): State<AppState>, u: CurrentUser, Json(b): Json<Val
         return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {} 筆進行中的認捐、{} 點餘額。請先到錢包撤回認捐，並聯絡客服處理剩餘點數後再刪除帳號。", held.0, held.1)));
     }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL").bind(id).execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM otp_challenges WHERE email = (SELECT email FROM users WHERE id = $1)").bind(id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM otp_challenges WHERE link_user_id=$1 OR email = (SELECT email FROM users WHERE id = $1)").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM auth_identities WHERE user_id = $1").bind(id).execute(&mut *tx).await?;
     let rows: Vec<(Uuid, String)> = sqlx::query_as("UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(closed_at, now()) WHERE owner_id = $1 AND status <> 'archived' RETURNING id, slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
@@ -147,6 +147,8 @@ async fn delete_me(State(st): State<AppState>, u: CurrentUser, Json(b): Json<Val
     sqlx::query("UPDATE claims SET claimer_name = '已刪除的使用者' WHERE user_id = $1").bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE contributions SET donor_name = '已刪除的使用者' WHERE user_id = $1").bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE notifications SET status = 'cancelled' WHERE user_id = $1 AND status = 'pending'").bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')")
+        .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, notification_prefs = '{}'::jsonb,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")

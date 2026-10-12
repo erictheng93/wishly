@@ -2,5 +2,5 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
   const u = await useAuth().fetchMe()
-  if (!u) return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
+  if (!u) return navigateTo({ path: '/login', query: { redirect: to.fullPath, ...(useState<string>('auth-error', () => '').value === 'account_blocked' ? { error: 'account_blocked' } : {}) } })
 })

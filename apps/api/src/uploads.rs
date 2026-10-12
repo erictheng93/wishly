@@ -11,6 +11,63 @@ use uuid::Uuid;
 
 pub const MAX_BYTES: usize = 5 * 1024 * 1024;
 
+fn avatar_source(provider: &str, raw: &str) -> Option<reqwest::Url> {
+    let url = reqwest::Url::parse(raw).ok()?;
+    let host = url.host_str()?;
+    let allowed = match provider {
+        "google" => host == "googleusercontent.com" || host.ends_with(".googleusercontent.com"),
+        "line" => matches!(host, "profile.line-scdn.net" | "obs.line-scdn.net" | "obs.line-apps.com"),
+        _ => false,
+    };
+    (allowed && url.scheme() == "https" && url.port_or_known_default() == Some(443) && url.username().is_empty() && url.password().is_none()).then_some(url)
+}
+
+async fn avatar_bytes(client: &reqwest::Client, url: reqwest::Url) -> Result<Vec<u8>, String> {
+    let mut response = client.get(url).send().await.map_err(|e| e.without_url().to_string())?.error_for_status().map_err(|e| e.without_url().to_string())?;
+    if !response.status().is_success() || response.content_length().is_some_and(|n| n > MAX_BYTES as u64) { return Err("頭像回應不合法或超過 5 MB".into()); }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.without_url().to_string())? {
+        if bytes.len() + chunk.len() > MAX_BYTES { return Err("頭像超過 5 MB".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
+/// 首次登入與舊外部 URL 的惰性轉存；圖片失敗不影響登入，保留預設頭像。
+pub(crate) async fn import_avatar(pool: &sqlx::PgPool, id: Uuid, provider: &str, picture: Option<&str>) {
+    let pool = pool.clone();
+    let provider = provider.to_owned();
+    let picture = picture.map(str::to_owned);
+    // ponytail: 最佳努力背景轉存，程序重啟時中斷；下次登入重試，需保證完成時再用持久佇列。
+    tokio::spawn(async move {
+        let result = async {
+            let current: Option<Option<String>> = sqlx::query_scalar("SELECT avatar_key FROM users WHERE id=$1 AND deleted_at IS NULL").bind(id).fetch_optional(&pool).await.map_err(|e| e.to_string())?;
+            let Some(old) = current else { return Ok::<(), String>(()); };
+            if old.as_deref().is_some_and(|k| k.starts_with("avatars/")) { return Ok(()); }
+            let Some(url) = picture.as_deref().or(old.as_deref()).and_then(|p| avatar_source(&provider, p)) else { return Ok(()); };
+            let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).redirect(reqwest::redirect::Policy::none()).build().map_err(|e| e.to_string())?;
+            let bytes = avatar_bytes(&client, url).await?;
+            let (clean, ct) = tokio::task::spawn_blocking(move || strip_metadata(&bytes)).await.map_err(|e| e.to_string())??;
+            let key = format!("avatars/{}.{}", Uuid::new_v4(), ext_of(ct).unwrap());
+            ensure_bucket().await;
+            let response = s3_req("PUT", &key, Some((clean, ct))).await.map_err(|e| format!("{e:?}"))?;
+            if !response.status().is_success() { return Err("頭像儲存失敗".into()); }
+            let updated = sqlx::query("UPDATE users SET avatar_key=$2 WHERE id=$1 AND deleted_at IS NULL AND avatar_key IS NOT DISTINCT FROM $3")
+                .bind(id).bind(&key).bind(&old).execute(&pool).await.map_err(|e| e.to_string())?;
+            if updated.rows_affected() == 0 { let _ = s3_req("DELETE", &key, None).await; }
+            Ok(())
+        }.await;
+        if let Err(error) = result { tracing::warn!(%error, "avatar import failed"); }
+    });
+}
+
+pub(crate) fn avatar_url(key: Option<&str>) -> Option<String> {
+    let key = key?;
+    let filename = key.strip_prefix("avatars/")?;
+    let (id, ext) = filename.rsplit_once('.')?;
+    (Uuid::parse_str(id).is_ok() && matches!(ext, "jpg" | "png" | "webp")).then(|| S3::get().public_url(key))
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new().route("/uploads/presign", post(presign)).route("/uploads/confirm", post(confirm))
 }
@@ -85,10 +142,11 @@ pub fn sign_url(endpoint: &str, host: &str, path: &str, method: &str, expires: i
 async fn s3_req(method: &str, key: &str, body: Option<(Vec<u8>, &str)>) -> Result<reqwest::Response, AppError> {
     let s3 = S3::get();
     let url = s3.presign(method, key, 300, &[], Utc::now());
-    let c = reqwest::Client::new();
+    let c = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build()
+        .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
     let mut rb = c.request(method.parse().unwrap(), url);
     if let Some((b, ct)) = body { rb = rb.header("content-type", ct).body(b); }
-    rb.send().await.map_err(|e| { tracing::error!(error=%e, "s3"); AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用") })
+    rb.send().await.map_err(|e| { tracing::error!(error=%e.without_url(), "s3"); AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用") })
 }
 
 async fn ensure_bucket() {
@@ -190,6 +248,49 @@ async fn confirm(user: CurrentUser, Json(r): Json<ConfirmReq>) -> Result<Json<Va
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[sqlx::test(migrations = "../../db/migrations")]
+    async fn avatar_import_does_not_wait_for_database(pool: sqlx::PgPool) {
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("LOCK TABLE users IN ACCESS EXCLUSIVE MODE").execute(&mut *tx).await.unwrap();
+        let result = tokio::time::timeout(std::time::Duration::from_millis(100),
+            import_avatar(&pool, Uuid::new_v4(), "google", Some("https://lh3.googleusercontent.com/a/photo"))).await;
+        tx.rollback().await.unwrap();
+        assert!(result.is_ok(), "頭像轉存不應阻塞登入請求");
+    }
+
+    #[test]
+    fn avatars_only_use_provider_sources_and_owned_keys() {
+        assert!(avatar_source("google", "https://lh3.googleusercontent.com/a/photo").is_some());
+        assert!(avatar_source("line", "https://profile.line-scdn.net/abc").is_some());
+        for url in ["http://profile.line-scdn.net/a", "https://profile.line-scdn.net.evil.com/a", "https://127.0.0.1/a", "https://u:p@profile.line-scdn.net/a", "https://profile.line-scdn.net:9000/a"] {
+            assert!(avatar_source("line", url).is_none(), "{url}");
+        }
+        assert!(avatar_source("google", "https://profile.line-scdn.net/a").is_none());
+        assert!(avatar_url(Some("https://profile.line-scdn.net/a")).is_none());
+        assert!(avatar_url(Some("avatars/../x.png")).is_none());
+        assert!(avatar_url(Some(&format!("avatars/{}.png", Uuid::new_v4()))).unwrap().contains("/avatars/"));
+    }
+
+    #[tokio::test]
+    async fn avatar_download_rejects_redirects_and_limits_streamed_bytes() {
+        use axum::{body::Body, http::{header, StatusCode}, routing::get, Router};
+        let mock = Router::new()
+            .route("/redirect", get(|| async { (StatusCode::FOUND, [(header::LOCATION, "/ok")]) }))
+            .route("/ok", get(|| async { "small image" }))
+            .route("/large", get(|| async {
+                let chunks = futures_util::stream::iter((0..6).map(|_| Ok::<_, std::io::Error>(vec![0u8; 1024 * 1024])));
+                Body::from_stream(chunks)
+            }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async { axum::serve(listener, mock).await.unwrap() });
+        let client = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().unwrap();
+        assert_eq!(avatar_bytes(&client, format!("{base}/ok").parse().unwrap()).await.unwrap(), b"small image");
+        assert!(avatar_bytes(&client, format!("{base}/redirect").parse().unwrap()).await.is_err());
+        assert!(avatar_bytes(&client, format!("{base}/large").parse().unwrap()).await.unwrap_err().contains("5 MB"));
+        server.abort();
+    }
 
     #[test]
     fn sigv4_matches_aws_doc_example() {

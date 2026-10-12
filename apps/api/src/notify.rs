@@ -88,8 +88,10 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     let cfg = crate::config::get();
     let n = rows.len();
     for (id, uid, gid, channel, kind, payload, attempts) in rows {
+        let security = matches!(kind.as_str(), "auth.identity_linked" | "auth.identity_unlinked");
         let to: Option<String> = if channel != "email" { None } else if let Some(u) = uid {
-            sqlx::query_scalar("SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL").bind(u).fetch_optional(pool).await?.flatten()
+            sqlx::query_scalar("SELECT CASE WHEN $2 THEN $3 ELSE email END FROM users WHERE id = $1 AND deleted_at IS NULL")
+                .bind(u).bind(security).bind(payload.get("to").and_then(Value::as_str)).fetch_optional(pool).await?.flatten()
         } else if let Some(g) = gid {
             sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL").bind(g).fetch_optional(pool).await?.flatten()
         } else { None };
@@ -110,7 +112,7 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
         }
         let api = cfg.api_base_url.clone();
         let sub = match (uid, gid) { (Some(u), _) => Some(('u', u)), (_, Some(g)) => Some(('g', g)), _ => None };
-        if let Some((k, i)) = sub {
+        if let Some((k, i)) = sub.filter(|_| !security) {
             payload["unsubscribe_url"] = format!("{}/api/v1/unsubscribe?token={}", api.trim_end_matches('/'), crate::account::unsub_token(k, i)).into();
         }
         if let (Some(g), "claim.confirmation") = (gid, kind.as_str()) {
@@ -138,6 +140,11 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
 
 /// 純函式：(主旨, 內文)。刻意只用數量，不帶品項 / 認領者。
 pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
+    if matches!(kind, "auth.identity_linked" | "auth.identity_unlinked") {
+        let provider = match payload["provider"].as_str() { Some("google") => "Google", Some("line") => "LINE", Some("email") => "Email", _ => "第三方" };
+        let action = if kind == "auth.identity_linked" { "新增" } else { "解除" };
+        return ("【WishSync】登入方式已變更".into(), format!("你的帳號已{action} {provider} 登入方式。\n若非本人操作，請立即檢查帳號設定及重設密碼。\n帳號設定：{}/settings\n這是帳號安全通知。", crate::config::get().app_url));
+    }
     let n = payload.get("count").and_then(Value::as_i64).unwrap_or(1);
     let base = crate::config::get().app_url;
     let manage = match payload.get("recovery_token").and_then(Value::as_str) { Some(t) => format!("{base}/me/claims#r={t}"), None => format!("{base}/me/claims") };

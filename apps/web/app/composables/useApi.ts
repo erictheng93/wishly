@@ -22,10 +22,12 @@ export function useApi() {
       const status = e.statusCode || e.status || 0
       const d = e.data && typeof e.data === 'object' ? e.data : {}
       const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || '連線失敗，請稍後再試', d.errors || [], d)
-      if (err.code === 'UNAUTHORIZED' && !noRedirect && import.meta.client) {
+      const blocked = err.code === 'ACCOUNT_BLOCKED'
+      if (import.meta.client && (blocked || (err.code === 'UNAUTHORIZED' && !noRedirect))) {
         useState('auth-user').value = null
         setNativeToken(null)
-        await navigateTo({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
+        if (blocked) useState<string>('auth-error', () => '').value = 'account_blocked'
+        if (!noRedirect) await navigateTo({ path: '/login', query: { redirect: router.currentRoute.value.fullPath, ...(blocked ? { error: 'account_blocked' } : {}) } })
       }
       throw err
     }

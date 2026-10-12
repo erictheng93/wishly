@@ -1,6 +1,6 @@
 //! 密碼登入（註冊 / 登入 / 重設）與 Google OIDC。Session 簽發、OTP、identity 連結都沿用 auth.rs。
 use crate::{
-    auth::{consume_otp, env, issue_otp, norm_email, session_response, upsert_identity},
+    auth::{consume_otp, env, issue_otp, norm_email, session_response, upsert_identity_in_tx},
     error::AppError, AppState,
 };
 use argon2::{password_hash::{rand_core::OsRng, SaltString}, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
@@ -56,14 +56,14 @@ struct CodeReq { email: String, code: String }
 
 async fn register_verify(State(st): State<AppState>, headers: HeaderMap, Json(r): Json<CodeReq>) -> Result<Response, AppError> {
     let email = norm_email(&r.email)?;
-    let taken: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_identities WHERE provider='email' AND provider_uid=$1 AND password_hash IS NOT NULL)")
-        .bind(&email).fetch_one(&st.pool).await?;
     let (pw, name) = consume_otp(&st.pool, &email, &r.code, "register").await?;
-    let (Some(pw), Some(name)) = (pw, name) else { return Err(AppError::problem(400, "OTP_INVALID", "驗證碼錯誤或已過期，請重新取得。")) };
-    if taken { return Err(AppError::problem(409, "EMAIL_EXISTS", "此 Email 已註冊，請直接登入或使用忘記密碼。")); }
-    let (uid, is_new) = upsert_identity(&st.pool, "email", &email, Some(&email), &name, None).await?;
-    sqlx::query("UPDATE auth_identities SET password_hash=$2 WHERE provider='email' AND provider_uid=$1 AND password_hash IS NULL")
-        .bind(&email).bind(pw).execute(&st.pool).await?;
+    let (Some(pw), Some(name)) = (pw, name) else { return Err(crate::auth::otp_invalid()); };
+    let mut tx = st.pool.begin().await?;
+    let (uid, is_new) = upsert_identity_in_tx(&mut tx, "email", &email, Some(&email), &name).await?;
+    let updated = sqlx::query("UPDATE auth_identities SET password_hash=$2 WHERE provider='email' AND provider_uid=$1 AND password_hash IS NULL")
+        .bind(&email).bind(pw).execute(&mut *tx).await?;
+    if updated.rows_affected() != 1 { return Err(AppError::problem(409, "EMAIL_EXISTS", "此 Email 已註冊，請直接登入或使用忘記密碼。")); }
+    tx.commit().await?;
     session_response(&st.pool, &headers, uid, is_new).await
 }
 
@@ -128,10 +128,18 @@ async fn reset_confirm(State(st): State<AppState>, Json(r): Json<ResetConfirm>) 
         .ok_or_else(|| AppError::problem(400, "OTP_INVALID", "驗證碼錯誤或已過期，請重新取得。"))?;
     let h = hash_blocking(r.new_password).await?;
     let mut tx = st.pool.begin().await?;
-    // 既有 OTP / Google 帳號沒有 email identity 或沒密碼 → 這裡設定
-    sqlx::query("INSERT INTO auth_identities (user_id, provider, provider_uid, email, password_hash) VALUES ($1,'email',$2,$2,$3)
-                 ON CONFLICT (provider, provider_uid) DO UPDATE SET password_hash = EXCLUDED.password_hash")
+    crate::identities::lock_identity(&mut tx, "email", &email, Some(&email)).await?;
+    // 雜湊期間可能已解除／更換 email；鎖住原帳號並重新核對，不得改到新持有者。
+    let blocked: bool = sqlx::query_scalar("SELECT blocked_at IS NOT NULL FROM users WHERE id=$1 AND email=$2 AND deleted_at IS NULL FOR UPDATE")
+        .bind(uid).bind(&email).fetch_optional(&mut *tx).await?.ok_or_else(crate::auth::otp_invalid)?;
+    if blocked { return Err(AppError::problem(403, "ACCOUNT_BLOCKED", "帳號已停權，請聯絡客服")); }
+    let identity: Option<uuid::Uuid> = sqlx::query_scalar("SELECT user_id FROM auth_identities WHERE provider='email' AND provider_uid=$1")
+        .bind(&email).fetch_optional(&mut *tx).await?;
+    if identity.is_some_and(|id| id != uid) { return Err(crate::identities::in_use()); }
+    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email,password_hash) VALUES ($1,'email',$2,$2,$3)
+                 ON CONFLICT (provider,provider_uid) DO UPDATE SET password_hash=EXCLUDED.password_hash WHERE auth_identities.user_id=EXCLUDED.user_id")
         .bind(uid).bind(&email).bind(&h).execute(&mut *tx).await?;
+    if identity.is_none() { crate::identities::notify(&mut tx, uid, "auth.identity_linked", "email", Some(&email)).await?; }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id=$1 AND revoked_at IS NULL").bind(uid).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM login_failures WHERE email=$1").bind(&email).execute(&mut *tx).await?;
     tx.commit().await?;
@@ -160,8 +168,38 @@ impl GoogleCfg {
 }
 pub struct GoogleIdentity { pub sub: String, pub email: Option<String>, pub name: String, pub picture: Option<String> }
 
+struct CachedJwks {
+    url: String, keys: JwkSet, expires: std::time::Instant,
+    unknown_refresh: Option<std::time::Instant>,
+}
+static JWKS: LazyLock<tokio::sync::Mutex<Option<CachedJwks>>> = LazyLock::new(|| tokio::sync::Mutex::new(None));
+
+fn key_from(keys: &JwkSet, kid: &str) -> Option<DecodingKey> { keys.find(kid).and_then(|k| DecodingKey::from_jwk(k).ok()) }
+
+async fn google_key(client: &reqwest::Client, url: &str, kid: &str) -> Result<Option<DecodingKey>, reqwest::Error> {
+    // 單一 Google 端點共用抓取；未知 kid 至多每 30 秒觸發一次額外更新，防止偽造 kid 打爆上游。
+    let mut cache = JWKS.lock().await;
+    let now = std::time::Instant::now();
+    let mut unknown_refresh = None;
+    if let Some(cached) = cache.as_ref().filter(|c| c.url == url && c.expires > now) {
+        if let Some(key) = key_from(&cached.keys, kid) { return Ok(Some(key)); }
+        if cached.unknown_refresh.is_some_and(|t| now.duration_since(t).as_secs() < 30) { return Ok(None); }
+        unknown_refresh = Some(now);
+    }
+    let response = client.get(url).send().await?.error_for_status()?;
+    let directives = response.headers().get(reqwest::header::CACHE_CONTROL).and_then(|h| h.to_str().ok()).unwrap_or("");
+    let directives: Vec<_> = directives.split(',').map(str::trim).collect();
+    let ttl = if directives.iter().any(|d| d.eq_ignore_ascii_case("no-store") || d.eq_ignore_ascii_case("no-cache")) { 0 } else {
+        directives.iter().find_map(|d| { let (name, value) = d.split_once('=')?; name.trim().eq_ignore_ascii_case("max-age").then(|| value.trim().trim_matches('"').parse::<u64>().ok()).flatten() }).unwrap_or(300).min(86400)
+    };
+    let age = response.headers().get(reqwest::header::AGE).and_then(|h| h.to_str().ok()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+    let keys: JwkSet = response.json().await?;
+    let key = key_from(&keys, kid);
+    *cache = Some(CachedJwks { url: url.into(), keys, expires: now + std::time::Duration::from_secs(ttl.saturating_sub(age)), unknown_refresh });
+    Ok(key)
+}
+
 /// code 換 token → 驗 id_token。Ok(None) = id_token 不合法；Err = 供應商端點故障（502）。
-// ponytail: 每次登入都抓一次 JWKS；流量大時加記憶體快取（依 Cache-Control）。
 pub async fn google_identity(code: &str, verifier: &str) -> Result<Option<GoogleIdentity>, AppError> {
     let cfg = GoogleCfg::from_env().ok_or_else(|| AppError::problem(502, "OAUTH_PROVIDER_ERROR", "Google 登入尚未設定"))?;
     let bad = |e: String| { tracing::error!(error = %e, "google oauth"); AppError::problem(502, "OAUTH_PROVIDER_ERROR", "Google 登入暫時無法使用") };
@@ -172,10 +210,8 @@ pub async fn google_identity(code: &str, verifier: &str) -> Result<Option<Google
         .send().await.and_then(|r| r.error_for_status()).map_err(|e| bad(e.to_string()))?
         .json().await.map_err(|e| bad(e.to_string()))?;
     let idt = tok["id_token"].as_str().ok_or_else(|| bad("no id_token".into()))?;
-    let Ok(kid) = decode_header(idt).map(|h| h.kid) else { return Ok(None) };
-    let jwks: JwkSet = c.get(&cfg.jwks_url).send().await.and_then(|r| r.error_for_status()).map_err(|e| bad(e.to_string()))?
-        .json().await.map_err(|e| bad(e.to_string()))?;
-    let Some(key) = kid.and_then(|k| jwks.find(&k)).and_then(|j| DecodingKey::from_jwk(j).ok()) else { return Ok(None) };
+    let Ok(Some(kid)) = decode_header(idt).map(|h| h.kid) else { return Ok(None) };
+    let Some(key) = google_key(&c, &cfg.jwks_url, &kid).await.map_err(|e| bad(e.to_string()))? else { return Ok(None) };
     let mut v = Validation::new(Algorithm::RS256);
     v.set_audience(&[&cfg.client_id]);
     v.set_issuer(&cfg.issuers);
@@ -184,7 +220,7 @@ pub async fn google_identity(code: &str, verifier: &str) -> Result<Option<Google
     let cl = d.claims;
     let Some(sub) = cl["sub"].as_str().filter(|s| !s.is_empty()) else { return Ok(None) };
     let verified = cl["email_verified"].as_bool() == Some(true) || cl["email_verified"].as_str() == Some("true");
-    let email = cl["email"].as_str().filter(|_| verified).map(|e| e.trim().to_lowercase());
+    let email = cl["email"].as_str().filter(|_| verified).and_then(|e| norm_email(e).ok());
     let name = cl["name"].as_str().or_else(|| email.as_deref().and_then(|e| e.split('@').next())).unwrap_or("Google 使用者").to_string();
     Ok(Some(GoogleIdentity { sub: sub.to_string(), email, name, picture: cl["picture"].as_str().map(String::from) }))
 }

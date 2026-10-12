@@ -1,10 +1,10 @@
 export function useAuth() {
   const user = useState<any>('auth-user', () => null)
   const loaded = useState<boolean>('auth-loaded', () => false)
-  const { api } = useApi()
+  const { api, base } = useApi()
   async function fetchMe(force = false) {
     if (loaded.value && !force) return user.value
-    try { user.value = await api('/me', { noRedirect: true }) } catch { user.value = null }
+    try { user.value = await api('/me', { noRedirect: true }); useState<string>('auth-error', () => '').value = '' } catch { user.value = null }
     loaded.value = true
     return user.value
   }
@@ -26,5 +26,8 @@ export function useAuth() {
   const verifyRegister = (email: string, code: string) => session('/auth/register/verify', { email, code })
   const requestReset = (email: string) => post('/auth/password/reset/request', { email })
   const confirmReset = (email: string, code: string, new_password: string) => post('/auth/password/reset/confirm', { email, code, new_password })
-  return { user, fetchMe, logout, login, register, verifyRegister, requestReset, confirmReset }
+  function oauth(provider: 'google' | 'line', redirect = '/dashboard', link = false) {
+    window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
+  }
+  return { oauth, user, fetchMe, logout, login, register, verifyRegister, requestReset, confirmReset }
 }
