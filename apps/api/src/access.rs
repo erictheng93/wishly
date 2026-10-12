@@ -1,5 +1,5 @@
 //! 清單與捐助的可見性判斷（0004_social）。所有對外讀取/認領/SSE/檢舉都經 `check_wishlist`。
-use crate::{error::AppError, session::{cookie_value, hash_token}, AppState};
+use crate::{error::AppError, session::hash_token, AppState};
 use axum::http::request::Parts;
 use hmac::{Hmac, Mac};
 use serde_json::json;
@@ -17,11 +17,11 @@ pub async fn are_friends<'e, E: PgExecutor<'e>>(ex: E, a: Uuid, b: Uuid) -> Resu
 
 /// 從 ws_session cookie 取得登入者（可無）；不拒絕請求
 pub async fn viewer(parts: &Parts, st: &AppState) -> Result<Option<Uuid>, AppError> {
-    let Some(tok) = cookie_value(parts, "ws_session") else { return Ok(None) };
+    let Some(tok) = crate::session::session_token(&parts.headers) else { return Ok(None) };
     Ok(sqlx::query_scalar(
         "SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.deleted_at IS NULL")
-        .bind(hash_token(tok)).fetch_optional(&st.pool).await?)
+        .bind(hash_token(&tok)).fetch_optional(&st.pool).await?)
 }
 
 /// 密碼清單的存取權杖：HMAC(wishlist_id + 目前密碼雜湊)；改密碼即全部失效。

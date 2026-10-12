@@ -1,4 +1,4 @@
-// 創建者端 API 客戶端：cookie（ws_session）驗證、RFC 9457 錯誤正規化
+// 創建者端 API 客戶端：cookie（ws_session）驗證；原生殼改用 Bearer（見 utils/native.ts）、RFC 9457 錯誤正規化
 export class CreatorApiError extends Error {
   constructor(public status: number, public code: string, public detail: string, public errors: any[] = [], public body: any = {}) { super(detail) }
 }
@@ -17,13 +17,14 @@ export function useApi() {
   async function api<T = any>(path: string, opts: any = {}): Promise<T> {
     const { noRedirect, ...rest } = opts
     try {
-      return await $fetch(path, { baseURL: base, credentials: 'include', ...rest }) as T
+      return await $fetch(path, { baseURL: base, credentials: 'include', ...rest, headers: { ...nativeHeaders(), ...rest.headers } }) as T
     } catch (e: any) {
       const status = e.statusCode || e.status || 0
       const d = e.data && typeof e.data === 'object' ? e.data : {}
       const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || '連線失敗，請稍後再試', d.errors || [], d)
       if (err.code === 'UNAUTHORIZED' && !noRedirect && import.meta.client) {
         useState('auth-user').value = null
+        setNativeToken(null)
         await navigateTo({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
       }
       throw err

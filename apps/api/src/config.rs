@@ -6,6 +6,8 @@ use std::{net::SocketAddr, sync::OnceLock};
 pub struct Config {
     pub is_prod: bool,
     pub app_url: String,
+    /// 額外允許的 CORS 來源（逗號分隔）：Tauri webview 的 origin，如 tauri://localhost。dev 預設含 Tauri 三種，production 需明確設定 NATIVE_ORIGINS。
+    pub native_origins: Vec<String>,
     pub api_base_url: String,
     pub otp_pepper: String,
     pub oauth_secret: String,
@@ -54,6 +56,7 @@ impl Config {
         Config {
             is_prod: false,
             app_url: v("APP_URL", "http://localhost:3000").trim_end_matches('/').into(),
+            native_origins: v("NATIVE_ORIGINS", "tauri://localhost,http://tauri.localhost,https://tauri.localhost").split(',').map(|s| s.trim().trim_end_matches('/').to_string()).filter(|s| !s.is_empty()).collect(),
             api_base_url: v("API_BASE_URL", "http://localhost:8080"),
             otp_pepper: v("OTP_PEPPER", "dev-pepper"),
             oauth_secret: v("OAUTH_SECRET", "dev-oauth-secret"),
@@ -87,6 +90,8 @@ impl Config {
             Some(o) => return Err(format!("APP_ENV={o} 無效（dev|test|production）")),
         }
         c.is_prod = true;
+        // production 不沿用 dev 預設：未設 NATIVE_ORIGINS 就只允許 APP_URL
+        if var("NATIVE_ORIGINS").is_none() { c.native_origins.clear(); }
         let must = |k: &str| match var(k) {
             None => Err(format!("production 需設定 {k}")),
             Some(s) if s.len() < 32 => Err(format!("{k} 至少 32 字元")),

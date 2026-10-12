@@ -14,16 +14,24 @@ pub fn cookie_value<'a>(parts: &'a Parts, name: &str) -> Option<&'a str> {
         .find_map(|c| c.trim().strip_prefix(name)?.strip_prefix('='))
 }
 
+/// 登入權杖：先 cookie `ws_session`（網頁），否則 `Authorization: Bearer`（Tauri / 原生，不帶 cookie）。
+pub fn session_token(h: &axum::http::HeaderMap) -> Option<String> {
+    crate::auth::cookie(h, "ws_session").or_else(|| {
+        let t = h.get(header::AUTHORIZATION)?.to_str().ok()?.strip_prefix("Bearer ")?.trim();
+        (!t.is_empty()).then(|| t.to_string())
+    })
+}
+
 pub struct CurrentUser { pub id: Uuid, pub is_staff: bool }
 
 impl FromRequestParts<AppState> for CurrentUser {
     type Rejection = AppError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
-        let tok = cookie_value(parts, "ws_session").ok_or(AppError::Unauthorized)?;
+        let tok = session_token(&parts.headers).ok_or(AppError::Unauthorized)?;
         let row: Option<(Uuid, bool)> = sqlx::query_as(
             "SELECT u.id, u.is_staff FROM sessions s JOIN users u ON u.id = s.user_id
              WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.deleted_at IS NULL")
-            .bind(hash_token(tok)).fetch_optional(&st.pool).await?;
+            .bind(hash_token(&tok)).fetch_optional(&st.pool).await?;
         row.map(|(id, is_staff)| CurrentUser { id, is_staff }).ok_or(AppError::Unauthorized)
     }
 }

@@ -105,15 +105,17 @@ async fn problem_json(res: axum::response::Response) -> axum::response::Response
     out
 }
 
-/// 前端（Pages）與 API 不同網域：只允許 APP_URL，並帶憑證。
+/// 前端（Pages）與 API 不同網域：只允許 APP_URL（+ NATIVE_ORIGINS 的 Tauri webview），並帶憑證。
 fn cors() -> tower_http::cors::CorsLayer {
-    use axum::http::{header, HeaderName, Method};
-    let origin = config::get().app_url;
+    use axum::http::{header, HeaderName, HeaderValue, Method};
+    let cfg = config::get();
+    let origins: Vec<HeaderValue> = std::iter::once(&cfg.app_url).chain(cfg.native_origins.iter())
+        .map(|o| o.parse().expect("APP_URL / NATIVE_ORIGINS")).collect();
     tower_http::cors::CorsLayer::new()
-        .allow_origin(origin.parse::<axum::http::HeaderValue>().expect("APP_URL"))
+        .allow_origin(origins)
         .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::PUT, Method::DELETE])
-        .allow_headers([header::CONTENT_TYPE, HeaderName::from_static("x-guest-token"), HeaderName::from_static("idempotency-key"), HeaderName::from_static("x-list-access")])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, HeaderName::from_static("x-native-client"), HeaderName::from_static("x-guest-token"), HeaderName::from_static("idempotency-key"), HeaderName::from_static("x-list-access")])
         .expose_headers([HeaderName::from_static("idempotency-replayed")])
 }
 

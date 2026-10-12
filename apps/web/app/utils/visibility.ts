@@ -1,3 +1,4 @@
+import { nativeHeaders } from './native'
 // 清單可見性：選項文案（同時作為分享時「誰能打開」的提示）+ 密碼清單權杖（sessionStorage ws_la_<slug>）
 export const VIS_OPTIONS = [
   { v: 'public', label: '公開', desc: '任何人都能看；會列在你的個人頁。' },
@@ -26,7 +27,7 @@ export function setListAccess(slug: string, token: string | null) {
  *  退回只為了「前端先上線、後端還是舊版」時好友仍看得到；新後端的 /public 永遠不回受限內容，退回不會外洩。
  *  ponytail: 前後端都上線後拿掉 404 退回（多一次請求只發生在真的 404 時）。 */
 export async function fetchListWithCreds<T = any>(apiBase: string, slug: string, access: string | null): Promise<T> {
-  const headers: Record<string, string> = access ? { 'X-List-Access': access } : {}
+  const headers: Record<string, string> = { ...nativeHeaders(), ...(access ? { 'X-List-Access': access } : {}) }
   const opt = { credentials: 'include' as const, cache: 'no-cache' as const, headers }
   try { return await $fetch<any>(`${apiBase}/api/v1/restricted/wishlists/${slug}`, opt) as T }
   catch (e: any) {

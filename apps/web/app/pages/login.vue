@@ -39,9 +39,9 @@ async function submit() {
       <NuxtLink :to="{ path: '/register', query: q }">建立帳號</NuxtLink>
       <NuxtLink to="/forgot-password">忘記密碼</NuxtLink>
     </div>
-    <p class="c-center c-mute">或</p>
-    <button type="button" class="c-btn block c-mb" @click="oauth('google')">使用 Google 繼續</button>
-    <button type="button" class="c-btn block c-mb" @click="oauth('line')">使用 LINE 繼續</button>
+    <p v-if="!isNative()" class="c-center c-mute">或</p>
+    <button v-if="!isNative()" type="button" class="c-btn block c-mb" @click="oauth('google')">使用 Google 繼續</button>
+    <button v-if="!isNative()" type="button" class="c-btn block c-mb" @click="oauth('line')">使用 LINE 繼續</button>
     <p class="c-mute">送禮的朋友不需要登入，直接用分享連結即可。</p>
   </main>
 </template>

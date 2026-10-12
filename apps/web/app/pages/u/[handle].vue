@@ -11,7 +11,7 @@ useHead(() => ({ title: p.value ? `${p.value.user.display_name} 的心願` : '�
 
 // 匿名也要能看：不走 useApi 的 401 轉址，直接帶 cookie 呼叫
 async function load() {
-  try { p.value = await $fetch(`${base}/users/${encodeURIComponent(handle)}`, { credentials: 'include' }); state.value = 'ok' }
+  try { p.value = await $fetch(`${base}/users/${encodeURIComponent(handle)}`, { credentials: 'include', headers: nativeHeaders() }); state.value = 'ok' }
   catch (e: any) { state.value = e.status === 404 || e.statusCode === 404 ? 'gone' : 'error' }
 }
 onMounted(async () => { await fetchMe(); await load() })

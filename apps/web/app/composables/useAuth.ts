@@ -11,11 +11,16 @@ export function useAuth() {
   async function logout() {
     try { await api('/auth/logout', { method: 'POST', noRedirect: true }) } catch {}
     user.value = null
+    setNativeToken(null)
     await navigateTo('/login')
   }
   const post = (path: string, body: any) => api(path, { method: 'POST', body, noRedirect: true, credentials: 'include' })
   // 成功回 session cookie；重抓 /me 讓全域 user 就緒
-  async function session(path: string, body: any) { await post(path, body); return fetchMe(true) }
+  async function session(path: string, body: any) {
+    const r = await post(path, body)
+    if (r?.session_token) setNativeToken(r.session_token)
+    return fetchMe(true)
+  }
   const login = (email: string, password: string) => session('/auth/login', { email, password })
   const register = (email: string, password: string, display_name: string) => post('/auth/register', { email, password, display_name })
   const verifyRegister = (email: string, code: string) => session('/auth/register/verify', { email, code })

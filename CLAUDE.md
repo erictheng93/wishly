@@ -38,5 +38,6 @@ node mocks/server.mjs                      # 訪客端契約 mock，:8080（slug
 **前端**（`apps/web`）：
 - `/s/[slug]` 為 SSR 分享頁（LINE/FB 預覽）；創建者頁面（dashboard、lists、settings、admin、登入等）在 `nuxt.config.ts` 的 `routeRules` 設為 `ssr: false`（靠 cookie 驗證），新增創建者路由要加進該清單。
 - API 在不同網域：`useApi()`（創建者，`credentials: 'include'`，把錯誤正規化為 `CreatorApiError`，401 自動導向登入）與 `useGuest()`（訪客權杖）。即時更新 `useWishlistEvents` 用 SSE，連續失敗 2 次改輪詢。
+- 原生殼（Tauri）：`npm run build:native`（`NUXT_NATIVE=1`，建置時常數 `__NATIVE__`）產出純 SPA。webview 跨站不送 cookie，所以登入帶 `X-Native-Client` 取 `session_token` 後走 `Authorization: Bearer`（`utils/native.ts`、後端 `session::session_token`）；CORS 來源由 `NATIVE_ORIGINS` 控制。新增直接 `$fetch` 的受保護請求要帶 `nativeHeaders()`。
 - 部署 Cloudflare Pages。`NUXT_DEMO` 與 `NUXT_PUBLIC_API_BASE` 是**建置時**變數：`npm run deploy`（正式）與 `deploy:demo`（只有 `/s/demo` 假資料，`server/routes/api/v1/public/...` 僅此時啟用，勿給真實使用者）；`wrangler.jsonc` 刻意不放 `vars`。
 - 樣式為「紅白實驗室」主題（白底、紅 #c8102e、直角、警示斜紋進度條）；token 在 `assets/tokens.css`，參考 `design/themes.html` 款式二。

@@ -159,7 +159,9 @@ pub(crate) async fn consume_otp(pool: &PgPool, email: &str, code: &str, purpose:
 pub(crate) async fn session_response(pool: &PgPool, headers: &HeaderMap, uid: Uuid, is_new: bool) -> Result<Response, AppError> {
     let token = new_session(pool, uid, headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok())).await?;
     let u = user_json(pool, uid).await?;
-    let body = json!({ "user": { "id": u["id"], "display_name": u["display_name"], "email": u["email"], "avatar_url": u["avatar_url"] }, "is_new_user": is_new });
+    let mut body = json!({ "user": { "id": u["id"], "display_name": u["display_name"], "email": u["email"], "avatar_url": u["avatar_url"] }, "is_new_user": is_new });
+    // 原生客戶端（Tauri）的 webview 不會帶跨站 cookie：帶 X-Native-Client 時把權杖放進回應，之後以 Bearer 使用。
+    if headers.contains_key("x-native-client") { body["session_token"] = json!(token); }
     Ok(([(header::SET_COOKIE, session_cookie(&token))], Json(body)).into_response())
 }
 
@@ -173,7 +175,7 @@ async fn otp_verify(State(st): State<AppState>, headers: HeaderMap, Json(r): Jso
 
 // ---------- logout / me ----------
 async fn logout(_u: CurrentUser, State(st): State<AppState>, headers: HeaderMap) -> Result<Response, AppError> {
-    if let Some(t) = cookie(&headers, "ws_session") {
+    if let Some(t) = crate::session::session_token(&headers) {
         sqlx::query("UPDATE sessions SET revoked_at = now() WHERE token_hash=$1 AND revoked_at IS NULL").bind(hash_token(&t)).execute(&st.pool).await?;
     }
     Ok((StatusCode::NO_CONTENT, [(header::SET_COOKIE, format!("ws_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{}", secure()))]).into_response())

@@ -90,6 +90,7 @@ npx playwright show-report                                      # 開啟上次�
 
 - 後端：`DATABASE_URL`；其餘（SMTP、LINE Login 等）見 `apps/api/.env.example`
   - `BIND`：預設 `127.0.0.1:8080`（dev、production 皆是）。容器內部署需明確設 `BIND=0.0.0.0:8080`，且只讓 Cloudflare Tunnel / 內網可達。
+  - `NATIVE_ORIGINS`：額外允許的 CORS 來源（逗號分隔），給 Tauri webview：`tauri://localhost`（macOS / iOS / Linux）、`http://tauri.localhost`（Windows / Android）。dev 預設全含；**production 未設就只允許 `APP_URL`**。原生殼不送 cookie，以 `X-Native-Client: 1` 登入取回 `session_token`，之後用 `Authorization: Bearer`（與 cookie 共用同一張 `sessions`）。
   - `TRUSTED_PROXY`：`cloudflare` 或 `none`。dev 預設 `none`；**production 必須明確設定**，未設或其他值會拒絕啟動（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）。設 `cloudflare` 時信任 `CF-Connecting-IP`，所以 API 不可被直接存取，否則該標頭可被偽造；若 `BIND` 不是回送位址，啟動時會印出 WARN。
   - `TURNSTILE_SECRET`：production 必填；檢舉的 `turnstile_token` 會送 siteverify 驗證，失敗回 403 `FORBIDDEN`。dev/test 不設則略過驗證（接受任何 token，含前端的 `dev-bypass`）。`TURNSTILE_VERIFY_URL` 僅測試時覆寫。
   - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。
@@ -114,6 +115,7 @@ npx playwright show-report                                      # 開啟上次�
 | 指令（在 `apps/web`） | 建置時設定 | 行為 |
 |---|---|---|
 | `npm run deploy`（正式） | `NUXT_DEMO` 清空；API 預設 `https://api.wishsync.tw` | 分享連結走真實 API，`/s/demo` 不會有假資料 |
+| `npm run build:native`（Tauri 前端） | `NUXT_NATIVE=1`、`NUXT_PUBLIC_SITE_URL`（分享連結網域，預設 `https://wishsync.tw`）、`NUXT_PUBLIC_API_BASE` | 純 SPA 靜態檔 `.output/public`（無 SSR、無 service worker、隱藏第三方登入）；Tauri 的 `frontendDist` 指向它。尚未包 Tauri 專案 |
 | `npm run deploy:demo`（示範） | `NUXT_DEMO=1`、`NUXT_PUBLIC_API_BASE=` | 僅 `/s/demo` 有同源假資料，其餘分享連結失敗；**不要給真實使用者** |
 
 - 正式 API 網域不同時，建置前設 `NUXT_PUBLIC_API_BASE=https://...`，或改 `nuxt.config.ts` 預設值。

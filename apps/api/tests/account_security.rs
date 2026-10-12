@@ -151,3 +151,25 @@ async fn export_includes_contribution_visibility(pool: PgPool) {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(export["contributions"][0]["visibility"], "friends");
 }
+
+/// Tauri：不帶 cookie，以 Authorization: Bearer 驗證；X-Native-Client 登入才回 session_token；CORS 允許 tauri origin
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn bearer_session_and_native_cors(pool: PgPool) {
+    let (_, tok) = user(&pool).await;
+    let (s, _, _) = call(&pool, "GET", "/me", None, &[], None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _, b) = call(&pool, "GET", "/me", None, &[("authorization", format!("Bearer {tok}"))], None).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let (s, _, _) = call(&pool, "GET", "/me", None, &[("authorization", "Bearer nope".into())], None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    // 登出以 Bearer 撤銷，之後同權杖失效
+    let (s, _, _) = call(&pool, "POST", "/auth/logout", None, &[("authorization", format!("Bearer {tok}"))], None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _, _) = call(&pool, "GET", "/me", None, &[("authorization", format!("Bearer {tok}"))], None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    // CORS preflight：tauri://localhost 通過、陌生來源不通過
+    let (_, h, _) = raw(&pool, "OPTIONS", "/api/v1/me", None, None, &[("origin", "tauri://localhost".into()), ("access-control-request-method", "GET".into()), ("access-control-request-headers", "authorization,x-native-client".into())], vec![]).await;
+    assert_eq!(h["access-control-allow-origin"], "tauri://localhost");
+    let (_, h, _) = raw(&pool, "OPTIONS", "/api/v1/me", None, None, &[("origin", "https://evil.example".into()), ("access-control-request-method", "GET".into())], vec![]).await;
+    assert!(h.get("access-control-allow-origin").is_none());
+}

@@ -35,7 +35,7 @@ onBeforeUnmount(() => clearTimeout(poll))
 const hidden = computed(() => w.value?.moderation_status === 'hidden')
 const shareUrl = computed(() => {
   if (!w.value) return ''
-  const u = w.value.share_url || `${location.origin}/s/${w.value.slug}`
+  const u = w.value.share_url || `${siteOrigin()}/s/${w.value.slug}`
   return external.value ? u + '?openExternalBrowser=1' : u
 })
 function openItem(i: any = null) { editing.value = i; sheet.value = true }
