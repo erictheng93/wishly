@@ -82,6 +82,9 @@ header.top,main{padding-left:16px;padding-right:16px}
 <a class="sub" href="#f17">F17 帳號刪除與匯出</a>
 <a class="sub" href="#f18">F18 拒付處理 (P2-A)</a>
 <a class="sub" href="#f19">F19 電子發票 (P2-A)</a>
+<a class="sub" href="#f20">F20 好友與邀請連結</a>
+<a class="sub" href="#f21">F21 清單可見性與存取</a>
+<a class="sub" href="#f22">F22 個人頁與捐助可見度</a>
 <a href="#s6">6. 橫切關注點</a>
 <a class="sub" href="#s66">6.6 金流與敏感資料安全</a>
 <a class="sub" href="#s67">6.7 測試策略</a>
@@ -99,9 +102,10 @@ header.top,main{padding-left:16px;padding-right:16px}
 <h2 id="s1">1. 文件資訊</h2>
 <table class="meta"><tbody>
 <tr><td>文件名稱</td><td>WishSync Master User Flow（後端版）</td></tr>
-<tr><td>版本</td><td>v0.4</td></tr>
-<tr><td>日期</td><td>2026-10-08</td></tr>
+<tr><td>版本</td><td>v0.5</td></tr>
+<tr><td>日期</td><td>2026-10-12</td></tr>
 <tr><td>狀態</td><td>Draft</td></tr>
+<tr><td>v0.5 變更</td><td>對齊 10/11 已實作的功能（原文件停在 10/8，流程圖落後實作）：新增 F1-c Email＋密碼註冊 / 登入 / 忘記密碼（登入頁實際入口）、F20 好友與邀請連結、F21 清單可見性與存取（好友 / 指定 / 密碼 / CDN 受限路徑）、F22 個人頁與捐助可見度；更新角色矩陣、錯誤碼（LOGIN_REQUIRED、FRIENDS_ONLY、NOT_ALLOWED、PASSWORD_REQUIRED、WRONG_PASSWORD、INVALID_CREDENTIALS、EMAIL_EXISTS、HANDLE_TAKEN、NOT_FRIEND、SELF_INVITE）；修正 F1-a 的 OTP_INVALID 狀態碼為 400（與實作與 04 一致）。</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證（本文件新增 F15 到 F19、6.7 到 6.9，並更新 F2、F9、F10）。前端部署為 Cloudflare Pages（Pages Functions SSR），Workers 為備案。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值（F11）、電子禮物卡（F12）、回饋星星（F13）、企業禮券（F14）；點數改為分批（point lots）管理。</td></tr>
 <tr><td>v0.2 變更</td><td>眾籌改為點數錢包與達標自動購買，移到 Phase 2。</td></tr>
@@ -206,13 +210,19 @@ flowchart LR
 <tr><td>地圖 / 需求彙總查詢</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td>P2；公開</td></tr>
 <tr><td>claim 逾期轉 expired、對帳、清理、通知寄送</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td>audit_logs 的 actor_type = system</td></tr>
 <tr><td>讀取 audit_logs</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td>v1 無對外 API，僅內部查詢</td></tr>
+<tr><td>瀏覽 friends / selected 清單 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">—</td><td>F21；需登入且為好友 / 在名單內；owner 本人免檢查；org 角色欄僅表示「已登入」，不因 org 身分放行</td></tr>
+<tr><td>解鎖並瀏覽 password 清單 <span class="badge p0">P0</span></td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F21；知道密碼即可，免登入；每 slug + IP 15 分鐘 10 次</td></tr>
+<tr><td>設定清單可見性、存取密碼、指定名單 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>F21；僅清單 owner_id 本人；指定名單只能選自己的好友</td></tr>
+<tr><td>好友申請 / 接受 / 邀請連結 / 解除好友 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F20；需登入；訪客可開邀請預覽但接受需登入</td></tr>
+<tr><td>設定 handle 與捐助預設可見度、逐筆調整認領可見度 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F22；訪客認領無帳號，不列入個人頁</td></tr>
+<tr><td>瀏覽他人個人頁 /u/{handle} <span class="badge p0">P0</span></td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F22；匿名可看 public 內容，依 relation 顯示更多</td></tr>
 </tbody></table>
 <p><b>授權實作原則：</b>授權條件寫進 SQL 的 WHERE（例如 <code>WHERE id=$1 AND owner_id=$2</code>），查無列一律回 <code>NOT_FOUND</code>，不回 <code>FORBIDDEN</code>，避免洩漏資源存在與否；只有「已登入但角色不足」（如 volunteer 想建立據點）才回 <code>FORBIDDEN</code>。</p>
 
 <h2 id="s4">4. 主流程總覽</h2>
 <pre class="mermaid">
 flowchart TD
-  A["建立者登入 F1<br/>Email OTP / LINE / Google"] --> B["建立清單與品項 F2<br/>status = draft"]
+  A["建立者登入 F1<br/>Email 密碼 / OTP / LINE / Google"] --> B["建立清單與品項 F2<br/>status = draft"]
   B --> C["發佈 F2<br/>draft 轉 active, 取得 slug"]
   C --> D["分享連結<br/>LINE / FB / 簡訊 /s/slug"]
   D --> E["訪客開啟 F3<br/>SSR + OG, 免註冊"]
@@ -238,6 +248,28 @@ flowchart TD
 </pre>
 <p>主流程的資料不變量：<code>0 ≤ qty_claimed ≤ qty_needed</code>（quantity 品項）；<code>qty_claimed</code> = 該品項狀態屬 reserved/purchased/delivered 的 claims 數量加總；crowdfund 品項（P2）：<code>0 ≤ pledged_points ≤ target_points</code>，<code>pledged_points</code> = pledged + captured 的 contributions 點數加總；每個錢包 <code>balance = Σ point_ledger.delta</code> 且 ≥ 0。定義見 F6。</p>
 
+
+<h4>4.1 社群與可見性主流程（v0.5 補充）<span class="badge p0">P0</span></h4>
+<p>主流程總覽只畫了「公開連結」路徑。實作後清單另有 6 種可見性與好友關係，訪客是否看得到清單、認領是否列在個人頁，都由下圖決定。</p>
+<pre class="mermaid">
+flowchart TD
+  O["建立者設定可見性 F21<br/>public / link / friends / selected / password / private"] --> S["清單 /s/slug"]
+  FR["好友關係 F20<br/>申請 或 邀請連結"] --> S
+  V["訪客或登入者開啟 /s/slug"] --> C{"access.rs check_wishlist"}
+  C -->|"public / link"| OK["200 公開內容 可被 CDN 快取"]
+  C -->|"private"| NF["404 NOT_FOUND"]
+  C -->|"password 且權杖有效"| OK2["200 受限內容 no-store"]
+  C -->|"password 無權杖"| PW["403 PASSWORD_REQUIRED<br/>輸入密碼 unlock"]
+  C -->|"friends / selected 未登入"| LG["403 LOGIN_REQUIRED<br/>登入後回到清單"]
+  C -->|"friends 非好友"| FO["403 FRIENDS_ONLY<br/>前往個人頁加好友"]
+  C -->|"selected 不在名單"| NA["403 NOT_ALLOWED"]
+  PW -->|"POST unlock 成功"| OK2
+  LG --> V
+  OK --> CL["認領 F4 或 認捐 F6b"]
+  OK2 --> CL
+  CL --> PR["登入者認領帶 visibility<br/>決定是否出現在個人頁 F22"]
+</pre>
+
 <h2 id="s5">5. 子流程</h2>
 <p>各子流程統一格式：時序圖、前置條件、步驟、API、交易邊界、例外與錯誤碼、冪等性。</p>
 
@@ -259,10 +291,10 @@ sequenceDiagram
   A->>D: BEGIN, SELECT challenge FOR UPDATE
   alt 過期或 attempts 已達 5
     A->>D: COMMIT
-    A-->>B: 401 OTP_INVALID 或 429 RATE_LIMITED
+    A-->>B: 400 OTP_INVALID 或 429 RATE_LIMITED
   else code 錯誤
     A->>D: attempts = attempts + 1, COMMIT (失敗計數必須落盤)
-    A-->>B: 401 OTP_INVALID
+    A-->>B: 400 OTP_INVALID
   else code 正確
     A->>D: consumed_at = now(), upsert users + auth_identities(email)
     A->>D: INSERT sessions (token_hash)
@@ -277,7 +309,7 @@ sequenceDiagram
 <tr><td>步驟</td><td>1) request：回應固定 202 且回應時間盡量一致，避免帳號枚舉。2) verify：成功後 upsert <code>users</code> 與 <code>auth_identities(provider=email, provider_uid=lower(email))</code>，建立 session：32 bytes 隨機 token，DB 存 SHA-256 hash，cookie <code>ws_session</code> 效期 30 天（滑動續期）。3) 成功後回傳使用者摘要，前端導向 <code>/dashboard</code>。</td></tr>
 <tr><td>API</td><td><code>POST /auth/otp/request</code>、<code>POST /auth/otp/verify</code>、<code>GET /me</code>、<code>POST /auth/logout</code></td></tr>
 <tr><td>交易邊界</td><td>request：單一短交易（作廢舊 + 新增 challenge），<strong>寄信在 COMMIT 之後</strong>，不在交易內呼叫外部服務。verify：<code>SELECT ... FOR UPDATE</code> 鎖 challenge 列；<strong>失敗路徑也要 COMMIT</strong>（attempts 遞增），不可 ROLLBACK；成功路徑在同一交易完成 consumed、users/identities upsert、sessions 新增。</td></tr>
-<tr><td>例外 / 錯誤碼</td><td><code>VALIDATION_FAILED</code> 422（email 格式、code 非 6 碼數字）；<code>OTP_INVALID</code> 401（不區分錯誤 / 過期 / 已使用 / 已作廢）；<code>RATE_LIMITED</code> 429（附 <code>Retry-After</code>）；寄信失敗不影響 202，使用者可重送。</td></tr>
+<tr><td>例外 / 錯誤碼</td><td><code>VALIDATION_FAILED</code> 422（email 格式、code 非 6 碼數字）；<code>OTP_INVALID</code> 400（不區分錯誤 / 過期 / 已使用 / 已作廢）；<code>RATE_LIMITED</code> 429（附 <code>Retry-After</code>）；寄信失敗不影響 202，使用者可重送。</td></tr>
 <tr><td>冪等性</td><td>request 非嚴格冪等（每次產生新 challenge，受冷卻限制）；verify 同一 code 第二次回 <code>OTP_INVALID</code>（已 consumed）。兩者不要求 Idempotency-Key。</td></tr>
 </tbody></table>
 
@@ -309,6 +341,60 @@ sequenceDiagram
 <tr><td>交易邊界</td><td>換 token 與驗 id_token 在交易<strong>之外</strong>；之後單一交易：upsert users/auth_identities（<code>ON CONFLICT (provider, provider_uid)</code>）+ INSERT sessions。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td>state 不符或 cookie 遺失：<code>OAUTH_STATE_INVALID</code> 400；使用者拒絕授權或 provider 回 error：302 回 <code>/login?error=...</code>；換 token 失敗或 id_token 驗證失敗：<code>OAUTH_PROVIDER_ERROR</code> 502；callback 因是瀏覽器導覽，錯誤以 302 帶參數回前端，不直接顯示 JSON。</td></tr>
 <tr><td>冪等性</td><td>authorization code 一次性；callback 重放會因 provider 拒絕而失敗，不會建立重複 session。identities 的 UNIQUE 約束確保不會產生重複 user。</td></tr>
+</tbody></table>
+
+
+<h4>F1-c Email＋密碼：註冊、登入、忘記密碼 <span class="badge p0">P0</span></h4>
+<p>/login 頁實際提供的主要入口（Email＋密碼，另有 Google / LINE）。F1-a 的 OTP 端點仍保留；註冊與重設密碼用 OTP 驗證 Email 所有權。</p>
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant B as 瀏覽器
+  participant A as Rust API
+  participant D as PostgreSQL
+  participant M as Email 供應商
+  Note over B,M: 註冊
+  B->>A: POST /auth/register (email, password, display_name)
+  A->>A: 驗證密碼 8-128 字、名稱 1-50 字，argon2 雜湊
+  A->>D: 作廢舊 challenge, INSERT otp_challenge (purpose=register, 暫存 password_hash 與 display_name)
+  A-->>B: 202 (不論 email 是否已註冊)
+  A->>M: 寄 6 碼 OTP
+  B->>A: POST /auth/register/verify (email, code)
+  alt 驗證碼錯誤或過期
+    A-->>B: 400 OTP_INVALID
+  else Email 已有密碼登入
+    A-->>B: 409 EMAIL_EXISTS
+  else 成功
+    A->>D: upsert users + auth_identities(email, password_hash), INSERT sessions
+    A-->>B: 200 + Set-Cookie ws_session
+  end
+  Note over B,M: 登入
+  B->>A: POST /auth/login (email, password)
+  A->>D: 統計 login_failures 近 15 分鐘
+  alt 超過門檻
+    A-->>B: 429 RATE_LIMITED
+  else 密碼錯誤或無此帳號
+    A->>D: INSERT login_failures (無帳號也跑一次 dummy hash)
+    A-->>B: 401 INVALID_CREDENTIALS
+  else 成功
+    A->>D: 清除該 email 的 login_failures, INSERT sessions
+    A-->>B: 200 + Set-Cookie ws_session
+  end
+  Note over B,M: 忘記密碼
+  B->>A: POST /auth/password/reset/request (email)
+  A-->>B: 202 (帳號存在才寄信, 被限流也回 202)
+  B->>A: POST /auth/password/reset/confirm (email, code, new_password)
+  A->>D: 消耗 OTP(purpose=reset), 設定 password_hash, 撤銷該使用者所有 sessions, 清 login_failures
+  A-->>B: 204, 前端導向 /login?reset=1
+</pre>
+<table class="meta"><tbody>
+<tr><td>前置條件</td><td>無（公開端點）。</td></tr>
+<tr><td>規則</td><td>密碼 8–128 字元（argon2）；註冊不論 Email 是否已註冊都回 202，已有密碼者到 verify 才回 <code>EMAIL_EXISTS</code>，避免帳號列舉；OTP 規則同 F1-a（10 分鐘、5 次錯誤作廢、每 email 每小時 5 封、重送冷卻 60 秒、每小時最多 10 次驗證嘗試）。登入失敗限流以 DB 計數：15 分鐘內同 (email, IP) 5 次、同 email 跨 IP 20 次、同 IP 30 次即鎖（回 429，附 Retry-After）；成功登入或重設密碼即清除該 email 紀錄。重設密碼同時撤銷所有既有 session，使用者需重新登入。原本只用 OTP / Google 登入的帳號，第一次經由「忘記密碼」設定密碼即可改用密碼登入。</td></tr>
+<tr><td>步驟</td><td>註冊：form → 寄驗證碼 → 輸入 6 碼 → 自動登入並導向 <code>redirect</code>（僅接受站內相對路徑，<code>//</code> 開頭拒絕）。登入：成功導向 <code>redirect</code> 或 /dashboard；LINE / Google 為整頁跳轉。忘記密碼：Email → 驗證碼＋新密碼 → 回 /login 顯示「密碼已重設」。</td></tr>
+<tr><td>API</td><td><code>POST /auth/register</code>、<code>POST /auth/register/verify</code>、<code>POST /auth/login</code>、<code>POST /auth/password/reset/request</code>、<code>POST /auth/password/reset/confirm</code></td></tr>
+<tr><td>交易邊界</td><td>寄信在 COMMIT 之後；verify 成功路徑於單一交易完成 consumed、users / identities upsert、sessions 新增；reset confirm 於單一交易完成設定密碼、撤銷 sessions、清除失敗紀錄。argon2 在 <code>spawn_blocking</code> 執行，不佔用 async worker。</td></tr>
+<tr><td>例外 / 錯誤碼</td><td><code>VALIDATION_FAILED</code> 422（Email 格式、密碼長度、名稱長度）；<code>OTP_INVALID</code> 400；<code>EMAIL_EXISTS</code> 409；<code>INVALID_CREDENTIALS</code> 401（不區分無帳號 / 密碼錯）；<code>RATE_LIMITED</code> 429。</td></tr>
+<tr><td>冪等性</td><td>不要求 Idempotency-Key；同一驗證碼只能消耗一次。</td></tr>
 </tbody></table>
 
 <h3 id="f2">F2 建立清單與品項 <span class="badge p0">P0</span></h3>
@@ -1501,6 +1587,135 @@ sequenceDiagram
 <tr><td>冪等性</td><td>以 invoice id 為加值中心端的冪等參照（merchant order no）；<code>(source_type, source_id)</code> UNIQUE 防重複建立；作廢 / 折讓以目標狀態為準。</td></tr>
 </tbody></table>
 
+
+<h3 id="f20">F20 好友與邀請連結 <span class="badge p0">P0</span></h3>
+<p>好友為<b>無向、需雙方同意</b>的關係，供「僅好友 / 指定好友」清單與「僅好友」的捐助可見度使用。兩條路徑：以 Email / handle 送申請，或分享邀請連結 / QR。</p>
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant X as 甲 瀏覽器
+  participant A as Rust API
+  participant D as PostgreSQL
+  participant Y as 乙 瀏覽器
+  Note over X,Y: 路徑一 以 Email 或 handle 申請
+  X->>A: POST /friends/requests (to = email 或 @handle)
+  A->>A: 限流 每 user 30 / 小時
+  alt 對象不存在 / 是自己 / 已是好友
+    A-->>X: 202 (靜默, 不洩漏帳號是否存在)
+  else 乙已先對甲送過申請
+    A->>D: BEGIN, INSERT friendships (user_a < user_b), DELETE 雙向 friend_requests, COMMIT
+    A-->>X: 202 (直接互為好友)
+  else 一般情況
+    A->>D: INSERT friend_requests ON CONFLICT DO NOTHING
+    A-->>X: 202
+  end
+  Y->>A: GET /friends (incoming / outgoing / friends)
+  Y->>A: POST /friends/requests/{id}/accept
+  A->>D: BEGIN, SELECT 申請 FOR UPDATE (限收件者), INSERT friendships, DELETE 申請, COMMIT
+  A-->>Y: 200 (friend)
+  Note over X,Y: 路徑二 邀請連結
+  X->>A: POST /friends/invites
+  A->>D: 撤銷甲舊連結, INSERT friend_invites (token_hash, 7 天)
+  A-->>X: 201 (url /invite/token)
+  Y->>A: GET /friends/invites/{token} (公開預覽 邀請者名稱)
+  alt 乙未登入
+    Y->>Y: 導向 /login?redirect=/invite/token, 登入後回來
+  end
+  Y->>A: POST /friends/invites/{token}/accept
+  alt 邀請者就是自己
+    A-->>Y: 422 SELF_INVITE
+  else 連結失效 / 撤銷 / 過期
+    A-->>Y: 404 NOT_FOUND
+  else 成功
+    A->>D: INSERT friendships (冪等), DELETE 雙方待處理申請
+    A-->>Y: 200 (friend)
+  end
+</pre>
+<table class="meta"><tbody>
+<tr><td>前置條件</td><td>雙方皆為登入使用者（<code>ws_session</code>）。邀請預覽 <code>GET /friends/invites/{token}</code> 為公開端點，只回邀請者 display_name 與 handle。</td></tr>
+<tr><td>規則</td><td><code>friendships</code> 一列一對且 <code>user_a &lt; user_b</code>；同一時間每位使用者只有一條有效邀請連結（重新產生即作廢舊的），預設 7 天有效、可多人重複使用至過期或撤銷；邀請連結 token 只存 SHA-256。接受申請者必須是收件者。解除好友為任一方可做，且<b>雙方清單的指定名單（wishlist_allowed_users）中彼此都會一併移除</b>。</td></tr>
+<tr><td>API</td><td><code>GET /friends</code>、<code>POST /friends/requests</code>、<code>POST /friends/requests/{id}/accept</code>、<code>DELETE /friends/requests/{id}</code>（收件者婉拒或發送者取消）、<code>DELETE /friends/{user_id}</code>、<code>POST /friends/invites</code>、<code>DELETE /friends/invites</code>、<code>GET /friends/invites/{token}</code>、<code>POST /friends/invites/{token}/accept</code></td></tr>
+<tr><td>交易邊界</td><td>成為好友（<code>befriend</code>）：INSERT friendships ON CONFLICT DO NOTHING 與清除雙向待處理申請在同一交易，冪等；解除好友與清除指定名單在同一交易。</td></tr>
+<tr><td>例外 / 錯誤碼</td><td><code>VALIDATION_FAILED</code> 422（to 為空或超過 200 字）；<code>SELF_INVITE</code> 422；<code>NOT_FOUND</code> 404（申請 / 邀請不存在、非收件者）；<code>RATE_LIMITED</code> 429；<code>UNAUTHORIZED</code> 401。</td></tr>
+<tr><td>冪等性</td><td>申請與接受皆天然冪等（UNIQUE 與 ON CONFLICT），不要求 Idempotency-Key。</td></tr>
+</tbody></table>
+
+<h3 id="f21">F21 清單可見性與存取 <span class="badge p0">P0</span></h3>
+<p>所有對外讀取 / 認領 / 認捐 / SSE / 檢舉都經 <code>access::check_wishlist</code>，判斷順序固定：擁有者 → visibility。</p>
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant B as 瀏覽器
+  participant C as Cloudflare CDN
+  participant A as Rust API
+  participant D as PostgreSQL
+  Note over B,D: 公開路徑 (可被 CDN 快取, 不讀 cookie 與 X-List-Access)
+  B->>C: GET /public/wishlists/{slug}
+  C->>A: (未命中)
+  alt visibility = public 或 link
+    A-->>B: 200 public, s-maxage=10
+  else 其他
+    A-->>B: 403 附 visibility 與 owner (no-store)
+  end
+  Note over B,D: 受限路徑 (永遠 no-store)
+  B->>A: GET /restricted/wishlists/{slug} (ws_session, X-List-Access)
+  A->>D: 讀 viewer 與 friendships / allowed_users
+  alt 擁有者 或 通過檢查
+    A-->>B: 200 private, no-store
+  else 未通過
+    A-->>B: 403 LOGIN_REQUIRED / FRIENDS_ONLY / NOT_ALLOWED / PASSWORD_REQUIRED
+  end
+  Note over B,D: 密碼清單解鎖
+  B->>A: POST /public/wishlists/{slug}/unlock (password)
+  A->>A: 限流 每 slug + IP 10 / 15 分鐘
+  alt 密碼正確
+    A-->>B: 200 access_token = HMAC(wishlist_id + 目前密碼雜湊)
+    B->>B: sessionStorage 存權杖, 之後帶 X-List-Access (SSE 用 ?access=)
+  else 錯誤
+    A-->>B: 422 WRONG_PASSWORD
+  end
+</pre>
+<div class="tw"><table>
+<thead><tr><th>visibility</th><th>誰能看</th><th>被擋時</th><th>列在個人頁</th></tr></thead>
+<tbody>
+<tr><td><code>public</code></td><td>任何人</td><td>—</td><td>是（任何人）</td></tr>
+<tr><td><code>link</code>（預設）</td><td>知道連結的人</td><td>—</td><td>否</td></tr>
+<tr><td><code>friends</code></td><td>擁有者的好友（需登入）</td><td>未登入 403 <code>LOGIN_REQUIRED</code>；非好友 403 <code>FRIENDS_ONLY</code></td><td>僅好友與本人看得到</td></tr>
+<tr><td><code>selected</code></td><td><code>wishlist_allowed_users</code> 名單內的使用者（須為好友，需登入）</td><td>未登入 <code>LOGIN_REQUIRED</code>；不在名單 <code>NOT_ALLOWED</code></td><td>名單內使用者與本人</td></tr>
+<tr><td><code>password</code></td><td>知道連結＋存取密碼（8–64 字，argon2）</td><td>403 <code>PASSWORD_REQUIRED</code>；解鎖錯誤 422 <code>WRONG_PASSWORD</code></td><td>否</td></tr>
+<tr><td><code>private</code></td><td>僅擁有者</td><td>404 <code>NOT_FOUND</code>（不洩漏存在）</td><td>否</td></tr>
+</tbody></table></div>
+<table class="meta"><tbody>
+<tr><td>規則</td><td>存取權杖綁定「清單 id＋目前密碼雜湊」，<b>改密碼即全部失效</b>；擁有者本人免權杖。<code>/public/wishlists/{slug}</code> 為 CDN 可快取路徑，<b>絕不可讀 cookie 或 X-List-Access</b>；受限內容只走 <code>/restricted/wishlists/{slug}</code>。清單從可公開收緊為其他可見性時（PATCH visibility），必須呼叫 <code>cdn::purge_wishlists</code> 清除邊緣快取。前端 SSR 拿不到 cookie，受限清單 SSR 為 403，client 端 hydrate 後以憑證重抓，抓取期間不閃現門檻頁。403 回應帶 <code>visibility</code> 與 <code>owner</code>（id、display_name、handle）供門檻頁顯示「由誰建立」與「前往個人頁加好友」。</td></tr>
+<tr><td>建立者端</td><td><code>POST /wishlists</code>、<code>PATCH /wishlists/{id}</code> 帶 <code>visibility</code>、<code>access_password</code>（僅 password）；<code>PUT /wishlists/{id}/allowed-users</code> 設定指定名單（只能選自己的好友，否則 422 <code>NOT_FRIEND</code>）。<code>has_password</code> 表示已設定密碼（留空則不變更）。切離 selected 後名單保留於 DB 但不生效。</td></tr>
+<tr><td>相關限制</td><td>認領、認捐、檢舉、SSE 皆先過 <code>check_wishlist</code>：看不到就不能認領；密碼清單的 FundSheet 與 SSE 需帶權杖。個人頁與捐助紀錄的可見判斷與此處同源（F22）。</td></tr>
+<tr><td>錯誤碼</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code>、<code>PASSWORD_REQUIRED</code>（皆 403）；<code>WRONG_PASSWORD</code>、<code>NOT_FRIEND</code>、<code>VALIDATION_FAILED</code>（缺 password 欄位，422）；<code>RATE_LIMITED</code> 429；<code>NOT_FOUND</code> 404。</td></tr>
+</tbody></table>
+
+<h3 id="f22">F22 個人頁與捐助可見度 <span class="badge p0">P0</span></h3>
+<pre class="mermaid">
+flowchart TD
+  A["使用者在 /settings 設定 handle<br/>與 default_claim_visibility"] --> B["個人頁 /u/handle 啟用"]
+  C["訪客 / 登入者開啟 /u/handle"] --> D["GET /users/handle 帶 ws_session 可選"]
+  D -->|"找不到或已刪除"| E["404 找不到這位使用者"]
+  D --> F["relation = anonymous / self / friend / incoming / outgoing / none"]
+  F --> G["清單區 依 visibility 過濾<br/>public 一律 / friends 需好友 / selected 需在名單 / 本人加看 friends 與 selected"]
+  F --> H["捐助區 認領 + 點數認捐"]
+  H --> H1{"認領 claims.visibility"}
+  H1 -->|"public"| I["任何人"]
+  H1 -->|"friends"| J["需為認領者好友"]
+  H1 -->|"private"| K["只有本人"]
+  H --> H2["認捐 contributions 依帳號 default_claim_visibility<br/>匿名認捐只給本人看"]
+  F -->|"none"| L["送出好友邀請 F20"]
+  F -->|"incoming"| M["接受好友邀請"]
+  F -->|"anonymous"| N["登入以加好友 redirect 回此頁"]
+</pre>
+<table class="meta"><tbody>
+<tr><td>規則</td><td><code>users.handle</code>：小寫英數與底線 3–30 字、唯一（<code>HANDLE_TAKEN</code> 409），可為空（無個人頁）。<b>訪客認領（無帳號）永遠不出現在任何個人頁</b>（<code>claims.visibility IS NULL</code>）。登入者認領時可在 ClaimSheet 指定 <code>visibility</code>（public / friends / private），未指定則由 DB trigger 套用帳號 <code>default_claim_visibility</code>（預設 private）；之後可於 /me/claims 逐筆 PATCH。點數認捐目前<b>沒有逐筆設定</b>，依查詢當下的帳號預設，故改預設會連帶影響舊認捐（已知限制，見 TODO #3）。驚喜鎖定中的清單、已下架 / 已刪除的清單，其捐助一律不顯示；link 清單的捐助不給 slug。捐助最多回 50 筆。</td></tr>
+<tr><td>API</td><td><code>GET /users/{handle}</code>（匿名可呼叫，帶 cookie 時回傳 relation）、<code>PATCH /me</code>（handle、default_claim_visibility）、<code>PATCH /claims/{id}</code>（visibility）</td></tr>
+<tr><td>例外 / 錯誤碼</td><td><code>NOT_FOUND</code> 404（handle 不存在 / 帳號已刪除）；<code>HANDLE_TAKEN</code> 409；<code>VALIDATION_FAILED</code> 422（handle 格式）。個人頁一律 <code>noindex</code>。</td></tr>
+</tbody></table>
+
 <h2 id="s6">6. 橫切關注點</h2>
 
 <h3>6.1 認證中介層</h3>
@@ -1715,13 +1930,23 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <tr><td><code>AUTO_TOPUP_LIMIT_REACHED</code> <span class="badge p2">P2-A</span></td><td>409</td><td>自動儲值本月已達上限（僅設定端點與通知，不阻擋認捐）</td></tr>
 <tr><td><code>CODES_ALREADY_EXPORTED</code> <span class="badge p2">P2-C</span></td><td>409</td><td>企業禮券批次兌換連結 CSV 已匯出過</td></tr>
 <tr><td><code>STAFF_ONLY</code> <span class="badge p2">P2</span></td><td>403</td><td>非 is_staff 呼叫 <code>/admin/*</code></td></tr>
-<tr><td><code>OTP_INVALID</code></td><td>401</td><td>OTP 錯誤、已使用、逾 10 分鐘或嘗試達 5 次已作廢（不區分原因）</td></tr>
+<tr><td><code>OTP_INVALID</code></td><td>400</td><td>OTP 錯誤、已使用、逾 10 分鐘或嘗試達 5 次已作廢（不區分原因）</td></tr>
 <tr><td><code>OAUTH_STATE_INVALID</code></td><td>400</td><td>OAuth state / PKCE cookie 不符或遺失</td></tr>
 <tr><td><code>OAUTH_PROVIDER_ERROR</code></td><td>502</td><td>換 token 或 id_token 驗證失敗</td></tr>
 <tr><td><code>SITE_NOT_ACTIVE</code> <span class="badge p2">P2</span></td><td>409</td><td>據點 paused 時新增認領</td></tr>
 <tr><td><code>USER_NOT_FOUND</code> <span class="badge p2">P2</span></td><td>404</td><td>加入 org 成員時該 email 尚無帳號</td></tr>
 <tr><td><code>MEMBER_ALREADY_EXISTS</code> <span class="badge p2">P2</span></td><td>409</td><td>重複加入成員</td></tr>
 <tr><td><code>LAST_OWNER</code> <span class="badge p2">P2</span></td><td>409</td><td>降級或移除組織最後一位 owner</td></tr>
+<tr><td><code>LOGIN_REQUIRED</code></td><td>403</td><td>friends / selected 清單，未登入（附 <code>visibility</code>、<code>owner</code>）</td></tr>
+<tr><td><code>FRIENDS_ONLY</code></td><td>403</td><td>friends 清單，登入者不是擁有者的好友</td></tr>
+<tr><td><code>NOT_ALLOWED</code></td><td>403</td><td>selected 清單，登入者不在指定名單</td></tr>
+<tr><td><code>PASSWORD_REQUIRED</code></td><td>403</td><td>password 清單，缺少或失效的 <code>X-List-Access</code> 權杖</td></tr>
+<tr><td><code>WRONG_PASSWORD</code></td><td>422</td><td>POST unlock 密碼錯誤</td></tr>
+<tr><td><code>NOT_FRIEND</code></td><td>422</td><td>指定名單包含不是自己好友的使用者</td></tr>
+<tr><td><code>SELF_INVITE</code></td><td>422</td><td>接受自己產生的好友邀請連結</td></tr>
+<tr><td><code>INVALID_CREDENTIALS</code></td><td>401</td><td>Email 或密碼錯誤（不區分無帳號與密碼錯）</td></tr>
+<tr><td><code>EMAIL_EXISTS</code></td><td>409</td><td>註冊驗證時該 Email 已有密碼登入</td></tr>
+<tr><td><code>HANDLE_TAKEN</code></td><td>409</td><td>帳號代號（handle）已被使用</td></tr>
 <tr><td><code>READ_ONLY_MODE</code></td><td>503</td><td>唯讀模式開啟時的寫入請求（附 Retry-After）</td></tr>
 <tr><td><code>SERVICE_UNAVAILABLE</code></td><td>503</td><td>連線池耗盡、lock_timeout、下游暫時不可用（附 Retry-After）</td></tr>
 <tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期錯誤（不外洩細節，僅回 request_id）</td></tr>

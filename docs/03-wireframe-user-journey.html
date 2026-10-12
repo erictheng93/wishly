@@ -150,6 +150,14 @@ main{padding:0 16px 60px}
 <a class="sub" href="#w-report">檢舉與下架</a>
 <a class="sub" href="#w-adminmvp">營運後台 /admin</a>
 <a class="sub" href="#w-settings">帳號設定 /me/settings</a>
+<a class="sub" href="#w-register">註冊 / 登入 / 忘記密碼</a>
+<a class="sub" href="#w-friends">好友 /friends</a>
+<a class="sub" href="#w-invite">好友邀請 /invite/{token}</a>
+<a class="sub" href="#w-profile">個人頁 /u/{handle}</a>
+<a class="sub" href="#w-vis">可見性選擇器</a>
+<a class="sub" href="#w-gate">受限清單門檻頁</a>
+<a class="sub" href="#w-social-set">個人頁與捐助設定</a>
+<a class="sub" href="#w-matrix">路由對照與覆蓋矩陣</a>
 <a href="#s6">6. 元件規格表</a>
 <a href="#s7">7. 狀態管理與資料流</a>
 <a href="#s8">8. PWA 規格</a>
@@ -171,9 +179,10 @@ main{padding:0 16px 60px}
 <div class="tw"><table>
 <tbody>
 <tr><th>文件</th><td>03 — Wireframe / Mockup &amp; User Flow（用戶旅程與原型圖）</td></tr>
-<tr><th>版本</th><td>v0.4</td></tr>
-<tr><th>日期</th><td>2026-10-08</td></tr>
+<tr><th>版本</th><td>v0.5</td></tr>
+<tr><th>日期</th><td>2026-10-12</td></tr>
 <tr><th>狀態</th><td>Draft</td></tr>
+<tr><th>v0.5 變更</th><td>對齊 10/11 已實作功能，補齊原文件缺漏的畫面與流程：Email＋密碼註冊 / 登入 / 忘記密碼（5.30）、好友（5.31）、好友邀請連結（5.32）、個人頁（5.33）、清單可見性選擇器（5.34）、受限清單門檻頁（5.35）、帳號設定的個人頁與捐助可見度、認領可見度（5.36）；新增旅程 3.9 / 3.10、User Flow 4.12 至 4.16、路由對照與實作覆蓋矩陣（5.37）、E2E 必測情境（13.1）。5.2 登入頁改以實作為準（密碼為主，OTP 僅用於註冊與重設）。</td></tr>
 <tr><th>v0.4 變更</th><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。本文件對應：檢舉與下架畫面、/admin、/me/settings、個資告知與 Email 管理連結、圖片 EXIF 提示、發票選項、錢包凍結、已驗證組織徽章、第 12 至 14 節。</td></tr>
 <tr><th>v0.3 變更</th><td>效仿星巴克，新增自動儲值、電子禮物卡、回饋星星、企業禮券。核心原則不變：點數永遠不能提領成現金給受捐者（收卡者也不能變現），只能用在心願品項。</td></tr>
 <tr><th>v0.2 變更</th><td>眾籌改為點數錢包與達標自動購買，移到 Phase 2（MVP 只做數量型認領）。受捐者永遠不持有點數；點數達標後由平台自動購買該品項（商品目錄自動下單，或非目錄商品由營運人員人工代購）。</td></tr>
@@ -263,10 +272,30 @@ flowchart TD
   RS --> CS
   D -.-> O
   O -.-> RS
+  RG["/register 註冊 v0.5"]
+  FP["/forgot-password 忘記密碼 v0.5"]
+  FR["/friends 好友 v0.5"]
+  IV["/invite/{token} 好友邀請 v0.5"]
+  UP["/u/{handle} 個人頁 v0.5"]
+  GT["/s/{slug} 門檻頁 密碼 登入 好友 v0.5"]
+  L -->|"建立帳號"| RG
+  RG -->|"驗證完成"| D
+  L -->|"忘記密碼"| FP
+  FP -->|"重設完成"| L
+  D --> FR
+  FR -.->|"產生邀請連結 分享"| IV
+  IV -->|"登入並接受"| FR
+  FR --> UP
+  UP -->|"清單"| S
+  S -->|"403 受限"| GT
+  GT -->|"解鎖 或 登入"| S
+  ST -->|"設定 handle"| UP
   classDef p2 fill:#eee,stroke:#6e7781,color:#333;
   class R,RS,O,W,AO,FS,TS,RA,G,GD,GC,RW,AC p2;
 </pre>
 <div class="note">/dashboard 與 /org/{id} 本文未畫完整線框（結構同清單卡片列表與成員表格，見 5.29），請依元件規格表組裝。/s/{slug}（P2-B 另有 /g/{code}）為需要 SSR 與 OG 的路由，其餘建立者頁面可 <code>ssr: false</code>（SPA）以簡化 cookie 轉送。</div>
+
+<div class="note w"><b>路由命名以實作為準（v0.5）：</b>本文件早期沿用 /w/new、/w/{id}/edit、/w/{id}/progress、/me/settings、/wallet；實作路由為 /lists/new、/lists/{id}/edit、/lists/{id}/progress、/settings、/me/wallet。對照表見 <a href="#w-matrix">5.37</a>，其餘章節的舊路徑視為同一頁。</div>
 
 <h2 id="s3">3. 用戶旅程地圖</h2>
 
@@ -374,6 +403,31 @@ flowchart TD
 <tr><td>4 發放</td><td>收到兌換連結（CSV 或系統寄送給員工 Email）</td><td>「怎麼發給員工？」</td><td>安心</td><td>CSV 或員工 Email</td><td>CSV 只能匯出一次，需提醒妥善保存</td></tr>
 <tr><td>5 員工兌換</td><td>員工依 3.7 流程兌換</td><td>「有沒有人還沒領？」</td><td>關心</td><td>/g/{code}</td><td>未來企業自助入口提供兌換率報表</td></tr>
 <tr><td>6 例外</td><td>有人離職未兌換，依合約整批退款</td><td>「沒領的可以退嗎？」</td><td>謹慎</td><td>營運作業</td><td>未兌換卡可作廢退款，已兌換不可</td></tr>
+</tbody></table></div>
+
+
+<h3>3.9 受限清單的送禮者（阿凱，小愛的大學同學）<span class="ph p0">P0</span></h3>
+<p class="small">目標：小愛把清單設為「僅好友」。阿凱從 LINE 點開，要能順利變成好友並完成認領，而不是撞牆。</p>
+<div class="tw"><table>
+<thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
+<tbody>
+<tr><td>1 點開連結</td><td>LINE 點開 /s/{slug}，看到「請先登入」</td><td>「不是說免註冊嗎？」</td><td>疑惑</td><td>門檻頁（LOGIN_REQUIRED）</td><td>門檻頁說明「這份清單只開放給好友」並顯示建立者名稱；訪客無需註冊的承諾只適用 link / public / password 清單</td></tr>
+<tr><td>2 登入</td><td>用 LINE / Google 或 Email 登入，帶 redirect 回清單</td><td>「登入完就能看吧」</td><td>耐心</td><td>/login?redirect=</td><td>LINE / Google 置頂；已有帳號者一步完成</td></tr>
+<tr><td>3 被擋（非好友）</td><td>看到「此清單僅限好友查看（擁有者：小愛）」</td><td>「我要怎麼加她？」</td><td>卡關</td><td>門檻頁（FRIENDS_ONLY）</td><td>「前往小愛的頁面加好友」直連 /u/{handle}；若小愛沒設 handle 則提示請她傳邀請連結</td></tr>
+<tr><td>4 加好友</td><td>在個人頁送出好友邀請，或點小愛先前傳的邀請連結直接成為好友</td><td>「等她接受」</td><td>等待</td><td>/u/{handle}、/invite/{token}</td><td>邀請連結一步到位（登入後即互為好友）；申請需對方接受，會提示「已送出邀請」</td></tr>
+<tr><td>5 認領</td><td>成為好友後回到清單，點「我要送」，暱稱已帶入，選擇這筆認領「誰看得到」</td><td>「我送什麼要不要讓大家知道？」</td><td>放心</td><td>/s/{slug}、ClaimSheet</td><td>預設值來自帳號設定；每筆可改（公開 / 僅好友 / 私人）</td></tr>
+<tr><td>6 事後</td><td>到 /me/claims 標記已購買，必要時調整可見度</td><td>「幫她確認我有買」</td><td>輕鬆</td><td>/me/claims</td><td>登入者的認領與帳號綁定，換裝置也找得到（不需管理連結）</td></tr>
+</tbody></table></div>
+
+<h3>3.10 密碼清單的訪客（阿嬤的朋友，免註冊）<span class="ph p0">P0</span></h3>
+<p class="small">目標：建立者想「有連結也不能亂看」，但不想要求親友註冊。她把清單設為密碼保護，並用口頭或群組私訊告知密碼。</p>
+<div class="tw"><table>
+<thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
+<tbody>
+<tr><td>1 點開</td><td>點開連結，看到「這份清單需要密碼」與建立者名稱</td><td>「密碼是什麼？」</td><td>停頓</td><td>門檻頁（PASSWORD_REQUIRED）</td><td>顯示「由 小愛 建立。請向對方詢問密碼。」</td></tr>
+<tr><td>2 輸入</td><td>輸入密碼；錯誤顯示「密碼錯誤」</td><td>「大小寫嗎？」</td><td>略急</td><td>解鎖表單</td><td>密碼欄可顯示 / 隱藏；錯太多次顯示稍後再試（每 slug + IP 15 分鐘 10 次）</td></tr>
+<tr><td>3 瀏覽與認領</td><td>解鎖後與一般清單相同；權杖存 sessionStorage，關閉分頁即失效</td><td>「跟平常一樣」</td><td>順暢</td><td>/s/{slug}</td><td>免登入認領（guest token）；即時更新 SSE 帶權杖</td></tr>
+<tr><td>4 密碼被更換</td><td>建立者改了密碼，舊權杖失效，頁面回到輸入密碼</td><td>「又要輸入一次？」</td><td>小煩</td><td>門檻頁</td><td>既有認領不受影響；在 /me/claims 仍可管理</td></tr>
 </tbody></table></div>
 
 <h2 id="s4">4. User Flow</h2>
@@ -648,6 +702,116 @@ flowchart TD
 </pre>
 <div class="note">信件裡不放 guest token，只放一次性恢復權杖，且放在 URL hash（<code>#r=</code>）以避免進入伺服器日誌與 Referer。每次寄信都會產生新權杖，舊的不受影響直到過期（30 天）或被使用。</div>
 
+
+<h3>4.12 註冊、登入與忘記密碼（建立者 / 登入者）<span class="ph p0">P0</span></h3>
+<pre class="mermaid">
+flowchart TD
+  A["/login?redirect="] --> B{"選擇方式"}
+  B -->|"Email 加密碼"| C["POST /auth/login"]
+  C -->|"401 INVALID_CREDENTIALS"| C1["帳號或密碼錯誤 可重試"]
+  C -->|"429 RATE_LIMITED"| C2["嘗試次數過多 請稍後再試"]
+  C -->|"200"| Z["導向 redirect 或 /dashboard"]
+  B -->|"Google 或 LINE"| O["整頁跳轉 OAuth"]
+  O -->|"失敗"| O1["回 /login?error=oauth_failed"]
+  O -->|"成功"| Z
+  B -->|"建立帳號"| R["/register 名稱 Email 密碼"]
+  R -->|"密碼少於 8 字"| R1["前端欄位錯誤"]
+  R --> R2["POST /auth/register 寄驗證碼"]
+  R2 --> R3["輸入 6 碼 POST /auth/register/verify"]
+  R3 -->|"400 OTP_INVALID"| R4["驗證碼不正確 清空重填"]
+  R3 -->|"409 EMAIL_EXISTS"| R5["此 Email 已註冊 前往登入"]
+  R3 -->|"200"| Z
+  B -->|"忘記密碼"| F["/forgot-password 輸入 Email"]
+  F --> F1["POST reset/request 一律顯示若帳號存在已寄出"]
+  F1 --> F2["輸入 6 碼 加 新密碼"]
+  F2 -->|"400 OTP_INVALID"| F3["驗證碼不正確"]
+  F2 -->|"204"| F4["導向 /login?reset=1 顯示密碼已重設"]
+  F4 --> A
+</pre>
+
+<h3>4.13 開啟受限清單（好友 / 指定 / 密碼）<span class="ph p0">P0</span></h3>
+<pre class="mermaid">
+flowchart TD
+  A["點開 /s/slug"] --> B["SSR GET /public/wishlists/slug 不帶憑證"]
+  B -->|"200 public 或 link"| C["顯示清單"]
+  B -->|"404"| D["找不到 或 private"]
+  B -->|"410"| D2["已下架"]
+  B -->|"403 受限"| E["client 以憑證重抓 GET /restricted/wishlists/slug<br/>抓取期間顯示載入中 不閃門檻頁"]
+  E -->|"200"| C
+  E -->|"403 PASSWORD_REQUIRED"| P["門檻頁 輸入密碼"]
+  P --> P1["POST /public/wishlists/slug/unlock"]
+  P1 -->|"422 WRONG_PASSWORD"| P2["密碼錯誤 可重試"]
+  P1 -->|"429"| P3["嘗試過多 請稍後再試"]
+  P1 -->|"200 access_token"| P4["存 sessionStorage 重抓"]
+  P4 --> E
+  E -->|"403 LOGIN_REQUIRED"| L["門檻頁 請先登入"]
+  L --> L1["/login?redirect=/s/slug 登入後回到清單"]
+  L1 --> E
+  E -->|"403 FRIENDS_ONLY"| F["門檻頁 僅限好友 附擁有者"]
+  F -->|"擁有者有 handle"| F1["前往 /u/handle 加好友 見 4.14"]
+  F -->|"無 handle"| F2["請向擁有者索取邀請連結"]
+  E -->|"403 NOT_ALLOWED"| N["門檻頁 你沒有權限查看"]
+  C --> G["認領 4.2 或 認捐 4.3<br/>SSE 帶 access 權杖"]
+</pre>
+
+<h3>4.14 建立好友關係（申請與邀請連結）<span class="ph p0">P0</span></h3>
+<pre class="mermaid">
+flowchart TD
+  A["/friends"] --> B{"方式"}
+  B -->|"輸入 Email 或 handle"| C["POST /friends/requests"]
+  C -->|"429"| C1["請稍後再試"]
+  C -->|"202"| C2["顯示 若對方有帳號 已送出邀請 不洩漏存在與否"]
+  C2 --> C3["對方在 收到的邀請 接受 或 婉拒"]
+  C3 -->|"接受"| Z["互為好友"]
+  C3 -->|"婉拒或取消"| Z2["申請刪除"]
+  B -->|"產生邀請連結"| D["POST /friends/invites 7 天有效 舊連結作廢"]
+  D --> D1["複製網址 或 QR 傳給朋友"]
+  D1 --> E["朋友開 /invite/token"]
+  E -->|"404 失效或撤銷"| E1["連結已失效 請索取新連結"]
+  E -->|"未登入"| E2["登入後成為好友 按鈕導 /login?redirect="]
+  E2 --> E3
+  E -->|"已登入"| E3["POST accept"]
+  E3 -->|"422 SELF_INVITE"| E4["不能接受自己的邀請"]
+  E3 -->|"200"| Z
+  Z --> Y["在 /friends 可見 並可解除好友<br/>解除會同時移除雙方指定名單中的彼此"]
+</pre>
+
+<h3>4.15 瀏覽個人頁與捐助可見度 <span class="ph p0">P0</span></h3>
+<pre class="mermaid">
+flowchart TD
+  A["/u/handle"] --> B["GET /users/handle 匿名也可"]
+  B -->|"404"| B1["找不到這位使用者"]
+  B --> C{"relation"}
+  C -->|"self"| C1["編輯個人設定 連到 /settings"]
+  C -->|"friend"| C2["好友徽章"]
+  C -->|"outgoing"| C3["已送出邀請"]
+  C -->|"incoming"| C4["接受好友邀請"]
+  C -->|"none"| C5["送出好友邀請"]
+  C -->|"anonymous"| C6["登入以加好友 redirect 回此頁"]
+  B --> D["心願清單 依可見性過濾 顯示可見性徽章 與 完成度"]
+  B --> E["捐助紀錄 依每筆可見度過濾<br/>最多 50 筆 匿名認捐只給本人"]
+  D --> F["點清單 進 /s/slug 仍受 4.13 檢查"]
+</pre>
+
+<h3>4.16 設定清單可見性（建立者）<span class="ph p0">P0</span></h3>
+<pre class="mermaid">
+flowchart TD
+  A["/lists/new 或 /lists/id/edit"] --> B["VisibilityPicker 六選一"]
+  B -->|"password"| C["輸入密碼 8 到 64 字<br/>編輯時留空 表示不變更"]
+  B -->|"selected"| D["載入 GET /friends 勾選好友"]
+  D -->|"沒有好友"| D1["提示先到 /friends 邀請朋友"]
+  B -->|"public link friends private"| E["儲存"]
+  C --> E
+  D --> E
+  E --> F["POST 或 PATCH /wishlists 帶 visibility"]
+  F --> G{"visibility 為 selected"}
+  G -->|"是"| H["PUT /wishlists/id/allowed-users"]
+  H -->|"422 NOT_FRIEND"| H1["名單只能選你的好友"]
+  G -->|"否"| I["完成"]
+  H --> I
+  I --> J["若由可公開收緊 後端清除 CDN 快取<br/>已分享的舊連結立即受新規則約束"]
+</pre>
+
 <h2 id="s5">5. 線框圖 Wireframes</h2>
 <div class="note w">v0.2 / v0.3：所有眾籌、錢包、禮物卡、星星、企業禮券相關畫面（5.9、5.14 至 5.25，其中 5.26 至 5.28 為 MVP）皆為 <span class="ph p2">P2</span>（子階段 P2-A 至 P2-C）；MVP 的 5.4、5.6、5.11 只呈現數量型認領，眾籌欄位以灰色 P2 標示。</div>
 <div class="note">線框為低保真：灰階 + 青綠 accent。虛線 = 灰掉 / 停用。所有可點區域高度 ≥ 44px。每個線框下方的表格即實作依據。以下 <code>API</code> 皆省略前綴 <code>/api/v1</code>。</div>
@@ -708,6 +872,8 @@ flowchart TD
 <tr><th>互動</th><td>LINE / Google 為整頁跳轉（<code>window.location</code>），跳轉前於 LINE in-app browser 內顯示一行「將開啟 LINE 登入頁」。OTP 輸入第 6 碼自動送出。登入成功導回 <code>?redirect=</code> 或 /dashboard。</td></tr>
 <tr><th>API</th><td>POST <code>/auth/otp/request</code>；POST <code>/auth/otp/verify</code>；GET <code>/auth/oauth/{provider}/start</code>（provider = line|google）；callback 由後端 302 回前端並設定 <code>ws_session</code>。</td></tr>
 </tbody></table></div></div></div>
+
+<div class="note w"><b>v0.5 實作對照：</b>上圖為 v0.1 的 OTP 登入設計。實作的 /login 以「Email＋密碼」為主、Google / LINE 為輔，OTP 只用於註冊與忘記密碼，畫面見 <a href="#w-register">5.30</a>。</div>
 
 <!-- 5.3 NEW -->
 <h3 id="w-new">5.3 建立清單 /w/new <span class="ph p0">P0</span></h3>
@@ -1681,6 +1847,336 @@ flowchart TD
 <tr><th>API</th><td>GET <code>/me</code>；GET <code>/me/export</code>；DELETE <code>/me</code>；DELETE <code>/guest/me</code>（訪客）。通知偏好以 PATCH <code>/me</code> 更新 <code>notification_prefs</code>（MVP 鍵 <code>{"email_claims": true}</code>）；信件內「一鍵退訂」連結為 GET <code>/unsubscribe?token=</code>（HMAC 簽章、免登入），退訂後此開關顯示為關</td></tr>
 </tbody></table></div></div></div>
 
+
+<!-- 5.30 REGISTER -->
+<h3 id="w-register">5.30 註冊 / 登入 / 忘記密碼 /login、/register、/forgot-password <span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 登入</div>
+<div class="bd">
+<div><div class="lbl"><b>Email</b></div><div class="inp">name@example.com</div></div>
+<div><div class="lbl"><b>密碼</b></div><div class="inp">••••••••　👁</div></div>
+<div style="color:var(--red);font-size:12px">帳號或密碼錯誤（錯誤示範）</div>
+<div class="btn pri">登入</div>
+<div class="row"><span class="fl lbl">建立帳號</span><span class="lbl">忘記密碼</span></div>
+<div class="lbl" style="text-align:center">或</div>
+<div class="btn">使用 Google 繼續</div>
+<div class="btn">使用 LINE 繼續</div>
+<div class="lbl">送禮的朋友不需要登入，直接用分享連結即可。</div>
+</div></div><div class="cap">/login（Email＋密碼為主）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 建立帳號</div>
+<div class="bd">
+<div><div class="lbl"><b>顯示名稱</b></div><div class="inp">小愛</div></div>
+<div><div class="lbl"><b>Email</b></div><div class="inp">name@example.com</div></div>
+<div><div class="lbl"><b>密碼</b></div><div class="inp">••••••••　👁</div></div>
+<div class="lbl">至少 8 個字元，最多 128 個字元</div>
+<div class="btn pri">寄送驗證碼</div>
+<div class="lbl" style="text-align:center">已有帳號？登入</div>
+</div></div><div class="cap">/register 步驟 1</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 建立帳號</div>
+<div class="bd">
+<div>驗證碼已寄到 <b>name@example.com</b></div>
+<div class="row"><div class="inp fl" style="justify-content:center">4</div><div class="inp fl" style="justify-content:center">8</div><div class="inp fl" style="justify-content:center">2</div><div class="inp fl" style="justify-content:center">1</div><div class="inp fl" style="justify-content:center">_</div><div class="inp fl" style="justify-content:center">_</div></div>
+<div style="color:var(--red);font-size:12px">此 Email 已註冊，請直接登入或使用忘記密碼（EMAIL_EXISTS 示範）</div>
+<div class="btn">前往登入</div>
+<div class="btn pri">完成註冊</div>
+<div class="btn ghost dis">45 秒後可重新寄送</div>
+<div class="btn ghost">修改資料</div>
+</div></div><div class="cap">/register 步驟 2：OTP</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 忘記密碼</div>
+<div class="bd">
+<div style="background:var(--green-soft);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px;font-size:12px">若帳號存在，已寄出驗證碼</div>
+<div class="lbl"><b>驗證碼</b></div>
+<div class="row"><div class="inp fl" style="justify-content:center">_</div><div class="inp fl" style="justify-content:center">_</div><div class="inp fl" style="justify-content:center">_</div><div class="inp fl" style="justify-content:center">_</div><div class="inp fl" style="justify-content:center">_</div><div class="inp fl" style="justify-content:center">_</div></div>
+<div><div class="lbl"><b>新密碼</b></div><div class="inp">至少 8 個字元</div></div>
+<div class="btn pri">重設密碼</div>
+<div class="btn ghost dis">60 秒後可重新寄送</div>
+</div></div><div class="cap">/forgot-password 步驟 2（步驟 1 僅 Email 欄位與「寄送驗證碼」）</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>EmailField、PasswordField（顯示 / 隱藏切換、<code>autocomplete="current-password"</code> 或 <code>"new-password"</code>）、OtpInput（6 格自動送出）、ResendTimer、OAuthButton</td></tr>
+<tr><th>狀態</th><td>loading：按鈕 spinner 並停用；error：<code>INVALID_CREDENTIALS</code>「帳號或密碼錯誤」、<code>RATE_LIMITED</code>「嘗試次數過多，請稍後再試」、<code>OTP_INVALID</code>「驗證碼不正確或已過期」並清空重填、<code>EMAIL_EXISTS</code> 顯示「前往登入」；OAuth 失敗：回 /login 顯示「第三方登入失敗，請重試」；重設成功：/login 顯示「密碼已重設，請用新密碼登入」。</td></tr>
+<tr><th>互動</th><td><code>?redirect=</code> 僅接受以 / 開頭且非 // 的站內路徑，否則回 /dashboard；/register 的「登入」連結保留 redirect。已登入者開 /login 直接導向 redirect。重設密碼會登出所有裝置。</td></tr>
+<tr><th>API</th><td>POST <code>/auth/login</code>、<code>/auth/register</code>、<code>/auth/register/verify</code>、<code>/auth/password/reset/request</code>、<code>/auth/password/reset/confirm</code>；GET <code>/auth/oauth/{provider}/start</code>。詳 02 F1-c。</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.31 FRIENDS -->
+<h3 id="w-friends">5.31 好友 /friends <span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone" style="min-height:760px">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 好友</div>
+<div class="bd">
+<div class="card" style="flex-direction:column"><b>加好友</b><div><div class="lbl"><b>對方的 Email 或帳號代號</b></div><div class="inp">name@example.com 或 @handle</div></div><div class="btn pri">送出邀請</div></div>
+<div class="card" style="flex-direction:column"><b>邀請連結</b><span class="lbl">把連結或 QR 給朋友，對方登入後即可成為好友。連結 7 天有效，重新產生會讓舊連結失效。</span><div class="inp">https://app.wishsync.tw/invite/Xk2…</div><div class="im" style="width:88px;height:88px">QR</div><div class="row"><div class="btn fl ghost">複製網址</div><div class="btn fl ghost">重新產生</div><div class="btn fl ghost" style="color:var(--red)">撤銷</div></div></div>
+<div class="card" style="flex-direction:column"><b>收到的邀請</b><div class="row"><span class="fl">阿凱 <span class="lbl">@kai_w</span></span><div class="btn pri" style="min-width:64px">接受</div><div class="btn ghost" style="min-width:64px">婉拒</div></div></div>
+<div class="card" style="flex-direction:column"><b>我的好友（2）</b><div class="row"><span class="fl">阿明 <span class="lbl">@aming</span></span><div class="btn ghost">解除好友</div></div><div class="row"><span class="fl">小芸</span><div class="btn ghost">解除好友</div></div></div>
+</div></div><div class="cap">/friends（已送出的邀請區塊在無資料時隱藏）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 好友</div>
+<div class="bd"><div class="card"><div class="col"><b>阿明</b></div></div></div>
+<div class="scrim"></div>
+<div class="sheet">
+<div class="grab"></div><b>解除與 阿明 的好友關係？</b><div class="lbl">對方將無法再看到你「僅好友」的清單，你在對方「指定名單」中的權限也會一併移除。</div><div class="btn" style="background:var(--red);border-color:var(--red);color:var(--bg)">解除好友</div><div class="btn ghost">取消</div>
+</div></div><div class="cap">解除好友確認</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>AddFriendForm、InviteLinkCard（URL、QR、複製、重新產生、撤銷）、RequestRow（incoming：接受 / 婉拒；outgoing：取消邀請）、FriendRow（連到 /u/{handle}）、ConfirmSheet</td></tr>
+<tr><th>狀態</th><td>loading；empty：「還沒有好友，用上面的方式邀請朋友吧。」；送出後顯示「若對方有帳號，已送出邀請」（不論對方是否存在，避免帳號列舉）；error：<code>RATE_LIMITED</code>（每小時 30 次）；複製失敗改提示手動選取。</td></tr>
+<tr><th>互動</th><td>輸入可含或不含 @；包含 @ 且不是開頭視為 Email。重新產生邀請連結會讓舊連結立即失效；每位使用者同時只有一條有效連結。解除好友為二次確認。</td></tr>
+<tr><th>API</th><td>GET <code>/friends</code>；POST <code>/friends/requests</code>；POST <code>/friends/requests/{id}/accept</code>；DELETE <code>/friends/requests/{id}</code>；DELETE <code>/friends/{user_id}</code>；POST / DELETE <code>/friends/invites</code>。需登入（auth middleware，未登入導向 /login）。</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.32 INVITE -->
+<h3 id="w-invite">5.32 好友邀請 /invite/{token} <span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">好友邀請</div>
+<div class="bd">
+<div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px"><b style="font-size:17px">小愛 邀請你成為好友</b><span class="lbl">@amy_wang</span><div class="btn pri">成為好友</div></div>
+</div></div><div class="cap">已登入</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">好友邀請</div>
+<div class="bd">
+<div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px"><b style="font-size:17px">小愛 邀請你成為好友</b><span class="lbl">@amy_wang</span><div class="btn pri">登入後成為好友</div><span class="lbl">登入後會自動回到此頁</span></div>
+</div></div><div class="cap">未登入（導向 /login?redirect=/invite/…）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">好友邀請</div>
+<div class="bd">
+<div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">!</div><b>這個邀請連結已失效或被撤銷。</b><span class="lbl">請向朋友索取新的連結。</span></div>
+</div></div><div class="cap">404：失效 / 撤銷 / 過期</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>InviterCard（display_name、handle）、AcceptButton、StatusNotice</td></tr>
+<tr><th>狀態</th><td>loading / ok / gone（404）/ error（重試）；接受中按鈕停用；<code>SELF_INVITE</code>「不能接受自己的邀請」；接受時 404 顯示「這個邀請已失效或被撤銷」。頁面 <code>noindex</code>。</td></tr>
+<tr><th>互動</th><td>預覽為公開端點，不需登入即可看到邀請者；接受成功導向 /friends。接受是冪等的，已是好友者再按一次也成功。</td></tr>
+<tr><th>API</th><td>GET <code>/friends/invites/{token}</code>（公開）；POST <code>/friends/invites/{token}/accept</code>（需登入）</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.33 PROFILE -->
+<h3 id="w-profile">5.33 個人頁 /u/{handle} <span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone" style="min-height:760px">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">小愛</div>
+<div class="bd">
+<div class="card" style="flex-direction:column"><b style="font-size:17px">小愛</b><span class="lbl">@amy_wang</span><div class="btn pri">送出好友邀請</div></div>
+<div class="lbl"><b>心願清單</b></div>
+<div class="card" style="flex-direction:column"><b>小愛的待產清單</b><div class="row"><span class="b teal">僅好友</span><span class="lbl">禮物登記</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
+<div class="card" style="flex-direction:column"><b>生日小物</b><div class="row"><span class="b teal">公開</span><span class="lbl">個人心願</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
+<div class="lbl"><b>捐助紀錄</b></div>
+<div class="card" style="flex-direction:column"><b>奶瓶 240ml × 2</b><span class="b gray">已認領</span><span class="lbl">送給 阿明・阿明的生日清單・2026/10/05</span></div>
+</div></div><div class="cap">/u/amy_wang：relation = none</div></div>
+<div><div class="phone" style="min-height:760px">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">小愛</div>
+<div class="bd">
+<div class="card" style="flex-direction:column"><b style="font-size:17px">小愛</b><span class="lbl">@amy_wang</span><div class="btn pri">登入以加好友</div></div>
+<div class="lbl"><b>心願清單</b></div>
+<div class="card" style="flex-direction:column"><b>生日小物</b><div class="row"><span class="b teal">公開</span><span class="lbl">個人心願</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
+<div class="lbl"><b>捐助紀錄</b></div>
+<div class="lbl">目前沒有可看的捐助紀錄。</div>
+</div></div><div class="cap">relation = anonymous（只看得到 public 內容）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">個人頁</div>
+<div class="bd">
+<div style="margin:auto;text-align:center"><b>找不到這位使用者。</b></div>
+</div></div><div class="cap">404（handle 不存在或帳號已刪除）</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>ProfileHeader（display_name、@handle、RelationAction）、WishlistRow（封面縮圖、可見性徽章、已結束徽章、類型、完成度）、DonationRow（品項 × 數量 或 點數、狀態徽章、送給誰、清單連結、日期）</td></tr>
+<tr><th>relation</th><td><code>self</code>：「編輯個人設定」→ /settings；<code>friend</code>：「好友」徽章；<code>outgoing</code>：「已送出邀請」；<code>incoming</code>：「接受好友邀請」；<code>none</code>：「送出好友邀請」；<code>anonymous</code>：「登入以加好友」（帶 redirect 回此頁）。</td></tr>
+<tr><th>可見度</th><td>清單：public 任何人；friends 需為好友；selected 需在名單；本人另可看到自己的 friends / selected（private、link、password 不列）。捐助：依每筆認領的 visibility，認捐依帳號預設，匿名認捐只給本人。驚喜鎖定中與已下架的清單不出現。link 清單的捐助不附連結。</td></tr>
+<tr><th>狀態</th><td>loading / ok / gone（404）/ error（重試）；頁面 <code>noindex</code>；empty：「目前沒有可看的清單。」「目前沒有可看的捐助紀錄。」。</td></tr>
+<tr><th>API</th><td>GET <code>/users/{handle}</code>（匿名可呼叫，帶 cookie 才有 relation）；POST <code>/friends/requests</code>；接受時先 GET <code>/friends</code> 找出申請 id 再 POST accept。</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.34 VISIBILITY PICKER -->
+<h3 id="w-vis">5.34 清單可見性選擇器（/lists/new、/lists/{id}/edit）<span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone" style="min-height:760px">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 編輯清單</div>
+<div class="bd">
+<div class="lbl"><b>誰可以看這份清單</b></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 公開</b><span class="lbl">任何人都能看；會列在你的個人頁。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◉ 知道連結</b><span class="lbl">只有拿到連結的人能開，不會列在個人頁。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 僅好友</b><span class="lbl">只有你的好友能開，對方需要登入。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 指定好友</b><span class="lbl">只有你勾選的好友能開，對方需要登入。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 密碼保護</b><span class="lbl">拿到連結且知道密碼的人才能開。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 私人</b><span class="lbl">只有你自己看得到，朋友打開會顯示找不到。</span></div></div>
+</div></div><div class="cap">選項（預設 link）</div></div>
+<div><div class="phone" style="min-height:760px">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 編輯清單</div>
+<div class="bd">
+<div class="lbl"><b>誰可以看這份清單</b></div>
+<div class="card" style="align-items:center"><div class="col"><b>◉ 指定好友</b></div></div>
+<div class="lbl"><b>選擇可以看的好友（已選 1 位）</b></div>
+<div class="card"><div class="col"><b>☑ 阿明</b><span class="lbl">@aming</span></div></div>
+<div class="card"><div class="col"><b>☐ 小芸</b></div></div>
+<div class="lbl" style="margin-top:8px">— 或，沒有好友時 —</div>
+<div class="lbl">還沒有好友。先到「好友」邀請朋友，再回來勾選。</div>
+<div class="lbl" style="margin-top:8px"><b>密碼保護時</b></div>
+<div><div class="lbl"><b>清單密碼（8–64 字）</b></div><div class="inp">已設定密碼，留空則不變更</div></div>
+</div></div><div class="cap">指定好友 / 密碼欄位（兩種狀態合併示意）</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>VisibilityPicker（RadioCardGroup ×6、PasswordField、FriendCheckList）；new 與 edit 共用。</td></tr>
+<tr><th>狀態</th><td>selected：載入好友中 / 無好友提示 / 載入失敗；password：新建必填 8–64 字，編輯時已設定者可留空（<code>has_password</code>）；儲存時 <code>NOT_FRIEND</code> 顯示「名單只能選擇你的好友」。</td></tr>
+<tr><th>互動</th><td>切到 selected 才載入 /friends。改為 password 後既有訪客權杖在密碼更換時全部失效。從 public 收緊到其他可見性，後端立即清除邊緣快取，頁面上以一行說明告知「已分享的舊連結會立即受新設定約束」。edit 頁底部顯示目前可見性說明。</td></tr>
+<tr><th>API</th><td>POST <code>/wishlists</code>、PATCH <code>/wishlists/{id}</code>（visibility、access_password）；GET / PUT <code>/wishlists/{id}/allowed-users</code>；GET <code>/friends</code>。</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.35 GATE -->
+<h3 id="w-gate">5.35 受限清單門檻頁 /s/{slug}（403）<span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">WishSync</div>
+<div class="bd">
+<div style="margin:auto;display:flex;flex-direction:column;gap:10px;width:100%"><div style="text-align:center"><b style="font-size:17px">這份清單需要密碼</b></div><span class="lbl" style="text-align:center">由 小愛 建立。請向對方詢問密碼。</span><div><div class="lbl"><b>密碼</b></div><div class="inp">••••••</div></div><div style="color:var(--red);font-size:12px">密碼錯誤（WRONG_PASSWORD 示範）</div><div class="btn pri">解鎖</div></div>
+</div></div><div class="cap">PASSWORD_REQUIRED</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">WishSync</div>
+<div class="bd">
+<div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px;width:100%"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">🔒</div><b style="font-size:17px">請先登入</b><span class="lbl">此清單僅限特定對象，請先登入</span><div class="btn pri">登入後查看</div></div>
+</div></div><div class="cap">LOGIN_REQUIRED（friends / selected 未登入）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">WishSync</div>
+<div class="bd">
+<div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px;width:100%"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">🔒</div><b style="font-size:17px">你沒有權限查看這份清單</b><span class="lbl">此清單僅限好友查看（擁有者：小愛）</span><div class="btn pri">前往 小愛 的頁面加好友</div></div>
+</div></div><div class="cap">FRIENDS_ONLY（擁有者有 handle 時才有按鈕）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">WishSync</div>
+<div class="bd">
+<div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px;width:100%"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">🔒</div><b style="font-size:17px">你沒有權限查看這份清單</b><span class="lbl">此清單僅限指定對象查看</span></div>
+</div></div><div class="cap">NOT_ALLOWED</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>AccessGate（依 <code>code</code> 切換）、UnlockForm、LoginCta、OwnerProfileLink</td></tr>
+<tr><th>狀態</th><td>載入：SSR 對受限清單回 403，client 帶憑證重抓期間顯示載入中，不閃現門檻頁（<code>checking</code>）。<code>PASSWORD_REQUIRED</code>：解鎖中 / <code>WRONG_PASSWORD</code> / <code>RATE_LIMITED</code>（每 slug + IP 15 分鐘 10 次）；成功後權杖存 sessionStorage（<code>ws_la_{slug}</code>）。權杖失效（密碼被換）時自動清除並回到輸入密碼。</td></tr>
+<tr><th>互動</th><td><code>LOGIN_REQUIRED</code> 的按鈕導向 /login?redirect=/s/{slug}，登入後自動重抓。門檻頁只顯示擁有者名稱，不洩漏標題、品項或封面。LINE 預覽（OG）對受限清單為通用文案。</td></tr>
+<tr><th>API</th><td>GET <code>/restricted/wishlists/{slug}</code>（ws_session + <code>X-List-Access</code>，no-store）；POST <code>/public/wishlists/{slug}/unlock</code>；SSE 以 <code>?access=</code> 帶權杖。</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.36 SOCIAL SETTINGS -->
+<h3 id="w-social-set">5.36 個人頁與捐助設定、認領可見度 <span class="ph p0">P0</span></h3>
+<div class="wf">
+<div class="phones">
+<div><div class="phone" style="min-height:700px">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 帳號設定</div>
+<div class="bd">
+<div class="lbl"><b>個人頁與捐助</b></div>
+<div><div class="lbl"><b>帳號代號（個人頁網址，可留空）</b></div><div class="inp">amy_wang</div></div>
+<div class="lbl">小寫英文、數字、底線，3–30 字。你的個人頁：https://app.wishsync.tw/u/amy_wang　[複製]</div>
+<div><div class="lbl"><b>捐助紀錄預設誰看得到</b></div><div class="inp">僅好友　▾</div></div>
+<div class="lbl">選項：公開 / 僅好友 / 私人。新的認領會套用此預設，可逐筆調整。</div>
+<div class="btn">儲存</div>
+<div class="lbl" style="color:var(--warn)">已被使用時顯示「此帳號代號已被使用」（HANDLE_TAKEN）。</div>
+</div></div><div class="cap">/settings 新增區塊（5.28 其餘區塊不變）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 我的認領</div>
+<div class="bd">
+<div class="card" style="flex-direction:column"><div class="row"><b class="fl">奶瓶 240ml × 2</b><span class="b teal">已認領</span></div><div class="lbl">送給 小愛・小愛的待產清單</div><div class="lbl"><b>誰看得到</b></div><div class="inp">僅好友　▾</div><div class="row"><div class="btn fl ghost">標記已購買</div><div class="btn fl ghost">取消認領</div></div></div>
+<div class="lbl">訪客認領（未登入）沒有「誰看得到」，也不會出現在任何個人頁。</div>
+</div></div><div class="cap">/me/claims（登入者每筆可調整）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
+<div class="ab">小愛的待產清單</div>
+<div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>奶瓶 240ml</b></div></div></div>
+<div class="scrim"></div>
+<div class="sheet">
+<div class="grab"></div><b>我要送</b><div class="stp"><span>−</span><span class="v">2</span><span>＋</span></div><div class="lbl">以 阿凱 認領（已登入）</div><div><div class="lbl"><b>誰看得到這筆認領</b></div><div class="inp">僅好友　▾（預設來自帳號設定）</div></div><div class="btn pri">確認認領</div>
+</div></div><div class="cap">ClaimSheet（登入者多一個可見度欄位，訪客不顯示）</div></div>
+</div>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>元件</th><td>HandleField（即時格式檢查）、CopyProfileUrl、SelectRow（default_claim_visibility）、ClaimVisibilitySelect</td></tr>
+<tr><th>狀態</th><td>handle 格式不符時前端即顯示錯誤並停用儲存；<code>HANDLE_TAKEN</code> 409；儲存成功「已儲存」；handle 可清空（關閉個人頁，連結 404）。</td></tr>
+<tr><th>互動</th><td>登入者開啟 ClaimSheet 時，名稱帶入帳號名稱、可見度預設帶帳號設定（載入前不送欄位，由伺服器套預設）。手快在 /me 載入完成前點「我要送」不會被當成訪客（以 <code>loggedInName</code> 判斷）。改帳號預設<b>不會回溯</b>既有認領，但會影響既有點數認捐（已知限制，TODO #3）。</td></tr>
+<tr><th>API</th><td>PATCH <code>/me</code>（handle、default_claim_visibility）；POST <code>/items/{id}/claims</code>（visibility，僅登入者）；PATCH <code>/claims/{id}</code>（visibility）。</td></tr>
+</tbody></table></div></div>
+</div>
+
+<!-- 5.37 MATRIX -->
+<h3 id="w-matrix">5.37 路由對照與實作覆蓋矩陣 <span class="ph p0">P0</span></h3>
+<p>本表回答「每個情境是否都有主流程、介面流向與線框」。<b>設計文件（02 / 03）已涵蓋全部情境；P0 與 P2-A 的實作畫面皆有對應線框；僅 P2-B / P2-C / P2-D 與 P2-A 金流尚未實作，設計已就緒。</b></p>
+<h4>情境覆蓋</h4>
+<div class="tw"><table>
+<thead><tr><th>情境</th><th>02 主流程</th><th>03 User Flow</th><th>03 線框</th><th>後端 API / 前端頁面</th><th>設計文件</th></tr></thead>
+<tbody>
+<tr><td>F1 登入（Email 密碼 / OTP / OAuth）</td><td>F1-a/b/c</td><td>4.1、4.12</td><td>5.2、5.30</td><td>✔</td><td>✔</td></tr>
+<tr><td>F2 建立清單與品項</td><td>F2</td><td>4.1</td><td>5.3、5.4、5.5</td><td>✔</td><td>✔</td></tr>
+<tr><td>F3 / F4 訪客開啟與認領</td><td>F3、F4</td><td>4.2</td><td>5.6 至 5.8</td><td>✔</td><td>✔</td></tr>
+<tr><td>F5 認領變更 / 取消 / 管理連結恢復</td><td>F5</td><td>4.2、4.11</td><td>5.10</td><td>✔</td><td>✔</td></tr>
+<tr><td>F6 點數眾籌（P2-A）</td><td>F6a–f</td><td>4.3、4.6、4.7</td><td>5.9、5.14 至 5.20</td><td>部分（目前只有人工發點，儲值未做）</td><td>✔</td></tr>
+<tr><td>F7 完成度儀表板</td><td>F7</td><td>4.4</td><td>5.11</td><td>✔</td><td>✔</td></tr>
+<tr><td>F8 / F9 關閉封存 / 背景工作</td><td>F8、F9</td><td>—</td><td>5.11</td><td>✔</td><td>✔</td></tr>
+<tr><td>F15 檢舉與下架</td><td>F15</td><td>—</td><td>5.26、5.27</td><td>✔</td><td>✔</td></tr>
+<tr><td>F16 / F17 通知 / 帳號刪除與匯出</td><td>F16、F17</td><td>—</td><td>5.28</td><td>✔</td><td>✔</td></tr>
+<tr><td><b>F20 好友與邀請（v0.5）</b></td><td>F20</td><td>4.14</td><td>5.31、5.32</td><td>✔</td><td>✔</td></tr>
+<tr><td><b>F21 清單可見性與存取（v0.5）</b></td><td>F21</td><td>4.13、4.16</td><td>5.34、5.35</td><td>✔</td><td>✔</td></tr>
+<tr><td><b>F22 個人頁與捐助可見度（v0.5）</b></td><td>F22</td><td>4.15</td><td>5.33、5.36</td><td>✔</td><td>✔</td></tr>
+<tr><td>F10 救災 / F11 自動儲值 / F12–F14 禮物卡、星星、企業禮券 / F18–F19 拒付、發票</td><td>F10–F14、F18、F19</td><td>4.5、4.8 至 4.10</td><td>5.12、5.13、5.15、5.16、5.21 至 5.25</td><td>尚未實作（P2-B / C / D 與 P2-A 金流）</td><td>設計完成</td></tr>
+</tbody></table></div>
+<h4>路由對照（設計路徑 → 實作路徑）</h4>
+<div class="tw"><table>
+<thead><tr><th>設計文件路徑</th><th>實作路徑</th><th>前端檔案（apps/web/app/pages）</th><th>線框 / 狀態</th></tr></thead>
+<tbody>
+<tr><td>/</td><td>/</td><td>apps/web/app/pages/index.vue</td><td>✔</td></tr>
+<tr><td>/login</td><td>/login</td><td>login.vue</td><td>✔ 5.30（v0.5 改為密碼為主）</td></tr>
+<tr><td>（未畫）</td><td>/register、/forgot-password</td><td>register.vue、forgot-password.vue</td><td>✔ 5.30</td></tr>
+<tr><td>/dashboard</td><td>/dashboard</td><td>dashboard/index.vue</td><td>✔</td></tr>
+<tr><td>/w/new</td><td><b>/lists/new</b></td><td>lists/new.vue</td><td>✔</td></tr>
+<tr><td>/w/{id}/edit</td><td><b>/lists/{id}/edit</b></td><td>lists/[id]/edit.vue</td><td>✔</td></tr>
+<tr><td>/w/{id}/progress</td><td><b>/lists/{id}/progress</b></td><td>lists/[id]/progress.vue</td><td>✔</td></tr>
+<tr><td>/s/{slug}</td><td>/s/{slug}</td><td>s/[slug].vue</td><td>✔ 含門檻頁 5.35</td></tr>
+<tr><td>/me/claims</td><td>/me/claims</td><td>me/claims.vue</td><td>✔</td></tr>
+<tr><td>/me/settings</td><td><b>/settings</b></td><td>settings.vue</td><td>✔ 5.28 / 5.36</td></tr>
+<tr><td>/wallet</td><td><b>/me/wallet</b></td><td>me/wallet.vue</td><td>✔ P2-A</td></tr>
+<tr><td>（未畫）</td><td>/friends</td><td>friends.vue</td><td>✔ 5.31</td></tr>
+<tr><td>（未畫）</td><td>/invite/{token}</td><td>invite/[token].vue</td><td>✔ 5.32</td></tr>
+<tr><td>（未畫）</td><td>/u/{handle}</td><td>u/[handle].vue</td><td>✔ 5.33</td></tr>
+<tr><td>/admin</td><td>/admin</td><td>admin/index.vue</td><td>✔ 5.27</td></tr>
+<tr><td>/admin/orders</td><td>/admin/orders</td><td>admin/orders.vue</td><td>✔ P2-A</td></tr>
+<tr><td>（5.20 內含）</td><td>/admin/wallets</td><td>admin/wallets.vue</td><td>✔ P2-A（發點 / 扣點 / 搜尋）</td></tr>
+<tr><td>/terms、/privacy</td><td>/terms、/privacy</td><td>terms.vue、privacy.vue</td><td>✔ 5.29</td></tr>
+<tr><td>（Email 退訂）</td><td>/unsubscribe、/unsubscribed</td><td>unsubscribe.vue、unsubscribed.vue</td><td>✔ 5.28</td></tr>
+<tr><td>/gift、/g/{code}、/rewards</td><td>—</td><td>—</td><td>尚未實作（P2-B）</td></tr>
+<tr><td>/admin/corporate</td><td>—</td><td>—</td><td>尚未實作（P2-C）</td></tr>
+<tr><td>/relief、/relief/sites/{slug}、/org/{id}</td><td>—</td><td>—</td><td>尚未實作（P2-D）</td></tr>
+</tbody></table></div>
+<div class="note">新增創建者路由須同步加入 <code>nuxt.config.ts</code> 的 <code>routeRules</code>（<code>ssr: false</code>）。需要 SSR 與 OG 的只有 /s/{slug}（與 P2-B 的 /g/{code}）。</div>
+
 <h3 id="w-others">5.29 未繪製頁面的組裝說明</h3>
 <ul>
 <li><b>/terms、/privacy</b>：純內容頁（SSR 靜態），含個資蒐集告知、Cookie 與本機儲存說明（列出 <code>ws_session</code>、<code>ws_guest</code>、localStorage 的 <code>ws_guest_token</code> 等用途與保存期間，以及行為分析工具）。頁尾與認領 sheet 都連到此處；P2 另增點數 / 禮物卡使用條款與退款政策。</li>
@@ -2223,6 +2719,14 @@ async function waitTopup(before) {
 <tr><td>guest_token 存活</td><td>清除 cookie 只保留 localStorage</td><td>仍可在 /me/claims 看到認領（靠 <code>X-Guest-Token</code>）</td></tr>
 <tr><td>刪除帳號</td><td>已登入</td><td>需輸入確認字樣；P2 有餘額時顯示 <code>ACCOUNT_HAS_BALANCE</code> 阻擋</td></tr>
 <tr><td>事件白名單</td><td>攔截 PostHog 請求</td><td>事件名與屬性皆在 12 節白名單內，不含暱稱與聯絡方式</td></tr>
+<tr><td>密碼註冊與登入</td><td>全新 Email；Mailpit 取得 OTP</td><td>註冊 → 輸入 OTP → 進 /dashboard；登出後以密碼登入成功；錯誤密碼顯示「帳號或密碼錯誤」；重複 Email 驗證顯示「此 Email 已註冊」</td></tr>
+<tr><td>忘記密碼</td><td>已註冊帳號</td><td>寄出 OTP → 設新密碼 → 回 /login 顯示「密碼已重設」；舊密碼失效、其他裝置 session 被撤銷</td></tr>
+<tr><td>密碼清單</td><td>visibility=password</td><td>匿名開啟看到門檻頁（無標題與品項）；錯誤密碼 422；正確密碼後可認領；建立者改密碼後舊權杖失效回到門檻頁</td></tr>
+<tr><td>好友清單</td><td>visibility=friends</td><td>未登入「請先登入」→ 登入後非好友「僅限好友」→ 成為好友後可看；解除好友後再次被擋</td></tr>
+<tr><td>指定清單</td><td>visibility=selected 名單含甲不含乙</td><td>甲可看、乙 NOT_ALLOWED；解除好友後甲被自動移出名單</td></tr>
+<tr><td>邀請連結</td><td>甲產生連結、乙開啟</td><td>未登入顯示「登入後成為好友」；登入後成為好友；自己開啟 SELF_INVITE；撤銷後 404；重新產生後舊連結失效</td></tr>
+<tr><td>個人頁可見度</td><td>甲有 public / friends 清單與 public / friends / private 認領</td><td>匿名只見 public；好友多見 friends；本人全見；訪客認領不出現；匿名認捐只有本人看得到</td></tr>
+<tr><td>CDN 邊界</td><td>受限清單</td><td><code>/public/wishlists/{slug}</code> 不讀 cookie（回 403 或公開內容）；<code>/restricted</code> 一律 no-store；收緊可見性後公開路徑立即 403（腳本 <code>scripts/cdn-canary.mjs</code>）</td></tr>
 <tr><td><span class="ph p2">P2-A</span> 投點流程</td><td>mock <code>INSUFFICIENT_POINTS</code>、<code>CROWDFUND_TARGET_EXCEEDED</code>、<code>ITEM_FUNDED</code>、<code>WALLET_FROZEN</code></td><td>儲值後回到原 sheet 並保留輸入；自動帶入 remaining_points；回滾餘額；凍結時停用</td></tr>
 </tbody></table></div>
 <div class="note w">Playwright 無法模擬 LINE 爬蟲與 LINE 內建瀏覽器的真實行為；OG 預覽與 cookie / localStorage 存活率以 Spike S1、S2 的真機測試為準（14.3）。LINE UA 測試只驗證前端偵測與分支邏輯。</div>
