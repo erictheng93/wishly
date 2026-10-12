@@ -30,7 +30,7 @@ const accept = () => run(async () => {
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader :title="p ? p.user.display_name : '個人頁'" />
+    <CreatorHeader :title="p ? p.user.display_name : '個人頁'" back="/friends" />
     <p v-if="state === 'loading'" class="c-mute" role="status">載入中…</p>
     <div v-else-if="state === 'gone'" class="c-center"><p>找不到這位使用者。</p></div>
     <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">讀取失敗，請稍後再試</p><button class="c-btn" @click="load">重試</button></div>

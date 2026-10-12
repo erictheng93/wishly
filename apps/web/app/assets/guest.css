@@ -84,3 +84,13 @@ dialog.g-dialog:focus-visible{outline:0}
   dialog.g-dialog{margin:auto}
   .g-sheet{border:1px solid var(--line);border-top:3px solid var(--red)}
 }
+/* 桌面滑鼠 hover：僅在有 hover 的精準指標裝置生效 */
+@media (hover:hover) and (pointer:fine){
+  .g-btn:not(:disabled):hover{background:var(--accent-press);border-color:var(--accent-press)}
+  .g-btn.ghost:not(:disabled):hover{background:var(--bg-alt);border-color:var(--accent)}
+  .g-btn.ghost.on:hover{background:var(--accent-press)}
+  .g-step button:not(:disabled):hover{background:var(--bg-alt)}
+  .g-top a:hover,.g-link:hover,.g-foot a:hover,.g-wrap summary:hover{text-decoration:underline}
+}
+/* 橫放手機等短視窗：頂欄不固定 */
+@media (max-height:500px) and (orientation:landscape){ .g-top{position:static} }

@@ -8,6 +8,7 @@
   --stripe:repeating-linear-gradient(45deg,var(--red) 0 8px,var(--red-dark) 8px 16px);
   --ease:cubic-bezier(.25,.1,.25,1);--t:.2s;color-scheme:light dark;
   --c-w:480px;--g-w:560px; /* 內容欄寬：手機 → 平板 → 桌面，c- 創建者 / g- 訪客共用斷點 */
+  --head-h:calc(55px + env(safe-area-inset-top)); /* .c-head：52 + 3px 邊框 + 安全區；sticky 側欄 / rail 以此定位（≥1100 header 不換行，高度固定） */
 }
 @media (min-width:768px){:root{--c-w:720px;--g-w:720px}}
 @media (min-width:1100px){:root{--c-w:1000px;--g-w:880px}}
@@ -26,3 +27,6 @@ a{color:var(--link);text-decoration:none}
 @keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+/* App 模式（已安裝 PWA / Tauri，無瀏覽器返回與重整）：去掉橡皮筋、操作列不可選取；內容文字仍可選取複製 */
+html[data-app]{overscroll-behavior:none}
+html[data-app] :is(.c-head,.g-top,.c-rail,.c-bottom,.c-fab,.c-btn,.g-btn,.c-tabs){-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}

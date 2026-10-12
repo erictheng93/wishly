@@ -19,7 +19,7 @@ async function accept() {
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader title="好友邀請" />
+    <CreatorHeader title="好友邀請" back="/dashboard" />
     <p v-if="state === 'loading'" class="c-mute" role="status">載入中…</p>
     <div v-else-if="state === 'gone'" class="c-center"><p>這個邀請連結已失效或被撤銷。</p><p class="c-mute">請向朋友索取新的連結。</p></div>
     <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">讀取失敗，請稍後再試</p></div>

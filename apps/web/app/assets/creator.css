@@ -97,14 +97,32 @@ dialog.c-sheet:focus-visible{outline:0}
 /* 桌面 ≥1100：編輯頁品項在左、設定在右 */
 @media (min-width:1100px){
   .c-split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0 24px;align-items:start}
-  .c-split>aside{position:sticky;top:76px}
+  .c-head{flex-wrap:nowrap}
+  .c-split>aside{position:sticky;top:calc(var(--head-h) + 20px)}
 }
 /* 桌面 ≥1280：側欄導覽，取代 header 內重複的導覽按鈕 */
 .c-rail{display:none}
 @media (min-width:1280px){
   :root{--c-w:900px}
-  .c-rail{display:flex;flex-direction:column;position:fixed;top:76px;left:max(16px,calc(50% - var(--c-w) / 2 - 184px));width:168px;z-index:5;border-left:3px solid var(--red)}
+  .c-rail{display:flex;flex-direction:column;position:fixed;top:calc(var(--head-h) + 20px);left:max(16px,calc(50% - var(--c-w) / 2 - 204px));width:168px;z-index:5;border-left:3px solid var(--red)}
   .c-rail a{display:flex;align-items:center;min-height:44px;padding:0 14px;color:var(--fg);font-weight:700;letter-spacing:.1em}
   .c-rail a.router-link-active{color:var(--red-text);background:var(--bg-alt)}
   .c-nav-dup{display:none}
+}
+/* 桌面滑鼠 hover：僅在有 hover 的精準指標裝置生效，觸控裝置不會黏住 */
+@media (hover:hover) and (pointer:fine){
+  .c-btn:not([disabled]):hover{background:var(--bg-alt)}
+  .c-btn.primary:not([disabled]):hover{background:var(--accent-press);border-color:var(--accent-press)}
+  .c-btn.plain:hover,.c-rail a:hover{background:var(--bg-alt)}
+  .c-tabs .c-btn.on:hover{background:var(--accent-press)}
+  .c-seg label:hover input:not(:checked)+span{background:var(--bg-alt)}
+  .c-links a:hover,.c-card a:not(.c-btn):hover{text-decoration:underline}
+  .c-card summary:hover{color:var(--red-text)}
+}
+/* 橫放手機等短視窗（高 ≤ 500）：header / 底欄不再固定，把垂直空間還給內容 */
+@media (max-height:500px) and (orientation:landscape){
+  .c-head{position:static}
+  .c-bottom{position:static;margin:0 -20px}
+  .c-page{padding-bottom:24px}
+  .c-split>aside{position:static}
 }
