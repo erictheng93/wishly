@@ -214,7 +214,7 @@ flowchart LR
 <tr><td>解鎖並瀏覽 password 清單 <span class="badge p0">P0</span></td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F21；知道密碼即可，免登入；每 slug + IP 15 分鐘 10 次</td></tr>
 <tr><td>設定清單可見性、存取密碼、指定名單 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>F21；僅清單 owner_id 本人；指定名單只能選自己的好友</td></tr>
 <tr><td>好友申請 / 接受 / 邀請連結 / 解除好友 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F20；需登入；訪客可開邀請預覽但接受需登入</td></tr>
-<tr><td>設定 handle 與捐助預設可見度、逐筆調整認領可見度 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F22；訪客認領無帳號，不列入個人頁</td></tr>
+<tr><td>設定 handle 與捐助預設可見度、逐筆調整認領與認捐可見度 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F22；訪客認領無帳號，不列入個人頁</td></tr>
 <tr><td>瀏覽他人個人頁 /u/{handle} <span class="badge p0">P0</span></td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F22；匿名可看 public 內容，依 relation 顯示更多</td></tr>
 </tbody></table>
 <p><b>授權實作原則：</b>授權條件寫進 SQL 的 WHERE（例如 <code>WHERE id=$1 AND owner_id=$2</code>），查無列一律回 <code>NOT_FOUND</code>，不回 <code>FORBIDDEN</code>，避免洩漏資源存在與否；只有「已登入但角色不足」（如 volunteer 想建立據點）才回 <code>FORBIDDEN</code>。</p>
@@ -1705,14 +1705,14 @@ flowchart TD
   H1 -->|"public"| I["任何人"]
   H1 -->|"friends"| J["需為認領者好友"]
   H1 -->|"private"| K["只有本人"]
-  H --> H2["認捐 contributions 依帳號 default_claim_visibility<br/>匿名認捐只給本人看"]
+  H --> H2["認捐 contributions.visibility<br/>匿名認捐只給本人看"]
   F -->|"none"| L["送出好友邀請 F20"]
   F -->|"incoming"| M["接受好友邀請"]
   F -->|"anonymous"| N["登入以加好友 redirect 回此頁"]
 </pre>
 <table class="meta"><tbody>
-<tr><td>規則</td><td><code>users.handle</code>：小寫英數與底線 3–30 字、唯一（<code>HANDLE_TAKEN</code> 409），可為空（無個人頁）。<b>訪客認領（無帳號）永遠不出現在任何個人頁</b>（<code>claims.visibility IS NULL</code>）。登入者認領時可在 ClaimSheet 指定 <code>visibility</code>（public / friends / private），未指定則由 DB trigger 套用帳號 <code>default_claim_visibility</code>（預設 private）；之後可於 /me/claims 逐筆 PATCH。點數認捐目前<b>沒有逐筆設定</b>，依查詢當下的帳號預設，故改預設會連帶影響舊認捐（已知限制，見 TODO #3）。驚喜鎖定中的清單、已下架 / 已刪除的清單，其捐助一律不顯示；link 清單的捐助不給 slug。捐助最多回 50 筆。</td></tr>
-<tr><td>API</td><td><code>GET /users/{handle}</code>（匿名可呼叫，帶 cookie 時回傳 relation）、<code>PATCH /me</code>（handle、default_claim_visibility）、<code>PATCH /claims/{id}</code>（visibility）</td></tr>
+<tr><td>規則</td><td><code>users.handle</code>：小寫英數與底線 3–30 字、唯一（<code>HANDLE_TAKEN</code> 409），可為空（無個人頁）。<b>訪客認領（無帳號）永遠不出現在任何個人頁</b>（<code>claims.visibility IS NULL</code>）。登入者認領時可在 ClaimSheet 指定 <code>visibility</code>（public / friends / private），未指定則由 DB trigger 套用帳號 <code>default_claim_visibility</code>（預設 private）；之後可於 /me/claims 逐筆 PATCH。點數認捐同樣保存逐筆 <code>visibility</code>，建立時可指定，未指定由 DB trigger 套帳號預設；既有資料回填遷移當下的帳號預設。之後可於 /me/wallet 逐筆 PATCH，改帳號預設不回溯既有認領或認捐；轉投保留原筆可見度。匿名認捐在個人頁仍僅本人可見。驚喜鎖定中的清單、已下架 / 已刪除的清單，其捐助一律不顯示；link 清單的捐助不給 slug。捐助最多回 50 筆。</td></tr>
+<tr><td>API</td><td><code>GET /users/{handle}</code>（匿名可呼叫，帶 cookie 時回傳 relation）、<code>PATCH /me</code>（handle、default_claim_visibility）、<code>PATCH /claims/{id}</code>（visibility）、<code>POST /items/{id}/contributions</code>（visibility，選填）、<code>PATCH /contributions/{id}</code>（visibility，僅認捐者本人）</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>NOT_FOUND</code> 404（handle 不存在 / 帳號已刪除）；<code>HANDLE_TAKEN</code> 409；<code>VALIDATION_FAILED</code> 422（handle 格式）。個人頁一律 <code>noindex</code>。</td></tr>
 </tbody></table>
 

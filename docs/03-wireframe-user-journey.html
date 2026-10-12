@@ -2005,7 +2005,7 @@ flowchart TD
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>ProfileHeader（display_name、@handle、RelationAction）、WishlistRow（封面縮圖、可見性徽章、已結束徽章、類型、完成度）、DonationRow（品項 × 數量 或 點數、狀態徽章、送給誰、清單連結、日期）</td></tr>
 <tr><th>relation</th><td><code>self</code>：「編輯個人設定」→ /settings；<code>friend</code>：「好友」徽章；<code>outgoing</code>：「已送出邀請」；<code>incoming</code>：「接受好友邀請」；<code>none</code>：「送出好友邀請」；<code>anonymous</code>：「登入以加好友」（帶 redirect 回此頁）。</td></tr>
-<tr><th>可見度</th><td>清單：public 任何人；friends 需為好友；selected 需在名單；本人另可看到自己的 friends / selected（private、link、password 不列）。捐助：依每筆認領的 visibility，認捐依帳號預設，匿名認捐只給本人。驚喜鎖定中與已下架的清單不出現。link 清單的捐助不附連結。</td></tr>
+<tr><th>可見度</th><td>清單：public 任何人；friends 需為好友；selected 需在名單；本人另可看到自己的 friends / selected（private、link、password 不列）。捐助：依每筆認領與認捐的 visibility，匿名認捐只給本人。驚喜鎖定中與已下架的清單不出現。link 清單的捐助不附連結。</td></tr>
 <tr><th>狀態</th><td>loading / ok / gone（404）/ error（重試）；頁面 <code>noindex</code>；empty：「目前沒有可看的清單。」「目前沒有可看的捐助紀錄。」。</td></tr>
 <tr><th>API</th><td>GET <code>/users/{handle}</code>（匿名可呼叫，帶 cookie 才有 relation）；POST <code>/friends/requests</code>；接受時先 GET <code>/friends</code> 找出申請 id 再 POST accept。</td></tr>
 </tbody></table></div></div>
@@ -2088,7 +2088,7 @@ flowchart TD
 </div>
 
 <!-- 5.36 SOCIAL SETTINGS -->
-<h3 id="w-social-set">5.36 個人頁與捐助設定、認領可見度 <span class="ph p0">P0</span></h3>
+<h3 id="w-social-set">5.36 個人頁與捐助設定、認領與認捐可見度 <span class="ph p0">P0</span></h3>
 <div class="wf">
 <div class="phones">
 <div><div class="phone" style="min-height:700px">
@@ -2099,7 +2099,7 @@ flowchart TD
 <div><div class="lbl"><b>帳號代號（個人頁網址，可留空）</b></div><div class="inp">amy_wang</div></div>
 <div class="lbl">小寫英文、數字、底線，3–30 字。你的個人頁：https://app.wishsync.tw/u/amy_wang　[複製]</div>
 <div><div class="lbl"><b>捐助紀錄預設誰看得到</b></div><div class="inp">僅好友　▾</div></div>
-<div class="lbl">選項：公開 / 僅好友 / 私人。新的認領會套用此預設，可逐筆調整。</div>
+<div class="lbl">選項：公開 / 僅好友 / 私人。新的認領與認捐會套用此預設，可逐筆調整。</div>
 <div class="btn">儲存</div>
 <div class="lbl" style="color:var(--warn)">已被使用時顯示「此帳號代號已被使用」（HANDLE_TAKEN）。</div>
 </div></div><div class="cap">/settings 新增區塊（5.28 其餘區塊不變）</div></div>
@@ -2112,6 +2112,14 @@ flowchart TD
 </div></div><div class="cap">/me/claims（登入者每筆可調整）</div></div>
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
+<div class="ab">‹ 我的點數</div>
+<div class="bd">
+<div class="lbl"><b>我的認捐</b></div>
+<div class="card" style="flex-direction:column"><div class="row"><b class="fl">嬰兒推車・700 點</b><span class="b teal">已認捐</span></div><div class="lbl">小愛的待產清單</div><div class="lbl"><b>誰看得到</b></div><div class="inp">僅好友　▾</div><div class="row"><div class="btn fl ghost">轉投其他品項</div><div class="btn fl ghost">撤回</div></div></div>
+<div class="lbl">匿名認捐在個人頁僅本人可見；轉投保留原筆可見度。</div>
+</div></div><div class="cap">/me/wallet（每筆認捐可調整，含歷史紀錄）</div></div>
+<div><div class="phone">
+<div class="st"><span>9:41</span><span></span></div>
 <div class="ab">小愛的待產清單</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>奶瓶 240ml</b></div></div></div>
 <div class="scrim"></div>
@@ -2120,10 +2128,10 @@ flowchart TD
 </div></div><div class="cap">ClaimSheet（登入者多一個可見度欄位，訪客不顯示）</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>HandleField（即時格式檢查）、CopyProfileUrl、SelectRow（default_claim_visibility）、ClaimVisibilitySelect</td></tr>
+<tr><th>元件</th><td>HandleField（即時格式檢查）、CopyProfileUrl、SelectRow（default_claim_visibility）、ClaimVisibilitySelect、ContributionVisibilitySelect</td></tr>
 <tr><th>狀態</th><td>handle 格式不符時前端即顯示錯誤並停用儲存；<code>HANDLE_TAKEN</code> 409；儲存成功「已儲存」；handle 可清空（關閉個人頁，連結 404）。</td></tr>
-<tr><th>互動</th><td>登入者開啟 ClaimSheet 時，名稱帶入帳號名稱、可見度預設帶帳號設定（載入前不送欄位，由伺服器套預設）。手快在 /me 載入完成前點「我要送」不會被當成訪客（以 <code>loggedInName</code> 判斷）。改帳號預設<b>不會回溯</b>既有認領，但會影響既有點數認捐（已知限制，TODO #3）。</td></tr>
-<tr><th>API</th><td>PATCH <code>/me</code>（handle、default_claim_visibility）；POST <code>/items/{id}/claims</code>（visibility，僅登入者）；PATCH <code>/claims/{id}</code>（visibility）。</td></tr>
+<tr><th>互動</th><td>登入者開啟 ClaimSheet 時，名稱帶入帳號名稱、可見度預設帶帳號設定（載入前不送欄位，由伺服器套預設）。手快在 /me 載入完成前點「我要送」不會被當成訪客（以 <code>loggedInName</code> 判斷）。改帳號預設<b>不會回溯</b>既有認領或點數認捐。/me/wallet 每筆認捐的「誰看得到」可選公開 / 僅好友 / 私人，PATCH 僅限本人；儲存中停用選單、失敗還原並顯示錯誤。匿名認捐在個人頁仍僅本人可見。轉投保留原筆可見度。</td></tr>
+<tr><th>API</th><td>PATCH <code>/me</code>（handle、default_claim_visibility）；POST <code>/items/{id}/claims</code>（visibility，僅登入者）；PATCH <code>/claims/{id}</code>（visibility）；POST <code>/items/{id}/contributions</code>（visibility，選填）；GET <code>/wallet/contributions</code>（每筆含 visibility）；PATCH <code>/contributions/{id}</code>（visibility）。</td></tr>
 </tbody></table></div></div>
 </div>
 

@@ -1,5 +1,6 @@
 # 待辦
 
-- [ ] 認捐（點數眾籌）逐筆可見度設定 — [#3](https://github.com/erictheng93/wishsync/issues/3)
-  - 現況：認捐只依捐助者帳號 `default_claim_visibility`，改預設會連帶影響舊認捐（`apps/api/src/profiles.rs:51`）。
-  - 做法：比照 claims，`contributions` 加 `visibility share_level` 欄位 + INSERT trigger 套帳號預設、回填既有資料；API 支援建立時指定與 PATCH；`profiles.rs` 改用逐筆欄位；前端認捐紀錄可調整。
+- [x] 認捐（點數眾籌）逐筆可見度設定 — [#3](https://github.com/erictheng93/wishsync/issues/3)
+  - 已完成：migration 0006 回填並保留原有欄位；建立時套帳號預設或指定 visibility，逐筆 PATCH；個人頁、錢包與資料匯出支援逐筆可見度；轉投保留設定，匿名認捐在個人頁僅本人可見。
+
+- [ ] FundSheet 增加認捐當下的「誰看得到」欄位（issue #3 後續）：目前套帳號預設，認捐後可到錢包修改；預設公開時，修改前可能已被看到。
