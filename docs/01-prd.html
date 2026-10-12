@@ -222,14 +222,14 @@ header.top,main{padding-left:16px;padding-right:16px}
 <div class="story"><span class="id">US-01 建立清單</span>　身為建立者，我想以 Email＋密碼、Google 或 LINE 登入並建立清單，以便開始收集心願。
 <ul>
 <li><b>Given</b> 我未登入，<b>When</b> 我以 Email＋密碼（或 Google／LINE）完成登入，<b>Then</b> 系統建立 session（<code>ws_session</code>）並導向 <code>/dashboard</code>。</li>
-<li><b>Given</b> 我已登入，<b>When</b> 我在 <code>/w/new</code> 選擇類型 <code>personal</code> 或 <code>registry</code> 並填標題，<b>Then</b> 建立一張 <code>draft</code> 清單與 10 碼 slug。</li>
+<li><b>Given</b> 我已登入，<b>When</b> 我在 <code>/lists/new</code> 選擇類型 <code>personal</code> 或 <code>registry</code> 並填標題，<b>Then</b> 建立一張 <code>draft</code> 清單與 10 碼 slug。</li>
 <li><b>Given</b> 密碼錯誤次數超過限制，<b>When</b> 我再次提交，<b>Then</b> 回 <code>RATE_LIMITED</code>。</li>
 <li><b>Given</b> 我是新用戶或忘記密碼，<b>When</b> 我以 Email 驗證碼完成註冊驗證或密碼重設，<b>Then</b> 才能設定密碼（Email 驗證碼僅用於註冊驗證與忘記密碼，不作為登入方式）。</li>
 </ul></div>
 
 <div class="story"><span class="id">US-02 新增品項與數量</span>　身為建立者，我想設定品項、品牌、數量與圖片，以便讓親友知道要買多少。
 <ul>
-<li><b>Given</b> 我在 <code>/w/{id}/edit</code>，<b>When</b> 我新增「奶瓶，數量 10，funding_mode=quantity」，<b>Then</b> 品項儲存且 <code>qty_needed=10</code>、<code>qty_claimed=0</code>。</li>
+<li><b>Given</b> 我在 <code>/lists/{id}/edit</code>，<b>When</b> 我新增「奶瓶，數量 10，funding_mode=quantity」，<b>Then</b> 品項儲存且 <code>qty_needed=10</code>、<code>qty_claimed=0</code>。</li>
 <li><b>Given</b> 我在 MVP 建立品項，<b>When</b> 我選擇 <code>funding_mode=crowdfund</code>，<b>Then</b> 回 <code>VALIDATION_FAILED</code>（<code>funding_mode</code> 欄位保留，但 MVP 只能選 <code>quantity</code>；眾籌為 Phase 2）。</li>
 <li><b>Given</b> 我上傳圖片，<b>When</b> 前端取得 presigned URL 直傳 R2，<b>Then</b> 品項顯示圖片，DB 僅存 object key。</li>
 </ul></div>
@@ -267,7 +267,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 
 <div class="story"><span class="id">US-07 完成度儀表板</span>　身為建立者，我想看完成度與誰認領了什麼。
 <ul>
-<li><b>Given</b> 清單有 5 個品項、2 個已滿，<b>When</b> 我開啟 <code>/w/{id}/progress</code>，<b>Then</b> 看到整體完成度與各品項已認領 / 需求。</li>
+<li><b>Given</b> 清單有 5 個品項、2 個已滿，<b>When</b> 我開啟 <code>/lists/{id}/progress</code>，<b>Then</b> 看到整體完成度與各品項已認領 / 需求。</li>
 <li><b>Given</b> 未開驚喜模式，<b>When</b> 我查看，<b>Then</b> 看到認領者暱稱與認領內容。</li>
 </ul></div>
 
@@ -311,13 +311,13 @@ header.top,main{padding-left:16px;padding-right:16px}
 </ul></div>
 <div class="story"><span class="id">US-38 MVP Email 通知</span>　身為建立者，我想在有人認領時收到 Email。
 <ul>
-<li><b>Given</b> 我的清單第一次被認領，<b>When</b> 認領成功，<b>Then</b> 我收到即時 Email；之後每日彙整一封；可在 <code>/me/settings</code> 關閉。</li>
+<li><b>Given</b> 我的清單第一次被認領，<b>When</b> 認領成功，<b>Then</b> 我收到即時 Email；之後每日彙整一封；可在 <code>/settings</code> 關閉。</li>
 <li><b>Given</b> 驚喜模式，<b>When</b> 通知內容，<b>Then</b> 只寫「有 N 件新認領」，不含品項與認領者。</li>
 <li><b>Given</b> 訪客留了 Email，<b>When</b> 認領成功，<b>Then</b> 收到確認信，含「管理我的認領」連結（換裝置找回的 MVP 最小版）。</li>
 </ul></div>
 <div class="story"><span class="id">US-39 帳號刪除與資料匯出</span>　身為使用者，我想匯出或刪除我的個資。
 <ul>
-<li><b>Given</b> 我已登入，<b>When</b> 我在 <code>/me/settings</code> 二次確認後呼叫 <code>DELETE /me</code>，<b>Then</b> email、名稱、identities 被去識別化 / 刪除，我的清單封存並從公開移除。</li>
+<li><b>Given</b> 我已登入，<b>When</b> 我在 <code>/settings</code> 二次確認後呼叫 <code>DELETE /me</code>，<b>Then</b> email、名稱、identities 被去識別化 / 刪除，我的清單封存並從公開移除。</li>
 <li><b>Given</b> 我已登入，<b>When</b> 我呼叫 <code>GET /me/export</code>，<b>Then</b> 取得 JSON：個人資料、清單、認領。</li>
 <li><b>Given</b> 我是訪客，<b>When</b> 我呼叫 <code>DELETE /guest/me</code>，<b>Then</b> 暱稱與聯絡方式被清除，我的認領保留為「已刪除的訪客」。</li>
 </ul></div>
@@ -381,7 +381,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>Given</b> 剩餘 500 點，<b>When</b> 我認捐 800 點，<b>Then</b> 回 409 <code>CROWDFUND_TARGET_EXCEEDED</code> 並附 <code>remaining_points</code>（眾籌一律硬上限，不可超額）；前端快選金額自動帶入剩餘點數。</li>
 <li><b>Given</b> 品項已達標，<b>When</b> 我再認捐，<b>Then</b> 回 409 <code>ITEM_FUNDED</code>。</li>
 <li><b>Given</b> 品項已截止（<code>expired</code>），<b>When</b> 我認捐，<b>Then</b> 回 409 <code>FUNDING_EXPIRED</code>。</li>
-<li><b>Given</b> 我認捐過數個品項，<b>When</b> 我開啟 <code>/wallet</code> 的「我的認捐」（<code>GET /wallet/contributions?status=&amp;cursor=</code>），<b>Then</b> 看到每筆認捐的品項、清單標題與狀態（<code>display_status</code>：open / funded / ordered / shipped / delivered / expired）。</li>
+<li><b>Given</b> 我認捐過數個品項，<b>When</b> 我開啟 <code>/me/wallet</code> 的「我的認捐」（<code>GET /wallet/contributions?status=&amp;cursor=</code>），<b>Then</b> 看到每筆認捐的品項、清單標題與狀態（<code>display_status</code>：open / funded / ordered / shipped / delivered / expired）。</li>
 </ul></div>
 <div class="story"><span class="id">US-19 達標前撤回</span>　身為眾籌捐贈者，我想在達標前撤回認捐。
 <ul>
@@ -504,7 +504,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>FR-08</td><td>認領逾期</td><td><code>claim_ttl_hours</code>：personal / registry 預設 NULL（不逾期），relief 預設 48；背景 job 轉 <code>expired</code> 並回補 <code>qty_claimed</code></td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-09</td><td>品項模式限制</td><td><code>funding_mode</code> 欄位保留；MVP 建立品項只能選 <code>quantity</code>，選 <code>crowdfund</code> 回 <code>VALIDATION_FAILED</code></td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-10</td><td>驚喜模式</td><td>now &lt; unlock_at（event_date 當日 00:00 Asia/Taipei）時，建立者儀表板只回整體彙總，品項明細為 null；眾籌品項只見「已下單 / 運送中」；公開頁軟性遮蔽為已知限制</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
-<tr><td>FR-11</td><td>完成度儀表板</td><td><code>/w/{id}/progress</code>，整體與品項完成度</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
+<tr><td>FR-11</td><td>完成度儀表板</td><td><code>/lists/{id}/progress</code>，整體與品項完成度</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-12</td><td>隱私設定</td><td><code>show_claimer_names</code> 預設關閉</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-13</td><td>即時更新</td><td>SSE：<code>item.updated</code>、<code>wishlist.updated</code></td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-14</td><td>冪等性</td><td>建立型 POST 強制 <code>Idempotency-Key</code>，保存 24 小時</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
@@ -524,7 +524,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>FR-27</td><td>認捐 → 運送 → 實收</td><td>claim_status 流轉（reserved 已認捐、purchased 運送中、delivered 已實收）；receipts 記錄實收；認領逾期預設 48 小時（<code>claim_ttl_hours</code>），背景 job 轉 expired 並回補數量</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-28</td><td>離線佇列</td><td>Background Sync 搭配 Idempotency-Key</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-29</td><td>金流儲值與 webhook</td><td>TapPay 或綠界（付款方式 <code>card</code> / <code>line_pay</code> / <code>apple_pay</code>，供應商由後端依 method 決定）；儲值 100 至 50,000 點、快選 500 / 1,000 / 2,000 / 5,000；<code>POST /wallet/topups</code>、<code>POST /webhooks/payments/{provider}</code>（驗簽、<code>provider_txn_id</code> 冪等）；<code>topups</code>、發票串接。須先通過 8.7</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
-<tr><td>FR-31</td><td>點數錢包</td><td><code>point_wallets</code>、<code>point_ledger</code>（只增不改）、<code>GET /wallet</code>、<code>/wallet</code> 頁；1 點 = NT$1，不可轉讓、不可提領給受捐者</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
+<tr><td>FR-31</td><td>點數錢包</td><td><code>point_wallets</code>、<code>point_ledger</code>（只增不改）、<code>GET /wallet</code>、<code>/me/wallet</code> 頁；1 點 = NT$1，不可轉讓、不可提領給受捐者</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-32</td><td>眾籌品項與認捐</td><td><code>target_points</code>（目錄：商品價 + 運費；代購：商品價 + 運費 + 8% 服務費 + 10% 價差緩衝，以商品價為基底）、硬上限；<code>POST /items/{item_id}/contributions</code>（需登入、Idempotency-Key）；鎖順序 wishlist (FOR SHARE) → wallet (FOR UPDATE) → item；對 expired 品項回 <code>FUNDING_EXPIRED</code>；<code>message</code>、<code>is_anonymous</code></td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-33</td><td>撤回認捐</td><td><code>open</code>，或 <code>expired</code> 後 7 天選擇期內可撤回；其他回 <code>CONTRIBUTION_LOCKED</code>。含「我的認捐」列表 <code>GET /wallet/contributions</code></td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-34</td><td>達標自動下單</td><td>達標同交易：funded、captured、建立 <code>purchase_orders</code>、outbox 觸發下單 job；商家 webhook 更新出貨 / 送達</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
@@ -550,7 +550,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>FR-54</td><td>圖片限制與 EXIF 去除</td><td>僅 image/jpeg、png、webp，&le; 5 MB；伺服器端去除 EXIF（含 GPS）後才公開；頁面提示勿上傳含個資照片</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-55</td><td>MVP 營運後台</td><td><code>/admin</code>（<code>is_staff</code>）：清單與使用者搜尋、下架 / 恢復、檢舉佇列、系統旗標（唯讀模式）；staff 動作寫 audit_logs；P2 的訂單、退款、企業後台掛在同一殼內</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-56</td><td>MVP Email 通知</td><td>第一筆認領即時、之後每日彙整，可關閉；驚喜模式只寫件數；訪客留 Email 則寄確認信與管理連結；<code>notifications</code> outbox；Resend 或 AWS SES</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
-<tr><td>FR-57</td><td>帳號刪除與資料匯出</td><td><code>DELETE /me</code>、<code>GET /me/export</code>、<code>DELETE /guest/me</code>；<code>/me/settings</code>。P2：有餘額或未結案認捐 / 訂單回 409 <code>ACCOUNT_HAS_BALANCE</code>，金融紀錄依商業會計法保存並假名化（年限待會計師確認）</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
+<tr><td>FR-57</td><td>帳號刪除與資料匯出</td><td><code>DELETE /me</code>、<code>GET /me/export</code>、<code>DELETE /guest/me</code>；<code>/settings</code>。P2：有餘額或未結案認捐 / 訂單回 409 <code>ACCOUNT_HAS_BALANCE</code>，金融紀錄依商業會計法保存並假名化（年限待會計師確認）</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-58</td><td>法律文件與個資告知</td><td><code>/terms</code>、<code>/privacy</code>、認領 sheet 個資告知連結（不強制勾選）、Cookie / 本機儲存說明；P2 另需點數 / 禮物卡使用條款、退款政策</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-59</td><td>環境與 CI/CD</td><td>local / staging / production；GitHub Actions；向前相容遷移；PR preview；測試策略見 8.9</td><td><span class="badge p0">P0</span></td><td>MVP</td></tr>
 <tr><td>FR-60</td><td>信用卡拒付風控</td><td>3DS、新帳號每日上限 NT$3,000、凍結錢包、<code>wallet_debts</code>、禮物卡 <code>claimable_at</code> 延遲兌換（最多 24 小時）</td><td><span class="badge p2">P2</span></td><td>2-A</td></tr>

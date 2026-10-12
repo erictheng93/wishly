@@ -401,7 +401,7 @@ sequenceDiagram
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant B as 瀏覽器 /w/new
+  participant B as 瀏覽器 /lists/new
   participant A as Rust API
   participant D as PostgreSQL
   participant R as R2
@@ -692,7 +692,7 @@ stateDiagram-v2
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant B as 瀏覽器 /wallet
+  participant B as 瀏覽器 /me/wallet
   participant A as Rust API
   participant D as PostgreSQL
   participant P as 金流商 TapPay 或 綠界
@@ -919,7 +919,7 @@ sequenceDiagram
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant G as 捐贈者 /wallet
+  participant G as 捐贈者 /me/wallet
   participant A as Rust API
   participant D as PostgreSQL
   participant S as 營運 / 財務 staff
@@ -948,7 +948,7 @@ sequenceDiagram
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant O as owner /w/id/progress
+  participant O as owner /lists/id/progress
   participant A as Rust API
   participant D as PostgreSQL
   O->>A: GET /wishlists/id/dashboard (ws_session)
@@ -1451,13 +1451,13 @@ sequenceDiagram
 <table class="meta"><tbody>
 <tr><td>觸發與頻率</td><td>
 <ul>
-<li><b>建立者</b>：清單的<strong>第一筆認領即時寄出</strong>（<code>scheduled_at = now()</code>）；之後同一清單的認領合併成<strong>每日彙整一封</strong>（每日 09:00 Asia/Taipei；以 <code>dedupe_key = owner_digest:{wishlist_id}:{date}</code> UNIQUE，<code>ON CONFLICT DO NOTHING</code>，件數於寄送時計算）。建立者可在 <code>/me/settings</code> 關閉（<code>users.notification_prefs.email_claims</code>，預設 true）。</li>
+<li><b>建立者</b>：清單的<strong>第一筆認領即時寄出</strong>（<code>scheduled_at = now()</code>）；之後同一清單的認領合併成<strong>每日彙整一封</strong>（每日 09:00 Asia/Taipei；以 <code>dedupe_key = owner_digest:{wishlist_id}:{date}</code> UNIQUE，<code>ON CONFLICT DO NOTHING</code>，件數於寄送時計算）。建立者可在 <code>/settings</code> 關閉（<code>users.notification_prefs.email_claims</code>，預設 true）。</li>
 <li><b>驚喜模式內容遮蔽</b>：<code>surprise_mode=true</code> 且 now &lt; unlock_at 時，信件內容只寫「你的清單有 N 件新認領」，<strong>不含品項名稱與認領者</strong>；即時信與彙整信皆同。Email 內容在<strong>寄送時</strong>依當下狀態組裝（非入隊時），避免入隊與寄送間狀態改變。</li>
 <li><b>訪客</b>：若 contact 是 Email 格式，認領成功寄確認信，含「管理我的認領」連結。這是 D15 換裝置找回的 MVP 最小版（P1 做完整版）。每個收件地址 24 小時最多 5 封（防被當垃圾郵件發射器），信末附退訂連結。</li>
 </ul></td></tr>
 <tr><td>訪客管理連結</td><td>採<strong>一次性恢復權杖</strong>，信件中<strong>不放 guest_token</strong>。表 <code>guest_recovery_tokens(id, guest_id, token_hash BYTEA UNIQUE, expires_at, used_at)</code>：32 bytes 隨機，DB 只存 SHA-256，效期 30 天，<strong>每次寄信產生新權杖</strong>。信件連結為 <code>/me/claims#r={token}</code>（放在 fragment，不進伺服器 log 與 Referer）；前端取出後呼叫 <code>POST /guest/recover</code>（body <code>{token}</code>），伺服器在交易內驗證「未使用、未過期」→ 標 <code>used_at</code> → 對該 guest 換發<strong>新的</strong> guest_token（舊 hash 作廢），Set-Cookie <code>ws_guest</code> 並回傳新 token 給前端存 localStorage。<strong>無效、過期、已使用一律回 404 <code>NOT_FOUND</code></strong>（不區分原因）。Email 為訪客自填、未驗證，連結只寄到該地址。</td></tr>
 <tr><td>Outbox</td><td><code>notifications</code>（MVP）：<code>kind</code>、<code>channel=email</code>、<code>to_user_id</code> 或 <code>to_email</code>、<code>scheduled_at</code>、<code>status pending | sending | sent | failed</code>、<code>attempts</code>、<code>next_attempt_at</code>、<code>locked_until</code>、<code>dedupe_key</code> UNIQUE、<code>payload</code>（只放 ID，不放個資內容）。通知與業務寫入<strong>同交易</strong>入隊。供應商：Resend 或 AWS SES（待定）；硬退信 / 投訴回報後加入 suppression list，不再寄送。LINE Messaging API 仍為 <span class="badge p1">P1</span>。</td></tr>
-<tr><td>API</td><td>無專屬寄送 API。<code>PATCH /me</code>（<code>notification_prefs</code>，如 <code>{"email_claims": true}</code>，供 /me/settings）、<code>POST /guest/recover</code>、退訂連結 <code>GET /unsubscribe?token=</code>（HMAC 簽章，內含 user / guest id 與通知類型，免登入一鍵退訂）。</td></tr>
+<tr><td>API</td><td>無專屬寄送 API。<code>PATCH /me</code>（<code>notification_prefs</code>，如 <code>{"email_claims": true}</code>，供 /settings）、<code>POST /guest/recover</code>、退訂連結 <code>GET /unsubscribe?token=</code>（HMAC 簽章，內含 user / guest id 與通知類型，免登入一鍵退訂）。</td></tr>
 <tr><td>交易邊界</td><td>入隊：在 F4（認領）等業務交易內 INSERT。寄送：短交易取列與租約 → 交易外呼叫供應商 → 短交易回寫。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td>寄送失敗不影響認領成功；<code>VALIDATION_FAILED</code> 422（token 格式）；<code>NOT_FOUND</code> 404（recovery token 無效、過期或已使用）；<code>RATE_LIMITED</code> 429。</td></tr>
 <tr><td>冪等性</td><td><code>dedupe_key</code> UNIQUE 防重複入隊；租約防重複寄送；供應商端附 notification id 作 idempotency key。</td></tr>
@@ -1467,7 +1467,7 @@ sequenceDiagram
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant U as 使用者 /me/settings
+  participant U as 使用者 /settings
   participant A as Rust API
   participant D as PostgreSQL
   participant J as 清理 job
