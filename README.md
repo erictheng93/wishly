@@ -57,6 +57,16 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 詳見[登入方式與 Email 政策](docs/account-login-methods.md)，包含無 Email 限制、解除後重新連結、頭像轉存、JWKS 快取與新增 API。新增 migration `0007_identity_linking.sql`，API 啟動時自動套用，無新增環境變數或依賴。
 
+## 營運後台
+
+`/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄。
+
+- 第一位 staff 需由資料庫設定 `users.is_staff = true`；之後可在後台設為／取消 staff。最後一位有效 staff 不可被停權、降權或自行刪帳號。
+- 停權、staff 變更與營運解除綁定會撤銷現有登入；解鎖後需重新登入。停權保留清單、認領與帳務紀錄，不會自動下架清單。
+- 使用者支援 Email、名稱、handle、UUID 查詢，以及登入來源／帳號狀態篩選。停權、staff 變更、解除綁定與復原協助必須填寫原因並留下稽核。
+- 解除 LINE／Google 綁定至少須保留一種登入方式，並更新聯絡 Email、寄送安全通知。復原協助僅向既有已驗證 Email 寄送密碼重設驗證信；無 Email 帳號須另行核驗身分，後台不能直接換綁。
+- 新增 migration `0008_admin_users.sql`（`users.blocked_at`），由 API 啟動時套用，無新增環境變數。稽核日期依台北時區且包含結束日。
+
 ## 測試
 
 ```sh
@@ -76,7 +86,8 @@ cd apps/web && npm run typecheck && npm test && npm run build   # CI 的 web job
 
 ```sh
 cd apps/web
-npm run e2e            # 全部（desktop-chromium + mobile 兩個 project）
+npm run e2e            # 全部（desktop-chromium + mobile，最後執行 admin）
+npx playwright test --project=admin --no-deps  # 只跑後台（含唯讀旗標，不與其他 E2E 同時執行）
 npm run e2e:ui         # Playwright UI 模式
 npm run e2e:headed     # 顯示瀏覽器
 npx playwright test guest-journey --project=desktop-chromium   # 單一檔案
@@ -88,7 +99,7 @@ npx playwright show-report                                      # 開啟上次�
 - API 用 `127.0.0.1:8081`、Web 用 `127.0.0.1:3012`（`playwright.config.ts` 的 `webServer` 啟動，且不重用既有伺服器；連接埠被佔用會直接失敗）。Web 是 production build + node-server（`e2e/.app` 是獨立 buildDir 的 Nuxt layer，不會覆蓋開發中的 `.nuxt`）。
 - 每個測試自建唯一資料（唯一 email、唯一清單），所以可平行（本機 3 workers、CI 2）。後端限流以身分計（email / guest / user），每 IP 的額度（新訪客 100/小時、檢舉 10/小時、登入失敗 30/15 分鐘）遠大於整個測試集的用量；後端不信任 `X-Forwarded-For`，所以測試也不靠它。
 - 同一 email 的 OTP 有 60 秒間隔（登入 / 註冊 / 重設共用），需要連續寄第二封時，測試用 `skipOtpCooldown(email)` 把舊紀錄往前推。
-- staff 權限由 `makeStaff(email)` 以 psql 直接設定 `users.is_staff`。
+- 測試初始 staff 權限由 `makeStaff(email)` 以 psql 設定 `users.is_staff`。後台 `admin` project 依賴其他 project 完成後才執行，避免唯讀旗標影響平行測試。
 
 失敗時看 `apps/web/playwright-report/`（`trace: on-first-retry`，CI 會重試 2 次並把報告與 trace 上傳為 artifact）。
 

@@ -2,7 +2,7 @@
 definePageMeta({ middleware: 'staff' })
 useHead({ title: '採購單佇列' })
 const { api } = useApi()
-const status = ref('pending')
+const status = ref('pending'), fulfillment = ref('')
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
 const err = ref(''), msg = ref('')
 const ACTION: Record<string, string> = { placed: '標記已下單', shipped: '標記已出貨', delivered: '標記已送達', failed: '標記失敗', cancelled: '取消採購' }
@@ -11,11 +11,11 @@ const actLabel = computed(() => (act.value ? ACTION[act.value.to] ?? '' : ''))
 async function load(more = false) {
   loading.value = true; err.value = ''
   try {
-    const r = await api('/admin/orders', { query: { status: status.value || undefined, limit: 20, cursor: more ? cursor.value : undefined } })
+    const r = await api('/admin/orders', { query: { status: status.value || undefined, fulfillment_type: fulfillment.value || undefined, limit: 20, cursor: more ? cursor.value : undefined } })
     rows.value = more ? [...rows.value, ...r.data] : r.data; cursor.value = r.next_cursor
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
 }
-watch(status, () => load())
+watch([status, fulfillment], () => load())
 onMounted(() => load())
 
 // 狀態更新：依目前狀態只提供合法動作（orderActions），欄位依目標狀態顯示
@@ -46,6 +46,7 @@ async function submit() {
     <CreatorHeader title="採購單佇列" back="/admin" />
     <label class="c-field"><span>狀態</span>
       <select v-model="status"><option value="">全部</option><option v-for="(t, k) in ORDER_STATUS" :key="k" :value="k">{{ t }}</option></select></label>
+    <label class="c-field"><span>履約類型</span><select v-model="fulfillment"><option value="">全部</option><option value="concierge">人工代購</option><option value="catalog">商品目錄</option></select></label>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">重試</button></p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <p v-if="loading && !rows.length" class="c-mute" role="status">載入中…</p>

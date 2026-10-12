@@ -3,12 +3,21 @@ definePageMeta({ middleware: 'staff' })
 useHead({ title: '點數錢包' })
 const { api } = useApi()
 const q = ref(''), rows = ref<ReturnType<typeof normWalletRow>[]>([]), done = ref(false)
-const err = ref(''), msg = ref('')
-async function search() {
+const err = ref(''), msg = ref(''), status = ref(''), cursor = ref<string | null>(null), busy = ref(false)
+async function search(more = false) {
+  if (busy.value) return
+  busy.value = true
   err.value = msg.value = ''
-  try { rows.value = (await api('/admin/wallets', { query: { q: q.value.trim() || undefined } })).data.map(normWalletRow); done.value = true }
-  catch (e) { err.value = errMsg(e) }
+  try {
+    const r = await api('/admin/wallets', { query: { q: q.value.trim() || undefined, status: status.value || undefined, cursor: more ? cursor.value : undefined } })
+    const data = r.data.map(normWalletRow)
+    rows.value = more ? [...rows.value, ...data] : data; cursor.value = r.next_cursor; done.value = true
+  }
+  catch (e) { err.value = errMsg(e) } finally { busy.value = false }
 }
+
+watch([q, status], () => { cursor.value = null })
+onMounted(() => search())
 
 // 發點 / 扣點（二次確認；Idempotency-Key 於開啟確認時產生，失敗重試沿用）
 const g = reactive({ points: '' as string | number, reason: '' })
@@ -48,7 +57,8 @@ async function setStatus() {
 <template>
   <main class="c-page c-admin">
     <CreatorHeader title="點數錢包" back="/admin" />
-    <form class="c-row c-mb" @submit.prevent="search"><input v-model="q" class="c-grow c-input" placeholder="Email 或顯示名稱" aria-label="搜尋使用者"><button class="c-btn primary">搜尋</button></form>
+    <form class="c-row c-mb" @submit.prevent="search()"><input v-model="q" class="c-grow c-input" placeholder="Email 或顯示名稱" aria-label="搜尋使用者" :disabled="busy"><button class="c-btn primary" :disabled="busy">{{ busy ? '搜尋中…' : '搜尋' }}</button></form>
+    <label class="c-field"><span>錢包狀態</span><select v-model="status" :disabled="busy"><option value="">全部</option><option value="active">正常</option><option value="frozen">已凍結</option><option value="none">未建立錢包</option></select></label>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <p v-if="done && !rows.length" class="c-center c-mute">沒有符合的使用者</p>
@@ -62,6 +72,7 @@ async function setStatus() {
       </div>
     </article>
 
+    <button v-if="cursor" class="c-btn block" :disabled="busy" @click="search(true)">載入更多錢包</button>
     <CreatorSheet :open="!!target" title="發點 / 扣點" @close="target = null">
       <p>對象：<strong>{{ target?.display_name }}</strong>（{{ target?.email }}）　目前餘額 {{ fmtPts(target?.balance) }} 點</p>
       <form @submit.prevent="confirmGrant">

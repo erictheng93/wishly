@@ -174,6 +174,7 @@ impl WalletRow { fn json(&self) -> Value { json!({ "id": self.id, "user_id": sel
 
 /// GET /admin/wallets?q=：以 email / 暱稱 / user id 搜尋使用者，連同錢包（沒有錢包 = id null、餘額 0）
 async fn list_wallets(State(st): State<AppState>, Staff(sid): Staff, Query(q): Query<PageQ>) -> R<Response> {
+    if q.status.as_deref().is_some_and(|s| !["active", "frozen", "none"].contains(&s)) { return Err(AppError::invalid("/status", "ENUM", "錢包狀態不正確")); }
     let qs = q.q.as_deref().map(str::trim).filter(|s| !s.is_empty());
     if let Some(s) = qs { audit(&st.pool, sid, "admin.search", "point_wallets", None, json!({ "q": s })).await?; }
     let qid = qs.and_then(|s| s.parse::<Uuid>().ok());
@@ -184,8 +185,9 @@ async fn list_wallets(State(st): State<AppState>, Staff(sid): Staff, Query(q): Q
           WHERE u.deleted_at IS NULL
             AND ($1::text IS NULL OR u.id = $2 OR strpos(lower(u.email), lower($1)) > 0 OR strpos(lower(u.display_name), lower($1)) > 0)
             AND ($3::uuid IS NULL OR u.id > $3)
+            AND ($5::text IS NULL OR ($5='none' AND w.id IS NULL) OR (w.id IS NOT NULL AND w.status::text=$5))
           ORDER BY u.id LIMIT $4")
-        .bind(qs).bind(qid).bind(q.cursor).bind(limit(&q) + 1).fetch_all(&st.pool).await?;
+        .bind(qs).bind(qid).bind(q.cursor).bind(limit(&q) + 1).bind(&q.status).fetch_all(&st.pool).await?;
     Ok(page(rows, limit(&q)))
 }
 

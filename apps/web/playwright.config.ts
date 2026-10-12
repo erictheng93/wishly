@@ -32,9 +32,11 @@ export default defineConfig({
     timezoneId: 'Asia/Taipei',
   },
   projects: [
-    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'desktop-chromium', testIgnore: /admin\.spec\.ts$/, use: { ...devices['Desktop Chrome'] } },
     // 行動版只跑與版面 / 觸控最相關的案例，其餘流程與桌面相同，避免重複消耗時間
     { name: 'mobile', testMatch: /(guest-journey|smoke|line-browser)\.spec\.ts/, use: { ...iphone, browserName: 'chromium' } },
+    // 後台測試會切換全站唯讀旗標：等其他 project 完成，再依序執行。
+    { name: 'admin', testMatch: /admin\.spec\.ts$/, dependencies: ['desktop-chromium', 'mobile'], fullyParallel: false, use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: [
     {
