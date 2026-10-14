@@ -1,41 +1,26 @@
 //! Races are staged with PostgreSQL row locks. No sleeps: pg_stat_activity proves
 //! both requests have reached the conflicting statement before the gate opens.
 mod common;
-use axum::{
-    body::Body,
-    http::{Request, StatusCode},
-    Router,
-};
-use common::{assert_claims_reconciled, call_request as call};
+use axum::{http::StatusCode, Router};
+use common::{assert_all_reconciled, balance, call_app as call, Resp, TestUser};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::time::Duration;
 use tokio::{sync::Semaphore, task::JoinHandle};
 
 use uuid::Uuid;
-use wishsync_api::{app, points, AppState};
+use wishsync_api::{app, AppState};
 
 // SQLx integration-test pools share a global 20-connection semaphore. Each
 // gated race needs up to 5 connections; leave capacity for fixture migrations.
 static RACE_SLOTS: Semaphore = Semaphore::const_new(2);
 
-type Resp = (StatusCode, axum::http::HeaderMap, Value);
-fn request(
-    method: &str,
-    path: &str,
-    token: Option<&str>,
-    key: Option<Uuid>,
-    body: Value,
-) -> Request<Body> {
-    let mut headers = token.map(common::ck).unwrap_or_default();
-    if let Some(key) = key {
-        headers.push(("idempotency-key", key.to_string()));
-    }
-    common::request(method, &format!("/api/v1{path}"), &headers, Some(body))
-}
-fn send(app: &Router, req: Request<Body>) -> JoinHandle<Resp> {
+fn send(
+    app: &Router,
+    (method, uri, headers, body): (&'static str, String, common::Hdr, Option<Value>),
+) -> JoinHandle<Resp> {
     let app = app.clone();
-    tokio::spawn(async move { call(&app, req).await })
+    tokio::spawn(async move { common::call_app(&app, method, &uri, &headers, body).await })
 }
 async fn finish(task: JoinHandle<Resp>) -> Resp {
     tokio::time::timeout(Duration::from_secs(15), task)
@@ -98,64 +83,45 @@ async fn waiting(pool: &PgPool, query: &str, count: i64) {
     }).await.unwrap_or_else(|_| panic!("expected {count} blocked statements containing {query:?}"));
 }
 async fn list(pool: &PgPool, owner: Uuid) -> Uuid {
-    let id = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title) VALUES($1,'registry','active',$2,'race') RETURNING id")
-        .bind(owner).bind(Uuid::new_v4().simple().to_string()[..10].to_string()).fetch_one(pool).await.unwrap();
+    let id = common::wishlist(pool, owner, common::ListOpts::default())
+        .await
+        .id;
+    sqlx::query("UPDATE wishlists SET title='race' WHERE id=$1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO shipping_addresses(wishlist_id,recipient_name_enc,phone_enc,address_enc) VALUES($1,$2,$2,$2)")
         .bind(id).bind(wishsync_api::sealed::seal(b"test address")).execute(pool).await.unwrap();
     id
 }
 async fn quantity(pool: &PgPool, wl: Uuid, qty: i32) -> Uuid {
-    sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed) VALUES($1,'quantity',$2) RETURNING id")
-        .bind(wl).bind(qty).fetch_one(pool).await.unwrap()
+    common::item(pool, wl, "quantity", qty).await
 }
 async fn funding(pool: &PgPool, wl: Uuid, target: i64) -> Uuid {
-    sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,funding_mode,target_points,funding_status,funding_deadline,fulfillment_type) VALUES($1,'funding',1,'crowdfund',$2,'open',now()+interval '7 days','concierge') RETURNING id")
-        .bind(wl).bind(target).fetch_one(pool).await.unwrap()
+    let id = common::crowdfund_item(pool, wl, target).await;
+    sqlx::query("UPDATE wishlist_items SET title='funding' WHERE id=$1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    id
 }
 async fn grant(pool: &PgPool, user: Uuid) -> Uuid {
-    let mut tx = pool.begin().await.unwrap();
-    let wallet = points::ensure_wallet(&mut tx, user).await.unwrap();
-    points::post(
-        &mut tx,
-        wallet,
-        1000,
-        points::Entry {
-            kind: "grant",
-            ref_type: "manual",
-            ref_id: None,
-            note: Some("race fixture"),
-            actor: None,
-        },
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
-    wallet
+    common::grant(pool, user, 1000).await;
+    sqlx::query_scalar("SELECT id FROM point_wallets WHERE user_id=$1")
+        .bind(user)
+        .fetch_one(pool)
+        .await
+        .unwrap()
 }
 async fn pledge(app: &Router, item: Uuid, token: &str, amount: i64) -> Uuid {
-    let (status, _, body) = call(
-        app,
-        request(
-            "POST",
-            &format!("/items/{item}/contributions"),
-            Some(token),
-            Some(Uuid::new_v4()),
-            json!({"points":amount}),
-        ),
-    )
-    .await;
+    let (status, _, body) = common::pledge(app, item, token, amount).await;
     assert_eq!(status, StatusCode::CREATED, "{body}");
     body["contribution"]["id"]
         .as_str()
         .unwrap()
         .parse()
-        .unwrap()
-}
-async fn balance(pool: &PgPool, user: Uuid) -> i64 {
-    sqlx::query_scalar("SELECT balance FROM point_wallets WHERE user_id=$1")
-        .bind(user)
-        .fetch_one(pool)
-        .await
         .unwrap()
 }
 async fn item_state(pool: &PgPool, id: Uuid) -> (i64, String) {
@@ -166,11 +132,7 @@ async fn item_state(pool: &PgPool, id: Uuid) -> (i64, String) {
         .unwrap()
 }
 async fn reconciled(pool: &PgPool) {
-    assert_claims_reconciled(pool).await;
-    let wallets: Vec<(Uuid,i64,i64)> = sqlx::query_as("SELECT w.id,w.balance,coalesce(sum(l.delta),0)::bigint FROM point_wallets w LEFT JOIN point_ledger l ON l.wallet_id=w.id GROUP BY w.id HAVING w.balance<>coalesce(sum(l.delta),0)").fetch_all(pool).await.unwrap();
-    assert!(wallets.is_empty(), "wallet/ledger drift: {wallets:?}");
-    let items: Vec<(Uuid,i64,i64)> = sqlx::query_as("SELECT i.id,i.pledged_points,coalesce(sum(c.points) FILTER(WHERE c.status IN ('pledged','captured')),0)::bigint FROM wishlist_items i LEFT JOIN contributions c ON c.item_id=i.id WHERE i.funding_mode='crowdfund' GROUP BY i.id HAVING i.pledged_points<>coalesce(sum(c.points) FILTER(WHERE c.status IN ('pledged','captured')),0)").fetch_all(pool).await.unwrap();
-    assert!(items.is_empty(), "item/contribution drift: {items:?}");
+    assert_all_reconciled(pool).await;
     let bad: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlist_items i WHERE i.funding_status='funded' AND (i.pledged_points<>i.target_points OR NOT EXISTS(SELECT 1 FROM purchase_orders o WHERE o.item_id=i.id) OR EXISTS(SELECT 1 FROM contributions c WHERE c.item_id=i.id AND c.status='pledged'))").fetch_one(pool).await.unwrap();
     assert_eq!(bad, 0, "funded item must be fully captured with an order");
 }
@@ -178,17 +140,19 @@ async fn reconciled(pool: &PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
     let it = quantity(&pool, list(&pool, owner).await, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let key = Uuid::new_v4();
     let req = || {
-        request(
+        (
             "POST",
-            &format!("/items/{it}/claims"),
-            None,
-            Some(key),
-            json!({"qty":2,"display_name":"guest"}),
+            format!("/items/{it}/claims"),
+            common::idem(key),
+            Some(json!({"qty":2,"display_name":"guest"})),
         )
     };
     let (gate, pid) = gate(&pool, "wishlist_items", it).await;
@@ -218,24 +182,27 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
         1
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn same_key_pledge_requests_overlap_and_debit_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (donor, token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: donor, token } = common::user(&pool, "donor").await;
     grant(&pool, donor).await;
     let it = funding(&pool, list(&pool, owner).await, 500).await;
     let app = app(AppState { pool: pool.clone() });
     let key = Uuid::new_v4();
     let req = || {
-        request(
+        (
             "POST",
-            &format!("/items/{it}/contributions"),
-            Some(&token),
-            Some(key),
-            json!({"points":200}),
+            format!("/items/{it}/contributions"),
+            [common::ck(&token), common::idem(key)].concat(),
+            Some(json!({"points":200})),
         )
     };
     let (gate, pid) = gate(&pool, "wishlist_items", it).await;
@@ -270,25 +237,28 @@ async fn same_key_pledge_requests_overlap_and_debit_once(pool: PgPool) {
         1
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn mixed_quantity_claims_report_remaining_and_never_oversell(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (_, ta) = common::user_pair(&pool, "a").await;
-    let (_, tb) = common::user_pair(&pool, "b").await;
-    let (_, tc) = common::user_pair(&pool, "c").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: _, token: ta } = common::user(&pool, "a").await;
+    let TestUser { id: _, token: tb } = common::user(&pool, "b").await;
+    let TestUser { id: _, token: tc } = common::user(&pool, "c").await;
     let app = app(AppState { pool: pool.clone() });
     for quantities in [[2, 3, 3], [2, 2, 2]] {
         let it = quantity(&pool, list(&pool, owner).await, 5).await;
         let req = |token: &str, qty| {
-            request(
+            (
                 "POST",
-                &format!("/items/{it}/claims"),
-                Some(token),
-                Some(Uuid::new_v4()),
-                json!({"qty":qty}),
+                format!("/items/{it}/claims"),
+                [common::ck(token), common::idem(Uuid::new_v4())].concat(),
+                Some(json!({"qty":qty})),
             )
         };
         let (gate, pid) = gate(&pool, "wishlist_items", it).await;
@@ -354,14 +324,18 @@ async fn mixed_quantity_claims_report_remaining_and_never_oversell(pool: PgPool)
         );
         reconciled(&pool).await;
     }
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn withdraw_vs_final_pledge_serializes_both_orders(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (a, ta) = common::user_pair(&pool, "a").await;
-    let (b, tb) = common::user_pair(&pool, "b").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "a").await;
+    let TestUser { id: b, token: tb } = common::user(&pool, "b").await;
     grant(&pool, a).await;
     grant(&pool, b).await;
     let wl = list(&pool, owner).await;
@@ -371,21 +345,19 @@ async fn withdraw_vs_final_pledge_serializes_both_orders(pool: PgPool) {
         let cid = pledge(&app, it, &ta, 300).await;
         let (gate, pid) = gate(&pool, "wishlist_items", it).await;
         let withdrawal = || {
-            request(
+            (
                 "DELETE",
-                &format!("/contributions/{cid}"),
-                Some(&ta),
-                None,
-                Value::Null,
+                format!("/contributions/{cid}"),
+                common::ck(&ta),
+                Some(Value::Null),
             )
         };
         let donation = || {
-            request(
+            (
                 "POST",
-                &format!("/items/{it}/contributions"),
-                Some(&tb),
-                Some(Uuid::new_v4()),
-                json!({"points":200}),
+                format!("/items/{it}/contributions"),
+                [common::ck(&tb), common::idem(Uuid::new_v4())].concat(),
+                Some(json!({"points":200})),
             )
         };
         let (w, p) = if pledge_first {
@@ -433,13 +405,17 @@ async fn withdraw_vs_final_pledge_serializes_both_orders(pool: PgPool) {
     }
     assert_eq!(balance(&pool, a).await, 700);
     assert_eq!(balance(&pool, b).await, 600);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn withdraw_vs_tick_refunds_exactly_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (donor, token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: donor, token } = common::user(&pool, "donor").await;
     let wallet = grant(&pool, donor).await;
     let wl = list(&pool, owner).await;
     let app = app(AppState { pool: pool.clone() });
@@ -461,12 +437,11 @@ async fn withdraw_vs_tick_refunds_exactly_once(pool: PgPool) {
         let (gate, pid) = gate(&pool, "point_wallets", wallet).await;
         let w = send(
             &app,
-            request(
+            (
                 "DELETE",
-                &format!("/contributions/{cid}"),
-                Some(&token),
-                None,
-                Value::Null,
+                format!("/contributions/{cid}"),
+                common::ck(&token),
+                Some(Value::Null),
             ),
         );
         blocked(&pool, pid, "SELECT id FROM point_wallets", 1).await;
@@ -508,14 +483,18 @@ async fn withdraw_vs_tick_refunds_exactly_once(pool: PgPool) {
         assert_eq!(refunds, (1, 200));
         reconciled(&pool).await;
     }
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reallocate_vs_last_pledge_respects_target_cap_in_both_orders(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (a, ta) = common::user_pair(&pool, "a").await;
-    let (b, tb) = common::user_pair(&pool, "b").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "a").await;
+    let TestUser { id: b, token: tb } = common::user(&pool, "b").await;
     grant(&pool, a).await;
     grant(&pool, b).await;
     let wl = list(&pool, owner).await;
@@ -533,21 +512,19 @@ async fn reallocate_vs_last_pledge_respects_target_cap_in_both_orders(pool: PgPo
         .unwrap();
         let (gate, pid) = gate(&pool, "wishlist_items", tgt).await;
         let reallocation = || {
-            request(
+            (
                 "POST",
-                &format!("/contributions/{cid}/reallocate"),
-                Some(&ta),
-                Some(Uuid::new_v4()),
-                json!({"target_item_id":tgt}),
+                format!("/contributions/{cid}/reallocate"),
+                [common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
+                Some(json!({"target_item_id":tgt})),
             )
         };
         let donation = || {
-            request(
+            (
                 "POST",
-                &format!("/items/{tgt}/contributions"),
-                Some(&tb),
-                Some(Uuid::new_v4()),
-                json!({"points":200}),
+                format!("/items/{tgt}/contributions"),
+                [common::ck(&tb), common::idem(Uuid::new_v4())].concat(),
+                Some(json!({"points":200})),
             )
         };
         let (r, p) = if reallocate_first {
@@ -608,14 +585,18 @@ async fn reallocate_vs_last_pledge_respects_target_cap_in_both_orders(pool: PgPo
     }
     assert_eq!(balance(&pool, a).await, 600);
     assert_eq!(balance(&pool, b).await, 800);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (a, ta) = common::user_pair(&pool, "a").await;
-    let (b, tb) = common::user_pair(&pool, "b").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "a").await;
+    let TestUser { id: b, token: tb } = common::user(&pool, "b").await;
     grant(&pool, a).await;
     grant(&pool, b).await;
     let wl = list(&pool, owner).await;
@@ -638,12 +619,11 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
     let (high_gate, high_pid) = gate(&pool, "wishlist_items", high).await;
     let r = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/contributions/{ca}/reallocate"),
-            Some(&ta),
-            Some(Uuid::new_v4()),
-            json!({"target_item_id":low}),
+            format!("/contributions/{ca}/reallocate"),
+            [common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"target_item_id":low})),
         ),
     );
     blocked(
@@ -657,12 +637,11 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
     // the unrelated high blocker must not be the first lock being requested.
     let p = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/contributions/{cb}/reallocate"),
-            Some(&tb),
-            Some(Uuid::new_v4()),
-            json!({"target_item_id":high}),
+            format!("/contributions/{cb}/reallocate"),
+            [common::ck(&tb), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"target_item_id":high})),
         ),
     );
     waiting(&pool, "SELECT id FROM wishlist_items WHERE id IN", 2).await;
@@ -694,37 +673,42 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
         2
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn wallet_freeze_vs_pledge_checks_status_under_lock(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (_, staff) = common::user_with_staff(&pool, "staff", true).await;
-    let (donor, token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: staff,
+    } = common::staff(&pool, "staff").await;
+    let TestUser { id: donor, token } = common::user(&pool, "donor").await;
     let wallet = grant(&pool, donor).await;
     let it = funding(&pool, list(&pool, owner).await, 500).await;
     let app = app(AppState { pool: pool.clone() });
     let (gate, pid) = gate(&pool, "point_wallets", wallet).await;
     let freeze = send(
         &app,
-        request(
+        (
             "PATCH",
-            &format!("/admin/wallets/{wallet}"),
-            Some(&staff),
-            None,
-            json!({"status":"frozen","reason":"race"}),
+            format!("/admin/wallets/{wallet}"),
+            common::ck(&staff),
+            Some(json!({"status":"frozen","reason":"race"})),
         ),
     );
     blocked(&pool, pid, "SELECT status::text FROM point_wallets", 1).await;
     let p = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/items/{it}/contributions"),
-            Some(&token),
-            Some(Uuid::new_v4()),
-            json!({"points":200}),
+            format!("/items/{it}/contributions"),
+            [common::ck(&token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"points":200})),
         ),
     );
     waiting(&pool, "point_wallets", 2).await;
@@ -763,38 +747,43 @@ async fn wallet_freeze_vs_pledge_checks_status_under_lock(pool: PgPool) {
         0
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn removal_vs_inflight_claim_serializes_and_reconciles(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
-    let (_, donor_token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: owner_token,
+    } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: donor_token,
+    } = common::user(&pool, "donor").await;
     let app = app(AppState { pool: pool.clone() });
     for archive in [false, true] {
         for removal_first in [false, true] {
             let wl = list(&pool, owner).await;
             let it = quantity(&pool, wl, 5).await;
             let remove = || {
-                request(
+                (
                     "DELETE",
-                    &if archive {
+                    if archive {
                         format!("/wishlists/{wl}")
                     } else {
                         format!("/items/{it}?force=true")
                     },
-                    Some(&owner_token),
-                    None,
-                    Value::Null,
+                    common::ck(&owner_token),
+                    Some(Value::Null),
                 )
             };
             let claim = || {
-                request(
+                (
                     "POST",
-                    &format!("/items/{it}/claims"),
-                    Some(&donor_token),
-                    Some(Uuid::new_v4()),
-                    json!({"qty":2}),
+                    format!("/items/{it}/claims"),
+                    [common::ck(&donor_token), common::idem(Uuid::new_v4())].concat(),
+                    Some(json!({"qty":2})),
                 )
             };
             let (c, r) = if removal_first {
@@ -868,13 +857,20 @@ async fn removal_vs_inflight_claim_serializes_and_reconciles(pool: PgPool) {
             reconciled(&pool).await;
         }
     }
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn removal_vs_inflight_pledge_serializes_and_refunds(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
-    let (donor, donor_token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: owner_token,
+    } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: donor,
+        token: donor_token,
+    } = common::user(&pool, "donor").await;
     grant(&pool, donor).await;
     let app = app(AppState { pool: pool.clone() });
     for archive in [false, true] {
@@ -882,25 +878,23 @@ async fn removal_vs_inflight_pledge_serializes_and_refunds(pool: PgPool) {
             let wl = list(&pool, owner).await;
             let it = funding(&pool, wl, 500).await;
             let remove = || {
-                request(
+                (
                     "DELETE",
-                    &if archive {
+                    if archive {
                         format!("/wishlists/{wl}")
                     } else {
                         format!("/items/{it}?force=true")
                     },
-                    Some(&owner_token),
-                    None,
-                    Value::Null,
+                    common::ck(&owner_token),
+                    Some(Value::Null),
                 )
             };
             let donate = || {
-                request(
+                (
                     "POST",
-                    &format!("/items/{it}/contributions"),
-                    Some(&donor_token),
-                    Some(Uuid::new_v4()),
-                    json!({"points":200}),
+                    format!("/items/{it}/contributions"),
+                    [common::ck(&donor_token), common::idem(Uuid::new_v4())].concat(),
+                    Some(json!({"points":200})),
                 )
             };
             let (p, r) = if removal_first {
@@ -973,50 +967,45 @@ async fn removal_vs_inflight_pledge_serializes_and_refunds(pool: PgPool) {
             reconciled(&pool).await;
         }
     }
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn deleting_quantity_item_preserves_delivered_claim_accounting(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user_pair(&pool, "owner").await;
-    let (_, donor) = common::user_pair(&pool, "donor").await;
+    let TestUser { id: owner, token } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: donor,
+    } = common::user(&pool, "donor").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (s, _, body) = call(
         &app,
-        request(
-            "POST",
-            &format!("/items/{it}/claims"),
-            Some(&donor),
-            Some(Uuid::new_v4()),
-            json!({"qty":2}),
-        ),
+        "POST",
+        &format!("/items/{it}/claims"),
+        &[common::ck(&donor), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty":2})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{body}");
     let cid = body["claim"]["id"].as_str().unwrap();
     let (s, _, body) = call(
         &app,
-        request(
-            "PATCH",
-            &format!("/claims/{cid}"),
-            Some(&donor),
-            None,
-            json!({"status":"delivered"}),
-        ),
+        "PATCH",
+        &format!("/claims/{cid}"),
+        &common::ck(&donor),
+        Some(json!({"status":"delivered"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{body}");
     let (s, _, body) = call(
         &app,
-        request(
-            "DELETE",
-            &format!("/items/{it}?force=true"),
-            Some(&token),
-            None,
-            Value::Null,
-        ),
+        "DELETE",
+        &format!("/items/{it}?force=true"),
+        &common::ck(&token),
+        Some(Value::Null),
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{body}");
@@ -1029,36 +1018,41 @@ async fn deleting_quantity_item_preserves_delivered_claim_accounting(pool: PgPoo
         2
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn archive_vs_waiting_claim_cannot_accept_after_archive_commit(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
-    let (_, donor_token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: owner_token,
+    } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: donor_token,
+    } = common::user(&pool, "donor").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (gate, pid) = gate(&pool, "wishlist_items", it).await;
     let c = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/items/{it}/claims"),
-            Some(&donor_token),
-            Some(Uuid::new_v4()),
-            json!({"qty":2}),
+            format!("/items/{it}/claims"),
+            [common::ck(&donor_token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"qty":2})),
         ),
     );
     blocked(&pool, pid, "SET qty_claimed", 1).await;
     let a = send(
         &app,
-        request(
+        (
             "DELETE",
-            &format!("/wishlists/{wl}"),
-            Some(&owner_token),
-            None,
-            Value::Null,
+            format!("/wishlists/{wl}"),
+            common::ck(&owner_token),
+            Some(Value::Null),
         ),
     );
     // Correct locking blocks archive behind the in-flight claim. If a mutation
@@ -1087,25 +1081,29 @@ async fn archive_vs_waiting_claim_cannot_accept_after_archive_commit(pool: PgPoo
         assert_eq!(cr.0, StatusCode::CREATED, "{}", cr.2);
     }
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
-    let (_, donor_token) = common::user_pair(&pool, "donor").await;
+    let TestUser {
+        id: owner,
+        token: owner_token,
+    } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: donor_token,
+    } = common::user(&pool, "donor").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (s, _, b) = call(
         &app,
-        request(
-            "POST",
-            &format!("/items/{it}/claims"),
-            Some(&donor_token),
-            Some(Uuid::new_v4()),
-            json!({"qty":2}),
-        ),
+        "POST",
+        &format!("/items/{it}/claims"),
+        &[common::ck(&donor_token), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty":2})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
@@ -1113,23 +1111,21 @@ async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPo
     let (gate, pid) = gate(&pool, "claims", cid).await;
     let d = send(
         &app,
-        request(
+        (
             "DELETE",
-            &format!("/items/{it}?force=true"),
-            Some(&owner_token),
-            None,
-            Value::Null,
+            format!("/items/{it}?force=true"),
+            common::ck(&owner_token),
+            Some(Value::Null),
         ),
     );
     blocked(&pool, pid, "UPDATE claims SET status='cancelled'", 1).await;
     let u = send(
         &app,
-        request(
+        (
             "PATCH",
-            &format!("/claims/{cid}"),
-            Some(&donor_token),
-            None,
-            json!({"qty":3}),
+            format!("/claims/{cid}"),
+            common::ck(&donor_token),
+            Some(json!({"qty":3})),
         ),
     );
     // Both operations have reached a conflicting row lock. With item -> claim
@@ -1158,35 +1154,34 @@ async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPo
         0
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user_pair(&pool, "owner").await;
+    let TestUser { id: owner, token } = common::user(&pool, "owner").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (gate, pid) = gate(&pool, "wishlists", wl).await;
     let c = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/items/{it}/claims"),
-            Some(&token),
-            Some(Uuid::new_v4()),
-            json!({"qty":2}),
+            format!("/items/{it}/claims"),
+            [common::ck(&token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"qty":2})),
         ),
     );
     blocked(&pool, pid, "FOR SHARE", 1).await;
     let d = send(
         &app,
-        request(
+        (
             "DELETE",
-            "/me",
-            Some(&token),
-            None,
-            json!({"confirm":"DELETE"}),
+            "/me".to_string(),
+            common::ck(&token),
+            Some(json!({"confirm":"DELETE"})),
         ),
     );
     common::wait_until("account deletion waiting on user or wishlist",|| async {
@@ -1211,12 +1206,13 @@ async fn account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim(pool
         0
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user_pair(&pool, "owner").await;
+    let TestUser { id: owner, token } = common::user(&pool, "owner").await;
     let wl = list(&pool, owner).await;
     let it = funding(&pool, wl, 500).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1225,23 +1221,21 @@ async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool)
     // prospective contribution and newly-created wallet for insufficient funds.
     let p = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/items/{it}/contributions"),
-            Some(&token),
-            Some(Uuid::new_v4()),
-            json!({"points":200}),
+            format!("/items/{it}/contributions"),
+            [common::ck(&token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"points":200})),
         ),
     );
     blocked(&pool, pid, "FOR SHARE", 1).await;
     let d = send(
         &app,
-        request(
+        (
             "DELETE",
-            "/me",
-            Some(&token),
-            None,
-            json!({"confirm":"DELETE"}),
+            "/me".to_string(),
+            common::ck(&token),
+            Some(json!({"confirm":"DELETE"})),
         ),
     );
     common::wait_until("account deletion waiting on user or wishlist",|| async {
@@ -1280,35 +1274,34 @@ async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool)
         0
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user_pair(&pool, "owner").await;
+    let TestUser { id: owner, token } = common::user(&pool, "owner").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (gate, pid) = gate(&pool, "wishlists", wl).await;
     let c = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/items/{it}/claims"),
-            None,
-            Some(Uuid::new_v4()),
-            json!({"qty":2,"display_name":"guest"}),
+            format!("/items/{it}/claims"),
+            common::idem(Uuid::new_v4()),
+            Some(json!({"qty":2,"display_name":"guest"})),
         ),
     );
     blocked(&pool, pid, "FOR SHARE", 1).await;
     let d = send(
         &app,
-        request(
+        (
             "DELETE",
-            "/me",
-            Some(&token),
-            None,
-            json!({"confirm":"DELETE"}),
+            "/me".to_string(),
+            common::ck(&token),
+            Some(json!({"confirm":"DELETE"})),
         ),
     );
     common::wait_until("owner deletion waiting on user or wishlist",|| async {
@@ -1324,24 +1317,27 @@ async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: 
     assert_eq!(row, (true, "archived".into(), 2));
     assert_eq!(sqlx::query_scalar::<_,i64>("SELECT count(*) FROM claims WHERE item_id=$1 AND status='reserved' AND guest_id IS NOT NULL").bind(it).fetch_one(&pool).await.unwrap(),1);
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn deleted_actor_cannot_create_claim_on_another_users_active_list(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user_pair(&pool, "owner").await;
-    let (actor, token) = common::user_pair(&pool, "actor").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser { id: actor, token } = common::user(&pool, "actor").await;
     let it = quantity(&pool, list(&pool, owner).await, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (gate, pid) = gate(&pool, "users", actor).await;
     let d = send(
         &app,
-        request(
+        (
             "DELETE",
-            "/me",
-            Some(&token),
-            None,
-            json!({"confirm":"DELETE"}),
+            "/me".to_string(),
+            common::ck(&token),
+            Some(json!({"confirm":"DELETE"})),
         ),
     );
     blocked(&pool, pid, "SELECT is_staff FROM users", 1).await;
@@ -1349,12 +1345,11 @@ async fn deleted_actor_cannot_create_claim_on_another_users_active_list(pool: Pg
     // wins before the transaction's actor lock. The locked read must revalidate.
     let c = send(
         &app,
-        request(
+        (
             "POST",
-            &format!("/items/{it}/claims"),
-            Some(&token),
-            Some(Uuid::new_v4()),
-            json!({"qty":2}),
+            format!("/items/{it}/claims"),
+            [common::ck(&token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"qty":2})),
         ),
     );
     waiting(&pool, "SELECT display_name FROM users", 1).await;
@@ -1381,4 +1376,5 @@ async fn deleted_actor_cannot_create_claim_on_another_users_active_list(pool: Pg
         0
     );
     reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
