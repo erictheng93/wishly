@@ -5,20 +5,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::{auth::code_hash, session::hash_token};
 
-async fn call(
-    pool: &PgPool,
-    method: &str,
-    path: &str,
-    cookie: Option<&str>,
-    body: Option<Value>,
-) -> (StatusCode, Value) {
-    let h = cookie.map(common::ck).unwrap_or_default();
-    let (s, _, b) = common::api(pool, method, path, &h, body).await;
-    (s, b)
-}
-
-async fn user(pool: &PgPool, provider: &str) -> (Uuid, String) {
-    let (id, token) = common::user_pair(pool, "LINE 測試").await;
+async fn provider_user(pool: &PgPool, provider: &str) -> common::TestUser {
+    let common::TestUser { id, token } = common::user(pool, "LINE 測試").await;
     sqlx::query("UPDATE users SET email=NULL WHERE id=$1")
         .bind(id)
         .execute(pool)
@@ -26,7 +14,7 @@ async fn user(pool: &PgPool, provider: &str) -> (Uuid, String) {
         .unwrap();
     sqlx::query("INSERT INTO auth_identities (user_id, provider, provider_uid) VALUES ($1,$2::auth_provider,$3)")
         .bind(id).bind(provider).bind(Uuid::new_v4().to_string()).execute(pool).await.unwrap();
-    (id, token)
+    common::TestUser { id, token }
 }
 
 async fn wait_for_lock(pool: &PgPool) {
@@ -38,15 +26,18 @@ async fn wait_for_lock(pool: &PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) {
-    let (id, token) = user(&pool, "line").await;
-    let (_, other) = user(&pool, "line").await;
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
+    let common::TestUser {
+        id: _,
+        token: other,
+    } = provider_user(&pool, "line").await;
     let request = json!({"email":"LINK@example.com"});
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            None,
+            &[],
             Some(request.clone())
         )
         .await
@@ -54,11 +45,11 @@ async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) 
         401
     );
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(request.clone())
         )
         .await
@@ -66,11 +57,11 @@ async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) 
         202
     );
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(request)
         )
         .await
@@ -85,34 +76,28 @@ async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) 
         .unwrap();
     let verify = json!({"email":"link@example.com","code":"123456"});
     assert_eq!(
-        call(
-            &pool,
-            "POST",
-            "/auth/otp/verify",
-            None,
-            Some(verify.clone())
-        )
-        .await
-        .0,
+        common::call(&pool, "POST", "/auth/otp/verify", &[], Some(verify.clone()))
+            .await
+            .0,
         400
     );
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/verify",
-            Some(&other),
+            &common::ck(&other),
             Some(verify.clone())
         )
         .await
         .0,
         400
     );
-    let (status, me) = call(
+    let (status, _, me) = common::call(
         &pool,
         "POST",
         "/me/identities/email/verify",
-        Some(&token),
+        &common::ck(&token),
         Some(verify.clone()),
     )
     .await;
@@ -121,11 +106,11 @@ async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) 
     assert_eq!(me["email"], "link@example.com");
     assert_eq!(me["identities"].as_array().unwrap().len(), 2);
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/verify",
-            Some(&token),
+            &common::ck(&token),
             Some(verify)
         )
         .await
@@ -140,12 +125,20 @@ async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) 
     .await
     .unwrap();
     assert_eq!(n, 1);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn unlink_serializes_and_keeps_one_login_method(pool: PgPool) {
-    let (id, token) = user(&pool, "line").await;
-    let (s, b) = call(&pool, "DELETE", "/me/identities/line", Some(&token), None).await;
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
+    let (s, _, b) = common::call(
+        &pool,
+        "DELETE",
+        "/me/identities/line",
+        &common::ck(&token),
+        None,
+    )
+    .await;
     assert_eq!(
         (s, b["code"].as_str()),
         (StatusCode::CONFLICT, Some("LAST_IDENTITY"))
@@ -158,8 +151,26 @@ async fn unlink_serializes_and_keeps_one_login_method(pool: PgPool) {
     .await
     .unwrap();
     let (a, b) = tokio::join!(
-        call(&pool, "DELETE", "/me/identities/line", Some(&token), None),
-        call(&pool, "DELETE", "/me/identities/google", Some(&token), None)
+        async {
+            common::call(
+                &pool,
+                "DELETE",
+                "/me/identities/line",
+                &common::ck(&token),
+                None,
+            )
+            .await
+        },
+        async {
+            common::call(
+                &pool,
+                "DELETE",
+                "/me/identities/google",
+                &common::ck(&token),
+                None,
+            )
+            .await
+        }
     );
     assert!(
         (a.0 == StatusCode::OK && b.0 == StatusCode::CONFLICT)
@@ -172,18 +183,26 @@ async fn unlink_serializes_and_keeps_one_login_method(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 1);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn unlink_email_clears_contact_and_blocks_implicit_relink(pool: PgPool) {
-    let (id, token) = user(&pool, "line").await;
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET email='old@example.com' WHERE id=$1")
         .bind(id)
         .execute(&pool)
         .await
         .unwrap();
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'email','old@example.com','old@example.com')").bind(id).execute(&pool).await.unwrap();
-    let (s, me) = call(&pool, "DELETE", "/me/identities/email", Some(&token), None).await;
+    let (s, _, me) = common::call(
+        &pool,
+        "DELETE",
+        "/me/identities/email",
+        &common::ck(&token),
+        None,
+    )
+    .await;
     assert_eq!(s, 200, "{me}");
     assert!(me["email"].is_null());
     let payload: Value = sqlx::query_scalar(
@@ -203,7 +222,13 @@ async fn unlink_email_clears_contact_and_blocks_implicit_relink(pool: PgPool) {
     .await
     .unwrap();
     assert_ne!(status, "cancelled", "解除 email 後仍保留安全通知的收件人");
-    assert_eq!(call(&pool, "GET", "/me", Some(&token), None).await.0, 200);
+    assert_eq!(
+        common::call(&pool, "GET", "/me", &common::ck(&token), None)
+            .await
+            .0,
+        200
+    );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[test]
@@ -228,8 +253,11 @@ fn security_mail_explains_change_and_cannot_be_unsubscribed() {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn email_link_refuses_existing_account(pool: PgPool) {
-    let (_, token) = user(&pool, "line").await;
-    let (other, _) = user(&pool, "google").await;
+    let common::TestUser { id: _, token } = provider_user(&pool, "line").await;
+    let common::TestUser {
+        id: other,
+        token: _,
+    } = provider_user(&pool, "google").await;
     sqlx::query("UPDATE users SET email='taken@example.com' WHERE id=$1")
         .bind(other)
         .execute(&pool)
@@ -237,11 +265,11 @@ async fn email_link_refuses_existing_account(pool: PgPool) {
         .unwrap();
     // 請求仍回 202；通過信箱驗證才揭露衝突。
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(json!({"email":"taken@example.com"}))
         )
         .await
@@ -253,11 +281,11 @@ async fn email_link_refuses_existing_account(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         "/me/identities/email/verify",
-        Some(&token),
+        &common::ck(&token),
         Some(json!({"email":"taken@example.com","code":"123456"})),
     )
     .await;
@@ -265,22 +293,23 @@ async fn email_link_refuses_existing_account(pool: PgPool) {
         (s, b["code"].as_str()),
         (StatusCode::CONFLICT, Some("IDENTITY_IN_USE"))
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn read_only_and_blocked_accounts_cannot_link(pool: PgPool) {
-    let (id, token) = user(&pool, "line").await;
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET blocked_at=now() WHERE id=$1")
         .bind(id)
         .execute(&pool)
         .await
         .unwrap();
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(json!({"email":"blocked@example.com"}))
         )
         .await
@@ -294,11 +323,11 @@ async fn read_only_and_blocked_accounts_cannot_link(pool: PgPool) {
         .unwrap();
     sqlx::query("INSERT INTO system_flags (key,value) VALUES ('read_only','true') ON CONFLICT (key) DO UPDATE SET value='true'").execute(&pool).await.unwrap();
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(json!({"email":"blocked@example.com"}))
         )
         .await
@@ -306,16 +335,23 @@ async fn read_only_and_blocked_accounts_cannot_link(pool: PgPool) {
         503
     );
     assert_eq!(
-        call(&pool, "DELETE", "/me/identities/line", Some(&token), None)
-            .await
-            .0,
+        common::call(
+            &pool,
+            "DELETE",
+            "/me/identities/line",
+            &common::ck(&token),
+            None
+        )
+        .await
+        .0,
         503
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reset_rechecks_contact_after_concurrent_unlink(pool: PgPool) {
-    let (id, _) = user(&pool, "line").await;
+    let common::TestUser { id, token: _ } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET email='race@example.com' WHERE id=$1")
         .bind(id)
         .execute(&pool)
@@ -337,7 +373,7 @@ async fn reset_rechecks_contact_after_concurrent_unlink(pool: PgPool) {
     let reset = tokio::spawn({
         let pool = pool.clone();
         async move {
-            call(&pool,"POST","/auth/password/reset/confirm",None,Some(json!({"email":"race@example.com","code":"123456","new_password":"valid-password"}))).await
+            common::call(&pool, "POST", "/auth/password/reset/confirm", &[], Some(json!({"email":"race@example.com","code":"123456","new_password":"valid-password"}))).await
         }
     });
     wait_for_lock(&pool).await;
@@ -365,18 +401,19 @@ async fn reset_rechecks_contact_after_concurrent_unlink(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(n, 0);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn registration_identity_and_password_are_atomic(pool: PgPool) {
-    let (id, _) = user(&pool, "line").await;
+    let common::TestUser { id, token: _ } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET email='register-race@example.com' WHERE id=$1")
         .bind(id)
         .execute(&pool)
         .await
         .unwrap();
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'email','register-race@example.com','register-race@example.com')").bind(id).execute(&pool).await.unwrap();
-    assert_eq!(call(&pool,"POST","/auth/register",None,Some(json!({"email":"register-race@example.com","password":"valid-password","display_name":"new"}))).await.0,202);
+    assert_eq!(common::call(&pool, "POST", "/auth/register", &[], Some(json!({"email":"register-race@example.com","password":"valid-password","display_name":"new"}))).await.0,202);
     sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE email='register-race@example.com'")
         .bind(code_hash("123456", "dev-pepper"))
         .execute(&pool)
@@ -396,11 +433,11 @@ async fn registration_identity_and_password_are_atomic(pool: PgPool) {
     let register = tokio::spawn({
         let pool = pool.clone();
         async move {
-            call(
+            common::call(
                 &pool,
                 "POST",
                 "/auth/register/verify",
-                None,
+                &[],
                 Some(json!({"email":"register-race@example.com","code":"123456"})),
             )
             .await
@@ -418,30 +455,34 @@ async fn registration_identity_and_password_are_atomic(pool: PgPool) {
         .await
         .unwrap();
     unlink.commit().await.unwrap();
-    let (s, b) = register.await.unwrap();
+    let (s, _, b) = register.await.unwrap();
     assert_eq!(s, 200, "{b}");
     let identity: Option<(Uuid,Option<String>)> = sqlx::query_as("SELECT user_id,password_hash FROM auth_identities WHERE provider='email' AND provider_uid='register-race@example.com'").fetch_optional(&pool).await.unwrap();
     let (owner, password) = identity.expect("註冊成功一定有可用的 Email identity");
     assert_eq!(b["user"]["id"], owner.to_string());
     assert!(password.unwrap().starts_with("$argon2id$"));
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn email_link_checks_email_on_other_provider_identity(pool: PgPool) {
-    let (other, _) = user(&pool, "line").await;
+    let common::TestUser {
+        id: other,
+        token: _,
+    } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET email='contact@example.com' WHERE id=$1")
         .bind(other)
         .execute(&pool)
         .await
         .unwrap();
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'google','alternate-google','alternate@example.com')").bind(other).execute(&pool).await.unwrap();
-    let (_, token) = user(&pool, "line").await;
+    let common::TestUser { id: _, token } = provider_user(&pool, "line").await;
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(json!({"email":"alternate@example.com"}))
         )
         .await
@@ -453,11 +494,11 @@ async fn email_link_checks_email_on_other_provider_identity(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         "/me/identities/email/verify",
-        Some(&token),
+        &common::ck(&token),
         Some(json!({"email":"alternate@example.com","code":"123456"})),
     )
     .await;
@@ -465,11 +506,12 @@ async fn email_link_checks_email_on_other_provider_identity(pool: PgPool) {
         (s, b["code"].as_str()),
         (StatusCode::CONFLICT, Some("IDENTITY_IN_USE"))
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn same_email_unlink_requires_fresh_verification_to_relink(pool: PgPool) {
-    let (id, token) = user(&pool, "google").await;
+    let common::TestUser { id, token } = provider_user(&pool, "google").await;
     sqlx::query("UPDATE users SET email='same@example.com' WHERE id=$1")
         .bind(id)
         .execute(&pool)
@@ -481,7 +523,14 @@ async fn same_email_unlink_requires_fresh_verification_to_relink(pool: PgPool) {
         .await
         .unwrap();
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'email','same@example.com','same@example.com')").bind(id).execute(&pool).await.unwrap();
-    let (s, me) = call(&pool, "DELETE", "/me/identities/email", Some(&token), None).await;
+    let (s, _, me) = common::call(
+        &pool,
+        "DELETE",
+        "/me/identities/email",
+        &common::ck(&token),
+        None,
+    )
+    .await;
     assert_eq!(s, 200);
     assert_eq!(
         me["email"], "same@example.com",
@@ -496,11 +545,11 @@ async fn same_email_unlink_requires_fresh_verification_to_relink(pool: PgPool) {
     .unwrap();
     assert_eq!(n, 0);
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/auth/otp/verify",
-            None,
+            &[],
             Some(json!({"email":"same@example.com","code":"123456"}))
         )
         .await
@@ -509,11 +558,11 @@ async fn same_email_unlink_requires_fresh_verification_to_relink(pool: PgPool) {
     );
     // 使用者重新證明信箱所有權，沿用原有 verified-email 合併政策。
     sqlx::query("INSERT INTO otp_challenges (email,code_hash,expires_at) VALUES ('same@example.com',$1,now()+interval '10 minutes')").bind(code_hash("123456","dev-pepper")).execute(&pool).await.unwrap();
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         "/auth/otp/verify",
-        None,
+        &[],
         Some(json!({"email":"same@example.com","code":"123456"})),
     )
     .await;
@@ -527,11 +576,12 @@ async fn same_email_unlink_requires_fresh_verification_to_relink(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(n, 1);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn auto_email_link_rechecks_alternate_email_after_unlink(pool: PgPool) {
-    let (id, _) = user(&pool, "line").await;
+    let common::TestUser { id, token: _ } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET email='contact@example.com' WHERE id=$1")
         .bind(id)
         .execute(&pool)
@@ -548,11 +598,11 @@ async fn auto_email_link_rechecks_alternate_email_after_unlink(pool: PgPool) {
     let login = tokio::spawn({
         let pool = pool.clone();
         async move {
-            call(
+            common::call(
                 &pool,
                 "POST",
                 "/auth/otp/verify",
-                None,
+                &[],
                 Some(json!({"email":"alternate@example.com","code":"123456"})),
             )
             .await
@@ -565,18 +615,19 @@ async fn auto_email_link_rechecks_alternate_email_after_unlink(pool: PgPool) {
         .await
         .unwrap();
     unlink.commit().await.unwrap();
-    let (s, b) = login.await.unwrap();
+    let (s, _, b) = login.await.unwrap();
     assert_eq!(s, 200, "{b}");
     assert_ne!(
         b["user"]["id"],
         id.to_string(),
         "已解除的不同信箱不再被視為舊帳號的所有權證明"
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn auto_email_link_matches_manual_contact_policy(pool: PgPool) {
-    let (id, _) = user(&pool, "line").await;
+    let common::TestUser { id, token: _ } = provider_user(&pool, "line").await;
     sqlx::query("UPDATE users SET email='contact@example.com' WHERE id=$1")
         .bind(id)
         .execute(&pool)
@@ -584,11 +635,11 @@ async fn auto_email_link_matches_manual_contact_policy(pool: PgPool) {
         .unwrap();
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'google','alternate','alternate@example.com')").bind(id).execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO otp_challenges (email,code_hash,expires_at) VALUES ('alternate@example.com',$1,now()+interval '10 minutes')").bind(code_hash("123456","dev-pepper")).execute(&pool).await.unwrap();
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         "/auth/otp/verify",
-        None,
+        &[],
         Some(json!({"email":"alternate@example.com","code":"123456"})),
     )
     .await;
@@ -604,17 +655,18 @@ async fn auto_email_link_matches_manual_contact_policy(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(n, 0, "不得產生無法用該信箱重設密碼的 Email 登入方式");
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_deletion_removes_link_challenges_and_security_recipients(pool: PgPool) {
-    let (id, token) = user(&pool, "line").await;
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "POST",
             "/me/identities/email/request",
-            Some(&token),
+            &common::ck(&token),
             Some(json!({"email":"pending@example.com"}))
         )
         .await
@@ -623,11 +675,11 @@ async fn account_deletion_removes_link_challenges_and_security_recipients(pool: 
     );
     sqlx::query("INSERT INTO notifications (user_id,channel,kind,payload,status) VALUES ($1,'email','auth.identity_unlinked','{\"to\":\"old@example.com\",\"provider\":\"email\"}','sent')").bind(id).execute(&pool).await.unwrap();
     assert_eq!(
-        call(
+        common::call(
             &pool,
             "DELETE",
             "/me",
-            Some(&token),
+            &common::ck(&token),
             Some(json!({"confirm":"DELETE"}))
         )
         .await
@@ -651,11 +703,12 @@ async fn account_deletion_removes_link_challenges_and_security_recipients(pool: 
         payload.get("to").is_none(),
         "安全信留存的 Email 也須去識別化"
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn link_otp_request_cannot_commit_after_account_deletion(pool: PgPool) {
-    let (id, token) = user(&pool, "line").await;
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
     let mut deletion = pool.begin().await.unwrap();
     sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
         .bind(id)
@@ -665,11 +718,11 @@ async fn link_otp_request_cannot_commit_after_account_deletion(pool: PgPool) {
     let request = tokio::spawn({
         let pool = pool.clone();
         async move {
-            call(
+            common::call(
                 &pool,
                 "POST",
                 "/me/identities/email/request",
-                Some(&token),
+                &common::ck(&token),
                 Some(json!({"email":"delete-race@example.com"})),
             )
             .await
@@ -694,33 +747,67 @@ async fn link_otp_request_cannot_commit_after_account_deletion(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 0);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn self_unlink_revokes_other_sessions_only_on_success(pool: PgPool) {
-    let (id, current) = user(&pool, "line").await;
+    let common::TestUser { id, token: current } = provider_user(&pool, "line").await;
     let other = "other-device";
     sqlx::query("INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,now()+interval '1 day')")
         .bind(id).bind(hash_token(other)).execute(&pool).await.unwrap();
-    let (_, unrelated) = user(&pool, "line").await;
+    let common::TestUser {
+        id: _,
+        token: unrelated,
+    } = provider_user(&pool, "line").await;
     assert_eq!(
-        call(&pool, "DELETE", "/me/identities/line", Some(&current), None)
-            .await
-            .0,
+        common::call(
+            &pool,
+            "DELETE",
+            "/me/identities/line",
+            &common::ck(&current),
+            None
+        )
+        .await
+        .0,
         409
     );
-    assert_eq!(call(&pool, "GET", "/me", Some(other), None).await.0, 200);
-    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid) VALUES ($1,'google','unlink-google')").bind(id).execute(&pool).await.unwrap();
     assert_eq!(
-        call(&pool, "DELETE", "/me/identities/line", Some(&current), None)
+        common::call(&pool, "GET", "/me", &common::ck(other), None)
             .await
             .0,
         200
     );
-    assert_eq!(call(&pool, "GET", "/me", Some(other), None).await.0, 401);
-    assert_eq!(call(&pool, "GET", "/me", Some(&current), None).await.0, 200);
+    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid) VALUES ($1,'google','unlink-google')").bind(id).execute(&pool).await.unwrap();
     assert_eq!(
-        call(&pool, "GET", "/me", Some(&unrelated), None).await.0,
+        common::call(
+            &pool,
+            "DELETE",
+            "/me/identities/line",
+            &common::ck(&current),
+            None
+        )
+        .await
+        .0,
         200
     );
+    assert_eq!(
+        common::call(&pool, "GET", "/me", &common::ck(other), None)
+            .await
+            .0,
+        401
+    );
+    assert_eq!(
+        common::call(&pool, "GET", "/me", &common::ck(&current), None)
+            .await
+            .0,
+        200
+    );
+    assert_eq!(
+        common::call(&pool, "GET", "/me", &common::ck(&unrelated), None)
+            .await
+            .0,
+        200
+    );
+    common::assert_all_reconciled(&pool).await;
 }
