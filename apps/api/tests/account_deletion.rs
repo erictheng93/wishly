@@ -1,32 +1,24 @@
 mod common;
 use axum::http::StatusCode;
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
 
-async fn call(
-    pool: &PgPool,
-    method: &str,
-    uri: &str,
-    cookie: Option<&str>,
-    body: Option<Value>,
-) -> (StatusCode, Value) {
-    let h = cookie.map(common::ck).unwrap_or_default();
-    let (s, _, b) = common::api(pool, method, uri, &h, body).await;
-    (s, b)
-}
-
 /// 回傳 (user_id, session token)
-use common::user_with_staff as user;
-
-use common::claimed_wishlist as wishlist;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_anonymizes(pool: PgPool) {
-    let (uid, tok) = user(&pool, "小米", false).await;
-    let (wid, slug, item) = wishlist(&pool, uid, false, 30).await;
+    let TestUser {
+        id: uid,
+        token: tok,
+    } = user(&pool, "小米").await;
+    let (wid, slug, item) = claimed_wishlist(&pool, uid, false, 30).await;
     // 此使用者在別人清單上的認領
-    let (other, _) = user(&pool, "o", false).await;
-    let (_, _, item2) = wishlist(&pool, other, false, 30).await;
+    let TestUser {
+        id: other,
+        token: _,
+    } = user(&pool, "o").await;
+    let (_, _, item2) = claimed_wishlist(&pool, other, false, 30).await;
     sqlx::query(
         "INSERT INTO claims (item_id, user_id, claimer_name, qty) VALUES ($1, $2, '小米', 1)",
     )
@@ -55,18 +47,18 @@ async fn account_delete_anonymizes(pool: PgPool) {
             &pool,
             "DELETE",
             "/me",
-            Some(&tok),
+            &ck(&tok),
             Some(json!({"confirm": "yes"}))
         )
         .await
         .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    let (s, v) = call(
+    let (s, _, v) = call(
         &pool,
         "DELETE",
         "/me",
-        Some(&tok),
+        &ck(&tok),
         Some(json!({"confirm": "DELETE"})),
     )
     .await;
@@ -107,8 +99,8 @@ async fn account_delete_anonymizes(pool: PgPool) {
     assert_eq!(pend, 0);
     // session 失效
     assert_eq!(
-        call(&pool, "GET", "/admin/stats", Some(&tok), None).await.0,
+        call(&pool, "GET", "/admin/stats", &ck(&tok), None).await.0,
         StatusCode::UNAUTHORIZED
     );
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
