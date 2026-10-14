@@ -6,7 +6,7 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::{claims, guest, AppState};
@@ -17,11 +17,7 @@ fn app(pool: &PgPool) -> Router {
         .with_state(AppState { pool: pool.clone() })
 }
 
-async fn call(
-    app: &Router,
-    mut req: Request<Body>,
-    ip: &str,
-) -> (StatusCode, axum::http::HeaderMap, Value) {
+async fn call_with_ip(app: &Router, mut req: Request<Body>, ip: &str) -> common::Resp {
     req.extensions_mut()
         .insert(ConnectInfo::<std::net::SocketAddr>(
             format!("{ip}:1234").parse().unwrap(),
@@ -107,7 +103,7 @@ async fn expire_due_releases_only_overdue_reserved(pool: PgPool) {
     // 冪等：再跑不重複回補
     assert_eq!(claims::expire_due(&pool).await.unwrap(), 0);
     assert_eq!(qty(&pool, a).await, 2);
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -136,13 +132,13 @@ async fn expire_due_concurrent_and_vs_cancel(pool: PgPool) {
         .header("x-guest-token", "tok")
         .body(Body::empty())
         .unwrap();
-    let (s, _, b) = call(&app(&pool), r, "9.9.9.9").await;
+    let (s, _, b) = call_with_ip(&app(&pool), r, "9.9.9.9").await;
     assert_eq!(
         (s, b["code"].as_str()),
         (StatusCode::CONFLICT, Some("INVALID_STATE_TRANSITION"))
     );
     assert_eq!(qty(&pool, it).await, 0);
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 fn sha(b: &[u8]) -> Vec<u8> {
@@ -161,12 +157,12 @@ fn post_claim_as(item: Uuid, key: Uuid, token: &str) -> Request<Body> {
 
 /// 建一個 guest 並回傳 token
 async fn new_guest(a: &Router, item: Uuid, ip: &str) -> String {
-    let (s, _, b) = call(a, post_claim(item, Uuid::new_v4()), ip).await;
+    let (s, _, b) = call_with_ip(a, post_claim(item, Uuid::new_v4()), ip).await;
     assert_eq!(s, StatusCode::CREATED);
     b["guest_token"].as_str().unwrap().to_string()
 }
 
-fn limited(r: &(StatusCode, axum::http::HeaderMap, Value)) -> bool {
+fn limited(r: &common::Resp) -> bool {
     r.0 == StatusCode::TOO_MANY_REQUESTS
         && r.2["code"] == "RATE_LIMITED"
         && r.1.contains_key("retry-after")
@@ -184,41 +180,47 @@ async fn claim_limit_is_per_identity_and_replay_free(pool: PgPool) {
                                                       // 同 key 重播：不消耗額度
     let k = Uuid::new_v4();
     assert_eq!(
-        call(&a, post_claim_as(its[1], k, &tok), "5.5.5.5").await.0,
+        call_with_ip(&a, post_claim_as(its[1], k, &tok), "5.5.5.5")
+            .await
+            .0,
         StatusCode::CREATED
     );
     for _ in 0..40 {
         assert_eq!(
-            call(&a, post_claim_as(its[1], k, &tok), "5.5.5.5").await.0,
+            call_with_ip(&a, post_claim_as(its[1], k, &tok), "5.5.5.5")
+                .await
+                .0,
             StatusCode::CREATED
         );
     }
     // 建立 guest 的那次按 IP 計、不計入該 guest；之後共 30 次：已計 1 次（its[1]），再 29 次成功，下一次 429
     for it in &its[2..31] {
         assert_eq!(
-            call(&a, post_claim_as(*it, Uuid::new_v4(), &tok), "5.5.5.5")
+            call_with_ip(&a, post_claim_as(*it, Uuid::new_v4(), &tok), "5.5.5.5")
                 .await
                 .0,
             StatusCode::CREATED
         );
     }
     assert!(limited(
-        &call(&a, post_claim_as(its[31], Uuid::new_v4(), &tok), "5.5.5.5").await
+        &call_with_ip(&a, post_claim_as(its[31], Uuid::new_v4(), &tok), "5.5.5.5").await
     ));
     // 同一個 IP 的另一個人不受影響（派對 Wi-Fi / CGNAT）
     let tok2 = new_guest(&a, its[32], "5.5.5.5").await;
     assert_eq!(
-        call(&a, post_claim_as(its[33], Uuid::new_v4(), &tok2), "5.5.5.5")
+        call_with_ip(&a, post_claim_as(its[33], Uuid::new_v4(), &tok2), "5.5.5.5")
             .await
             .0,
         StatusCode::CREATED
     );
     // 超限後重播先前成功的請求仍可回放
     assert_eq!(
-        call(&a, post_claim_as(its[1], k, &tok), "5.5.5.5").await.0,
+        call_with_ip(&a, post_claim_as(its[1], k, &tok), "5.5.5.5")
+            .await
+            .0,
         StatusCode::CREATED
     );
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -229,23 +231,25 @@ async fn claim_per_wishlist_limit_is_per_identity(pool: PgPool) {
     // 建立 guest 那次不計；其後同清單 15 次成功，第 16 次 429
     for it in &its[1..16] {
         assert_eq!(
-            call(&a, post_claim_as(*it, Uuid::new_v4(), &tok), "7.7.7.7")
+            call_with_ip(&a, post_claim_as(*it, Uuid::new_v4(), &tok), "7.7.7.7")
                 .await
                 .0,
             StatusCode::CREATED
         );
     }
     assert!(limited(
-        &call(&a, post_claim_as(its[16], Uuid::new_v4(), &tok), "7.7.7.7").await
+        &call_with_ip(&a, post_claim_as(its[16], Uuid::new_v4(), &tok), "7.7.7.7").await
     ));
     // 同 IP、同清單的其他人照常認領（場地 Wi-Fi 的賓客）
     for it in &its[17..20] {
         assert_eq!(
-            call(&a, post_claim(*it, Uuid::new_v4()), "7.7.7.7").await.0,
+            call_with_ip(&a, post_claim(*it, Uuid::new_v4()), "7.7.7.7")
+                .await
+                .0,
             StatusCode::CREATED
         );
     }
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -254,18 +258,20 @@ async fn new_guest_limit_is_per_ip(pool: PgPool) {
     let (_, its) = wishlist(&pool, "RlNew00001", 101, 100).await;
     for it in &its[..100] {
         assert_eq!(
-            call(&a, post_claim(*it, Uuid::new_v4()), "4.4.4.4").await.0,
+            call_with_ip(&a, post_claim(*it, Uuid::new_v4()), "4.4.4.4")
+                .await
+                .0,
             StatusCode::CREATED
         );
     }
     assert!(limited(
-        &call(&a, post_claim(its[100], Uuid::new_v4()), "4.4.4.4").await
+        &call_with_ip(&a, post_claim(its[100], Uuid::new_v4()), "4.4.4.4").await
     )); // 同 IP 第 101 個新 guest
     assert_eq!(
-        call(&a, post_claim(its[100], Uuid::new_v4()), "3.3.3.3")
+        call_with_ip(&a, post_claim(its[100], Uuid::new_v4()), "3.3.3.3")
             .await
             .0,
         StatusCode::CREATED
     ); // 換 IP 可以
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
