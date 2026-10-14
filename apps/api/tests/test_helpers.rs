@@ -170,7 +170,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
 async fn call_app_sets_content_type_only_for_json_and_accepts_plain_responses() {
     let app = Router::new().route("/api/v1/headers",post(|headers: HeaderMap| async move {
         Json(json!({"content_type":headers.get("content-type").map(|v|v.to_str().unwrap()),"key":headers.get("idempotency-key").map(|v|v.to_str().unwrap())}))
-    })).route("/api/v1/text",post(||async {"plain"}));
+    })).route("/api/v1/text",post(||async {"plain"})).route("/api/v1/empty",post(||async {axum::http::StatusCode::NO_CONTENT}));
     let key = Uuid::new_v4();
     let with = call_app(&app, "POST", "/headers", &idem(key), Some(json!({}))).await;
     assert_eq!(
@@ -180,6 +180,9 @@ async fn call_app_sets_content_type_only_for_json_and_accepts_plain_responses() 
     let without = call_app(&app, "POST", "/headers", &[], None).await;
     assert_eq!(without.2, json!({"content_type":null,"key":null}));
     assert!(call_app(&app, "POST", "/text", &[], None).await.2.is_null());
+    let empty = call_app(&app, "POST", "/empty", &[], None).await;
+    assert_eq!(empty.0, axum::http::StatusCode::NO_CONTENT);
+    assert!(empty.2.is_null());
 }
 
 #[tokio::test]
