@@ -1,0 +1,21 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.68s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-4be6727502b163e7)
+
+running 1 test
+
+thread 'opposite_reallocations_lock_lowest_item_first_without_deadlock' (6905044) panicked at tests/concurrency.rs:158:5:
+assertion `left == right` failed: reallocation source-first lock order caused a PostgreSQL deadlock: pg_stat_database.deadlocks 0 -> 1
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test opposite_reallocations_lock_lowest_item_first_without_deadlock ... FAILED
+
+failures:
+
+failures:
+    opposite_reallocations_lock_lowest_item_first_without_deadlock
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 2.11s
+
+error: test failed, to rerun pass `--test concurrency`

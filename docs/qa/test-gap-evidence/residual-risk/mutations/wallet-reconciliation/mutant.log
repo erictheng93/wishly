@@ -1,0 +1,22 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
+     Running tests/test_helpers.rs (apps/api/target/debug/deps/test_helpers-0a6ba8ee6d925bed)
+
+running 1 test
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (6921025) panicked at tests/common/mod.rs:249:5:
+qty_claimed 與有效 claims 加總不一致: [(01a13b3d-0794-7565-9bd9-aa55d0d36e40, 4, 3)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (6921025) panicked at tests/test_helpers.rs:140:14:
+wallet reconciliation accepted a drifted balance: ()
+test fixtures_preserve_options_quantities_and_reconcile_domain_state ... FAILED
+
+failures:
+
+failures:
+    fixtures_preserve_options_quantities_and_reconcile_domain_state
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.70s
+
+error: test failed, to rerun pass `--test test_helpers`

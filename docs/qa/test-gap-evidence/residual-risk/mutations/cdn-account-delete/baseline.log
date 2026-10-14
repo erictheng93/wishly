@@ -1,0 +1,9 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.20s
+     Running tests/account_deletion.rs (apps/api/target/debug/deps/account_deletion-536b20cda6a8f8f4)
+
+running 1 test
+test account_delete_purges_public_lists_after_commit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.91s
+

@@ -1,0 +1,28 @@
+unit: killed (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmps7bw5r7y/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpsg9tl_m0/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpe629pfrs/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpmvvjyro3/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp9gq518en/output/unit)
+unit: killed (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmph1l745zt/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmppkngc7yb/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp4nlskb7e/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpzteefrf9/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpi79kz9in/output/unit)
+unit: killed (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpm3rsrz7e/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpntwfqze5/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpnjkmv383/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp_nu0qilv/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp4l461o3m/output/unit)
+unit: killed (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmptxqv1925/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp582rz6sw/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp299_d58k/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpyvp_9c9t/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp6mt_k0ur/output/unit)
+.unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpcd5rom47/output/unit)
+unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpap8t_5kl/output/unit)
+..unit: killed (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpi2ihfwkl/output/unit)
+.
+----------------------------------------------------------------------
+Ran 4 tests in 0.047s
+
+OK

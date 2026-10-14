@@ -1,0 +1,456 @@
+API coverage lines: baseline 91.289157%, floor 90.789157% (margin 0.5 pp)
+API coverage functions: baseline 88.255034%, floor 87.755034% (margin 0.5 pp)
+API coverage regions: baseline 87.156589%, floor 86.656589% (margin 0.5 pp)
+info: cargo-llvm-cov currently setting cfg(coverage); you can opt-out it by passing --no-cfg-coverage
+   Compiling rustls v0.23.46
+   Compiling sqlx-core v0.8.6
+   Compiling tokio-rustls v0.26.6
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.12.28
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.79s
+     Running unittests src/lib.rs (apps/api/target/llvm-cov-target/debug/deps/wishsync_api-9f7f8ccd1002f397)
+
+running 13 tests
+test cdn::tests::servable_only_public_link_live_ok ... ok
+test access::tests::subtle_eq_works ... ok
+test points::tests::largest_remainder_sums_to_diff ... ok
+test uploads::tests::rejects_non_images_and_bad_keys ... ok
+test uploads::tests::avatars_only_use_provider_sources_and_owned_keys ... ok
+test config::tests::prod_fail_closed ... ok
+test auth::tests::native_token_only_for_native_origins ... ok
+test sealed::tests::roundtrip_and_tamper ... ok
+test uploads::tests::sigv4_matches_aws_doc_example ... ok
+test auth::tests::state_cookie_roundtrip_and_tamper ... ok
+test uploads::tests::exif_gps_is_stripped ... ok
+test uploads::tests::avatar_download_rejects_redirects_and_limits_streamed_bytes ... ok
+test uploads::tests::avatar_import_does_not_wait_for_database ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+     Running unittests src/main.rs (apps/api/target/llvm-cov-target/debug/deps/wishsync_api-51e1bcc81196a852)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/account_deletion.rs (apps/api/target/llvm-cov-target/debug/deps/account_deletion-536b20cda6a8f8f4)
+
+running 2 tests
+test account_delete_purges_public_lists_after_commit ... ok
+test account_delete_anonymizes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+
+     Running tests/account_security.rs (apps/api/target/llvm-cov-target/debug/deps/account_security-d8febf91ad4a3f2e)
+
+running 8 tests
+test framework_errors_are_problem_json ... ok
+test login_19_distributed_failures_not_locked ... ok
+test bearer_session_and_native_cors ... ok
+test unsubscribe_post_allowed_in_read_only ... ok
+test export_includes_contribution_visibility ... ok
+test security_headers_on_all_responses ... ok
+test login_lockout_is_per_email_ip_with_email_cap ... ok
+test delete_account_cancels_reserved_keeps_fulfilled ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s
+
+     Running tests/admin_users.rs (apps/api/target/llvm-cov-target/debug/deps/admin_users-3d5f6fed03f44592)
+
+running 10 tests
+test concurrent_staff_changes_keep_an_effective_staff ... ok
+test last_staff_and_last_login_are_protected ... ok
+test admin_unlink_clears_provider_email_and_notifies_user ... ok
+test audit_date_range_uses_taipei_inclusive_end_day ... ok
+test read_only_blocks_admin_suspension_without_side_effects ... ok
+test recovery_uses_one_connection_and_rolls_back_on_rate_limit ... ok
+test filters_paginate_and_sensitive_routes_require_staff ... ok
+test suspension_revokes_sessions_blocks_login_and_is_audited ... ok
+test recovery_rechecks_email_after_waiting_for_otp_lock ... ok
+test name_provider_filters_stats_and_recovery ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s
+
+     Running tests/auth_regressions.rs (apps/api/target/llvm-cov-target/debug/deps/auth_regressions-912c25823f1b3216)
+
+running 4 tests
+test oauth_start_without_credentials_redirects ... ok
+test otp_cooldown_ignores_consumed_challenges ... ok
+test read_only_lets_login_and_otp_through ... ok
+test seed_demo_account_can_login ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+
+     Running tests/cdn_invalidation.rs (apps/api/target/llvm-cov-target/debug/deps/cdn_invalidation-4769695b418e49be)
+
+running 1 test
+test privacy_archive_and_moderation_send_cdn_purge ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/claims.rs (apps/api/target/llvm-cov-target/debug/deps/claims-50a49eaa4a5f9fab)
+
+running 5 tests
+test public_page_404_and_410 ... ok
+test idempotency_key_replay_and_conflict ... ok
+test public_page_happy_and_masking ... ok
+test claim_lifecycle ... ok
+test oversell_only_one_wins ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s
+
+     Running tests/closes_at.rs (apps/api/target/llvm-cov-target/debug/deps/closes_at-1d32522d551a7f27)
+
+running 10 tests
+test closing_mail_renders_taipei_time ... ok
+test public_page_exposes_closes_at ... ok
+test reopen_requires_future_or_cleared_closes_at ... ok
+test expired_list_rejects_claims_before_sweep ... ok
+test create_with_and_without_closes_at ... ok
+test close_due_only_touches_active_and_expired ... ok
+test expired_list_rejects_pledges_before_sweep ... ok
+test patch_sets_clears_and_keeps_closes_at ... ok
+test reminder_sent_once_and_rearmed_on_change ... ok
+test close_due_purges_due_public_lists_and_keeps_future_lists_cached ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s
+
+     Running tests/concurrency.rs (apps/api/target/llvm-cov-target/debug/deps/concurrency-4be6727502b163e7)
+
+running 17 tests
+test account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim ... ok
+test force_delete_vs_claim_update_uses_item_then_claim_lock_order ... ok
+test account_delete_vs_guest_claim_locks_owner_before_notification_fk ... ok
+test opposite_reallocations_lock_lowest_item_first_without_deadlock ... ok
+test reallocate_vs_last_pledge_respects_target_cap_in_both_orders ... ok
+test deleted_actor_cannot_create_claim_on_another_users_active_list ... ok
+test archive_vs_waiting_claim_cannot_accept_after_archive_commit ... ok
+test deleting_quantity_item_preserves_delivered_claim_accounting ... ok
+test removal_vs_inflight_claim_serializes_and_reconciles ... ok
+test account_delete_vs_own_pledge_checks_actor_before_wishlist ... ok
+test mixed_quantity_claims_report_remaining_and_never_oversell ... ok
+test wallet_freeze_vs_pledge_checks_status_under_lock ... ok
+test same_key_claim_requests_overlap_and_claim_once ... ok
+test removal_vs_inflight_pledge_serializes_and_refunds ... ok
+test same_key_pledge_requests_overlap_and_debit_once ... ok
+test withdraw_vs_final_pledge_serializes_both_orders ... ok
+test withdraw_vs_tick_refunds_exactly_once ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.76s
+
+     Running tests/config_mail.rs (apps/api/target/llvm-cov-target/debug/deps/config_mail-5d54a97565ea80a8)
+
+running 5 tests
+test client_ip_trust ... ok
+test production_fails_closed ... ok
+test cloudflare_email_request_format ... ok
+test cloudflare_purge_request_format ... ok
+test turnstile_verification ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/crowdfund_owner.rs (apps/api/target/llvm-cov-target/debug/deps/crowdfund_owner-b6414ec4bdea35b8)
+
+running 18 tests
+test admin_order_unknown_id_is_404 ... ok
+test admin_orders_audit_only_returned_rows ... ok
+test admin_wallet_grant_adjust_idempotent_freeze ... ok
+test admin_order_placed_partial_refund_and_lifecycle ... ok
+test archiving_wishlist_releases_pledges ... ok
+test admin_order_failed_refunds_everything ... ok
+test admin_endpoints_staff_only ... ok
+test dashboard_and_orders_hide_everything_while_surprise_locked ... ok
+test account_delete_blocked_by_points ... ok
+test create_crowdfund_item_rules ... ok
+test publish_requires_shipping_address ... ok
+test public_page_hides_contributors_while_surprise_locked ... ok
+test item_delete_force_releases_pledges ... ok
+test owner_orders_progress ... ok
+test shipping_address_masked_and_encrypted ... ok
+test dashboard_lists_contributors ... ok
+test public_page_funding_fields_and_contributors ... ok
+test edit_rules_after_pledges ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.03s
+
+     Running tests/crowdfund_pledge.rs (apps/api/target/llvm-cov-target/debug/deps/crowdfund_pledge-6af53335517ea5fb)
+
+running 17 tests
+test contribution_visibility_migration_preserves_existing_scope ... ok
+test concurrent_last_slot_only_one_wins ... ok
+test idempotent_replay_does_not_double_charge ... ok
+test contribution_visibility_default_override_and_patch ... ok
+test pledge_respects_list_visibility ... ok
+test pledge_rejections ... ok
+test exact_target_funds_and_captures ... ok
+test hard_cap_reports_remaining ... ok
+test concurrent_exact_fill_never_oversells ... ok
+test pledge_happy_path ... ok
+test reallocate_rejects_overflow_and_expired_window ... ok
+test withdraw_locked_when_captured_or_window_over ... ok
+test withdraw_refunds_and_is_idempotent ... ok
+test reallocate_within_choice_window ... ok
+test wallet_endpoint_held_points_and_pagination ... ok
+test wallet_contributions_flags_and_filter ... ok
+test tick_expires_then_auto_refunds_once ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.87s
+
+     Running tests/dashboard_guards.rs (apps/api/target/llvm-cov-target/debug/deps/dashboard_guards-1ebcfab699fdf40e)
+
+running 1 test
+test dashboard_locked_totals_and_moderation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+
+     Running tests/dashboard_privacy.rs (apps/api/target/llvm-cov-target/debug/deps/dashboard_privacy-9f695f42dd597351)
+
+running 2 tests
+test surprise_dashboard_hides_claimers ... ok
+test unified_pct_owner_names_list_fields_and_image_base ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
+
+     Running tests/expiry_ratelimit.rs (apps/api/target/llvm-cov-target/debug/deps/expiry_ratelimit-8b6d6c326651a935)
+
+running 5 tests
+test expire_due_releases_only_overdue_reserved ... ok
+test claim_per_wishlist_limit_is_per_identity ... ok
+test claim_limit_is_per_identity_and_replay_free ... ok
+test expire_due_concurrent_and_vs_cancel ... ok
+test new_guest_limit_is_per_ip ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.52s
+
+     Running tests/exports_notifications.rs (apps/api/target/llvm-cov-target/debug/deps/exports_notifications-b55939aa9a938c2c)
+
+running 2 tests
+test no_confirmation_without_email ... ok
+test export_and_unsubscribe ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+
+     Running tests/guest_lifecycle.rs (apps/api/target/llvm-cov-target/debug/deps/guest_lifecycle-ddcb5d3cec67be1a)
+
+running 2 tests
+test confirmation_mail_has_recovery_and_unsubscribe_links ... ok
+test guest_delete_and_recover ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+     Running tests/hardening.rs (apps/api/target/llvm-cov-target/debug/deps/hardening-d9fbe35c12c94589)
+
+running 7 tests
+test force_delete_still_forbidden_while_surprise_locked ... ok
+test lost_first_response_replay_reissues_usable_token ... ok
+test text_validation_claims_reports_slug ... ok
+test text_validation_wishlists_and_items ... ok
+test event_date_range ... ok
+test claim_email_must_be_deliverable ... ok
+test force_delete_cleans_up_claims ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+
+     Running tests/identities.rs (apps/api/target/llvm-cov-target/debug/deps/identities-d997e59a9d72f5a4)
+
+running 15 tests
+test account_deletion_removes_link_challenges_and_security_recipients ... ok
+test reset_rechecks_contact_after_concurrent_unlink ... ok
+test security_mail_explains_change_and_cannot_be_unsubscribed ... ok
+test email_link_refuses_existing_account ... ok
+test auto_email_link_matches_manual_contact_policy ... ok
+test registration_identity_and_password_are_atomic ... ok
+test read_only_and_blocked_accounts_cannot_link ... ok
+test email_link_checks_email_on_other_provider_identity ... ok
+test auto_email_link_rechecks_alternate_email_after_unlink ... ok
+test email_link_is_scoped_and_does_not_create_another_account ... ok
+test link_otp_request_cannot_commit_after_account_deletion ... ok
+test unlink_email_clears_contact_and_blocks_implicit_relink ... ok
+test same_email_unlink_requires_fresh_verification_to_relink ... ok
+test unlink_serializes_and_keeps_one_login_method ... ok
+test self_unlink_revokes_other_sessions_only_on_success ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.31s
+
+     Running tests/line_oauth.rs (apps/api/target/llvm-cov-target/debug/deps/line_oauth-8cc0f72b58f5f834)
+
+running 1 test
+test line_login_with_mock_provider ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+     Running tests/migration_constraints.rs (apps/api/target/llvm-cov-target/debug/deps/migration_constraints-ea53231322eb6abd)
+
+running 3 tests
+test wallet_and_ledger_enforce_nonnegative_balance_and_append_only ... ok
+test quantities_cannot_be_negative_zero_or_oversold ... ok
+test crowdfunding_checks_reject_invalid_money_and_lifecycle_shapes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+     Running tests/moderation.rs (apps/api/target/llvm-cov-target/debug/deps/moderation-b857b4135df81229)
+
+running 1 test
+test staff_guard_report_and_moderation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/notifications.rs (apps/api/target/llvm-cov-target/debug/deps/notifications-51b7c0636bac13a9)
+
+running 1 test
+test enqueue_claim_first_immediate_then_digest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+
+     Running tests/otp.rs (apps/api/target/llvm-cov-target/debug/deps/otp-118f287ce0cbcd90)
+
+running 2 tests
+test otp_locks_after_5_wrong_attempts ... ok
+test otp_full_flow ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+     Running tests/owner_claim_actions.rs (apps/api/target/llvm-cov-target/debug/deps/owner_claim_actions-70afa9cbb4231a0c)
+
+running 1 test
+test owner_delivers_and_cancels_claims ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/password_google.rs (apps/api/target/llvm-cov-target/debug/deps/password_google-b2ef9d9a438b767f)
+
+running 7 tests
+test google_jwks_cache_respects_ttl_and_rotation ... ok
+test google_manual_link_binds_session_and_refuses_account_merge ... ok
+test google_login_links_by_verified_email ... ok
+test google_rejects_bad_id_tokens ... ok
+test google_login_redirects_blocked_and_ambiguous_accounts ... ok
+test otp_account_sets_password_via_reset ... ok
+test password_register_login_reset ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.67s
+
+     Running tests/profiles.rs (apps/api/target/llvm-cov-target/debug/deps/profiles-2350a79fd5fb283d)
+
+running 2 tests
+test deleted_account_profile_is_indistinguishable_from_missing_handle ... ok
+test profile_handle_case_and_unpublished_fields_are_private ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+
+     Running tests/ratelimit.rs (apps/api/target/llvm-cov-target/debug/deps/ratelimit-729dc3047ba1f9bd)
+
+running 7 tests
+test cleanup_removes_old_rows ... ok
+test claim_mail_per_email_limit_still_creates_claim ... ok
+test report_known_reporter_duplicate_returns_same_id ... ok
+test check_blocks_with_retry_after ... ok
+test presign_limit_per_user ... ok
+test report_limits ... ok
+test claim_mail_per_guest_daily_limit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s
+
+     Running tests/read_only.rs (apps/api/target/llvm-cov-target/debug/deps/read_only-7518646235942e27)
+
+running 1 test
+test read_only_mode_blocks_writes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+     Running tests/smtp_worker.rs (apps/api/target/llvm-cov-target/debug/deps/smtp_worker-85b26961dd98fb3b)
+
+running 1 test
+test worker_sends_via_smtp_and_mailpit_receives_private_notification ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/social.rs (apps/api/target/llvm-cov-target/debug/deps/social-1744eb12cfcb5513)
+
+running 12 tests
+test profile_completion_counts_funded_crowdfund_item ... ok
+test me_handle_and_default_visibility ... ok
+test invite_links ... ok
+test claim_visibility_default_override_patch ... ok
+test mutual_request_auto_friends_and_decline_withdraw ... ok
+test profile_lists_visibility ... ok
+test friend_request_flow_and_no_enumeration ... ok
+test profile_pledge_visibility_is_per_record ... ok
+test profile_donations_visibility ... ok
+test friend_request_rate_limited ... ok
+test public_page_masks_non_public_user_claims ... ok
+test unfriend_clears_allowed_users ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.35s
+
+     Running tests/stale_cookie.rs (apps/api/target/llvm-cov-target/debug/deps/stale_cookie-860259491210fc22)
+
+running 1 test
+test stale_cookie_is_anonymous_but_stale_header_is_401 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/test_helpers.rs (apps/api/target/llvm-cov-target/debug/deps/test_helpers-0a6ba8ee6d925bed)
+
+running 3 tests
+test call_app_sets_content_type_only_for_json_and_accepts_plain_responses ... ok
+test malformed_json_response_cannot_silently_turn_into_null - should panic ... ok
+test fixtures_preserve_options_quantities_and_reconcile_domain_state ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+     Running tests/uploads.rs (apps/api/target/llvm-cov-target/debug/deps/uploads-77484edcd7958a16)
+
+running 1 test
+test presign_whitelists_size_type_purpose_and_binds_incoming_to_user ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/visibility.rs (apps/api/target/llvm-cov-target/debug/deps/visibility-13f42c1832d8f1a9)
+
+running 10 tests
+test private_only_owner ... ok
+test friends_list ... ok
+test allowed_users_only_friends ... ok
+test unlock_non_password_404_and_rate_limited ... ok
+test public_and_link_open_and_cacheable ... ok
+test selected_list ... ok
+test public_path_never_serves_restricted_content ... ok
+test owner_password_rules_and_no_hash_leak ... ok
+test password_list_unlock_and_tokens ... ok
+test claim_requires_access ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.66s
+
+     Running tests/wishlist_events.rs (apps/api/target/llvm-cov-target/debug/deps/wishlist_events-642d125976efb574)
+
+running 1 test
+test sse_pushes_item_update_and_410_when_hidden ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+     Running tests/wishlist_guards.rs (apps/api/target/llvm-cov-target/debug/deps/wishlist_guards-8169a83ac208efd5)
+
+running 5 tests
+test archive_is_idempotent ... ok
+test optimistic_concurrency ... ok
+test unlocked_keeps_specific_errors ... ok
+test closes_at_is_optional_and_enforced ... ok
+test surprise_lock_errors_do_not_reveal_claims ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
+
+     Running tests/wishlist_items.rs (apps/api/target/llvm-cov-target/debug/deps/wishlist_items-7c3c0f79f988ebfe)
+
+running 1 test
+test owner_only_and_item_rules ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
+
+
+    Finished report saved to apps/api/target/coverage.json

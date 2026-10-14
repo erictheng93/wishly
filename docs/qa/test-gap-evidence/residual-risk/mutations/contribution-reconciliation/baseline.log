@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/test_helpers.rs (apps/api/target/debug/deps/test_helpers-0a6ba8ee6d925bed)
+
+running 1 test
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (6921577) panicked at tests/common/mod.rs:249:5:
+qty_claimed 與有效 claims 加總不一致: [(01a13b3d-195d-7fc0-847f-1019dd2519d6, 4, 3)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (6921577) panicked at tests/common/mod.rs:154:5:
+錢包 balance 與 ledger 加總不一致: [01a13b3d-19d4-73ed-9d7d-7024163ca595]
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (6921577) panicked at tests/common/mod.rs:157:5:
+item.pledged_points 漂移: [01a13b3d-19d9-7537-b341-0ff6d6e4205c]
+test fixtures_preserve_options_quantities_and_reconcile_domain_state ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.84s
+

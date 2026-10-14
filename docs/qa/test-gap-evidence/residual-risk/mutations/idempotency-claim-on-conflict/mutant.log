@@ -1,0 +1,19 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.16s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-4be6727502b163e7)
+
+running 1 test
+
+thread 'same_key_claim_requests_overlap_and_claim_once' (6898506) panicked at tests/concurrency.rs:195:13:
+claim idempotency ON CONFLICT missing: SQLSTATE 23505 constraint idempotency_keys_pkey
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test same_key_claim_requests_overlap_and_claim_once ... FAILED
+
+failures:
+
+failures:
+    same_key_claim_requests_overlap_and_claim_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.97s
+
+error: test failed, to rerun pass `--test concurrency`

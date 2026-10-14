@@ -1,0 +1,3 @@
+# Preserve raw stdout and exact mutation diffs, including whitespace.
+*.patch -whitespace
+*.log -whitespace
