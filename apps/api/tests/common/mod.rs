@@ -169,6 +169,11 @@ pub async fn call_request(app: &Router, req: Request<Body>) -> Resp {
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
     let body = if bytes.is_empty() {
         Value::Null
+    } else if headers
+        .get("content-type")
+        .is_some_and(|h| h.to_str().is_ok_and(|s| s.contains("json")))
+    {
+        serde_json::from_slice(&bytes).expect("JSON response must be valid")
     } else {
         serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     };

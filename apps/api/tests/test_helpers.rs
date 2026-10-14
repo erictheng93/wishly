@@ -78,21 +78,91 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
             .unwrap();
         assert_all_reconciled(&pool).await;
     }
-    sqlx::query("UPDATE claims SET status='cancelled' WHERE id=$1")
-        .bind(claim)
+    // 對帳必須能拒絕快取漂移，避免測試只涵蓋綠燈。
+    sqlx::query("UPDATE wishlist_items SET qty_claimed=4 WHERE id=$1")
+        .bind(it)
         .execute(&pool)
         .await
         .unwrap();
+    let check = pool.clone();
+    assert!(
+        tokio::spawn(async move { assert_claims_reconciled(&check).await })
+            .await
+            .unwrap_err()
+            .is_panic()
+    );
     sqlx::query("UPDATE wishlist_items SET qty_claimed=0 WHERE id=$1")
         .bind(it)
         .execute(&pool)
         .await
         .unwrap();
+    for status in ["cancelled", "expired"] {
+        sqlx::query("UPDATE claims SET status=$2::claim_status WHERE id=$1")
+            .bind(claim)
+            .bind(status)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_all_reconciled(&pool).await;
+    }
+    let protected = wishlist(
+        &pool,
+        owner.id,
+        ListOpts {
+            visibility: Some("password"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let unlock = call(
+        &pool,
+        "POST",
+        &format!("/public/wishlists/{}/unlock", protected.slug),
+        &[],
+        Some(json!({"password":"test password"})),
+    )
+    .await;
+    assert_eq!(unlock.0, axum::http::StatusCode::OK, "{}", unlock.2);
     grant(&pool, operator.id, 100).await;
     let cf = crowdfund_item(&pool, wl.id, 1000).await;
     let result = pledge(&test_app(&pool), cf, &operator.token, 30).await;
     assert_eq!(result.0, axum::http::StatusCode::CREATED, "{}", result.2);
     assert_eq!(balance(&pool, operator.id).await, 70);
+    sqlx::query("UPDATE point_wallets SET balance=71 WHERE user_id=$1")
+        .bind(operator.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let check = pool.clone();
+    assert!(
+        tokio::spawn(async move { assert_points_reconciled(&check).await })
+            .await
+            .unwrap_err()
+            .is_panic()
+    );
+    sqlx::query("UPDATE point_wallets SET balance=70 WHERE user_id=$1")
+        .bind(operator.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE wishlist_items SET pledged_points=31 WHERE id=$1")
+        .bind(cf)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let check = pool.clone();
+    assert!(
+        tokio::spawn(async move { assert_points_reconciled(&check).await })
+            .await
+            .unwrap_err()
+            .is_panic()
+    );
+    sqlx::query("UPDATE wishlist_items SET pledged_points=30 WHERE id=$1")
+        .bind(cf)
+        .execute(&pool)
+        .await
+        .unwrap();
+
     assert_all_reconciled(&pool).await;
 }
 
@@ -110,4 +180,14 @@ async fn call_app_sets_content_type_only_for_json_and_accepts_plain_responses() 
     let without = call_app(&app, "POST", "/headers", &[], None).await;
     assert_eq!(without.2, json!({"content_type":null,"key":null}));
     assert!(call_app(&app, "POST", "/text", &[], None).await.2.is_null());
+}
+
+#[tokio::test]
+#[should_panic(expected = "JSON response must be valid")]
+async fn malformed_json_response_cannot_silently_turn_into_null() {
+    let app = Router::new().route(
+        "/api/v1/bad",
+        post(|| async { ([("content-type", "application/json")], "broken") }),
+    );
+    call_app(&app, "POST", "/bad", &[], None).await;
 }
