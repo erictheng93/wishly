@@ -96,14 +96,7 @@ async fn otp_full_flow(pool: PgPool) {
     .await;
     assert_eq!(st, 400);
     // /me
-    let (st, _, me) = call_app(
-        &app,
-        "GET",
-        "/me",
-        &[("cookie", (&cookie).to_string())],
-        None,
-    )
-    .await;
+    let (st, _, me) = call_app(&app, "GET", "/me", &[("cookie", cookie.clone())], None).await;
     assert_eq!(st, 200);
     assert_eq!(me["identities"][0]["provider"], "email");
     assert_eq!(me["notification_prefs"]["email_claims"], true);
@@ -111,7 +104,7 @@ async fn otp_full_flow(pool: PgPool) {
         &app,
         "PATCH",
         "/me",
-        &[("cookie", (&cookie).to_string())],
+        &[("cookie", cookie.clone())],
         Some(json!({ "display_name": "小米", "notification_prefs": { "email_claims": false } })),
     )
     .await;
@@ -122,7 +115,7 @@ async fn otp_full_flow(pool: PgPool) {
         &app,
         "PATCH",
         "/me",
-        &[("cookie", (&cookie).to_string())],
+        &[("cookie", cookie.clone())],
         Some(json!({ "notification_prefs": { "evil": true } })),
     )
     .await;
@@ -132,7 +125,7 @@ async fn otp_full_flow(pool: PgPool) {
         &app,
         "POST",
         "/auth/logout",
-        &[("cookie", (&cookie).to_string())],
+        &[("cookie", cookie.clone())],
         None,
     )
     .await;
@@ -143,14 +136,7 @@ async fn otp_full_flow(pool: PgPool) {
         .to_str()
         .unwrap()
         .contains("Max-Age=0"));
-    let (st, ..) = call_app(
-        &app,
-        "GET",
-        "/me",
-        &[("cookie", (&cookie).to_string())],
-        None,
-    )
-    .await;
+    let (st, ..) = call_app(&app, "GET", "/me", &[("cookie", cookie.clone())], None).await;
     assert_eq!(st, 401);
     // 再次登入同 email → 同一 user，非新使用者（先把上一張挑戰時間往前挪以略過 60 秒限制）
     sqlx::query(
