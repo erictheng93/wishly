@@ -7,17 +7,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::points;
 
-use common::api as call;
-use common::ck;
-fn idem(t: &str) -> [(&'static str, String); 2] {
-    [
-        ("cookie", format!("ws_session={t}")),
-        ("idempotency-key", Uuid::new_v4().to_string()),
-    ]
-}
-
-use common::user_with_staff as user;
-
+use common::call;
+use common::{assert_all_reconciled, balance, ck, TestUser};
 /// 透過 API 建清單（registry）；extra 會合併進 body。回傳 (wishlist_id, slug)
 async fn mk_list(pool: &PgPool, tok: &str, extra: Value) -> (Uuid, String) {
     let mut b = json!({ "type": "registry", "title": "寶寶清單", "show_claimer_names": true });
@@ -63,25 +54,12 @@ async fn publish(pool: &PgPool, tok: &str, wid: Uuid) {
 
 /// 營運發點到某使用者錢包（直接走 points::post）
 async fn grant(pool: &PgPool, user: Uuid, n: i64) -> Uuid {
-    let mut tx = pool.begin().await.unwrap();
-    let w = points::ensure_wallet(&mut tx, user).await.unwrap();
-    points::lock_wallets(&mut tx, &[w]).await.unwrap();
-    points::post(
-        &mut tx,
-        w,
-        n,
-        points::Entry {
-            kind: "grant",
-            ref_type: "manual",
-            ref_id: None,
-            note: Some("測試"),
-            actor: None,
-        },
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
-    w
+    common::grant(pool, user, n).await;
+    sqlx::query_scalar("SELECT id FROM point_wallets WHERE user_id=$1")
+        .bind(user)
+        .fetch_one(pool)
+        .await
+        .unwrap()
 }
 
 /// 模擬一筆認捐（認捐 API 的效果）：發點 → 扣點 → INSERT contribution → 累加 pledged_points；剛好達標則 funded + capture_and_order
@@ -115,24 +93,7 @@ async fn pledge(pool: &PgPool, item: Uuid, user: Uuid, n: i64, anon: bool) -> Uu
     cid
 }
 
-async fn balance(pool: &PgPool, user: Uuid) -> i64 {
-    sqlx::query_scalar(
-        "SELECT coalesce(sum(balance), 0)::bigint FROM point_wallets WHERE user_id = $1",
-    )
-    .bind(user)
-    .fetch_one(pool)
-    .await
-    .unwrap()
-}
-
 /// 對帳不變式：每個錢包 balance = Σ ledger.delta
-async fn assert_reconciled(pool: &PgPool) {
-    let bad: Vec<(Uuid, i64, i64)> = sqlx::query_as(
-        "SELECT w.id, w.balance, coalesce(sum(l.delta), 0)::bigint FROM point_wallets w LEFT JOIN point_ledger l ON l.wallet_id = w.id GROUP BY w.id HAVING w.balance <> coalesce(sum(l.delta), 0)")
-        .fetch_all(pool).await.unwrap();
-    assert!(bad.is_empty(), "balance 與 ledger 加總不一致: {bad:?}");
-}
-
 async fn order_of(pool: &PgPool, item: Uuid) -> Uuid {
     sqlx::query_scalar("SELECT id FROM purchase_orders WHERE item_id = $1")
         .bind(item)
@@ -144,7 +105,7 @@ async fn order_of(pool: &PgPool, item: Uuid) -> Uuid {
 // ================= 建立眾籌品項 =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn create_crowdfund_item_rules(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     let path = format!("/wishlists/{wid}/items");
     let body = json!({ "title": "推車", "funding_mode": "crowdfund", "target_points": 5000, "funding_deadline": deadline() });
@@ -261,12 +222,13 @@ async fn create_crowdfund_item_rules(pool: PgPool) {
     let (_, _, b) = call(&pool, "GET", &format!("/wishlists/{wid}"), &ck(&t), None).await;
     assert_eq!(b["wishlist"]["has_shipping_address"], true);
     assert_eq!(b["items"][0]["target_points"], 5000);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn edit_rules_after_pledges(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
@@ -398,7 +360,7 @@ async fn edit_rules_after_pledges(pool: PgPool) {
     );
 
     // 達標後不可改 target / deadline
-    let (b_id, _) = user(&pool, "阿華", false).await;
+    let TestUser { id: b_id, token: _ } = common::user(&pool, "阿華").await;
     pledge(&pool, item, b_id, 1, false).await; // 401 = target
     let (s, _, b) = call(
         &pool,
@@ -437,12 +399,12 @@ async fn edit_rules_after_pledges(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["funding_status"], "funded");
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn publish_requires_shipping_address(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     cf_item(&pool, &t, wid, 1000).await;
@@ -474,13 +436,14 @@ async fn publish_requires_shipping_address(pool: PgPool) {
     );
     put_addr(&pool, &t, wid).await;
     publish(&pool, &t, wid).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 // ================= 收件資訊 =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn shipping_address_masked_and_encrypted(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (_, t2) = user(&pool, "路人", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: _, token: t2 } = common::user(&pool, "路人").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     let path = format!("/wishlists/{wid}/shipping-address");
 
@@ -555,15 +518,16 @@ async fn shipping_address_masked_and_encrypted(pool: PgPool) {
         call(&pool, "GET", &path, &[], None).await.0,
         StatusCode::UNAUTHORIZED
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 // ================= dashboard =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn dashboard_lists_contributors(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
-    let (b_, _) = user(&pool, "小華", false).await;
-    let (c, _) = user(&pool, "路人C", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    let TestUser { id: b_, token: _ } = common::user(&pool, "小華").await;
+    let TestUser { id: c, token: _ } = common::user(&pool, "路人C").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let open_item = cf_item(&pool, &t, wid, 1000).await;
@@ -674,7 +638,7 @@ async fn dashboard_lists_contributors(pool: PgPool) {
     assert_eq!(d["totals"]["completion_pct"], 50);
 
     // 非擁有者看不到
-    let (_, t2) = user(&pool, "別人", false).await;
+    let TestUser { id: _, token: t2 } = common::user(&pool, "別人").await;
     assert_eq!(
         call(
             &pool,
@@ -687,12 +651,13 @@ async fn dashboard_lists_contributors(pool: PgPool) {
         .0,
         StatusCode::NOT_FOUND
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn dashboard_and_orders_hide_everything_while_surprise_locked(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     let day = (Utc::now() + Duration::days(30))
         .format("%Y-%m-%d")
         .to_string();
@@ -761,13 +726,14 @@ async fn dashboard_and_orders_hide_everything_while_surprise_locked(pool: PgPool
         (403, Some("FORBIDDEN")),
         "{b}"
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn owner_orders_progress(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (_, s) = user(&pool, "營運", true).await;
-    let (a, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: _, token: s } = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 500).await;
@@ -821,15 +787,16 @@ async fn owner_orders_progress(pool: PgPool) {
         !o.to_string().contains("阿明") && !o.to_string().contains("和平東路"),
         "擁有者看不到捐贈者與收件人以外的資料"
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 // ================= 公開頁 =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn public_page_funding_fields_and_contributors(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
-    let (b_, _) = user(&pool, "小華", false).await;
-    let (c, _) = user(&pool, "路人C", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    let TestUser { id: b_, token: _ } = common::user(&pool, "小華").await;
+    let TestUser { id: c, token: _ } = common::user(&pool, "路人C").await;
     let (wid, slug) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
@@ -943,12 +910,13 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     .await;
     assert!(p["items"][0].get("contributors").is_none(), "{p}");
     assert_eq!(p["items"][0]["pledged_points"], 420);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn public_page_hides_contributors_while_surprise_locked(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     let day = (Utc::now() + Duration::days(30))
         .format("%Y-%m-%d")
         .to_string();
@@ -975,15 +943,16 @@ async fn public_page_hides_contributors_while_surprise_locked(pool: PgPool) {
         p["items"][0].get("contributors").is_none() && !p.to_string().contains("阿明"),
         "{p}"
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 // ================= 營運：採購單 =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn admin_order_placed_partial_refund_and_lifecycle(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (sid, s) = user(&pool, "營運", true).await;
-    let (a, _) = user(&pool, "阿明", false).await;
-    let (b_, _) = user(&pool, "小華", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: sid, token: s } = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    let TestUser { id: b_, token: _ } = common::user(&pool, "小華").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 7600).await;
@@ -1214,15 +1183,15 @@ async fn admin_order_placed_partial_refund_and_lifecycle(pool: PgPool) {
         .unwrap(),
         3
     );
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn admin_order_failed_refunds_everything(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (_, s) = user(&pool, "營運", true).await;
-    let (a, _) = user(&pool, "阿明", false).await;
-    let (b_, _) = user(&pool, "小華", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: _, token: s } = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    let TestUser { id: b_, token: _ } = common::user(&pool, "小華").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 7600).await;
@@ -1300,7 +1269,7 @@ async fn admin_order_failed_refunds_everything(pool: PgPool) {
         .unwrap(),
         2
     );
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 
     // 品項可再被認捐達標：重用同一張採購單（capture_and_order 的 upsert），pending 重新開始
     pledge(&pool, item, a, 7600, false).await;
@@ -1335,13 +1304,13 @@ async fn admin_order_failed_refunds_everything(pool: PgPool) {
     .unwrap();
     assert_eq!((ps, fs.as_str(), exp.is_some()), (0, "expired", true));
     assert_eq!(balance(&pool, a).await, 1600 + 7600);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn admin_endpoints_staff_only(pool: PgPool) {
-    let (_, t) = user(&pool, "一般人", false).await;
-    let (u, _) = user(&pool, "某人", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "一般人").await;
+    let TestUser { id: u, token: _ } = common::user(&pool, "某人").await;
     let id = Uuid::new_v4();
     let key = Uuid::new_v4().to_string();
     let cases: Vec<(&str, String, Option<Value>)> = vec![
@@ -1387,11 +1356,12 @@ async fn admin_endpoints_staff_only(pool: PgPool) {
         );
     }
     assert_eq!(balance(&pool, u).await, 0);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn admin_order_unknown_id_is_404(pool: PgPool) {
-    let (_, s) = user(&pool, "營運", true).await;
+    let TestUser { id: _, token: s } = common::staff(&pool, "營運").await;
     let (st, _, _) = call(
         &pool,
         "PATCH",
@@ -1401,13 +1371,14 @@ async fn admin_order_unknown_id_is_404(pool: PgPool) {
     )
     .await;
     assert_eq!(st, StatusCode::NOT_FOUND);
+    common::assert_all_reconciled(&pool).await;
 }
 
 // ================= 營運：錢包 =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn admin_wallet_grant_adjust_idempotent_freeze(pool: PgPool) {
-    let (sid, s) = user(&pool, "營運", true).await;
-    let (u, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: sid, token: s } = common::staff(&pool, "營運").await;
+    let TestUser { id: u, token: _ } = common::user(&pool, "阿明").await;
     let g = |pts: i64| json!({ "user_id": u, "points": pts, "reason": "活動贈點" });
 
     // 缺 Idempotency-Key
@@ -1475,7 +1446,7 @@ async fn admin_wallet_grant_adjust_idempotent_freeze(pool: PgPool) {
         &pool,
         "POST",
         "/admin/wallets/grants",
-        &idem(&s),
+        &[ck(&s), common::idem(Uuid::new_v4())].concat(),
         Some(g(-200)),
     )
     .await;
@@ -1492,7 +1463,7 @@ async fn admin_wallet_grant_adjust_idempotent_freeze(pool: PgPool) {
         &pool,
         "POST",
         "/admin/wallets/grants",
-        &idem(&s),
+        &[ck(&s), common::idem(Uuid::new_v4())].concat(),
         Some(g(-301)),
     )
     .await;
@@ -1512,7 +1483,14 @@ async fn admin_wallet_grant_adjust_idempotent_freeze(pool: PgPool) {
         json!({ "user_id": u, "points": 5, "reason": "" }),
         json!({ "points": 5, "reason": "x" }),
     ] {
-        let (st, _, b) = call(&pool, "POST", "/admin/wallets/grants", &idem(&s), Some(bad)).await;
+        let (st, _, b) = call(
+            &pool,
+            "POST",
+            "/admin/wallets/grants",
+            &[ck(&s), common::idem(Uuid::new_v4())].concat(),
+            Some(bad),
+        )
+        .await;
         assert_eq!(
             (st.as_u16(), b["code"].as_str()),
             (422, Some("VALIDATION_FAILED")),
@@ -1523,7 +1501,7 @@ async fn admin_wallet_grant_adjust_idempotent_freeze(pool: PgPool) {
         &pool,
         "POST",
         "/admin/wallets/grants",
-        &idem(&s),
+        &[ck(&s), common::idem(Uuid::new_v4())].concat(),
         Some(json!({ "user_id": Uuid::new_v4(), "points": 5, "reason": "x" })),
     )
     .await;
@@ -1641,15 +1619,15 @@ async fn admin_wallet_grant_adjust_idempotent_freeze(pool: PgPool) {
         .unwrap(),
         2
     );
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 // ================= 刪除品項 / 封存 / 帳號 =================
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn item_delete_force_releases_pledges(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
-    let (b_, _) = user(&pool, "小華", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    let TestUser { id: b_, token: _ } = common::user(&pool, "小華").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
@@ -1710,13 +1688,13 @@ async fn item_delete_force_releases_pledges(pool: PgPool) {
         );
     }
     assert_eq!(balance(&pool, a).await, 300);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn archiving_wishlist_releases_pledges(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
@@ -1732,15 +1710,15 @@ async fn archiving_wishlist_releases_pledges(pool: PgPool) {
             .unwrap(),
         0
     );
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_blocked_by_points(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (a, ta) = user(&pool, "阿明", false).await;
-    let (b_, tb) = user(&pool, "小華", false).await;
-    let (c, tc) = user(&pool, "路人C", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "阿明").await;
+    let TestUser { id: b_, token: tb } = common::user(&pool, "小華").await;
+    let TestUser { id: c, token: tc } = common::user(&pool, "路人C").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
@@ -1818,15 +1796,15 @@ async fn account_delete_blocked_by_points(pool: PgPool) {
     .await;
     assert_eq!(st, StatusCode::OK, "{b}");
     assert_eq!(balance(&pool, a).await, 300);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 // 分頁多查的那一筆只用來判斷 next_cursor，不可被解密或寫入 order.view_address
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn admin_orders_audit_only_returned_rows(pool: PgPool) {
-    let (_, t) = user(&pool, "媽媽", false).await;
-    let (sid, s) = user(&pool, "營運", true).await;
-    let (a, _) = user(&pool, "阿明", false).await;
+    let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
+    let TestUser { id: sid, token: s } = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     let (wid, _) = mk_list(&pool, &t, json!({})).await;
     put_addr(&pool, &t, wid).await;
     for _ in 0..3 {
@@ -1863,4 +1841,5 @@ async fn admin_orders_audit_only_returned_rows(pool: PgPool) {
     assert_eq!(p2["data"].as_array().unwrap().len(), 1);
     assert!(p2["next_cursor"].is_null());
     assert_eq!(audits().await, 3);
+    common::assert_all_reconciled(&pool).await;
 }
