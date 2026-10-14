@@ -13,7 +13,9 @@ const pubBusy = ref(false), pubErrs = ref<string[]>([])
 const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
-const meta = reactive<any>({ title: '', description: '', event_date: '', show_claimer_names: false, visibility: 'link', password: '' })
+// API 回 UTC ISO；datetime-local 要本地時間字串
+const toLocal = (iso?: string | null) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''
+const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'link', password: '' })
 const allowed = ref<string[]>([])
 let poll: any
 
@@ -22,7 +24,7 @@ async function load(quiet = false) {
   try {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
-    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, password: '' })
+    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocal(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, password: '' })
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
@@ -55,7 +57,7 @@ async function patchList(body: any, ok = '已儲存') {
 }
 async function saveMeta() {
   if (meta.visibility === 'password' && !meta.password && !w.value.has_password) { err.value = '請設定清單密碼（8–64 字）'; return }
-  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, show_claimer_names: meta.show_claimer_names, visibility: meta.visibility }
+  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: meta.closes_at ? new Date(meta.closes_at).toISOString() : null, show_claimer_names: meta.show_claimer_names, visibility: meta.visibility }
   if (meta.visibility === 'password' && meta.password) body.access_password = meta.password
   if (!await patchList(body)) return
   meta.password = ''
@@ -144,6 +146,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <label class="c-field"><span>清單名稱</span><input v-model="meta.title" maxlength="100" required></label>
           <label class="c-field"><span>說明</span><textarea v-model="meta.description" rows="2" /></label>
           <label class="c-field"><span>活動日</span><input v-model="meta.event_date" type="date"></label>
+          <label class="c-field"><span>自動結束時間（選填，留空＝不設期限）</span><input v-model="meta.closes_at" type="datetime-local"></label>
           <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>顯示認領者暱稱給其他訪客</span></label>
           <CreatorVisibilityPicker v-model:visibility="meta.visibility" v-model:password="meta.password" v-model:users="allowed" :has-password="w.has_password" />
           <p class="c-mute">驚喜模式：{{ w.surprise_mode ? (w.surprise_locked ? '開啟中（鎖定至活動日，無法關閉）' : '開啟中（已解鎖）') : '未開啟' }}</p>

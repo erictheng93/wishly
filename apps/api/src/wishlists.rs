@@ -94,13 +94,13 @@ struct W {
     id: Uuid, ty: String, status: String, visibility: String, slug: String, title: String, description: Option<String>,
     cover_image_key: Option<String>, cover_image_status: String, event_date: Option<NaiveDate>, show_claimer_names: bool,
     surprise_mode: bool, has_password: bool, surprise_locked: bool, claim_ttl_hours: Option<i32>, moderation_status: String,
-    moderation_reason: Option<String>, moderated_at: Option<DateTime<Utc>>, created_at: DateTime<Utc>, updated_at: DateTime<Utc>,
+    moderation_reason: Option<String>, moderated_at: Option<DateTime<Utc>>, closes_at: Option<DateTime<Utc>>, created_at: DateTime<Utc>, updated_at: DateTime<Utc>,
     has_shipping_address: bool,
 }
 const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
   cover_image_key, cover_image_status::text AS cover_image_status, event_date, show_claimer_names, surprise_mode, (access_password_hash IS NOT NULL) AS has_password,
   (surprise_mode AND event_date IS NOT NULL AND now() < (event_date::timestamp AT TIME ZONE 'Asia/Taipei')) AS surprise_locked,
-  claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, created_at, updated_at,
+  claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, closes_at, created_at, updated_at,
   EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address";
 
 impl W {
@@ -113,7 +113,7 @@ impl W {
             "cover_image_status": self.cover_image_status, "event_date": self.event_date,
             "show_claimer_names": self.show_claimer_names, "surprise_mode": self.surprise_mode, "surprise_locked": self.surprise_locked, "has_password": self.has_password,
             "claim_ttl_hours": self.claim_ttl_hours, "moderation_status": self.moderation_status,
-            "moderation_reason": self.moderation_reason, "moderated_at": self.moderated_at,
+            "moderation_reason": self.moderation_reason, "moderated_at": self.moderated_at, "closes_at": self.closes_at,
             "has_shipping_address": self.has_shipping_address, "org_id": null, "location": null, "address": null, "site_status": null,
             "share_url": format!("{}/s/{}", app_url(), self.slug), "created_at": self.created_at, "updated_at": self.updated_at,
         })
@@ -189,6 +189,19 @@ fn date(m: &Map<String, Value>, k: &str) -> R<Option<Option<NaiveDate>>> {
         _ => Err(AppError::invalid(&format!("/{k}"), "TYPE", "日期格式須為 YYYY-MM-DD")),
     }
 }
+/// closes_at：RFC 3339 時間或 null（不設期限）；設定時須在未來
+fn closes_at(m: &Map<String, Value>) -> R<Option<Option<DateTime<Utc>>>> {
+    match m.get("closes_at") {
+        None => Ok(None),
+        Some(Value::Null) => Ok(Some(None)),
+        Some(Value::String(s)) => {
+            let t: DateTime<Utc> = s.parse().map_err(|_| AppError::invalid("/closes_at", "FORMAT", "closes_at 須為 RFC 3339 時間"))?;
+            if t <= Utc::now() { return Err(AppError::invalid("/closes_at", "RANGE", "結束時間須在現在之後")); }
+            Ok(Some(Some(t)))
+        }
+        _ => Err(AppError::invalid("/closes_at", "TYPE", "closes_at 須為字串或 null")),
+    }
+}
 /// 圖片 key：須為 uploads 發出的格式，且前綴符合用途
 fn image_key(m: &Map<String, Value>, k: &str, dir: &str) -> R<Option<Option<String>>> {
     Ok(match text(m, k, 0, 200)? {
@@ -212,12 +225,13 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     let names = boolean(m, "show_claimer_names")?.unwrap_or(false);
     let surprise = boolean(m, "surprise_mode")?.unwrap_or(false);
     let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.flatten();
+    let closes = closes_at(m)?.flatten();
     if surprise && !event.is_some_and(|d| d > today_tw()) { return Err(AppError::invalid("/event_date", "REQUIRED", "驚喜模式需填寫未來的活動日期")); }
     for _ in 0..5 {
         let r = sqlx::query_scalar::<_, Uuid>(
-            "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, access_password_hash)
-             VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12) RETURNING id")
-            .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(&pw_hash)
+            "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, access_password_hash, closes_at)
+             VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12,$13) RETURNING id")
+            .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(&pw_hash).bind(closes)
             .fetch_one(&st.pool).await;
         match r {
             Ok(id) => {
@@ -340,6 +354,7 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
     };
     if let Some(v) = boolean(m, "show_claimer_names")? { w.show_claimer_names = v; }
     if let Some(v) = int(m, "claim_ttl_hours", 1, 24 * 365)? { w.claim_ttl_hours = v.map(|t| t as i32); }
+    if let Some(v) = closes_at(m)? { w.closes_at = v; }
     if let Some(v) = boolean(m, "surprise_mode")? {
         if !v && w.surprise_locked { return Err(forbidden("驚喜鎖定期間不可關閉驚喜模式")); }
         w.surprise_mode = v;
@@ -368,20 +383,34 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
         }
         w.status = new.into();
     }
+    // 重開 / 發佈時不可留著已過的結束時間，否則下個 tick 又被關掉
+    if w.status == "active" && w.closes_at.is_some_and(|t| t <= Utc::now()) {
+        return Err(AppError::invalid("/closes_at", "RANGE", "結束時間已過，請延後或清除後再開啟"));
+    }
     let mut tx = st.pool.begin().await?;
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
-                 show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status,
+                 show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$15,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
                  access_password_hash = CASE WHEN $13 THEN $14 ELSE access_password_hash END
                  WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12)")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
-        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(pw_hash.is_some()).bind(pw_hash.flatten()).execute(&mut *tx).await?;
+        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(pw_hash.is_some()).bind(pw_hash.flatten()).bind(w.closes_at).execute(&mut *tx).await?;
     if res.rows_affected() == 0 { return Err(stale()); }
     if w.status == "archived" { release_pledged(&mut tx, &[id]).await?; }
     tx.commit().await?;
     // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
     if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) { crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]); }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
+}
+
+/// closes_at 到期 → active 轉 closed（同手動關閉；冪等，多實例安全）。認領 / 認捐路徑另外即時檢查 closes_at，這裡只負責狀態與快取。
+pub async fn close_due(pool: &PgPool) -> Result<usize, sqlx::Error> {
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
+        "UPDATE wishlists SET status = 'closed', closed_at = now()
+         WHERE status = 'active' AND closes_at <= now() RETURNING id, slug::text").fetch_all(pool).await?;
+    for (id, _) in &rows { crate::dashboard::notify(pool, *id).await?; }
+    if !rows.is_empty() { crate::cdn::purge_wishlists(rows.iter().map(|r| r.1.trim().to_string()).collect()); } // 公開快取副本的 status 要更新
+    Ok(rows.len())
 }
 
 async fn archive(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>) -> R<StatusCode> {

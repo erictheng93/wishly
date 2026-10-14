@@ -186,7 +186,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <img v-if="data.cover_image_url" :src="data.cover_image_url" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
       <p class="g-mute">
-        <template v-if="data.event_date">日期 {{ data.event_date }}・</template>由 {{ data.owner.display_name }} 建立
+        <template v-if="data.event_date">日期 {{ data.event_date }}・</template><template v-if="data.closes_at && data.status === 'active'">{{ new Date(data.closes_at).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }) }} 結束・</template>由 {{ data.owner.display_name }} 建立
       </p>
       <p v-if="data.description">{{ data.description }}</p>
       <div v-if="masked" class="g-banner">你正以建立者身分瀏覽，解鎖前不顯示各品項進度。</div>

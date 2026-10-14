@@ -133,3 +133,32 @@ async fn optimistic_concurrency(pool: PgPool) {
     assert_eq!((s.as_u16(), b["code"].as_str()), (409, Some("STALE_VERSION")), "{b}");
 }
 
+
+/// closes_at：預設不設期限；設了之後到期即擋認領、sweep 轉 closed；過去時間不可設、不可帶著過期值重開
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn closes_at_is_optional_and_enforced(pool: PgPool) {
+    let (o, t) = user(&pool, false).await;
+    let (wid, item) = list(&pool, o, false, 30).await;
+    let uri = format!("/wishlists/{wid}");
+    let (_, _, b) = call(&pool, "GET", &uri, &ck(&t), None).await;
+    assert!(b["wishlist"]["closes_at"].is_null(), "預設不設期限");
+
+    let (s, _, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "closes_at": "2000-01-01T00:00:00Z" }))).await;
+    assert_eq!((s.as_u16(), b["errors"][0]["pointer"].as_str()), (422, Some("/closes_at")), "{b}");
+    let (s, _, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "closes_at": "2999-01-01T00:00:00Z" }))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["closes_at"], "2999-01-01T00:00:00Z");
+
+    // 繞過 API 把期限改成過去：認領立即被擋（不等 sweep），sweep 後轉 closed 並可由創建者重開
+    sqlx::query("UPDATE wishlists SET closes_at = now() - interval '1 minute' WHERE id = $1").bind(wid).execute(&pool).await.unwrap();
+    let (s, _, b) = call(&pool, "POST", &format!("/items/{item}/claims"), &[("idempotency-key", Uuid::new_v4().to_string())],
+        Some(json!({ "qty": 1, "display_name": "小明" }))).await;
+    assert_eq!((s.as_u16(), b["code"].as_str()), (409, Some("WISHLIST_CLOSED")), "{b}");
+    assert_eq!(wishsync_api::wishlists::close_due(&pool).await.unwrap(), 1);
+    let (_, _, b) = call(&pool, "GET", &uri, &ck(&t), None).await;
+    assert_eq!(b["wishlist"]["status"], "closed");
+    let (s, _, _) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "status": "active" }))).await;
+    assert_eq!(s.as_u16(), 422, "過期的 closes_at 不可直接重開");
+    let (s, _, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "status": "active", "closes_at": null }))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+}

@@ -180,7 +180,7 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
         "UPDATE wishlist_items i SET qty_claimed = i.qty_claimed + $2
          FROM wishlists w
          WHERE i.id = $1 AND w.id = i.wishlist_id
-           AND w.status = 'active' AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.visibility <> 'private'
+           AND w.status = 'active' AND (w.closes_at IS NULL OR w.closes_at > now()) AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.visibility <> 'private'
            AND i.deleted_at IS NULL AND i.funding_mode = 'quantity' AND i.qty_claimed + $2 <= i.qty_needed
          RETURNING i.qty_needed, i.qty_claimed, w.claim_ttl_hours")
         .bind(item_id).bind(req.qty).fetch_optional(&mut *tx).await?;
@@ -247,7 +247,7 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
 /// 4.1 (d)：失敗歸因（rollback 後獨立查詢）
 async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, AppError> {
     let r: Option<(bool, String, String, String, String, i32)> = sqlx::query_as(
-        "SELECT (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), w.status::text, w.visibility::text, w.moderation_status::text,
+        "SELECT (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), CASE WHEN w.status = 'active' AND w.closes_at <= now() THEN 'closed' ELSE w.status::text END, w.visibility::text, w.moderation_status::text,
                 i.funding_mode::text, i.qty_needed - i.qty_claimed
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id WHERE i.id = $1")
         .bind(item_id).fetch_optional(&st.pool).await?;

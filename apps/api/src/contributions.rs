@@ -112,7 +112,7 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, user: Cur
     let wl: Option<Uuid> = sqlx::query_scalar("SELECT wishlist_id FROM wishlist_items WHERE id = $1 AND deleted_at IS NULL").bind(item_id).fetch_optional(&mut *tx).await?;
     let locked: Option<Uuid> = match wl {
         Some(w) => sqlx::query_scalar(
-            "SELECT id FROM wishlists WHERE id = $1 AND status = 'active' AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
+            "SELECT id FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
             .bind(w).fetch_optional(&mut *tx).await?,
         None => None,
     };

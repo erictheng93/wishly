@@ -42,7 +42,7 @@ pub fn image_url(key: Option<&str>, status: &str) -> Option<String> {
 struct W {
     id: Uuid, slug: String, r#type: String, status: String, visibility: String, moderation: String,
     title: String, description: Option<String>, cover_image_key: Option<String>, cover_image_status: String,
-    event_date: Option<NaiveDate>, show_claimer_names: bool, surprise_mode: bool,
+    event_date: Option<NaiveDate>, closes_at: Option<DateTime<Utc>>, show_claimer_names: bool, surprise_mode: bool,
     owner_id: Uuid, owner_name: String, pw_hash: Option<String>, locked: bool, updated_at: DateTime<Utc>,
 }
 
@@ -74,7 +74,7 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
     let w: W = sqlx::query_as(
         "SELECT w.id, w.slug::text AS slug, w.type::text AS type, w.status::text AS status, w.visibility::text AS visibility,
                 w.moderation_status::text AS moderation, w.title, w.description, w.cover_image_key,
-                w.cover_image_status::text AS cover_image_status, w.event_date, w.show_claimer_names, w.surprise_mode,
+                w.cover_image_status::text AS cover_image_status, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
                 w.owner_id, u.display_name AS owner_name, w.access_password_hash AS pw_hash,
                 (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei'))) AS locked,
                 GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
@@ -167,7 +167,7 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
     let body = json!({
         "slug": w.slug, "visibility": w.visibility, "type": w.r#type, "status": w.status, "title": w.title, "description": w.description,
         "cover_image_url": image_url(w.cover_image_key.as_deref(), &w.cover_image_status),
-        "event_date": w.event_date, "id": w.id,
+        "event_date": w.event_date, "closes_at": w.closes_at, "id": w.id,
         "owner": { "id": w.owner_id, "display_name": w.owner_name },
         "surprise_mode": w.surprise_mode, "claimers_visible": visible,
         "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
