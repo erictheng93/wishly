@@ -8,6 +8,7 @@ use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_anonymizes(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let TestUser {
         id: uid,
         token: tok,
@@ -102,5 +103,105 @@ async fn account_delete_anonymizes(pool: PgPool) {
         call(&pool, "GET", "/admin/stats", &ck(&tok), None).await.0,
         StatusCode::UNAUTHORIZED
     );
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn account_delete_purges_public_lists_after_commit(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let owner = user(&pool, "Owner").await;
+    let other = user(&pool, "Other").await;
+    let public = wishlist(
+        &pool,
+        owner.id,
+        ListOpts {
+            visibility: Some("public"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let link = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let unaffected = wishlist(
+        &pool,
+        other.id,
+        ListOpts {
+            visibility: Some("public"),
+            ..Default::default()
+        },
+    )
+    .await;
+    for list in [&public, &link, &unaffected] {
+        item(&pool, list.id, "Visible item", 1).await;
+        let (status, _, body) = call(
+            &pool,
+            "GET",
+            &format!("/public/wishlists/{}", list.slug),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["status"], "active");
+    }
+    let (status, _, body) = call(
+        &pool,
+        "DELETE",
+        "/me",
+        &ck(&owner.token),
+        Some(json!({"confirm":"DELETE"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["deleted"], true);
+    let purge = cdn.wait_for(&public.slug).await;
+    assert_eq!(purge.authorization, "Bearer test-purge-token");
+    let mut urls: Vec<String> = serde_json::from_value(purge.body["files"].clone()).unwrap();
+    urls.sort();
+    let mut expected = vec![
+        common::cdn::public_url(&public.slug),
+        common::cdn::public_url(&link.slug),
+    ];
+    expected.sort();
+    assert_eq!(urls, expected);
+    assert!(cdn.requests_for(&unaffected.slug).is_empty());
+    for list in [&public, &link] {
+        let state: (String, String) =
+            sqlx::query_as("SELECT status::text,visibility::text FROM wishlists WHERE id=$1")
+                .bind(list.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(state, ("archived".into(), "private".into()));
+        let (status, _, body) = call(
+            &pool,
+            "GET",
+            &format!("/public/wishlists/{}", list.slug),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    }
+    assert!(sqlx::query_scalar::<_, bool>(
+        "SELECT deleted_at IS NOT NULL AND anonymized_at IS NOT NULL FROM users WHERE id=$1"
+    )
+    .bind(owner.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap());
+    assert_eq!(
+        call(&pool, "GET", "/me", &ck(&owner.token), None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let (status, _, body) = call(
+        &pool,
+        "GET",
+        &format!("/public/wishlists/{}", unaffected.slug),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["status"], "active");
     assert_all_reconciled(&pool).await;
 }

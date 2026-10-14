@@ -7,9 +7,10 @@ use http_body_util::BodyExt;
 use sqlx::PgPool;
 use tower::ServiceExt;
 
-/// 回傳 (user_id, session token)
 use common::*;
 
+// dashboard::BUS 是 process-wide OnceCell，只監聽第一次成功初始化的 pool，關閉後也不會重綁。
+// 此 integration-test binary 的所有 SSE 測試必須共用同一 pool；勿新增使用另一個 sqlx::test pool 的 SSE 測試。
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
     let TestUser {

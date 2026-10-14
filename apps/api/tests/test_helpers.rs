@@ -88,7 +88,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
     assert!(
         tokio::spawn(async move { assert_claims_reconciled(&check).await })
             .await
-            .unwrap_err()
+            .expect_err("claims reconciliation accepted a drifted cache")
             .is_panic()
     );
     sqlx::query("UPDATE wishlist_items SET qty_claimed=0 WHERE id=$1")
@@ -137,7 +137,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
     assert!(
         tokio::spawn(async move { assert_points_reconciled(&check).await })
             .await
-            .unwrap_err()
+            .expect_err("wallet reconciliation accepted a drifted balance")
             .is_panic()
     );
     sqlx::query("UPDATE point_wallets SET balance=70 WHERE user_id=$1")
@@ -154,7 +154,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
     assert!(
         tokio::spawn(async move { assert_points_reconciled(&check).await })
             .await
-            .unwrap_err()
+            .expect_err("contribution reconciliation accepted a drifted cache")
             .is_panic()
     );
     sqlx::query("UPDATE wishlist_items SET pledged_points=30 WHERE id=$1")

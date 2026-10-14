@@ -1,6 +1,8 @@
 //! 共用測試 helper；此目錄不會被 Cargo 當成獨立測試 binary。
 #![allow(dead_code)] // 每個整合測試 binary 只使用部分 fixture。
 
+pub mod cdn;
+
 use axum::{
     body::Body,
     http::{HeaderMap, Request, StatusCode},
@@ -250,7 +252,7 @@ pub async fn assert_claims_reconciled(pool: &PgPool) {
     );
 }
 
-/// 上限只用於回報缺少事件；成功取決於 predicate，沒有固定 sleep。
+/// 成功取決於 predicate；5ms 間隔只降低輪詢負載，逾時上限只診斷缺少事件。
 pub async fn wait_until<F, Fut>(label: &str, mut ready: F)
 where
     F: FnMut() -> Fut,
@@ -258,7 +260,7 @@ where
 {
     tokio::time::timeout(Duration::from_secs(10), async {
         while !ready().await {
-            tokio::task::yield_now().await;
+            tokio::time::sleep(Duration::from_millis(5)).await;
         }
     })
     .await

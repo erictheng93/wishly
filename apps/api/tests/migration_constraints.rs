@@ -3,7 +3,15 @@ mod common;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-fn rejected(error: sqlx::Error, code: &str, constraint: Option<&str>) {
+fn rejected(
+    result: Result<sqlx::postgres::PgQueryResult, sqlx::Error>,
+    code: &str,
+    constraint: Option<&str>,
+) {
+    let error = result.expect_err(&format!(
+        "DB must reject SQLSTATE {code} constraint {}",
+        constraint.unwrap_or("unnamed")
+    ));
     let error = error.as_database_error().expect("database error");
     assert_eq!(error.code().as_deref(), Some(code));
     if let Some(name) = constraint {
@@ -21,15 +29,14 @@ async fn quantities_cannot_be_negative_zero_or_oversold(pool: PgPool) {
         (5, 6, "items_qty_claimed_range"),
     ] {
         rejected(sqlx::query("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,qty_claimed) VALUES ($1,'Invalid',$2,$3)")
-            .bind(wishlist).bind(needed).bind(claimed).execute(&pool).await.unwrap_err(), "23514", Some(constraint));
+            .bind(wishlist).bind(needed).bind(claimed).execute(&pool).await, "23514", Some(constraint));
     }
     let item: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,qty_claimed) VALUES ($1,'Valid',5,5) RETURNING id").bind(wishlist).fetch_one(&pool).await.unwrap();
     rejected(
         sqlx::query("UPDATE wishlist_items SET qty_needed=4 WHERE id=$1")
             .bind(item)
             .execute(&pool)
-            .await
-            .unwrap_err(),
+            .await,
         "23514",
         Some("items_qty_claimed_range"),
     );
@@ -63,8 +70,7 @@ async fn wallet_and_ledger_enforce_nonnegative_balance_and_append_only(pool: PgP
         sqlx::query("INSERT INTO point_wallets(user_id,balance) VALUES ($1,-1)")
             .bind(user)
             .execute(&pool)
-            .await
-            .unwrap_err(),
+            .await,
         "23514",
         Some("point_wallets_balance_nonneg"),
     );
@@ -80,25 +86,20 @@ async fn wallet_and_ledger_enforce_nonnegative_balance_and_append_only(pool: PgP
         sqlx::query("UPDATE point_wallets SET balance=-1 WHERE id=$1")
             .bind(wallet)
             .execute(&pool)
-            .await
-            .unwrap_err(),
+            .await,
         "23514",
         Some("point_wallets_balance_nonneg"),
     );
     for (delta, balance) in [(0i64, 100i64), (-101, -1)] {
         rejected(sqlx::query("INSERT INTO point_ledger(wallet_id,delta,balance_after,entry_type) VALUES ($1,$2,$3,'adjustment')")
-            .bind(wallet).bind(delta).bind(balance).execute(&pool).await.unwrap_err(), "23514", None);
+            .bind(wallet).bind(delta).bind(balance).execute(&pool).await, "23514", None);
     }
     for statement in [
         "UPDATE point_ledger SET delta=99 WHERE id=$1",
         "DELETE FROM point_ledger WHERE id=$1",
     ] {
         rejected(
-            sqlx::query(statement)
-                .bind(ledger)
-                .execute(&pool)
-                .await
-                .unwrap_err(),
+            sqlx::query(statement).bind(ledger).execute(&pool).await,
             "23001",
             None,
         );
@@ -141,8 +142,7 @@ async fn crowdfunding_checks_reject_invalid_money_and_lifecycle_shapes(pool: PgP
             ))
             .bind(item)
             .execute(&pool)
-            .await
-            .unwrap_err(),
+            .await,
             "23514",
             Some(constraint),
         );

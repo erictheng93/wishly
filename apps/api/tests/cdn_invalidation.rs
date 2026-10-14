@@ -1,39 +1,13 @@
 //! Privacy changes must invalidate the actual cached public URL, after the DB commits.
 mod common;
-use axum::{
-    http::{HeaderMap, StatusCode},
-    routing::post,
-    Json, Router,
-};
+use axum::http::StatusCode;
 use common::{call, ck, staff, user, wishlist, ListOpts, TestList, TestUser};
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
-use std::time::Duration;
-use tokio::sync::mpsc;
-use wishsync_api::config::Config;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
-    let (send, mut received) = mpsc::unbounded_channel();
-    let mock = Router::new().route(
-        "/zones/zone1/purge_cache",
-        post(move |headers: HeaderMap, Json(body): Json<Value>| {
-            let send = send.clone();
-            async move {
-                send.send((headers["authorization"].to_str().unwrap().to_owned(), body))
-                    .unwrap();
-                Json(json!({"success":true}))
-            }
-        }),
-    );
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let mut cfg = Config::dev();
-    cfg.cf_api_base = format!("http://{}", listener.local_addr().unwrap());
-    cfg.cf_zone_id = Some("zone1".into());
-    cfg.cf_purge_token = Some("test-purge-token".into());
-    cfg.api_base_url = "https://api.example.test".into();
-    wishsync_api::config::init(cfg);
-    let server = tokio::spawn(async move { axum::serve(listener, mock).await.unwrap() });
+    let cdn = common::cdn::init();
     let TestUser { id: owner, token } = user(&pool, "Owner").await;
     let TestUser {
         id: _,
@@ -101,15 +75,9 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         };
         let (status, _, response) = call(&pool, method, &uri, &ck(session), body).await;
         assert_eq!(status, expected, "{response}");
-        let (auth, purge) = tokio::time::timeout(Duration::from_secs(5), received.recv())
-            .await
-            .expect("privacy change did not purge CDN")
-            .unwrap();
-        assert_eq!(auth, "Bearer test-purge-token");
-        assert_eq!(
-            purge,
-            json!({"files":[format!("https://api.example.test/api/v1/public/wishlists/{slug}")]})
-        );
+        let purge = cdn.wait_for(slug).await;
+        assert_eq!(purge.authorization, "Bearer test-purge-token");
+        assert_eq!(purge.body, json!({"files":[common::cdn::public_url(slug)]}));
         let state: (String, String, String) = sqlx::query_as("SELECT visibility::text,status::text,moderation_status::text FROM wishlists WHERE id=$1").bind(id).fetch_one(&pool).await.unwrap();
         if id == privacy {
             assert_eq!(state.0, "private");
@@ -131,11 +99,11 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
             StatusCode::OK,
             "old public content still accessible: {public}"
         );
-        assert!(
-            received.try_recv().is_err(),
+        assert_eq!(
+            cdn.requests_for(slug).len(),
+            1,
             "one change unexpectedly sent multiple purges"
         );
     }
-    server.abort();
     common::assert_all_reconciled(&pool).await;
 }

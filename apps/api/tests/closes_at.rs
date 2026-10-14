@@ -44,6 +44,7 @@ async fn closing_notifs(pool: &PgPool) -> i64 {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn create_with_and_without_closes_at(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: _, token: t } = common::user(&pool, "u").await;
     let (s, _, b) = common::call(
         &pool,
@@ -91,6 +92,7 @@ async fn create_with_and_without_closes_at(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn patch_sets_clears_and_keeps_closes_at(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let wid = deadline_list(&pool, o, "active", "NULL").await;
     let uri = format!("/wishlists/{wid}");
@@ -128,6 +130,7 @@ async fn patch_sets_clears_and_keeps_closes_at(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn close_due_only_touches_active_and_expired(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
     let due = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
     let future = deadline_list(&pool, o, "active", "now() + interval '1 hour'").await;
@@ -151,6 +154,7 @@ async fn close_due_only_touches_active_and_expired(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reminder_sent_once_and_rearmed_on_change(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let soon = deadline_list(&pool, o, "active", "now() + interval '2 hours'").await;
     let far = deadline_list(&pool, o, "active", "now() + interval '3 days'").await;
@@ -219,6 +223,7 @@ fn closing_mail_renders_taipei_time() {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
     let ok = deadline_list(&pool, o, "active", "now() + interval '1 hour'").await;
     let late = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
@@ -257,6 +262,7 @@ async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
     let common::TestUser {
         id: donor,
@@ -313,6 +319,7 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn public_page_exposes_closes_at(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
     let wid = deadline_list(&pool, o, "active", "'2999-01-01T00:00:00Z'::timestamptz").await;
     sqlx::query(
@@ -342,6 +349,7 @@ async fn public_page_exposes_closes_at(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reopen_requires_future_or_cleared_closes_at(pool: PgPool) {
+    let _cdn = common::cdn::init();
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let wid = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
     wishlists::close_due(&pool).await.unwrap();
@@ -363,5 +371,113 @@ async fn reopen_requires_future_or_cleared_closes_at(pool: PgPool) {
     let (s, _, b) = common::call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "status": "active", "closes_at": (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339() }))).await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(status_of(&pool, wid).await, "active");
+    common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn close_due_purges_due_public_lists_and_keeps_future_lists_cached(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let owner = common::user(&pool, "Owner").await;
+    let public = common::wishlist(
+        &pool,
+        owner.id,
+        common::ListOpts {
+            visibility: Some("public"),
+            closes_in: Some("-1 minute"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let link = common::wishlist(
+        &pool,
+        owner.id,
+        common::ListOpts {
+            closes_in: Some("-1 minute"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let future = common::wishlist(
+        &pool,
+        owner.id,
+        common::ListOpts {
+            visibility: Some("public"),
+            closes_in: Some("1 hour"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let no_deadline = common::wishlist(
+        &pool,
+        owner.id,
+        common::ListOpts {
+            visibility: Some("public"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let draft = common::wishlist(
+        &pool,
+        owner.id,
+        common::ListOpts {
+            status: Some("draft"),
+            visibility: Some("public"),
+            closes_in: Some("-1 minute"),
+            ..Default::default()
+        },
+    )
+    .await;
+    assert_eq!(wishlists::close_due(&pool).await.unwrap(), 2);
+    let purge = cdn.wait_for(&public.slug).await;
+    assert_eq!(purge.authorization, "Bearer test-purge-token");
+    let mut urls: Vec<String> = serde_json::from_value(purge.body["files"].clone()).unwrap();
+    urls.sort();
+    let mut expected = vec![
+        common::cdn::public_url(&public.slug),
+        common::cdn::public_url(&link.slug),
+    ];
+    expected.sort();
+    assert_eq!(
+        urls, expected,
+        "only the two due active lists should be purged"
+    );
+    for (list, expected_status) in [
+        (&public, "closed"),
+        (&link, "closed"),
+        (&future, "active"),
+        (&no_deadline, "active"),
+        (&draft, "draft"),
+    ] {
+        let state: (String, bool) =
+            sqlx::query_as("SELECT status::text,closed_at IS NOT NULL FROM wishlists WHERE id=$1")
+                .bind(list.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(state, (expected_status.into(), expected_status == "closed"));
+        let (status, _, body) = common::call(
+            &pool,
+            "GET",
+            &format!("/public/wishlists/{}", list.slug),
+            &[],
+            None,
+        )
+        .await;
+        if expected_status == "draft" {
+            assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+        } else {
+            assert_eq!(status, StatusCode::OK, "{body}");
+            assert_eq!(body["status"], expected_status);
+        }
+        if expected_status != "closed" {
+            assert!(
+                cdn.requests_for(&list.slug).is_empty(),
+                "unexpired/draft list was purged"
+            );
+        }
+    }
+    assert_eq!(wishlists::close_due(&pool).await.unwrap(), 0);
+    assert_eq!(cdn.requests_for(&public.slug).len(), 1);
+    assert_eq!(cdn.requests_for(&link.slug).len(), 1);
     common::assert_all_reconciled(&pool).await;
 }
