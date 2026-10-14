@@ -171,3 +171,7 @@ scripts/mutate.sh all
 python3 scripts/test_mutate.py
 python3 scripts/test_coverage.py
 ```
+
+本輪可重播的程式碼提交為 `7234d2f`。從該提交完整重跑 26 案，全部 baseline exit 0 → mutant exit 101 → restored exit 0；receipt 的 HEAD 與原始／還原／提交內容 SHA 全數吻合。完整 [receipts](test-gap-evidence/residual-risk/mutations.json)、每案三份 log 與 patch 均保存在 [residual-risk](test-gap-evidence/residual-risk/)。
+
+最終 API 205／205、0 ignored，覆蓋率仍為 lines 91.289157%／functions 88.255034%／regions 87.156589%，counts 與原基準完全相同；新餘裕沒有用來掩蓋本輪覆蓋率下降。fmt／clippy 通過，runner unit 4／4、coverage policy unit 2／2；併發測試另以預設執行緒重跑五次，85／85 通過。API／native audit exit 0；實際新增 rustls advisory 的失敗與修補後輸出、advisory DB commit、npm 11 high／0 critical、版本與 GitHub PR 規則查核均另存同一證據目錄。

@@ -1,0 +1,11 @@
+--- a/apps/api/src/contributions.rs
++++ b/apps/api/src/contributions.rs
+@@ -517,7 +517,7 @@
+         return Err(not_allowed());
+     }
+     // 兩品項依 id 排序鎖定，再鎖認捐
+-    sqlx::query("SELECT id FROM wishlist_items WHERE id IN ($1, $2) ORDER BY id FOR UPDATE")
++    sqlx::query("SELECT id FROM wishlist_items WHERE id IN ($1, $2) ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END FOR UPDATE")
+         .bind(src)
+         .bind(tgt)
+         .execute(&mut *tx)

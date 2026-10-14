@@ -1,0 +1,11 @@
+--- a/db/migrations/0004_crowdfund.sql
++++ b/db/migrations/0004_crowdfund.sql
+@@ -43,7 +43,7 @@
+   status      wallet_status NOT NULL DEFAULT 'active',   -- frozen → 認捐回 403 WALLET_FROZEN
+   created_at  timestamptz   NOT NULL DEFAULT now(),
+   updated_at  timestamptz   NOT NULL DEFAULT now(),
+-  CONSTRAINT point_wallets_balance_nonneg CHECK (balance >= 0)
++  CONSTRAINT point_wallets_balance_nonneg CHECK (true)
+ );
+ 
+ CREATE TABLE point_ledger (

@@ -1,0 +1,55 @@
+{
+  "replay_commit": "7234d2f7c9c163a88a18cc6a8c9122381ab6539e",
+  "api_tests": {
+    "passed": 205,
+    "failed": 0,
+    "ignored": 0
+  },
+  "coverage_gate_exit": 0,
+  "coverage_totals": {
+    "branches": {
+      "count": 0,
+      "covered": 0,
+      "notcovered": 0,
+      "percent": 0
+    },
+    "functions": {
+      "count": 894,
+      "covered": 789,
+      "percent": 88.25503355704699
+    },
+    "instantiations": {
+      "count": 1789,
+      "covered": 858,
+      "percent": 47.95975405254332
+    },
+    "lines": {
+      "count": 8300,
+      "covered": 7577,
+      "percent": 91.28915662650603
+    },
+    "mcdc": {
+      "count": 0,
+      "covered": 0,
+      "notcovered": 0,
+      "percent": 0
+    },
+    "regions": {
+      "count": 14669,
+      "covered": 12785,
+      "notcovered": 1884,
+      "percent": 87.1565887245211
+    }
+  },
+  "fmt_exit": 0,
+  "clippy_exit": 0,
+  "mutation_runner_exit": 0,
+  "mutations_killed": 26,
+  "runner_unit_tests": 4,
+  "coverage_policy_unit_tests": 2,
+  "concurrency_repeat_passed": 85,
+  "ci_config_check_exit": 0,
+  "git_diff_check_exit": 0,
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "cargo_llvm_cov": "cargo-llvm-cov 0.9.1"
+}

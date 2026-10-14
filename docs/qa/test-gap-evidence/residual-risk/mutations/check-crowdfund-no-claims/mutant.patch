@@ -1,0 +1,11 @@
+--- a/db/migrations/0004_crowdfund.sql
++++ b/db/migrations/0004_crowdfund.sql
+@@ -28,7 +28,7 @@
+       target_points IS NULL AND pledged_points = 0 AND funding_status IS NULL AND funding_deadline IS NULL
+       AND fulfillment_type IS NULL AND price_snapshot_amount IS NULL AND expired_at IS NULL)),
+   ADD CONSTRAINT items_expired_has_time    CHECK ((funding_status = 'expired') = (expired_at IS NOT NULL) OR funding_status IS NULL),
+-  ADD CONSTRAINT items_crowdfund_no_claims CHECK (funding_mode <> 'crowdfund' OR qty_claimed = 0),
++  ADD CONSTRAINT items_crowdfund_no_claims CHECK (true),
+   -- 硬上限：絕不超額
+   ADD CONSTRAINT items_pledged_le_target   CHECK (target_points IS NULL OR pledged_points <= target_points),
+   ADD CONSTRAINT items_funded_is_full      CHECK (funding_status IS NULL OR funding_status NOT IN ('funded', 'fulfilled') OR pledged_points = target_points);
