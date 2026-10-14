@@ -1,0 +1,47 @@
+
+ RUN  v5.0.3 /Users/eric/Documents/Code/Wishlist/apps/web
+
+ ❯ tests/reportSheet.test.ts (10 tests | 1 failed | 9 skipped) 15ms
+   × report refuses an unverified form even when submission bypasses its disabled button 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/reportSheet.test.ts > report refuses an unverified form even when submission bypasses its disabled button
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/public/wishlists/public-list/reports",
+      Object {
+        "body": Object {
+          "detail": "疑似詐騙",
+          "item_id": null,
+          "reason": "scam",
+          "turnstile_token": "",
+        },
+        "method": "POST",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ tests/reportSheet.test.ts:42:19
+     40|   await input(el, '#rd', '疑似詐騙')
+     41|   await submit(el)
+     42|   expect(api).not.toHaveBeenCalled()
+       |                   ^
+     43|   expect(sent).not.toHaveBeenCalled()
+     44|   expect(el.querySelector('[role="alert"]')?.textContent).toContain('請…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  00:58:37
+   Duration  237ms (environment 45%, transform 29%, import 16%, tests 8%, worker 1%)
+

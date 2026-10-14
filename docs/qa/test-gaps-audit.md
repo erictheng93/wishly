@@ -175,3 +175,20 @@ python3 scripts/test_coverage.py
 本輪可重播的程式碼提交為 `7234d2f`。從該提交完整重跑 26 案，全部 baseline exit 0 → mutant exit 101 → restored exit 0；receipt 的 HEAD 與原始／還原／提交內容 SHA 全數吻合。完整 [receipts](test-gap-evidence/residual-risk/mutations.json)、每案三份 log 與 patch 均保存在 [residual-risk](test-gap-evidence/residual-risk/)。
 
 最終 API 205／205、0 ignored，覆蓋率仍為 lines 91.289157%／functions 88.255034%／regions 87.156589%，counts 與原基準完全相同；新餘裕沒有用來掩蓋本輪覆蓋率下降。fmt／clippy 通過，runner unit 4／4、coverage policy unit 2／2；併發測試另以預設執行緒重跑五次，85／85 通過。API／native audit exit 0；實際新增 rustls advisory 的失敗與修補後輸出、advisory DB commit、npm 11 high／0 critical、版本與 GitHub PR 規則查核均另存同一證據目錄。
+
+
+## 後續建議核對與行為回歸
+
+本輪程式碼提交為 `e6e83e8`。P1 五個併發 mutant 已於 `7234d2f` 納入，registry 是 26 案。`wait_until` 的 5ms 輪詢間隔、SSE 首個 pool 的註解及 API 覆蓋率 0.5pp 餘裕也已存在。README 再補明刪除已覆蓋程式碼可能讓比例低於門檻，需重測並同步 baseline。
+
+`deleted_item_stats.rs` 新增實際 HTTP 回歸：先建立 delivered qty=2 品項及 live qty=1／needed=4 正向控制，force delete 後核對 soft delete、保留 delivered claim／cached qty=2、所有 DB 不變式；dashboard 的有效品項／數量／完成率及 /me/export 都只含 live 品項。移除兩個 deleted_at 過濾條件各自造成明確 HTTP 數值斷言失敗；這兩案未加入標準 registry，另有重跑腳本。
+
+`/admin/stats` 沒有 qty_claimed 庫存加總，claims_by_status 是歷史筆數；`731adb1` 的查詢已如此，沒有因保留 delivered cache 而增加數量。本輪保留歷史口徑，測試核對 delivered=1／reserved=1、users／wishlists／active_wishlists 不變。若希望改成只計未刪品項，需明確變更這個統計口徑。
+
+新增 ReportSheet 10、ItemCard 12、GuestTop 1 個實際 DOM 元件測試。ReportSheet 使用後端真實的 403／FORBIDDEN ApiError 測 token 重設／輸入保留／重試；驗證未完成、pending、成功／rate limit、驗證過期／失敗與取消均涵蓋。快速同 tick 雙擊發現重複 HTTP，補一行 busy guard。驗證略過與 pending 提前清除的兩個 frontend mutant 也會被精確呼叫次數斷言抓到。
+
+前端 120／120，Node 22 typecheck 通過；全域覆蓋率 lines 62.92%、statements 60.56%、functions 59.83%、branches 59.81%。ReportSheet 分支 92.30%、ItemCard 分支 87.83%、GuestTop 全項 100%；未宣稱 Turnstile 所有載入生命週期及 ItemCard 所有備援顯示分支均已測。既有前端基準未調低。API 206／206、0 ignored，fmt／clippy／coverage gate 通過，API counts 與原基準仍完全相同。
+
+已建立公開上游追蹤 [issue #7](https://github.com/erictheng93/wishsync/issues/7)，保存 issue readback。npm 仍有 11 high／0 critical；上游修補前 web-audit 保持非 required，CI 每週重查。完整行為與 mutation 證據在 [behavior-followup](test-gap-evidence/behavior-followup/)。
+
+從 `e6e83e8` 再跑 `scripts/mutate.sh all`：26／26 killed，每案原始／還原／提交 source SHA 一致。兩個額外 deleted filter mutant 及兩個 ReportSheet mutant 亦有完整三階段 logs／patch／SHA；後者保存 real 403 fixture 的 test SHA，避免把修改前的錯誤 mock 當作本輪證據。額外 Rust 案例可用 `python3 docs/qa/test-gap-evidence/behavior-followup/deleted-stats/reproduce.py` 重跑（同樣需要 DATABASE_URL／APP_ENV）。

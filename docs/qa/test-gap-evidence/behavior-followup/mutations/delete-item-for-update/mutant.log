@@ -1,0 +1,21 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.76s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-4be6727502b163e7)
+
+running 1 test
+
+thread 'force_delete_vs_claim_update_uses_item_then_claim_lock_order' (7009420) panicked at tests/concurrency.rs:158:5:
+assertion `left == right` failed: item deletion without item lock caused a PostgreSQL deadlock: pg_stat_database.deadlocks 0 -> 1
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test force_delete_vs_claim_update_uses_item_then_claim_lock_order ... FAILED
+
+failures:
+
+failures:
+    force_delete_vs_claim_update_uses_item_then_claim_lock_order
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 1.98s
+
+error: test failed, to rerun pass `--test concurrency`

@@ -1,0 +1,11 @@
+--- a/apps/api/src/wishlists.rs
++++ b/apps/api/src/wishlists.rs
+@@ -563,7 +563,7 @@
+ }
+ 
+ async fn items_of(pool: &PgPool, wid: Uuid) -> R<Vec<I>> {
+-    Ok(sqlx::query_as(&format!("SELECT {ICOLS} FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL ORDER BY sort_order, id")).bind(wid).fetch_all(pool).await?)
++    Ok(sqlx::query_as(&format!("SELECT {ICOLS} FROM wishlist_items WHERE wishlist_id=$1  ORDER BY sort_order, id")).bind(wid).fetch_all(pool).await?)
+ }
+ 
+ async fn get_one(

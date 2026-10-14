@@ -1,0 +1,26 @@
+
+ RUN  v5.0.3 /Users/eric/Documents/Code/Wishlist/apps/web
+
+ ❯ tests/reportSheet.test.ts (10 tests | 1 failed | 9 skipped) 15ms
+   × report keeps one request pending across rapid submissions and emits sent only after success 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/reportSheet.test.ts > report keeps one request pending across rapid submissions and emits sent only after success
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+ ❯ tests/reportSheet.test.ts:59:15
+     57|   // Both clicks happen before Vue patches disabled: the handler must …
+     58|   button(el).click(); button(el).click(); await nextTick()
+     59|   expect(api).toHaveBeenCalledTimes(1)
+       |               ^
+     60|   expect(api).toHaveBeenCalledWith('/public/wishlists/public-list/repo…
+     61|     reason: 'personal_info', detail: '頁面公開了私人電話', item_id: null, turns…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  00:58:41
+   Duration  225ms (environment 46%, transform 29%, import 16%, tests 9%, worker 1%)
+

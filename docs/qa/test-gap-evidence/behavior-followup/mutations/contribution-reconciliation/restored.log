@@ -1,0 +1,19 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.50s
+     Running tests/test_helpers.rs (apps/api/target/debug/deps/test_helpers-0a6ba8ee6d925bed)
+
+running 1 test
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (7027942) panicked at tests/common/mod.rs:249:5:
+qty_claimed 與有效 claims 加總不一致: [(01a13b5b-852e-7854-bf0f-b1d5219ddb99, 4, 3)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (7027942) panicked at tests/common/mod.rs:154:5:
+錢包 balance 與 ledger 加總不一致: [01a13b5b-85a5-7a9f-ae41-62c4ab2fd0be]
+
+thread 'fixtures_preserve_options_quantities_and_reconcile_domain_state' (7027942) panicked at tests/common/mod.rs:157:5:
+item.pledged_points 漂移: [01a13b5b-85a9-7e8c-8475-870fa24592ba]
+test fixtures_preserve_options_quantities_and_reconcile_domain_state ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.13s
+

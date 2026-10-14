@@ -1,0 +1,11 @@
+--- a/db/migrations/0004_crowdfund.sql
++++ b/db/migrations/0004_crowdfund.sql
+@@ -19,7 +19,7 @@
+   ADD COLUMN fulfillment_type      fulfillment_type,
+   ADD COLUMN price_snapshot_amount bigint CHECK (price_snapshot_amount >= 0),
+   ADD COLUMN expired_at            timestamptz,                         -- 轉為 expired 的時間；7 天選擇期自此起算
+-  ADD CONSTRAINT items_points_nonneg       CHECK (pledged_points >= 0),
++  ADD CONSTRAINT items_points_nonneg       CHECK (true),
+   ADD CONSTRAINT items_crowdfund_shape     CHECK (funding_mode <> 'crowdfund' OR (
+       qty_needed = 1 AND target_points IS NOT NULL AND target_points > 0
+       AND fulfillment_type IS NOT NULL AND funding_status IS NOT NULL AND funding_deadline IS NOT NULL)),

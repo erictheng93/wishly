@@ -1,0 +1,11 @@
+--- a/apps/web/app/components/guest/ReportSheet.vue
++++ b/apps/web/app/components/guest/ReportSheet.vue
+@@ -39,7 +39,7 @@
+ async function submit() {
+   if (busy.value) return
+   if (!token.value) { msg.value = '請先完成驗證'; return }
+-  busy.value = true; msg.value = ''
++  busy.value = false; msg.value = ''
+   try {
+     await api(`/public/wishlists/${props.slug}/reports`, { method: 'POST', body: { reason: reason.value, detail: detail.value || null, item_id: null, turnstile_token: token.value } })
+     emit('sent')

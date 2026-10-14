@@ -1,0 +1,53 @@
+{
+  "replay_commit": "e6e83e8515e235d49881124a6f62821b283068de",
+  "api_tests": {
+    "passed": 206,
+    "failed": 0,
+    "ignored": 0
+  },
+  "web_tests": 120,
+  "web_coverage_totals": {
+    "lines": {
+      "total": 642,
+      "covered": 404,
+      "skipped": 0,
+      "pct": 62.92
+    },
+    "statements": {
+      "total": 1032,
+      "covered": 625,
+      "skipped": 0,
+      "pct": 60.56
+    },
+    "functions": {
+      "total": 239,
+      "covered": 143,
+      "skipped": 0,
+      "pct": 59.83
+    },
+    "branches": {
+      "total": 978,
+      "covered": 585,
+      "skipped": 0,
+      "pct": 59.81
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "rust_mutants_killed": 26,
+  "extra_deleted_filter_mutants_killed": 2,
+  "report_mutants_killed": 2,
+  "coverage_exit": 0,
+  "clippy_exit": 0,
+  "fmt_exit": 0,
+  "web_typecheck_exit": 0,
+  "source_restored": true,
+  "admin_stats_scope": "historical claim record counts; no qty_claimed inventory aggregate",
+  "issue_url": "https://github.com/erictheng93/wishsync/issues/7",
+  "web_build_exit": 0,
+  "deleted_stats_test_sha256": "bbdfd24baa6a68ab6ed8c90045b867ab0d61e1611ce1ccfa7183dc17f2499db9"
+}

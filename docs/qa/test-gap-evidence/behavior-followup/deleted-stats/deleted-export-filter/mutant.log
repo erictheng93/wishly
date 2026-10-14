@@ -1,0 +1,21 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.88s
+     Running tests/deleted_item_stats.rs (apps/api/target/debug/deps/deleted_item_stats-7c624ad289edae2c)
+
+running 1 test
+
+thread 'deleted_delivered_item_is_excluded_from_dashboard_and_export' (7033088) panicked at tests/deleted_item_stats.rs:101:5:
+assertion `left == right` failed: export included soft-deleted delivered item
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test deleted_delivered_item_is_excluded_from_dashboard_and_export ... FAILED
+
+failures:
+
+failures:
+    deleted_delivered_item_is_excluded_from_dashboard_and_export
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+error: test failed, to rerun pass `--test deleted_item_stats`
