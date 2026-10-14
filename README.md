@@ -77,7 +77,7 @@ CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit，以�
 
 ```sh
 cargo test --manifest-path apps/api/Cargo.toml    # 每個測試使用獨立資料庫（sqlx::test）
-cd apps/web && npm run typecheck && npm test && npm run build   # CI 的 web job 依序執行這三步
+cd apps/web && npm run typecheck && npm run test:coverage && npm run build   # CI 的 web job 依序執行這三步
 ```
 
 ### 端對端測試（Playwright）

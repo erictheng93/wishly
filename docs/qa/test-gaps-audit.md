@@ -2,7 +2,7 @@
 
 2026-10-14。以使用者提出的 17 項缺口為範圍；實作與驗證均在本機 PostGIS／Mailpit、Rust stable、Node 22 執行。沒有新增 DB migration。
 
-驗證結果：API 200／200（0 ignored）、前端 97／97、Tauri 2／2、目標瀏覽器旅程 3／3。API 覆蓋率門檻腳本、Rust fmt／clippy 與 Rust audit 通過；npm audit 仍由以下上游 advisory 阻擋。
+驗證結果：API 203／203（0 ignored；本次 helper 遷移新增 3 個測試）、前端 97／97、Tauri 2／2、目標瀏覽器旅程 3／3。API 覆蓋率門檻腳本、Rust fmt／clippy 與 Rust audit 通過；npm audit 仍由以下上游 advisory 阻擋。
 
 ## 缺口對照
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 1 同 Idempotency-Key | `apps/api/tests/concurrency.rs` | 第一筆確實阻塞於業務寫入，再送第二筆並確認它等待 idempotency INSERT；兩筆重放同一回應，DB 僅一筆 claim／contribution、一次扣點。 |
 | 2 認捐競爭 | 同上 | withdraw 與最後認捐兩種順序；withdraw 與過期／自動退款 tick；轉投與目標最後認捐兩種順序；反向轉投；凍結與認捐。檢查錢包、ledger、contributions、品項快取與採購單。 |
-| 3 認領不變式 | `tests/common/mod.rs`、20 個相關測試檔 | `qty_claimed = SUM(reserved/purchased/delivered claims.qty)`，含 soft-deleted 品項；相關測試結尾對帳。原本只改快取的 fixture 已補實際認領列或改用 API 建立。 |
+| 3 認領不變式 | `tests/common/mod.rs`、使用完整 migrations 的 DB 測試 | `qty_claimed = SUM(reserved/purchased/delivered claims.qty)`，含 soft-deleted 品項；相關測試結尾對帳。原本只改快取的 fixture 已補實際認領列或改用 API 建立。 |
 | 4 多數量競爭 | `tests/concurrency.rs` | needed=5，混合 2／3 件請求與各 2 件；檢查成功量、失敗剩餘量與成功回應快照、最終庫存／claims。允許合法的串行結果，不假設 UPDATE waiter 的 FIFO。 |
 | 5 刪除／封存競爭 | 同上 | quantity／crowdfund × force delete／archive × 兩種先後；另外驗證刪品項與改認領的 item→claim 鎖序、保留 delivered 數量。 |
 | 6 CDN purge | `tests/cdn_invalidation.rs` | 接收實際 Cloudflare mock 請求：private、DELETE／PATCH archive、moderation hidden；檢查 URL、DB 變更與公開端點不再可讀。 |
@@ -19,7 +19,7 @@
 | 9 Presign | `tests/uploads.rs` | 真實端點的 MIME／用途／大小邊界、簽名 headers、incoming object_key 與 user 綁定、跨使用者 confirm 被拒。 |
 | 10 SMTP worker | `tests/smtp_worker.rs`、CI API Mailpit service | 一般測試即執行，不再 ignore；直接 tick，檢查 sent／attempts／sent_at 與 Mailpit 的實際收件、隱私內容、不重寄。 |
 | 11 品質閘門 | `.github/workflows/ci.yml`、`scripts/{audit-api,coverage-api}.sh`、兩份 coverage baseline | Rust fmt／clippy `-D warnings`、Rust／npm audit、API／Vitest 覆蓋率門檻與 artifact；原生測試新增 macOS CI job。npm audit 外部阻擋見下。 |
-| 12 共用 helper | `tests/common/mod.rs` | 統一 response／request／API transport、Cookie／guest headers、session／user／wishlist fixtures、不變式與 bounded wait。既有特殊路由／IP／Bearer 呼叫保留薄 adapter。 |
+| 12 共用 helper | `tests/common/mod.rs` | 依共用骨架統一 `call`／`call_app`、`TestUser`／`ListOpts`、headers、明確數量的 fixtures、ledger 發點與三種對帳。只有原始 IP／Bearer／API 建立 fixture 保留必要特化；逐檔測試後 commit，無 legacy alias。 |
 | 13 功能命名 | `tests/otp.rs`、`line_oauth.rs`、`wishlist_items.rs`、`guest_lifecycle.rs`、`notifications.rs` 等 | slice3／slice45／gaps 拆成對應功能；regress 改為 auth_regressions；原測試保留，忽略 SMTP 由更強的正常測試接替。 |
 | 14 時間 flaky | `src/dashboard.rs`、SSE／identity／admin／notification tests | 回應 SSE 前完成 LISTEN；移除 800ms sleep 與 10ms 輪詢 sleep。用實際 DB blocking predicate＋失敗上限；通知在同交易固定 now() 並檢查精確台北 09:00 排程。 |
 | 15 前端單元 | `tests/use{Auth,Guest,WishlistEvents}.test.ts`、`contributionSheets.test.ts` | 身份讀取／錯誤與登出、token／Cookie 優先序、連續兩次 SSE error 改輪詢及復原／cleanup、ClaimSheet／FundSheet 驗證與 pending／成功／錯誤狀態。 |
@@ -99,3 +99,19 @@ npm run build
 npm audit --audit-level=high
 npx playwright test guest-journey.spec.ts crowdfund.spec.ts --project=desktop-chromium
 ```
+
+## 共用 helper 遷移追加驗證
+
+遷移的起點為 `b804d30`，先建立骨架並搬 hardening，再搬原 gaps 的功能檔、visibility、原 slice3／slice45 的功能檔，其餘由兩個 worker 分檔執行。每檔測試通過後各自 commit；未改產品 API 行為。`claims.rs` 與 `crowdfund_pledge.rs` 保留隔離 Router，併發測試 clone 同一個 Router，再呼叫 `call_app`。原有 qty、NULL email、title、身份 fixture 與原始 Cookie 格式均保留；需要固定 slug 的案例仍指定原 slug，CDN／profile 案例改用實際 TestList.slug 做斷言。
+
+`test_helpers.rs` 的 3 個測試涵蓋 fixture 選項、password 真實 unlock、三種有效認領狀態與 cancelled／expired 排除、三種對帳漂移的拒絕、JSON／空／純文字回應和 malformed JSON 拒絕。`wait_until` 以條件與逾時上限運作，沒有固定 sleep。秘密客 privacy fixture 與 quantity fixture 也經單一 wishlist／item 實作，needed／qty 明確指定。
+
+唯一完整財務對帳的例外是 `contribution_visibility_migration_preserves_existing_scope`：它只套用 0001–0005 後驗證 0006 backfill，刻意未扣錢包／累加品項；保留原本 before／after scope assertions，並在測試內註明。舊 schema 尚無 closes_at，因此只在此案例用最小 inline SQL 建清單。
+
+追加的 [mutation 記錄](test-gap-evidence/helper-mutations.json) 與 5 份 raw logs 均為實際跑測試所得，mutant 執行後以 SHA-256 確認原始碼還原：
+
+- 停用認領、錢包、認捐品項任一對帳斷言，負 fixture 測試都會失敗，避免 helper 變成 no-op 還全綠。
+- 移除 pledge 的錢包 FOR UPDATE：凍結錢包最終 balance 變成 800，而預期為 1000；由最終 DB 狀態殺死 mutant。
+- 改成來源品項優先鎖：預期的 DB blocked statement 不再成立，測試在診斷上限失敗。此追加 log 驗證鎖順序；真實死鎖的資料庫證據仍見上一輪 `wishlist-mutation-delete-deadlock-evidence.txt`，不把本次的等待失敗宣稱為新死鎖證據。
+
+還原後完整 API coverage gate：203 passed、0 failed、0 ignored；lines 91.289%、functions 88.255%、regions 87.157%，覆蓋的行／函式／region 數與原基準完全相同，沒有調低門檻。原始結果為 [完整測試與 coverage log](test-gap-evidence/helper-migration-final.txt)；Rust fmt、clippy `-D warnings` 與 diff whitespace 檢查也通過。上一輪的 200-test artifacts 保持原樣，新增證據區分本次 203-test 結果。

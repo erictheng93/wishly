@@ -1,0 +1,11 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.75s
+     Running tests/test_helpers.rs (apps/api/target/debug/deps/test_helpers-d74d551dcfe44e60)
+
+running 3 tests
+test call_app_sets_content_type_only_for_json_and_accepts_plain_responses ... ok
+test malformed_json_response_cannot_silently_turn_into_null - should panic ... ok
+test fixtures_preserve_options_quantities_and_reconcile_domain_state ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+

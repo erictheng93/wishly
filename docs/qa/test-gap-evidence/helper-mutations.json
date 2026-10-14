@@ -1,0 +1,44 @@
+{
+  "base_commit": "af38658aa2261dd8655867b7875287e51eace9b0",
+  "mutations": [
+    {
+      "mutation": "claims-reconciliation",
+      "test": "fixtures_preserve_options_quantities_and_reconcile_domain_state",
+      "exit_code": 101,
+      "log": "helper-mutation-claims-reconciliation.txt",
+      "result": "killed"
+    },
+    {
+      "mutation": "wallet-reconciliation",
+      "test": "fixtures_preserve_options_quantities_and_reconcile_domain_state",
+      "exit_code": 101,
+      "log": "helper-mutation-wallet-reconciliation.txt",
+      "result": "killed"
+    },
+    {
+      "mutation": "contribution-reconciliation",
+      "test": "fixtures_preserve_options_quantities_and_reconcile_domain_state",
+      "exit_code": 101,
+      "log": "helper-mutation-contribution-reconciliation.txt",
+      "result": "killed"
+    },
+    {
+      "mutation": "wallet-for-update",
+      "test": "wallet_freeze_vs_pledge_checks_status_under_lock",
+      "exit_code": 101,
+      "log": "helper-mutation-wallet-for-update.txt",
+      "result": "killed"
+    },
+    {
+      "mutation": "reallocation-source-first",
+      "test": "opposite_reallocations_lock_lowest_item_first_without_deadlock",
+      "exit_code": 101,
+      "log": "helper-mutation-reallocation-source-first.txt",
+      "result": "killed"
+    }
+  ],
+  "restored_sha256": {
+    "apps/api/tests/common/mod.rs": "9c773d487094ac43ba93156fda6178f5afd060234ebd67ff87dd5c46b0b7ea66",
+    "apps/api/src/contributions.rs": "f64c94fa5402cee8cff63a197bc85558e71825668ff1d721fee656da33cd2df6"
+  }
+}

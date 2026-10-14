@@ -1,0 +1,19 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.45s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-7d9beb916a018c0f)
+
+running 1 test
+
+thread 'opposite_reallocations_lock_lowest_item_first_without_deadlock' (6476875) panicked at tests/concurrency.rs:72:9:
+expected 1 blocked statements containing "SELECT id FROM wishlist_items WHERE id IN", blocker 47431
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test opposite_reallocations_lock_lowest_item_first_without_deadlock ... FAILED
+
+failures:
+
+failures:
+    opposite_reallocations_lock_lowest_item_first_without_deadlock
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 10.74s
+
+error: test failed, to rerun pass `--test concurrency`
