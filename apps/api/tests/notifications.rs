@@ -3,14 +3,15 @@ use serde_json::json;
 use sqlx::PgPool;
 
 /// 回傳 (user_id, session token)
-use common::user_with_staff as user;
-
-use common::claimed_wishlist as wishlist;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
-    let (owner, _) = user(&pool, "o", false).await;
-    let (wid, _, _) = wishlist(&pool, owner, true, 30).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "o").await;
+    let (wid, _, _) = claimed_wishlist(&pool, owner, true, 30).await;
     let mut tx = pool.begin().await.unwrap();
     for _ in 0..3 {
         wishsync_api::notify::enqueue_claim(&mut *tx, wid)
@@ -43,4 +44,5 @@ async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
     assert_eq!(n, 2);
     let (_, body) = wishsync_api::notify::render("claim.digest", "清單", &json!({"count": 2}));
     assert!(body.contains("2 件新認領"));
+    assert_all_reconciled(&pool).await;
 }
