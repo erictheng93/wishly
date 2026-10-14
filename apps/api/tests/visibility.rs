@@ -10,25 +10,13 @@ use tower::ServiceExt;
 use uuid::Uuid;
 use wishsync_api::{app, AppState};
 
-use common::api as call;
-use common::ck;
-
-use common::user_pair as user;
-async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {
-    let (x, y) = if a < b { (a, b) } else { (b, a) };
-    sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES ($1, $2)")
-        .bind(x)
-        .bind(y)
-        .execute(pool)
-        .await
-        .unwrap();
-}
+use common::*;
 
 struct Ctx {
-    owner: (Uuid, String),
-    friend: (Uuid, String),
-    stranger: (Uuid, String),
-    allowed: (Uuid, String),
+    owner: TestUser,
+    friend: TestUser,
+    stranger: TestUser,
+    allowed: TestUser,
 }
 async fn ctx(pool: &PgPool) -> Ctx {
     let c = Ctx {
@@ -37,8 +25,8 @@ async fn ctx(pool: &PgPool) -> Ctx {
         stranger: user(pool, "路人").await,
         allowed: user(pool, "名單").await,
     };
-    befriend(pool, c.owner.0, c.friend.0).await;
-    befriend(pool, c.owner.0, c.allowed.0).await;
+    befriend(pool, c.owner.id, c.friend.id).await;
+    befriend(pool, c.owner.id, c.allowed.id).await;
     c
 }
 
@@ -48,7 +36,7 @@ async fn mk(pool: &PgPool, c: &Ctx, vis: &str, pw: Option<&str>) -> (Uuid, Strin
     if let Some(p) = pw {
         b["access_password"] = json!(p);
     }
-    let (s, _, w) = call(pool, "POST", "/wishlists", &ck(&c.owner.1), Some(b)).await;
+    let (s, _, w) = call(pool, "POST", "/wishlists", &ck(&c.owner.token), Some(b)).await;
     assert_eq!(s, StatusCode::CREATED, "{w}");
     let id: Uuid = w["id"].as_str().unwrap().parse().unwrap();
     let it: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 3) RETURNING id").bind(id).fetch_one(pool).await.unwrap();
@@ -62,8 +50,8 @@ async fn mk(pool: &PgPool, c: &Ctx, vis: &str, pw: Option<&str>) -> (Uuid, Strin
             pool,
             "PUT",
             &format!("/wishlists/{id}/allowed-users"),
-            &ck(&c.owner.1),
-            Some(json!({ "user_ids": [c.allowed.0] })),
+            &ck(&c.owner.token),
+            Some(json!({ "user_ids": [c.allowed.id] })),
         )
         .await;
         assert_eq!(s, StatusCode::OK, "{v}");
@@ -118,6 +106,7 @@ async fn public_and_link_open_and_cacheable(pool: PgPool) {
             (StatusCode::OK, "private, no-store")
         );
     }
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -126,10 +115,14 @@ async fn private_only_owner(pool: PgPool) {
     let (_, slug, _) = mk(&pool, &c, "private", None).await;
     assert_eq!(get(&pool, &slug, &[]).await.0, StatusCode::NOT_FOUND);
     assert_eq!(
-        get(&pool, &slug, &ck(&c.friend.1)).await.0,
+        get(&pool, &slug, &ck(&c.friend.token)).await.0,
         StatusCode::NOT_FOUND
     );
-    assert_eq!(get(&pool, &slug, &ck(&c.owner.1)).await.0, StatusCode::OK);
+    assert_eq!(
+        get(&pool, &slug, &ck(&c.owner.token)).await.0,
+        StatusCode::OK
+    );
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -143,18 +136,19 @@ async fn friends_list(pool: PgPool) {
     );
     assert_eq!(v["visibility"], "friends");
     assert_eq!(v["owner"]["display_name"], "主人");
-    let (s, _, v) = get(&pool, &slug, &ck(&c.stranger.1)).await;
+    let (s, _, v) = get(&pool, &slug, &ck(&c.stranger.token)).await;
     assert_eq!(
         (s, v["code"].as_str()),
         (StatusCode::FORBIDDEN, Some("FRIENDS_ONLY"))
     );
-    for t in [&c.friend.1, &c.owner.1] {
+    for t in [&c.friend.token, &c.owner.token] {
         let (s, h, v) = get(&pool, &slug, &ck(t)).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(v["visibility"], "friends");
         assert_eq!(h["cache-control"], "private, no-store");
         assert!(h.get("etag").is_none());
     }
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -163,17 +157,21 @@ async fn selected_list(pool: PgPool) {
     let (_, slug, _) = mk(&pool, &c, "selected", None).await;
     assert_eq!(get(&pool, &slug, &[]).await.2["code"], "LOGIN_REQUIRED");
     // 好友但不在名單 / 路人 → NOT_ALLOWED
-    for t in [&c.friend.1, &c.stranger.1] {
+    for t in [&c.friend.token, &c.stranger.token] {
         let (s, _, v) = get(&pool, &slug, &ck(t)).await;
         assert_eq!(
             (s, v["code"].as_str()),
             (StatusCode::FORBIDDEN, Some("NOT_ALLOWED"))
         );
     }
-    let (s, h, _) = get(&pool, &slug, &ck(&c.allowed.1)).await;
+    let (s, h, _) = get(&pool, &slug, &ck(&c.allowed.token)).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(h["cache-control"], "private, no-store");
-    assert_eq!(get(&pool, &slug, &ck(&c.owner.1)).await.0, StatusCode::OK);
+    assert_eq!(
+        get(&pool, &slug, &ck(&c.owner.token)).await.0,
+        StatusCode::OK
+    );
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -230,7 +228,10 @@ async fn password_list_unlock_and_tokens(pool: PgPool) {
     );
     assert!(h.get("etag").is_none());
     // 擁有者免密碼
-    assert_eq!(get(&pool, &slug, &ck(&c.owner.1)).await.0, StatusCode::OK);
+    assert_eq!(
+        get(&pool, &slug, &ck(&c.owner.token)).await.0,
+        StatusCode::OK
+    );
     // SSE 與檢舉走同一道門
     assert_eq!(
         call(
@@ -294,7 +295,7 @@ async fn password_list_unlock_and_tokens(pool: PgPool) {
         &pool,
         "PATCH",
         &format!("/wishlists/{id}"),
-        &ck(&c.owner.1),
+        &ck(&c.owner.token),
         Some(json!({ "access_password": "another-pass1" })),
     )
     .await;
@@ -303,6 +304,7 @@ async fn password_list_unlock_and_tokens(pool: PgPool) {
         get(&pool, &slug, &[("x-list-access", tok)]).await.0,
         StatusCode::FORBIDDEN
     );
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -353,6 +355,7 @@ async fn unlock_non_password_404_and_rate_limited(pool: PgPool) {
         (s, v["code"].as_str()),
         (StatusCode::TOO_MANY_REQUESTS, Some("RATE_LIMITED"))
     );
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -378,12 +381,18 @@ async fn claim_requires_access(pool: PgPool) {
         (s, v["code"].as_str()),
         (StatusCode::FORBIDDEN, Some("LOGIN_REQUIRED"))
     );
-    assert_eq!(claim(it, ck(&c.stranger.1)).await.0, StatusCode::FORBIDDEN);
-    assert_eq!(claim(it, ck(&c.friend.1)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        claim(it, ck(&c.stranger.token)).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(claim(it, ck(&c.friend.token)).await.0, StatusCode::CREATED);
 
     let (_, _, it) = mk(&pool, &c, "selected", None).await;
-    assert_eq!(claim(it, ck(&c.friend.1)).await.2["code"], "NOT_ALLOWED");
-    assert_eq!(claim(it, ck(&c.allowed.1)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        claim(it, ck(&c.friend.token)).await.2["code"],
+        "NOT_ALLOWED"
+    );
+    assert_eq!(claim(it, ck(&c.allowed.token)).await.0, StatusCode::CREATED);
 
     let (_, slug, it) = mk(&pool, &c, "password", Some("correct-horse")).await;
     assert_eq!(claim(it, vec![]).await.2["code"], "PASSWORD_REQUIRED");
@@ -402,10 +411,13 @@ async fn claim_requires_access(pool: PgPool) {
     );
 
     let (_, _, it) = mk(&pool, &c, "private", None).await;
-    assert_eq!(claim(it, ck(&c.friend.1)).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        claim(it, ck(&c.friend.token)).await.0,
+        StatusCode::NOT_FOUND
+    );
     let (_, _, it) = mk(&pool, &c, "public", None).await;
     assert_eq!(claim(it, vec![]).await.0, StatusCode::CREATED);
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
     tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
         .await
         .expect("SSE listener must release its connection when the pool closes");
@@ -414,7 +426,7 @@ async fn claim_requires_access(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn owner_password_rules_and_no_hash_leak(pool: PgPool) {
     let c = ctx(&pool).await;
-    let o = ck(&c.owner.1);
+    let o = ck(&c.owner.token);
     let bad = |b: Value| {
         let (p, o) = (pool.clone(), o.clone());
         async move { call(&p, "POST", "/wishlists", &o, Some(b)).await }
@@ -488,6 +500,7 @@ async fn owner_password_rules_and_no_hash_leak(pool: PgPool) {
         .0,
         StatusCode::OK
     );
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -499,8 +512,8 @@ async fn allowed_users_only_friends(pool: PgPool) {
         &pool,
         "PUT",
         &u,
-        &ck(&c.owner.1),
-        Some(json!({ "user_ids": [c.friend.0, c.stranger.0] })),
+        &ck(&c.owner.token),
+        Some(json!({ "user_ids": [c.friend.id, c.stranger.id] })),
     )
     .await;
     assert_eq!(
@@ -508,14 +521,14 @@ async fn allowed_users_only_friends(pool: PgPool) {
         (StatusCode::UNPROCESSABLE_ENTITY, Some("NOT_FRIEND"))
     );
     // 失敗不改動既有名單
-    let (_, _, v) = call(&pool, "GET", &u, &ck(&c.owner.1), None).await;
+    let (_, _, v) = call(&pool, "GET", &u, &ck(&c.owner.token), None).await;
     assert_eq!(v["users"].as_array().unwrap().len(), 1);
     let (s, _, v) = call(
         &pool,
         "PUT",
         &u,
-        &ck(&c.owner.1),
-        Some(json!({ "user_ids": [c.friend.0, c.allowed.0, c.friend.0] })),
+        &ck(&c.owner.token),
+        Some(json!({ "user_ids": [c.friend.id, c.allowed.id, c.friend.id] })),
     )
     .await;
     assert_eq!(s, StatusCode::OK);
@@ -525,7 +538,7 @@ async fn allowed_users_only_friends(pool: PgPool) {
             &pool,
             "PUT",
             &u,
-            &ck(&c.owner.1),
+            &ck(&c.owner.token),
             Some(json!({ "user_ids": [] }))
         )
         .await
@@ -537,7 +550,7 @@ async fn allowed_users_only_friends(pool: PgPool) {
     );
     // 非擁有者 → 404
     assert_eq!(
-        call(&pool, "GET", &u, &ck(&c.friend.1), None).await.0,
+        call(&pool, "GET", &u, &ck(&c.friend.token), None).await.0,
         StatusCode::NOT_FOUND
     );
     assert_eq!(
@@ -545,13 +558,14 @@ async fn allowed_users_only_friends(pool: PgPool) {
             &pool,
             "PUT",
             &u,
-            &ck(&c.friend.1),
+            &ck(&c.friend.token),
             Some(json!({ "user_ids": [] }))
         )
         .await
         .0,
         StatusCode::NOT_FOUND
     );
+    assert_all_reconciled(&pool).await;
 }
 
 /// CDN 防線：公開（可快取）路徑不論帶什麼憑證，都不會回受限清單內容；擋下的回應帶 CDN 專用 no-store。
@@ -570,10 +584,10 @@ async fn public_path_never_serves_restricted_content(pool: PgPool) {
     .2;
     let tok = v["access_token"].as_str().unwrap().to_string();
     let cases: Vec<(&str, Vec<(&str, String)>)> = vec![
-        ("friends", ck(&c.friend.1)),
-        ("friends", ck(&c.owner.1)),
-        ("selected", ck(&c.allowed.1)),
-        ("private", ck(&c.owner.1)),
+        ("friends", ck(&c.friend.token)),
+        ("friends", ck(&c.owner.token)),
+        ("selected", ck(&c.allowed.token)),
+        ("private", ck(&c.owner.token)),
     ];
     for (vis, hdr) in cases {
         let (_, slug, _) = mk(&pool, &c, vis, None).await;
@@ -609,4 +623,5 @@ async fn public_path_never_serves_restricted_content(pool: PgPool) {
         get(&pool, &pw_slug, &[("x-list-access", tok)]).await.0,
         StatusCode::OK
     );
+    assert_all_reconciled(&pool).await;
 }
