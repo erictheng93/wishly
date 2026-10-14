@@ -21,7 +21,7 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
         id: staff_id,
         token: staff,
     } = staff(&pool, "s").await;
-    let (wid, slug, _) = claimed_wishlist(&pool, owner, false, 30).await;
+    let (wid, slug, _) = claimed_wishlist(&pool, owner, false, 30, 2, 1).await;
 
     for uri in [
         "/admin/reports",

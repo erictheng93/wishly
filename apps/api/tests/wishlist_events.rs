@@ -16,7 +16,7 @@ async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
         id: owner,
         token: _,
     } = user(&pool, "o").await;
-    let (wid, slug, item) = claimed_wishlist(&pool, owner, false, 30).await;
+    let (wid, slug, item) = claimed_wishlist(&pool, owner, false, 30, 2, 1).await;
     let req = Request::builder()
         .uri(format!("/api/v1/public/wishlists/{slug}/events"))
         .body(Body::empty())

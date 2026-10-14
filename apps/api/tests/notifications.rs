@@ -11,7 +11,7 @@ async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
         id: owner,
         token: _,
     } = user(&pool, "o").await;
-    let (wid, _, _) = claimed_wishlist(&pool, owner, true, 30).await;
+    let (wid, _, _) = claimed_wishlist(&pool, owner, true, 30, 2, 1).await;
     let mut tx = pool.begin().await.unwrap();
     for _ in 0..3 {
         wishsync_api::notify::enqueue_claim(&mut *tx, wid)

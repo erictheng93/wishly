@@ -12,13 +12,13 @@ async fn account_delete_anonymizes(pool: PgPool) {
         id: uid,
         token: tok,
     } = user(&pool, "小米").await;
-    let (wid, slug, item) = claimed_wishlist(&pool, uid, false, 30).await;
+    let (wid, slug, item) = claimed_wishlist(&pool, uid, false, 30, 2, 1).await;
     // 此使用者在別人清單上的認領
     let TestUser {
         id: other,
         token: _,
     } = user(&pool, "o").await;
-    let (_, _, item2) = claimed_wishlist(&pool, other, false, 30).await;
+    let (_, _, item2) = claimed_wishlist(&pool, other, false, 30, 2, 1).await;
     sqlx::query(
         "INSERT INTO claims (item_id, user_id, claimer_name, qty) VALUES ($1, $2, '小米', 1)",
     )

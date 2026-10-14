@@ -31,20 +31,15 @@ pub async fn call_app(
     call_request(app, request(method, &format!("/api/v1{uri}"), hdr, body)).await
 }
 
-// 僅在逐檔遷移期間保留；全部檔案遷移後移除。
-pub use call as api;
-
 pub struct TestUser {
     pub id: Uuid,
     pub token: String,
 }
 pub async fn user(pool: &PgPool, name: &str) -> TestUser {
-    let (id, token) = user_with_staff(pool, name, false).await;
-    TestUser { id, token }
+    create_user(pool, name, false).await
 }
 pub async fn staff(pool: &PgPool, name: &str) -> TestUser {
-    let (id, token) = user_with_staff(pool, name, true).await;
-    TestUser { id, token }
+    create_user(pool, name, true).await
 }
 pub async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {
     let (a, b) = if a < b { (a, b) } else { (b, a) };
@@ -56,6 +51,7 @@ pub async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {
         .unwrap();
 }
 
+/// 未指定時採 active / link / ok；password fixture 的密碼為 "test password"。
 #[derive(Default)]
 pub struct ListOpts {
     pub status: Option<&'static str>,
@@ -163,6 +159,7 @@ pub async fn assert_all_reconciled(pool: &PgPool) {
     assert_claims_reconciled(pool).await;
 }
 
+/// 原始 Request 的 URI 含 /api/v1；供需要注入 ConnectInfo 的測試使用。
 pub async fn call_request(app: &Router, req: Request<Body>) -> Resp {
     let res = app.clone().oneshot(req).await.unwrap();
     let (status, headers) = (res.status(), res.headers().clone());
@@ -199,6 +196,7 @@ pub fn request(
     .unwrap()
 }
 
+/// 完整 app，URI 不含 /api/v1。
 pub async fn call(
     pool: &PgPool,
     method: &str,
@@ -224,11 +222,7 @@ pub async fn session(pool: &PgPool, id: Uuid) -> String {
     token
 }
 
-pub async fn user_pair(pool: &PgPool, name: &str) -> (Uuid, String) {
-    user_with_staff(pool, name, false).await
-}
-
-pub async fn user_with_staff(pool: &PgPool, name: &str, staff: bool) -> (Uuid, String) {
+async fn create_user(pool: &PgPool, name: &str, staff: bool) -> TestUser {
     let id = sqlx::query_scalar(
         "INSERT INTO users (display_name, email, is_staff) VALUES ($1, $2, $3) RETURNING id",
     )
@@ -238,12 +232,10 @@ pub async fn user_with_staff(pool: &PgPool, name: &str, staff: bool) -> (Uuid, S
     .fetch_one(pool)
     .await
     .unwrap();
-    (id, session(pool, id).await)
-}
-
-pub async fn wishlist_named(pool: &PgPool, owner: Uuid, slug: &str) -> Uuid {
-    sqlx::query_scalar("INSERT INTO wishlists (owner_id, type, status, slug, title) VALUES ($1, 'registry', 'active', $2, '清單') RETURNING id")
-        .bind(owner).bind(slug).fetch_one(pool).await.unwrap()
+    TestUser {
+        id,
+        token: session(pool, id).await,
+    }
 }
 
 pub async fn assert_claims_reconciled(pool: &PgPool) {
@@ -282,59 +274,64 @@ pub async fn wait_for_blocked(pool: &PgPool, blocker_pid: i32, minimum: i64) {
     }).await;
 }
 
+/// 隱私測試的秘密訪客 fixture；數量均由呼叫端明確指定，無 API 通知副作用。
 pub async fn claimed_wishlist(
     pool: &PgPool,
     owner: Uuid,
     surprise: bool,
     event_offset_days: i32,
+    needed: i32,
+    qty: i32,
 ) -> (Uuid, String, Uuid) {
-    let slug: String = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let wid: Uuid = sqlx::query_scalar(
-        "INSERT INTO wishlists (owner_id, type, status, slug, title, surprise_mode, event_date)
-         VALUES ($1, 'registry', 'active', $2, '寶寶清單', $3, current_date + $4::int) RETURNING id")
-        .bind(owner).bind(&slug).bind(surprise).bind(event_offset_days).fetch_one(pool).await.unwrap();
-    let item: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed, qty_claimed) VALUES ($1, '玻璃奶瓶', 2, 1) RETURNING id")
-        .bind(wid).fetch_one(pool).await.unwrap();
+    let list = wishlist(
+        pool,
+        owner,
+        ListOpts {
+            surprise,
+            event_offset_days: Some(event_offset_days),
+            ..Default::default()
+        },
+    )
+    .await;
+    let wid = list.id;
+    sqlx::query("UPDATE wishlists SET title='寶寶清單' WHERE id=$1")
+        .bind(wid)
+        .execute(pool)
+        .await
+        .unwrap();
+    let item = item(pool, wid, "玻璃奶瓶", needed).await;
+    sqlx::query("UPDATE wishlist_items SET qty_claimed=$2 WHERE id=$1")
+        .bind(item)
+        .bind(qty)
+        .execute(pool)
+        .await
+        .unwrap();
     let g: Uuid = sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, contact) VALUES ($1, '秘密客', 'line:secret') RETURNING id")
         .bind(wishsync_api::session::hash_token(&Uuid::new_v4().to_string())).fetch_one(pool).await.unwrap();
     sqlx::query(
-        "INSERT INTO claims (item_id, guest_id, claimer_name, qty) VALUES ($1, $2, '秘密客', 1)",
+        "INSERT INTO claims (item_id, guest_id, claimer_name, qty) VALUES ($1, $2, '秘密客', $3)",
     )
     .bind(item)
     .bind(g)
+    .bind(qty)
     .execute(pool)
     .await
     .unwrap();
-    (wid, slug, item)
+    (wid, list.slug, item)
 }
 
-pub async fn guest_wishlist(pool: &PgPool, owner: Uuid, surprise: bool, off: i32) -> (Uuid, Uuid) {
-    let slug: String = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let wid: Uuid = sqlx::query_scalar(
-        "INSERT INTO wishlists (owner_id, type, status, slug, title, surprise_mode, event_date)
-        VALUES ($1, 'registry', 'active', $2, '清單', $3, current_date + $4::int) RETURNING id",
-    )
-    .bind(owner)
-    .bind(slug)
-    .bind(surprise)
-    .bind(off)
-    .fetch_one(pool)
-    .await
-    .unwrap();
-    let it: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 3) RETURNING id").bind(wid).fetch_one(pool).await.unwrap();
-    (wid, it)
-}
 pub async fn guest_claim_with_email(
     pool: &PgPool,
     item: Uuid,
+    qty: i32,
     email: Option<&str>,
 ) -> (String, Uuid) {
-    let (s, _, b) = api(
+    let (s, _, b) = call(
         pool,
         "POST",
         &format!("/items/{item}/claims"),
-        &[("idempotency-key", Uuid::new_v4().to_string())],
-        Some(serde_json::json!({ "qty": 1, "display_name": "小明", "email": email })),
+        &idem(Uuid::new_v4()),
+        Some(serde_json::json!({ "qty": qty, "display_name": "小明", "email": email })),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
@@ -354,28 +351,22 @@ pub async fn quantity_wishlist(
         .fetch_one(pool)
         .await
         .unwrap();
-    let list = wishlist_named(pool, owner, slug).await;
+    // 這個 fixture 刻意無 email，避免限流案例建立額外通知。
+    let list = wishlist(pool, owner, ListOpts::default()).await.id;
+    sqlx::query("UPDATE wishlists SET slug=$2 WHERE id=$1")
+        .bind(list)
+        .bind(slug)
+        .execute(pool)
+        .await
+        .unwrap();
     let mut ids = Vec::new();
     for n in 0..items {
-        ids.push(sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, $2, $3) RETURNING id")
-            .bind(list).bind(format!("i{n}")).bind(needed).fetch_one(pool).await.unwrap());
+        ids.push(item(pool, list, &format!("i{n}"), needed).await);
     }
     (list, ids)
 }
 
 /// 建立指定數量的訪客認領。
 pub async fn guest_claim(pool: &PgPool, item: Uuid, qty: i32) -> (String, Uuid) {
-    let (status, _, body) = call(
-        pool,
-        "POST",
-        &format!("/items/{item}/claims"),
-        &idem(Uuid::new_v4()),
-        Some(json!({"qty":qty,"display_name":"小明"})),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "{body}");
-    (
-        body["guest_token"].as_str().unwrap().into(),
-        body["claim"]["id"].as_str().unwrap().parse().unwrap(),
-    )
+    guest_claim_with_email(pool, item, qty, None).await
 }

@@ -22,7 +22,7 @@ async fn guest_delete_and_recover(pool: PgPool) {
     )
     .await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    let (tok, cid) = guest_claim_with_email(&pool, it, Some("a@example.com")).await;
+    let (tok, cid) = guest_claim_with_email(&pool, it, 1, Some("a@example.com")).await;
     // 確認信已入佇列
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='claim.confirmation' AND guest_id IS NOT NULL").fetch_one(&pool).await.unwrap();
     assert_eq!(n, 1);
