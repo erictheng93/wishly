@@ -4,47 +4,29 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use common::{assert_claims_reconciled, call_request as call};
+use common::{assert_all_reconciled, call_app as call, item, ListOpts, TestList};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::{claims, guest, public, AppState};
 
-fn get(uri: &str) -> Request<Body> {
-    Request::get(uri).body(Body::empty()).unwrap()
-}
-
-fn post_claim(item: Uuid, key: Uuid, token: Option<&str>, body: Value) -> Request<Body> {
-    let mut r = Request::post(format!("/api/v1/items/{item}/claims"))
-        .header("content-type", "application/json")
-        .header("idempotency-key", key.to_string());
-    if let Some(t) = token {
-        r = r.header("x-guest-token", t);
-    }
-    r.body(Body::from(body.to_string())).unwrap()
-}
-
-struct Fx {
-    wl: Uuid,
-}
-
 /// 建立 owner + 清單（active）；回傳 slug / id
-async fn wishlist(pool: &PgPool, slug: &str, extra: &str) -> Fx {
-    let owner: Uuid =
-        sqlx::query_scalar("INSERT INTO users (display_name) VALUES ('小米') RETURNING id")
-            .fetch_one(pool)
-            .await
-            .unwrap();
-    let wl: Uuid = sqlx::query_scalar(&format!(
-        "INSERT INTO wishlists (owner_id, type, status, slug, title {}) VALUES ($1, 'registry', 'active', $2, '寶寶清單' {}) RETURNING id",
-        if extra.is_empty() { "" } else { ", moderation_status, moderation_reason, show_claimer_names" },
-        if extra.is_empty() { "" } else { extra })).bind(owner).bind(slug).fetch_one(pool).await.unwrap();
-    Fx { wl }
-}
-
-async fn item(pool: &PgPool, wl: Uuid, title: &str, needed: i32) -> Uuid {
-    sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, $2, $3) RETURNING id")
-        .bind(wl).bind(title).bind(needed).fetch_one(pool).await.unwrap()
+async fn named_list(pool: &PgPool, slug: &str) -> TestList {
+    let owner = common::user(pool, "小米").await;
+    sqlx::query("UPDATE users SET email=NULL WHERE id=$1")
+        .bind(owner.id)
+        .execute(pool)
+        .await
+        .unwrap();
+    let mut list = common::wishlist(pool, owner.id, ListOpts::default()).await;
+    sqlx::query("UPDATE wishlists SET slug=$2,title='寶寶清單' WHERE id=$1")
+        .bind(list.id)
+        .bind(slug)
+        .execute(pool)
+        .await
+        .unwrap();
+    list.slug = slug.to_string();
+    list
 }
 
 /// 只掛本切片的路由，不受其他模組影響
@@ -62,22 +44,25 @@ fn test_app(pool: &PgPool) -> Router {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn public_page_happy_and_masking(pool: PgPool) {
     let app = test_app(&pool);
-    let f = wishlist(&pool, "Ab3dE5gH7k", ", 'ok', NULL, true").await;
-    let bottle = item(&pool, f.wl, "玻璃奶瓶", 10).await;
-    item(&pool, f.wl, "推車", 2).await;
+    let f = named_list(&pool, "Ab3dE5gH7k").await;
+    sqlx::query("UPDATE wishlists SET show_claimer_names=true WHERE id=$1")
+        .bind(f.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let bottle = item(&pool, f.id, "玻璃奶瓶", 10).await;
+    item(&pool, f.id, "推車", 2).await;
     let (st, _, c) = call(
         &app,
-        post_claim(
-            bottle,
-            Uuid::new_v4(),
-            None,
-            json!({"qty": 5, "display_name": "小明"}),
-        ),
+        "POST",
+        &format!("/items/{}/claims", bottle),
+        &common::idem(Uuid::new_v4()),
+        Some(json!({"qty": 5, "display_name": "小明"})),
     )
     .await;
     assert_eq!(st, StatusCode::CREATED, "{c}");
 
-    let (st, h, b) = call(&app, get("/api/v1/public/wishlists/Ab3dE5gH7k")).await;
+    let (st, h, b) = call(&app, "GET", "/public/wishlists/Ab3dE5gH7k", &[], None).await;
     assert_eq!(st, StatusCode::OK);
     assert!(h["cache-control"]
         .to_str()
@@ -98,16 +83,16 @@ async fn public_page_happy_and_masking(pool: PgPool) {
     sqlx::query(
         "UPDATE wishlists SET surprise_mode = true, event_date = current_date + 30 WHERE id = $1",
     )
-    .bind(f.wl)
+    .bind(f.id)
     .execute(&pool)
     .await
     .unwrap();
-    let (_, _, b) = call(&app, get("/api/v1/public/wishlists/Ab3dE5gH7k")).await;
+    let (_, _, b) = call(&app, "GET", "/public/wishlists/Ab3dE5gH7k", &[], None).await;
     assert_eq!(b["surprise_mode"], true);
     assert_eq!(b["claimers_visible"], false);
     assert!(b["items"][0].get("claimers").is_none());
     assert_eq!(b["items"][0]["qty_claimed"], 5);
-    assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -115,53 +100,53 @@ async fn public_page_404_and_410(pool: PgPool) {
     let app = test_app(&pool);
     let get_status = |slug: &'static str| {
         let app = app.clone();
-        async move { call(&app, get(&format!("/api/v1/public/wishlists/{slug}"))).await }
+        async move { call(&app, "GET", &format!("/public/wishlists/{slug}"), &[], None).await }
     };
     assert_eq!(get_status("Zz9999999z").await.0, StatusCode::NOT_FOUND);
 
-    let deleted = wishlist(&pool, "Deleted001", "").await;
+    let deleted = named_list(&pool, "Deleted001").await;
     sqlx::query("UPDATE wishlists SET deleted_at = now() WHERE id = $1")
-        .bind(deleted.wl)
+        .bind(deleted.id)
         .execute(&pool)
         .await
         .unwrap();
     assert_eq!(get_status("Deleted001").await.0, StatusCode::NOT_FOUND);
 
-    let draft = wishlist(&pool, "Draft00001", "").await;
+    let draft = named_list(&pool, "Draft00001").await;
     sqlx::query("UPDATE wishlists SET status = 'draft' WHERE id = $1")
-        .bind(draft.wl)
+        .bind(draft.id)
         .execute(&pool)
         .await
         .unwrap();
     assert_eq!(get_status("Draft00001").await.0, StatusCode::NOT_FOUND);
 
-    wishlist(&pool, "Hidden0001", ", 'hidden', '詐騙', false").await;
+    let hidden = named_list(&pool, "Hidden0001").await;
+    sqlx::query("UPDATE wishlists SET moderation_status='hidden',moderation_reason='詐騙',show_claimer_names=false WHERE id=$1")
+        .bind(hidden.id).execute(&pool).await.unwrap();
     let (st, _, b) = get_status("Hidden0001").await;
     assert_eq!(
         (st, b["code"].as_str().unwrap()),
         (StatusCode::GONE, "WISHLIST_REMOVED")
     );
     assert!(!b.to_string().contains("詐騙"));
-    assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn oversell_only_one_wins(pool: PgPool) {
     let app = test_app(&pool);
-    let f = wishlist(&pool, "Race000001", "").await;
-    let it = item(&pool, f.wl, "最後一件", 1).await;
+    let f = named_list(&pool, "Race000001").await;
+    let it = item(&pool, f.id, "最後一件", 1).await;
     let tasks: Vec<_> = (0..8)
         .map(|n| {
             let app = app.clone();
             tokio::spawn(async move {
                 call(
                     &app,
-                    post_claim(
-                        it,
-                        Uuid::new_v4(),
-                        None,
-                        json!({"qty": 1, "display_name": format!("g{n}")}),
-                    ),
+                    "POST",
+                    &format!("/items/{}/claims", it),
+                    &common::idem(Uuid::new_v4()),
+                    Some(json!({"qty": 1, "display_name": format!("g{n}")})),
                 )
                 .await
             })
@@ -189,21 +174,35 @@ async fn oversell_only_one_wins(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(guests, 1);
-    assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn idempotency_key_replay_and_conflict(pool: PgPool) {
     let app = test_app(&pool);
-    let f = wishlist(&pool, "Idem000001", "").await;
-    let it = item(&pool, f.wl, "奶瓶", 5).await;
+    let f = named_list(&pool, "Idem000001").await;
+    let it = item(&pool, f.id, "奶瓶", 5).await;
     let key = Uuid::new_v4();
     let body = json!({"qty": 2, "display_name": "小明"});
 
-    let (s1, h1, b1) = call(&app, post_claim(it, key, None, body.clone())).await;
+    let (s1, h1, b1) = call(
+        &app,
+        "POST",
+        &format!("/items/{}/claims", it),
+        &common::idem(key),
+        Some(body.clone()),
+    )
+    .await;
     assert_eq!(s1, StatusCode::CREATED);
     assert!(h1.contains_key("set-cookie") && h1.contains_key("location"));
-    let (s2, h2, b2) = call(&app, post_claim(it, key, None, body.clone())).await;
+    let (s2, h2, b2) = call(
+        &app,
+        "POST",
+        &format!("/items/{}/claims", it),
+        &common::idem(key),
+        Some(body.clone()),
+    )
+    .await;
     assert_eq!(s2, StatusCode::CREATED);
     assert_eq!(h2["idempotency-replayed"], "true");
     // F-01：anon 首次認領的重播改為對同一 guest 重簽新 token（回應 + Set-Cookie）；舊 token 失效；idempotency_keys 仍不存明文
@@ -233,7 +232,10 @@ async fn idempotency_key_replay_and_conflict(pool: PgPool) {
 
     let (s3, _, b3) = call(
         &app,
-        post_claim(it, key, None, json!({"qty": 3, "display_name": "小明"})),
+        "POST",
+        &format!("/items/{}/claims", it),
+        &common::idem(key),
+        Some(json!({"qty": 3, "display_name": "小明"})),
     )
     .await;
     assert_eq!(
@@ -245,46 +247,37 @@ async fn idempotency_key_replay_and_conflict(pool: PgPool) {
     let r = Request::post(format!("/api/v1/items/{it}/claims"))
         .body(Body::from(body.to_string()))
         .unwrap();
-    let (s4, _, b4) = call(&app, r).await;
+    let (s4, _, b4) = common::call_request(&app, r).await;
     assert_eq!(
         (s4, b4["code"].as_str().unwrap()),
         (StatusCode::BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED")
     );
-    assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn claim_lifecycle(pool: PgPool) {
     let app = test_app(&pool);
-    let f = wishlist(&pool, "Life000001", "").await;
-    let it = item(&pool, f.wl, "奶瓶", 3).await;
+    let f = named_list(&pool, "Life000001").await;
+    let it = item(&pool, f.id, "奶瓶", 3).await;
     let (_, _, b) = call(
         &app,
-        post_claim(
-            it,
-            Uuid::new_v4(),
-            None,
-            json!({"qty": 1, "display_name": "小明"}),
-        ),
+        "POST",
+        &format!("/items/{}/claims", it),
+        &common::idem(Uuid::new_v4()),
+        Some(json!({"qty": 1, "display_name": "小明"})),
     )
     .await;
     let tok = b["guest_token"].as_str().unwrap().to_string();
     let cid = b["claim"]["id"].as_str().unwrap().to_string();
-    let req = |m: &str, uri: &str, body: Value, t: Option<&str>| {
-        let mut r = Request::builder()
-            .method(m)
-            .uri(uri)
-            .header("content-type", "application/json");
-        if let Some(t) = t {
-            r = r.header("x-guest-token", t);
-        }
-        r.body(Body::from(body.to_string())).unwrap()
-    };
 
     // 重複認領 → CLAIM_ALREADY_EXISTS（附 claim_id）
     let (s, _, e) = call(
         &app,
-        post_claim(it, Uuid::new_v4(), Some(&tok), json!({"qty": 1})),
+        "POST",
+        &format!("/items/{}/claims", it),
+        &[common::gt(&tok), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty": 1})),
     )
     .await;
     assert_eq!(
@@ -296,20 +289,25 @@ async fn claim_lifecycle(pool: PgPool) {
         (StatusCode::CONFLICT, "CLAIM_ALREADY_EXISTS", cid.as_str())
     );
     // 改量超過 → ITEM_FULLY_CLAIMED；合法改量
-    let url = format!("/api/v1/claims/{cid}");
-    let (s, _, e) = call(&app, req("PATCH", &url, json!({"qty": 4}), Some(&tok))).await;
+    let url = format!("/claims/{cid}");
+    let (s, _, e) = call(
+        &app,
+        "PATCH",
+        &url,
+        &common::gt(&tok),
+        Some(json!({"qty": 4})),
+    )
+    .await;
     assert_eq!(
         (s, e["code"].as_str().unwrap()),
         (StatusCode::CONFLICT, "ITEM_FULLY_CLAIMED")
     );
     let (s, _, o) = call(
         &app,
-        req(
-            "PATCH",
-            &url,
-            json!({"qty": 3, "status": "purchased"}),
-            Some(&tok),
-        ),
+        "PATCH",
+        &url,
+        &common::gt(&tok),
+        Some(json!({"qty": 3, "status": "purchased"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{o}");
@@ -321,24 +319,17 @@ async fn claim_lifecycle(pool: PgPool) {
         ("purchased", 3)
     );
     // 他人不可改；無 token 401
-    let (s, _, _) = call(&app, req("PATCH", &url, json!({"note": "x"}), None)).await;
+    let (s, _, _) = call(&app, "PATCH", &url, &[], Some(json!({"note": "x"}))).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
     // GET /guest/me
-    let (s, h, me) = call(
-        &app,
-        Request::get("/api/v1/guest/me")
-            .header("x-guest-token", &tok)
-            .body(Body::empty())
-            .unwrap(),
-    )
-    .await;
+    let (s, h, me) = call(&app, "GET", "/guest/me", &common::gt(&tok), None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(h["cache-control"], "private, no-store");
     assert_eq!(me["claims"][0]["item"]["title"], "奶瓶");
     assert_eq!(me["claims"][0]["wishlist"]["slug"], "Life000001");
     // 取消回補，重複 DELETE 冪等
     for _ in 0..2 {
-        let (s, _, _) = call(&app, req("DELETE", &url, Value::Null, Some(&tok))).await;
+        let (s, _, _) = call(&app, "DELETE", &url, &common::gt(&tok), Some(Value::Null)).await;
         assert_eq!(s, StatusCode::NO_CONTENT);
     }
     let q: i32 = sqlx::query_scalar("SELECT qty_claimed FROM wishlist_items WHERE id = $1")
@@ -350,9 +341,12 @@ async fn claim_lifecycle(pool: PgPool) {
     // 取消後可再認領（partial unique 只算有效）
     let (s, _, _) = call(
         &app,
-        post_claim(it, Uuid::new_v4(), Some(&tok), json!({"qty": 1})),
+        "POST",
+        &format!("/items/{}/claims", it),
+        &[common::gt(&tok), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty": 1})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
