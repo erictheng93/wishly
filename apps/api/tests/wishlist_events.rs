@@ -2,31 +2,26 @@ mod common;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
-    Router,
 };
 use http_body_util::BodyExt;
 use sqlx::PgPool;
 use tower::ServiceExt;
-use wishsync_api::{app, AppState};
-
-fn router(pool: &PgPool) -> Router {
-    app(AppState { pool: pool.clone() })
-}
 
 /// 回傳 (user_id, session token)
-use common::user_with_staff as user;
-
-use common::claimed_wishlist as wishlist;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
-    let (owner, _) = user(&pool, "o", false).await;
-    let (wid, slug, item) = wishlist(&pool, owner, false, 30).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "o").await;
+    let (wid, slug, item) = claimed_wishlist(&pool, owner, false, 30).await;
     let req = Request::builder()
         .uri(format!("/api/v1/public/wishlists/{slug}/events"))
         .body(Body::empty())
         .unwrap();
-    let res = router(&pool).oneshot(req).await.unwrap();
+    let res = test_app(&pool).oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(res.headers()["content-type"], "text/event-stream");
     let mut body = res.into_body();
@@ -70,10 +65,10 @@ async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
         .body(Body::empty())
         .unwrap();
     assert_eq!(
-        router(&pool).oneshot(req).await.unwrap().status(),
+        test_app(&pool).oneshot(req).await.unwrap().status(),
         StatusCode::GONE
     );
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
     drop(body);
     tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
         .await
