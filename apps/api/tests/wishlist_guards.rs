@@ -4,28 +4,23 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use common::api as call;
+use common::call;
 use common::ck;
-
-async fn user(pool: &PgPool, staff: bool) -> (Uuid, String) {
-    common::user_with_staff(pool, "u", staff).await
-}
 
 /// 清單 + 一個 qty_needed=3 的品項；event_offset_days>0 且 surprise → 鎖定
 async fn list(pool: &PgPool, owner: Uuid, surprise: bool, off: i32) -> (Uuid, Uuid) {
-    let slug: String = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let wid: Uuid = sqlx::query_scalar(
-        "INSERT INTO wishlists (owner_id, type, status, slug, title, surprise_mode, event_date)
-        VALUES ($1, 'registry', 'active', $2, '清單', $3, current_date + $4::int) RETURNING id",
+    let wid = common::wishlist(
+        pool,
+        owner,
+        common::ListOpts {
+            surprise,
+            event_offset_days: Some(off),
+            ..Default::default()
+        },
     )
-    .bind(owner)
-    .bind(slug)
-    .bind(surprise)
-    .bind(off)
-    .fetch_one(pool)
     .await
-    .unwrap();
-    let it: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 3) RETURNING id").bind(wid).fetch_one(pool).await.unwrap();
+    .id;
+    let it = common::item(pool, wid, "奶瓶", 3).await;
     (wid, it)
 }
 
@@ -48,7 +43,7 @@ async fn claim(pool: &PgPool, item: Uuid, email: Option<&str>) -> (String, Uuid)
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn surprise_lock_errors_do_not_reveal_claims(pool: PgPool) {
-    let (o, t) = user(&pool, false).await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (wid, claimed) = list(&pool, o, true, 30).await;
     let free: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1,'x',3) RETURNING id").bind(wid).fetch_one(&pool).await.unwrap();
     claim(&pool, claimed, None).await;
@@ -122,12 +117,12 @@ async fn surprise_lock_errors_do_not_reveal_claims(pool: PgPool) {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn unlocked_keeps_specific_errors(pool: PgPool) {
-    let (o, t) = user(&pool, false).await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (_, it) = list(&pool, o, false, 30).await;
     claim(&pool, it, None).await;
     let (_, _, b) = call(
@@ -155,12 +150,12 @@ async fn unlocked_keeps_specific_errors(pool: PgPool) {
         (s.as_u16(), b["code"].as_str()),
         (409, Some("ITEM_HAS_CLAIMS"))
     );
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn archive_is_idempotent(pool: PgPool) {
-    let (o, t) = user(&pool, false).await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (wid, _) = list(&pool, o, false, 30).await;
     let uri = format!("/wishlists/{wid}");
     assert_eq!(
@@ -192,11 +187,12 @@ async fn archive_is_idempotent(pool: PgPool) {
         (s.as_u16(), b["code"].as_str()),
         (409, Some("WISHLIST_CLOSED"))
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn optimistic_concurrency(pool: PgPool) {
-    let (o, t) = user(&pool, false).await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (wid, it) = list(&pool, o, false, 30).await;
     let uri = format!("/wishlists/{wid}");
     let (_, _, g) = call(&pool, "GET", &uri, &ck(&t), None).await;
@@ -288,12 +284,13 @@ async fn optimistic_concurrency(pool: PgPool) {
         (409, Some("STALE_VERSION")),
         "{b}"
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 /// closes_at：預設不設期限；設了之後到期即擋認領、sweep 轉 closed；過去時間不可設、不可帶著過期值重開
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn closes_at_is_optional_and_enforced(pool: PgPool) {
-    let (o, t) = user(&pool, false).await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (wid, item) = list(&pool, o, false, 30).await;
     let uri = format!("/wishlists/{wid}");
     let (_, _, b) = call(&pool, "GET", &uri, &ck(&t), None).await;
@@ -393,5 +390,5 @@ async fn closes_at_is_optional_and_enforced(pool: PgPool) {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
