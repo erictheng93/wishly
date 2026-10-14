@@ -42,6 +42,8 @@ for (const [name, vp] of Object.entries(SIZES)) {
       const rail = (await page.locator('.c-rail').boundingBox())!
       const main = (await page.locator('.c-page').boundingBox())!
       expect(rail.x + rail.width).toBeLessThanOrEqual(main.x)
+      // header 內與 rail 重複的導覽按鈕必須隱藏
+      expect(await page.locator('.c-head .c-nav-dup:visible').count()).toBe(0)
     })
     await test.step('滑鼠 hover 有視覺回饋', async () => {
       await page.goto(`/lists/${list.id}/edit`)

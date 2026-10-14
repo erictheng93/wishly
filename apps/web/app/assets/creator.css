@@ -2,7 +2,7 @@
 .c-page{max-width:var(--c-w);margin:0 auto;padding:0 20px 112px}
 .c-admin{max-width:max(var(--c-w),880px)}
 .c-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-height:52px;position:sticky;top:0;z-index:20;margin:0 -20px 16px;padding:env(safe-area-inset-top) 20px 0;background:var(--glass);border-bottom:3px solid var(--red)}
-.c-head h1{flex:1 1 8em;min-width:0;overflow-wrap:anywhere;font-size:18px;line-height:1.2;margin:0;letter-spacing:.1em;color:var(--red-text);text-transform:uppercase;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.c-head h1{flex:1 1 5em;min-width:0;overflow-wrap:anywhere;font-size:18px;line-height:1.2;margin:0;letter-spacing:.1em;color:var(--red-text);text-transform:uppercase;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .c-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--red);padding:16px;margin:0 0 12px}
 .c-card.bad{border-left-color:var(--bad);background:var(--bad-bg)}
 .c-card>h2:first-child,.c-h2{font-size:18px;margin:0 0 12px}
@@ -88,6 +88,9 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-sub{border-top:1px dashed var(--line);margin-top:12px;padding-top:8px}
 .c-sub .c-list>li{padding:8px 0;border-bottom:1px solid var(--line)}
 .c-pos{color:var(--ok)}.c-neg{color:var(--bad)}
+/* 窄螢幕：header 內按鈕收緊，避免導覽鈕被擠到第二列、sticky header 變成兩倍高 */
+@media (max-width:767px){.c-head .c-btn{padding:0 10px;letter-spacing:.06em}}
+@media (max-width:359px){.c-head .c-btn{padding:0 6px;letter-spacing:.02em;font-size:13px;min-width:0}}
 /* 平板 / 桌面：清單改格線、底部面板改置中 modal */
 @media (min-width:768px){
   .c-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0 16px;align-items:start}
@@ -107,7 +110,7 @@ dialog.c-sheet:focus-visible{outline:0}
   .c-rail{display:flex;flex-direction:column;position:fixed;top:calc(var(--head-h) + 20px);left:max(16px,calc(50% - var(--c-w) / 2 - 204px));width:168px;z-index:5;border-left:3px solid var(--red)}
   .c-rail a{display:flex;align-items:center;min-height:44px;padding:0 14px;color:var(--fg);font-weight:700;letter-spacing:.1em}
   .c-rail a.router-link-active{color:var(--red-text);background:var(--bg-alt)}
-  .c-nav-dup{display:none}
+  .c-btn.c-nav-dup,a.c-btn.c-nav-dup{display:none} /* 需高於 a.c-btn 的 display */
 }
 /* 桌面滑鼠 hover：僅在有 hover 的精準指標裝置生效，觸控裝置不會黏住 */
 @media (hover:hover) and (pointer:fine){
