@@ -84,7 +84,7 @@ async fn line_login_with_mock_provider(pool: PgPool) {
         &app,
         "GET",
         "/auth/oauth/line/callback?code=c&state=wrong",
-        &[("cookie", (&oc).to_string())],
+        &[("cookie", oc.clone())],
         None,
     )
     .await;
@@ -100,7 +100,7 @@ async fn line_login_with_mock_provider(pool: PgPool) {
         &app,
         "GET",
         &format!("/auth/oauth/line/callback?code=c&state={state}"),
-        &[("cookie", (&oc).to_string())],
+        &[("cookie", oc.clone())],
         None,
     )
     .await;
@@ -118,14 +118,7 @@ async fn line_login_with_mock_provider(pool: PgPool) {
         .find(|c| c.starts_with("ws_session="))
         .unwrap();
     let cookie = sess.split(';').next().unwrap().to_string();
-    let (st, _, me) = call_app(
-        &app,
-        "GET",
-        "/me",
-        &[("cookie", (&cookie).to_string())],
-        None,
-    )
-    .await;
+    let (st, _, me) = call_app(&app, "GET", "/me", &[("cookie", cookie.clone())], None).await;
     assert_eq!(st, 200);
     assert_eq!(me["display_name"], "LINE小明");
     assert_eq!(me["identities"][0]["provider"], "line");
