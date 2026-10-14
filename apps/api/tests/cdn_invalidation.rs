@@ -5,7 +5,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use common::{api, ck, user_pair as user, user_with_staff, wishlist_named as wishlist};
+use common::{call, ck, staff, user, wishlist, ListOpts, TestList, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use std::time::Duration;
@@ -34,12 +34,27 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
     cfg.api_base_url = "https://api.example.test".into();
     wishsync_api::config::init(cfg);
     let server = tokio::spawn(async move { axum::serve(listener, mock).await.unwrap() });
-    let (owner, token) = user(&pool, "Owner").await;
-    let (_, staff) = user_with_staff(&pool, "Moderator", true).await;
-    let privacy = wishlist(&pool, owner, "PurgePriv1").await;
-    let archive = wishlist(&pool, owner, "PurgeArch1").await;
-    let patch_archive = wishlist(&pool, owner, "PurgeArch2").await;
-    let hidden = wishlist(&pool, owner, "PurgeHide1").await;
+    let TestUser { id: owner, token } = user(&pool, "Owner").await;
+    let TestUser {
+        id: _,
+        token: staff,
+    } = staff(&pool, "Moderator").await;
+    let TestList {
+        id: privacy,
+        slug: privacy_slug,
+    } = wishlist(&pool, owner, ListOpts::default()).await;
+    let TestList {
+        id: archive,
+        slug: archive_slug,
+    } = wishlist(&pool, owner, ListOpts::default()).await;
+    let TestList {
+        id: patch_archive,
+        slug: patch_archive_slug,
+    } = wishlist(&pool, owner, ListOpts::default()).await;
+    let TestList {
+        id: hidden,
+        slug: hidden_slug,
+    } = wishlist(&pool, owner, ListOpts::default()).await;
     sqlx::query("UPDATE wishlists SET status='active',visibility='public'")
         .execute(&pool)
         .await
@@ -48,7 +63,7 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         (
             "PATCH",
             privacy,
-            "PurgePriv1",
+            privacy_slug.as_str(),
             token.as_str(),
             Some(json!({"visibility":"private"})),
             StatusCode::OK,
@@ -56,7 +71,7 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         (
             "DELETE",
             archive,
-            "PurgeArch1",
+            archive_slug.as_str(),
             token.as_str(),
             None,
             StatusCode::NO_CONTENT,
@@ -64,7 +79,7 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         (
             "PATCH",
             patch_archive,
-            "PurgeArch2",
+            patch_archive_slug.as_str(),
             token.as_str(),
             Some(json!({"status":"archived"})),
             StatusCode::OK,
@@ -72,7 +87,7 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         (
             "PATCH",
             hidden,
-            "PurgeHide1",
+            hidden_slug.as_str(),
             staff.as_str(),
             Some(json!({"moderation_status":"hidden","reason":"Unsafe"})),
             StatusCode::OK,
@@ -84,7 +99,7 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         } else {
             format!("/wishlists/{id}")
         };
-        let (status, _, response) = api(&pool, method, &uri, &ck(session), body).await;
+        let (status, _, response) = call(&pool, method, &uri, &ck(session), body).await;
         assert_eq!(status, expected, "{response}");
         let (auth, purge) = tokio::time::timeout(Duration::from_secs(5), received.recv())
             .await
@@ -103,7 +118,7 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         } else {
             assert_eq!(state.1, "archived");
         }
-        let (public_status, _, public) = api(
+        let (public_status, _, public) = call(
             &pool,
             "GET",
             &format!("/public/wishlists/{slug}"),
@@ -122,4 +137,5 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
         );
     }
     server.abort();
+    common::assert_all_reconciled(&pool).await;
 }
