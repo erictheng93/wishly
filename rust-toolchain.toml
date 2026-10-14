@@ -1,0 +1,5 @@
+# Coverage counts were measured with this compiler; update the baseline together.
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]

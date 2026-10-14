@@ -7,4 +7,4 @@ exec docker run --rm -v "$PWD/../..":/w -w /w/apps/api \
   -e DATABASE_URL="${DATABASE_URL:-postgres://wishsync:wishsync@host.docker.internal:5432/wishsync}" \
   -e APP_ENV="${APP_ENV:-dev}" -e SMTP_HOST="${SMTP_HOST:-host.docker.internal}" \
   -e MAILPIT_API_BASE="${MAILPIT_API_BASE:-http://host.docker.internal:8025}" \
-  -e SQLX_OFFLINE=false rust:1 cargo "$@"
+  -e SQLX_OFFLINE=false rust:1.99.0 cargo "$@"
