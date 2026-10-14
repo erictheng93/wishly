@@ -1,3 +1,4 @@
+//! 共用測試 helper；此目錄不會被 Cargo 當成獨立測試 binary。
 #![allow(dead_code)] // 每個整合測試 binary 只使用部分 fixture。
 
 use axum::{
@@ -6,22 +7,170 @@ use axum::{
     Router,
 };
 use http_body_util::BodyExt;
-use serde_json::Value;
+use serde_json::{json, Value};
 use sqlx::PgPool;
 use std::{future::Future, time::Duration};
 use tower::ServiceExt;
 use uuid::Uuid;
 
 pub type Resp = (StatusCode, HeaderMap, Value);
+pub type Hdr = Vec<(&'static str, String)>;
 
-pub async fn call(app: &Router, req: Request<Body>) -> Resp {
+pub fn test_app(pool: &PgPool) -> Router {
+    wishsync_api::app(wishsync_api::AppState { pool: pool.clone() })
+}
+
+/// URI 不含 /api/v1；可傳入隔離的 Router 或併發共用的 Router。
+pub async fn call_app(
+    app: &Router,
+    method: &str,
+    uri: &str,
+    hdr: &[(&str, String)],
+    body: Option<Value>,
+) -> Resp {
+    call_request(app, request(method, &format!("/api/v1{uri}"), hdr, body)).await
+}
+
+// 僅在逐檔遷移期間保留；全部檔案遷移後移除。
+pub use call as api;
+
+pub struct TestUser {
+    pub id: Uuid,
+    pub token: String,
+}
+pub async fn user(pool: &PgPool, name: &str) -> TestUser {
+    let (id, token) = user_with_staff(pool, name, false).await;
+    TestUser { id, token }
+}
+pub async fn staff(pool: &PgPool, name: &str) -> TestUser {
+    let (id, token) = user_with_staff(pool, name, true).await;
+    TestUser { id, token }
+}
+pub async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {
+    let (a, b) = if a < b { (a, b) } else { (b, a) };
+    sqlx::query("INSERT INTO friendships(user_a,user_b) VALUES($1,$2)")
+        .bind(a)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+#[derive(Default)]
+pub struct ListOpts {
+    pub status: Option<&'static str>,
+    pub visibility: Option<&'static str>,
+    pub surprise: bool,
+    pub event_offset_days: Option<i32>,
+    pub closes_in: Option<&'static str>,
+    pub moderation_status: Option<&'static str>,
+}
+pub struct TestList {
+    pub id: Uuid,
+    pub slug: String,
+}
+pub async fn wishlist(pool: &PgPool, owner: Uuid, o: ListOpts) -> TestList {
+    let slug = Uuid::new_v4().simple().to_string()[..10].to_string();
+    let password_hash = if o.visibility == Some("password") {
+        use argon2::{
+            password_hash::{rand_core::OsRng, SaltString},
+            Argon2, PasswordHasher,
+        };
+        Some(
+            Argon2::default()
+                .hash_password(b"test password", &SaltString::generate(&mut OsRng))
+                .unwrap()
+                .to_string(),
+        )
+    } else {
+        None
+    };
+    let id = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title,visibility,surprise_mode,event_date,closes_at,moderation_status,moderation_reason,access_password_hash)
+        VALUES($1,'registry',$2::wishlist_status,$3,'清單',$4::visibility,$5,current_date+$6::int,now()+$7::interval,$8::moderation_status,
+        CASE WHEN $8='hidden' THEN 'test fixture' END,CASE WHEN $4='password' THEN $9 END) RETURNING id")
+        .bind(owner).bind(o.status.unwrap_or("active")).bind(&slug).bind(o.visibility.unwrap_or("link"))
+        .bind(o.surprise).bind(o.event_offset_days).bind(o.closes_in).bind(o.moderation_status.unwrap_or("ok"))
+        .bind(password_hash).fetch_one(pool).await.unwrap();
+    TestList { id, slug }
+}
+pub async fn item(pool: &PgPool, wl: Uuid, title: &str, needed: i32) -> Uuid {
+    sqlx::query_scalar(
+        "INSERT INTO wishlist_items(wishlist_id,title,qty_needed) VALUES($1,$2,$3) RETURNING id",
+    )
+    .bind(wl)
+    .bind(title)
+    .bind(needed)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+pub async fn crowdfund_item(pool: &PgPool, wl: Uuid, target_points: i64) -> Uuid {
+    sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,funding_mode,target_points,funding_status,funding_deadline,fulfillment_type)
+        VALUES($1,'嬰兒推車',1,'crowdfund',$2,'open',now()+interval '7 days','concierge') RETURNING id")
+        .bind(wl).bind(target_points).fetch_one(pool).await.unwrap()
+}
+pub fn idem(key: Uuid) -> Hdr {
+    vec![("idempotency-key", key.to_string())]
+}
+pub async fn grant(pool: &PgPool, user: Uuid, n: i64) {
+    let mut tx = pool.begin().await.unwrap();
+    let wallet = wishsync_api::points::ensure_wallet(&mut tx, user)
+        .await
+        .unwrap();
+    wishsync_api::points::post(
+        &mut tx,
+        wallet,
+        n,
+        wishsync_api::points::Entry {
+            kind: "grant",
+            ref_type: "manual",
+            ref_id: None,
+            note: Some("test"),
+            actor: None,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+}
+pub async fn balance(pool: &PgPool, user: Uuid) -> i64 {
+    sqlx::query_scalar("SELECT COALESCE((SELECT balance FROM point_wallets WHERE user_id=$1),0)")
+        .bind(user)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+pub async fn pledge(app: &Router, item: Uuid, token: &str, points: i64) -> Resp {
+    call_app(
+        app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        &[ck(token), idem(Uuid::new_v4())].concat(),
+        Some(json!({"points":points})),
+    )
+    .await
+}
+pub async fn assert_points_reconciled(pool: &PgPool) {
+    let bad: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM point_wallets w WHERE balance <> COALESCE((SELECT sum(delta) FROM point_ledger l WHERE l.wallet_id=w.id),0)")
+        .fetch_all(pool).await.unwrap();
+    assert!(bad.is_empty(), "錢包 balance 與 ledger 加總不一致: {bad:?}");
+    let drift: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM wishlist_items i WHERE funding_mode='crowdfund' AND pledged_points <> COALESCE((SELECT sum(points) FROM contributions c WHERE c.item_id=i.id AND c.status IN ('pledged','captured')),0)")
+        .fetch_all(pool).await.unwrap();
+    assert!(drift.is_empty(), "item.pledged_points 漂移: {drift:?}");
+}
+pub async fn assert_all_reconciled(pool: &PgPool) {
+    assert_points_reconciled(pool).await;
+    assert_claims_reconciled(pool).await;
+}
+
+pub async fn call_request(app: &Router, req: Request<Body>) -> Resp {
     let res = app.clone().oneshot(req).await.unwrap();
     let (status, headers) = (res.status(), res.headers().clone());
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
     let body = if bytes.is_empty() {
         Value::Null
     } else {
-        serde_json::from_slice(&bytes).expect("API response must be JSON")
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
     };
     (status, headers, body)
 }
@@ -45,25 +194,21 @@ pub fn request(
     .unwrap()
 }
 
-pub async fn api(
+pub async fn call(
     pool: &PgPool,
     method: &str,
     uri: &str,
     headers: &[(&str, String)],
     body: Option<Value>,
 ) -> Resp {
-    call(
-        &wishsync_api::app(wishsync_api::AppState { pool: pool.clone() }),
-        request(method, &format!("/api/v1{uri}"), headers, body),
-    )
-    .await
+    call_app(&test_app(pool), method, uri, headers, body).await
 }
 
-pub fn ck(token: &str) -> Vec<(&'static str, String)> {
+pub fn ck(token: &str) -> Hdr {
     vec![("cookie", format!("ws_session={token}"))]
 }
 
-pub fn gt(token: &str) -> Vec<(&'static str, String)> {
+pub fn gt(token: &str) -> Hdr {
     vec![("x-guest-token", token.to_string())]
 }
 
@@ -74,7 +219,7 @@ pub async fn session(pool: &PgPool, id: Uuid) -> String {
     token
 }
 
-pub async fn user(pool: &PgPool, name: &str) -> (Uuid, String) {
+pub async fn user_pair(pool: &PgPool, name: &str) -> (Uuid, String) {
     user_with_staff(pool, name, false).await
 }
 
@@ -91,7 +236,7 @@ pub async fn user_with_staff(pool: &PgPool, name: &str, staff: bool) -> (Uuid, S
     (id, session(pool, id).await)
 }
 
-pub async fn wishlist(pool: &PgPool, owner: Uuid, slug: &str) -> Uuid {
+pub async fn wishlist_named(pool: &PgPool, owner: Uuid, slug: &str) -> Uuid {
     sqlx::query_scalar("INSERT INTO wishlists (owner_id, type, status, slug, title) VALUES ($1, 'registry', 'active', $2, '清單') RETURNING id")
         .bind(owner).bind(slug).fetch_one(pool).await.unwrap()
 }
@@ -100,7 +245,7 @@ pub async fn assert_claims_reconciled(pool: &PgPool) {
     let drift: Vec<(Uuid, i32, i64)> = sqlx::query_as(
         "SELECT i.id, i.qty_claimed, COALESCE(sum(c.qty), 0)::bigint FROM wishlist_items i
          LEFT JOIN claims c ON c.item_id = i.id AND c.status IN ('reserved', 'purchased', 'delivered')
-         GROUP BY i.id HAVING i.qty_claimed <> COALESCE(sum(c.qty), 0)")
+         GROUP BY i.id HAVING i.qty_claimed <> COALESCE(sum(c.qty), 0) OR i.qty_claimed < 0 OR i.qty_claimed > i.qty_needed")
         .fetch_all(pool).await.unwrap();
     assert!(
         drift.is_empty(),
@@ -174,7 +319,11 @@ pub async fn guest_wishlist(pool: &PgPool, owner: Uuid, surprise: bool, off: i32
     let it: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 3) RETURNING id").bind(wid).fetch_one(pool).await.unwrap();
     (wid, it)
 }
-pub async fn guest_claim(pool: &PgPool, item: Uuid, email: Option<&str>) -> (String, Uuid) {
+pub async fn guest_claim_with_email(
+    pool: &PgPool,
+    item: Uuid,
+    email: Option<&str>,
+) -> (String, Uuid) {
     let (s, _, b) = api(
         pool,
         "POST",
@@ -200,11 +349,28 @@ pub async fn quantity_wishlist(
         .fetch_one(pool)
         .await
         .unwrap();
-    let list = wishlist(pool, owner, slug).await;
+    let list = wishlist_named(pool, owner, slug).await;
     let mut ids = Vec::new();
     for n in 0..items {
         ids.push(sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, $2, $3) RETURNING id")
             .bind(list).bind(format!("i{n}")).bind(needed).fetch_one(pool).await.unwrap());
     }
     (list, ids)
+}
+
+/// 建立指定數量的訪客認領。
+pub async fn guest_claim(pool: &PgPool, item: Uuid, qty: i32) -> (String, Uuid) {
+    let (status, _, body) = call(
+        pool,
+        "POST",
+        &format!("/items/{item}/claims"),
+        &idem(Uuid::new_v4()),
+        Some(json!({"qty":qty,"display_name":"小明"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    (
+        body["guest_token"].as_str().unwrap().into(),
+        body["claim"]["id"].as_str().unwrap().parse().unwrap(),
+    )
 }

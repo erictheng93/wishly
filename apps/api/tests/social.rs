@@ -25,7 +25,7 @@ async fn call(
 
 /// (id, session token, email)
 async fn user(pool: &PgPool, name: &str, handle: Option<&str>) -> (Uuid, String, String) {
-    let (id, token) = common::user(pool, name).await;
+    let (id, token) = common::user_pair(pool, name).await;
     let email: String =
         sqlx::query_scalar("UPDATE users SET handle=$2 WHERE id=$1 RETURNING email")
             .bind(id)

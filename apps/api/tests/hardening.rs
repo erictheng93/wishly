@@ -5,24 +5,13 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use common::api as call;
-use common::ck;
-use common::gt;
-fn idem(k: Uuid) -> Vec<(&'static str, String)> {
-    vec![("idempotency-key", k.to_string())]
-}
-
-async fn user(pool: &PgPool) -> (Uuid, String) {
-    common::user(pool, "u").await
-}
+use common::*;
 
 /// active 清單 + qty_needed=5 的品項
 async fn fixture(pool: &PgPool, owner: Uuid) -> (Uuid, String, Uuid) {
-    let slug: String = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let wid: Uuid = sqlx::query_scalar("INSERT INTO wishlists (owner_id, type, status, slug, title) VALUES ($1, 'registry', 'active', $2, '清單') RETURNING id")
-        .bind(owner).bind(&slug).fetch_one(pool).await.unwrap();
-    let it: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 5) RETURNING id").bind(wid).fetch_one(pool).await.unwrap();
-    (wid, slug, it)
+    let wl = wishlist(pool, owner, ListOpts::default()).await;
+    let it = item(pool, wl.id, "奶瓶", 5).await;
+    (wl.id, wl.slug, it)
 }
 
 async fn claim(
@@ -44,7 +33,10 @@ fn field(b: &Value) -> &str {
 // ---------- F-01 ----------
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn lost_first_response_replay_reissues_usable_token(pool: PgPool) {
-    let (owner, _) = user(&pool).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "u").await;
     let (_, _, it) = fixture(&pool, owner).await;
     let key = Uuid::new_v4();
     let body = json!({"qty": 2, "display_name": "小明"});
@@ -81,13 +73,13 @@ async fn lost_first_response_replay_reissues_usable_token(pool: PgPool) {
     let leaked: i64 = sqlx::query_scalar("SELECT count(*) FROM idempotency_keys WHERE response_body::text LIKE $1 OR response_body::text LIKE $2")
         .bind(format!("%{old}%")).bind(format!("%{new}%")).fetch_one(&pool).await.unwrap();
     assert_eq!(leaked, 0);
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 // ---------- F-03 / F-16 ----------
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn text_validation_wishlists_and_items(pool: PgPool) {
-    let (_, tok) = user(&pool).await;
+    let TestUser { id: _, token: tok } = user(&pool, "u").await;
     let h = ck(&tok);
     for (t, why) in [
         ("a\u{0}b", "nul"),
@@ -201,11 +193,15 @@ async fn text_validation_wishlists_and_items(pool: PgPool) {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn text_validation_claims_reports_slug(pool: PgPool) {
-    let (owner, _) = user(&pool).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "u").await;
     let (_, slug, it) = fixture(&pool, owner).await;
     for (k, v) in [
         ("display_name", "a\u{0}b"),
@@ -274,13 +270,16 @@ async fn text_validation_claims_reports_slug(pool: PgPool) {
         .0,
         StatusCode::NOT_FOUND
     );
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 // ---------- F-11 ----------
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn claim_email_must_be_deliverable(pool: PgPool) {
-    let (owner, _) = user(&pool).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "u").await;
     let (_, _, it) = fixture(&pool, owner).await;
     for e in [
         "a b@c.com",
@@ -319,13 +318,13 @@ async fn claim_email_must_be_deliverable(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(e, "ok@example.com");
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 // ---------- F-17 ----------
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn event_date_range(pool: PgPool) {
-    let (_, tok) = user(&pool).await;
+    let TestUser { id: _, token: tok } = user(&pool, "u").await;
     let h = ck(&tok);
     for d in [
         "0000-01-01",
@@ -354,12 +353,16 @@ async fn event_date_range(pool: PgPool) {
         .await;
         assert_eq!(s, StatusCode::CREATED, "{d}");
     }
+    assert_all_reconciled(&pool).await;
 }
 
 // ---------- F-09 ----------
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn force_delete_cleans_up_claims(pool: PgPool) {
-    let (owner, tok) = user(&pool).await;
+    let TestUser {
+        id: owner,
+        token: tok,
+    } = user(&pool, "u").await;
     let (wid, _, it) = fixture(&pool, owner).await;
     let (_, _, a) = claim(
         &pool,
@@ -377,7 +380,10 @@ async fn force_delete_cleans_up_claims(pool: PgPool) {
         json!({"qty": 1, "display_name": "乙"}),
     )
     .await;
-    let (cu, ctok) = user(&pool).await; // 登入使用者認領（有 email）
+    let TestUser {
+        id: cu,
+        token: ctok,
+    } = user(&pool, "u").await; // 登入使用者認領（有 email）
     let (s, _, _) = claim(&pool, it, Uuid::new_v4(), ck(&ctok), json!({"qty": 1})).await;
     assert_eq!(s, StatusCode::CREATED);
     assert!(a["guest_token"].is_string());
@@ -430,12 +436,15 @@ async fn force_delete_cleans_up_claims(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(nu, 1);
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn force_delete_still_forbidden_while_surprise_locked(pool: PgPool) {
-    let (owner, tok) = user(&pool).await;
+    let TestUser {
+        id: owner,
+        token: tok,
+    } = user(&pool, "u").await;
     let (wid, _, it) = fixture(&pool, owner).await;
     sqlx::query(
         "UPDATE wishlists SET surprise_mode = true, event_date = current_date + 30 WHERE id = $1",
@@ -470,5 +479,5 @@ async fn force_delete_still_forbidden_while_surprise_locked(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(q, 1);
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }

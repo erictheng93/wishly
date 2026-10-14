@@ -28,7 +28,7 @@ async fn call(
     let h = cookie
         .map(|c| vec![("cookie", c.to_string())])
         .unwrap_or_default();
-    common::call(app, common::request(method, uri, &h, body)).await
+    common::call_request(app, common::request(method, uri, &h, body)).await
 }
 
 async fn recover_code(pool: &PgPool, email: &str, purpose: &str) -> String {

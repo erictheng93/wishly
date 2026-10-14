@@ -34,7 +34,7 @@ async fn call(
                 format!("{ip}:1234").parse().unwrap(),
             ));
     }
-    common::call(app, req).await
+    common::call_request(app, req).await
 }
 
 async fn wishlist(pool: &PgPool, slug: &str, items: usize) -> (Uuid, Vec<Uuid>) {

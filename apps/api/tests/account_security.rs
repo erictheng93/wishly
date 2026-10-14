@@ -67,7 +67,7 @@ async fn call(
     (s, h, serde_json::from_slice(&b).unwrap_or(Value::Null))
 }
 async fn user(pool: &PgPool) -> (Uuid, String) {
-    common::user(pool, "u").await
+    common::user_pair(pool, "u").await
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

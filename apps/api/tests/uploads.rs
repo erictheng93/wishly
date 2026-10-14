@@ -6,7 +6,7 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use common::{api, ck, user};
+use common::{api, ck, user_pair as user};
 use serde_json::json;
 use sqlx::PgPool;
 use tokio::sync::mpsc;

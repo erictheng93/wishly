@@ -23,12 +23,12 @@ async fn call(
     let h = cookie
         .map(|c| vec![("cookie", c.to_string())])
         .unwrap_or_default();
-    common::call(app, common::request(method, uri, &h, body)).await
+    common::call_request(app, common::request(method, uri, &h, body)).await
 }
 
 /// 直接建 user + session，回傳 cookie
 async fn login(pool: &PgPool) -> (Uuid, String) {
-    let (id, token) = common::user(pool, "t").await;
+    let (id, token) = common::user_pair(pool, "t").await;
     (id, format!("ws_session={token}"))
 }
 

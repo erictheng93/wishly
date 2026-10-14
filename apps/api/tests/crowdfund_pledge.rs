@@ -26,7 +26,7 @@ async fn call(
     if let Some(k) = key {
         h.push(("idempotency-key", k.to_string()));
     }
-    common::call(
+    common::call_request(
         app,
         common::request(method, &format!("/api/v1{uri}"), &h, body),
     )
@@ -46,7 +46,7 @@ async fn pledge(app: &Router, item: Uuid, tok: &str, points: i64) -> Resp {
 }
 
 /// 使用者 + session；回傳 (id, token)
-use common::user;
+use common::user_pair as user;
 
 /// 發點（ledger grant），保持 balance = Σ delta
 async fn grant(pool: &PgPool, uid: Uuid, n: i64) {

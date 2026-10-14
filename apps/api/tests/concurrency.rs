@@ -6,7 +6,7 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use common::{assert_claims_reconciled, call};
+use common::{assert_claims_reconciled, call_request as call};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::time::Duration;
@@ -178,7 +178,7 @@ async fn reconciled(pool: &PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
     let it = quantity(&pool, list(&pool, owner).await, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let key = Uuid::new_v4();
@@ -223,8 +223,8 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn same_key_pledge_requests_overlap_and_debit_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (donor, token) = common::user(&pool, "donor").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (donor, token) = common::user_pair(&pool, "donor").await;
     grant(&pool, donor).await;
     let it = funding(&pool, list(&pool, owner).await, 500).await;
     let app = app(AppState { pool: pool.clone() });
@@ -275,10 +275,10 @@ async fn same_key_pledge_requests_overlap_and_debit_once(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn mixed_quantity_claims_report_remaining_and_never_oversell(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (_, ta) = common::user(&pool, "a").await;
-    let (_, tb) = common::user(&pool, "b").await;
-    let (_, tc) = common::user(&pool, "c").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (_, ta) = common::user_pair(&pool, "a").await;
+    let (_, tb) = common::user_pair(&pool, "b").await;
+    let (_, tc) = common::user_pair(&pool, "c").await;
     let app = app(AppState { pool: pool.clone() });
     for quantities in [[2, 3, 3], [2, 2, 2]] {
         let it = quantity(&pool, list(&pool, owner).await, 5).await;
@@ -359,9 +359,9 @@ async fn mixed_quantity_claims_report_remaining_and_never_oversell(pool: PgPool)
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn withdraw_vs_final_pledge_serializes_both_orders(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (a, ta) = common::user(&pool, "a").await;
-    let (b, tb) = common::user(&pool, "b").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (a, ta) = common::user_pair(&pool, "a").await;
+    let (b, tb) = common::user_pair(&pool, "b").await;
     grant(&pool, a).await;
     grant(&pool, b).await;
     let wl = list(&pool, owner).await;
@@ -438,8 +438,8 @@ async fn withdraw_vs_final_pledge_serializes_both_orders(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn withdraw_vs_tick_refunds_exactly_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (donor, token) = common::user(&pool, "donor").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (donor, token) = common::user_pair(&pool, "donor").await;
     let wallet = grant(&pool, donor).await;
     let wl = list(&pool, owner).await;
     let app = app(AppState { pool: pool.clone() });
@@ -513,9 +513,9 @@ async fn withdraw_vs_tick_refunds_exactly_once(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reallocate_vs_last_pledge_respects_target_cap_in_both_orders(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (a, ta) = common::user(&pool, "a").await;
-    let (b, tb) = common::user(&pool, "b").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (a, ta) = common::user_pair(&pool, "a").await;
+    let (b, tb) = common::user_pair(&pool, "b").await;
     grant(&pool, a).await;
     grant(&pool, b).await;
     let wl = list(&pool, owner).await;
@@ -613,9 +613,9 @@ async fn reallocate_vs_last_pledge_respects_target_cap_in_both_orders(pool: PgPo
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (a, ta) = common::user(&pool, "a").await;
-    let (b, tb) = common::user(&pool, "b").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (a, ta) = common::user_pair(&pool, "a").await;
+    let (b, tb) = common::user_pair(&pool, "b").await;
     grant(&pool, a).await;
     grant(&pool, b).await;
     let wl = list(&pool, owner).await;
@@ -699,9 +699,9 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn wallet_freeze_vs_pledge_checks_status_under_lock(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
     let (_, staff) = common::user_with_staff(&pool, "staff", true).await;
-    let (donor, token) = common::user(&pool, "donor").await;
+    let (donor, token) = common::user_pair(&pool, "donor").await;
     let wallet = grant(&pool, donor).await;
     let it = funding(&pool, list(&pool, owner).await, 500).await;
     let app = app(AppState { pool: pool.clone() });
@@ -768,8 +768,8 @@ async fn wallet_freeze_vs_pledge_checks_status_under_lock(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn removal_vs_inflight_claim_serializes_and_reconciles(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user(&pool, "owner").await;
-    let (_, donor_token) = common::user(&pool, "donor").await;
+    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
+    let (_, donor_token) = common::user_pair(&pool, "donor").await;
     let app = app(AppState { pool: pool.clone() });
     for archive in [false, true] {
         for removal_first in [false, true] {
@@ -873,8 +873,8 @@ async fn removal_vs_inflight_claim_serializes_and_reconciles(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn removal_vs_inflight_pledge_serializes_and_refunds(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user(&pool, "owner").await;
-    let (donor, donor_token) = common::user(&pool, "donor").await;
+    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
+    let (donor, donor_token) = common::user_pair(&pool, "donor").await;
     grant(&pool, donor).await;
     let app = app(AppState { pool: pool.clone() });
     for archive in [false, true] {
@@ -978,8 +978,8 @@ async fn removal_vs_inflight_pledge_serializes_and_refunds(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn deleting_quantity_item_preserves_delivered_claim_accounting(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user(&pool, "owner").await;
-    let (_, donor) = common::user(&pool, "donor").await;
+    let (owner, token) = common::user_pair(&pool, "owner").await;
+    let (_, donor) = common::user_pair(&pool, "donor").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1034,8 +1034,8 @@ async fn deleting_quantity_item_preserves_delivered_claim_accounting(pool: PgPoo
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn archive_vs_waiting_claim_cannot_accept_after_archive_commit(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user(&pool, "owner").await;
-    let (_, donor_token) = common::user(&pool, "donor").await;
+    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
+    let (_, donor_token) = common::user_pair(&pool, "donor").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1092,8 +1092,8 @@ async fn archive_vs_waiting_claim_cannot_accept_after_archive_commit(pool: PgPoo
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, owner_token) = common::user(&pool, "owner").await;
-    let (_, donor_token) = common::user(&pool, "donor").await;
+    let (owner, owner_token) = common::user_pair(&pool, "owner").await;
+    let (_, donor_token) = common::user_pair(&pool, "donor").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1163,7 +1163,7 @@ async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPo
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user(&pool, "owner").await;
+    let (owner, token) = common::user_pair(&pool, "owner").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1216,7 +1216,7 @@ async fn account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim(pool
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user(&pool, "owner").await;
+    let (owner, token) = common::user_pair(&pool, "owner").await;
     let wl = list(&pool, owner).await;
     let it = funding(&pool, wl, 500).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1285,7 +1285,7 @@ async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool)
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, token) = common::user(&pool, "owner").await;
+    let (owner, token) = common::user_pair(&pool, "owner").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1329,8 +1329,8 @@ async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn deleted_actor_cannot_create_claim_on_another_users_active_list(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
-    let (owner, _) = common::user(&pool, "owner").await;
-    let (actor, token) = common::user(&pool, "actor").await;
+    let (owner, _) = common::user_pair(&pool, "owner").await;
+    let (actor, token) = common::user_pair(&pool, "actor").await;
     let it = quantity(&pool, list(&pool, owner).await, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let (gate, pid) = gate(&pool, "users", actor).await;

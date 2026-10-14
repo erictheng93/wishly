@@ -14,7 +14,7 @@ async fn user(pool: &PgPool, staff: bool) -> (Uuid, String) {
 use common::guest_wishlist as list;
 
 /// 訪客認領；回傳 (guest_token, claim_id)
-use common::guest_claim as claim;
+use common::guest_claim_with_email as claim;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn dashboard_locked_totals_and_moderation(pool: PgPool) {

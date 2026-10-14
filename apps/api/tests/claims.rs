@@ -4,7 +4,7 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use common::{assert_claims_reconciled, call};
+use common::{assert_claims_reconciled, call_request as call};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;

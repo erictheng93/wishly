@@ -13,7 +13,7 @@ use wishsync_api::{app, AppState};
 use common::api as call;
 use common::ck;
 
-use common::user;
+use common::user_pair as user;
 async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {
     let (x, y) = if a < b { (a, b) } else { (b, a) };
     sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES ($1, $2)")

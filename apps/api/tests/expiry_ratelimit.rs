@@ -26,7 +26,7 @@ async fn call(
         .insert(ConnectInfo::<std::net::SocketAddr>(
             format!("{ip}:1234").parse().unwrap(),
         ));
-    common::call(app, req).await
+    common::call_request(app, req).await
 }
 
 use common::quantity_wishlist as wishlist;

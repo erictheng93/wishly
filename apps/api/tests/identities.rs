@@ -18,7 +18,7 @@ async fn call(
 }
 
 async fn user(pool: &PgPool, provider: &str) -> (Uuid, String) {
-    let (id, token) = common::user(pool, "LINE 測試").await;
+    let (id, token) = common::user_pair(pool, "LINE 測試").await;
     sqlx::query("UPDATE users SET email=NULL WHERE id=$1")
         .bind(id)
         .execute(pool)

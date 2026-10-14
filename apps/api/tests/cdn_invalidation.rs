@@ -5,7 +5,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use common::{api, ck, user, user_with_staff, wishlist};
+use common::{api, ck, user_pair as user, user_with_staff, wishlist_named as wishlist};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use std::time::Duration;

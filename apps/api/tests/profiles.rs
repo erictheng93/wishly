@@ -1,7 +1,7 @@
 //! Dedicated public profile boundaries: handles are case insensitive; hidden data stays hidden.
 mod common;
 use axum::http::StatusCode;
-use common::{api, ck, user, wishlist};
+use common::{api, ck, user_pair as user, wishlist_named as wishlist};
 use serde_json::json;
 use sqlx::PgPool;
 

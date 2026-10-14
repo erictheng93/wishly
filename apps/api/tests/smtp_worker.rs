@@ -1,6 +1,6 @@
 //! Enabled in normal cargo test; docker compose Mailpit is the SMTP integration fixture.
 mod common;
-use common::{user, wait_until, wishlist};
+use common::{user_pair as user, wait_until, wishlist_named as wishlist};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use wishsync_api::config::Config;

@@ -19,7 +19,7 @@ async fn call(
 use common::ck;
 
 async fn user(pool: &PgPool) -> (Uuid, String) {
-    common::user(pool, "u").await
+    common::user_pair(pool, "u").await
 }
 
 /// 清單；closes_sql 是 SQL 運算式（如 "now() + interval '1 hour'" 或 "NULL"）
