@@ -27,6 +27,11 @@ CASES = {
     "ledger-update": ("db/migrations/0004_crowdfund.sql", None, "BEFORE UPDATE OR DELETE ON point_ledger", "BEFORE DELETE ON point_ledger", "migration_constraints", LEDGER_TEST),
     "ledger-delete": ("db/migrations/0004_crowdfund.sql", None, "BEFORE UPDATE OR DELETE ON point_ledger", "BEFORE UPDATE ON point_ledger", "migration_constraints", LEDGER_TEST),
     "wallet-for-update": (API + "contributions.rs", "create", "SELECT status::text FROM point_wallets WHERE id = $1 FOR UPDATE", "SELECT status::text FROM point_wallets WHERE id = $1", "concurrency", "wallet_freeze_vs_pledge_checks_status_under_lock"),
+    "claim-wishlist-for-share": (API + "claims.rs", "create", "SELECT id FROM wishlists WHERE id = $1 FOR SHARE", "SELECT id FROM wishlists WHERE id = $1", "concurrency", "archive_vs_waiting_claim_cannot_accept_after_archive_commit"),
+    "idempotency-claim-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_claim_requests_overlap_and_claim_once"),
+    "idempotency-pledge-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_pledge_requests_overlap_and_debit_once"),
+    "delete-item-for-update": (API + "wishlists.rs", "item_delete", "SELECT id FROM wishlist_items WHERE id=$1 FOR UPDATE", "SELECT id FROM wishlist_items WHERE id=$1", "concurrency", "force_delete_vs_claim_update_uses_item_then_claim_lock_order"),
+    "reallocation-source-first": (API + "contributions.rs", "reallocate", "ORDER BY id FOR UPDATE", "ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END FOR UPDATE", "concurrency", "opposite_reallocations_lock_lowest_item_first_without_deadlock"),
 }
 # Disable exactly one named constraint while retaining valid migration SQL.
 for name, migration, constraint, test in [
@@ -55,6 +60,11 @@ FAILURE_MARKERS.update({
     "ledger-update": "DB must reject SQLSTATE 23001 constraint unnamed",
     "ledger-delete": "DB must reject SQLSTATE 23001 constraint unnamed",
     "wallet-for-update": "frozen wallet was debited by the racing pledge",
+    "claim-wishlist-for-share": "claim accepted after archive committed",
+    "idempotency-claim-on-conflict": "claim idempotency ON CONFLICT missing: SQLSTATE 23505 constraint idempotency_keys_pkey",
+    "idempotency-pledge-on-conflict": "pledge idempotency ON CONFLICT missing: SQLSTATE 23505 constraint idempotency_keys_pkey",
+    "delete-item-for-update": "item deletion without item lock caused a PostgreSQL deadlock: pg_stat_database.deadlocks",
+    "reallocation-source-first": "reallocation source-first lock order caused a PostgreSQL deadlock: pg_stat_database.deadlocks",
     "claims-reconciliation": "claims reconciliation accepted a drifted cache",
     "wallet-reconciliation": "wallet reconciliation accepted a drifted balance",
     "contribution-reconciliation": "contribution reconciliation accepted a drifted cache",

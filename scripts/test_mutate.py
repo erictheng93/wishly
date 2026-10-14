@@ -19,7 +19,7 @@ ORIGINAL = b'pub async fn create() { let value = "original"; }\n'
 
 
 class MutatorTests(unittest.TestCase):
-    def exercise(self, mutant_log, interrupted=False):
+    def exercise(self, mutant_log, interrupted=False, expected_marker="semantic violation"):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "source.rs"
@@ -57,7 +57,7 @@ class MutatorTests(unittest.TestCase):
 
             with patch.object(mutator, "ROOT", root), patch.dict(mutator.CASES, {"unit": (
                 "source.rs", "create", "original", "changed", "fake", "fake_test",
-            )}, clear=True), patch.dict(mutator.FAILURE_MARKERS, {"unit": "semantic violation"}, clear=True), \
+            )}, clear=True), patch.dict(mutator.FAILURE_MARKERS, {"unit": expected_marker}, clear=True), \
                 patch.object(mutator.subprocess, "check_output", return_value="fake provenance"), \
                 patch.object(mutator.subprocess, "Popen", side_effect=spawn), patch.object(mutator.os, "killpg") as killpg:
                 if interrupted:
@@ -97,6 +97,20 @@ class MutatorTests(unittest.TestCase):
                 killed, data = self.exercise(log)
                 self.assertFalse(killed)
                 self.assertEqual(data["result"], "invalid-mutant")
+
+    def test_concurrency_kills_require_the_specific_database_evidence(self):
+        for name in ("delete-item-for-update", "reallocation-source-first",
+                     "idempotency-claim-on-conflict", "idempotency-pledge-on-conflict"):
+            marker = mutator.FAILURE_MARKERS[name]
+            with self.subTest(case=name):
+                killed, _ = self.exercise(marker + " 0 -> 1\n" + RED, expected_marker=marker)
+                self.assertTrue(killed)
+                for diagnostic in ("race did not finish (possible deadlock)",
+                                   "expected 2 blocked statements", "SQLSTATE 23505",
+                                   "assertion failed: HTTP 500"):
+                    killed, receipt = self.exercise(diagnostic + "\n" + RED, expected_marker=marker)
+                    self.assertFalse(killed)
+                    self.assertEqual(receipt["result"], "invalid-mutant")
 
     def test_interrupted_rerun_restores_source_and_replaces_old_receipt(self):
         self.exercise("semantic violation", interrupted=True)

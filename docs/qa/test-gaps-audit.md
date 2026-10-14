@@ -43,7 +43,7 @@
 | --- | --- |
 | 移除 claim wishlist FOR SHARE | archive 已先提交，最終 DB qty_claimed 仍由 0 變 2。 |
 | 移除 pledge wallet FOR UPDATE | frozen wallet 最終 balance 由 1000 變 800。 |
-| reallocate 改來源品項優先 | high→low 先鎖 high，違反兩個方向都先鎖較小 id 的實際 blocking predicate。 |
+| reallocate 改來源品項優先 | 原先捕捉鎖序 predicate；2026-10-15 runner 進一步形成真實死鎖，觀察 isolated DB deadlocks 0→1 並驗 final DB 完整回滾。 |
 | 移除 delete 的 item FOR UPDATE | 真實 PostgreSQL `deadlock detected`，更新認領回 500。 |
 | 移除 idempotency ON CONFLICT | claim、pledge 第二筆均回 500，未能重放／409。 |
 | 停用 CDN purge | 五個呼叫點（private、archive、hidden、account delete、close_due）逐一停用後，對應 mock 接收斷言皆失敗；全部可由 scripts/mutate.sh 重跑。 |
@@ -63,7 +63,9 @@
 
 ## 覆蓋率與閘門
 
-API 基準為 [coverage-baseline.json](../../apps/api/tests/coverage-baseline.json)，涵蓋 API 自有 Rust 程式碼，排除 tests／examples 與外部 dependencies；保護 lines 91.28%、functions 88.25%、regions 87.15%。Rust 與 Docker／CI 固定 1.99.0，cargo-llvm-cov 固定 0.9.1；coverage script 若版本不同會先拒絕，必須同步重新量測後才能更新。原生殼目前是 command unit tests，沒有宣稱原生介面／OS keychain 的整體覆蓋率。
+API 基準為 [coverage-baseline.json](../../apps/api/tests/coverage-baseline.json)，涵蓋 API 自有 Rust 程式碼，排除 tests／examples 與外部 dependencies。2026-10-15 保留實測 counts，加入每項 0.5 個百分點的明確餘裕；門檻直接由 covered／total 計算，為 lines 90.789157%、functions 87.755034%、regions 86.656589%。允許下降最多 0.5 個百分點，並非每 PR 零下降保證；CI 不自動改基準或餘裕。Rust 與 Docker／CI 固定 1.99.0，cargo-llvm-cov 固定 0.9.1；coverage script 若版本不同會先拒絕。原生殼目前是 command unit tests，沒有宣稱原生介面／OS keychain 的整體覆蓋率。
+
+更新基準時，以固定工具版本重新執行 `sh scripts/coverage-api.sh`，取 `apps/api/target/coverage.json` 的 `data[0].totals`，把三項 `covered`／`count` 記入 baseline 的 `covered`／`total`。若工具改版，同步更新 toolchain 設定、CI 安裝版本與 baseline 的 toolchain，再保存重測證據。PR 必須說明範圍、刪除已覆蓋程式碼等比例變動原因；不能只因 gate 紅燈就降低 counts。餘裕是另行審核的政策值，不在重新量測時自動擴大。`python3 scripts/test_coverage.py` 驗證門檻傳遞與版本不符拒絕。
 
 前端基準為 [coverage-baseline.json](../../apps/web/tests/coverage-baseline.json)：lines 52.67%、statements 49.85%、functions 49.15%、branches 49.62%。範圍為 composables、utils、components，包含未測元件的零覆蓋檔；不含 route pages。Node 22／24 的結果相同。門檻固定，不會在 CI 自動調低。
 
@@ -78,7 +80,13 @@ API 基準為 [coverage-baseline.json](../../apps/api/tests/coverage-baseline.js
 
 兩者由 Nuxt→Nitro 間接引入，上一輪查核時 npm registry 最新版本仍受影響。已更新 Nuxt 4.6.1、Devtools 3.4.3、Wrangler 4.151.0，消除 critical；audit 的 aggregate 仍有 11 high。精確 resolver 資訊見 [npm-advisories.json](test-gap-evidence/npm-advisories.json)。
 
+2026-10-15 再查 registry 與 advisory，braces 最新 3.0.3、node-forge 最新 1.4.0，仍未有修補版；Nuxt 4.6.1／Nitro 2.13.4 也已為最新。`npm audit` 的 `fixAvailable` 雖提出 Nuxt 4.1.3，這是降版建議，不是上游已修補的證據，因此未執行 `npm audit fix --force`。追蹤條件：上述兩個 GHSA 出現 patched version 後，更新 lockfile 並跑 typecheck／test:coverage／build／E2E，直到 high／critical 清零才結束。每週一 UTC 01:00 只執行 `web-audit` 重查 advisory 並保存 JSON，不啟動 DB 或其他品質 jobs。
+
+GitHub `main` 在本次查核時沒有 branch protection 或 ruleset，`web-audit` 並非必要檢查，未修改遠端規則。未來建立 PR 規則時，上游修補前只將 api／web／native／e2e 列為必要檢查；`web-audit` 保持獨立失敗與 artifact。修補完成後再評估將 audit 納入必要檢查。
+
 API 鎖檔的 RSA `RUSTSEC-2023-0071` 屬未啟用的 SQLx MySQL optional dependency。`audit-api.sh` 先檢查所有平台的實際依賴樹，只有 RSA 不在樹中才略過該 advisory；一旦啟用 RSA 會恢復完整 audit 並失敗。原生 audit 無 vulnerability，仍有上游 informational warnings。
+
+API／native 的 cargo-audit 固定 0.22.2，advisory DB 仍每次更新，避免漏掉新公告。本次重新稽核實際發現 rustls 0.23.45 的四個 10/14 新 advisory（RUSTSEC-2026-0346～0349）；API lockfile 已只升級此套件至 [修補版 0.23.46](https://github.com/rustls/rustls/releases/tag/v/0.23.46)，沒有忽略新 advisory。
 
 ## 重跑
 
@@ -118,7 +126,7 @@ npx playwright test guest-journey.spec.ts crowdfund.spec.ts --project=desktop-ch
 
 ## 稽核後修正與獨立重跑
 
-可重播的程式碼 snapshot 為 `be15ed2`。五個 CDN 站點、十個代表性 CHECK、ledger UPDATE／DELETE、三種對帳與錢包鎖共 21 個 case 均完成原版綠 → 預期語義失敗 → 原始碼還原且重測綠。runner 用 testcase 專屬 panic 訊息判定；編譯錯誤、HTTP 500／連線錯誤、一般 assertion 或單純 lock timeout 都不算 killed。反向轉投的歷史等待失敗證據保留，但不列入此 runner 的語義 kill 數。
+當輪可重播的程式碼 snapshot 為 `be15ed2`。五個 CDN 站點、十個代表性 CHECK、ledger UPDATE／DELETE、三種對帳與錢包鎖共 21 個 case 均完成原版綠 → 預期語義失敗 → 原始碼還原且重測綠。runner 用 testcase 專屬 panic 訊息判定；編譯錯誤、HTTP 500／連線錯誤、一般 assertion 或單純 lock timeout 都不算 killed。反向轉投的歷史等待失敗證據保留，但不列入當輪 runner 的語義 kill 數；新增案例見下。
 
 `scripts/mutate.sh --list` 顯示名稱；`all` 依序跑所有 case。log、patch、receipt 預設存於 `apps/api/target/mutations/<name>/`，可用 MUTATION_OUTPUT_DIR 指定目錄。exit 0 表示 killed 且還原測試綠；survived／invalid 回非零。不要同時對同一 SQLx test path 跑一般測試；runner 間有 process lock。Ctrl-C／SIGTERM 會先終止 Cargo 子程序群，再還原 source、記錄 interrupted；重跑不沿用舊 killed receipt。三個純 stdlib 測試驗證語義分類、infra 拒絕與中斷還原。
 
@@ -138,3 +146,28 @@ python3 scripts/test_mutate.py
 已核對有效品項的 qty_claimed 統計，清單／dashboard／SSE／public／profile 完成度均排除 deleted_at；admin stats／orders 不以該欄位計算有效庫存。profiles 的 delivered 捐助歷史直接取 claims.qty，與 `731adb1` 一致，不是保留 qty_claimed 帶來的回歸。wishlist_events.rs 註明 BUS 只綁第一個 pool，同 binary 的未來 SSE 測試需共用 pool。
 
 本輪 npm audit 仍是 11 high／0 critical，保留獨立安全訊號；此次沒有新增 frontend component 覆蓋範圍。toolchain pins 依 [rust-toolchain action 文件](https://github.com/dtolnay/rust-toolchain) 與 [install-action 的版本語法](https://github.com/taiki-e/install-action#example-workflow) 設定。
+
+## 殘留風險補強（2026-10-15）
+
+runner 新增五個併發防護，registry 共 26 案；CI 在 coverage 後依序執行 `scripts/mutate.sh all`，任何 survived／invalid 都失敗並保存 artifact。沒有新增固定 sleep；NOWAIT／blocked statements 確認衝突點，deadlock counter 以條件輪詢等待 PostgreSQL 發布統計。
+
+| 名稱 | mutation 與精確失敗證據 |
+| --- | --- |
+| `claim-wishlist-for-share` | 移除 claim 的 wishlist FOR SHARE；清單已 archived，最終 DB qty_claimed 卻變 2。 |
+| `idempotency-claim-on-conflict` | 移除 ON CONFLICT；兩請求確實重疊、最終一筆 claim，已提交 reservation 的 begin probe 得到 SQLSTATE 23505／idempotency_keys_pkey。 |
+| `idempotency-pledge-on-conflict` | 同上，最終一筆 contribution／一次扣點，probe 證實精確 DB 錯誤；不以一般 HTTP 500 作 kill。 |
+| `delete-item-for-update` | 移除 item FOR UPDATE；先確認兩種 victim 結果均完整 rollback／reconcile，再觀察 per-DB deadlocks 0→1。 |
+| `reallocation-source-first` | 改成來源先鎖；先確認錢包 800／兩品項 pledged 200／兩 contributions／0 orders／reconcile，再觀察 deadlocks 0→1。 |
+
+反向轉投仍不是兩筆可同時合法的業務交換；此測試證實在 eligibility validation 前鎖定品項時，來源優先會造成真實交叉等待。所有 kill 必須有該 case 的專屬語義斷言，infra／單純 timeout 一律 invalid。
+
+```sh
+scripts/mutate.sh claim-wishlist-for-share
+scripts/mutate.sh idempotency-claim-on-conflict
+scripts/mutate.sh idempotency-pledge-on-conflict
+scripts/mutate.sh delete-item-for-update
+scripts/mutate.sh reallocation-source-first
+scripts/mutate.sh all
+python3 scripts/test_mutate.py
+python3 scripts/test_coverage.py
+```

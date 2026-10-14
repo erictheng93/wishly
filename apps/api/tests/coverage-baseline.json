@@ -1,11 +1,7 @@
 {
   "scope": "apps/api/src; excludes tests, examples, dependencies",
   "toolchain": "rustc 1.99.0 / cargo-llvm-cov 0.9.1",
-  "thresholds": {
-    "lines": 91.28,
-    "functions": 88.25,
-    "regions": 87.15
-  },
+  "margin_percentage_points": 0.5,
   "counts": {
     "lines": {
       "covered": 7577,

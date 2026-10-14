@@ -137,6 +137,67 @@ async fn reconciled(pool: &PgPool) {
     assert_eq!(bad, 0, "funded item must be fully captured with an order");
 }
 
+async fn deadlocks(pool: &PgPool) -> i64 {
+    sqlx::query_scalar("SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// A 500 or a timeout alone is insufficient: require PostgreSQL's per-database
+/// deadlock counter to advance after both transactions finished and reconciled.
+async fn assert_no_deadlock(pool: &PgPool, before: i64, server_error: bool, marker: &str) {
+    if server_error {
+        common::wait_until(
+            "PostgreSQL deadlock statistic after failed race",
+            || async { deadlocks(pool).await > before },
+        )
+        .await;
+    }
+    let after = deadlocks(pool).await;
+    assert_eq!(
+        after, before,
+        "{marker}: pg_stat_database.deadlocks {before} -> {after}"
+    );
+}
+
+async fn row_locked(pool: &PgPool, id: Uuid) -> bool {
+    let mut tx = pool.begin().await.unwrap();
+    let result = sqlx::query("SELECT id FROM wishlist_items WHERE id=$1 FOR UPDATE NOWAIT")
+        .bind(id)
+        .execute(&mut *tx)
+        .await;
+    tx.rollback().await.unwrap();
+    match result {
+        Ok(_) => false,
+        Err(sqlx::Error::Database(e)) if e.code().as_deref() == Some("55P03") => true,
+        Err(e) => panic!("unexpected lock probe error: {e}"),
+    }
+}
+
+/// Probe the committed reservation too: an HTTP 500 alone is not mutation evidence.
+async fn committed_key_replays(pool: &PgPool, key: Uuid, kind: &str) {
+    let (scope, hash): (String, Vec<u8>) =
+        sqlx::query_as("SELECT scope,request_hash FROM idempotency_keys WHERE key=$1")
+            .bind(key)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    let mut tx = pool.begin().await.unwrap();
+    let result = wishsync_api::idempotency::begin(&mut tx, &scope, key, &hash).await;
+    tx.rollback().await.unwrap();
+    match result {
+        Ok(wishsync_api::idempotency::Begin::Replay(201, _)) => (),
+        Err(wishsync_api::error::AppError::Db(sqlx::Error::Database(e)))
+            if e.code().as_deref() == Some("23505")
+                && e.constraint() == Some("idempotency_keys_pkey") =>
+        {
+            panic!("{kind} idempotency ON CONFLICT missing: SQLSTATE 23505 constraint idempotency_keys_pkey");
+        }
+        _ => panic!("committed idempotency reservation did not replay"),
+    }
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
@@ -163,13 +224,6 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
     gate.commit().await.unwrap();
     let (sa, _, ba) = finish(a).await;
     let (sb, h, bb) = finish(b).await;
-    assert_eq!(
-        (sa, sb),
-        (StatusCode::CREATED, StatusCode::CREATED),
-        "{ba} {bb}"
-    );
-    assert_eq!(h["idempotency-replayed"], "true");
-    assert_eq!(ba["claim"], bb["claim"]);
     let state: (i32,i64,i64) = sqlx::query_as("SELECT qty_claimed,(SELECT count(*) FROM claims),(SELECT count(*) FROM guests) FROM wishlist_items WHERE id=$1").bind(it).fetch_one(&pool).await.unwrap();
     assert_eq!(state, (2, 1, 1));
     assert_eq!(
@@ -182,6 +236,14 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
         1
     );
     reconciled(&pool).await;
+    committed_key_replays(&pool, key, "claim").await;
+    assert_eq!(
+        (sa, sb),
+        (StatusCode::CREATED, StatusCode::CREATED),
+        "{ba} {bb}"
+    );
+    assert_eq!(h["idempotency-replayed"], "true");
+    assert_eq!(ba["claim"], bb["claim"]);
     common::assert_all_reconciled(&pool).await;
 }
 
@@ -213,13 +275,6 @@ async fn same_key_pledge_requests_overlap_and_debit_once(pool: PgPool) {
     gate.commit().await.unwrap();
     let (sa, _, ba) = finish(a).await;
     let (sb, h, bb) = finish(b).await;
-    assert_eq!(
-        (sa, sb),
-        (StatusCode::CREATED, StatusCode::CREATED),
-        "{ba} {bb}"
-    );
-    assert_eq!(h["idempotency-replayed"], "true");
-    assert_eq!(ba, bb);
     assert_eq!(balance(&pool, donor).await, 800);
     assert_eq!(item_state(&pool, it).await, (200, "open".into()));
     assert_eq!(
@@ -237,6 +292,14 @@ async fn same_key_pledge_requests_overlap_and_debit_once(pool: PgPool) {
         1
     );
     reconciled(&pool).await;
+    committed_key_replays(&pool, key, "pledge").await;
+    assert_eq!(
+        (sa, sb),
+        (StatusCode::CREATED, StatusCode::CREATED),
+        "{ba} {bb}"
+    );
+    assert_eq!(h["idempotency-replayed"], "true");
+    assert_eq!(ba, bb);
     common::assert_all_reconciled(&pool).await;
 }
 
@@ -615,8 +678,9 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
     .unwrap();
     // Opposite transfers cannot both be valid: a source must be expired while
     // its target must be open. They still must acquire the two locks in one order.
-    let (low_gate, low_pid) = gate(&pool, "wishlist_items", low).await;
-    let (high_gate, high_pid) = gate(&pool, "wishlist_items", high).await;
+    let before_deadlocks = deadlocks(&pool).await;
+    let (low_gate, _) = gate(&pool, "wishlist_items", low).await;
+    let (high_gate, _) = gate(&pool, "wishlist_items", high).await;
     let r = send(
         &app,
         (
@@ -626,15 +690,9 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
             Some(json!({"target_item_id":low})),
         ),
     );
-    blocked(
-        &pool,
-        low_pid,
-        "SELECT id FROM wishlist_items WHERE id IN",
-        1,
-    )
-    .await;
-    // The second request is started after high -> low demonstrably waits on low;
-    // the unrelated high blocker must not be the first lock being requested.
+    // Correct code waits on low; source-first mutation waits on high. Both
+    // reach the real lock statement before starting the opposite direction.
+    waiting(&pool, "SELECT id FROM wishlist_items WHERE id IN", 1).await;
     let p = send(
         &app,
         (
@@ -645,22 +703,17 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
         ),
     );
     waiting(&pool, "SELECT id FROM wishlist_items WHERE id IN", 2).await;
-    let high_waiters: i64 = sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))").bind(high_pid).fetch_one(&pool).await.unwrap();
-    assert_eq!(
-        high_waiters, 0,
-        "both directions must acquire lowest item first"
-    );
-    high_gate.commit().await.unwrap();
     low_gate.commit().await.unwrap();
+    // Prove one request now owns low while high remains gated. NOWAIT gives
+    // SQLSTATE 55P03 for a real row lock, rather than assuming waiter timing.
+    common::wait_until("reallocation owns low item", || async {
+        row_locked(&pool, low).await
+    })
+    .await;
+    waiting(&pool, "SELECT id FROM wishlist_items WHERE id IN", 2).await;
+    high_gate.commit().await.unwrap();
     let rr = finish(r).await;
     let pr = finish(p).await;
-    assert_eq!(
-        (rr.0, pr.0),
-        (StatusCode::CONFLICT, StatusCode::CONFLICT),
-        "{} {}",
-        rr.2,
-        pr.2
-    );
     assert_eq!(item_state(&pool, low).await, (200, "expired".into()));
     assert_eq!(item_state(&pool, high).await, (200, "expired".into()));
     assert_eq!(balance(&pool, a).await, 800);
@@ -673,6 +726,34 @@ async fn opposite_reallocations_lock_lowest_item_first_without_deadlock(pool: Pg
         2
     );
     reconciled(&pool).await;
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM contributions WHERE status='pledged'")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM purchase_orders")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_no_deadlock(
+        &pool,
+        before_deadlocks,
+        rr.0 == StatusCode::INTERNAL_SERVER_ERROR || pr.0 == StatusCode::INTERNAL_SERVER_ERROR,
+        "reallocation source-first lock order caused a PostgreSQL deadlock",
+    )
+    .await;
+    assert_eq!(
+        (rr.0, pr.0),
+        (StatusCode::CONFLICT, StatusCode::CONFLICT),
+        "{} {}",
+        rr.2,
+        pr.2
+    );
     common::assert_all_reconciled(&pool).await;
 }
 
@@ -1073,6 +1154,25 @@ async fn archive_vs_waiting_claim_cannot_accept_after_archive_commit(pool: PgPoo
         .fetch_one(&pool)
         .await
         .unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT status::text FROM wishlists WHERE id=$1")
+            .bind(wl)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        "archived"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM claims WHERE item_id=$1 AND status='reserved'"
+        )
+        .bind(it)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        if qty == 0 { 0 } else { 1 }
+    );
+    reconciled(&pool).await;
     if archived_first {
         assert_eq!(qty, 0, "claim accepted after archive committed");
         assert_eq!(cr.0, StatusCode::CONFLICT, "{}", cr.2);
@@ -1108,6 +1208,7 @@ async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPo
     .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
     let cid: Uuid = b["claim"]["id"].as_str().unwrap().parse().unwrap();
+    let before_deadlocks = deadlocks(&pool).await;
     let (gate, pid) = gate(&pool, "claims", cid).await;
     let d = send(
         &app,
@@ -1135,25 +1236,29 @@ async fn force_delete_vs_claim_update_uses_item_then_claim_lock_order(pool: PgPo
     gate.commit().await.unwrap();
     let dr = finish(d).await;
     let ur = finish(u).await;
-    assert_eq!(dr.0, StatusCode::NO_CONTENT, "{}", dr.2);
+    let row: (String, i32, i32, bool) = sqlx::query_as(
+        "SELECT c.status::text,c.qty,i.qty_claimed,i.deleted_at IS NOT NULL FROM claims c JOIN wishlist_items i ON i.id=c.item_id WHERE c.id=$1")
+        .bind(cid).fetch_one(&pool).await.unwrap();
+    // Either transaction can be the deadlock victim. Check complete rollback:
+    // deletion wins with cancellation, or update wins with a live qty=3 claim.
+    if dr.0 == StatusCode::INTERNAL_SERVER_ERROR {
+        assert_eq!(ur.0, StatusCode::OK);
+        assert_eq!(row, ("reserved".into(), 3, 3, false));
+    } else {
+        assert_eq!(dr.0, StatusCode::NO_CONTENT);
+        assert_eq!(row, ("cancelled".into(), 2, 0, true));
+    }
+    reconciled(&pool).await;
+    assert_no_deadlock(
+        &pool,
+        before_deadlocks,
+        dr.0 == StatusCode::INTERNAL_SERVER_ERROR || ur.0 == StatusCode::INTERNAL_SERVER_ERROR,
+        "item deletion without item lock caused a PostgreSQL deadlock",
+    )
+    .await;
     assert_eq!(ur.0, StatusCode::OK, "{}", ur.2);
     assert_eq!(ur.2["claim"]["status"], "cancelled");
     assert_eq!(ur.2["claim"]["qty"], 2);
-    let row: (String, i32) = sqlx::query_as("SELECT status::text,qty FROM claims WHERE id=$1")
-        .bind(cid)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(row, ("cancelled".into(), 2));
-    assert_eq!(
-        sqlx::query_scalar::<_, i32>("SELECT qty_claimed FROM wishlist_items WHERE id=$1")
-            .bind(it)
-            .fetch_one(&pool)
-            .await
-            .unwrap(),
-        0
-    );
-    reconciled(&pool).await;
     common::assert_all_reconciled(&pool).await;
 }
 
