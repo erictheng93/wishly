@@ -1,32 +1,27 @@
 mod common;
 use axum::http::StatusCode;
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-async fn call(
-    pool: &PgPool,
-    method: &str,
-    uri: &str,
-    cookie: Option<&str>,
-    body: Option<Value>,
-) -> (StatusCode, Value) {
-    let h = cookie.map(common::ck).unwrap_or_default();
-    let (s, _, b) = common::api(pool, method, uri, &h, body).await;
-    (s, b)
-}
-
 /// 回傳 (user_id, session token)
-use common::user_with_staff as user;
-
-use common::claimed_wishlist as wishlist;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn staff_guard_report_and_moderation(pool: PgPool) {
-    let (owner, _) = user(&pool, "owner", false).await;
-    let (_, normal) = user(&pool, "n", false).await;
-    let (staff_id, staff) = user(&pool, "s", true).await;
-    let (wid, slug, _) = wishlist(&pool, owner, false, 30).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: normal,
+    } = user(&pool, "n").await;
+    let TestUser {
+        id: staff_id,
+        token: staff,
+    } = staff(&pool, "s").await;
+    let (wid, slug, _) = claimed_wishlist(&pool, owner, false, 30).await;
 
     for uri in [
         "/admin/reports",
@@ -34,14 +29,14 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
         "/admin/users",
         "/admin/stats",
     ] {
-        let (s, v) = call(&pool, "GET", uri, Some(&normal), None).await;
+        let (s, _, v) = call(&pool, "GET", uri, &ck(&normal), None).await;
         assert_eq!(
             (s, v["code"].as_str()),
             (StatusCode::FORBIDDEN, Some("STAFF_ONLY")),
             "{uri}"
         );
         assert_eq!(
-            call(&pool, "GET", uri, None, None).await.0,
+            call(&pool, "GET", uri, &[], None).await.0,
             StatusCode::UNAUTHORIZED
         );
     }
@@ -50,7 +45,7 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "PUT",
             "/admin/system-flags/read_only",
-            Some(&normal),
+            &ck(&normal),
             Some(json!({"value": true}))
         )
         .await
@@ -59,11 +54,11 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
     );
 
     // 公開檢舉
-    let (s, r) = call(
+    let (s, _, r) = call(
         &pool,
         "POST",
         &format!("/public/wishlists/{slug}/reports"),
-        None,
+        &[],
         Some(json!({"reason": "scam", "detail": "私下轉帳"})),
     )
     .await;
@@ -74,7 +69,7 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "POST",
             &format!("/public/wishlists/{slug}/reports"),
-            None,
+            &[],
             Some(json!({"reason": "bogus"}))
         )
         .await
@@ -86,7 +81,7 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "POST",
             "/public/wishlists/nonexistent/reports",
-            None,
+            &[],
             Some(json!({"reason": "scam"}))
         )
         .await
@@ -94,7 +89,7 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
         StatusCode::NOT_FOUND
     );
 
-    let (s, q) = call(&pool, "GET", "/admin/reports", Some(&staff), None).await;
+    let (s, _, q) = call(&pool, "GET", "/admin/reports", &ck(&staff), None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(q["data"][0]["wishlist"]["slug"], slug.as_str());
     assert_eq!(q["data"][0]["reporter"], "anonymous");
@@ -106,18 +101,18 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "PATCH",
             &uri,
-            Some(&staff),
+            &ck(&staff),
             Some(json!({"moderation_status": "hidden"}))
         )
         .await
         .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    let (s, v) = call(
+    let (s, _, v) = call(
         &pool,
         "PATCH",
         &uri,
-        Some(&staff),
+        &ck(&staff),
         Some(json!({"moderation_status": "hidden", "reason": "疑似詐騙"})),
     )
     .await;
@@ -137,18 +132,18 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "POST",
             &format!("/public/wishlists/{slug}/reports"),
-            None,
+            &[],
             Some(json!({"reason": "scam"}))
         )
         .await
         .0,
         StatusCode::GONE
     );
-    let (s, v) = call(
+    let (s, _, v) = call(
         &pool,
         "PATCH",
         &format!("/admin/reports/{rid}"),
-        Some(&staff),
+        &ck(&staff),
         Some(json!({"status": "dismissed"})),
     )
     .await;
@@ -157,11 +152,11 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
         (StatusCode::CONFLICT, Some("INVALID_STATE_TRANSITION"))
     );
     // 復原
-    let (_, v) = call(
+    let (_, _, v) = call(
         &pool,
         "PATCH",
         &uri,
-        Some(&staff),
+        &ck(&staff),
         Some(json!({"moderation_status": "ok"})),
     )
     .await;
@@ -169,20 +164,20 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
     assert!(v["moderation_reason"].is_null());
 
     // 搜尋 + system flag + stats
-    let (_, v) = call(
+    let (_, _, v) = call(
         &pool,
         "GET",
         &format!("/admin/wishlists?q={slug}"),
-        Some(&staff),
+        &ck(&staff),
         None,
     )
     .await;
     assert_eq!(v["data"][0]["id"], wid.to_string());
-    let (s, v) = call(
+    let (s, _, v) = call(
         &pool,
         "PUT",
         "/admin/system-flags/read_only",
-        Some(&staff),
+        &ck(&staff),
         Some(json!({"value": true})),
     )
     .await;
@@ -192,7 +187,7 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "PUT",
             "/admin/system-flags/nope",
-            Some(&staff),
+            &ck(&staff),
             Some(json!({"value": true}))
         )
         .await
@@ -204,15 +199,16 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
             &pool,
             "PUT",
             "/admin/system-flags/read_only",
-            Some(&staff),
+            &ck(&staff),
             Some(json!({"value": "x"}))
         )
         .await
         .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    let (s, v) = call(&pool, "GET", "/admin/stats", Some(&staff), None).await;
+    let (s, _, v) = call(&pool, "GET", "/admin/stats", &ck(&staff), None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["flags"]["read_only"], true);
     assert_eq!(v["claims_by_status"]["reserved"], 1);
+    assert_all_reconciled(&pool).await;
 }
