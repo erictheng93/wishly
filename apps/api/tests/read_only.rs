@@ -5,21 +5,26 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use common::api as call;
-use common::ck;
-
-async fn user(pool: &PgPool, staff: bool) -> (Uuid, String) {
-    common::user_with_staff(pool, "u", staff).await
-}
-
-/// 清單 + 一個 qty_needed=3 的品項；event_offset_days>0 且 surprise → 鎖定
-use common::guest_wishlist as list;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn read_only_mode_blocks_writes(pool: PgPool) {
-    let (_, staff) = user(&pool, true).await;
-    let (o, ot) = user(&pool, false).await;
-    let (_, it) = list(&pool, o, false, 0).await;
+    let TestUser {
+        id: _,
+        token: staff,
+    } = staff(&pool, "u").await;
+    let TestUser { id: o, token: ot } = user(&pool, "u").await;
+    let wl = wishlist(
+        &pool,
+        o,
+        ListOpts {
+            surprise: false,
+            event_offset_days: Some(0),
+            ..Default::default()
+        },
+    )
+    .await;
+    let it = item(&pool, wl.id, "奶瓶", 3).await;
     let (_, _, v) = call(&pool, "GET", "/admin/system-flags", &ck(&staff), None).await;
     assert_eq!(v["data"][0]["key"], "read_only");
     assert_eq!(v["data"][0]["value"], false);
@@ -88,7 +93,7 @@ async fn read_only_mode_blocks_writes(pool: PgPool) {
         StatusCode::OK
     );
     assert_eq!(claim_status(&pool, it).await, StatusCode::CREATED);
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 async fn claim_status(pool: &PgPool, it: Uuid) -> StatusCode {
