@@ -1,4 +1,5 @@
 //! Database trust boundaries: invalid direct writes must fail independently of HTTP validation.
+mod common;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -12,11 +13,7 @@ fn rejected(error: sqlx::Error, code: &str, constraint: Option<&str>) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn quantities_cannot_be_negative_zero_or_oversold(pool: PgPool) {
-    let owner: Uuid =
-        sqlx::query_scalar("INSERT INTO users(display_name) VALUES ('Owner') RETURNING id")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let owner = common::user(&pool, "Owner").await.id;
     let wishlist: Uuid = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,slug,title) VALUES ($1,'registry','CheckQty01','Checks') RETURNING id").bind(owner).fetch_one(&pool).await.unwrap();
     for (needed, claimed, constraint) in [
         (0, 0, "items_qty_needed_pos"),
@@ -36,6 +33,12 @@ async fn quantities_cannot_be_negative_zero_or_oversold(pool: PgPool) {
         "23514",
         Some("items_qty_claimed_range"),
     );
+    sqlx::query("INSERT INTO claims(item_id,user_id,claimer_name,qty) VALUES ($1,$2,'Owner',5)")
+        .bind(item)
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
     let quantities: (i32, i32) =
         sqlx::query_as("SELECT qty_needed,qty_claimed FROM wishlist_items WHERE id=$1")
             .bind(item)
@@ -50,15 +53,12 @@ async fn quantities_cannot_be_negative_zero_or_oversold(pool: PgPool) {
             .unwrap(),
         1
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn wallet_and_ledger_enforce_nonnegative_balance_and_append_only(pool: PgPool) {
-    let user: Uuid =
-        sqlx::query_scalar("INSERT INTO users(display_name) VALUES ('Donor') RETURNING id")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let user = common::user(&pool, "Donor").await.id;
     rejected(
         sqlx::query("INSERT INTO point_wallets(user_id,balance) VALUES ($1,-1)")
             .bind(user)
@@ -118,15 +118,12 @@ async fn wallet_and_ledger_enforce_nonnegative_balance_and_append_only(pool: PgP
             .unwrap(),
         100
     );
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn crowdfunding_checks_reject_invalid_money_and_lifecycle_shapes(pool: PgPool) {
-    let owner: Uuid =
-        sqlx::query_scalar("INSERT INTO users(display_name) VALUES ('Owner') RETURNING id")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let owner = common::user(&pool, "Owner").await.id;
     let wishlist: Uuid = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,slug,title) VALUES ($1,'registry','CheckFund1','Checks') RETURNING id").bind(owner).fetch_one(&pool).await.unwrap();
     let item: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,funding_mode,target_points,funding_status,funding_deadline,fulfillment_type) VALUES ($1,'Fund','crowdfund',100,'open',now()+interval '1 day','concierge') RETURNING id").bind(wishlist).fetch_one(&pool).await.unwrap();
     for (assignment, constraint) in [
@@ -152,4 +149,5 @@ async fn crowdfunding_checks_reject_invalid_money_and_lifecycle_shapes(pool: PgP
     }
     let state: (i64, i64, String, i32) = sqlx::query_as("SELECT target_points,pledged_points,funding_status::text,qty_claimed FROM wishlist_items WHERE id=$1").bind(item).fetch_one(&pool).await.unwrap();
     assert_eq!(state, (100, 0, "open".into(), 0));
+    common::assert_all_reconciled(&pool).await;
 }
