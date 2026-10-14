@@ -13,8 +13,6 @@ const pubBusy = ref(false), pubErrs = ref<string[]>([])
 const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
-// API 回 UTC ISO；datetime-local 要本地時間字串
-const toLocal = (iso?: string | null) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''
 const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'link', password: '' })
 const allowed = ref<string[]>([])
 let poll: any
@@ -24,7 +22,7 @@ async function load(quiet = false) {
   try {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
-    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocal(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, password: '' })
+    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, password: '' })
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
@@ -57,7 +55,7 @@ async function patchList(body: any, ok = '已儲存') {
 }
 async function saveMeta() {
   if (meta.visibility === 'password' && !meta.password && !w.value.has_password) { err.value = '請設定清單密碼（8–64 字）'; return }
-  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: meta.closes_at ? new Date(meta.closes_at).toISOString() : null, show_claimer_names: meta.show_claimer_names, visibility: meta.visibility }
+  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, visibility: meta.visibility }
   if (meta.visibility === 'password' && meta.password) body.access_password = meta.password
   if (!await patchList(body)) return
   meta.password = ''
