@@ -31,7 +31,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
             &pool,
             "PATCH",
             &path,
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             Some(json!({"blocked":true,"reason":"abuse"}))
         )
         .await
@@ -43,7 +43,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
             &pool,
             "PATCH",
             &path,
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"blocked":true,"reason":" "}))
         )
         .await
@@ -54,7 +54,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
         &pool,
         "PATCH",
         &path,
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         Some(json!({"blocked":true,"reason":"abuse"})),
     )
     .await;
@@ -65,7 +65,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
             &pool,
             "GET",
             "/me",
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             None
         )
         .await
@@ -99,7 +99,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
             &pool,
             "PATCH",
             &path,
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"blocked":false,"reason":"appeal"}))
         )
         .await
@@ -111,7 +111,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
             &pool,
             "GET",
             "/me",
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             None
         )
         .await
@@ -122,7 +122,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
         &pool,
         "GET",
         &format!("/admin/audit-logs?entity_id={id}&action=user.update&limit=1"),
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -133,7 +133,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
         &pool,
         "GET",
         &format!("/admin/audit-logs?entity_id={id}&action=user.update&limit=1&cursor={next}"),
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -153,7 +153,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
                 &pool,
                 "PATCH",
                 &format!("/admin/users/{sid}"),
-                &[("authorization", format!("Bearer {}", &staff))],
+                &[("authorization", format!("Bearer {staff}"))],
                 Some(body)
             )
             .await
@@ -168,7 +168,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             &pool,
             "DELETE",
             &path,
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"help"}))
         )
         .await
@@ -186,7 +186,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             &pool,
             "DELETE",
             &format!("/admin/users/{id}/identities/line"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"help"}))
         )
         .await
@@ -198,7 +198,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             &pool,
             "GET",
             "/me",
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             None
         )
         .await
@@ -210,7 +210,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             &pool,
             "PATCH",
             &format!("/admin/users/{id}"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"is_staff":true,"reason":"hire"}))
         )
         .await
@@ -222,7 +222,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             &pool,
             "PATCH",
             &format!("/admin/users/{sid}"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"is_staff":false,"reason":"handover"}))
         )
         .await
@@ -257,7 +257,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "GET",
             &format!("/admin/users?{q}"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             None,
         )
         .await;
@@ -270,7 +270,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "GET",
             "/admin/users?provider=bogus",
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             None
         )
         .await
@@ -282,7 +282,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "POST",
             &format!("/admin/users/{id}/recovery"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"help"}))
         )
         .await
@@ -295,7 +295,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "POST",
             &format!("/admin/users/{eid}/recovery"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"help"}))
         )
         .await
@@ -314,7 +314,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
         &pool,
         "GET",
         "/admin/stats",
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -324,7 +324,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "GET",
             "/admin/audit-logs?from=2026-10-12&to=2026-10-11",
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             None
         )
         .await
@@ -336,7 +336,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "GET",
             "/admin/wallets?status=bogus",
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             None
         )
         .await
@@ -348,7 +348,7 @@ async fn name_provider_filters_stats_and_recovery(pool: PgPool) {
             &pool,
             "GET",
             "/admin/wishlists?status=bogus",
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             None
         )
         .await
@@ -371,7 +371,7 @@ async fn concurrent_staff_changes_keep_an_effective_staff(pool: PgPool) {
                 &pool,
                 "PATCH",
                 &pa,
-                &[("authorization", format!("Bearer {}", &ta))],
+                &[("authorization", format!("Bearer {ta}"))],
                 Some(body.clone()),
             )
             .await
@@ -381,7 +381,7 @@ async fn concurrent_staff_changes_keep_an_effective_staff(pool: PgPool) {
                 &pool,
                 "PATCH",
                 &pb,
-                &[("authorization", format!("Bearer {}", &tb))],
+                &[("authorization", format!("Bearer {tb}"))],
                 Some(body.clone()),
             )
             .await
@@ -407,7 +407,7 @@ async fn concurrent_staff_changes_keep_an_effective_staff(pool: PgPool) {
             &pool,
             "DELETE",
             "/me",
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             Some(json!({"confirm":"DELETE"}))
         )
         .await
@@ -426,7 +426,7 @@ async fn filters_paginate_and_sensitive_routes_require_staff(pool: PgPool) {
         &pool,
         "GET",
         "/admin/users?status=active&provider=email&limit=1",
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -439,7 +439,7 @@ async fn filters_paginate_and_sensitive_routes_require_staff(pool: PgPool) {
             "/admin/users?status=active&provider=email&limit=1&cursor={}",
             p["next_cursor"].as_str().unwrap()
         ),
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -453,7 +453,7 @@ async fn filters_paginate_and_sensitive_routes_require_staff(pool: PgPool) {
         &pool,
         "GET",
         "/admin/wallets?status=frozen",
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -462,7 +462,7 @@ async fn filters_paginate_and_sensitive_routes_require_staff(pool: PgPool) {
         &pool,
         "GET",
         "/admin/wallets?status=none",
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         None,
     )
     .await;
@@ -482,7 +482,7 @@ async fn filters_paginate_and_sensitive_routes_require_staff(pool: PgPool) {
                 &pool,
                 "GET",
                 uri,
-                &[("authorization", format!("Bearer {}", &token))],
+                &[("authorization", format!("Bearer {token}"))],
                 None
             )
             .await
@@ -521,7 +521,7 @@ async fn admin_unlink_clears_provider_email_and_notifies_user(pool: PgPool) {
             &pool,
             "DELETE",
             &format!("/admin/users/{id}/identities/google"),
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"lost access"}))
         )
         .await
@@ -560,7 +560,7 @@ async fn admin_unlink_clears_provider_email_and_notifies_user(pool: PgPool) {
         &pool,
         "DELETE",
         &format!("/admin/users/{id}/identities/line"),
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         Some(json!({"reason":"help"})),
     )
     .await;
@@ -582,7 +582,7 @@ async fn audit_date_range_uses_taipei_inclusive_end_day(pool: PgPool) {
         sqlx::query("INSERT INTO audit_logs(actor_type,actor_id,action,entity,entity_id,diff,created_at) VALUES ('staff',$1,'test.audit','users',$2,$3,$4::text::timestamptz)")
             .bind(sid).bind(id).bind(json!({"n":n})).bind(time).execute(&pool).await.unwrap();
     }
-    let (s, _, b) = common::call(&pool, "GET", &format!("/admin/audit-logs?actor_id={sid}&entity=users&entity_id={id}&action=test.audit&from=2026-10-12&to=2026-10-12"), &[("authorization", format!("Bearer {}", &staff))], None).await;
+    let (s, _, b) = common::call(&pool, "GET", &format!("/admin/audit-logs?actor_id={sid}&entity=users&entity_id={id}&action=test.audit&from=2026-10-12&to=2026-10-12"), &[("authorization", format!("Bearer {staff}"))], None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(b["data"].as_array().unwrap().len(), 2);
     let mut ns: Vec<i64> = b["data"]
@@ -613,7 +613,7 @@ async fn recovery_uses_one_connection_and_rolls_back_on_rate_limit(pool: PgPool)
             &single,
             "POST",
             &path,
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"help"})),
         ),
     )
@@ -625,7 +625,7 @@ async fn recovery_uses_one_connection_and_rolls_back_on_rate_limit(pool: PgPool)
             &single,
             "POST",
             &path,
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"reason":"retry"}))
         )
         .await
@@ -661,7 +661,7 @@ async fn read_only_blocks_admin_suspension_without_side_effects(pool: PgPool) {
             &pool,
             "PUT",
             "/admin/system-flags/read_only",
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"value":true}))
         )
         .await
@@ -673,7 +673,7 @@ async fn read_only_blocks_admin_suspension_without_side_effects(pool: PgPool) {
         &pool,
         "PATCH",
         &path,
-        &[("authorization", format!("Bearer {}", &staff))],
+        &[("authorization", format!("Bearer {staff}"))],
         Some(json!({"blocked":true,"reason":"abuse"})),
     )
     .await;
@@ -690,7 +690,7 @@ async fn read_only_blocks_admin_suspension_without_side_effects(pool: PgPool) {
             &pool,
             "GET",
             "/me",
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             None
         )
         .await
@@ -710,7 +710,7 @@ async fn read_only_blocks_admin_suspension_without_side_effects(pool: PgPool) {
             &pool,
             "PUT",
             "/admin/system-flags/read_only",
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"value":false}))
         )
         .await
@@ -722,7 +722,7 @@ async fn read_only_blocks_admin_suspension_without_side_effects(pool: PgPool) {
             &pool,
             "PATCH",
             &path,
-            &[("authorization", format!("Bearer {}", &staff))],
+            &[("authorization", format!("Bearer {staff}"))],
             Some(json!({"blocked":true,"reason":"abuse"}))
         )
         .await
@@ -734,7 +734,7 @@ async fn read_only_blocks_admin_suspension_without_side_effects(pool: PgPool) {
             &pool,
             "GET",
             "/me",
-            &[("authorization", format!("Bearer {}", &token))],
+            &[("authorization", format!("Bearer {token}"))],
             None
         )
         .await
@@ -761,7 +761,7 @@ async fn recovery_rechecks_email_after_waiting_for_otp_lock(pool: PgPool) {
                 &pool,
                 "POST",
                 &format!("/admin/users/{id}/recovery"),
-                &[("authorization", format!("Bearer {}", &staff))],
+                &[("authorization", format!("Bearer {staff}"))],
                 Some(json!({"reason":"help"})),
             )
             .await
