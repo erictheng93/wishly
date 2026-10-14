@@ -1,26 +1,25 @@
 //! 儀表板驚喜模式與下架資訊。
 mod common;
 use sqlx::PgPool;
-use uuid::Uuid;
 
-use common::api as call;
-use common::ck;
-
-async fn user(pool: &PgPool, staff: bool) -> (Uuid, String) {
-    common::user_with_staff(pool, "u", staff).await
-}
-
-/// 清單 + 一個 qty_needed=3 的品項；event_offset_days>0 且 surprise → 鎖定
-use common::guest_wishlist as list;
-
-/// 訪客認領；回傳 (guest_token, claim_id)
-use common::guest_claim_with_email as claim;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn dashboard_locked_totals_and_moderation(pool: PgPool) {
-    let (o, t) = user(&pool, false).await;
-    let (wid, it) = list(&pool, o, true, 30).await;
-    claim(&pool, it, None).await;
+    let TestUser { id: o, token: t } = user(&pool, "u").await;
+    let wl = wishlist(
+        &pool,
+        o,
+        ListOpts {
+            surprise: true,
+            event_offset_days: Some(30),
+            ..Default::default()
+        },
+    )
+    .await;
+    let wid = wl.id;
+    let it = item(&pool, wl.id, "奶瓶", 3).await;
+    guest_claim(&pool, it, 1).await;
     let (_, _, v) = call(
         &pool,
         "GET",
@@ -54,5 +53,5 @@ async fn dashboard_locked_totals_and_moderation(pool: PgPool) {
         ),
         (Some("hidden"), Some("違規"))
     );
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
