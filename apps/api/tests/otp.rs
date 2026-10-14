@@ -1,30 +1,11 @@
 //! OTP 登入、一次性驗證與錯誤次數限制。
 mod common;
-use axum::{
-    http::{header, StatusCode},
-    Router,
-};
-use serde_json::{json, Value};
+use axum::http::{header, StatusCode};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{app, AppState};
 
-fn setup(pool: PgPool) -> (Router, PgPool) {
-    (app(AppState { pool: pool.clone() }), pool)
-}
-
-async fn call(
-    app: &Router,
-    method: &str,
-    uri: &str,
-    cookie: Option<&str>,
-    body: Option<Value>,
-) -> common::Resp {
-    let h = cookie
-        .map(|c| vec![("cookie", c.to_string())])
-        .unwrap_or_default();
-    common::call_request(app, common::request(method, uri, &h, body)).await
-}
+use common::*;
 
 /// 固定測試碼，不依賴 SMTP 或暴力枚舉。
 async fn recover_code(pool: &PgPool, email: &str) -> String {
@@ -43,25 +24,25 @@ async fn recover_code(pool: &PgPool, email: &str) -> String {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn otp_full_flow(pool: PgPool) {
-    let (app, pool) = setup(pool);
+    let app = test_app(&pool);
     let email = format!("otp-{}@Example.com", Uuid::new_v4());
     let lower = email.to_lowercase();
-    let (st, _, b) = call(
+    let (st, _, b) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/request",
-        None,
+        "/auth/otp/request",
+        &[],
         Some(json!({ "email": email })),
     )
     .await;
     assert_eq!(st, 202);
     assert_eq!(b["expires_in"], 600);
     // 60 秒內重送 → 429
-    let (st, h, b) = call(
+    let (st, h, b) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/request",
-        None,
+        "/auth/otp/request",
+        &[],
         Some(json!({ "email": email })),
     )
     .await;
@@ -70,11 +51,11 @@ async fn otp_full_flow(pool: PgPool) {
     assert!(h.contains_key("retry-after"));
     let code = recover_code(&pool, &lower).await;
     let wrong = if code == "000000" { "000001" } else { "000000" };
-    let (st, _, b) = call(
+    let (st, _, b) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/verify",
-        None,
+        "/auth/otp/verify",
+        &[],
         Some(json!({ "email": email, "code": wrong })),
     )
     .await;
@@ -82,11 +63,11 @@ async fn otp_full_flow(pool: PgPool) {
         (st, b["code"].as_str()),
         (StatusCode::BAD_REQUEST, Some("OTP_INVALID"))
     );
-    let (st, h, b) = call(
+    let (st, h, b) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/verify",
-        None,
+        "/auth/otp/verify",
+        &[],
         Some(json!({ "email": email, "code": code })),
     )
     .await;
@@ -105,42 +86,56 @@ async fn otp_full_flow(pool: PgPool) {
     );
     let cookie = sc.split(';').next().unwrap().to_string();
     // 驗證碼只能用一次
-    let (st, ..) = call(
+    let (st, ..) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/verify",
-        None,
+        "/auth/otp/verify",
+        &[],
         Some(json!({ "email": email, "code": code })),
     )
     .await;
     assert_eq!(st, 400);
     // /me
-    let (st, _, me) = call(&app, "GET", "/api/v1/me", Some(&cookie), None).await;
+    let (st, _, me) = call_app(
+        &app,
+        "GET",
+        "/me",
+        &[("cookie", (&cookie).to_string())],
+        None,
+    )
+    .await;
     assert_eq!(st, 200);
     assert_eq!(me["identities"][0]["provider"], "email");
     assert_eq!(me["notification_prefs"]["email_claims"], true);
-    let (st, _, me) = call(
+    let (st, _, me) = call_app(
         &app,
         "PATCH",
-        "/api/v1/me",
-        Some(&cookie),
+        "/me",
+        &[("cookie", (&cookie).to_string())],
         Some(json!({ "display_name": "小米", "notification_prefs": { "email_claims": false } })),
     )
     .await;
     assert_eq!(st, 200);
     assert_eq!(me["display_name"], "小米");
     assert_eq!(me["notification_prefs"]["email_claims"], false);
-    let (st, ..) = call(
+    let (st, ..) = call_app(
         &app,
         "PATCH",
-        "/api/v1/me",
-        Some(&cookie),
+        "/me",
+        &[("cookie", (&cookie).to_string())],
         Some(json!({ "notification_prefs": { "evil": true } })),
     )
     .await;
     assert_eq!(st, 422);
     // 登出後 session 失效
-    let (st, h, _) = call(&app, "POST", "/api/v1/auth/logout", Some(&cookie), None).await;
+    let (st, h, _) = call_app(
+        &app,
+        "POST",
+        "/auth/logout",
+        &[("cookie", (&cookie).to_string())],
+        None,
+    )
+    .await;
     assert_eq!(st, 204);
     assert!(h
         .get(header::SET_COOKIE)
@@ -148,7 +143,14 @@ async fn otp_full_flow(pool: PgPool) {
         .to_str()
         .unwrap()
         .contains("Max-Age=0"));
-    let (st, ..) = call(&app, "GET", "/api/v1/me", Some(&cookie), None).await;
+    let (st, ..) = call_app(
+        &app,
+        "GET",
+        "/me",
+        &[("cookie", (&cookie).to_string())],
+        None,
+    )
+    .await;
     assert_eq!(st, 401);
     // 再次登入同 email → 同一 user，非新使用者（先把上一張挑戰時間往前挪以略過 60 秒限制）
     sqlx::query(
@@ -158,55 +160,56 @@ async fn otp_full_flow(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    call(
+    call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/request",
-        None,
+        "/auth/otp/request",
+        &[],
         Some(json!({ "email": email })),
     )
     .await;
     let code = recover_code(&pool, &lower).await;
-    let (_, _, b) = call(
+    let (_, _, b) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/verify",
-        None,
+        "/auth/otp/verify",
+        &[],
         Some(json!({ "email": email, "code": code })),
     )
     .await;
     assert_eq!(b["is_new_user"], false);
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
-    let (app, pool) = setup(pool);
+    let app = test_app(&pool);
     let email = format!("lock-{}@example.com", Uuid::new_v4());
-    call(
+    call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/request",
-        None,
+        "/auth/otp/request",
+        &[],
         Some(json!({ "email": email })),
     )
     .await;
     let code = recover_code(&pool, &email).await;
     let wrong = if code == "000000" { "000001" } else { "000000" };
     for _ in 0..5 {
-        call(
+        call_app(
             &app,
             "POST",
-            "/api/v1/auth/otp/verify",
-            None,
+            "/auth/otp/verify",
+            &[],
             Some(json!({ "email": email, "code": wrong })),
         )
         .await;
     }
-    let (st, _, b) = call(
+    let (st, _, b) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/verify",
-        None,
+        "/auth/otp/verify",
+        &[],
         Some(json!({ "email": email, "code": code })),
     )
     .await;
@@ -214,13 +217,14 @@ async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
         (st, b["code"].as_str()),
         (StatusCode::BAD_REQUEST, Some("OTP_INVALID"))
     );
-    let (st, ..) = call(
+    let (st, ..) = call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/request",
-        None,
+        "/auth/otp/request",
+        &[],
         Some(json!({ "email": "bad" })),
     )
     .await;
     assert_eq!(st, 422);
+    assert_all_reconciled(&pool).await;
 }
