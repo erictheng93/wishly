@@ -37,7 +37,7 @@ async function doUnfriend() {
 const makeInvite = () => act(async () => { invite.value = await api('/friends/invites', { method: 'POST' }); copied.value = false })
 const revoke = () => act(async () => { await api('/friends/invites', { method: 'DELETE' }); invite.value = null })
 async function copy() {
-  try { await navigator.clipboard.writeText(invite.value.url); copied.value = true } catch { err.value = '無法複製，請手動選取網址' }
+  try { await copyText(invite.value.url); copied.value = true } catch { err.value = '無法複製，請手動選取網址' }
 }
 </script>
 <template>

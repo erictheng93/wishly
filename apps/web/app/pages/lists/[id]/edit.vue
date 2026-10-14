@@ -87,7 +87,7 @@ async function move(i: number, d: number) {
   catch (e) { err.value = errMsg(e); await load(true) }
 }
 async function copy() {
-  try { await navigator.clipboard.writeText(shareUrl.value); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
+  try { await copyText(shareUrl.value); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
   catch { (document.getElementById('c-share-input') as HTMLInputElement)?.select() }
 }
 const lineHref = computed(() => `https://line.me/R/share?text=${encodeURIComponent(`${w.value?.title ?? ''} ${shareUrl.value}`)}`)

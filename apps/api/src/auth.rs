@@ -228,13 +228,21 @@ pub(crate) async fn consume_otp_scoped(pool: &PgPool, email: &str, code: &str, p
     Ok((pw, name))
 }
 
+/// 只有 Origin 屬於 NATIVE_ORIGINS（Tauri webview）且帶 X-Native-Client 才把權杖放進回應：
+/// 網頁版 origin（APP_URL）即使送了 header 也拿不到，權杖仍只在 HttpOnly cookie。
+/// 注意 Origin 可被非瀏覽器客戶端偽造，但那類客戶端本來就要有帳密，這道門擋的是「網頁內腳本」。
+pub(crate) fn native_client(h: &HeaderMap) -> bool {
+    let origin = h.get(header::ORIGIN).and_then(|v| v.to_str().ok()).unwrap_or("");
+    h.contains_key("x-native-client") && crate::config::get().native_origins.iter().any(|o| o == origin)
+}
+
 /// 簽發 session 並回 {user, is_new_user} + Set-Cookie（OTP / 註冊 / 密碼登入共用）。
 pub(crate) async fn session_response(pool: &PgPool, headers: &HeaderMap, uid: Uuid, is_new: bool) -> Result<Response, AppError> {
     let token = new_session(pool, uid, headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok())).await?;
     let u = user_json(pool, uid).await?;
     let mut body = json!({ "user": { "id": u["id"], "display_name": u["display_name"], "email": u["email"], "avatar_url": u["avatar_url"] }, "is_new_user": is_new });
     // 原生客戶端（Tauri）的 webview 不會帶跨站 cookie：帶 X-Native-Client 時把權杖放進回應，之後以 Bearer 使用。
-    if headers.contains_key("x-native-client") { body["session_token"] = json!(token); }
+    if native_client(headers) { body["session_token"] = json!(token); }
     Ok(([(header::SET_COOKIE, session_cookie(&token))], Json(body)).into_response())
 }
 
@@ -462,6 +470,20 @@ async fn oauth_callback(State(st): State<AppState>, Path(provider): Path<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_token_only_for_native_origins() {
+        let mk = |origin: Option<&str>, native: bool| {
+            let mut h = HeaderMap::new();
+            if let Some(o) = origin { h.insert(header::ORIGIN, o.parse().unwrap()); }
+            if native { h.insert("x-native-client", "1".parse().unwrap()); }
+            h
+        };
+        assert!(native_client(&mk(Some("tauri://localhost"), true)));
+        assert!(!native_client(&mk(Some("tauri://localhost"), false)), "沒帶 X-Native-Client");
+        assert!(!native_client(&mk(Some(&crate::config::get().app_url), true)), "網頁版 origin 不發權杖");
+        assert!(!native_client(&mk(Some("https://evil.example"), true)));
+        assert!(!native_client(&mk(None, true)), "沒有 Origin");
+    }
     #[test]
     fn state_cookie_roundtrip_and_tamper() {
         let payload = B64.encode(serde_json::to_vec(&OAuthState { state: "st1".into(), verifier: "ver1".into(), redirect: "/dashboard".into(), provider: "google".into(), issued_at: chrono::Utc::now().timestamp(), link_user: None, session_hash: None }).unwrap());

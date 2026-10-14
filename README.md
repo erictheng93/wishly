@@ -107,7 +107,7 @@ npx playwright show-report                                      # 開啟上次�
 
 - 後端：`DATABASE_URL`；其餘（SMTP、LINE Login 等）見 `apps/api/.env.example`
   - `BIND`：預設 `127.0.0.1:8080`（dev、production 皆是）。容器內部署需明確設 `BIND=0.0.0.0:8080`，且只讓 Cloudflare Tunnel / 內網可達。
-  - `NATIVE_ORIGINS`：額外允許的 CORS 來源（逗號分隔），給 Tauri webview：`tauri://localhost`（macOS / iOS / Linux）、`http://tauri.localhost`（Windows / Android）。dev 預設全含；**production 未設就只允許 `APP_URL`**。原生殼不送 cookie，以 `X-Native-Client: 1` 登入取回 `session_token`，之後用 `Authorization: Bearer`（與 cookie 共用同一張 `sessions`）。
+  - `NATIVE_ORIGINS`：額外允許的 CORS 來源（逗號分隔），給 Tauri webview：`tauri://localhost`（macOS / iOS / Linux）、`http://tauri.localhost`（Windows / Android）。dev 預設全含；**production 未設就只允許 `APP_URL`**。原生殼不送 cookie，以 `X-Native-Client: 1` 登入取回 `session_token`，之後用 `Authorization: Bearer`（與 cookie 共用同一張 `sessions`）；只有 `Origin` 屬於 `NATIVE_ORIGINS` 才會發 `session_token`，網頁版 origin 即使送了 header 也拿不到。Tauri 殼在 `apps/web/src-tauri`（權杖存 OS keychain；Android 尚無 keyring 後端），建置方式見其 `README.md`。
   - `TRUSTED_PROXY`：`cloudflare` 或 `none`。dev 預設 `none`；**production 必須明確設定**，未設或其他值會拒絕啟動（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）。設 `cloudflare` 時信任 `CF-Connecting-IP`，所以 API 不可被直接存取，否則該標頭可被偽造；若 `BIND` 不是回送位址，啟動時會印出 WARN。
   - `TURNSTILE_SECRET`：production 必填；檢舉的 `turnstile_token` 會送 siteverify 驗證，失敗回 403 `FORBIDDEN`。dev/test 不設則略過驗證（接受任何 token，含前端的 `dev-bypass`）。`TURNSTILE_VERIFY_URL` 僅測試時覆寫。
   - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。

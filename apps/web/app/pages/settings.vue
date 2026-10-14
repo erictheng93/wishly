@@ -78,7 +78,7 @@ async function saveSocial() {
     hMsg.value = '已儲存'
   } catch (e: any) { hErr.value = apiErrMsg(e) }
 }
-async function copyUrl() { try { await navigator.clipboard.writeText(profileUrl.value); copied.value = true } catch { hErr.value = '無法複製，請手動選取網址' } }
+async function copyUrl() { try { await copyText(profileUrl.value); copied.value = true } catch { hErr.value = '無法複製，請手動選取網址' } }
 async function exportData() {
   exporting.value = true; err.value = ''
   try {
