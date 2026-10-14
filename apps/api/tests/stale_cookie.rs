@@ -6,7 +6,7 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::{claims, guest, AppState};
@@ -17,11 +17,7 @@ fn app(pool: &PgPool) -> Router {
         .with_state(AppState { pool: pool.clone() })
 }
 
-async fn call(
-    app: &Router,
-    mut req: Request<Body>,
-    ip: &str,
-) -> (StatusCode, axum::http::HeaderMap, Value) {
+async fn call_with_ip(app: &Router, mut req: Request<Body>, ip: &str) -> common::Resp {
     req.extensions_mut()
         .insert(ConnectInfo::<std::net::SocketAddr>(
             format!("{ip}:1234").parse().unwrap(),
@@ -47,7 +43,7 @@ async fn stale_cookie_is_anonymous_but_stale_header_is_401(pool: PgPool) {
     let a = app(&pool);
     let (_, its) = wishlist(&pool, "StaleTok01", 2, 10).await;
     // header 明確帶了失效 token → 401
-    let (s, _, b) = call(
+    let (s, _, b) = call_with_ip(
         &a,
         claim_req(its[0], ("x-guest-token", "dead-token")),
         "2.2.2.2",
@@ -58,7 +54,7 @@ async fn stale_cookie_is_anonymous_but_stale_header_is_401(pool: PgPool) {
         (StatusCode::UNAUTHORIZED, Some("UNAUTHORIZED"))
     );
     // 只有失效的 ws_guest cookie → 視為匿名：建立新訪客、回新 token，並以 Set-Cookie 覆蓋舊的
-    let (s, h, b) = call(
+    let (s, h, b) = call_with_ip(
         &a,
         claim_req(its[1], ("cookie", "ws_guest=dead-cookie")),
         "2.2.2.2",
@@ -67,5 +63,5 @@ async fn stale_cookie_is_anonymous_but_stale_header_is_401(pool: PgPool) {
     assert_eq!(s, StatusCode::CREATED, "{b}");
     assert!(b["guest_token"].as_str().is_some());
     assert!(h["set-cookie"].to_str().unwrap().starts_with("ws_guest="));
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
