@@ -189,18 +189,22 @@ fn date(m: &Map<String, Value>, k: &str) -> R<Option<Option<NaiveDate>>> {
         _ => Err(AppError::invalid(&format!("/{k}"), "TYPE", "日期格式須為 YYYY-MM-DD")),
     }
 }
-/// closes_at：RFC 3339 時間或 null（不設期限）；設定時須在未來
+/// closes_at：RFC 3339 時間或 null（不設期限）。「須在未來」由呼叫端檢查（`future_only`），
+/// 因為編輯頁每次儲存都會帶回現有值，未變動的過期值不應擋住其他欄位的編輯。
 fn closes_at(m: &Map<String, Value>) -> R<Option<Option<DateTime<Utc>>>> {
     match m.get("closes_at") {
         None => Ok(None),
         Some(Value::Null) => Ok(Some(None)),
         Some(Value::String(s)) => {
             let t: DateTime<Utc> = s.parse().map_err(|_| AppError::invalid("/closes_at", "FORMAT", "closes_at 須為 RFC 3339 時間"))?;
-            if t <= Utc::now() { return Err(AppError::invalid("/closes_at", "RANGE", "結束時間須在現在之後")); }
             Ok(Some(Some(t)))
         }
         _ => Err(AppError::invalid("/closes_at", "TYPE", "closes_at 須為字串或 null")),
     }
+}
+fn future_only(t: Option<DateTime<Utc>>) -> R<()> {
+    if t.is_some_and(|t| t <= Utc::now()) { return Err(AppError::invalid("/closes_at", "RANGE", "結束時間須在現在之後")); }
+    Ok(())
 }
 /// 圖片 key：須為 uploads 發出的格式，且前綴符合用途
 fn image_key(m: &Map<String, Value>, k: &str, dir: &str) -> R<Option<Option<String>>> {
@@ -226,6 +230,7 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     let surprise = boolean(m, "surprise_mode")?.unwrap_or(false);
     let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.flatten();
     let closes = closes_at(m)?.flatten();
+    future_only(closes)?;
     if surprise && !event.is_some_and(|d| d > today_tw()) { return Err(AppError::invalid("/event_date", "REQUIRED", "驚喜模式需填寫未來的活動日期")); }
     for _ in 0..5 {
         let r = sqlx::query_scalar::<_, Uuid>(
@@ -354,7 +359,10 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
     };
     if let Some(v) = boolean(m, "show_claimer_names")? { w.show_claimer_names = v; }
     if let Some(v) = int(m, "claim_ttl_hours", 1, 24 * 365)? { w.claim_ttl_hours = v.map(|t| t as i32); }
-    if let Some(v) = closes_at(m)? { w.closes_at = v; }
+    if let Some(v) = closes_at(m)? {
+        if v != w.closes_at { future_only(v)?; } // 未變動的值（含已過期）原樣放行
+        w.closes_at = v;
+    }
     if let Some(v) = boolean(m, "surprise_mode")? {
         if !v && w.surprise_locked { return Err(forbidden("驚喜鎖定期間不可關閉驚喜模式")); }
         w.surprise_mode = v;
@@ -362,6 +370,7 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
     if w.surprise_mode && !w.event_date.is_some_and(|d| d > today_tw()) && (m.contains_key("surprise_mode") || m.contains_key("event_date")) {
         return Err(AppError::invalid("/event_date", "REQUIRED", "驚喜模式需填寫未來的活動日期"));
     }
+    let was_active = w.status == "active";
     if let Some(new) = one_of(m, "status", &["draft", "active", "closed", "archived"])? {
         let ok = matches!((w.status.as_str(), new), (a, b) if a == b) || matches!((w.status.as_str(), new),
             ("draft", "active") | ("active", "closed") | ("closed", "active") | ("draft", "archived") | ("active", "archived") | ("closed", "archived"));
@@ -383,8 +392,9 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
         }
         w.status = new.into();
     }
-    // 重開 / 發佈時不可留著已過的結束時間，否則下個 tick 又被關掉
-    if w.status == "active" && w.closes_at.is_some_and(|t| t <= Utc::now()) {
+    // 只在「進入 active」（發佈 / 重開）時擋已過的結束時間，否則下個 tick 又被關掉；
+    // 本來就 active 但已到期、尚未被背景 job 掃到的清單，編輯其他欄位照常放行（有效狀態已是 closed，認領早被 SQL 擋住）。
+    if !was_active && w.status == "active" && w.closes_at.is_some_and(|t| t <= Utc::now()) {
         return Err(AppError::invalid("/closes_at", "RANGE", "結束時間已過，請延後或清除後再開啟"));
     }
     let mut tx = st.pool.begin().await?;

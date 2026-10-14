@@ -151,6 +151,15 @@ async fn closes_at_is_optional_and_enforced(pool: PgPool) {
 
     // 繞過 API 把期限改成過去：認領立即被擋（不等 sweep），sweep 後轉 closed 並可由創建者重開
     sqlx::query("UPDATE wishlists SET closes_at = now() - interval '1 minute' WHERE id = $1").bind(wid).execute(&pool).await.unwrap();
+    // 已到期但尚未被 sweep：編輯其他欄位不應被擋
+    let (s, _, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "title": "改名" }))).await;
+    assert_eq!(s, StatusCode::OK, "到期未掃到時改標題不該 422：{b}");
+    // 前端儲存設定會原樣帶回 closes_at：值沒變就放行，改成另一個過去的時間仍擋
+    let cur = b["closes_at"].clone();
+    let (s, _, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "title": "再改", "closes_at": cur }))).await;
+    assert_eq!(s, StatusCode::OK, "帶回未變動的過期 closes_at：{b}");
+    let (s, _, _) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "closes_at": "2001-01-01T00:00:00Z" }))).await;
+    assert_eq!(s.as_u16(), 422);
     let (s, _, b) = call(&pool, "POST", &format!("/items/{item}/claims"), &[("idempotency-key", Uuid::new_v4().to_string())],
         Some(json!({ "qty": 1, "display_name": "小明" }))).await;
     assert_eq!((s.as_u16(), b["code"].as_str()), (409, Some("WISHLIST_CLOSED")), "{b}");
