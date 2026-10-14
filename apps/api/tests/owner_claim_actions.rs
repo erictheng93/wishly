@@ -5,26 +5,26 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use common::api as call;
-use common::ck;
-
-async fn user(pool: &PgPool, staff: bool) -> (Uuid, String) {
-    common::user_with_staff(pool, "u", staff).await
-}
-
-/// 清單 + 一個 qty_needed=3 的品項；event_offset_days>0 且 surprise → 鎖定
-use common::guest_wishlist as list;
-
-/// 訪客認領；回傳 (guest_token, claim_id)
-use common::guest_claim_with_email as claim;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn owner_delivers_and_cancels_claims(pool: PgPool) {
-    let (o, ot) = user(&pool, false).await;
-    let (_, st) = user(&pool, false).await;
-    let (wid, it) = list(&pool, o, false, 0).await;
-    let (_, c1) = claim(&pool, it, None).await;
-    let (_, c2) = claim(&pool, it, None).await;
+    let TestUser { id: o, token: ot } = user(&pool, "u").await;
+    let TestUser { id: _, token: st } = user(&pool, "u").await;
+    let wl = wishlist(
+        &pool,
+        o,
+        ListOpts {
+            surprise: false,
+            event_offset_days: Some(0),
+            ..Default::default()
+        },
+    )
+    .await;
+    let wid = wl.id;
+    let it = item(&pool, wl.id, "奶瓶", 3).await;
+    let (_, c1) = guest_claim(&pool, it, 1).await;
+    let (_, c2) = guest_claim(&pool, it, 1).await;
     let url = |c: Uuid| format!("/claims/{c}");
     // 路人 / 擁有者改數量或 purchased → 403
     assert_eq!(
@@ -98,12 +98,22 @@ async fn owner_delivers_and_cancels_claims(pool: PgPool) {
     let a: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE actor_type='user' AND actor_id=$1 AND action='claim.owner_update'").bind(o).fetch_one(&pool).await.unwrap();
     assert_eq!(a, 2);
     // 驚喜鎖定期間禁止
-    let (_, it2) = list(&pool, o, true, 30).await;
-    let (_, c3) = claim(&pool, it2, None).await;
+    let wl = wishlist(
+        &pool,
+        o,
+        ListOpts {
+            surprise: true,
+            event_offset_days: Some(30),
+            ..Default::default()
+        },
+    )
+    .await;
+    let it2 = item(&pool, wl.id, "奶瓶", 3).await;
+    let (_, c3) = guest_claim(&pool, it2, 1).await;
     assert_eq!(
         call(&pool, "DELETE", &url(c3), &ck(&ot), None).await.0,
         StatusCode::FORBIDDEN
     );
     let _ = wid;
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
