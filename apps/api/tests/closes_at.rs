@@ -1,34 +1,32 @@
 //! 清單自動結束時間 closes_at：建立 / 驗證、到期掃描、到期前提醒、認領與認捐即時擋、公開頁。
 mod common;
 use axum::http::StatusCode;
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::wishlists;
 
-async fn call(
-    pool: &PgPool,
-    method: &str,
-    uri: &str,
-    hdr: &[(&str, String)],
-    body: Option<Value>,
-) -> (StatusCode, Value) {
-    let (s, _, b) = common::api(pool, method, uri, hdr, body).await;
-    (s, b)
-}
 use common::ck;
 
-async fn user(pool: &PgPool) -> (Uuid, String) {
-    common::user_pair(pool, "u").await
-}
-
 /// 清單；closes_sql 是 SQL 運算式（如 "now() + interval '1 hour'" 或 "NULL"）
-async fn list(pool: &PgPool, owner: Uuid, status: &str, closes_sql: &str) -> Uuid {
-    let slug: String = Uuid::new_v4().simple().to_string()[..10].to_string();
-    sqlx::query_scalar(&format!(
-        "INSERT INTO wishlists (owner_id, type, visibility, status, slug, title, closes_at)
-         VALUES ($1, 'registry', 'link', $2::wishlist_status, $3, '清單', {closes_sql}) RETURNING id"))
-        .bind(owner).bind(status).bind(slug).fetch_one(pool).await.unwrap()
+async fn deadline_list(pool: &PgPool, owner: Uuid, status: &'static str, closes_sql: &str) -> Uuid {
+    let list = common::wishlist(
+        pool,
+        owner,
+        common::ListOpts {
+            status: Some(status),
+            ..Default::default()
+        },
+    )
+    .await;
+    sqlx::query(&format!(
+        "UPDATE wishlists SET closes_at={closes_sql} WHERE id=$1"
+    ))
+    .bind(list.id)
+    .execute(pool)
+    .await
+    .unwrap();
+    list.id
 }
 async fn status_of(pool: &PgPool, id: Uuid) -> String {
     sqlx::query_scalar("SELECT status::text FROM wishlists WHERE id = $1")
@@ -46,8 +44,8 @@ async fn closing_notifs(pool: &PgPool) -> i64 {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn create_with_and_without_closes_at(pool: PgPool) {
-    let (_, t) = user(&pool).await;
-    let (s, b) = call(
+    let common::TestUser { id: _, token: t } = common::user(&pool, "u").await;
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         "/wishlists",
@@ -58,7 +56,7 @@ async fn create_with_and_without_closes_at(pool: PgPool) {
     assert_eq!(s, StatusCode::CREATED, "{b}");
     assert!(b["closes_at"].is_null(), "預設不設期限");
 
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         "/wishlists",
@@ -74,7 +72,7 @@ async fn create_with_and_without_closes_at(pool: PgPool) {
         json!("not-a-time"),
         json!(123),
     ] {
-        let (s, b) = call(
+        let (s, _, b) = common::call(
             &pool,
             "POST",
             "/wishlists",
@@ -88,14 +86,15 @@ async fn create_with_and_without_closes_at(pool: PgPool) {
             "{bad}: {b}"
         );
     }
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn patch_sets_clears_and_keeps_closes_at(pool: PgPool) {
-    let (o, t) = user(&pool).await;
-    let wid = list(&pool, o, "active", "NULL").await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
+    let wid = deadline_list(&pool, o, "active", "NULL").await;
     let uri = format!("/wishlists/{wid}");
-    let (_, b) = call(
+    let (_, _, b) = common::call(
         &pool,
         "PATCH",
         &uri,
@@ -105,7 +104,7 @@ async fn patch_sets_clears_and_keeps_closes_at(pool: PgPool) {
     .await;
     assert_eq!(b["closes_at"], "2999-01-01T00:00:00Z");
     // 不帶欄位 = 不動
-    let (_, b) = call(
+    let (_, _, b) = common::call(
         &pool,
         "PATCH",
         &uri,
@@ -115,7 +114,7 @@ async fn patch_sets_clears_and_keeps_closes_at(pool: PgPool) {
     .await;
     assert_eq!(b["closes_at"], "2999-01-01T00:00:00Z");
     // null = 清除
-    let (_, b) = call(
+    let (_, _, b) = common::call(
         &pool,
         "PATCH",
         &uri,
@@ -124,15 +123,16 @@ async fn patch_sets_clears_and_keeps_closes_at(pool: PgPool) {
     )
     .await;
     assert!(b["closes_at"].is_null());
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn close_due_only_touches_active_and_expired(pool: PgPool) {
-    let (o, _) = user(&pool).await;
-    let due = list(&pool, o, "active", "now() - interval '1 minute'").await;
-    let future = list(&pool, o, "active", "now() + interval '1 hour'").await;
-    let none = list(&pool, o, "active", "NULL").await;
-    let draft = list(&pool, o, "draft", "now() - interval '1 minute'").await;
+    let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
+    let due = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
+    let future = deadline_list(&pool, o, "active", "now() + interval '1 hour'").await;
+    let none = deadline_list(&pool, o, "active", "NULL").await;
+    let draft = deadline_list(&pool, o, "draft", "now() - interval '1 minute'").await;
     assert_eq!(wishlists::close_due(&pool).await.unwrap(), 1);
     assert_eq!(status_of(&pool, due).await, "closed");
     let closed_at: Option<chrono::DateTime<chrono::Utc>> =
@@ -146,16 +146,17 @@ async fn close_due_only_touches_active_and_expired(pool: PgPool) {
         assert_eq!(status_of(&pool, id).await, st);
     }
     assert_eq!(wishlists::close_due(&pool).await.unwrap(), 0, "冪等");
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reminder_sent_once_and_rearmed_on_change(pool: PgPool) {
-    let (o, t) = user(&pool).await;
-    let soon = list(&pool, o, "active", "now() + interval '2 hours'").await;
-    let far = list(&pool, o, "active", "now() + interval '3 days'").await;
-    let _none = list(&pool, o, "active", "NULL").await;
-    let _closed = list(&pool, o, "closed", "now() + interval '2 hours'").await;
-    let _past = list(&pool, o, "active", "now() - interval '1 hour'").await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
+    let soon = deadline_list(&pool, o, "active", "now() + interval '2 hours'").await;
+    let far = deadline_list(&pool, o, "active", "now() + interval '3 days'").await;
+    let _none = deadline_list(&pool, o, "active", "NULL").await;
+    let _closed = deadline_list(&pool, o, "closed", "now() + interval '2 hours'").await;
+    let _past = deadline_list(&pool, o, "active", "now() - interval '1 hour'").await;
 
     assert_eq!(
         wishlists::remind_closing(&pool).await.unwrap(),
@@ -172,7 +173,7 @@ async fn reminder_sent_once_and_rearmed_on_change(pool: PgPool) {
     assert_eq!((uid, wl), (o, soon.to_string()));
 
     // 創建者改期 → 重新武裝；遠期不提醒
-    let (s, _) = call(
+    let (s, _, _) = common::call(
         &pool,
         "PATCH",
         &format!("/wishlists/{soon}"),
@@ -185,7 +186,7 @@ async fn reminder_sent_once_and_rearmed_on_change(pool: PgPool) {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(wishlists::remind_closing(&pool).await.unwrap(), 1);
     // 沒改動的 PATCH 不會重置
-    let (s, _) = call(
+    let (s, _, _) = common::call(
         &pool,
         "PATCH",
         &format!("/wishlists/{soon}"),
@@ -196,6 +197,7 @@ async fn reminder_sent_once_and_rearmed_on_change(pool: PgPool) {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(wishlists::remind_closing(&pool).await.unwrap(), 0);
     assert_eq!(status_of(&pool, far).await, "active");
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[test]
@@ -217,9 +219,9 @@ fn closing_mail_renders_taipei_time() {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
-    let (o, _) = user(&pool).await;
-    let ok = list(&pool, o, "active", "now() + interval '1 hour'").await;
-    let late = list(&pool, o, "active", "now() - interval '1 minute'").await;
+    let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
+    let ok = deadline_list(&pool, o, "active", "now() + interval '1 hour'").await;
+    let late = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
     let mut ids = vec![];
     for w in [ok, late] {
         ids.push(sqlx::query_scalar::<_, Uuid>("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 2) RETURNING id").bind(w).fetch_one(&pool).await.unwrap());
@@ -227,7 +229,7 @@ async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
     let claim = |item: Uuid| {
         let pool = pool.clone();
         async move {
-            call(
+            common::call(
                 &pool,
                 "POST",
                 &format!("/items/{item}/claims"),
@@ -238,7 +240,7 @@ async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
         }
     };
     assert_eq!(claim(ids[0]).await.0, StatusCode::CREATED);
-    let (s, b) = claim(ids[1]).await;
+    let (s, _, b) = claim(ids[1]).await;
     assert_eq!(
         (s.as_u16(), b["code"].as_str()),
         (409, Some("WISHLIST_CLOSED")),
@@ -250,14 +252,17 @@ async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 0, "被擋的認領不留痕");
-    common::assert_claims_reconciled(&pool).await;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
-    let (o, _) = user(&pool).await;
-    let (donor, tok) = user(&pool).await;
-    let wid: Uuid = list(&pool, o, "active", "now() - interval '1 minute'").await;
+    let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
+    let common::TestUser {
+        id: donor,
+        token: tok,
+    } = common::user(&pool, "u").await;
+    let wid: Uuid = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
     sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $2, $2)")
         .bind(wid).bind(wishsync_api::sealed::seal(b"x")).execute(&pool).await.unwrap();
     let item: Uuid = sqlx::query_scalar(
@@ -274,7 +279,7 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
 
     let mut hdr = ck(&tok).to_vec();
     hdr.push(("idempotency-key", Uuid::new_v4().to_string()));
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         &format!("/items/{item}/contributions"),
@@ -294,7 +299,7 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
         .unwrap();
     hdr.pop();
     hdr.push(("idempotency-key", Uuid::new_v4().to_string()));
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "POST",
         &format!("/items/{item}/contributions"),
@@ -303,12 +308,13 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn public_page_exposes_closes_at(pool: PgPool) {
-    let (o, _) = user(&pool).await;
-    let wid = list(&pool, o, "active", "'2999-01-01T00:00:00Z'::timestamptz").await;
+    let common::TestUser { id: o, token: _ } = common::user(&pool, "u").await;
+    let wid = deadline_list(&pool, o, "active", "'2999-01-01T00:00:00Z'::timestamptz").await;
     sqlx::query(
         "INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 1)",
     )
@@ -321,7 +327,7 @@ async fn public_page_exposes_closes_at(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "GET",
         &format!("/public/wishlists/{}", slug.trim()),
@@ -331,15 +337,16 @@ async fn public_page_exposes_closes_at(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["closes_at"], "2999-01-01T00:00:00Z");
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reopen_requires_future_or_cleared_closes_at(pool: PgPool) {
-    let (o, t) = user(&pool).await;
-    let wid = list(&pool, o, "active", "now() - interval '1 minute'").await;
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
+    let wid = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
     wishlists::close_due(&pool).await.unwrap();
     let uri = format!("/wishlists/{wid}");
-    let (s, b) = call(
+    let (s, _, b) = common::call(
         &pool,
         "PATCH",
         &uri,
@@ -353,7 +360,8 @@ async fn reopen_requires_future_or_cleared_closes_at(pool: PgPool) {
         "{b}"
     );
     assert_eq!(status_of(&pool, wid).await, "closed");
-    let (s, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "status": "active", "closes_at": (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339() }))).await;
+    let (s, _, b) = common::call(&pool, "PATCH", &uri, &ck(&t), Some(json!({ "status": "active", "closes_at": (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339() }))).await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(status_of(&pool, wid).await, "active");
+    common::assert_all_reconciled(&pool).await;
 }
