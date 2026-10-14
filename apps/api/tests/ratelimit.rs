@@ -235,6 +235,11 @@ async fn report_known_reporter_duplicate_returns_same_id(pool: PgPool) {
 async fn presign_limit_per_user(pool: PgPool) {
     let a = app(&pool);
     let common::TestUser { id: uid, token } = common::user(&pool, "u").await;
+    sqlx::query("UPDATE users SET email=NULL WHERE id=$1")
+        .bind(uid)
+        .execute(&pool)
+        .await
+        .unwrap();
     // 預填：本小時已用 60 次 → 第 61 次 429（不必真的連 S3）
     sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ($1, to_timestamp(floor(extract(epoch FROM now()) / 3600) * 3600), 60)")
         .bind(format!("presign:{uid}")).execute(&pool).await.unwrap();
