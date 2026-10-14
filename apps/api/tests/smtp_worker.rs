@@ -1,6 +1,6 @@
 //! Enabled in normal cargo test; docker compose Mailpit is the SMTP integration fixture.
 mod common;
-use common::{user_pair as user, wait_until, wishlist_named as wishlist};
+use common::{user, wait_until, wishlist, ListOpts, TestList, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use wishsync_api::config::Config;
@@ -11,8 +11,11 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
     cfg.cf_account_id = None;
     cfg.cf_email_api_token = None;
     wishsync_api::config::init(cfg);
-    let (owner, _) = user(&pool, "Secret Owner").await;
-    let wishlist = wishlist(&pool, owner, "SmtpWorker").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = user(&pool, "Secret Owner").await;
+    let TestList { id: wishlist, .. } = wishlist(&pool, owner, ListOpts::default()).await;
     sqlx::query("UPDATE wishlists SET title='SMTP integration wishlist',surprise_mode=true,event_date=current_date+30 WHERE id=$1").bind(wishlist).execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO wishlist_items(wishlist_id,title) VALUES ($1,'Secret Gift')")
         .bind(wishlist)
@@ -105,4 +108,5 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .await
         .unwrap();
     assert_eq!(payload, json!({"wishlist_id":wishlist,"count":1}));
+    common::assert_all_reconciled(&pool).await;
 }
