@@ -6,7 +6,7 @@ use axum::{
     Form, Json, Router,
 };
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use serde_json::{json, Value};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::{collections::HashMap, sync::OnceLock};
@@ -17,19 +17,6 @@ static GOOGLE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(
 
 const RSA_PEM: &str = "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCwYdSsFyEqb2fM\nC+GAozSLr/6KbAI8valKrNdWYvixQ4ilybk9kcFMCIQaFvte11/z8rqVYOMoRX+K\nnHhG054PIGufQockZtUBScwVtXLqv7XMvcF4ubURT7AkB6eV1Qvvs1bRgcIQRxgF\nXRQiZehvXXtc8Fc9YpJul+v93siBlFLptqF7dbvI2gh6v9rjdlV+g3robDX4flUw\nngWnakF+rsrFCeWwRyK7Mvjd+8L47RtRlgU/IiNdu1kt2Yg3RVecEmYOCdUue0i2\nbUFxFw8sZk97ydJBXhBCpdE9g4CgPTKCwbrjB1ncODjxqnbpVwMLsEtvPcjmOhD0\n4xOI8uSJAgMBAAECggEAFNf+0rZqBjKDpOabh8DhrwdFkJSagBSWurspuGz6QDJ/\npb3svOSqX+Kav92K56aSkYjT+V6pgYMTAy2h/ha4dUeqyDeLsmbPkbcnncIjWi/9\nGzyqbiqeBfVxlpRr/sYeQr2iCyCnLxbDtTCOdlEuMmjs8Or7GEc7kEO2UPpAniVX\ng9W3I14qxbF9S25BK2T9mLS5IKCLzR2w9fIzWEV19NlDqp+lUW9W05TyYBXTS6S3\n8BRTcVwfzlJHUF4InFnsjokl9Txji+fqqapkz33l6VkSMSzGg2ZvBr3Oe0hIN2UN\nvc/W+w6lrozWYO+CPMZQ28ldOtKEkvePS9cuNdIJnQKBgQDiLJ+uF8/ye9wOHgiA\nJpDQwGna7uh/Am4qb5PIpV4S4iQ7ZL6dl3jrWLdC+kHh6Pl4Cz9yZbez52QRy9kw\naiE+0yN6z94LHyXmNn4lW9kYqnUIuRp8AdEM3E4+rzMGunKoniv7/mOeAG2wC4cH\nZPYars8WW7Hdhff0ZCT7oVe0ZQKBgQDHpEhko9aBFtcGAiDacqaIfvz69Etd/T6Z\nFgBrc2HC5IboMpxIso3VckY6wGzj+vyAhCZhFFEihWcdpYEEZmXSHYnDfX4HN8CY\nYmXXwSkgCnePQfq8kkWXxrwmgW5MvTdGksOERiveqJjdPtPonraMQK0+sGhQksUE\nDOekMmaTVQKBgFVepJMQ1+PeDoyhl3HPnL++sPX7UXSHVU/dN7n3eU/FXgmxGCXh\nw7mJjfrQ/UcpKei+zh7+990HDQWOnRciKBRPm8fCaDxocGS50tmFFqexx2UYgT+n\na+Hf0gTlGmyCub6dnVqLhcxguwZFA52t5RrjOrVkvPkxlQsBNdho6PLlAoGAFXLX\n+EAF7q6GgXW/E9kXfTivc0LFyh5IGGhduS2XRjoJKG8vjTvpsxHo66z6xe+UKzaH\nbQyivuO4NV4vo0phDBbyUxdrb9kUjwqbSHfPNEsLl0+OYa4RXgIS+swTDpmRk7p2\n2QI0+mIAslxqpeZPVHgqZL7NJkLuecXtKR3lGVUCgYAL8bhPlRruNgEUWCl+gPkO\nYbZmmuFY/4uTzAi2ZEOWigsIkABXHkaZKKtgXvfPb7OsfOIM126Abxs3pFga52ls\npeo77uySdh4QwKJ8V2oV3PdWgC/vl+VoxOuEEsRplcXp+p73pJ+wZhlCqj+cr8ZR\nDIApeLQ2Yx11IDSVjBRReA==\n-----END PRIVATE KEY-----\n";
 const RSA_N: &str = "sGHUrBchKm9nzAvhgKM0i6_-imwCPL2pSqzXVmL4sUOIpcm5PZHBTAiEGhb7Xtdf8_K6lWDjKEV_ipx4RtOeDyBrn0KHJGbVAUnMFbVy6r-1zL3BeLm1EU-wJAenldUL77NW0YHCEEcYBV0UImXob117XPBXPWKSbpfr_d7IgZRS6bahe3W7yNoIer_a43ZVfoN66Gw1-H5VMJ4Fp2pBfq7KxQnlsEciuzL43fvC-O0bUZYFPyIjXbtZLdmIN0VXnBJmDgnVLntItm1BcRcPLGZPe8nSQV4QQqXRPYOAoD0ygsG64wdZ3Dg48ap26VcDC7BLbz3I5joQ9OMTiPLkiQ";
-
-async fn call(
-    app: &Router,
-    method: &str,
-    uri: &str,
-    cookie: Option<&str>,
-    body: Option<Value>,
-) -> common::Resp {
-    let h = cookie
-        .map(|c| vec![("cookie", c.to_string())])
-        .unwrap_or_default();
-    common::call_request(app, common::request(method, uri, &h, body)).await
-}
 
 async fn recover_code(pool: &PgPool, email: &str, purpose: &str) -> String {
     let h: Vec<u8> = sqlx::query_scalar("SELECT code_hash FROM otp_challenges WHERE email=$1 AND purpose=$2 ORDER BY created_at DESC LIMIT 1")
@@ -63,23 +50,17 @@ async fn password_register_login_reset(pool: PgPool) {
     let email = format!("pw-{}@example.com", Uuid::new_v4());
     let reg = |pw: &str| json!({ "email": email, "password": pw, "display_name": "小明" });
     assert_eq!(
-        call(
-            &app,
-            "POST",
-            "/api/v1/auth/register",
-            None,
-            Some(reg("short"))
-        )
-        .await
-        .0,
+        common::call_app(&app, "POST", "/auth/register", &[], Some(reg("short")))
+            .await
+            .0,
         422
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/register",
-            None,
+            "/auth/register",
+            &[],
             Some(reg(&"x".repeat(129)))
         )
         .await
@@ -87,11 +68,11 @@ async fn password_register_login_reset(pool: PgPool) {
         422
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/register",
-            None,
+            "/auth/register",
+            &[],
             Some(reg("correct-horse"))
         )
         .await
@@ -106,11 +87,11 @@ async fn password_register_login_reset(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 0);
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/login",
-            None,
+            "/auth/login",
+            &[],
             Some(json!({ "email": email, "password": "correct-horse" }))
         )
         .await
@@ -121,22 +102,22 @@ async fn password_register_login_reset(pool: PgPool) {
     let code = recover_code(&pool, &email, "register").await;
     let wrong = if code == "000000" { "000001" } else { "000000" };
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/register/verify",
-            None,
+            "/auth/register/verify",
+            &[],
             Some(json!({ "email": email, "code": wrong }))
         )
         .await
         .0,
         400
     );
-    let (st, h, b) = call(
+    let (st, h, b) = common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/register/verify",
-        None,
+        "/auth/register/verify",
+        &[],
         Some(json!({ "email": email, "code": code })),
     )
     .await;
@@ -156,11 +137,11 @@ async fn password_register_login_reset(pool: PgPool) {
             .unwrap();
     assert!(hash.starts_with("$argon2id$"));
     // 登入
-    let (st, h, b) = call(
+    let (st, h, b) = common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/login",
-        None,
+        "/auth/login",
+        &[],
         Some(json!({ "email": email.to_uppercase(), "password": "correct-horse" })),
     )
     .await;
@@ -170,23 +151,25 @@ async fn password_register_login_reset(pool: PgPool) {
     );
     let old = session_cookie(&h);
     assert_eq!(
-        call(&app, "GET", "/api/v1/me", Some(&old), None).await.0,
+        common::call_app(&app, "GET", "/me", &[("cookie", old.to_string())], None)
+            .await
+            .0,
         200
     );
     // 錯誤密碼與不存在帳號：同一個 401 與相同內容
-    let (s1, _, e1) = call(
+    let (s1, _, e1) = common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/login",
-        None,
+        "/auth/login",
+        &[],
         Some(json!({ "email": email, "password": "wrong-password" })),
     )
     .await;
-    let (s2, _, e2) = call(
+    let (s2, _, e2) = common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/login",
-        None,
+        "/auth/login",
+        &[],
         Some(json!({ "email": "nobody@example.com", "password": "wrong-password" })),
     )
     .await;
@@ -199,11 +182,11 @@ async fn password_register_login_reset(pool: PgPool) {
     // 已有密碼者再註冊 → 驗證時 409
     // 剛驗證成功（驗證碼已使用）不擋下一次請求；但新寄出、尚未使用的驗證碼 60 秒內不能再要
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/register",
-            None,
+            "/auth/register",
+            &[],
             Some(reg("another-pass"))
         )
         .await
@@ -211,11 +194,11 @@ async fn password_register_login_reset(pool: PgPool) {
         202
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/register",
-            None,
+            "/auth/register",
+            &[],
             Some(reg("another-pass"))
         )
         .await
@@ -225,11 +208,11 @@ async fn password_register_login_reset(pool: PgPool) {
     age_otps(&pool).await;
     let code = recover_code(&pool, &email, "register").await;
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/register/verify",
-            None,
+            "/auth/register/verify",
+            &[],
             Some(json!({ "email": email, "code": code }))
         )
         .await
@@ -239,11 +222,11 @@ async fn password_register_login_reset(pool: PgPool) {
     // 重設：不存在的 email 也 202（且不產生挑戰）
     age_otps(&pool).await;
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/password/reset/request",
-            None,
+            "/auth/password/reset/request",
+            &[],
             Some(json!({ "email": "ghost@example.com" }))
         )
         .await
@@ -257,11 +240,11 @@ async fn password_register_login_reset(pool: PgPool) {
             .unwrap();
     assert_eq!(n, 0);
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/password/reset/request",
-            None,
+            "/auth/password/reset/request",
+            &[],
             Some(json!({ "email": email }))
         )
         .await
@@ -269,11 +252,11 @@ async fn password_register_login_reset(pool: PgPool) {
         202
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/password/reset/request",
-            None,
+            "/auth/password/reset/request",
+            &[],
             Some(json!({ "email": email }))
         )
         .await
@@ -282,36 +265,38 @@ async fn password_register_login_reset(pool: PgPool) {
     ); // 限流也 202
     let code = recover_code(&pool, &email, "reset").await;
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/password/reset/confirm",
-            None,
+            "/auth/password/reset/confirm",
+            &[],
             Some(json!({ "email": email, "code": code, "new_password": "tiny" }))
         )
         .await
         .0,
         422
     );
-    let (st, ..) = call(
+    let (st, ..) = common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/password/reset/confirm",
-        None,
+        "/auth/password/reset/confirm",
+        &[],
         Some(json!({ "email": email, "code": code, "new_password": "brand-new-pass" })),
     )
     .await;
     assert_eq!(st, 204);
     assert_eq!(
-        call(&app, "GET", "/api/v1/me", Some(&old), None).await.0,
+        common::call_app(&app, "GET", "/me", &[("cookie", old.to_string())], None)
+            .await
+            .0,
         401
     ); // 舊 session 失效
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/login",
-            None,
+            "/auth/login",
+            &[],
             Some(json!({ "email": email, "password": "correct-horse" }))
         )
         .await
@@ -319,11 +304,11 @@ async fn password_register_login_reset(pool: PgPool) {
         401
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/login",
-            None,
+            "/auth/login",
+            &[],
             Some(json!({ "email": email, "password": "brand-new-pass" }))
         )
         .await
@@ -332,20 +317,20 @@ async fn password_register_login_reset(pool: PgPool) {
     );
     // 失敗過多 → 429（每 email）
     for _ in 0..5 {
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/login",
-            None,
+            "/auth/login",
+            &[],
             Some(json!({ "email": "brute@example.com", "password": "bad-password" })),
         )
         .await;
     }
-    let (st, h, b) = call(
+    let (st, h, b) = common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/login",
-        None,
+        "/auth/login",
+        &[],
         Some(json!({ "email": "brute@example.com", "password": "bad-password" })),
     )
     .await;
@@ -354,27 +339,28 @@ async fn password_register_login_reset(pool: PgPool) {
         (StatusCode::TOO_MANY_REQUESTS, Some("RATE_LIMITED"))
     );
     assert!(h.contains_key("retry-after"));
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn otp_account_sets_password_via_reset(pool: PgPool) {
     let app = app(AppState { pool: pool.clone() });
     let email = format!("otp-{}@example.com", Uuid::new_v4());
-    call(
+    common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/otp/request",
-        None,
+        "/auth/otp/request",
+        &[],
         Some(json!({ "email": email })),
     )
     .await;
     let code = recover_code(&pool, &email, "login").await;
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/otp/verify",
-            None,
+            "/auth/otp/verify",
+            &[],
             Some(json!({ "email": email, "code": code }))
         )
         .await
@@ -382,11 +368,11 @@ async fn otp_account_sets_password_via_reset(pool: PgPool) {
         200
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/login",
-            None,
+            "/auth/login",
+            &[],
             Some(json!({ "email": email, "password": "whatever-123" }))
         )
         .await
@@ -394,21 +380,21 @@ async fn otp_account_sets_password_via_reset(pool: PgPool) {
         401
     );
     age_otps(&pool).await;
-    call(
+    common::call_app(
         &app,
         "POST",
-        "/api/v1/auth/password/reset/request",
-        None,
+        "/auth/password/reset/request",
+        &[],
         Some(json!({ "email": email })),
     )
     .await;
     let code = recover_code(&pool, &email, "reset").await;
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/password/reset/confirm",
-            None,
+            "/auth/password/reset/confirm",
+            &[],
             Some(json!({ "email": email, "code": code, "new_password": "whatever-123" }))
         )
         .await
@@ -416,11 +402,11 @@ async fn otp_account_sets_password_via_reset(pool: PgPool) {
         204
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
-            "/api/v1/auth/login",
-            None,
+            "/auth/login",
+            &[],
             Some(json!({ "email": email, "password": "whatever-123" }))
         )
         .await
@@ -433,6 +419,7 @@ async fn otp_account_sets_password_via_reset(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 1);
+    common::assert_all_reconciled(&pool).await;
 }
 
 // ---------- Google ----------
@@ -475,11 +462,11 @@ fn id_token(sub: &str, email: &str, verified: bool, aud: &str, exp_offset: i64) 
 
 /// 走完 start → callback，回傳 (callback status, headers)
 async fn google_login(app: &Router, idt: &str) -> (StatusCode, axum::http::HeaderMap) {
-    let (st, h, _) = call(
+    let (st, h, _) = common::call_app(
         app,
         "GET",
-        "/api/v1/auth/oauth/google/start?redirect=/lists",
-        None,
+        "/auth/oauth/google/start?redirect=/lists",
+        &[],
         None,
     )
     .await;
@@ -513,11 +500,11 @@ async fn google_login(app: &Router, idt: &str) -> (StatusCode, axum::http::Heade
         .next()
         .unwrap()
         .to_string();
-    let (st, h, _) = call(
+    let (st, h, _) = common::call_app(
         app,
         "GET",
-        &format!("/api/v1/auth/oauth/google/callback?code={idt}&state={state}"),
-        Some(&oc),
+        &format!("/auth/oauth/google/callback?code={idt}&state={state}"),
+        &[("cookie", oc.to_string())],
         None,
     )
     .await;
@@ -560,7 +547,8 @@ async fn google_login_links_by_verified_email(pool: PgPool) {
         .unwrap()
         .ends_with("/lists"));
     let cookie = session_cookie(&h);
-    let (_, _, me) = call(&app, "GET", "/api/v1/me", Some(&cookie), None).await;
+    let (_, _, me) =
+        common::call_app(&app, "GET", "/me", &[("cookie", cookie.to_string())], None).await;
     assert_eq!(me["id"], uid.to_string());
     assert_eq!(me["display_name"], "既有");
     let provs: Vec<&str> = me["identities"]
@@ -595,7 +583,14 @@ async fn google_login_links_by_verified_email(pool: PgPool) {
     // 新 email → 新帳號
     let new_email = format!("gnew-{}@example.com", Uuid::new_v4());
     let (_, h) = google_login(&app, &id_token("g-sub-2", &new_email, true, "gid", 3600)).await;
-    let (_, _, me) = call(&app, "GET", "/api/v1/me", Some(&session_cookie(&h)), None).await;
+    let (_, _, me) = common::call_app(
+        &app,
+        "GET",
+        "/me",
+        &[("cookie", session_cookie(&h).to_string())],
+        None,
+    )
+    .await;
     assert_ne!(me["id"], uid.to_string());
     assert_eq!(me["email"], new_email);
     assert_eq!(me["display_name"], "G User");
@@ -609,9 +604,17 @@ async fn google_login_links_by_verified_email(pool: PgPool) {
 
     // email_verified=false 不得連結到既有帳號（另建不帶 email 的新 user）
     let (_, h) = google_login(&app, &id_token("g-sub-3", &email, false, "gid", 3600)).await;
-    let (_, _, me) = call(&app, "GET", "/api/v1/me", Some(&session_cookie(&h)), None).await;
+    let (_, _, me) = common::call_app(
+        &app,
+        "GET",
+        "/me",
+        &[("cookie", session_cookie(&h).to_string())],
+        None,
+    )
+    .await;
     assert_ne!(me["id"], uid.to_string());
     assert!(me["email"].is_null());
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -645,7 +648,7 @@ async fn google_rejects_bad_id_tokens(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 0);
     // state 不符
-    let (_, h, _) = call(&app, "GET", "/api/v1/auth/oauth/google/start", None, None).await;
+    let (_, h, _) = common::call_app(&app, "GET", "/auth/oauth/google/start", &[], None).await;
     let oc = h
         .get(header::SET_COOKIE)
         .unwrap()
@@ -655,16 +658,17 @@ async fn google_rejects_bad_id_tokens(pool: PgPool) {
         .next()
         .unwrap()
         .to_string();
-    let (st, h, _) = call(
+    let (st, h, _) = common::call_app(
         &app,
         "GET",
-        "/api/v1/auth/oauth/google/callback?code=x&state=wrong",
-        Some(&oc),
+        "/auth/oauth/google/callback?code=x&state=wrong",
+        &[("cookie", oc.to_string())],
         None,
     )
     .await;
     assert_eq!(st, 302);
     assert!(failed(&h));
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -683,23 +687,17 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
         .bind(uid).bind(wishsync_api::session::hash_token(token)).execute(&pool).await.unwrap();
     let session = format!("ws_session={token}");
     assert_eq!(
-        call(
-            &app,
-            "GET",
-            "/api/v1/auth/oauth/google/start?link=true",
-            None,
-            None
-        )
-        .await
-        .0,
+        common::call_app(&app, "GET", "/auth/oauth/google/start?link=true", &[], None)
+            .await
+            .0,
         401
     );
     async fn start(app: &Router, session: &str) -> (String, String) {
-        let (s, h, _) = call(
+        let (s, h, _) = common::call_app(
             app,
             "GET",
-            "/api/v1/auth/oauth/google/start?link=true",
-            Some(session),
+            "/auth/oauth/google/start?link=true",
+            &[("cookie", session.to_string())],
             None,
         )
         .await;
@@ -722,8 +720,8 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
     }
     let (state, oc) = start(&app, &session).await;
     let idt = id_token("manual-google", "manual@example.com", true, "gid", 3600);
-    let uri = format!("/api/v1/auth/oauth/google/callback?state={state}&code={idt}");
-    let (_, h, _) = call(&app, "GET", &uri, Some(&oc), None).await;
+    let uri = format!("/auth/oauth/google/callback?state={state}&code={idt}");
+    let (_, h, _) = common::call_app(&app, "GET", &uri, &[("cookie", oc.to_string())], None).await;
     assert!(h[header::LOCATION]
         .to_str()
         .unwrap()
@@ -731,11 +729,14 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
     // 相同 user 的另一個 session 也不能完成這次綁定。
     sqlx::query("INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,now()+interval '1 day')")
         .bind(uid).bind(wishsync_api::session::hash_token("other-session")).execute(&pool).await.unwrap();
-    let (_, h, _) = call(
+    let (_, h, _) = common::call_app(
         &app,
         "GET",
         &uri,
-        Some(&format!("{oc}; ws_session=other-session")),
+        &[(
+            "cookie",
+            format!("{oc}; ws_session=other-session").to_string(),
+        )],
         None,
     )
     .await;
@@ -743,7 +744,14 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
         .to_str()
         .unwrap()
         .ends_with("/settings?error=oauth_failed"));
-    let (_, h, _) = call(&app, "GET", &uri, Some(&format!("{oc}; {session}")), None).await;
+    let (_, h, _) = common::call_app(
+        &app,
+        "GET",
+        &uri,
+        &[("cookie", format!("{oc}; {session}").to_string())],
+        None,
+    )
+    .await;
     assert!(h[header::LOCATION]
         .to_str()
         .unwrap()
@@ -754,15 +762,16 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
             .any(|v| v.to_str().unwrap().starts_with("ws_session=")),
         "綁定不切換登入 session"
     );
-    let (_, _, me) = call(&app, "GET", "/api/v1/me", Some(&session), None).await;
+    let (_, _, me) =
+        common::call_app(&app, "GET", "/me", &[("cookie", session.to_string())], None).await;
     assert_eq!(me["id"], uid.to_string());
     assert_eq!(me["email"], "manual@example.com");
     let (state, oc) = start(&app, &session).await;
-    let (_, h, _) = call(
+    let (_, h, _) = common::call_app(
         &app,
         "GET",
-        &format!("/api/v1/auth/oauth/line/callback?state={state}&code=x"),
-        Some(&format!("{oc}; {session}")),
+        &format!("/auth/oauth/line/callback?state={state}&code=x"),
+        &[("cookie", format!("{oc}; {session}").to_string())],
         None,
     )
     .await;
@@ -782,11 +791,11 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid) VALUES ($1,'google','occupied-google')").bind(other).execute(&pool).await.unwrap();
     let (state, oc) = start(&app, &session).await;
     let idt = id_token("occupied-google", "occupied@example.com", true, "gid", 3600);
-    let (_, h, _) = call(
+    let (_, h, _) = common::call_app(
         &app,
         "GET",
-        &format!("/api/v1/auth/oauth/google/callback?state={state}&code={idt}"),
-        Some(&format!("{oc}; {session}")),
+        &format!("/auth/oauth/google/callback?state={state}&code={idt}"),
+        &[("cookie", format!("{oc}; {session}").to_string())],
         None,
     )
     .await;
@@ -801,6 +810,7 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
     .await
     .unwrap();
     assert_eq!(owner, other);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[tokio::test]
@@ -906,4 +916,5 @@ async fn google_login_redirects_blocked_and_ambiguous_accounts(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(count, 0);
+    common::assert_all_reconciled(&pool).await;
 }
