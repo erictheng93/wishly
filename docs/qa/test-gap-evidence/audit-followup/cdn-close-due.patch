@@ -1,0 +1,11 @@
+--- a/apps/api/src/wishlists.rs
++++ b/apps/api/src/wishlists.rs
+@@ -762,7 +762,7 @@
+         crate::dashboard::notify(pool, *id).await?;
+     }
+     if !rows.is_empty() {
+-        crate::cdn::purge_wishlists(rows.iter().map(|r| r.1.trim().to_string()).collect());
++        
+     } // 公開快取副本的 status 要更新
+     Ok(rows.len())
+ }

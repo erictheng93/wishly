@@ -1,0 +1,19 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.67s
+     Running tests/closes_at.rs (apps/api/target/debug/deps/closes_at-0cb008ea0554374f)
+
+running 1 test
+
+thread 'close_due_purges_due_public_lists_and_keeps_future_lists_cached' (6659597) panicked at tests/common/cdn.rs:96:29:
+CDN purge missing for wishlist 457043aece
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test close_due_purges_due_public_lists_and_keeps_future_lists_cached ... FAILED
+
+failures:
+
+failures:
+    close_due_purges_due_public_lists_and_keeps_future_lists_cached
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 5.82s
+
+error: test failed, to rerun pass `--test closes_at`

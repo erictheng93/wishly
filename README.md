@@ -73,7 +73,9 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 後端一般測試也會驗證真實 SMTP 寄送，請先啟動 `docker compose up -d db mailpit`。`scripts/cargo.sh` 已設定容器連到宿主的 SMTP 與 Mailpit API；直接跑 cargo 預設使用 localhost。
 
-CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit，以及 API／前端覆蓋率不得低於已量測基準的檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`（先安裝 cargo-llvm-cov 與 llvm-tools-preview）。完整範圍、mutation 證據與外部依賴阻擋記錄於 [測試缺口稽核](docs/qa/test-gaps-audit.md)。
+CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit，以及 API／前端覆蓋率不得低於已量測基準的檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`（Rust 固定 1.99.0，cargo-llvm-cov 固定 0.9.1；版本不符會拒絕）。npm audit 在獨立 `web-audit` job 保留失敗訊號，不影響 web 的 typecheck／test／build。完整範圍、mutation 證據與外部依賴阻擋記錄於 [測試缺口稽核](docs/qa/test-gaps-audit.md)。
+
+Mutation 可在 Mac／Linux 用 `scripts/mutate.sh --list` 選擇，例如 `scripts/mutate.sh cdn-account-delete`、`scripts/mutate.sh cdn-close-due`；需 Python 3、Rust 與可建立測試 DB 的 DATABASE_URL。runner 自動確認原版綠、停用單一行為後紅、還原後綠；輸出保存於 `apps/api/target/mutations/`，請勿與相同 SQLx test path 的一般測試併跑。`python3 scripts/test_mutate.py` 不需要 DB，可驗證 runner 的分類與中斷還原。
 
 ```sh
 cargo test --manifest-path apps/api/Cargo.toml    # 每個測試使用獨立資料庫（sqlx::test）

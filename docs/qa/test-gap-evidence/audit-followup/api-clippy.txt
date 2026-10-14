@@ -1,0 +1,2 @@
+    Checking wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.80s
