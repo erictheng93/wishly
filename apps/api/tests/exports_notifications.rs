@@ -6,38 +6,47 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::session::hash_token;
 
-use common::api as call;
-use common::ck;
-
-async fn user(pool: &PgPool, staff: bool) -> (Uuid, String) {
-    common::user_with_staff(pool, "u", staff).await
-}
-
-/// 清單 + 一個 qty_needed=3 的品項；event_offset_days>0 且 surprise → 鎖定
-use common::guest_wishlist as list;
-
-/// 訪客認領；回傳 (guest_token, claim_id)
-use common::guest_claim_with_email as claim;
+use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn no_confirmation_without_email(pool: PgPool) {
-    let (o, _) = user(&pool, false).await;
-    let (_, it) = list(&pool, o, false, 0).await;
-    claim(&pool, it, None).await;
+    let TestUser { id: o, token: _ } = user(&pool, "u").await;
+    let wl = wishlist(
+        &pool,
+        o,
+        ListOpts {
+            surprise: false,
+            event_offset_days: Some(0),
+            ..Default::default()
+        },
+    )
+    .await;
+    let it = item(&pool, wl.id, "奶瓶", 3).await;
+    guest_claim(&pool, it, 1).await;
     let n: i64 =
         sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='claim.confirmation'")
             .fetch_one(&pool)
             .await
             .unwrap();
     assert_eq!(n, 0);
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn export_and_unsubscribe(pool: PgPool) {
-    let (u, t) = user(&pool, false).await;
-    let (_, it) = list(&pool, u, false, 0).await;
-    claim(&pool, it, None).await;
+    let TestUser { id: u, token: t } = user(&pool, "u").await;
+    let wl = wishlist(
+        &pool,
+        u,
+        ListOpts {
+            surprise: false,
+            event_offset_days: Some(0),
+            ..Default::default()
+        },
+    )
+    .await;
+    let it = item(&pool, wl.id, "奶瓶", 3).await;
+    guest_claim(&pool, it, 1).await;
     let (s, h, v) = call(&pool, "GET", "/me/export", &ck(&t), None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(h["content-disposition"]
@@ -195,5 +204,5 @@ async fn export_and_unsubscribe(pool: PgPool) {
             .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
