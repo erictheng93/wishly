@@ -1,54 +1,26 @@
 //! 擁有者權限、品項與庫存規則。
 mod common;
-use axum::{
-    http::{header, StatusCode},
-    Router,
-};
-use serde_json::{json, Value};
+use axum::http::{header, StatusCode};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{app, AppState};
 
-fn setup(pool: PgPool) -> (Router, PgPool) {
-    (app(AppState { pool: pool.clone() }), pool)
-}
-
-async fn call(
-    app: &Router,
-    method: &str,
-    uri: &str,
-    cookie: Option<&str>,
-    body: Option<Value>,
-) -> common::Resp {
-    let h = cookie
-        .map(|c| vec![("cookie", c.to_string())])
-        .unwrap_or_default();
-    common::call_request(app, common::request(method, uri, &h, body)).await
-}
-
-/// 直接建 user + session，回傳 cookie
-async fn login(pool: &PgPool) -> (Uuid, String) {
-    let (id, token) = common::user_pair(pool, "t").await;
-    (id, format!("ws_session={token}"))
-}
+use common::*;
 
 /// 固定測試碼，不依賴 SMTP 或暴力枚舉。
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn owner_only_and_item_rules(pool: PgPool) {
-    let (app, pool) = setup(pool);
-    let (_, a) = login(&pool).await;
-    let (_, b) = login(&pool).await;
-    assert_eq!(
-        call(&app, "GET", "/api/v1/wishlists", None, None).await.0,
-        401
-    );
+    let app = test_app(&pool);
+    let TestUser { id: _, token: a } = user(&pool, "t").await;
+    let TestUser { id: _, token: b } = user(&pool, "t").await;
+    assert_eq!(call_app(&app, "GET", "/wishlists", &[], None).await.0, 401);
 
-    let (st, h, w) = call(
+    let (st, h, w) = call_app(
         &app,
         "POST",
-        "/api/v1/wishlists",
-        Some(&a),
+        "/wishlists",
+        &ck(&a),
         Some(json!({ "type": "registry", "title": "寶寶清單" })),
     )
     .await;
@@ -62,11 +34,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         format!("/api/v1/wishlists/{wid}")
     );
     assert_eq!(
-        call(
+        call_app(
             &app,
             "POST",
-            "/api/v1/wishlists",
-            Some(&a),
+            "/wishlists",
+            &ck(&a),
             Some(json!({ "type": "relief", "title": "x" }))
         )
         .await
@@ -74,11 +46,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         422
     );
     assert_eq!(
-        call(
+        call_app(
             &app,
             "POST",
-            "/api/v1/wishlists",
-            Some(&a),
+            "/wishlists",
+            &ck(&a),
             Some(json!({ "type": "personal", "title": "x", "surprise_mode": true }))
         )
         .await
@@ -87,11 +59,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     );
 
     // 空清單不可發佈
-    let (st, _, e) = call(
+    let (st, _, e) = call_app(
         &app,
         "PATCH",
-        &format!("/api/v1/wishlists/{wid}"),
-        Some(&a),
+        &format!("/wishlists/{wid}"),
+        &ck(&a),
         Some(json!({ "status": "active" })),
     )
     .await;
@@ -100,11 +72,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         (StatusCode::CONFLICT, Some("WISHLIST_NOT_PUBLISHABLE"))
     );
 
-    let (st, _, it) = call(
+    let (st, _, it) = call_app(
         &app,
         "POST",
-        &format!("/api/v1/wishlists/{wid}/items"),
-        Some(&a),
+        &format!("/wishlists/{wid}/items"),
+        &ck(&a),
         Some(json!({ "title": "奶瓶", "qty_needed": 3 })),
     )
     .await;
@@ -112,11 +84,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     let iid = it["id"].as_str().unwrap().to_string();
     assert_eq!(it["sort_order"], 10);
     assert_eq!(
-        call(
+        call_app(
             &app,
             "POST",
-            &format!("/api/v1/wishlists/{wid}/items"),
-            Some(&a),
+            &format!("/wishlists/{wid}/items"),
+            &ck(&a),
             Some(json!({ "title": "x", "funding_mode": "crowdfund" }))
         )
         .await
@@ -125,8 +97,8 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     );
 
     // 他人一律 404
-    let wu = format!("/api/v1/wishlists/{wid}");
-    let iu = format!("/api/v1/items/{iid}");
+    let wu = format!("/wishlists/{wid}");
+    let iu = format!("/items/{iid}");
     for (m, u, body) in [
         ("GET", wu.clone(), None),
         ("PATCH", wu.clone(), Some(json!({ "title": "hack" }))),
@@ -141,17 +113,17 @@ async fn owner_only_and_item_rules(pool: PgPool) {
             Some(json!({ "item_ids": [iid] })),
         ),
     ] {
-        let (st, _, e) = call(&app, m, &u, Some(&b), body).await;
+        let (st, _, e) = call_app(&app, m, &u, &ck(&b), body).await;
         assert_eq!(
             (st, e["code"].as_str()),
             (StatusCode::NOT_FOUND, Some("NOT_FOUND")),
             "{m} {u}"
         );
     }
-    let (_, _, l) = call(&app, "GET", "/api/v1/wishlists", Some(&b), None).await;
+    let (_, _, l) = call_app(&app, "GET", "/wishlists", &ck(&b), None).await;
     assert!(l["data"].as_array().unwrap().is_empty());
     // 擁有者標題未被改動
-    let (_, _, got) = call(&app, "GET", &wu, Some(&a), None).await;
+    let (_, _, got) = call_app(&app, "GET", &wu, &ck(&a), None).await;
     assert_eq!(got["wishlist"]["title"], "寶寶清單");
     assert_eq!(got["items"][0]["qty_claimed"], 0);
 
@@ -168,11 +140,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    let (st, _, e) = call(
+    let (st, _, e) = call_app(
         &app,
         "PATCH",
         &iu,
-        Some(&a),
+        &ck(&a),
         Some(json!({ "qty_needed": 1 })),
     )
     .await;
@@ -181,11 +153,11 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         (StatusCode::CONFLICT, Some("QTY_BELOW_CLAIMED"))
     );
     assert_eq!(
-        call(
+        call_app(
             &app,
             "PATCH",
             &iu,
-            Some(&a),
+            &ck(&a),
             Some(json!({ "qty_needed": 2, "priority": "high" }))
         )
         .await
@@ -194,27 +166,27 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     );
 
     // 有認領的品項刪除需 force
-    let (st, _, e) = call(&app, "DELETE", &iu, Some(&a), None).await;
+    let (st, _, e) = call_app(&app, "DELETE", &iu, &ck(&a), None).await;
     assert_eq!(
         (st, e["code"].as_str()),
         (StatusCode::CONFLICT, Some("ITEM_HAS_CLAIMS"))
     );
     // 重排：集合不符 → 422；相符 → 204
-    let (_, _, it2) = call(
+    let (_, _, it2) = call_app(
         &app,
         "POST",
         &format!("{wu}/items"),
-        Some(&a),
+        &ck(&a),
         Some(json!({ "title": "第二個" })),
     )
     .await;
     let i2 = it2["id"].as_str().unwrap();
     assert_eq!(
-        call(
+        call_app(
             &app,
             "POST",
             &format!("{wu}/items/reorder"),
-            Some(&a),
+            &ck(&a),
             Some(json!({ "item_ids": [iid] }))
         )
         .await
@@ -222,56 +194,56 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         422
     );
     assert_eq!(
-        call(
+        call_app(
             &app,
             "POST",
             &format!("{wu}/items/reorder"),
-            Some(&a),
+            &ck(&a),
             Some(json!({ "item_ids": [i2, iid] }))
         )
         .await
         .0,
         204
     );
-    let (_, _, got) = call(&app, "GET", &wu, Some(&a), None).await;
+    let (_, _, got) = call_app(&app, "GET", &wu, &ck(&a), None).await;
     assert_eq!(got["items"][0]["id"], i2);
     assert_eq!(
-        call(&app, "DELETE", &format!("{iu}?force=true"), Some(&a), None)
+        call_app(&app, "DELETE", &format!("{iu}?force=true"), &ck(&a), None)
             .await
             .0,
         204
     );
 
     // 發佈 → 關閉 → 修改品項被拒；DELETE 清單 = 封存且冪等
-    assert!(!call(
+    assert!(!call_app(
         &app,
         "PATCH",
         &wu,
-        Some(&a),
+        &ck(&a),
         Some(json!({ "status": "active" }))
     )
     .await
     .1
     .is_empty());
-    let (_, _, w) = call(&app, "GET", &wu, Some(&a), None).await;
+    let (_, _, w) = call_app(&app, "GET", &wu, &ck(&a), None).await;
     assert_eq!(w["wishlist"]["status"], "active");
     assert_eq!(
-        call(
+        call_app(
             &app,
             "PATCH",
             &wu,
-            Some(&a),
+            &ck(&a),
             Some(json!({ "status": "closed" }))
         )
         .await
         .0,
         200
     );
-    let (st, _, e) = call(
+    let (st, _, e) = call_app(
         &app,
         "PATCH",
-        &format!("/api/v1/items/{i2}"),
-        Some(&a),
+        &format!("/items/{i2}"),
+        &ck(&a),
         Some(json!({ "title": "x" })),
     )
     .await;
@@ -279,16 +251,16 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         (st, e["code"].as_str()),
         (StatusCode::CONFLICT, Some("WISHLIST_CLOSED"))
     );
-    assert_eq!(call(&app, "DELETE", &wu, Some(&a), None).await.0, 204);
-    assert_eq!(call(&app, "DELETE", &wu, Some(&a), None).await.0, 204);
-    let (_, _, l) = call(
+    assert_eq!(call_app(&app, "DELETE", &wu, &ck(&a), None).await.0, 204);
+    assert_eq!(call_app(&app, "DELETE", &wu, &ck(&a), None).await.0, 204);
+    let (_, _, l) = call_app(
         &app,
         "GET",
-        "/api/v1/wishlists?status=archived&limit=5",
-        Some(&a),
+        "/wishlists?status=archived&limit=5",
+        &ck(&a),
         None,
     )
     .await;
     assert_eq!(l["data"][0]["status"], "archived");
-    common::assert_claims_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
