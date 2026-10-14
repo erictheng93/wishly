@@ -12,6 +12,9 @@
     "deploy:preview": "node scripts/check-preview-env.mjs && NUXT_DEMO= NUXT_PUBLIC_API_BASE= nuxt build && wrangler pages deploy dist --project-name wishsync-web --branch qa",
     "deploy:demo": "npm run build:demo && wrangler pages deploy dist --project-name wishsync-web",
     "build:native": "NUXT_NATIVE=1 NUXT_PUBLIC_SITE_URL=${NUXT_PUBLIC_SITE_URL:-https://wishsync.tw} nuxt generate",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:build": "npm run build:native && tauri build",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "build:e2e": "cd e2e/.app && NUXT_PUBLIC_API_BASE=http://localhost:8081 ../../node_modules/.bin/nuxt build",
@@ -28,6 +31,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "@tauri-apps/cli": "^2.12.2",
     "@types/node": "^22.20.5",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3",
