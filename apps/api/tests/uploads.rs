@@ -6,7 +6,7 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use common::{api, ck, user_pair as user};
+use common::{call, ck, user, TestUser};
 use serde_json::json;
 use sqlx::PgPool;
 use tokio::sync::mpsc;
@@ -34,11 +34,14 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
     cfg.s3.public_base = "https://cdn.example.test/media".into();
     wishsync_api::config::init(cfg);
     let server = tokio::spawn(async move { axum::serve(listener, mock).await.unwrap() });
-    let (alice, token) = user(&pool, "Alice").await;
-    let (bob, bob_token) = user(&pool, "Bob").await;
+    let TestUser { id: alice, token } = user(&pool, "Alice").await;
+    let TestUser {
+        id: bob,
+        token: bob_token,
+    } = user(&pool, "Bob").await;
     let valid = json!({"purpose":"item","content_type":"image/png","content_length":1});
     assert_eq!(
-        api(&pool, "POST", "/uploads/presign", &[], Some(valid.clone()))
+        call(&pool, "POST", "/uploads/presign", &[], Some(valid.clone()))
             .await
             .0,
         StatusCode::UNAUTHORIZED
@@ -51,7 +54,7 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
         json!({"purpose":"item","content_type":"image/png","content_length":0}),
         json!({"purpose":"item","content_type":"image/png","content_length":MAX_BYTES+1}),
     ] {
-        let response = api(
+        let response = call(
             &pool,
             "POST",
             "/uploads/presign",
@@ -80,7 +83,7 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
         ("cover", "image/jpeg", "jpg", MAX_BYTES),
         ("item", "image/webp", "webp", 2),
     ] {
-        let response = api(
+        let response = call(
             &pool,
             "POST",
             "/uploads/presign",
@@ -114,7 +117,7 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
             format!("https://cdn.example.test/media/{key}")
         );
         // A second user cannot confirm Alice's staged object: GET must stay in Bob's namespace.
-        let response = api(
+        let response = call(
             &pool,
             "POST",
             "/uploads/confirm",
@@ -135,4 +138,5 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
         .unwrap();
     assert_eq!(used, 3);
     server.abort();
+    common::assert_all_reconciled(&pool).await;
 }
