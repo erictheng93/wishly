@@ -37,6 +37,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => { if (wid !== undefined) (window as any).turnstile?.remove(wid); wid = undefined })
 async function submit() {
+  if (busy.value) return
   if (!token.value) { msg.value = '請先完成驗證'; return }
   busy.value = true; msg.value = ''
   try {
