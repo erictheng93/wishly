@@ -36,18 +36,28 @@ pub struct Config {
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// main.rs 啟動時呼叫一次。
-pub fn init(c: Config) { let _ = CONFIG.set(c); }
+pub fn init(c: Config) {
+    let _ = CONFIG.set(c);
+}
 
 /// 已 init 則回該設定；否則（僅測試 / examples 等未經 main 的情況）回 dev 設定。
 /// 正式程序一定經 main 的 init，所以此 fallback 不會在 production 生效。
-pub fn get() -> Config { CONFIG.get().cloned().unwrap_or_else(Config::dev) }
+pub fn get() -> Config {
+    CONFIG.get().cloned().unwrap_or_else(Config::dev)
+}
 
 fn key32(b64: &str) -> Option<[u8; 32]> {
     use base64::Engine;
-    base64::engine::general_purpose::STANDARD.decode(b64.trim()).ok()?.try_into().ok()
+    base64::engine::general_purpose::STANDARD
+        .decode(b64.trim())
+        .ok()?
+        .try_into()
+        .ok()
 }
 
-fn var(k: &str) -> Option<String> { std::env::var(k).ok().filter(|v| !v.is_empty()) }
+fn var(k: &str) -> Option<String> {
+    std::env::var(k).ok().filter(|v| !v.is_empty())
+}
 
 impl Config {
     /// dev 預設值（僅本機 / 測試）；仍讀環境變數覆寫。
@@ -55,14 +65,25 @@ impl Config {
         let v = |k: &str, d: &str| var(k).unwrap_or_else(|| d.into());
         Config {
             is_prod: false,
-            app_url: v("APP_URL", "http://localhost:3000").trim_end_matches('/').into(),
-            native_origins: v("NATIVE_ORIGINS", "tauri://localhost,http://tauri.localhost,https://tauri.localhost").split(',').map(|s| s.trim().trim_end_matches('/').to_string()).filter(|s| !s.is_empty()).collect(),
+            app_url: v("APP_URL", "http://localhost:3000")
+                .trim_end_matches('/')
+                .into(),
+            native_origins: v(
+                "NATIVE_ORIGINS",
+                "tauri://localhost,http://tauri.localhost,https://tauri.localhost",
+            )
+            .split(',')
+            .map(|s| s.trim().trim_end_matches('/').to_string())
+            .filter(|s| !s.is_empty())
+            .collect(),
             api_base_url: v("API_BASE_URL", "http://localhost:8080"),
             otp_pepper: v("OTP_PEPPER", "dev-pepper"),
             oauth_secret: v("OAUTH_SECRET", "dev-oauth-secret"),
             unsub_secret: v("UNSUB_SECRET", "dev-unsub-secret"),
             smtp_host: v("SMTP_HOST", "localhost"),
-            smtp_port: var("SMTP_PORT").and_then(|p| p.parse().ok()).unwrap_or(1025),
+            smtp_port: var("SMTP_PORT")
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(1025),
             mail_from: v("MAIL_FROM", "WishSync <no-reply@wishsync.tw>"),
             cf_account_id: var("CF_ACCOUNT_ID"),
             cf_email_api_token: var("CF_EMAIL_API_TOKEN"),
@@ -72,9 +93,17 @@ impl Config {
             trusted_proxy_cloudflare: var("TRUSTED_PROXY").as_deref() == Some("cloudflare"),
             bind: v("BIND", "127.0.0.1:8080"),
             turnstile_secret: var("TURNSTILE_SECRET"),
-            turnstile_verify_url: v("TURNSTILE_VERIFY_URL", "https://challenges.cloudflare.com/turnstile/v0/siteverify"),
+            turnstile_verify_url: v(
+                "TURNSTILE_VERIFY_URL",
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            ),
             s3: crate::uploads::S3::dev(),
-            shipping_key: var("SHIPPING_ENC_KEY").and_then(|k| key32(&k)).unwrap_or_else(|| { use sha2::Digest; sha2::Sha256::digest(b"dev-shipping-key").into() }),
+            shipping_key: var("SHIPPING_ENC_KEY")
+                .and_then(|k| key32(&k))
+                .unwrap_or_else(|| {
+                    use sha2::Digest;
+                    sha2::Sha256::digest(b"dev-shipping-key").into()
+                }),
         }
     }
 
@@ -91,7 +120,9 @@ impl Config {
         }
         c.is_prod = true;
         // production 不沿用 dev 預設：未設 NATIVE_ORIGINS 就只允許 APP_URL
-        if var("NATIVE_ORIGINS").is_none() { c.native_origins.clear(); }
+        if var("NATIVE_ORIGINS").is_none() {
+            c.native_origins.clear();
+        }
         let must = |k: &str| match var(k) {
             None => Err(format!("production 需設定 {k}")),
             Some(s) if s.len() < 32 => Err(format!("{k} 至少 32 字元")),
@@ -101,7 +132,11 @@ impl Config {
         c.oauth_secret = must("OAUTH_SECRET")?;
         c.unsub_secret = must("UNSUB_SECRET")?;
         let need = |k: &str| var(k).ok_or_else(|| format!("production 需設定 {k}"));
-        need("CF_ACCOUNT_ID")?; need("CF_EMAIL_API_TOKEN")?; need("MAIL_FROM")?; need("APP_URL")?; need("API_BASE_URL")?;
+        need("CF_ACCOUNT_ID")?;
+        need("CF_EMAIL_API_TOKEN")?;
+        need("MAIL_FROM")?;
+        need("APP_URL")?;
+        need("API_BASE_URL")?;
         // 不設會讓所有使用者看起來來自同一 IP（反向代理的位址），使每 IP 限流變成全域限流。
         match var("TRUSTED_PROXY").as_deref() {
             Some("cloudflare") => {
@@ -114,10 +149,14 @@ impl Config {
             _ => return Err("production 必須明確設定 TRUSTED_PROXY=cloudflare|none（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）".into()),
         }
         need("TURNSTILE_SECRET")?;
-        c.shipping_key = key32(&need("SHIPPING_ENC_KEY")?).ok_or("SHIPPING_ENC_KEY 必須是 base64 編碼的 32 bytes")?;
+        c.shipping_key = key32(&need("SHIPPING_ENC_KEY")?)
+            .ok_or("SHIPPING_ENC_KEY 必須是 base64 編碼的 32 bytes")?;
         c.s3 = crate::uploads::S3 {
-            endpoint: need("S3_ENDPOINT")?.trim_end_matches('/').into(), bucket: need("S3_BUCKET")?,
-            ak: need("S3_ACCESS_KEY")?, sk: need("S3_SECRET_KEY")?, public_base: need("S3_PUBLIC_BASE")?,
+            endpoint: need("S3_ENDPOINT")?.trim_end_matches('/').into(),
+            bucket: need("S3_BUCKET")?,
+            ak: need("S3_ACCESS_KEY")?,
+            sk: need("S3_SECRET_KEY")?,
+            public_base: need("S3_PUBLIC_BASE")?,
             region: var("S3_REGION").unwrap_or_else(|| "us-east-1".into()),
         };
         Ok(c)
@@ -125,12 +164,22 @@ impl Config {
 
     /// TRUSTED_PROXY=cloudflare 但綁定到非回送位址 → API 可能被直接存取，CF-Connecting-IP 可被偽造。
     pub fn bind_warning(&self) -> Option<String> {
-        let loopback = self.bind.parse::<SocketAddr>().map(|a| a.ip().is_loopback()).unwrap_or(false);
+        let loopback = self
+            .bind
+            .parse::<SocketAddr>()
+            .map(|a| a.ip().is_loopback())
+            .unwrap_or(false);
         (self.trusted_proxy_cloudflare && !loopback).then(|| format!(
             "TRUSTED_PROXY=cloudflare 但 BIND={} 非回送位址：若 API 可被直接存取，CF-Connecting-IP 可被偽造而繞過限流；請只允許經 Cloudflare Tunnel 存取。", self.bind))
     }
 
-    pub fn secure_cookie(&self) -> &'static str { if self.is_prod { "; Secure" } else { "" } }
+    pub fn secure_cookie(&self) -> &'static str {
+        if self.is_prod {
+            "; Secure"
+        } else {
+            ""
+        }
+    }
 }
 
 /// 共用：取得用戶端 IP。TRUSTED_PROXY=cloudflare 才信任 CF-Connecting-IP；
@@ -138,15 +187,35 @@ impl Config {
 /// handler 以 `parts: axum::http::request::Parts` 取得後呼叫。
 pub fn client_ip(parts: &axum::http::request::Parts, cfg: &Config) -> String {
     if cfg.trusted_proxy_cloudflare {
-        if let Some(ip) = parts.headers.get("cf-connecting-ip").and_then(|v| v.to_str().ok()).map(str::trim).filter(|v| !v.is_empty()) {
+        if let Some(ip) = parts
+            .headers
+            .get("cf-connecting-ip")
+            .and_then(|v| v.to_str().ok())
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
             return ip.to_string();
         }
     }
-    parts.extensions.get::<axum::extract::ConnectInfo<SocketAddr>>().map(|c| c.0.ip().to_string()).unwrap_or_else(|| "unknown".into())
+    parts
+        .extensions
+        .get::<axum::extract::ConnectInfo<SocketAddr>>()
+        .map(|c| c.0.ip().to_string())
+        .unwrap_or_else(|| "unknown".into())
 }
 
 /// 常數時間比較
-pub fn ct_eq(a: &[u8], b: &[u8]) -> bool { use subtle::ConstantTimeEq; a.ct_eq(b).into() }
+pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+    use subtle::ConstantTimeEq;
+    a.ct_eq(b).into()
+}
+
+// 手寫 Debug：Config 含機密，不可被 {:?} 印出
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config").finish_non_exhaustive()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -157,9 +226,4 @@ mod tests {
         assert!(!Config::dev().is_prod && Config::dev().secure_cookie().is_empty());
         assert!(ct_eq(b"abc", b"abc") && !ct_eq(b"abc", b"abd") && !ct_eq(b"abc", b"ab"));
     }
-}
-
-// 手寫 Debug：Config 含機密，不可被 {:?} 印出
-impl std::fmt::Debug for Config {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_struct("Config").finish_non_exhaustive() }
 }

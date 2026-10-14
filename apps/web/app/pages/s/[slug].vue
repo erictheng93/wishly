@@ -138,7 +138,8 @@ function onDone(r: any) {
 // --- 點數贊助（需登入：未登入導到登入頁，登入後回到本頁）---
 const fundId = ref<string | null>(null), funded = ref<any>(null)
 const fundItem = computed(() => items.value.find(i => i.id === fundId.value) ?? null) // 取即時資料（SSE / refresh 會換掉物件）
-function onFund(it: any) {
+async function onFund(it: any) {
+  await meReady
   if (!me.value) return navigateTo({ path: '/login', query: { redirect: `/s/${slug}` } })
   fundId.value = it.id
 }

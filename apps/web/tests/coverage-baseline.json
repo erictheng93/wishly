@@ -1,0 +1,31 @@
+{
+  "scope": [
+    "app/composables/**/*.ts",
+    "app/utils/**/*.ts",
+    "app/components/**/*.vue"
+  ],
+  "thresholds": {
+    "lines": 52.67,
+    "statements": 49.85,
+    "functions": 49.15,
+    "branches": 49.62
+  },
+  "counts": {
+    "lines": {
+      "covered": 344,
+      "total": 653
+    },
+    "statements": {
+      "covered": 531,
+      "total": 1065
+    },
+    "functions": {
+      "covered": 116,
+      "total": 236
+    },
+    "branches": {
+      "covered": 468,
+      "total": 943
+    }
+  }
+}

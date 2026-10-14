@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-7d9beb916a018c0f)
+
+running 17 tests
+test deleting_quantity_item_preserves_delivered_claim_accounting ... ok
+test account_delete_vs_guest_claim_locks_owner_before_notification_fk ... ok
+test force_delete_vs_claim_update_uses_item_then_claim_lock_order ... ok
+test mixed_quantity_claims_report_remaining_and_never_oversell ... ok
+test reallocate_vs_last_pledge_respects_target_cap_in_both_orders ... ok
+test account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim ... ok
+test opposite_reallocations_lock_lowest_item_first_without_deadlock ... ok
+test removal_vs_inflight_claim_serializes_and_reconciles ... ok
+test deleted_actor_cannot_create_claim_on_another_users_active_list ... ok
+test archive_vs_waiting_claim_cannot_accept_after_archive_commit ... ok
+test account_delete_vs_own_pledge_checks_actor_before_wishlist ... ok
+test wallet_freeze_vs_pledge_checks_status_under_lock ... ok
+test removal_vs_inflight_pledge_serializes_and_refunds ... ok
+test withdraw_vs_final_pledge_serializes_both_orders ... ok
+test same_key_claim_requests_overlap_and_claim_once ... ok
+test same_key_pledge_requests_overlap_and_debit_once ... ok
+test withdraw_vs_tick_refunds_exactly_once ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.32s
+

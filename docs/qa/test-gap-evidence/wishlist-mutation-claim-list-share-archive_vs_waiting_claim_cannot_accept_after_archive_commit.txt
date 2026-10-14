@@ -1,0 +1,21 @@
+   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.93s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-7d9beb916a018c0f)
+
+running 1 test
+
+thread 'archive_vs_waiting_claim_cannot_accept_after_archive_commit' (6207218) panicked at tests/concurrency.rs:506:9:
+assertion `left == right` failed: claim accepted after archive committed
+  left: 2
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test archive_vs_waiting_claim_cannot_accept_after_archive_commit ... FAILED
+
+failures:
+
+failures:
+    archive_vs_waiting_claim_cannot_accept_after_archive_commit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.91s
+
+error: test failed, to rerun pass `--test concurrency`

@@ -15,62 +15,128 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/public/wishlists/{slug}", get(wishlist)).route("/public/wishlists/{slug}/unlock", post(unlock))
+    Router::new()
+        .route("/public/wishlists/{slug}", get(wishlist))
+        .route("/public/wishlists/{slug}/unlock", post(unlock))
         .route("/restricted/wishlists/{slug}", get(restricted))
 }
 
 /// POST /public/wishlists/{slug}/unlock：密碼清單換存取權杖（同 slug+IP 每 15 分鐘 10 次）
-async fn unlock(State(st): State<AppState>, Path(slug): Path<String>, peer: crate::ratelimit::Peer, Json(b): Json<Value>) -> Result<Json<Value>, AppError> {
-    if !crate::validate::slug_ok(&slug) { return Err(AppError::NotFound); }
+async fn unlock(
+    State(st): State<AppState>,
+    Path(slug): Path<String>,
+    peer: crate::ratelimit::Peer,
+    Json(b): Json<Value>,
+) -> Result<Json<Value>, AppError> {
+    if !crate::validate::slug_ok(&slug) {
+        return Err(AppError::NotFound);
+    }
     crate::ratelimit::check(&st.pool, &format!("unlock:{slug}:{}", peer.0), 10, 900).await?;
     let w: Option<(Uuid, Option<String>)> = sqlx::query_as(
         "SELECT id, access_password_hash FROM wishlists WHERE slug = $1 AND deleted_at IS NULL AND visibility::text = 'password' AND status IN ('active', 'closed')")
         .bind(&slug).fetch_optional(&st.pool).await?;
-    let Some((id, Some(hash))) = w else { return Err(AppError::NotFound) };
-    let Some(pw) = b["password"].as_str().map(str::to_owned) else { return Err(AppError::invalid("/password", "REQUIRED", "請輸入密碼")) };
+    let Some((id, Some(hash))) = w else {
+        return Err(AppError::NotFound);
+    };
+    let Some(pw) = b["password"].as_str().map(str::to_owned) else {
+        return Err(AppError::invalid("/password", "REQUIRED", "請輸入密碼"));
+    };
     let h = hash.clone();
-    let ok = tokio::task::spawn_blocking(move || crate::auth_ext::verify_pw(&pw, &h)).await.unwrap_or(false);
-    if !ok { return Err(AppError::problem(422, "WRONG_PASSWORD", "密碼錯誤")); }
-    Ok(Json(json!({ "access_token": crate::access::access_token(id, &hash) })))
+    let ok = tokio::task::spawn_blocking(move || crate::auth_ext::verify_pw(&pw, &h))
+        .await
+        .unwrap_or(false);
+    if !ok {
+        return Err(AppError::problem(422, "WRONG_PASSWORD", "密碼錯誤"));
+    }
+    Ok(Json(
+        json!({ "access_token": crate::access::access_token(id, &hash) }),
+    ))
 }
 
 pub fn image_url(key: Option<&str>, status: &str) -> Option<String> {
-    key.filter(|_| status == "ready").map(|k| crate::uploads::S3::get().public_url(k))
+    key.filter(|_| status == "ready")
+        .map(|k| crate::uploads::S3::get().public_url(k))
 }
 
 #[derive(FromRow)]
 struct W {
-    id: Uuid, slug: String, r#type: String, status: String, visibility: String, moderation: String,
-    title: String, description: Option<String>, cover_image_key: Option<String>, cover_image_status: String,
-    event_date: Option<NaiveDate>, closes_at: Option<DateTime<Utc>>, show_claimer_names: bool, surprise_mode: bool,
-    owner_id: Uuid, owner_name: String, pw_hash: Option<String>, locked: bool, updated_at: DateTime<Utc>,
+    id: Uuid,
+    slug: String,
+    r#type: String,
+    status: String,
+    visibility: String,
+    moderation: String,
+    title: String,
+    description: Option<String>,
+    cover_image_key: Option<String>,
+    cover_image_status: String,
+    event_date: Option<NaiveDate>,
+    closes_at: Option<DateTime<Utc>>,
+    show_claimer_names: bool,
+    surprise_mode: bool,
+    owner_id: Uuid,
+    owner_name: String,
+    pw_hash: Option<String>,
+    locked: bool,
+    updated_at: DateTime<Utc>,
 }
 
 #[derive(FromRow)]
 struct It {
-    id: Uuid, title: String, brand: Option<String>, spec: Option<String>, image_key: Option<String>, image_status: String,
-    product_url: Option<String>, unit_price_amount: Option<i64>, priority: String, funding_mode: String,
-    qty_needed: i32, qty_claimed: i32,
-    target_points: Option<i64>, pledged_points: i64, funding_status: Option<String>, display_status: Option<String>, funding_deadline: Option<DateTime<Utc>>,
+    id: Uuid,
+    title: String,
+    brand: Option<String>,
+    spec: Option<String>,
+    image_key: Option<String>,
+    image_status: String,
+    product_url: Option<String>,
+    unit_price_amount: Option<i64>,
+    priority: String,
+    funding_mode: String,
+    qty_needed: i32,
+    qty_claimed: i32,
+    target_points: Option<i64>,
+    pledged_points: i64,
+    funding_status: Option<String>,
+    display_status: Option<String>,
+    funding_deadline: Option<DateTime<Utc>>,
 }
 
 /// 可被 CDN 快取的路徑：**不讀 cookie、不讀 X-List-Access**，只會回 public / link 清單內容；
 /// 受限清單（friends / selected / password / private）在這裡一律以匿名身分判斷 → 只會得到不含清單內容的 403 / 404。
 /// 這樣即使 Cloudflare 被設成強制快取這個路徑，也只可能快取到公開資料或空的門檻回應。
-async fn wishlist(State(st): State<AppState>, Path(slug): Path<String>, parts: Parts) -> Result<Response, AppError> {
+async fn wishlist(
+    State(st): State<AppState>,
+    Path(slug): Path<String>,
+    parts: Parts,
+) -> Result<Response, AppError> {
     render(&st, &slug, None, &parts).await
 }
 
 /// 受限清單內容：依 ws_session 與 X-List-Access 判斷，任何清單都回 private, no-store（不走 CDN 快取）。
-async fn restricted(State(st): State<AppState>, Path(slug): Path<String>, parts: Parts) -> Result<Response, AppError> {
+async fn restricted(
+    State(st): State<AppState>,
+    Path(slug): Path<String>,
+    parts: Parts,
+) -> Result<Response, AppError> {
     let viewer = crate::access::viewer(&parts, &st).await?;
-    let acc = parts.headers.get("x-list-access").and_then(|v| v.to_str().ok());
+    let acc = parts
+        .headers
+        .get("x-list-access")
+        .and_then(|v| v.to_str().ok());
     render(&st, &slug, Some((viewer, acc)), &parts).await
 }
 
 /// who = None：公開（可快取）路徑，匿名判斷；Some((登入者, 密碼權杖))：受限路徑。
-async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&str>)>, parts: &Parts) -> Result<Response, AppError> {
-    if !crate::validate::slug_ok(slug) { return Err(AppError::NotFound); }
+async fn render(
+    st: &AppState,
+    slug: &str,
+    who: Option<(Option<Uuid>, Option<&str>)>,
+    parts: &Parts,
+) -> Result<Response, AppError> {
+    if !crate::validate::slug_ok(slug) {
+        return Err(AppError::NotFound);
+    }
     let w: W = sqlx::query_as(
         "SELECT w.id, w.slug::text AS slug, w.type::text AS type, w.status::text AS status, w.visibility::text AS visibility,
                 w.moderation_status::text AS moderation, w.title, w.description, w.cover_image_key,
@@ -81,16 +147,50 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
          FROM wishlists w JOIN users u ON u.id = w.owner_id
          WHERE w.slug = $1 AND w.deleted_at IS NULL")
         .bind(slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
-    if w.status == "draft" || w.status == "archived" { return Err(AppError::NotFound); }
+    if w.status == "draft" || w.status == "archived" {
+        return Err(AppError::NotFound);
+    }
     let (viewer, acc) = who.unwrap_or((None, None));
-    crate::access::check_wishlist(&st.pool, &crate::access::ListAccess { wishlist_id: w.id, owner_id: w.owner_id, visibility: &w.visibility, pw_hash: w.pw_hash.as_deref() }, viewer, acc).await?;
-    if w.moderation == "hidden" { return Err(AppError::WishlistRemoved); }
+    crate::access::check_wishlist(
+        &st.pool,
+        &crate::access::ListAccess {
+            wishlist_id: w.id,
+            owner_id: w.owner_id,
+            visibility: &w.visibility,
+            pw_hash: w.pw_hash.as_deref(),
+        },
+        viewer,
+        acc,
+    )
+    .await?;
+    if w.moderation == "hidden" {
+        return Err(AppError::WishlistRemoved);
+    }
 
     // 只有公開路徑上的 public / link 可被共用快取；受限路徑一律 no-store、不出 ETag（依觀看者而異）
     let restricted = who.is_some() || !matches!(w.visibility.as_str(), "public" | "link");
-    let etag = format!("\"w-{}-{}{}\"", w.slug, w.updated_at.timestamp_millis(), if w.locked { "-l" } else { "" });
-    let cache = [(header::CACHE_CONTROL, if restricted { "private, no-store" } else { "public, s-maxage=10, stale-while-revalidate=60" }.to_string())];
-    if !restricted && parts.headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) == Some(etag.as_str()) {
+    let etag = format!(
+        "\"w-{}-{}{}\"",
+        w.slug,
+        w.updated_at.timestamp_millis(),
+        if w.locked { "-l" } else { "" }
+    );
+    let cache = [(
+        header::CACHE_CONTROL,
+        if restricted {
+            "private, no-store"
+        } else {
+            "public, s-maxage=10, stale-while-revalidate=60"
+        }
+        .to_string(),
+    )];
+    if !restricted
+        && parts
+            .headers
+            .get(header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok())
+            == Some(etag.as_str())
+    {
         return Ok((StatusCode::NOT_MODIFIED, cache, [(header::ETAG, etag)]).into_response());
     }
 
@@ -113,7 +213,12 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
              WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('reserved','purchased','delivered')
              GROUP BY c.item_id, n ORDER BY min(c.created_at)")
             .bind(w.id).fetch_all(&st.pool).await?;
-        for (item, name, qty) in rows { claimers.entry(item).or_default().push(json!({ "display_name": name, "qty": qty })); }
+        for (item, name, qty) in rows {
+            claimers
+                .entry(item)
+                .or_default()
+                .push(json!({ "display_name": name, "qty": qty }));
+        }
     }
 
     // 眾籌捐贈者：同一位（同 user 且非匿名）合併成一筆；匿名者各自一筆、一律「匿名朋友」。只算 pledged / captured。
@@ -127,10 +232,18 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
         let mut merged: HashMap<(Uuid, Uuid), usize> = HashMap::new(); // (item, user) -> 該品項 contributors 的索引（僅非匿名）
         for (item, user, anon, name, points) in rows {
             let list = contributors.entry(item).or_default();
-            if anon { list.push(json!({ "display_name": "匿名朋友", "points": points })); continue; }
+            if anon {
+                list.push(json!({ "display_name": "匿名朋友", "points": points }));
+                continue;
+            }
             match merged.get(&(item, user)) {
-                Some(&k) => list[k]["points"] = json!(list[k]["points"].as_i64().unwrap_or(0) + points),
-                None => { merged.insert((item, user), list.len()); list.push(json!({ "display_name": name, "points": points })); }
+                Some(&k) => {
+                    list[k]["points"] = json!(list[k]["points"].as_i64().unwrap_or(0) + points)
+                }
+                None => {
+                    merged.insert((item, user), list.len());
+                    list.push(json!({ "display_name": name, "points": points }));
+                }
             }
         }
     }
@@ -138,9 +251,17 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
     // 完成度：數量型 = qty_claimed/qty_needed；眾籌型達標（funded / fulfilled）算 1/1（見 wishlists::units）
     let (mut total, mut got, mut fulfilled) = (0i64, 0i64, 0usize);
     for i in &items {
-        let (c, n) = crate::wishlists::units(&i.funding_mode, i.qty_needed, i.qty_claimed, i.funding_status.as_deref());
-        total += n; got += c;
-        if c >= n { fulfilled += 1; }
+        let (c, n) = crate::wishlists::units(
+            &i.funding_mode,
+            i.qty_needed,
+            i.qty_claimed,
+            i.funding_status.as_deref(),
+        );
+        total += n;
+        got += c;
+        if c >= n {
+            fulfilled += 1;
+        }
     }
     let pct = crate::wishlists::completion_pct;
     let item_json: Vec<Value> = items.iter().map(|i| {
@@ -173,6 +294,8 @@ async fn render(st: &AppState, slug: &str, who: Option<(Option<Uuid>, Option<&st
         "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
         "items": item_json, "updated_at": w.updated_at,
     });
-    if restricted { return Ok((cache, Json(body)).into_response()); }
+    if restricted {
+        return Ok((cache, Json(body)).into_response());
+    }
     Ok((cache, [(header::ETAG, etag)], Json(body)).into_response())
 }

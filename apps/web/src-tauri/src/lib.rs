@@ -70,3 +70,101 @@ mod tests {
         assert!(validate_token("中文").is_err());
     }
 }
+
+#[cfg(test)]
+mod command_tests {
+    use super::*;
+    use keyring::credential::{Credential, CredentialApi, CredentialBuilderApi};
+    use keyring::mock::MockCredential;
+    use std::{any::Any, sync::Arc};
+
+    // The built-in mock is EntryOnly; commands create a new Entry each time.
+    // Share its credential through a test-only builder to model real persistence.
+    struct Store(Arc<MockCredential>);
+
+    impl CredentialApi for Store {
+        fn set_secret(&self, secret: &[u8]) -> keyring::Result<()> {
+            self.0.set_secret(secret)
+        }
+        fn get_secret(&self) -> keyring::Result<Vec<u8>> {
+            self.0.get_secret()
+        }
+        fn delete_credential(&self) -> keyring::Result<()> {
+            self.0.delete_credential()
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    impl CredentialBuilderApi for Store {
+        fn build(
+            &self,
+            target: Option<&str>,
+            service: &str,
+            user: &str,
+        ) -> keyring::Result<Box<Credential>> {
+            assert_eq!(
+                (target, service, user),
+                (None, "tw.wishsync.app", "session")
+            );
+            Ok(Box::new(Store(self.0.clone())))
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    #[test]
+    fn commands_persist_replace_clear_and_propagate_keychain_errors() {
+        let mock = Arc::new(MockCredential::default());
+        keyring::set_default_credential_builder(Box::new(Store(mock.clone())));
+        assert_eq!(session_token_get().unwrap(), None);
+        assert!(session_token_clear().is_ok());
+        session_token_set("first-token".into()).unwrap();
+        assert_eq!(session_token_get().unwrap().as_deref(), Some("first-token"));
+        session_token_set("replacement-token".into()).unwrap();
+        assert_eq!(
+            session_token_get().unwrap().as_deref(),
+            Some("replacement-token")
+        );
+
+        for invalid in [
+            "".into(),
+            "a".repeat(513),
+            "has space".into(),
+            "中文".into(),
+        ] {
+            assert!(session_token_set(invalid).is_err());
+            assert_eq!(
+                session_token_get().unwrap().as_deref(),
+                Some("replacement-token")
+            );
+        }
+        session_token_clear().unwrap();
+        assert_eq!(session_token_get().unwrap(), None);
+        assert!(session_token_clear().is_ok());
+
+        mock.set_error(keyring::Error::Invalid(
+            "store".into(),
+            "unavailable".into(),
+        ));
+        assert!(session_token_get().unwrap_err().contains("unavailable"));
+        mock.set_error(keyring::Error::Invalid(
+            "store".into(),
+            "unavailable".into(),
+        ));
+        assert!(session_token_set("valid-token".into())
+            .unwrap_err()
+            .contains("unavailable"));
+        assert_eq!(session_token_get().unwrap(), None);
+        session_token_set("kept-token".into()).unwrap();
+        mock.set_error(keyring::Error::Invalid(
+            "store".into(),
+            "unavailable".into(),
+        ));
+        assert!(session_token_clear().unwrap_err().contains("unavailable"));
+        assert_eq!(session_token_get().unwrap().as_deref(), Some("kept-token"));
+        session_token_clear().unwrap();
+    }
+}

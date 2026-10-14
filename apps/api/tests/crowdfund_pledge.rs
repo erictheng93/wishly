@@ -1,54 +1,75 @@
 //! P2-A 捐贈者端：認捐 / 撤回 / 轉投 / 錢包 / tick_funding。fixture 全以 SQL 建立，不依賴品項 API。
-use axum::{body::Body, http::{Request, StatusCode}, Router};
-use http_body_util::BodyExt;
+mod common;
+use axum::{http::StatusCode, Router};
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use tower::ServiceExt;
 use uuid::Uuid;
-use wishsync_api::{contributions, session::hash_token, wallet, AppState};
+use wishsync_api::{contributions, wallet, AppState};
 
 type Resp = (StatusCode, axum::http::HeaderMap, Value);
 
 fn test_app(pool: &PgPool) -> Router {
-    Router::new().nest("/api/v1", contributions::routes().merge(wallet::routes())).with_state(AppState { pool: pool.clone() })
+    Router::new()
+        .nest("/api/v1", contributions::routes().merge(wallet::routes()))
+        .with_state(AppState { pool: pool.clone() })
 }
 
-async fn call(app: &Router, method: &str, uri: &str, cookie: Option<&str>, key: Option<Uuid>, body: Option<Value>) -> Resp {
-    let mut r = Request::builder().method(method).uri(format!("/api/v1{uri}"));
-    if let Some(c) = cookie { r = r.header("cookie", format!("ws_session={c}")); }
-    if let Some(k) = key { r = r.header("idempotency-key", k.to_string()); }
-    let req = match body { Some(b) => r.header("content-type", "application/json").body(Body::from(b.to_string())), None => r.body(Body::empty()) }.unwrap();
-    let res = app.clone().oneshot(req).await.unwrap();
-    let (st, h) = (res.status(), res.headers().clone());
-    let b = res.into_body().collect().await.unwrap().to_bytes();
-    (st, h, serde_json::from_slice(&b).unwrap_or(Value::Null))
+async fn call(
+    app: &Router,
+    method: &str,
+    uri: &str,
+    cookie: Option<&str>,
+    key: Option<Uuid>,
+    body: Option<Value>,
+) -> common::Resp {
+    let mut h = cookie.map(common::ck).unwrap_or_default();
+    if let Some(k) = key {
+        h.push(("idempotency-key", k.to_string()));
+    }
+    common::call(
+        app,
+        common::request(method, &format!("/api/v1{uri}"), &h, body),
+    )
+    .await
 }
 
 async fn pledge(app: &Router, item: Uuid, tok: &str, points: i64) -> Resp {
-    call(app, "POST", &format!("/items/{item}/contributions"), Some(tok), Some(Uuid::new_v4()), Some(json!({ "points": points }))).await
+    call(
+        app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        Some(tok),
+        Some(Uuid::new_v4()),
+        Some(json!({ "points": points })),
+    )
+    .await
 }
 
 /// 使用者 + session；回傳 (id, token)
-async fn user(pool: &PgPool, name: &str) -> (Uuid, String) {
-    let id: Uuid = sqlx::query_scalar("INSERT INTO users (display_name, email) VALUES ($1, $2) RETURNING id")
-        .bind(name).bind(format!("{}@example.com", Uuid::new_v4())).fetch_one(pool).await.unwrap();
-    let tok = Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '1 day')")
-        .bind(id).bind(hash_token(&tok)).execute(pool).await.unwrap();
-    (id, tok)
-}
+use common::user;
 
 /// 發點（ledger grant），保持 balance = Σ delta
 async fn grant(pool: &PgPool, uid: Uuid, n: i64) {
     let wid: Uuid = sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id RETURNING id")
         .bind(uid).fetch_one(pool).await.unwrap();
-    let after: i64 = sqlx::query_scalar("UPDATE point_wallets SET balance = balance + $2 WHERE id = $1 RETURNING balance").bind(wid).bind(n).fetch_one(pool).await.unwrap();
+    let after: i64 = sqlx::query_scalar(
+        "UPDATE point_wallets SET balance = balance + $2 WHERE id = $1 RETURNING balance",
+    )
+    .bind(wid)
+    .bind(n)
+    .fetch_one(pool)
+    .await
+    .unwrap();
     sqlx::query("INSERT INTO point_ledger (wallet_id, delta, balance_after, entry_type, ref_type, note) VALUES ($1, $2, $3, 'grant', 'manual', 'test')")
         .bind(wid).bind(n).bind(after).execute(pool).await.unwrap();
 }
 
 async fn balance(pool: &PgPool, uid: Uuid) -> i64 {
-    sqlx::query_scalar("SELECT COALESCE((SELECT balance FROM point_wallets WHERE user_id = $1), 0)").bind(uid).fetch_one(pool).await.unwrap()
+    sqlx::query_scalar("SELECT COALESCE((SELECT balance FROM point_wallets WHERE user_id = $1), 0)")
+        .bind(uid)
+        .fetch_one(pool)
+        .await
+        .unwrap()
 }
 
 async fn wishlist(pool: &PgPool, owner: Uuid) -> Uuid {
@@ -69,7 +90,11 @@ async fn cf_item(pool: &PgPool, wl: Uuid, target: i64) -> Uuid {
 }
 
 async fn item_row(pool: &PgPool, id: Uuid) -> (i64, String) {
-    sqlx::query_as("SELECT pledged_points, funding_status::text FROM wishlist_items WHERE id = $1").bind(id).fetch_one(pool).await.unwrap()
+    sqlx::query_as("SELECT pledged_points, funding_status::text FROM wishlist_items WHERE id = $1")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
 }
 
 async fn assert_reconciled(pool: &PgPool) {
@@ -93,8 +118,15 @@ async fn pledge_happy_path(pool: PgPool) {
     grant(&pool, donor, 1000).await;
     let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
 
-    let (st, h, b) = call(&app, "POST", &format!("/items/{item}/contributions"), Some(&tok), Some(Uuid::new_v4()),
-        Some(json!({ "points": 200, "message": "恭喜", "is_anonymous": true }))).await;
+    let (st, h, b) = call(
+        &app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        Some(&tok),
+        Some(Uuid::new_v4()),
+        Some(json!({ "points": 200, "message": "恭喜", "is_anonymous": true })),
+    )
+    .await;
     assert_eq!(st, StatusCode::CREATED, "{b}");
     assert!(h["cache-control"].to_str().unwrap().contains("no-store"));
     assert_eq!(b["funded"], false);
@@ -108,7 +140,10 @@ async fn pledge_happy_path(pool: PgPool) {
     let (delta, kind, after): (i64, String, i64) = sqlx::query_as(
         "SELECT delta, entry_type::text, balance_after FROM point_ledger WHERE ref_type = 'contribution' ORDER BY seq DESC LIMIT 1").fetch_one(&pool).await.unwrap();
     assert_eq!((delta, kind.as_str(), after), (-200, "pledge", 800));
-    let name: String = sqlx::query_scalar("SELECT donor_name FROM contributions").fetch_one(&pool).await.unwrap();
+    let name: String = sqlx::query_scalar("SELECT donor_name FROM contributions")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(name, "阿明");
     assert_reconciled(&pool).await;
 }
@@ -131,15 +166,32 @@ async fn exact_target_funds_and_captures(pool: PgPool) {
     assert_eq!(r["item"]["progress_percent"], 100);
     assert_eq!(r["contribution"]["status"], "captured");
     assert_eq!(item_row(&pool, item).await, (500, "funded".into()));
-    let captured: i64 = sqlx::query_scalar("SELECT count(*) FROM contributions WHERE status = 'captured' AND captured_at IS NOT NULL").fetch_one(&pool).await.unwrap();
+    let captured: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM contributions WHERE status = 'captured' AND captured_at IS NOT NULL",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(captured, 2);
-    let (amount, ost): (i64, String) = sqlx::query_as("SELECT amount, status::text FROM purchase_orders WHERE item_id = $1").bind(item).fetch_one(&pool).await.unwrap();
+    let (amount, ost): (i64, String) =
+        sqlx::query_as("SELECT amount, status::text FROM purchase_orders WHERE item_id = $1")
+            .bind(item)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!((amount, ost.as_str()), (500, "pending"));
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'crowdfund.funded'").fetch_one(&pool).await.unwrap();
+    let n: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'crowdfund.funded'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(n, 2);
     // 達標後再認捐 → ITEM_FUNDED
     let (st, _, e) = pledge(&app, item, &ta, 1).await;
-    assert_eq!((st, e["code"].as_str()), (StatusCode::CONFLICT, Some("ITEM_FUNDED")));
+    assert_eq!(
+        (st, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ITEM_FUNDED"))
+    );
     assert_reconciled(&pool).await;
 }
 
@@ -152,7 +204,14 @@ async fn hard_cap_reports_remaining(pool: PgPool) {
     let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
     assert_eq!(pledge(&app, item, &ta, 450).await.0, StatusCode::CREATED);
     let (st, _, e) = pledge(&app, item, &ta, 100).await;
-    assert_eq!((st, e["code"].as_str(), e["remaining_points"].as_i64()), (StatusCode::CONFLICT, Some("CROWDFUND_TARGET_EXCEEDED"), Some(50)));
+    assert_eq!(
+        (st, e["code"].as_str(), e["remaining_points"].as_i64()),
+        (
+            StatusCode::CONFLICT,
+            Some("CROWDFUND_TARGET_EXCEEDED"),
+            Some(50)
+        )
+    );
     assert_eq!(balance(&pool, a).await, 550);
     assert_eq!(item_row(&pool, item).await.0, 450);
     assert_reconciled(&pool).await;
@@ -169,16 +228,22 @@ async fn concurrent_last_slot_only_one_wins(pool: PgPool) {
         grant(&pool, id, 100).await;
         users.push((id, tok));
     }
-    let tasks: Vec<_> = users.iter().map(|(_, tok)| {
-        let (app, tok) = (app.clone(), tok.clone());
-        tokio::spawn(async move { pledge(&app, item, &tok, 60).await })
-    }).collect();
+    let tasks: Vec<_> = users
+        .iter()
+        .map(|(_, tok)| {
+            let (app, tok) = (app.clone(), tok.clone());
+            tokio::spawn(async move { pledge(&app, item, &tok, 60).await })
+        })
+        .collect();
     let mut ok = 0;
     for t in tasks {
         let (st, _, b) = t.await.unwrap();
         match st {
             StatusCode::CREATED => ok += 1,
-            StatusCode::CONFLICT => assert!(["CROWDFUND_TARGET_EXCEEDED", "ITEM_FUNDED"].contains(&b["code"].as_str().unwrap()), "{b}"),
+            StatusCode::CONFLICT => assert!(
+                ["CROWDFUND_TARGET_EXCEEDED", "ITEM_FUNDED"].contains(&b["code"].as_str().unwrap()),
+                "{b}"
+            ),
             other => panic!("unexpected {other} {b}"),
         }
     }
@@ -186,7 +251,13 @@ async fn concurrent_last_slot_only_one_wins(pool: PgPool) {
     assert_eq!(item_row(&pool, item).await, (60, "open".into()));
     // 失敗者點數未被扣
     let mut spent = 0;
-    for (id, _) in &users { let b = balance(&pool, *id).await; assert!(b == 100 || b == 40); if b == 40 { spent += 1; } }
+    for (id, _) in &users {
+        let b = balance(&pool, *id).await;
+        assert!(b == 100 || b == 40);
+        if b == 40 {
+            spent += 1;
+        }
+    }
     assert_eq!(spent, 1);
     assert_reconciled(&pool).await;
 }
@@ -198,10 +269,24 @@ async fn concurrent_exact_fill_never_oversells(pool: PgPool) {
     let (owner, _) = user(&pool, "小米").await;
     let item = cf_item(&pool, wishlist(&pool, owner).await, 100).await;
     let mut toks = vec![];
-    for n in 0..5 { let (id, t) = user(&pool, &format!("u{n}")).await; grant(&pool, id, 100).await; toks.push(t); }
-    let tasks: Vec<_> = toks.iter().map(|t| { let (app, t) = (app.clone(), t.clone()); tokio::spawn(async move { pledge(&app, item, &t, 30).await.0 }) }).collect();
+    for n in 0..5 {
+        let (id, t) = user(&pool, &format!("u{n}")).await;
+        grant(&pool, id, 100).await;
+        toks.push(t);
+    }
+    let tasks: Vec<_> = toks
+        .iter()
+        .map(|t| {
+            let (app, t) = (app.clone(), t.clone());
+            tokio::spawn(async move { pledge(&app, item, &t, 30).await.0 })
+        })
+        .collect();
     let mut ok = 0;
-    for t in tasks { if t.await.unwrap() == StatusCode::CREATED { ok += 1; } }
+    for t in tasks {
+        if t.await.unwrap() == StatusCode::CREATED {
+            ok += 1;
+        }
+    }
     assert_eq!(ok, 3);
     assert_eq!(item_row(&pool, item).await.0, 90);
     assert_reconciled(&pool).await;
@@ -219,38 +304,114 @@ async fn pledge_rejections(pool: PgPool) {
 
     // 餘額不足：回 balance，且不留下認捐
     let r = pledge(&app, item, &ta, 101).await;
-    assert_eq!(code(&r), (StatusCode::CONFLICT, "INSUFFICIENT_POINTS".into()));
+    assert_eq!(
+        code(&r),
+        (StatusCode::CONFLICT, "INSUFFICIENT_POINTS".into())
+    );
     assert_eq!(r.2["balance"], 100);
     assert_eq!(item_row(&pool, item).await.0, 0);
     // 欄位驗證
-    for p in [0, -5, 10_000_001] { assert_eq!(pledge(&app, item, &ta, p).await.0, StatusCode::UNPROCESSABLE_ENTITY); }
-    let r = call(&app, "POST", &format!("/items/{item}/contributions"), Some(&ta), Some(Uuid::new_v4()), Some(json!({ "points": 1, "message": "x".repeat(201) }))).await;
+    for p in [0, -5, 10_000_001] {
+        assert_eq!(
+            pledge(&app, item, &ta, p).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+    let r = call(
+        &app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        Some(&ta),
+        Some(Uuid::new_v4()),
+        Some(json!({ "points": 1, "message": "x".repeat(201) })),
+    )
+    .await;
     assert_eq!(r.0, StatusCode::UNPROCESSABLE_ENTITY);
     // 未登入 / 缺 key
-    let r = call(&app, "POST", &format!("/items/{item}/contributions"), None, Some(Uuid::new_v4()), Some(json!({ "points": 1 }))).await;
+    let r = call(
+        &app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        None,
+        Some(Uuid::new_v4()),
+        Some(json!({ "points": 1 })),
+    )
+    .await;
     assert_eq!(code(&r), (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".into()));
-    let r = call(&app, "POST", &format!("/items/{item}/contributions"), Some(&ta), None, Some(json!({ "points": 1 }))).await;
-    assert_eq!(code(&r), (StatusCode::BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED".into()));
+    let r = call(
+        &app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        Some(&ta),
+        None,
+        Some(json!({ "points": 1 })),
+    )
+    .await;
+    assert_eq!(
+        code(&r),
+        (StatusCode::BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED".into())
+    );
     // 不存在的品項
-    assert_eq!(pledge(&app, Uuid::new_v4(), &ta, 1).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        pledge(&app, Uuid::new_v4(), &ta, 1).await.0,
+        StatusCode::NOT_FOUND
+    );
     // 數量型品項
     let q: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 3) RETURNING id").bind(wl).fetch_one(&pool).await.unwrap();
-    assert_eq!(code(&pledge(&app, q, &ta, 1).await), (StatusCode::CONFLICT, "FUNDING_MODE_MISMATCH".into()));
+    assert_eq!(
+        code(&pledge(&app, q, &ta, 1).await),
+        (StatusCode::CONFLICT, "FUNDING_MODE_MISMATCH".into())
+    );
     // 已過截止但 tick 尚未跑
-    sqlx::query("UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id = $1").bind(item).execute(&pool).await.unwrap();
-    assert_eq!(code(&pledge(&app, item, &ta, 1).await), (StatusCode::CONFLICT, "FUNDING_EXPIRED".into()));
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id = $1",
+    )
+    .bind(item)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        code(&pledge(&app, item, &ta, 1).await),
+        (StatusCode::CONFLICT, "FUNDING_EXPIRED".into())
+    );
     // 已 expired
-    sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() WHERE id = $1").bind(item).execute(&pool).await.unwrap();
-    assert_eq!(code(&pledge(&app, item, &ta, 1).await), (StatusCode::CONFLICT, "FUNDING_EXPIRED".into()));
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() WHERE id = $1",
+    )
+    .bind(item)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        code(&pledge(&app, item, &ta, 1).await),
+        (StatusCode::CONFLICT, "FUNDING_EXPIRED".into())
+    );
     // 凍結
     let open = cf_item(&pool, wl, 500).await;
-    sqlx::query("UPDATE point_wallets SET status = 'frozen' WHERE user_id = $1").bind(a).execute(&pool).await.unwrap();
-    assert_eq!(code(&pledge(&app, open, &ta, 1).await), (StatusCode::FORBIDDEN, "WALLET_FROZEN".into()));
+    sqlx::query("UPDATE point_wallets SET status = 'frozen' WHERE user_id = $1")
+        .bind(a)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        code(&pledge(&app, open, &ta, 1).await),
+        (StatusCode::FORBIDDEN, "WALLET_FROZEN".into())
+    );
     assert_eq!(balance(&pool, a).await, 100);
     // 清單已關閉
-    sqlx::query("UPDATE point_wallets SET status = 'active'").execute(&pool).await.unwrap();
-    sqlx::query("UPDATE wishlists SET status = 'closed' WHERE id = $1").bind(wl).execute(&pool).await.unwrap();
-    assert_eq!(code(&pledge(&app, open, &ta, 1).await), (StatusCode::CONFLICT, "WISHLIST_CLOSED".into()));
+    sqlx::query("UPDATE point_wallets SET status = 'active'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE wishlists SET status = 'closed' WHERE id = $1")
+        .bind(wl)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        code(&pledge(&app, open, &ta, 1).await),
+        (StatusCode::CONFLICT, "WISHLIST_CLOSED".into())
+    );
     assert_reconciled(&pool).await;
 }
 
@@ -263,21 +424,60 @@ async fn idempotent_replay_does_not_double_charge(pool: PgPool) {
     let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
     let key = Uuid::new_v4();
     let uri = format!("/items/{item}/contributions");
-    let (s1, h1, b1) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(json!({ "points": 100 }))).await;
-    let (s2, h2, b2) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(json!({ "points": 100 }))).await;
+    let (s1, h1, b1) = call(
+        &app,
+        "POST",
+        &uri,
+        Some(&ta),
+        Some(key),
+        Some(json!({ "points": 100 })),
+    )
+    .await;
+    let (s2, h2, b2) = call(
+        &app,
+        "POST",
+        &uri,
+        Some(&ta),
+        Some(key),
+        Some(json!({ "points": 100 })),
+    )
+    .await;
     assert_eq!((s1, s2), (StatusCode::CREATED, StatusCode::CREATED));
     assert!(h1.get("idempotency-replayed").is_none());
     assert_eq!(h2["idempotency-replayed"], "true");
     assert_eq!(b1["contribution"]["id"], b2["contribution"]["id"]);
     assert_eq!(balance(&pool, a).await, 900);
     // 同 key 不同內容 → 衝突
-    let (s3, _, b3) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(json!({ "points": 50 }))).await;
-    assert_eq!((s3, b3["code"].as_str()), (StatusCode::CONFLICT, Some("IDEMPOTENCY_CONFLICT")));
+    let (s3, _, b3) = call(
+        &app,
+        "POST",
+        &uri,
+        Some(&ta),
+        Some(key),
+        Some(json!({ "points": 50 })),
+    )
+    .await;
+    assert_eq!(
+        (s3, b3["code"].as_str()),
+        (StatusCode::CONFLICT, Some("IDEMPOTENCY_CONFLICT"))
+    );
     // 失敗不占 key：同 key 於餘額補足後可重試
     let k2 = Uuid::new_v4();
-    let (s, ..) = call(&app, "POST", &uri, Some(&ta), Some(k2), Some(json!({ "points": 5000 }))).await;
+    let (s, ..) = call(
+        &app,
+        "POST",
+        &uri,
+        Some(&ta),
+        Some(k2),
+        Some(json!({ "points": 5000 })),
+    )
+    .await;
     assert_eq!(s, StatusCode::CONFLICT);
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM idempotency_keys WHERE key = $1").bind(k2).fetch_one(&pool).await.unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM idempotency_keys WHERE key = $1")
+        .bind(k2)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(n, 0);
     assert_reconciled(&pool).await;
 }
@@ -294,22 +494,81 @@ async fn withdraw_refunds_and_is_idempotent(pool: PgPool) {
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
 
     // 他人 403；不存在 404；未登入 401
-    assert_eq!(call(&app, "DELETE", &format!("/contributions/{cid}"), Some(&tb), None, None).await.0, StatusCode::FORBIDDEN);
-    assert_eq!(call(&app, "DELETE", &format!("/contributions/{}", Uuid::new_v4()), Some(&ta), None, None).await.0, StatusCode::NOT_FOUND);
-    assert_eq!(call(&app, "DELETE", &format!("/contributions/{cid}"), None, None, None).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        call(
+            &app,
+            "DELETE",
+            &format!("/contributions/{cid}"),
+            Some(&tb),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(
+            &app,
+            "DELETE",
+            &format!("/contributions/{}", Uuid::new_v4()),
+            Some(&ta),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(
+            &app,
+            "DELETE",
+            &format!("/contributions/{cid}"),
+            None,
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::UNAUTHORIZED
+    );
     assert_eq!(balance(&pool, a).await, 700);
 
-    let (st, _, b) = call(&app, "DELETE", &format!("/contributions/{cid}"), Some(&ta), None, None).await;
+    let (st, _, b) = call(
+        &app,
+        "DELETE",
+        &format!("/contributions/{cid}"),
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st, StatusCode::OK, "{b}");
     assert_eq!(b["contribution"]["status"], "released");
     assert_eq!(b["contribution"]["refunded_points"], 300);
     assert_eq!(b["wallet"]["balance"], 1000);
     assert_eq!(b["item"]["pledged_points"], 0);
     // 重複撤回：冪等，不重複退點
-    let (st, _, b) = call(&app, "DELETE", &format!("/contributions/{cid}"), Some(&ta), None, None).await;
-    assert_eq!((st, b["contribution"]["status"].as_str()), (StatusCode::OK, Some("released")));
+    let (st, _, b) = call(
+        &app,
+        "DELETE",
+        &format!("/contributions/{cid}"),
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(
+        (st, b["contribution"]["status"].as_str()),
+        (StatusCode::OK, Some("released"))
+    );
     assert_eq!(balance(&pool, a).await, 1000);
-    let rel: i64 = sqlx::query_scalar("SELECT count(*) FROM point_ledger WHERE entry_type = 'release'").fetch_one(&pool).await.unwrap();
+    let rel: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM point_ledger WHERE entry_type = 'release'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(rel, 1);
     assert_reconciled(&pool).await;
 }
@@ -325,8 +584,19 @@ async fn withdraw_locked_when_captured_or_window_over(pool: PgPool) {
     let (_, _, r) = pledge(&app, item, &ta, 100).await;
     assert_eq!(r["funded"], true);
     let cid = r["contribution"]["id"].as_str().unwrap();
-    let (st, _, e) = call(&app, "DELETE", &format!("/contributions/{cid}"), Some(&ta), None, None).await;
-    assert_eq!((st, e["code"].as_str()), (StatusCode::CONFLICT, Some("CONTRIBUTION_LOCKED")));
+    let (st, _, e) = call(
+        &app,
+        "DELETE",
+        &format!("/contributions/{cid}"),
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(
+        (st, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("CONTRIBUTION_LOCKED"))
+    );
     assert_eq!(balance(&pool, a).await, 900);
 
     // expired 且超過 7 天選擇期
@@ -334,11 +604,38 @@ async fn withdraw_locked_when_captured_or_window_over(pool: PgPool) {
     let (_, _, r) = pledge(&app, item2, &ta, 10).await;
     let cid2 = r["contribution"]["id"].as_str().unwrap();
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '8 days' WHERE id = $1").bind(item2).execute(&pool).await.unwrap();
-    let (st, _, e) = call(&app, "DELETE", &format!("/contributions/{cid2}"), Some(&ta), None, None).await;
-    assert_eq!((st, e["code"].as_str()), (StatusCode::CONFLICT, Some("CONTRIBUTION_LOCKED")));
+    let (st, _, e) = call(
+        &app,
+        "DELETE",
+        &format!("/contributions/{cid2}"),
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(
+        (st, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("CONTRIBUTION_LOCKED"))
+    );
     // expired 但仍在選擇期 → 可撤回
-    sqlx::query("UPDATE wishlist_items SET expired_at = now() - interval '1 day' WHERE id = $1").bind(item2).execute(&pool).await.unwrap();
-    assert_eq!(call(&app, "DELETE", &format!("/contributions/{cid2}"), Some(&ta), None, None).await.0, StatusCode::OK);
+    sqlx::query("UPDATE wishlist_items SET expired_at = now() - interval '1 day' WHERE id = $1")
+        .bind(item2)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        call(
+            &app,
+            "DELETE",
+            &format!("/contributions/{cid2}"),
+            Some(&ta),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
     assert_eq!(balance(&pool, a).await, 900);
     assert_reconciled(&pool).await;
 }
@@ -358,13 +655,41 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     let (_, _, r) = pledge(&app, src, &ta, 200).await;
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
     let uri = format!("/contributions/{cid}/reallocate");
-    assert_eq!(call(&app, "PATCH", &format!("/contributions/{cid}"), Some(&ta), None,
-        Some(json!({ "visibility": "friends" }))).await.0, StatusCode::OK);
+    assert_eq!(
+        call(
+            &app,
+            "PATCH",
+            &format!("/contributions/{cid}"),
+            Some(&ta),
+            None,
+            Some(json!({ "visibility": "friends" }))
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
     let go = |tok: &str, target: Uuid| {
         let (app, uri, tok) = (app.clone(), uri.clone(), tok.to_string());
-        async move { call(&app, "POST", &uri, Some(&tok), Some(Uuid::new_v4()), Some(json!({ "target_item_id": target }))).await }
+        async move {
+            call(
+                &app,
+                "POST",
+                &uri,
+                Some(&tok),
+                Some(Uuid::new_v4()),
+                Some(json!({ "target_item_id": target })),
+            )
+            .await
+        }
     };
-    let not_allowed = |r: &Resp| assert_eq!((r.0, r.2["code"].as_str()), (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED")), "{}", r.2);
+    let not_allowed = |r: &Resp| {
+        assert_eq!(
+            (r.0, r.2["code"].as_str()),
+            (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED")),
+            "{}",
+            r.2
+        )
+    };
 
     // 來源仍 open → 不可轉投
     not_allowed(&go(&ta, dst).await);
@@ -375,15 +700,30 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     not_allowed(&go(&ta, src).await);
     not_allowed(&go(&ta, Uuid::new_v4()).await);
     // 無 Idempotency-Key
-    assert_eq!(call(&app, "POST", &uri, Some(&ta), None, Some(json!({ "target_item_id": dst }))).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &uri,
+            Some(&ta),
+            None,
+            Some(json!({ "target_item_id": dst }))
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
 
     let before = balance(&pool, a).await;
-    let ledger_before: i64 = sqlx::query_scalar("SELECT count(*) FROM point_ledger").fetch_one(&pool).await.unwrap();
+    let ledger_before: i64 = sqlx::query_scalar("SELECT count(*) FROM point_ledger")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     let key = Uuid::new_v4();
     let body = json!({ "target_item_id": dst });
     let (st, _, b) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(body.clone())).await;
     assert_eq!(st, StatusCode::CREATED, "{b}");
-    assert_eq!(b["funded"], true);   // 200 點剛好填滿 dst
+    assert_eq!(b["funded"], true); // 200 點剛好填滿 dst
     assert_eq!(b["original"]["status"], "reallocated");
     assert_eq!(b["original"]["visibility"], "friends");
     assert_eq!(b["contribution"]["visibility"], "friends");
@@ -393,13 +733,23 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     assert_eq!(item_row(&pool, dst).await, (200, "funded".into()));
     // 錢包不動、不寫 ledger
     assert_eq!(balance(&pool, a).await, before);
-    let ledger_after: i64 = sqlx::query_scalar("SELECT count(*) FROM point_ledger").fetch_one(&pool).await.unwrap();
+    let ledger_after: i64 = sqlx::query_scalar("SELECT count(*) FROM point_ledger")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(ledger_before, ledger_after);
-    let po: i64 = sqlx::query_scalar("SELECT count(*) FROM purchase_orders WHERE item_id = $1").bind(dst).fetch_one(&pool).await.unwrap();
+    let po: i64 = sqlx::query_scalar("SELECT count(*) FROM purchase_orders WHERE item_id = $1")
+        .bind(dst)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(po, 1);
     // 重放同 key → 不會再轉一次
     let (st, h, _) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(body)).await;
-    assert_eq!((st, h["idempotency-replayed"].to_str().unwrap()), (StatusCode::CREATED, "true"));
+    assert_eq!(
+        (st, h["idempotency-replayed"].to_str().unwrap()),
+        (StatusCode::CREATED, "true")
+    );
     // 已轉投的不能再轉
     not_allowed(&go(&ta, dst).await);
     assert_reconciled(&pool).await;
@@ -418,12 +768,38 @@ async fn reallocate_rejects_overflow_and_expired_window(pool: PgPool) {
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '1 day' WHERE id = $1").bind(src).execute(&pool).await.unwrap();
     let uri = format!("/contributions/{cid}/reallocate");
-    let r = call(&app, "POST", &uri, Some(&ta), Some(Uuid::new_v4()), Some(json!({ "target_item_id": small }))).await;
-    assert_eq!((r.0, r.2["code"].as_str()), (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED"))); // 200 > 目標 100
-    sqlx::query("UPDATE wishlist_items SET expired_at = now() - interval '8 days' WHERE id = $1").bind(src).execute(&pool).await.unwrap();
+    let r = call(
+        &app,
+        "POST",
+        &uri,
+        Some(&ta),
+        Some(Uuid::new_v4()),
+        Some(json!({ "target_item_id": small })),
+    )
+    .await;
+    assert_eq!(
+        (r.0, r.2["code"].as_str()),
+        (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED"))
+    ); // 200 > 目標 100
+    sqlx::query("UPDATE wishlist_items SET expired_at = now() - interval '8 days' WHERE id = $1")
+        .bind(src)
+        .execute(&pool)
+        .await
+        .unwrap();
     let big = cf_item(&pool, wl, 900).await;
-    let r = call(&app, "POST", &uri, Some(&ta), Some(Uuid::new_v4()), Some(json!({ "target_item_id": big }))).await;
-    assert_eq!((r.0, r.2["code"].as_str()), (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED"))); // 選擇期已過
+    let r = call(
+        &app,
+        "POST",
+        &uri,
+        Some(&ta),
+        Some(Uuid::new_v4()),
+        Some(json!({ "target_item_id": big })),
+    )
+    .await;
+    assert_eq!(
+        (r.0, r.2["code"].as_str()),
+        (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED"))
+    ); // 選擇期已過
     assert_eq!(item_row(&pool, src).await.0, 200);
     assert_reconciled(&pool).await;
 }
@@ -444,34 +820,90 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
     pledge(&app, fresh, &ta, 50).await;
 
     // 未到期：不動
-    assert_eq!(wishsync_api::contributions::tick_funding(&pool).await.unwrap(), (0, 0));
-    sqlx::query("UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id = $1").bind(item).execute(&pool).await.unwrap();
-    assert_eq!(wishsync_api::contributions::tick_funding(&pool).await.unwrap(), (1, 0));
+    assert_eq!(
+        wishsync_api::contributions::tick_funding(&pool)
+            .await
+            .unwrap(),
+        (0, 0)
+    );
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id = $1",
+    )
+    .bind(item)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        wishsync_api::contributions::tick_funding(&pool)
+            .await
+            .unwrap(),
+        (1, 0)
+    );
     let (pledged, fs) = item_row(&pool, item).await;
     assert_eq!((pledged, fs.as_str()), (250, "expired"));
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'funding.expired'").fetch_one(&pool).await.unwrap();
+    let n: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'funding.expired'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(n, 2);
     // 重複執行：不再重複轉換 / 通知
-    assert_eq!(wishsync_api::contributions::tick_funding(&pool).await.unwrap(), (0, 0));
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'funding.expired'").fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        wishsync_api::contributions::tick_funding(&pool)
+            .await
+            .unwrap(),
+        (0, 0)
+    );
+    let n: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'funding.expired'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(n, 2);
     assert_eq!(balance(&pool, a).await, 850); // 選擇期內不退
 
     // 選擇期結束 → 自動退點
-    sqlx::query("UPDATE wishlist_items SET expired_at = now() - interval '8 days' WHERE id = $1").bind(item).execute(&pool).await.unwrap();
-    assert_eq!(wishsync_api::contributions::tick_funding(&pool).await.unwrap(), (0, 2));
+    sqlx::query("UPDATE wishlist_items SET expired_at = now() - interval '8 days' WHERE id = $1")
+        .bind(item)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        wishsync_api::contributions::tick_funding(&pool)
+            .await
+            .unwrap(),
+        (0, 2)
+    );
     assert_eq!(balance(&pool, a).await, 950); // 1000 - 50（fresh 仍 pledged）
     assert_eq!(balance(&pool, b).await, 1000);
     assert_eq!(item_row(&pool, item).await.0, 0);
     assert_eq!(item_row(&pool, fresh).await, (50, "open".into()));
     // 再跑不重複退點
-    assert_eq!(wishsync_api::contributions::tick_funding(&pool).await.unwrap(), (0, 0));
+    assert_eq!(
+        wishsync_api::contributions::tick_funding(&pool)
+            .await
+            .unwrap(),
+        (0, 0)
+    );
     assert_eq!(balance(&pool, a).await, 950);
-    let rel: i64 = sqlx::query_scalar("SELECT count(*) FROM point_ledger WHERE entry_type = 'release'").fetch_one(&pool).await.unwrap();
+    let rel: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM point_ledger WHERE entry_type = 'release'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(rel, 2);
     // 並行執行安全
-    sqlx::query("UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id = $1").bind(fresh).execute(&pool).await.unwrap();
-    let (r1, r2) = tokio::join!(wishsync_api::contributions::tick_funding(&pool), wishsync_api::contributions::tick_funding(&pool));
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id = $1",
+    )
+    .bind(fresh)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (r1, r2) = tokio::join!(
+        wishsync_api::contributions::tick_funding(&pool),
+        wishsync_api::contributions::tick_funding(&pool)
+    );
     assert_eq!(r1.unwrap().0 + r2.unwrap().0, 1);
     assert_reconciled(&pool).await;
 }
@@ -486,9 +918,19 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
     let (st, h, b) = call(&app, "GET", "/wallet", Some(&ta), None, None).await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(h["cache-control"], "private, no-store");
-    assert_eq!((b["wallet"]["balance"].as_i64(), b["wallet"]["status"].as_str(), b["wallet"]["held_points"].as_i64()), (Some(0), Some("active"), Some(0)));
+    assert_eq!(
+        (
+            b["wallet"]["balance"].as_i64(),
+            b["wallet"]["status"].as_str(),
+            b["wallet"]["held_points"].as_i64()
+        ),
+        (Some(0), Some("active"), Some(0))
+    );
     assert!(b["wallet"]["id"].is_null());
-    assert_eq!(call(&app, "GET", "/wallet", None, None, None).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        call(&app, "GET", "/wallet", None, None, None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
 
     grant(&pool, a, 1000).await;
     let wl = wishlist(&pool, owner).await;
@@ -500,11 +942,15 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
     assert_eq!(b["wallet"]["balance"], 780);
     assert_eq!(b["wallet"]["held_points"], 220);
     assert_eq!(b["data"].as_array().unwrap().len(), 3);
-    assert_eq!(b["data"][0]["entry_type"], "pledge");   // seq DESC
+    assert_eq!(b["data"][0]["entry_type"], "pledge"); // seq DESC
     assert_eq!(b["data"][2]["entry_type"], "grant");
     assert!(b["next_cursor"].is_null());
     // 部分退款後 held 只算實際花費
-    sqlx::query("UPDATE contributions SET refunded_points = 10 WHERE item_id = $1").bind(done).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE contributions SET refunded_points = 10 WHERE item_id = $1")
+        .bind(done)
+        .execute(&pool)
+        .await
+        .unwrap();
     let (_, _, b) = call(&app, "GET", "/wallet", Some(&ta), None, None).await;
     assert_eq!(b["wallet"]["held_points"], 210);
 
@@ -512,11 +958,24 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
     let (_, _, p1) = call(&app, "GET", "/wallet?limit=2", Some(&ta), None, None).await;
     assert_eq!(p1["data"].as_array().unwrap().len(), 2);
     let cur = p1["next_cursor"].as_str().unwrap();
-    let (_, _, p2) = call(&app, "GET", &format!("/wallet?limit=2&cursor={cur}"), Some(&ta), None, None).await;
+    let (_, _, p2) = call(
+        &app,
+        "GET",
+        &format!("/wallet?limit=2&cursor={cur}"),
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(p2["data"].as_array().unwrap().len(), 1);
     assert_eq!(p2["data"][0]["entry_type"], "grant");
     assert!(p2["next_cursor"].is_null());
-    assert_eq!(call(&app, "GET", "/wallet?cursor=abc", Some(&ta), None, None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        call(&app, "GET", "/wallet?cursor=abc", Some(&ta), None, None)
+            .await
+            .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
     let _ = a;
 }
 
@@ -532,7 +991,14 @@ async fn wallet_contributions_flags_and_filter(pool: PgPool) {
     let expired = cf_item(&pool, wl, 500).await;
     let late = cf_item(&pool, wl, 500).await;
     let done = cf_item(&pool, wl, 100).await;
-    for it in [open, expired, late, done] { assert_eq!(pledge(&app, it, &ta, if it == done { 100 } else { 10 }).await.0, StatusCode::CREATED); }
+    for it in [open, expired, late, done] {
+        assert_eq!(
+            pledge(&app, it, &ta, if it == done { 100 } else { 10 })
+                .await
+                .0,
+            StatusCode::CREATED
+        );
+    }
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '1 day' WHERE id = $1").bind(expired).execute(&pool).await.unwrap();
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '9 days' WHERE id = $1").bind(late).execute(&pool).await.unwrap();
 
@@ -541,8 +1007,17 @@ async fn wallet_contributions_flags_and_filter(pool: PgPool) {
     assert_eq!(h["cache-control"], "private, no-store");
     let rows = b["data"].as_array().unwrap();
     assert_eq!(rows.len(), 4);
-    let by = |it: Uuid| rows.iter().find(|r| r["contribution"]["item_id"] == it.to_string()).unwrap();
-    let flags = |it: Uuid| (by(it)["can_withdraw"].as_bool().unwrap(), by(it)["can_reallocate"].as_bool().unwrap());
+    let by = |it: Uuid| {
+        rows.iter()
+            .find(|r| r["contribution"]["item_id"] == it.to_string())
+            .unwrap()
+    };
+    let flags = |it: Uuid| {
+        (
+            by(it)["can_withdraw"].as_bool().unwrap(),
+            by(it)["can_reallocate"].as_bool().unwrap(),
+        )
+    };
     assert_eq!(flags(open), (true, false));
     assert_eq!(flags(expired), (true, true));
     assert_eq!(flags(late), (false, false));
@@ -555,13 +1030,49 @@ async fn wallet_contributions_flags_and_filter(pool: PgPool) {
     assert!(by(open)["wishlist"]["slug"].is_string());
     assert!(by(open)["item"].get("image_url").is_some());
     // 篩選 + 分頁
-    let (_, _, f) = call(&app, "GET", "/wallet/contributions?status=captured", Some(&ta), None, None).await;
+    let (_, _, f) = call(
+        &app,
+        "GET",
+        "/wallet/contributions?status=captured",
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(f["data"].as_array().unwrap().len(), 1);
-    assert_eq!(call(&app, "GET", "/wallet/contributions?status=bogus", Some(&ta), None, None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-    let (_, _, p1) = call(&app, "GET", "/wallet/contributions?limit=3", Some(&ta), None, None).await;
+    assert_eq!(
+        call(
+            &app,
+            "GET",
+            "/wallet/contributions?status=bogus",
+            Some(&ta),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (_, _, p1) = call(
+        &app,
+        "GET",
+        "/wallet/contributions?limit=3",
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(p1["data"].as_array().unwrap().len(), 3);
     let cur = p1["next_cursor"].as_str().unwrap();
-    let (_, _, p2) = call(&app, "GET", &format!("/wallet/contributions?limit=3&cursor={cur}"), Some(&ta), None, None).await;
+    let (_, _, p2) = call(
+        &app,
+        "GET",
+        &format!("/wallet/contributions?limit=3&cursor={cur}"),
+        Some(&ta),
+        None,
+        None,
+    )
+    .await;
     assert_eq!(p2["data"].as_array().unwrap().len(), 1);
     assert!(p2["next_cursor"].is_null());
     // 只看得到自己的
@@ -575,14 +1086,32 @@ async fn pledge_respects_list_visibility(pool: PgPool) {
     let (owner, _) = user(&pool, "小米").await;
     let (stranger, ts) = user(&pool, "路人").await;
     let (friend, tf) = user(&pool, "好友").await;
-    for u in [stranger, friend] { grant(&pool, u, 1000).await; }
-    let (a, b) = if owner < friend { (owner, friend) } else { (friend, owner) };
-    sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES ($1, $2)").bind(a).bind(b).execute(&pool).await.unwrap();
+    for u in [stranger, friend] {
+        grant(&pool, u, 1000).await;
+    }
+    let (a, b) = if owner < friend {
+        (owner, friend)
+    } else {
+        (friend, owner)
+    };
+    sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES ($1, $2)")
+        .bind(a)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
     let wl = wishlist(&pool, owner).await;
-    sqlx::query("UPDATE wishlists SET visibility = 'friends' WHERE id = $1").bind(wl).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE wishlists SET visibility = 'friends' WHERE id = $1")
+        .bind(wl)
+        .execute(&pool)
+        .await
+        .unwrap();
     let item = cf_item(&pool, wl, 500).await;
     let (st, _, b) = pledge(&app, item, &ts, 100).await;
-    assert_eq!((st, b["code"].as_str()), (StatusCode::FORBIDDEN, Some("FRIENDS_ONLY")));
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("FRIENDS_ONLY"))
+    );
     assert_eq!(balance(&pool, stranger).await, 1000);
     assert_eq!(pledge(&app, item, &tf, 100).await.0, StatusCode::CREATED);
 }
@@ -594,45 +1123,150 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
     let (donor, tok) = user(&pool, "D").await;
     grant(&pool, donor, 1000).await;
     let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
-    sqlx::query("UPDATE users SET default_claim_visibility = 'friends' WHERE id = $1").bind(donor).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE users SET default_claim_visibility = 'friends' WHERE id = $1")
+        .bind(donor)
+        .execute(&pool)
+        .await
+        .unwrap();
     let r = pledge(&app, item, &tok, 100).await;
     assert_eq!(r.0, StatusCode::CREATED, "{}", r.2);
     assert_eq!(r.2["contribution"]["visibility"], "friends");
     let cid = r.2["contribution"]["id"].as_str().unwrap();
     let uri = format!("/contributions/{cid}");
-    sqlx::query("UPDATE users SET default_claim_visibility = 'public' WHERE id = $1").bind(donor).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE users SET default_claim_visibility = 'public' WHERE id = $1")
+        .bind(donor)
+        .execute(&pool)
+        .await
+        .unwrap();
     let rows = call(&app, "GET", "/wallet/contributions", Some(&tok), None, None).await;
     assert_eq!(rows.2["data"][0]["contribution"]["visibility"], "friends");
-    assert_eq!(pledge(&app, item, &tok, 100).await.2["contribution"]["visibility"], "public");
-    let r = call(&app, "POST", &format!("/items/{item}/contributions"), Some(&tok), Some(Uuid::new_v4()),
-        Some(json!({ "points": 100, "visibility": "private" }))).await;
+    assert_eq!(
+        pledge(&app, item, &tok, 100).await.2["contribution"]["visibility"],
+        "public"
+    );
+    let r = call(
+        &app,
+        "POST",
+        &format!("/items/{item}/contributions"),
+        Some(&tok),
+        Some(Uuid::new_v4()),
+        Some(json!({ "points": 100, "visibility": "private" })),
+    )
+    .await;
     assert_eq!(r.2["contribution"]["visibility"], "private");
     for bad in [json!("bogus"), json!(42)] {
-        assert_eq!(call(&app, "POST", &format!("/items/{item}/contributions"), Some(&tok), Some(Uuid::new_v4()),
-            Some(json!({ "points": 1, "visibility": bad }))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(call(&app, "PATCH", &uri, Some(&tok), None, Some(json!({ "visibility": bad }))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            call(
+                &app,
+                "POST",
+                &format!("/items/{item}/contributions"),
+                Some(&tok),
+                Some(Uuid::new_v4()),
+                Some(json!({ "points": 1, "visibility": bad }))
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            call(
+                &app,
+                "PATCH",
+                &uri,
+                Some(&tok),
+                None,
+                Some(json!({ "visibility": bad }))
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
     }
     for empty in [json!({}), json!({ "visibility": null })] {
-        assert_eq!(call(&app, "PATCH", &uri, Some(&tok), None, Some(empty)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            call(&app, "PATCH", &uri, Some(&tok), None, Some(empty))
+                .await
+                .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
     }
-    assert_eq!(call(&app, "PATCH", &uri, None, None, Some(json!({ "visibility": "public" }))).await.0, StatusCode::UNAUTHORIZED);
-    assert_eq!(call(&app, "PATCH", &uri, Some(&owner_tok), None, Some(json!({ "visibility": "public" }))).await.0, StatusCode::FORBIDDEN);
-    assert_eq!(call(&app, "PATCH", &format!("/contributions/{}", Uuid::new_v4()), Some(&tok), None,
-        Some(json!({ "visibility": "public" }))).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        call(
+            &app,
+            "PATCH",
+            &uri,
+            None,
+            None,
+            Some(json!({ "visibility": "public" }))
+        )
+        .await
+        .0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        call(
+            &app,
+            "PATCH",
+            &uri,
+            Some(&owner_tok),
+            None,
+            Some(json!({ "visibility": "public" }))
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(
+            &app,
+            "PATCH",
+            &format!("/contributions/{}", Uuid::new_v4()),
+            Some(&tok),
+            None,
+            Some(json!({ "visibility": "public" }))
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
     let rows = call(&app, "GET", "/wallet/contributions", Some(&tok), None, None).await;
-    let unchanged = rows.2["data"].as_array().unwrap().iter().find(|r| r["contribution"]["id"] == cid).unwrap();
+    let unchanged = rows.2["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["contribution"]["id"] == cid)
+        .unwrap();
     assert_eq!(unchanged["contribution"]["visibility"], "friends");
     let before = balance(&pool, donor).await;
     for vis in ["private", "friends", "public"] {
-        let r = call(&app, "PATCH", &uri, Some(&tok), None, Some(json!({ "visibility": vis }))).await;
+        let r = call(
+            &app,
+            "PATCH",
+            &uri,
+            Some(&tok),
+            None,
+            Some(json!({ "visibility": vis })),
+        )
+        .await;
         assert_eq!(r.0, StatusCode::OK, "{}", r.2);
         assert!(r.1["cache-control"].to_str().unwrap().contains("no-store"));
         assert_eq!(r.2["contribution"]["visibility"], vis);
     }
     assert_eq!(balance(&pool, donor).await, before);
     // 已退回的歷史紀錄仍可調整隱私；不得異動點數。
-    assert_eq!(call(&app, "DELETE", &uri, Some(&tok), None, None).await.0, StatusCode::OK);
-    let r = call(&app, "PATCH", &uri, Some(&tok), None, Some(json!({ "visibility": "private" }))).await;
+    assert_eq!(
+        call(&app, "DELETE", &uri, Some(&tok), None, None).await.0,
+        StatusCode::OK
+    );
+    let r = call(
+        &app,
+        "PATCH",
+        &uri,
+        Some(&tok),
+        None,
+        Some(json!({ "visibility": "private" })),
+    )
+    .await;
     assert_eq!(r.0, StatusCode::OK);
     assert_eq!(r.2["contribution"]["status"], "released");
     assert_eq!(balance(&pool, donor).await, before + 100);
@@ -642,35 +1276,84 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
 #[sqlx::test(migrations = false)]
 async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool) {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../db/migrations");
-    for name in ["0001_mvp.sql", "0002_password.sql", "0003_ratelimit.sql", "0004_crowdfund.sql", "0005_social.sql"] {
-        sqlx::raw_sql(&std::fs::read_to_string(dir.join(name)).unwrap()).execute(&pool).await.unwrap();
+    for name in [
+        "0001_mvp.sql",
+        "0002_password.sql",
+        "0003_ratelimit.sql",
+        "0004_crowdfund.sql",
+        "0005_social.sql",
+    ] {
+        sqlx::raw_sql(&std::fs::read_to_string(dir.join(name)).unwrap())
+            .execute(&pool)
+            .await
+            .unwrap();
     }
     let (owner, _) = user(&pool, "O").await;
     let wl = wishlist(&pool, owner).await;
     let item = cf_item(&pool, wl, 1000).await;
     for vis in ["public", "friends", "private"] {
         let (donor, _) = user(&pool, vis).await;
-        sqlx::query("UPDATE users SET default_claim_visibility = $2::text::share_level WHERE id = $1").bind(donor).bind(vis).execute(&pool).await.unwrap();
+        sqlx::query(
+            "UPDATE users SET default_claim_visibility = $2::text::share_level WHERE id = $1",
+        )
+        .bind(donor)
+        .bind(vis)
+        .execute(&pool)
+        .await
+        .unwrap();
         grant(&pool, donor, 100).await;
         sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points)
             SELECT $1, $2, user_id, id, 'x', 10 FROM point_wallets WHERE user_id = $3")
             .bind(item).bind(wl).bind(donor).execute(&pool).await.unwrap();
     }
-    let before: Value = sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(c) ORDER BY c.id) FROM contributions c").fetch_one(&pool).await.unwrap();
-    sqlx::raw_sql(&std::fs::read_to_string(dir.join("0006_contribution_visibility.sql")).unwrap()).execute(&pool).await.unwrap();
-    let after: Value = sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(c) - 'visibility' ORDER BY c.id) FROM contributions c").fetch_one(&pool).await.unwrap();
+    let before: Value =
+        sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(c) ORDER BY c.id) FROM contributions c")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::raw_sql(&std::fs::read_to_string(dir.join("0006_contribution_visibility.sql")).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let after: Value = sqlx::query_scalar(
+        "SELECT jsonb_agg(to_jsonb(c) - 'visibility' ORDER BY c.id) FROM contributions c",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(after, before, "回填不得改動認捐原有欄位（含 updated_at）");
-    let timestamp: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("SELECT max(updated_at) FROM contributions").fetch_one(&pool).await.unwrap();
+    let timestamp: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT max(updated_at) FROM contributions")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let timestamp_updates: bool = sqlx::query_scalar("UPDATE contributions SET message = '更新留言' WHERE id = (SELECT id FROM contributions LIMIT 1) RETURNING updated_at > $1")
         .bind(timestamp).fetch_one(&pool).await.unwrap();
     assert!(timestamp_updates, "回填後正常更新仍須觸發 updated_at");
     let scopes: Vec<(String, String)> = sqlx::query_as("SELECT u.default_claim_visibility::text, c.visibility::text FROM contributions c JOIN users u ON u.id = c.user_id ORDER BY u.default_claim_visibility")
         .fetch_all(&pool).await.unwrap();
-    assert_eq!(scopes, [("public".into(), "public".into()), ("friends".into(), "friends".into()), ("private".into(), "private".into())]);
-    sqlx::query("UPDATE users SET default_claim_visibility = 'private'").execute(&pool).await.unwrap();
-    let preserved: Vec<String> = sqlx::query_scalar("SELECT visibility::text FROM contributions ORDER BY visibility").fetch_all(&pool).await.unwrap();
+    assert_eq!(
+        scopes,
+        [
+            ("public".into(), "public".into()),
+            ("friends".into(), "friends".into()),
+            ("private".into(), "private".into())
+        ]
+    );
+    sqlx::query("UPDATE users SET default_claim_visibility = 'private'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let preserved: Vec<String> =
+        sqlx::query_scalar("SELECT visibility::text FROM contributions ORDER BY visibility")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(preserved, ["friends", "private", "public"]);
-    assert!(sqlx::query("UPDATE contributions SET visibility = NULL").execute(&pool).await.is_err());
+    assert!(sqlx::query("UPDATE contributions SET visibility = NULL")
+        .execute(&pool)
+        .await
+        .is_err());
     let fresh: String = sqlx::query_scalar("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points)
         SELECT item_id, wishlist_id, user_id, wallet_id, donor_name, 1 FROM contributions LIMIT 1 RETURNING visibility::text")
         .fetch_one(&pool).await.unwrap();

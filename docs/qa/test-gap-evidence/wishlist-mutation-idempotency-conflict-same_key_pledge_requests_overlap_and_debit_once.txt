@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/concurrency.rs (apps/api/target/debug/deps/concurrency-7d9beb916a018c0f)
+
+running 1 test
+
+thread 'same_key_pledge_requests_overlap_and_debit_once' (6212663) panicked at tests/concurrency.rs:141:5:
+assertion `left == right` failed: {"contribution":{"captured_at":null,"created_at":"2026-10-14T06:56:58.714092+00:00","id":"01a13933-31c2-7a45-ad0a-7d97abdba1a9","is_anonymous":false,"item_id":"01a13933-30ef-7e68-994e-80e5ecebb9c6","message":null,"points":200,"reallocated_to_item_id":null,"refunded_points":0,"released_at":null,"status":"pledged","updated_at":"2026-10-14T06:56:58.714092+00:00","visibility":"private","wishlist_id":"01a13933-30e7-7dde-a30f-8c83eaa69533"},"funded":false,"item":{"funding_status":"open","id":"01a13933-30ef-7e68-994e-80e5ecebb9c6","pledged_points":200,"progress_percent":40,"remaining_points":300,"target_points":500},"wallet":{"balance":800}} {"code":"INTERNAL_ERROR","status":500,"title":"系統錯誤","type":"https://wishsync.tw/problems/internal-error"}
+  left: (201, 500)
+ right: (201, 201)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test same_key_pledge_requests_overlap_and_debit_once ... FAILED
+
+failures:
+
+failures:
+    same_key_pledge_requests_overlap_and_debit_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.80s
+
+error: test failed, to rerun pass `--test concurrency`

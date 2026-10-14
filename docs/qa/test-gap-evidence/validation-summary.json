@@ -1,0 +1,30 @@
+{
+  "api_gate": {
+    "passed": 200,
+    "failed": 0,
+    "ignored": 0,
+    "exit_code": 0
+  },
+  "frontend": {
+    "passed": 97,
+    "failed": 0,
+    "node": 22
+  },
+  "native": {
+    "passed": 2,
+    "failed": 0
+  },
+  "targeted_e2e": {
+    "passed": 3,
+    "failed": 0
+  },
+  "sha256": {
+    "apps/api/src/claims.rs": "5031dd77e022cf61f347771a8aab5610aa37d2502f660dc9064667e9fba7b657",
+    "apps/api/src/contributions.rs": "f64c94fa5402cee8cff63a197bc85558e71825668ff1d721fee656da33cd2df6",
+    "apps/api/src/wishlists.rs": "85977e4b0f670690cb44b9b94eb47f3c112045d312a68adfd27357d88ed0fd20",
+    "apps/api/src/dashboard.rs": "ce909c7706176a730ae3d819524c98d1b9995e5c8a06b3178d9c3b5ec3404a18",
+    "apps/web/app/components/guest/ClaimSheet.vue": "dc07201f4807d6fc8ca60de75cf3274ff937b428f1f7f84c34790b84b5eb03b6",
+    "apps/web/app/pages/s/[slug].vue": "620c8dc26b1bbfa688f8ab806315d9f5ccc8d1c62f32a579c2c903301ab387c0",
+    "apps/web/src-tauri/src/lib.rs": "4d962c08180bf1233a892290881aa40e689d8d6a16891c39754a1c2f05ae66d0"
+  }
+}

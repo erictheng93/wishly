@@ -69,6 +69,12 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 ## 測試
 
+`apps/web/qa/*.mjs` 是手動探索腳本（crawl、network、security、expiry、invariants 等），需手動啟動服務並準備資料；**不屬於 CI 自動測試**。可重複驗證的回歸測試以 `apps/api/tests/`、`apps/web/tests/` 與 `apps/web/e2e/` 為準。
+
+後端一般測試也會驗證真實 SMTP 寄送，請先啟動 `docker compose up -d db mailpit`。`scripts/cargo.sh` 已設定容器連到宿主的 SMTP 與 Mailpit API；直接跑 cargo 預設使用 localhost。
+
+CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit，以及 API／前端覆蓋率不得低於已量測基準的檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`（先安裝 cargo-llvm-cov 與 llvm-tools-preview）。完整範圍、mutation 證據與外部依賴阻擋記錄於 [測試缺口稽核](docs/qa/test-gaps-audit.md)。
+
 ```sh
 cargo test --manifest-path apps/api/Cargo.toml    # 每個測試使用獨立資料庫（sqlx::test）
 cd apps/web && npm run typecheck && npm test && npm run build   # CI 的 web job 依序執行這三步

@@ -20,7 +20,7 @@ const note = ref(props.mine?.note ?? '')
 const busy = ref(false)
 const msg = ref('')
 const errs = ref<Record<string, string>>({})
-const needName = !getGuestToken() && !props.loggedInName
+const needName = !editing && !getGuestToken() && !props.loggedInName
 const name0 = name.value, note0 = note.value
 const dirty = computed(() => name.value !== name0 || note.value !== note0 || !!contact.value || !!email.value)
 

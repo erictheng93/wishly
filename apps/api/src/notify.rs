@@ -2,7 +2,9 @@
 //! 背景 worker `spawn_worker` 輪詢到期通知，經 SMTP（預設 Mailpit localhost:1025）寄出。
 //! 內容刻意不含品項與認領者，只寫「有 N 件新認領」，所以驚喜模式下天然不洩漏。
 use crate::config::Config;
-use lettre::{message::header::ContentType, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
+use lettre::{
+    message::header::ContentType, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+};
 use serde_json::Value;
 use sqlx::PgPool;
 use std::time::Duration;
@@ -10,7 +12,10 @@ use uuid::Uuid;
 
 /// 認領成功的同一交易內呼叫：第一筆即時 claim.created；之後合併為每日台北 09:00 的 claim.digest（count 累加）。
 /// 建立者關閉 email_claims 或已刪除則不寫。
-pub async fn enqueue_claim<'e, E: sqlx::PgExecutor<'e>>(ex: E, wishlist_id: Uuid) -> Result<(), sqlx::Error> {
+pub async fn enqueue_claim<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    wishlist_id: Uuid,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO notifications (user_id, channel, kind, payload, scheduled_at)
          SELECT u.id, 'email',
@@ -33,7 +38,12 @@ pub async fn enqueue_claim<'e, E: sqlx::PgExecutor<'e>>(ex: E, wishlist_id: Uuid
 /// 眾籌（P2-A）：通知某品項的捐贈者（status in `statuses` 的認捐，每人一封）。
 /// kind：crowdfund.funded / order.shipped / order.delivered / order.failed / funding.expired。
 /// payload 帶 wishlist_id 與 item_id；捐贈者本來就知道自己捐了哪個品項，故可寫品項名稱。
-pub async fn enqueue_donors<'e, E: sqlx::PgExecutor<'e>>(ex: E, item_id: Uuid, kind: &str, statuses: &[&str]) -> Result<(), sqlx::Error> {
+pub async fn enqueue_donors<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    item_id: Uuid,
+    kind: &str,
+    statuses: &[&str],
+) -> Result<(), sqlx::Error> {
     let statuses: Vec<String> = statuses.iter().map(|s| s.to_string()).collect();
     sqlx::query(
         "INSERT INTO notifications (user_id, channel, kind, payload)
@@ -48,7 +58,10 @@ pub async fn enqueue_donors<'e, E: sqlx::PgExecutor<'e>>(ex: E, item_id: Uuid, k
 /// （production 啟動時強制要求）；否則 dev 走 SMTP → Mailpit。錯誤字串不含 token。
 pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Result<(), String> {
     if let (Some(acct), Some(tok)) = (&cfg.cf_account_id, &cfg.cf_email_api_token) {
-        let url = format!("{}/accounts/{acct}/email/sending/send", cfg.cf_api_base.trim_end_matches('/'));
+        let url = format!(
+            "{}/accounts/{acct}/email/sending/send",
+            cfg.cf_api_base.trim_end_matches('/')
+        );
         let r = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().map_err(|e| e.without_url().to_string())?
             .post(url).bearer_auth(tok)
             .json(&serde_json::json!({ "from": cfg.mail_from, "to": to, "subject": subject, "text": body }))
@@ -56,64 +69,125 @@ pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Res
         let status = r.status();
         let v: Value = r.json().await.unwrap_or(Value::Null);
         // 2xx 且 success != false 才算成功；永久退信也視為失敗
-        if status.is_success() && v["success"] != false && v["result"]["permanent_bounces"].as_array().is_none_or(|a| a.is_empty()) { return Ok(()); }
+        if status.is_success()
+            && v["success"] != false
+            && v["result"]["permanent_bounces"]
+                .as_array()
+                .is_none_or(|a| a.is_empty())
+        {
+            return Ok(());
+        }
         return Err(format!("cloudflare email {status}: {}", v["errors"]));
     }
-    let msg = Message::builder().from(cfg.mail_from.parse().map_err(|e| format!("{e}"))?)
+    let msg = Message::builder()
+        .from(cfg.mail_from.parse().map_err(|e| format!("{e}"))?)
         .to(to.parse().map_err(|e| format!("{e}"))?)
-        .subject(subject).header(ContentType::TEXT_PLAIN).body(body.to_string()).map_err(|e| e.to_string())?;
-    AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(cfg.smtp_host.clone()).port(cfg.smtp_port).build().send(msg).await.map(|_| ()).map_err(|e| e.to_string())
+        .subject(subject)
+        .header(ContentType::TEXT_PLAIN)
+        .body(body.to_string())
+        .map_err(|e| e.to_string())?;
+    AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(cfg.smtp_host.clone())
+        .port(cfg.smtp_port)
+        .build()
+        .send(msg)
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 pub fn spawn_worker(pool: PgPool) {
     tokio::spawn(async move {
         loop {
-            if let Err(e) = tick(&pool).await { tracing::warn!(error = %e, "notify worker"); }
+            if let Err(e) = tick(&pool).await {
+                tracing::warn!(error = %e, "notify worker");
+            }
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
     });
 }
 
+type PendingNotification = (Uuid, Option<Uuid>, Option<Uuid>, String, String, Value, i16);
+
 const MAX_ATTEMPTS: i16 = 3;
 
 /// 處理一批到期通知；回傳處理筆數。領取時 attempts+1 並把 scheduled_at 推後 1 分鐘當租約（失敗即自動重試）。
 pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
-    let rows: Vec<(Uuid, Option<Uuid>, Option<Uuid>, String, String, Value, i16)> = sqlx::query_as(
+    let rows: Vec<PendingNotification> = sqlx::query_as(
         "UPDATE notifications SET attempts = attempts + 1, scheduled_at = now() + interval '1 minute'
           WHERE id IN (SELECT id FROM notifications WHERE status = 'pending' AND scheduled_at <= now()
                         ORDER BY scheduled_at LIMIT 20 FOR UPDATE SKIP LOCKED)
          RETURNING id, user_id, guest_id, channel::text, kind, payload, attempts")
         .fetch_all(pool).await?;
-    if rows.is_empty() { return Ok(0); }
+    if rows.is_empty() {
+        return Ok(0);
+    }
     let cfg = crate::config::get();
     let n = rows.len();
     for (id, uid, gid, channel, kind, payload, attempts) in rows {
-        let security = matches!(kind.as_str(), "auth.identity_linked" | "auth.identity_unlinked");
-        let to: Option<String> = if channel != "email" { None } else if let Some(u) = uid {
+        let security = matches!(
+            kind.as_str(),
+            "auth.identity_linked" | "auth.identity_unlinked"
+        );
+        let to: Option<String> = if channel != "email" {
+            None
+        } else if let Some(u) = uid {
             sqlx::query_scalar("SELECT CASE WHEN $2 THEN $3 ELSE email END FROM users WHERE id = $1 AND deleted_at IS NULL")
                 .bind(u).bind(security).bind(payload.get("to").and_then(Value::as_str)).fetch_optional(pool).await?.flatten()
         } else if let Some(g) = gid {
-            sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL").bind(g).fetch_optional(pool).await?.flatten()
-        } else { None };
+            sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL")
+                .bind(g)
+                .fetch_optional(pool)
+                .await?
+                .flatten()
+        } else {
+            None
+        };
         let Some(to) = to else {
             sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'no email recipient' WHERE id = $1").bind(id).execute(pool).await?;
             continue;
         };
-        let title: String = match payload.get("wishlist_id").and_then(Value::as_str).and_then(|s| s.parse::<Uuid>().ok()) {
-            Some(w) => sqlx::query_scalar("SELECT title FROM wishlists WHERE id = $1").bind(w).fetch_optional(pool).await?.unwrap_or_default(),
+        let title: String = match payload
+            .get("wishlist_id")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse::<Uuid>().ok())
+        {
+            Some(w) => sqlx::query_scalar("SELECT title FROM wishlists WHERE id = $1")
+                .bind(w)
+                .fetch_optional(pool)
+                .await?
+                .unwrap_or_default(),
             None => String::new(),
         };
         // 寄信時才產生：退訂連結；訪客確認信的一次性恢復權杖（每次寄信換發，30 天）
         let mut payload = payload;
         // 眾籌通知：寄信時才查品項名稱（品項可能已被刪除，仍保留列）
-        if let Some(it) = payload.get("item_id").and_then(Value::as_str).and_then(|s| s.parse::<Uuid>().ok()) {
-            let t: Option<String> = sqlx::query_scalar("SELECT title FROM wishlist_items WHERE id = $1").bind(it).fetch_optional(pool).await?;
-            if let Some(t) = t { payload["item_title"] = t.into(); }
+        if let Some(it) = payload
+            .get("item_id")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse::<Uuid>().ok())
+        {
+            let t: Option<String> =
+                sqlx::query_scalar("SELECT title FROM wishlist_items WHERE id = $1")
+                    .bind(it)
+                    .fetch_optional(pool)
+                    .await?;
+            if let Some(t) = t {
+                payload["item_title"] = t.into();
+            }
         }
         let api = cfg.api_base_url.clone();
-        let sub = match (uid, gid) { (Some(u), _) => Some(('u', u)), (_, Some(g)) => Some(('g', g)), _ => None };
+        let sub = match (uid, gid) {
+            (Some(u), _) => Some(('u', u)),
+            (_, Some(g)) => Some(('g', g)),
+            _ => None,
+        };
         if let Some((k, i)) = sub.filter(|_| !security) {
-            payload["unsubscribe_url"] = format!("{}/api/v1/unsubscribe?token={}", api.trim_end_matches('/'), crate::account::unsub_token(k, i)).into();
+            payload["unsubscribe_url"] = format!(
+                "{}/api/v1/unsubscribe?token={}",
+                api.trim_end_matches('/'),
+                crate::account::unsub_token(k, i)
+            )
+            .into();
         }
         if let (Some(g), "claim.confirmation") = (gid, kind.as_str()) {
             let (tok, h) = crate::guest::new_token();
@@ -128,9 +202,15 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
         }
         let sent = send_mail(&cfg, &to, &subject, &body).await;
         match sent {
-            Ok(()) => { sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = NULL WHERE id = $1").bind(id).execute(pool).await?; }
+            Ok(()) => {
+                sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = NULL WHERE id = $1").bind(id).execute(pool).await?;
+            }
             Err(e) => {
-                let st = if attempts >= MAX_ATTEMPTS { "failed" } else { "pending" };
+                let st = if attempts >= MAX_ATTEMPTS {
+                    "failed"
+                } else {
+                    "pending"
+                };
                 sqlx::query("UPDATE notifications SET status = $2::notification_status, last_error = $3 WHERE id = $1").bind(id).bind(st).bind(e).execute(pool).await?;
             }
         }
@@ -141,14 +221,29 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
 /// 純函式：(主旨, 內文)。刻意只用數量，不帶品項 / 認領者。
 pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
     if matches!(kind, "auth.identity_linked" | "auth.identity_unlinked") {
-        let provider = match payload["provider"].as_str() { Some("google") => "Google", Some("line") => "LINE", Some("email") => "Email", _ => "第三方" };
-        let action = if kind == "auth.identity_linked" { "新增" } else { "解除" };
+        let provider = match payload["provider"].as_str() {
+            Some("google") => "Google",
+            Some("line") => "LINE",
+            Some("email") => "Email",
+            _ => "第三方",
+        };
+        let action = if kind == "auth.identity_linked" {
+            "新增"
+        } else {
+            "解除"
+        };
         return ("【WishSync】登入方式已變更".into(), format!("你的帳號已{action} {provider} 登入方式。\n若非本人操作，請立即檢查帳號設定及重設密碼。\n帳號設定：{}/settings\n這是帳號安全通知。", crate::config::get().app_url));
     }
     let n = payload.get("count").and_then(Value::as_i64).unwrap_or(1);
     let base = crate::config::get().app_url;
-    let manage = match payload.get("recovery_token").and_then(Value::as_str) { Some(t) => format!("{base}/me/claims#r={t}"), None => format!("{base}/me/claims") };
-    let item = payload.get("item_title").and_then(Value::as_str).unwrap_or("品項");
+    let manage = match payload.get("recovery_token").and_then(Value::as_str) {
+        Some(t) => format!("{base}/me/claims#r={t}"),
+        None => format!("{base}/me/claims"),
+    };
+    let item = payload
+        .get("item_title")
+        .and_then(Value::as_str)
+        .unwrap_or("品項");
     let wallet = format!("{base}/me/wallet");
     let (subject, body) = match kind {
         "crowdfund.funded" => (format!("【WishSync】《{item}》集資達標了"), format!("你支持的「{item}」（清單《{title}》）已集資達標，營運團隊會開始代購。\n查看我的點數與捐贈：{wallet}\n")),

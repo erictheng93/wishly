@@ -1,6 +1,10 @@
 //! 認領：POST /items/{id}/claims、PATCH/DELETE /claims/{id}（契約 4.1 / 4.2、F4 / F5）。
 //! 鎖序：wishlist_items（條件式 UPDATE / FOR UPDATE）→ claims。
-use crate::{error::AppError, guest::{self, Actor, MaybeActor}, idempotency, ratelimit, AppState};
+use crate::{
+    error::AppError,
+    guest::{self, Actor, MaybeActor},
+    idempotency, ratelimit, AppState,
+};
 use axum::{
     body::Bytes,
     extract::{Path, State},
@@ -27,16 +31,28 @@ pub const CLAIM_COLS: &str = "c.id, c.item_id, c.qty, c.status::text AS status, 
 
 #[derive(FromRow, Serialize)]
 pub struct ClaimRow {
-    pub id: Uuid, pub item_id: Uuid, pub qty: i32, pub status: String, pub claimer_name: String, pub note: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>, pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc>,
-    pub purchased_at: Option<DateTime<Utc>>, pub delivered_at: Option<DateTime<Utc>>, pub cancelled_at: Option<DateTime<Utc>>,
+    pub id: Uuid,
+    pub item_id: Uuid,
+    pub qty: i32,
+    pub status: String,
+    pub claimer_name: String,
+    pub note: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub purchased_at: Option<DateTime<Utc>>,
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub cancelled_at: Option<DateTime<Utc>>,
     /// 登入者認領的公開層級（public/friends/private）；訪客認領為 null
     pub visibility: Option<String>,
 }
 
 /// trim + 字元驗證；空（含只有零寬字元）→ None
 fn clean(s: Option<&str>, ptr: &str, multi: bool) -> Result<Option<String>, AppError> {
-    match s { Some(s) => Ok(Some(crate::validate::text(s, ptr, multi)?).filter(|s| !s.is_empty())), None => Ok(None) }
+    match s {
+        Some(s) => Ok(Some(crate::validate::text(s, ptr, multi)?).filter(|s| !s.is_empty())),
+        None => Ok(None),
+    }
 }
 
 fn parse<T: DeserializeOwned>(b: &[u8]) -> Result<T, AppError> {
@@ -44,21 +60,39 @@ fn parse<T: DeserializeOwned>(b: &[u8]) -> Result<T, AppError> {
 }
 
 fn no_store(status: StatusCode) -> axum::http::response::Builder {
-    Response::builder().status(status).header(header::CACHE_CONTROL, "private, no-store")
+    Response::builder()
+        .status(status)
+        .header(header::CACHE_CONTROL, "private, no-store")
 }
 
 fn json_resp(status: i32, body: &Value, replay: bool) -> Response {
-    let mut b = no_store(StatusCode::from_u16(status as u16).unwrap()).header(header::CONTENT_TYPE, "application/json");
+    let mut b = no_store(StatusCode::from_u16(status as u16).unwrap())
+        .header(header::CONTENT_TYPE, "application/json");
     if status == 201 {
-        if let Some(id) = body["claim"]["id"].as_str() { b = b.header(header::LOCATION, format!("/api/v1/claims/{id}")); }
+        if let Some(id) = body["claim"]["id"].as_str() {
+            b = b.header(header::LOCATION, format!("/api/v1/claims/{id}"));
+        }
     }
-    if let Some(t) = body["guest_token"].as_str() { b = b.header(header::SET_COOKIE, guest::cookie(t)); }
-    if replay { b = b.header("Idempotency-Replayed", HeaderValue::from_static("true")); }
+    if let Some(t) = body["guest_token"].as_str() {
+        b = b.header(header::SET_COOKIE, guest::cookie(t));
+    }
+    if replay {
+        b = b.header("Idempotency-Replayed", HeaderValue::from_static("true"));
+    }
     b.body(axum::body::Body::from(body.to_string())).unwrap()
 }
 
-async fn audit(tx: &mut Transaction<'_, Postgres>, actor: Actor, action: &str, claim: Uuid, diff: Value) -> Result<(), AppError> {
-    let (t, id) = match actor { Actor::Guest(g) => ("guest", g), Actor::User(u) => ("user", u) };
+async fn audit(
+    tx: &mut Transaction<'_, Postgres>,
+    actor: Actor,
+    action: &str,
+    claim: Uuid,
+    diff: Value,
+) -> Result<(), AppError> {
+    let (t, id) = match actor {
+        Actor::Guest(g) => ("guest", g),
+        Actor::User(u) => ("user", u),
+    };
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ($1::actor_type, $2, $3, 'claims', $4, $5)")
         .bind(t).bind(id).bind(action).bind(claim).bind(diff).execute(&mut **tx).await?;
     Ok(())
@@ -69,47 +103,111 @@ fn item_json(id: Uuid, needed: i32, claimed: i32) -> Value {
 }
 
 fn full(remaining: i32, want: i32) -> AppError {
-    AppError::Extra { status: 409, code: "ITEM_FULLY_CLAIMED", detail: format!("此品項剩餘 {remaining} 件，無法再認領 {want} 件。"),
-        extra: json!({ "remaining": remaining }) }
+    AppError::Extra {
+        status: 409,
+        code: "ITEM_FULLY_CLAIMED",
+        detail: format!("此品項剩餘 {remaining} 件，無法再認領 {want} 件。"),
+        extra: json!({ "remaining": remaining }),
+    }
 }
 
 // ---------- POST /items/{id}/claims ----------
 
 #[derive(Deserialize)]
-struct CreateReq { qty: i32, display_name: Option<String>, contact: Option<String>, email: Option<String>, note: Option<String>, visibility: Option<String> }
-
-pub(crate) fn share_level(v: &Option<String>) -> Result<(), AppError> {
-    match v.as_deref() { None | Some("public" | "friends" | "private") => Ok(()), _ => Err(AppError::invalid("/visibility", "ENUM", "visibility 只能是 public / friends / private")) }
+struct CreateReq {
+    qty: i32,
+    display_name: Option<String>,
+    contact: Option<String>,
+    email: Option<String>,
+    note: Option<String>,
+    visibility: Option<String>,
 }
 
-async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActor(actor): MaybeActor, peer: ratelimit::Peer, headers: HeaderMap, body: Bytes)
-    -> Result<Response, AppError> {
+pub(crate) fn share_level(v: &Option<String>) -> Result<(), AppError> {
+    match v.as_deref() {
+        None | Some("public" | "friends" | "private") => Ok(()),
+        _ => Err(AppError::invalid(
+            "/visibility",
+            "ENUM",
+            "visibility 只能是 public / friends / private",
+        )),
+    }
+}
+
+async fn create(
+    State(st): State<AppState>,
+    Path(item_id): Path<Uuid>,
+    MaybeActor(actor): MaybeActor,
+    peer: ratelimit::Peer,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, AppError> {
     let key = idempotency::key(&headers)?;
     let req: CreateReq = parse(&body)?;
-    if !(1..=99).contains(&req.qty) { return Err(AppError::invalid("/qty", "RANGE", "qty 必須介於 1 與 99")); }
+    if !(1..=99).contains(&req.qty) {
+        return Err(AppError::invalid("/qty", "RANGE", "qty 必須介於 1 與 99"));
+    }
     share_level(&req.visibility)?;
     let mut req = req;
     req.note = clean(req.note.as_deref(), "/note", true)?;
     req.contact = clean(req.contact.as_deref(), "/contact", false)?;
-    if req.note.as_deref().is_some_and(|n| n.chars().count() > 200) { return Err(AppError::invalid("/note", "RANGE", "備註至多 200 字")); }
-    if req.contact.as_deref().is_some_and(|n| n.chars().count() > 100) { return Err(AppError::invalid("/contact", "RANGE", "聯絡方式至多 100 字")); }
+    if req.note.as_deref().is_some_and(|n| n.chars().count() > 200) {
+        return Err(AppError::invalid("/note", "RANGE", "備註至多 200 字"));
+    }
+    if req
+        .contact
+        .as_deref()
+        .is_some_and(|n| n.chars().count() > 100)
+    {
+        return Err(AppError::invalid(
+            "/contact",
+            "RANGE",
+            "聯絡方式至多 100 字",
+        ));
+    }
     // F-11：非空 Email 必須是可寄送格式，否則 422（不再假裝已寄出管理連結）
-    let email = match req.email.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
+    let email = match req
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+    {
         Some(e) => Some(crate::validate::email(e, "/email")?),
         None => None,
     };
     let dn = clean(req.display_name.as_deref(), "/display_name", false)?;
     let dn = dn.as_deref();
-    if dn.is_some_and(|s| s.chars().count() > 30) { return Err(AppError::invalid("/display_name", "RANGE", "暱稱需為 1–30 字")); }
+    if dn.is_some_and(|s| s.chars().count() > 30) {
+        return Err(AppError::invalid(
+            "/display_name",
+            "RANGE",
+            "暱稱需為 1–30 字",
+        ));
+    }
 
     // 存取判斷（看得到才能認領）：好友/名單/密碼清單；品項不存在則交給後面的 diagnose 回 404
     let wl: Option<(Uuid, Uuid, String, Option<String>)> = sqlx::query_as(
         "SELECT w.id, w.owner_id, w.visibility::text, w.access_password_hash FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
          WHERE i.id = $1 AND i.deleted_at IS NULL AND w.deleted_at IS NULL").bind(item_id).fetch_optional(&st.pool).await?;
     if let Some((wid, owner_id, vis, pw)) = &wl {
-        let viewer = if let Some(Actor::User(u)) = actor { Some(u) } else { None };
+        let viewer = if let Some(Actor::User(u)) = actor {
+            Some(u)
+        } else {
+            None
+        };
         let acc = headers.get("x-list-access").and_then(|v| v.to_str().ok());
-        crate::access::check_wishlist(&st.pool, &crate::access::ListAccess { wishlist_id: *wid, owner_id: *owner_id, visibility: vis, pw_hash: pw.as_deref() }, viewer, acc).await?;
+        crate::access::check_wishlist(
+            &st.pool,
+            &crate::access::ListAccess {
+                wishlist_id: *wid,
+                owner_id: *owner_id,
+                visibility: vis,
+                pw_hash: pw.as_deref(),
+            },
+            viewer,
+            acc,
+        )
+        .await?;
     }
 
     let route = "POST /items/{id}/claims";
@@ -121,15 +219,22 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
     let hash = idempotency::request_hash(&format!("POST /items/{item_id}/claims"), &body);
 
     let mut tx = st.pool.begin().await?;
-    if let idempotency::Begin::Replay(s, mut b) = idempotency::begin(&mut tx, &scope, key, &hash).await? {
+    if let idempotency::Begin::Replay(s, mut b) =
+        idempotency::begin(&mut tx, &scope, key, &hash).await?
+    {
         // F-01：首次認領建立了 guest 的那次（scope=anon），回應可能已遺失 → 對同一 guest 重新簽發新 token（舊 token 失效）。
         // 明文只存在這次回應；idempotency_keys 只存 guest_id（非機密）。key 是客戶端產生的 UUID，只有送出者知道。
-        let gid = b.as_object_mut().and_then(|o| o.remove("_guest_id")).and_then(|v| v.as_str().and_then(|s| s.parse::<Uuid>().ok()));
+        let gid = b
+            .as_object_mut()
+            .and_then(|o| o.remove("_guest_id"))
+            .and_then(|v| v.as_str().and_then(|s| s.parse::<Uuid>().ok()));
         if let Some(gid) = gid {
             let (tok, h) = guest::new_token();
             let n = sqlx::query("UPDATE guests SET guest_token_hash = $2, last_seen_at = now() WHERE id = $1 AND deleted_at IS NULL")
                 .bind(gid).bind(h).execute(&mut *tx).await?.rows_affected();
-            if n > 0 { b["guest_token"] = json!(tok); }
+            if n > 0 {
+                b["guest_token"] = json!(tok);
+            }
             tx.commit().await?;
         }
         return Ok(json_resp(s, &b, true));
@@ -147,10 +252,24 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
     match &who {
         Some(w) => {
             ratelimit::check(&mut *tx, &format!("claim_post:{w}"), 30, 3600).await?;
-            let wl: Option<Uuid> = sqlx::query_scalar("SELECT wishlist_id FROM wishlist_items WHERE id = $1").bind(item_id).fetch_optional(&mut *tx).await?;
-            if let Some(wl) = wl { ratelimit::check(&mut *tx, &format!("claim_post_wl:{wl}:{w}"), 15, 3600).await?; }
+            let wl: Option<Uuid> =
+                sqlx::query_scalar("SELECT wishlist_id FROM wishlist_items WHERE id = $1")
+                    .bind(item_id)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+            if let Some(wl) = wl {
+                ratelimit::check(&mut *tx, &format!("claim_post_wl:{wl}:{w}"), 15, 3600).await?;
+            }
         }
-        None => ratelimit::check(&mut *tx, &format!("claim_new_guest_ip:{}", peer.0), 100, 3600).await?,
+        None => {
+            ratelimit::check(
+                &mut *tx,
+                &format!("claim_new_guest_ip:{}", peer.0),
+                100,
+                3600,
+            )
+            .await?
+        }
     }
 
     // 身分：user / 既有 guest / 首次建立 guest（同交易，失敗一併 rollback）
@@ -158,14 +277,28 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
     let name: String = match actor {
         Some(Actor::User(u)) => {
             user_id = Some(u);
-            sqlx::query_scalar("SELECT display_name FROM users WHERE id = $1").bind(u).fetch_one(&mut *tx).await?
+            // 使用者 → 清單：刪帳號先鎖 users，認領的 FK 不能反向等待。
+            sqlx::query_scalar(
+                "SELECT display_name FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE",
+            )
+            .bind(u)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(AppError::Unauthorized)?
         }
         Some(Actor::Guest(g)) => {
             guest_id = Some(g);
-            sqlx::query_scalar("SELECT display_name FROM guests WHERE id = $1").bind(g).fetch_one(&mut *tx).await?
+            sqlx::query_scalar("SELECT display_name FROM guests WHERE id = $1")
+                .bind(g)
+                .fetch_one(&mut *tx)
+                .await?
         }
         None => {
-            let name = dn.ok_or_else(|| AppError::invalid("/display_name", "REQUIRED", "首次認領需填寫暱稱"))?.to_owned();
+            let name = dn
+                .ok_or_else(|| {
+                    AppError::invalid("/display_name", "REQUIRED", "首次認領需填寫暱稱")
+                })?
+                .to_owned();
             let (tok, h) = guest::new_token();
             guest_id = Some(sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, contact, email) VALUES ($1, $2, $3, $4) RETURNING id")
                 .bind(h).bind(&name).bind(&req.contact).bind(&email).fetch_one(&mut *tx).await?);
@@ -174,6 +307,21 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
         }
     };
 
+    // 清單 → 品項：與封存 / 強制刪除互斥，避免 UPDATE 的舊快照接受已封存清單。
+    if let Some((wid, owner, ..)) = &wl {
+        // 通知也引用清單擁有者；訪客同樣要先鎖 users，避免與擁有者刪帳號互鎖。
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE",
+        )
+        .bind(owner)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(AppError::NotFound)?;
+        sqlx::query("SELECT id FROM wishlists WHERE id = $1 FOR SHARE")
+            .bind(wid)
+            .execute(&mut *tx)
+            .await?;
+    }
     // 4.1 (b)：條件式 UPDATE 取得 item row lock 並驗證剩餘量。
     // 偏差：加 moderation_status='ok' 與 visibility<>'private'，下架/私人清單不可認領。
     let upd: Option<(i32, i32, Option<i32>)> = sqlx::query_as(
@@ -203,26 +351,51 @@ async fn create(State(st): State<AppState>, Path(item_id): Path<Uuid>, MaybeActo
             let id: Option<Uuid> = sqlx::query_scalar(
                 "SELECT id FROM claims WHERE item_id = $1 AND (guest_id = $2 OR user_id = $3) AND status IN ('reserved','purchased','delivered')")
                 .bind(item_id).bind(guest_id).bind(user_id).fetch_optional(&st.pool).await?;
-            return Err(AppError::Extra { status: 409, code: "CLAIM_ALREADY_EXISTS", detail: "你已認領過此品項，請改用修改數量".into(),
-                extra: json!({ "claim_id": id }) });
+            return Err(AppError::Extra {
+                status: 409,
+                code: "CLAIM_ALREADY_EXISTS",
+                detail: "你已認領過此品項，請改用修改數量".into(),
+                extra: json!({ "claim_id": id }),
+            });
         }
         Err(e) => return Err(e.into()),
     };
 
-    let actor = guest_id.map(Actor::Guest).or(user_id.map(Actor::User)).unwrap();
-    audit(&mut tx, actor, "claim.create", claim.id, json!({ "qty": req.qty })).await?;
+    let actor = guest_id
+        .map(Actor::Guest)
+        .or(user_id.map(Actor::User))
+        .unwrap();
+    audit(
+        &mut tx,
+        actor,
+        "claim.create",
+        claim.id,
+        json!({ "qty": req.qty }),
+    )
+    .await?;
     let mut resp = json!({ "claim": claim, "item": item_json(item_id, needed, claimed) });
-    if let Some(t) = new_token { resp["guest_token"] = json!(t); }
+    if let Some(t) = new_token {
+        resp["guest_token"] = json!(t);
+    }
     // 不存明文 token；改存 guest_id，重播時據此對同一 guest 重簽新 token（見 create 開頭）
     let mut stored = resp.clone();
-    if let Some(o) = stored.as_object_mut() { o.remove("guest_token"); }
-    if resp.get("guest_token").is_some() { stored["_guest_id"] = json!(guest_id); }
+    if let Some(o) = stored.as_object_mut() {
+        o.remove("guest_token");
+    }
+    if resp.get("guest_token").is_some() {
+        stored["_guest_id"] = json!(guest_id);
+    }
     idempotency::finish(&mut tx, &scope, key, 201, &stored).await?;
     let wid = wishlist_of(&mut tx, item_id).await?;
     // 訪客有留 Email → 確認信（恢復權杖於寄信時才產生，明文不落庫）。
     // 濫用限流：超限只是不寄信，認領本身照常成功。
     let guest_email: Option<String> = match guest_id {
-        Some(g) => sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL").bind(g).fetch_one(&mut *tx).await?,
+        Some(g) => {
+            sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL")
+                .bind(g)
+                .fetch_one(&mut *tx)
+                .await?
+        }
         None => None,
     };
     let send_mail = match (&guest_email, guest_id) {
@@ -255,8 +428,12 @@ async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, A
         None | Some((true, ..)) => AppError::NotFound,
         Some((_, _, _, m, ..)) if m == "hidden" => AppError::WishlistRemoved,
         Some((_, s, v, ..)) if s == "draft" || v == "private" => AppError::NotFound,
-        Some((_, s, ..)) if s != "active" => AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受認領"),
-        Some((_, _, _, _, f, _)) if f != "quantity" => AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是數量型認領"),
+        Some((_, s, ..)) if s != "active" => {
+            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受認領")
+        }
+        Some((_, _, _, _, f, _)) if f != "quantity" => {
+            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是數量型認領")
+        }
         Some((.., remaining)) => full(remaining, want),
     })
 }
@@ -264,80 +441,193 @@ async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, A
 // ---------- PATCH / DELETE /claims/{id} ----------
 
 #[derive(Deserialize)]
-struct PatchReq { qty: Option<i32>, note: Option<String>, status: Option<String>, visibility: Option<String> }
+struct PatchReq {
+    qty: Option<i32>,
+    note: Option<String>,
+    status: Option<String>,
+    visibility: Option<String>,
+}
 
-async fn update(State(st): State<AppState>, Path(id): Path<Uuid>, MaybeActor(actor): MaybeActor, body: Bytes) -> Result<Response, AppError> {
+async fn update(
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    MaybeActor(actor): MaybeActor,
+    body: Bytes,
+) -> Result<Response, AppError> {
     let p: PatchReq = parse(&body)?;
-    if p.qty.is_none() && p.note.is_none() && p.status.is_none() && p.visibility.is_none() { return Err(AppError::invalid("/", "REQUIRED", "至少需提供 qty、note、status 或 visibility")); }
+    if p.qty.is_none() && p.note.is_none() && p.status.is_none() && p.visibility.is_none() {
+        return Err(AppError::invalid(
+            "/",
+            "REQUIRED",
+            "至少需提供 qty、note、status 或 visibility",
+        ));
+    }
     share_level(&p.visibility)?;
-    if p.qty.is_some_and(|q| !(1..=99).contains(&q)) { return Err(AppError::invalid("/qty", "RANGE", "qty 必須介於 1 與 99")); }
+    if p.qty.is_some_and(|q| !(1..=99).contains(&q)) {
+        return Err(AppError::invalid("/qty", "RANGE", "qty 必須介於 1 與 99"));
+    }
     let mut p = p;
-    if let Some(n) = p.note.as_deref() { p.note = Some(crate::validate::text(n, "/note", true)?); }
-    if p.note.as_deref().is_some_and(|n| n.chars().count() > 200) { return Err(AppError::invalid("/note", "RANGE", "備註至多 200 字")); }
-    if p.status.as_deref().is_some_and(|s| !["purchased", "delivered", "cancelled"].contains(&s)) {
-        return Err(AppError::invalid("/status", "ENUM", "status 只能是 purchased / delivered / cancelled"));
+    if let Some(n) = p.note.as_deref() {
+        p.note = Some(crate::validate::text(n, "/note", true)?);
+    }
+    if p.note.as_deref().is_some_and(|n| n.chars().count() > 200) {
+        return Err(AppError::invalid("/note", "RANGE", "備註至多 200 字"));
+    }
+    if p.status
+        .as_deref()
+        .is_some_and(|s| !["purchased", "delivered", "cancelled"].contains(&s))
+    {
+        return Err(AppError::invalid(
+            "/status",
+            "ENUM",
+            "status 只能是 purchased / delivered / cancelled",
+        ));
     }
     let (claim, item) = apply(&st, id, actor, p).await?;
-    Ok(json_resp(200, &json!({ "claim": claim, "item": item }), false))
+    Ok(json_resp(
+        200,
+        &json!({ "claim": claim, "item": item }),
+        false,
+    ))
 }
 
 /// 已 cancelled 的重複 DELETE 回 204（冪等）
-async fn cancel(State(st): State<AppState>, Path(id): Path<Uuid>, MaybeActor(actor): MaybeActor) -> Result<Response, AppError> {
-    apply(&st, id, actor, PatchReq { qty: None, note: None, status: Some("cancelled".into()), visibility: None }).await?;
-    Ok(no_store(StatusCode::NO_CONTENT).body(axum::body::Body::empty()).unwrap().into_response())
+async fn cancel(
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    MaybeActor(actor): MaybeActor,
+) -> Result<Response, AppError> {
+    apply(
+        &st,
+        id,
+        actor,
+        PatchReq {
+            qty: None,
+            note: None,
+            status: Some("cancelled".into()),
+            visibility: None,
+        },
+    )
+    .await?;
+    Ok(no_store(StatusCode::NO_CONTENT)
+        .body(axum::body::Body::empty())
+        .unwrap()
+        .into_response())
 }
 
-async fn apply(st: &AppState, id: Uuid, actor: Option<Actor>, p: PatchReq) -> Result<(ClaimRow, Value), AppError> {
+async fn apply(
+    st: &AppState,
+    id: Uuid,
+    actor: Option<Actor>,
+    p: PatchReq,
+) -> Result<(ClaimRow, Value), AppError> {
     let actor = actor.ok_or(AppError::Unauthorized)?;
     let mut tx = st.pool.begin().await?;
     // F5 交易邊界：先（不加鎖）取 item_id → 鎖 item → 鎖 claim
-    let item_id: Uuid = sqlx::query_scalar("SELECT item_id FROM claims WHERE id = $1").bind(id).fetch_optional(&mut *tx).await?
+    let item_id: Uuid = sqlx::query_scalar("SELECT item_id FROM claims WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
         .ok_or(AppError::NotFound)?;
     let (needed, claimed, wl_status, owner_id, locked): (i32, i32, String, Uuid, bool) = sqlx::query_as(
         "SELECT i.qty_needed, i.qty_claimed, w.status::text, w.owner_id,
                 (w.surprise_mode AND w.event_date IS NOT NULL AND now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei'))
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
          WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).fetch_one(&mut *tx).await?;
-    let (guest_id, user_id, cur, old_qty): (Option<Uuid>, Option<Uuid>, String, i32) = sqlx::query_as(
-        "SELECT guest_id, user_id, status::text, qty FROM claims WHERE id = $1 FOR UPDATE").bind(id).fetch_one(&mut *tx).await?;
-    let mine = match actor { Actor::Guest(g) => guest_id == Some(g), Actor::User(u) => user_id == Some(u) };
+    let (guest_id, user_id, cur, old_qty): (Option<Uuid>, Option<Uuid>, String, i32) =
+        sqlx::query_as(
+            "SELECT guest_id, user_id, status::text, qty FROM claims WHERE id = $1 FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let mine = match actor {
+        Actor::Guest(g) => guest_id == Some(g),
+        Actor::User(u) => user_id == Some(u),
+    };
     // 清單擁有者（F5）：只能推進 delivered 或取消；驚喜鎖定期間看不到認領，一律禁止
     let by_owner = !mine && matches!(actor, Actor::User(u) if u == owner_id);
-    if !mine && !by_owner { return Err(AppError::problem(403, "FORBIDDEN", "只有認領者本人可以操作")); }
-    if by_owner && (locked || p.qty.is_some() || p.note.is_some() || p.visibility.is_some() || !matches!(p.status.as_deref(), Some("delivered" | "cancelled"))) {
-        return Err(AppError::problem(403, "FORBIDDEN", "清單擁有者只能在驚喜解鎖後標記已送達或取消認領"));
+    if !mine && !by_owner {
+        return Err(AppError::problem(
+            403,
+            "FORBIDDEN",
+            "只有認領者本人可以操作",
+        ));
+    }
+    if by_owner
+        && (locked
+            || p.qty.is_some()
+            || p.note.is_some()
+            || p.visibility.is_some()
+            || !matches!(p.status.as_deref(), Some("delivered" | "cancelled")))
+    {
+        return Err(AppError::problem(
+            403,
+            "FORBIDDEN",
+            "清單擁有者只能在驚喜解鎖後標記已送達或取消認領",
+        ));
     }
 
-    if p.visibility.is_some() && user_id.is_none() { return Err(AppError::invalid("/visibility", "NOT_APPLICABLE", "訪客認領沒有公開層級設定")); }
+    if p.visibility.is_some() && user_id.is_none() {
+        return Err(AppError::invalid(
+            "/visibility",
+            "NOT_APPLICABLE",
+            "訪客認領沒有公開層級設定",
+        ));
+    }
     let bad = || AppError::problem(409, "INVALID_STATE_TRANSITION", "不允許的狀態轉換");
     let mut new_status = cur.clone();
     if let Some(s) = p.status.as_deref() {
         match (cur.as_str(), s) {
             ("cancelled", "cancelled") => {} // 冪等 no-op
-            ("reserved", "purchased") | ("reserved" | "purchased", "delivered") | ("reserved" | "purchased", "cancelled") => new_status = s.into(),
+            ("reserved", "purchased")
+            | ("reserved" | "purchased", "delivered")
+            | ("reserved" | "purchased", "cancelled") => new_status = s.into(),
             _ => return Err(bad()),
         }
     }
     let cancelling = new_status == "cancelled";
     let mut new_qty = None;
     if let (Some(q), false) = (p.qty, cancelling) {
-        if !["reserved", "purchased"].contains(&cur.as_str()) { return Err(bad()); }
-        if wl_status != "active" { return Err(AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，無法修改數量")); }
+        if !["reserved", "purchased"].contains(&cur.as_str()) {
+            return Err(bad());
+        }
+        if wl_status != "active" {
+            return Err(AppError::problem(
+                409,
+                "WISHLIST_CLOSED",
+                "此清單已結束，無法修改數量",
+            ));
+        }
         let delta = q - old_qty;
         if delta != 0 {
             let r: Option<(i32,)> = sqlx::query_as("UPDATE wishlist_items SET qty_claimed = qty_claimed + $2 WHERE id = $1 AND qty_claimed + $2 <= qty_needed RETURNING qty_claimed")
                 .bind(item_id).bind(delta).fetch_optional(&mut *tx).await?;
-            if r.is_none() { return Err(full(needed - claimed, delta)); }
+            if r.is_none() {
+                return Err(full(needed - claimed, delta));
+            }
             new_qty = Some(q);
         }
     }
     if cancelling && cur != "cancelled" {
         let r = sqlx::query("UPDATE wishlist_items SET qty_claimed = qty_claimed - $2 WHERE id = $1 AND qty_claimed >= $2")
             .bind(item_id).bind(old_qty).execute(&mut *tx).await?;
-        if r.rows_affected() == 0 { tracing::error!(%id, "qty_claimed drift"); return Err(AppError::Db(sqlx::Error::RowNotFound)); }
+        if r.rows_affected() == 0 {
+            tracing::error!(%id, "qty_claimed drift");
+            return Err(AppError::Db(sqlx::Error::RowNotFound));
+        }
     }
-    let claim: ClaimRow = if new_status == cur && new_qty.is_none() && p.note.is_none() && p.visibility.is_none() {
-        sqlx::query_as(&format!("SELECT {CLAIM_COLS} FROM claims c WHERE c.id = $1")).bind(id).fetch_one(&mut *tx).await?
+    let claim: ClaimRow = if new_status == cur
+        && new_qty.is_none()
+        && p.note.is_none()
+        && p.visibility.is_none()
+    {
+        sqlx::query_as(&format!(
+            "SELECT {CLAIM_COLS} FROM claims c WHERE c.id = $1"
+        ))
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?
     } else {
         sqlx::query_as(&format!(
             "UPDATE claims c SET qty = COALESCE($2, qty), note = COALESCE($3, note), visibility = COALESCE($5::text::share_level, visibility), status = $4::text::claim_status,
@@ -348,10 +638,25 @@ async fn apply(st: &AppState, id: Uuid, actor: Option<Actor>, p: PatchReq) -> Re
              WHERE c.id = $1 RETURNING {CLAIM_COLS}"))
             .bind(id).bind(new_qty).bind(&p.note).bind(&new_status).bind(&p.visibility).fetch_one(&mut *tx).await?
     };
-    let (n, c): (i32, i32) = sqlx::query_as("SELECT qty_needed, qty_claimed FROM wishlist_items WHERE id = $1").bind(item_id).fetch_one(&mut *tx).await?;
+    let (n, c): (i32, i32) =
+        sqlx::query_as("SELECT qty_needed, qty_claimed FROM wishlist_items WHERE id = $1")
+            .bind(item_id)
+            .fetch_one(&mut *tx)
+            .await?;
     if new_status != cur || new_qty.is_some() {
-        let action = if by_owner { "claim.owner_update" } else { "claim.update" };
-        audit(&mut tx, actor, action, id, json!({ "status": [cur, new_status], "qty": [old_qty, claim.qty] })).await?;
+        let action = if by_owner {
+            "claim.owner_update"
+        } else {
+            "claim.update"
+        };
+        audit(
+            &mut tx,
+            actor,
+            action,
+            id,
+            json!({ "status": [cur, new_status], "qty": [old_qty, claim.qty] }),
+        )
+        .await?;
     }
     let wid = wishlist_of(&mut tx, item_id).await?;
     crate::dashboard::notify(&mut *tx, wid).await?;
@@ -360,7 +665,12 @@ async fn apply(st: &AppState, id: Uuid, actor: Option<Actor>, p: PatchReq) -> Re
 }
 
 async fn wishlist_of(tx: &mut Transaction<'_, Postgres>, item_id: Uuid) -> Result<Uuid, AppError> {
-    Ok(sqlx::query_scalar("SELECT wishlist_id FROM wishlist_items WHERE id = $1").bind(item_id).fetch_one(&mut **tx).await?)
+    Ok(
+        sqlx::query_scalar("SELECT wishlist_id FROM wishlist_items WHERE id = $1")
+            .bind(item_id)
+            .fetch_one(&mut **tx)
+            .await?,
+    )
 }
 
 /// FR-08：把逾期的 reserved 認領設為 expired 並回補 qty_claimed，回傳釋放的認領數。
@@ -382,7 +692,9 @@ pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
            SELECT 'system'::actor_type, 'claim.expire', 'claims', id, jsonb_build_object('qty', qty) FROM x)
          SELECT DISTINCT wishlist_id, (SELECT count(*) FROM x) FROM r")
         .fetch_all(&mut *tx).await?;
-    for (w, _) in &rows { crate::dashboard::notify(&mut *tx, *w).await?; }
+    for (w, _) in &rows {
+        crate::dashboard::notify(&mut *tx, *w).await?;
+    }
     tx.commit().await?;
     Ok(rows.first().map_or(0, |r| r.1 as usize))
 }

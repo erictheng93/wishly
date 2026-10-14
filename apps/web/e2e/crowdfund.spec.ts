@@ -91,10 +91,20 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
 
   // ---- 阿美：在分享頁贊助 400，再到「我的點數」撤回 ----
   const ap = await pageAs(browser, amy)
+  // Hold identity loading until after the click: authenticated users can click
+  // before /me responds, and must not be mistaken for signed-out guests.
+  let releaseMe!: () => void
+  const meGate = new Promise<void>(resolve => { releaseMe = resolve })
+  const meRequest = ap.waitForRequest('**/api/v1/me')
+  await ap.route('**/api/v1/me', async route => { await meGate; await route.continue() })
   await ap.goto(`/s/${slug}`)
+  await meRequest
   await expect(card(ap, '嬰兒推車')).toContainText('已募 0 / 1,000 點')
   await card(ap, '嬰兒推車').getByRole('button', { name: '用點數贊助' }).click()
+  releaseMe()
   const fund = ap.getByRole('dialog')
+  await expect(fund).toBeVisible()
+  await expect(ap).toHaveURL(new RegExp(`/s/${slug}$`))
   await fund.getByLabel('贊助點數').fill('400')
   await fund.getByLabel('留言（選填）').fill('寶寶加油')
   await fund.getByRole('button', { name: /確認贊助/ }).click()
@@ -114,6 +124,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   await bp.goto(`/s/${slug}`)
   await card(bp, '嬰兒推車').getByRole('button', { name: '用點數贊助' }).click()
   const bf = bp.getByRole('dialog')
+  await expect(bf).toBeVisible()
   await bf.getByLabel('贊助點數').fill('400')
   await bf.getByLabel('匿名贊助（頁面上顯示為「匿名朋友」）').check()
   await bf.getByRole('button', { name: /確認贊助/ }).click()
