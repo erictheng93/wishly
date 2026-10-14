@@ -6,87 +6,30 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wishsync_api::{contributions, wallet, AppState};
 
-type Resp = (StatusCode, axum::http::HeaderMap, Value);
-
 fn test_app(pool: &PgPool) -> Router {
     Router::new()
         .nest("/api/v1", contributions::routes().merge(wallet::routes()))
         .with_state(AppState { pool: pool.clone() })
 }
 
-async fn call(
-    app: &Router,
-    method: &str,
-    uri: &str,
-    cookie: Option<&str>,
-    key: Option<Uuid>,
-    body: Option<Value>,
-) -> common::Resp {
-    let mut h = cookie.map(common::ck).unwrap_or_default();
-    if let Some(k) = key {
-        h.push(("idempotency-key", k.to_string()));
-    }
-    common::call_request(
-        app,
-        common::request(method, &format!("/api/v1{uri}"), &h, body),
-    )
-    .await
-}
+use common::{
+    assert_all_reconciled, balance, crowdfund_item as cf_item, grant, pledge, Resp, TestUser,
+};
 
-async fn pledge(app: &Router, item: Uuid, tok: &str, points: i64) -> Resp {
-    call(
-        app,
-        "POST",
-        &format!("/items/{item}/contributions"),
-        Some(tok),
-        Some(Uuid::new_v4()),
-        Some(json!({ "points": points })),
-    )
-    .await
-}
-
-/// 使用者 + session；回傳 (id, token)
-use common::user_pair as user;
-
-/// 發點（ledger grant），保持 balance = Σ delta
-async fn grant(pool: &PgPool, uid: Uuid, n: i64) {
-    let wid: Uuid = sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id RETURNING id")
-        .bind(uid).fetch_one(pool).await.unwrap();
-    let after: i64 = sqlx::query_scalar(
-        "UPDATE point_wallets SET balance = balance + $2 WHERE id = $1 RETURNING balance",
-    )
-    .bind(wid)
-    .bind(n)
-    .fetch_one(pool)
-    .await
-    .unwrap();
-    sqlx::query("INSERT INTO point_ledger (wallet_id, delta, balance_after, entry_type, ref_type, note) VALUES ($1, $2, $3, 'grant', 'manual', 'test')")
-        .bind(wid).bind(n).bind(after).execute(pool).await.unwrap();
-}
-
-async fn balance(pool: &PgPool, uid: Uuid) -> i64 {
-    sqlx::query_scalar("SELECT COALESCE((SELECT balance FROM point_wallets WHERE user_id = $1), 0)")
-        .bind(uid)
-        .fetch_one(pool)
+/// 已啟用清單與加密收件地址；品項可直接用共用 SQL fixture。
+async fn list_with_shipping(pool: &PgPool, owner: Uuid) -> Uuid {
+    let w = common::wishlist(pool, owner, common::ListOpts::default())
         .await
-        .unwrap()
-}
-
-async fn wishlist(pool: &PgPool, owner: Uuid) -> Uuid {
-    let slug: String = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let w: Uuid = sqlx::query_scalar("INSERT INTO wishlists (owner_id, type, status, slug, title) VALUES ($1, 'registry', 'active', $2, '寶寶清單') RETURNING id")
-        .bind(owner).bind(slug).fetch_one(pool).await.unwrap();
+        .id;
+    sqlx::query("UPDATE wishlists SET title='寶寶清單' WHERE id=$1")
+        .bind(w)
+        .execute(pool)
+        .await
+        .unwrap();
     let sealed = |s: &str| wishsync_api::sealed::seal(s.as_bytes());
     sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $3, $4)")
         .bind(w).bind(sealed("王小米")).bind(sealed("0912345678")).bind(sealed("台北市大安區某路 1 號")).execute(pool).await.unwrap();
     w
-}
-
-async fn cf_item(pool: &PgPool, wl: Uuid, target: i64) -> Uuid {
-    sqlx::query_scalar(
-        "INSERT INTO wishlist_items (wishlist_id, title, qty_needed, funding_mode, target_points, funding_status, funding_deadline, fulfillment_type)
-         VALUES ($1, '嬰兒推車', 1, 'crowdfund', $2, 'open', now() + interval '7 days', 'concierge') RETURNING id")
-        .bind(wl).bind(target).fetch_one(pool).await.unwrap()
 }
 
 async fn item_row(pool: &PgPool, id: Uuid) -> (i64, String) {
@@ -97,33 +40,25 @@ async fn item_row(pool: &PgPool, id: Uuid) -> (i64, String) {
         .unwrap()
 }
 
-async fn assert_reconciled(pool: &PgPool) {
-    let bad: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM point_wallets w WHERE w.balance <> COALESCE((SELECT sum(delta) FROM point_ledger l WHERE l.wallet_id = w.id), 0)")
-        .fetch_one(pool).await.unwrap();
-    assert_eq!(bad, 0, "錢包 balance 與 ledger 加總不一致");
-    // 品項快取：pledged_points = Σ pledged/captured
-    let drift: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM wishlist_items i WHERE i.funding_mode = 'crowdfund'
-           AND i.pledged_points <> COALESCE((SELECT sum(points) FROM contributions c WHERE c.item_id = i.id AND c.status IN ('pledged','captured')), 0)")
-        .fetch_one(pool).await.unwrap();
-    assert_eq!(drift, 0, "item.pledged_points 漂移");
-}
-
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn pledge_happy_path(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (donor, tok) = user(&pool, "阿明").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser {
+        id: donor,
+        token: tok,
+    } = common::user(&pool, "阿明").await;
     grant(&pool, donor, 1000).await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 500).await;
 
-    let (st, h, b) = call(
+    let (st, h, b) = common::call_app(
         &app,
         "POST",
         &format!("/items/{item}/contributions"),
-        Some(&tok),
-        Some(Uuid::new_v4()),
+        &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
         Some(json!({ "points": 200, "message": "恭喜", "is_anonymous": true })),
     )
     .await;
@@ -145,18 +80,21 @@ async fn pledge_happy_path(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(name, "阿明");
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn exact_target_funds_and_captures(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
-    let (b, tb) = user(&pool, "乙").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let TestUser { id: b, token: tb } = common::user(&pool, "乙").await;
     grant(&pool, a, 1000).await;
     grant(&pool, b, 1000).await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 500).await;
 
     assert_eq!(pledge(&app, item, &ta, 300).await.0, StatusCode::CREATED);
     let (st, _, r) = pledge(&app, item, &tb, 200).await;
@@ -192,16 +130,19 @@ async fn exact_target_funds_and_captures(pool: PgPool) {
         (st, e["code"].as_str()),
         (StatusCode::CONFLICT, Some("ITEM_FUNDED"))
     );
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn hard_cap_reports_remaining(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
     grant(&pool, a, 1000).await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 500).await;
     assert_eq!(pledge(&app, item, &ta, 450).await.0, StatusCode::CREATED);
     let (st, _, e) = pledge(&app, item, &ta, 100).await;
     assert_eq!(
@@ -214,17 +155,20 @@ async fn hard_cap_reports_remaining(pool: PgPool) {
     );
     assert_eq!(balance(&pool, a).await, 550);
     assert_eq!(item_row(&pool, item).await.0, 450);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn concurrent_last_slot_only_one_wins(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 100).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 100).await;
     let mut users = vec![];
     for n in 0..6 {
-        let (id, tok) = user(&pool, &format!("u{n}")).await;
+        let TestUser { id, token: tok } = common::user(&pool, &format!("u{n}")).await;
         grant(&pool, id, 100).await;
         users.push((id, tok));
     }
@@ -259,18 +203,21 @@ async fn concurrent_last_slot_only_one_wins(pool: PgPool) {
         }
     }
     assert_eq!(spent, 1);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn concurrent_exact_fill_never_oversells(pool: PgPool) {
     // 5 人各 30 點搶 100 點目標 → 最多 3 人成功（90），不會超額
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 100).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 100).await;
     let mut toks = vec![];
     for n in 0..5 {
-        let (id, t) = user(&pool, &format!("u{n}")).await;
+        let TestUser { id, token: t } = common::user(&pool, &format!("u{n}")).await;
         grant(&pool, id, 100).await;
         toks.push(t);
     }
@@ -289,16 +236,19 @@ async fn concurrent_exact_fill_never_oversells(pool: PgPool) {
     }
     assert_eq!(ok, 3);
     assert_eq!(item_row(&pool, item).await.0, 90);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn pledge_rejections(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
     grant(&pool, a, 100).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let item = cf_item(&pool, wl, 500).await;
     let code = |r: &Resp| (r.0, r.2["code"].as_str().unwrap_or("").to_string());
 
@@ -317,33 +267,30 @@ async fn pledge_rejections(pool: PgPool) {
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
-    let r = call(
+    let r = common::call_app(
         &app,
         "POST",
         &format!("/items/{item}/contributions"),
-        Some(&ta),
-        Some(Uuid::new_v4()),
+        &[common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
         Some(json!({ "points": 1, "message": "x".repeat(201) })),
     )
     .await;
     assert_eq!(r.0, StatusCode::UNPROCESSABLE_ENTITY);
     // 未登入 / 缺 key
-    let r = call(
+    let r = common::call_app(
         &app,
         "POST",
         &format!("/items/{item}/contributions"),
-        None,
-        Some(Uuid::new_v4()),
+        &common::idem(Uuid::new_v4()),
         Some(json!({ "points": 1 })),
     )
     .await;
     assert_eq!(code(&r), (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".into()));
-    let r = call(
+    let r = common::call_app(
         &app,
         "POST",
         &format!("/items/{item}/contributions"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         Some(json!({ "points": 1 })),
     )
     .await;
@@ -412,33 +359,34 @@ async fn pledge_rejections(pool: PgPool) {
         code(&pledge(&app, open, &ta, 1).await),
         (StatusCode::CONFLICT, "WISHLIST_CLOSED".into())
     );
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn idempotent_replay_does_not_double_charge(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
     grant(&pool, a, 1000).await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 500).await;
     let key = Uuid::new_v4();
     let uri = format!("/items/{item}/contributions");
-    let (s1, h1, b1) = call(
+    let (s1, h1, b1) = common::call_app(
         &app,
         "POST",
         &uri,
-        Some(&ta),
-        Some(key),
+        &[common::ck(&ta), common::idem(key)].concat(),
         Some(json!({ "points": 100 })),
     )
     .await;
-    let (s2, h2, b2) = call(
+    let (s2, h2, b2) = common::call_app(
         &app,
         "POST",
         &uri,
-        Some(&ta),
-        Some(key),
+        &[common::ck(&ta), common::idem(key)].concat(),
         Some(json!({ "points": 100 })),
     )
     .await;
@@ -448,12 +396,11 @@ async fn idempotent_replay_does_not_double_charge(pool: PgPool) {
     assert_eq!(b1["contribution"]["id"], b2["contribution"]["id"]);
     assert_eq!(balance(&pool, a).await, 900);
     // 同 key 不同內容 → 衝突
-    let (s3, _, b3) = call(
+    let (s3, _, b3) = common::call_app(
         &app,
         "POST",
         &uri,
-        Some(&ta),
-        Some(key),
+        &[common::ck(&ta), common::idem(key)].concat(),
         Some(json!({ "points": 50 })),
     )
     .await;
@@ -463,12 +410,11 @@ async fn idempotent_replay_does_not_double_charge(pool: PgPool) {
     );
     // 失敗不占 key：同 key 於餘額補足後可重試
     let k2 = Uuid::new_v4();
-    let (s, ..) = call(
+    let (s, ..) = common::call_app(
         &app,
         "POST",
         &uri,
-        Some(&ta),
-        Some(k2),
+        &[common::ck(&ta), common::idem(k2)].concat(),
         Some(json!({ "points": 5000 })),
     )
     .await;
@@ -479,28 +425,30 @@ async fn idempotent_replay_does_not_double_charge(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 0);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn withdraw_refunds_and_is_idempotent(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
-    let (_, tb) = user(&pool, "乙").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let TestUser { id: _, token: tb } = common::user(&pool, "乙").await;
     grant(&pool, a, 1000).await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 500).await;
     let (_, _, r) = pledge(&app, item, &ta, 300).await;
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
 
     // 他人 403；不存在 404；未登入 401
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "DELETE",
             &format!("/contributions/{cid}"),
-            Some(&tb),
-            None,
+            &common::ck(&tb),
             None
         )
         .await
@@ -508,12 +456,11 @@ async fn withdraw_refunds_and_is_idempotent(pool: PgPool) {
         StatusCode::FORBIDDEN
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "DELETE",
             &format!("/contributions/{}", Uuid::new_v4()),
-            Some(&ta),
-            None,
+            &common::ck(&ta),
             None
         )
         .await
@@ -521,26 +468,18 @@ async fn withdraw_refunds_and_is_idempotent(pool: PgPool) {
         StatusCode::NOT_FOUND
     );
     assert_eq!(
-        call(
-            &app,
-            "DELETE",
-            &format!("/contributions/{cid}"),
-            None,
-            None,
-            None
-        )
-        .await
-        .0,
+        common::call_app(&app, "DELETE", &format!("/contributions/{cid}"), &[], None)
+            .await
+            .0,
         StatusCode::UNAUTHORIZED
     );
     assert_eq!(balance(&pool, a).await, 700);
 
-    let (st, _, b) = call(
+    let (st, _, b) = common::call_app(
         &app,
         "DELETE",
         &format!("/contributions/{cid}"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
@@ -550,12 +489,11 @@ async fn withdraw_refunds_and_is_idempotent(pool: PgPool) {
     assert_eq!(b["wallet"]["balance"], 1000);
     assert_eq!(b["item"]["pledged_points"], 0);
     // 重複撤回：冪等，不重複退點
-    let (st, _, b) = call(
+    let (st, _, b) = common::call_app(
         &app,
         "DELETE",
         &format!("/contributions/{cid}"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
@@ -570,26 +508,28 @@ async fn withdraw_refunds_and_is_idempotent(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(rel, 1);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn withdraw_locked_when_captured_or_window_over(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
     grant(&pool, a, 1000).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let item = cf_item(&pool, wl, 100).await;
     let (_, _, r) = pledge(&app, item, &ta, 100).await;
     assert_eq!(r["funded"], true);
     let cid = r["contribution"]["id"].as_str().unwrap();
-    let (st, _, e) = call(
+    let (st, _, e) = common::call_app(
         &app,
         "DELETE",
         &format!("/contributions/{cid}"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
@@ -604,12 +544,11 @@ async fn withdraw_locked_when_captured_or_window_over(pool: PgPool) {
     let (_, _, r) = pledge(&app, item2, &ta, 10).await;
     let cid2 = r["contribution"]["id"].as_str().unwrap();
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '8 days' WHERE id = $1").bind(item2).execute(&pool).await.unwrap();
-    let (st, _, e) = call(
+    let (st, _, e) = common::call_app(
         &app,
         "DELETE",
         &format!("/contributions/{cid2}"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
@@ -624,12 +563,11 @@ async fn withdraw_locked_when_captured_or_window_over(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "DELETE",
             &format!("/contributions/{cid2}"),
-            Some(&ta),
-            None,
+            &common::ck(&ta),
             None
         )
         .await
@@ -637,31 +575,33 @@ async fn withdraw_locked_when_captured_or_window_over(pool: PgPool) {
         StatusCode::OK
     );
     assert_eq!(balance(&pool, a).await, 900);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reallocate_within_choice_window(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
-    let (_, tb) = user(&pool, "乙").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let TestUser { id: _, token: tb } = common::user(&pool, "乙").await;
     grant(&pool, a, 1000).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let src = cf_item(&pool, wl, 500).await;
     let dst = cf_item(&pool, wl, 200).await;
-    let other_wl = wishlist(&pool, owner).await;
+    let other_wl = list_with_shipping(&pool, owner).await;
     let foreign = cf_item(&pool, other_wl, 200).await;
     let (_, _, r) = pledge(&app, src, &ta, 200).await;
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
     let uri = format!("/contributions/{cid}/reallocate");
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "PATCH",
             &format!("/contributions/{cid}"),
-            Some(&ta),
-            None,
+            &common::ck(&ta),
             Some(json!({ "visibility": "friends" }))
         )
         .await
@@ -671,12 +611,11 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     let go = |tok: &str, target: Uuid| {
         let (app, uri, tok) = (app.clone(), uri.clone(), tok.to_string());
         async move {
-            call(
+            common::call_app(
                 &app,
                 "POST",
                 &uri,
-                Some(&tok),
-                Some(Uuid::new_v4()),
+                &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
                 Some(json!({ "target_item_id": target })),
             )
             .await
@@ -701,12 +640,11 @@ async fn reallocate_within_choice_window(pool: PgPool) {
     not_allowed(&go(&ta, Uuid::new_v4()).await);
     // 無 Idempotency-Key
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "POST",
             &uri,
-            Some(&ta),
-            None,
+            &common::ck(&ta),
             Some(json!({ "target_item_id": dst }))
         )
         .await
@@ -721,7 +659,14 @@ async fn reallocate_within_choice_window(pool: PgPool) {
         .unwrap();
     let key = Uuid::new_v4();
     let body = json!({ "target_item_id": dst });
-    let (st, _, b) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(body.clone())).await;
+    let (st, _, b) = common::call_app(
+        &app,
+        "POST",
+        &uri,
+        &[common::ck(&ta), common::idem(key)].concat(),
+        Some(body.clone()),
+    )
+    .await;
     assert_eq!(st, StatusCode::CREATED, "{b}");
     assert_eq!(b["funded"], true); // 200 點剛好填滿 dst
     assert_eq!(b["original"]["status"], "reallocated");
@@ -745,35 +690,44 @@ async fn reallocate_within_choice_window(pool: PgPool) {
         .unwrap();
     assert_eq!(po, 1);
     // 重放同 key → 不會再轉一次
-    let (st, h, _) = call(&app, "POST", &uri, Some(&ta), Some(key), Some(body)).await;
+    let (st, h, _) = common::call_app(
+        &app,
+        "POST",
+        &uri,
+        &[common::ck(&ta), common::idem(key)].concat(),
+        Some(body),
+    )
+    .await;
     assert_eq!(
         (st, h["idempotency-replayed"].to_str().unwrap()),
         (StatusCode::CREATED, "true")
     );
     // 已轉投的不能再轉
     not_allowed(&go(&ta, dst).await);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn reallocate_rejects_overflow_and_expired_window(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
     grant(&pool, a, 1000).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let src = cf_item(&pool, wl, 500).await;
     let small = cf_item(&pool, wl, 100).await;
     let (_, _, r) = pledge(&app, src, &ta, 200).await;
     let cid = r["contribution"]["id"].as_str().unwrap().to_string();
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '1 day' WHERE id = $1").bind(src).execute(&pool).await.unwrap();
     let uri = format!("/contributions/{cid}/reallocate");
-    let r = call(
+    let r = common::call_app(
         &app,
         "POST",
         &uri,
-        Some(&ta),
-        Some(Uuid::new_v4()),
+        &[common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
         Some(json!({ "target_item_id": small })),
     )
     .await;
@@ -787,12 +741,11 @@ async fn reallocate_rejects_overflow_and_expired_window(pool: PgPool) {
         .await
         .unwrap();
     let big = cf_item(&pool, wl, 900).await;
-    let r = call(
+    let r = common::call_app(
         &app,
         "POST",
         &uri,
-        Some(&ta),
-        Some(Uuid::new_v4()),
+        &[common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
         Some(json!({ "target_item_id": big })),
     )
     .await;
@@ -801,18 +754,21 @@ async fn reallocate_rejects_overflow_and_expired_window(pool: PgPool) {
         (StatusCode::CONFLICT, Some("REALLOCATION_NOT_ALLOWED"))
     ); // 選擇期已過
     assert_eq!(item_row(&pool, src).await.0, 200);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
-    let (b, tb) = user(&pool, "乙").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let TestUser { id: b, token: tb } = common::user(&pool, "乙").await;
     grant(&pool, a, 1000).await;
     grant(&pool, b, 1000).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let item = cf_item(&pool, wl, 500).await;
     let fresh = cf_item(&pool, wl, 500).await;
     pledge(&app, item, &ta, 100).await;
@@ -905,17 +861,20 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
         wishsync_api::contributions::tick_funding(&pool)
     );
     assert_eq!(r1.unwrap().0 + r2.unwrap().0, 1);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
 
     // 沒有錢包
-    let (st, h, b) = call(&app, "GET", "/wallet", Some(&ta), None, None).await;
+    let (st, h, b) = common::call_app(&app, "GET", "/wallet", &common::ck(&ta), None).await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(h["cache-control"], "private, no-store");
     assert_eq!(
@@ -928,17 +887,17 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
     );
     assert!(b["wallet"]["id"].is_null());
     assert_eq!(
-        call(&app, "GET", "/wallet", None, None, None).await.0,
+        common::call_app(&app, "GET", "/wallet", &[], None).await.0,
         StatusCode::UNAUTHORIZED
     );
 
     grant(&pool, a, 1000).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let open = cf_item(&pool, wl, 500).await;
     let done = cf_item(&pool, wl, 100).await;
     pledge(&app, open, &ta, 120).await;
     pledge(&app, done, &ta, 100).await; // captured
-    let (_, _, b) = call(&app, "GET", "/wallet", Some(&ta), None, None).await;
+    let (_, _, b) = common::call_app(&app, "GET", "/wallet", &common::ck(&ta), None).await;
     assert_eq!(b["wallet"]["balance"], 780);
     assert_eq!(b["wallet"]["held_points"], 220);
     assert_eq!(b["data"].as_array().unwrap().len(), 3);
@@ -951,19 +910,18 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    let (_, _, b) = call(&app, "GET", "/wallet", Some(&ta), None, None).await;
+    let (_, _, b) = common::call_app(&app, "GET", "/wallet", &common::ck(&ta), None).await;
     assert_eq!(b["wallet"]["held_points"], 210);
 
     // 分頁
-    let (_, _, p1) = call(&app, "GET", "/wallet?limit=2", Some(&ta), None, None).await;
+    let (_, _, p1) = common::call_app(&app, "GET", "/wallet?limit=2", &common::ck(&ta), None).await;
     assert_eq!(p1["data"].as_array().unwrap().len(), 2);
     let cur = p1["next_cursor"].as_str().unwrap();
-    let (_, _, p2) = call(
+    let (_, _, p2) = common::call_app(
         &app,
         "GET",
         &format!("/wallet?limit=2&cursor={cur}"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
@@ -971,22 +929,26 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
     assert_eq!(p2["data"][0]["entry_type"], "grant");
     assert!(p2["next_cursor"].is_null());
     assert_eq!(
-        call(&app, "GET", "/wallet?cursor=abc", Some(&ta), None, None)
+        common::call_app(&app, "GET", "/wallet?cursor=abc", &common::ck(&ta), None)
             .await
             .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
     let _ = a;
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn wallet_contributions_flags_and_filter(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (a, ta) = user(&pool, "甲").await;
-    let (_, tb) = user(&pool, "乙").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let TestUser { id: _, token: tb } = common::user(&pool, "乙").await;
     grant(&pool, a, 1000).await;
-    let wl = wishlist(&pool, owner).await;
+    let wl = list_with_shipping(&pool, owner).await;
     let open = cf_item(&pool, wl, 500).await;
     let expired = cf_item(&pool, wl, 500).await;
     let late = cf_item(&pool, wl, 500).await;
@@ -1002,7 +964,8 @@ async fn wallet_contributions_flags_and_filter(pool: PgPool) {
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '1 day' WHERE id = $1").bind(expired).execute(&pool).await.unwrap();
     sqlx::query("UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() - interval '9 days' WHERE id = $1").bind(late).execute(&pool).await.unwrap();
 
-    let (st, h, b) = call(&app, "GET", "/wallet/contributions", Some(&ta), None, None).await;
+    let (st, h, b) =
+        common::call_app(&app, "GET", "/wallet/contributions", &common::ck(&ta), None).await;
     assert_eq!(st, StatusCode::OK, "{b}");
     assert_eq!(h["cache-control"], "private, no-store");
     let rows = b["data"].as_array().unwrap();
@@ -1030,77 +993,74 @@ async fn wallet_contributions_flags_and_filter(pool: PgPool) {
     assert!(by(open)["wishlist"]["slug"].is_string());
     assert!(by(open)["item"].get("image_url").is_some());
     // 篩選 + 分頁
-    let (_, _, f) = call(
+    let (_, _, f) = common::call_app(
         &app,
         "GET",
         "/wallet/contributions?status=captured",
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
     assert_eq!(f["data"].as_array().unwrap().len(), 1);
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "GET",
             "/wallet/contributions?status=bogus",
-            Some(&ta),
-            None,
+            &common::ck(&ta),
             None
         )
         .await
         .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    let (_, _, p1) = call(
+    let (_, _, p1) = common::call_app(
         &app,
         "GET",
         "/wallet/contributions?limit=3",
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
     assert_eq!(p1["data"].as_array().unwrap().len(), 3);
     let cur = p1["next_cursor"].as_str().unwrap();
-    let (_, _, p2) = call(
+    let (_, _, p2) = common::call_app(
         &app,
         "GET",
         &format!("/wallet/contributions?limit=3&cursor={cur}"),
-        Some(&ta),
-        None,
+        &common::ck(&ta),
         None,
     )
     .await;
     assert_eq!(p2["data"].as_array().unwrap().len(), 1);
     assert!(p2["next_cursor"].is_null());
     // 只看得到自己的
-    let (_, _, other) = call(&app, "GET", "/wallet/contributions", Some(&tb), None, None).await;
+    let (_, _, other) =
+        common::call_app(&app, "GET", "/wallet/contributions", &common::ck(&tb), None).await;
     assert_eq!(other["data"].as_array().unwrap().len(), 0);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn pledge_respects_list_visibility(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, _) = user(&pool, "小米").await;
-    let (stranger, ts) = user(&pool, "路人").await;
-    let (friend, tf) = user(&pool, "好友").await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser {
+        id: stranger,
+        token: ts,
+    } = common::user(&pool, "路人").await;
+    let TestUser {
+        id: friend,
+        token: tf,
+    } = common::user(&pool, "好友").await;
     for u in [stranger, friend] {
         grant(&pool, u, 1000).await;
     }
-    let (a, b) = if owner < friend {
-        (owner, friend)
-    } else {
-        (friend, owner)
-    };
-    sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES ($1, $2)")
-        .bind(a)
-        .bind(b)
-        .execute(&pool)
-        .await
-        .unwrap();
-    let wl = wishlist(&pool, owner).await;
+    common::befriend(&pool, owner, friend).await;
+    let wl = list_with_shipping(&pool, owner).await;
     sqlx::query("UPDATE wishlists SET visibility = 'friends' WHERE id = $1")
         .bind(wl)
         .execute(&pool)
@@ -1114,15 +1074,22 @@ async fn pledge_respects_list_visibility(pool: PgPool) {
     );
     assert_eq!(balance(&pool, stranger).await, 1000);
     assert_eq!(pledge(&app, item, &tf, 100).await.0, StatusCode::CREATED);
+    common::assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
     let app = test_app(&pool);
-    let (owner, owner_tok) = user(&pool, "O").await;
-    let (donor, tok) = user(&pool, "D").await;
+    let TestUser {
+        id: owner,
+        token: owner_tok,
+    } = common::user(&pool, "O").await;
+    let TestUser {
+        id: donor,
+        token: tok,
+    } = common::user(&pool, "D").await;
     grant(&pool, donor, 1000).await;
-    let item = cf_item(&pool, wishlist(&pool, owner).await, 500).await;
+    let item = cf_item(&pool, list_with_shipping(&pool, owner).await, 500).await;
     sqlx::query("UPDATE users SET default_claim_visibility = 'friends' WHERE id = $1")
         .bind(donor)
         .execute(&pool)
@@ -1138,30 +1105,35 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    let rows = call(&app, "GET", "/wallet/contributions", Some(&tok), None, None).await;
+    let rows = common::call_app(
+        &app,
+        "GET",
+        "/wallet/contributions",
+        &common::ck(&tok),
+        None,
+    )
+    .await;
     assert_eq!(rows.2["data"][0]["contribution"]["visibility"], "friends");
     assert_eq!(
         pledge(&app, item, &tok, 100).await.2["contribution"]["visibility"],
         "public"
     );
-    let r = call(
+    let r = common::call_app(
         &app,
         "POST",
         &format!("/items/{item}/contributions"),
-        Some(&tok),
-        Some(Uuid::new_v4()),
+        &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
         Some(json!({ "points": 100, "visibility": "private" })),
     )
     .await;
     assert_eq!(r.2["contribution"]["visibility"], "private");
     for bad in [json!("bogus"), json!(42)] {
         assert_eq!(
-            call(
+            common::call_app(
                 &app,
                 "POST",
                 &format!("/items/{item}/contributions"),
-                Some(&tok),
-                Some(Uuid::new_v4()),
+                &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
                 Some(json!({ "points": 1, "visibility": bad }))
             )
             .await
@@ -1169,12 +1141,11 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
             StatusCode::UNPROCESSABLE_ENTITY
         );
         assert_eq!(
-            call(
+            common::call_app(
                 &app,
                 "PATCH",
                 &uri,
-                Some(&tok),
-                None,
+                &common::ck(&tok),
                 Some(json!({ "visibility": bad }))
             )
             .await
@@ -1184,19 +1155,18 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
     }
     for empty in [json!({}), json!({ "visibility": null })] {
         assert_eq!(
-            call(&app, "PATCH", &uri, Some(&tok), None, Some(empty))
+            common::call_app(&app, "PATCH", &uri, &common::ck(&tok), Some(empty))
                 .await
                 .0,
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "PATCH",
             &uri,
-            None,
-            None,
+            &[],
             Some(json!({ "visibility": "public" }))
         )
         .await
@@ -1204,12 +1174,11 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
         StatusCode::UNAUTHORIZED
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "PATCH",
             &uri,
-            Some(&owner_tok),
-            None,
+            &common::ck(&owner_tok),
             Some(json!({ "visibility": "public" }))
         )
         .await
@@ -1217,19 +1186,25 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
         StatusCode::FORBIDDEN
     );
     assert_eq!(
-        call(
+        common::call_app(
             &app,
             "PATCH",
             &format!("/contributions/{}", Uuid::new_v4()),
-            Some(&tok),
-            None,
+            &common::ck(&tok),
             Some(json!({ "visibility": "public" }))
         )
         .await
         .0,
         StatusCode::NOT_FOUND
     );
-    let rows = call(&app, "GET", "/wallet/contributions", Some(&tok), None, None).await;
+    let rows = common::call_app(
+        &app,
+        "GET",
+        "/wallet/contributions",
+        &common::ck(&tok),
+        None,
+    )
+    .await;
     let unchanged = rows.2["data"]
         .as_array()
         .unwrap()
@@ -1239,12 +1214,11 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
     assert_eq!(unchanged["contribution"]["visibility"], "friends");
     let before = balance(&pool, donor).await;
     for vis in ["private", "friends", "public"] {
-        let r = call(
+        let r = common::call_app(
             &app,
             "PATCH",
             &uri,
-            Some(&tok),
-            None,
+            &common::ck(&tok),
             Some(json!({ "visibility": vis })),
         )
         .await;
@@ -1255,26 +1229,29 @@ async fn contribution_visibility_default_override_and_patch(pool: PgPool) {
     assert_eq!(balance(&pool, donor).await, before);
     // 已退回的歷史紀錄仍可調整隱私；不得異動點數。
     assert_eq!(
-        call(&app, "DELETE", &uri, Some(&tok), None, None).await.0,
+        common::call_app(&app, "DELETE", &uri, &common::ck(&tok), None)
+            .await
+            .0,
         StatusCode::OK
     );
-    let r = call(
+    let r = common::call_app(
         &app,
         "PATCH",
         &uri,
-        Some(&tok),
-        None,
+        &common::ck(&tok),
         Some(json!({ "visibility": "private" })),
     )
     .await;
     assert_eq!(r.0, StatusCode::OK);
     assert_eq!(r.2["contribution"]["status"], "released");
     assert_eq!(balance(&pool, donor).await, before + 100);
-    assert_reconciled(&pool).await;
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = false)]
 async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool) {
+    // Schema-only backfill fixture intentionally omits wallet debits/item totals;
+    // assert_all_reconciled does not apply to this pre-0006 isolated database.
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../db/migrations");
     for name in [
         "0001_mvp.sql",
@@ -1288,11 +1265,19 @@ async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool
             .await
             .unwrap();
     }
-    let (owner, _) = user(&pool, "O").await;
-    let wl = wishlist(&pool, owner).await;
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "O").await;
+    // Pre-0006 schema has no closes_at fixture column.
+    let wl = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title) VALUES($1,'registry','active',$2,'寶寶清單') RETURNING id")
+        .bind(owner).bind(Uuid::new_v4().simple().to_string()[..10].to_string()).fetch_one(&pool).await.unwrap();
     let item = cf_item(&pool, wl, 1000).await;
     for vis in ["public", "friends", "private"] {
-        let (donor, _) = user(&pool, vis).await;
+        let TestUser {
+            id: donor,
+            token: _,
+        } = common::user(&pool, vis).await;
         sqlx::query(
             "UPDATE users SET default_claim_visibility = $2::text::share_level WHERE id = $1",
         )
