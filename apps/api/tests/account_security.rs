@@ -198,8 +198,7 @@ async fn framework_errors_are_problem_json(pool: PgPool) {
     assert_eq!(h[header::CONTENT_TYPE], "application/problem+json");
     assert!(
         s.is_client_error() && !b.to_string().contains("Cannot parse"),
-        "{s} {}",
-        b.to_string()
+        "{s} {b}"
     );
     let (s, h, b) = common::call_request(
         &common::test_app(&pool),
