@@ -161,6 +161,12 @@ pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
         "claim.created" => (format!("【WishSync】《{title}》有 {n} 件新認領"), format!("你的清單《{title}》有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
         "claim.confirmation" => ("【WishSync】認領已確認".into(), format!("你的認領已記錄，謝謝你的心意。\n管理我的認領：{manage}\n")),
         "claim.item_removed" => ("【WishSync】你認領的品項已被移除".into(), format!("清單《{title}》的建立者移除了你認領的品項，這筆認領已取消。\n查看其他品項：{manage}\n")),
+        "wishlist.closing" => {
+            // 以台北時間顯示；解析失敗就只講「24 小時內」
+            let at = payload.get("closes_at").and_then(Value::as_str).and_then(|t| t.parse::<chrono::DateTime<chrono::Utc>>().ok())
+                .map(|t| (t + chrono::Duration::hours(8)).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "24 小時內".into());
+            (format!("【WishSync】《{title}》即將結束"), format!("你的清單《{title}》將於 {at}（台北時間）自動結束，屆時訪客不能再認領。\n要延長或取消期限：{base}/dashboard\n"))
+        }
         "event.reminder" => (format!("【WishSync】《{title}》活動日快到了"), format!("你的清單《{title}》的活動日即將到來。\n{base}/dashboard\n")),
         _ => ("【WishSync】通知".into(), format!("{base}\n")),
     };

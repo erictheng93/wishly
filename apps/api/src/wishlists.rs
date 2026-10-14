@@ -400,6 +400,7 @@ async fn update(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
     let mut tx = st.pool.begin().await?;
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$15,
+                 closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $15 THEN NULL ELSE closes_reminded_at END,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
                  access_password_hash = CASE WHEN $13 THEN $14 ELSE access_password_hash END
                  WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12)")
@@ -421,6 +422,19 @@ pub async fn close_due(pool: &PgPool) -> Result<usize, sqlx::Error> {
     for (id, _) in &rows { crate::dashboard::notify(pool, *id).await?; }
     if !rows.is_empty() { crate::cdn::purge_wishlists(rows.iter().map(|r| r.1.trim().to_string()).collect()); } // 公開快取副本的 status 要更新
     Ok(rows.len())
+}
+
+/// closes_at 前 24 小時提醒創建者一次（寄信走既有 notifications 佇列）。冪等：UPDATE ... IS NULL 保證多實例只排一封。
+/// 清單剛設定且離結束不到 24 小時時，會在下個 tick 立刻提醒。
+pub async fn remind_closing(pool: &PgPool) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "WITH d AS (UPDATE wishlists SET closes_reminded_at = now()
+                     WHERE status = 'active' AND deleted_at IS NULL AND closes_reminded_at IS NULL
+                       AND closes_at > now() AND closes_at <= now() + interval '24 hours'
+                     RETURNING id, owner_id, closes_at)
+         INSERT INTO notifications (user_id, channel, kind, payload)
+         SELECT owner_id, 'email', 'wishlist.closing', jsonb_build_object('wishlist_id', id, 'closes_at', closes_at) FROM d")
+        .execute(pool).await?.rows_affected())
 }
 
 async fn archive(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>) -> R<StatusCode> {
