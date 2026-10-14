@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { newEmail, PASSWORD, skipOtpCooldown, uid, waitForOtp } from './helpers'
+import { newEmail, PASSWORD, skipOtpCooldown, sql, uid, waitForOtp } from './helpers'
 
 test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分享連結 → 登出/登入 → 忘記密碼', async ({ page, browser }) => {
   const email = newEmail('creator'), name = `阿美${uid().slice(0, 3)}`, title = `寶寶滿月 ${uid().slice(0, 4)}`
@@ -42,6 +42,28 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await expect(page.getByRole('article').filter({ hasText: '奶瓶' })).toContainText('需要 2')
   })
 
+  const closesLocal = new Date(Date.now() + 7 * 864e5 + 8 * 36e5).toISOString().slice(0, 16) // timezoneId = Asia/Taipei
+  await test.step('自動結束時間：預設留空 → 設定並儲存 → 重新整理仍在 → 清空 → 再設定', async () => {
+    const openSettings = () => page.getByText('清單設定', { exact: true }).click() // 設定收在 <details>，重新整理後會收合
+    await openSettings()
+    // 「已儲存」訊息會殘留，改等 PATCH 回應再往下，避免 reload 搶在請求完成前
+    const save = () => Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), page.getByRole('button', { name: '儲存設定' }).click()])
+    const field = page.getByLabel(/自動結束時間/)
+    await expect(field).toHaveValue('') // 預設不設期限
+    await field.fill(closesLocal)
+    await save()
+    await page.reload()
+    await openSettings()
+    await expect(page.getByLabel(/自動結束時間/)).toHaveValue(closesLocal)
+    await page.getByLabel(/自動結束時間/).fill('')
+    await save()
+    await page.reload()
+    await openSettings()
+    await expect(page.getByLabel(/自動結束時間/)).toHaveValue('')
+    await page.getByLabel(/自動結束時間/).fill(closesLocal)
+    await save()
+  })
+
   await test.step('發佈並取得分享連結', async () => {
     await page.getByRole('button', { name: '發佈並分享' }).click()
     await expect(page.getByRole('dialog', { name: '分享你的清單' })).toBeVisible()
@@ -55,6 +77,22 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await guest.goto(shareUrl)
     await expect(guest.getByRole('heading', { level: 1, name: title })).toBeVisible()
     await expect(guest.locator('li.g-card', { hasText: '奶瓶' })).toContainText('0 / 2')
+    await ctx.close()
+  })
+
+  await test.step('分享頁顯示結束時間；到期後訪客無法認領（不必等背景 job）', async () => {
+    const ctx = await browser.newContext()
+    const guest = await ctx.newPage()
+    await guest.goto(shareUrl)
+    await expect(guest.getByText(/結束・/)).toBeVisible()
+    const slug = shareUrl.split('/').pop()!
+    sql(`UPDATE wishlists SET closes_at = now() - interval '1 minute' WHERE slug = '${slug}'`) // 模擬時間流逝；背景 job 每 5 分鐘才轉 closed
+    await guest.goto(shareUrl)
+    await guest.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
+    const dialog = guest.getByRole('dialog')
+    await dialog.getByLabel('你的暱稱（必填）').fill('遲到的朋友')
+    await dialog.getByRole('button', { name: '確認認領' }).click()
+    await expect(guest.getByText(/已結束/).first()).toBeVisible()
     await ctx.close()
   })
 
