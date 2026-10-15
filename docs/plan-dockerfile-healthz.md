@@ -90,7 +90,9 @@
 - 覆蓋率：專案有 `scripts/coverage-api.sh` 與 `scripts/test_coverage.py` 閘門，新增檔案的行需被測試覆蓋；實作後跑 `sh scripts/coverage-api.sh` 確認不降低基線。
 - `scripts/mutate.sh`：此處不涉及鎖序／併發 SQL，**不需新增 mutant**（依 CLAUDE.md 規範）。
 
-## 4. 選配但建議一併處理：SIGTERM 優雅關閉
+## 4. 選配：SIGTERM 優雅關閉（已實作後移除）
+
+> **2026-10-15：已實作（`e2593f5`）後依決定移除**；換版時進行中的請求會被切斷，客戶端以 `Idempotency-Key` 重試。以下為當時的設計紀錄。
 
 換版／停止容器時（Dokploy／`docker stop`）送 SIGTERM，預設 10 秒後強殺。現況 `axum::serve` 無 graceful shutdown，進行中的認領 POST 會被切斷（有 Idempotency-Key，客戶端重試可恢復，但體驗差）。
 - 做法：`axum::serve(...).with_graceful_shutdown(shutdown_signal())`，`shutdown_signal` 等待 `tokio::signal::unix::signal(SignalKind::terminate())` 與 ctrl-c（tokio 已啟用 `signal`）。
