@@ -49,6 +49,13 @@ jobs:
         with:
           name: api-coverage
           path: apps/api/target/coverage.json
+  image:
+    # 只驗證 Dockerfile 能建置（不 push）；build context 必須是 repo 根目錄。
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/api/Dockerfile -t wishsync-api:ci .
   web:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
