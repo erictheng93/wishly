@@ -74,8 +74,8 @@ jobs:
           name: web-coverage
           path: apps/web/coverage/
   web-audit:
-    # Upstream advisories stay visible without hiding web typecheck/test/build results.
-    # Keep this advisory-only job out of required PR checks until the tracked upstream fixes land.
+    # Accept only backported advisories after verifying source hashes and security regressions.
+    # New high/critical advisories and audit errors still fail; retain the unfiltered JSON.
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
-      - run: npm audit --audit-level=high --json > npm-audit.json
+      - run: npm run audit:security
       - uses: actions/upload-artifact@v4
         if: always()
         with:

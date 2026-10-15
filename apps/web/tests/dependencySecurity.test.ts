@@ -137,6 +137,9 @@ it('applies backports on fresh source, supports reruns, and refuses source or ve
     }
     const reversed = spawnSync('git', ['apply', '--no-index', '--reverse', 'patches/dependency-security.patch'], { cwd: directory, encoding: 'utf8' })
     expect(reversed.status, reversed.stderr).toBe(0)
+    const unpatched = run('scripts/patch-dependencies.mjs', '--check')
+    expect(unpatched.status).not.toBe(0)
+    expect(unpatched.stderr).toContain('Security backport was not applied')
     const first = run('scripts/patch-dependencies.mjs')
     expect(first.status, first.stderr).toBe(0)
     expect(run('scripts/patch-dependencies.mjs').status).toBe(0)

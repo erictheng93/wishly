@@ -35,7 +35,7 @@ for (const [name, version] of [['braces', '3.0.3'], ['node-forge', '1.4.0']]) {
 }
 
 const digest = path => createHash('sha256').update(readFileSync(new URL(`node_modules/${path}`, root))).digest('hex')
-if (!Object.entries(files).every(([path, hashes]) => digest(path) === hashes[1])) {
+if (!process.argv.includes('--check') && !Object.entries(files).every(([path, hashes]) => digest(path) === hashes[1])) {
   for (const [path, hashes] of Object.entries(files)) {
     assert.equal(digest(path), hashes[0], `Unexpected dependency source: ${path}; reinstall or review the backport`)
   }

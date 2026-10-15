@@ -73,11 +73,11 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 後端一般測試也會驗證真實 SMTP 寄送，請先啟動 `docker compose up -d db mailpit`。`scripts/cargo.sh` 已設定容器連到宿主的 SMTP 與 Mailpit API；直接跑 cargo 預設使用 localhost。
 
-CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。npm audit 在獨立 `web-audit` job 保留失敗訊號，每週一另行重查，不影響 web 的 typecheck／test／build；上游修補前不要將此 job 列為必要 PR 檢查。完整範圍、更新基準流程、mutation 證據與上游追蹤記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）。
+CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。獨立 `web-audit` job 執行 `npm run audit:security`，每週一另行重查；只有通過本地補丁 hash 與安全回歸測試的兩個指定公告及其依賴鏈可接受，其他 high／critical 與掃描錯誤仍使 CI 失敗。完整原始 audit JSON 保留為 artifact。歷史範圍、更新基準流程及 mutation 證據記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）；現行回補政策以[本地安全補丁說明](apps/web/patches/README.md)為準。
 
 刪除已覆蓋的程式碼也會改變覆蓋率的分子與分母；若比例低於基準減 0.5pp，API gate 會變紅。刻意調整測試範圍或程式碼時，請重新量測並同步更新 baseline，勿將此結果視為 flaky。上游 npm advisory 由 [issue #7](https://github.com/erictheng93/wishsync/issues/7) 追蹤。
 
-前端安裝時會自動套用 `braces`／`node-forge` 的[本地安全補丁](apps/web/patches/README.md)，需安裝 Git 且不可略過 postinstall。回歸測試會驗證深層 glob 與惡意 RSA DigestAlgorithm 都被拒絕；版本號仍維持上游版本，因此 npm audit 的警報仍會保留，直到正式修補版發布。
+前端安裝時會自動套用 `braces`／`node-forge` 的[本地安全補丁](apps/web/patches/README.md)，需安裝 Git 且不可略過 postinstall。回歸測試會驗證深層 glob 與惡意 RSA DigestAlgorithm 都被拒絕；版本號仍維持上游版本，因此原始 npm audit 仍會報警，由上述驗證閘門精確處理，直到正式修補版發布。
 
 Mutation 可在 Mac／Linux 用 `scripts/mutate.sh --list` 選擇，例如 `scripts/mutate.sh cdn-account-delete`、`scripts/mutate.sh cdn-close-due`；需 Python 3、Rust 與可建立測試 DB 的 DATABASE_URL。runner 自動確認原版綠、停用單一行為後紅、還原後綠；CI 的 API job 會在 coverage 完成後執行 `scripts/mutate.sh all` 並上傳 receipts／patch／logs。輸出保存於 `apps/api/target/mutations/`，請勿與相同 SQLx test path 的一般測試併跑。`python3 scripts/test_mutate.py` 不需要 DB，可驗證 runner 的分類與中斷還原。
 
