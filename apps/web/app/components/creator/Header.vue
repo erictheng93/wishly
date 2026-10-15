@@ -8,6 +8,7 @@ const { user } = useAuth()
     <h1>{{ title }}</h1>
     <NuxtLink v-if="user?.handle" :to="`/u/${user.handle}`" class="c-btn c-nav-dup">個人頁</NuxtLink>
     <NuxtLink v-if="user" to="/friends" class="c-btn c-nav-dup">好友</NuxtLink>
+    <ThemeToggle />
     <slot />
   </header>
   <!-- 桌面（≥1280）側欄：取代各頁重複的導覽按鈕 -->

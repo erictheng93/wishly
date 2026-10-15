@@ -27,7 +27,7 @@ onMounted(async () => {
     const t = await loadTurnstile()
     if (!box.value) return // 載入期間 sheet 已關閉
     wid = t.render(box.value, {
-      sitekey: siteKey, theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', language: 'zh-tw',
+      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: 'zh-tw',
       callback: (v: string) => { token.value = v; msg.value = '' },
       'expired-callback': () => { token.value = ''; msg.value = '驗證已過期，請重新驗證' },
       'timeout-callback': () => { token.value = ''; msg.value = '驗證逾時，請重新驗證' },

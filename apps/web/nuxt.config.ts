@@ -35,6 +35,8 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
         { name: 'apple-mobile-web-app-title', content: 'WishSync' },
       ],
+      // 首繪前套用手動主題，避免閃白；key 與 composables/useTheme.ts 一致
+      script: [{ innerHTML: "try{var t=localStorage.getItem('ws_theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}", tagPriority: 'critical' }],
       link: [
         { rel: 'manifest', href: '/manifest.webmanifest' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
