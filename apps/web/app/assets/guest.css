@@ -57,6 +57,7 @@
 .g-wrap summary{display:flex;align-items:center;min-height:44px;cursor:pointer}
 .g-foot{text-align:center;margin-top:48px;font-size:12px;color:var(--mute);letter-spacing:.08em}
 .g-foot a,.g-foot .g-link{color:var(--mute);font-size:12px}
+.g-nowrap{white-space:nowrap} /* 括號說明整組換行，不拆出孤字 */
 .g-center{text-align:center;padding:64px 0}
 .g-doc h2{font-size:20px;margin-top:32px}
 .g-doc li{margin:4px 0}

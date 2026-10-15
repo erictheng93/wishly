@@ -58,7 +58,7 @@ async function setStatus() {
   <main class="c-page c-admin">
     <CreatorHeader title="點數錢包" back="/admin" />
     <form class="c-row c-mb" @submit.prevent="search()"><input v-model="q" class="c-grow c-input" placeholder="Email 或顯示名稱" aria-label="搜尋使用者" :disabled="busy"><button class="c-btn primary" :disabled="busy">{{ busy ? '搜尋中…' : '搜尋' }}</button></form>
-    <label class="c-field"><span>錢包狀態</span><select v-model="status" :disabled="busy"><option value="">全部</option><option value="active">正常</option><option value="frozen">已凍結</option><option value="none">未建立錢包</option></select></label>
+    <label class="c-field c-narrow"><span>錢包狀態</span><select v-model="status" :disabled="busy"><option value="">全部</option><option value="active">正常</option><option value="frozen">已凍結</option><option value="none">未建立錢包</option></select></label>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <p v-if="done && !rows.length" class="c-center c-mute">沒有符合的使用者</p>

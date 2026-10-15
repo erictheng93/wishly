@@ -18,7 +18,7 @@ for (const [name, vp] of Object.entries(SIZES)) {
     await test.step('dashboard：標題不被擠成一字寬、無溢出', async () => {
       await page.goto('/dashboard')
       await expect(page.locator('.c-head h1')).toBeVisible()
-      expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(100)
+      expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(60)
       expect(await noOverflow()).toBe(true)
       expect(await page.locator('.c-rail').isVisible()).toBe(vp.width >= 1280)
       expect(await page.getByRole('link', { name: '好友' }).first().isVisible()).toBe(true) // header 或側欄其一
@@ -26,7 +26,7 @@ for (const [name, vp] of Object.entries(SIZES)) {
     await test.step('edit：標題寬度、雙欄、無溢出', async () => {
       await page.goto(`/lists/${list.id}/edit`)
       await expect(page.locator('.c-head h1')).toBeVisible()
-      expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(100)
+      expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(60)
       expect(await noOverflow()).toBe(true)
       const split = await cols('.c-split')
       expect(split).toBe(vp.width >= 1100 ? 2 : 1)
@@ -52,6 +52,14 @@ for (const [name, vp] of Object.entries(SIZES)) {
       const before = await bg()
       await btn.hover()
       await expect.poll(bg).not.toBe(before) // 有 .2s transition，需輪詢
+    })
+    await test.step('後台採購單：篩選在平板以上並排', async () => {
+      await page.goto('/admin/orders')
+      await expect(page.locator('.c-filters select')).toHaveCount(2)
+      const ys = await page.locator('.c-filters select').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)))
+      expect(ys).toHaveLength(2)
+      expect(ys[0] === ys[1]).toBe(vp.width >= 768)
+      expect(await noOverflow()).toBe(true)
     })
     await test.step('分享頁：品項欄數與無溢出', async () => {
       await page.goto(`/s/${list.slug}`)

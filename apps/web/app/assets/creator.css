@@ -129,3 +129,6 @@ dialog.c-sheet:focus-visible{outline:0}
   .c-page{padding-bottom:24px}
   .c-split>aside{position:static}
 }
+/* 後台篩選：窄螢幕單欄，平板以上並排；單一篩選則限制寬度 */
+.c-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px}
+.c-narrow{max-width:240px}

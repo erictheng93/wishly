@@ -44,9 +44,11 @@ async function submit() {
 <template>
   <main class="c-page c-admin">
     <CreatorHeader title="採購單佇列" back="/admin" />
+    <div class="c-filters">
     <label class="c-field"><span>狀態</span>
       <select v-model="status"><option value="">全部</option><option v-for="(t, k) in ORDER_STATUS" :key="k" :value="k">{{ t }}</option></select></label>
     <label class="c-field"><span>履約類型</span><select v-model="fulfillment"><option value="">全部</option><option value="concierge">人工代購</option><option value="catalog">商品目錄</option></select></label>
+    </div>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">重試</button></p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <p v-if="loading && !rows.length" class="c-mute" role="status">載入中…</p>

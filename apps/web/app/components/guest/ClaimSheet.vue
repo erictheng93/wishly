@@ -97,7 +97,7 @@ async function submit() {
       </template>
       <label for="cm">留言（選填）</label>
       <input id="cm" v-model="note" maxlength="200" :readonly="busy">
-      <p class="g-mute">不需註冊。認領後可隨時修改或取消。我們如何使用你的資料：<NuxtLink to="/privacy#collect" target="_blank">個資蒐集告知</NuxtLink>（不需勾選）</p>
+      <p class="g-mute">不需註冊。認領後可隨時修改或取消。我們如何使用你的資料：<NuxtLink to="/privacy#collect" target="_blank">個資蒐集告知</NuxtLink><span class="g-nowrap">（不需勾選）</span></p>
       <button class="g-btn" :disabled="busy || !online">{{ !online ? '離線中，暫時無法認領' : busy ? '送出中…' : editing ? '儲存修改' : '確認認領' }}</button>
       <button type="button" class="g-link" @click="emit('close')">取消</button>
     </form>
