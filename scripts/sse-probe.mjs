@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Spike S3 量測：對目標鏈路（Cloudflare → Cloud Run）持續連 SSE，記錄首位元組、心跳間隔、斷線與重連、事件延遲。
+// Spike S3 量測：對目標鏈路（Cloudflare → Tunnel → VPS）持續連 SSE，記錄首位元組、心跳間隔、斷線與重連、事件延遲。
 // 事件延遲 = 「認領 POST 回應完成」到「SSE 收到對應 item.updated」。只在測試清單上用 TRIGGER，會建立真實認領。
 //
 //   API_BASE=https://api.wishsync.tw SLUG=AbCdEf1234 DURATION_MIN=120 \

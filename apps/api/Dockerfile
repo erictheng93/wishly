@@ -12,7 +12,7 @@ COPY db/migrations /app/db/migrations
 COPY apps/api/src ./src
 RUN cargo build --release --locked --bin wishsync-api
 
-# distroless/cc：glibc 與 CA 憑證，無 shell、非 root。探針由 Cloud Run 設定（/healthz、/readyz），不用 HEALTHCHECK。
+# distroless/cc：glibc 與 CA 憑證，無 shell、非 root。探針由 Dokploy／外部監控打 /healthz、/readyz，不用 HEALTHCHECK（映像無 curl）。
 FROM gcr.io/distroless/cc-debian12:nonroot
 COPY --from=build /app/apps/api/target/release/wishsync-api /wishsync-api
 ENV RUST_LOG=info
