@@ -1,5 +1,20 @@
 # 待辦
 
+## P0 上線阻擋
+
+- [ ] Spike S1–S3 真機／真實鏈路驗收（無結案證據，補測優先於新功能）— 流程見 [spike-protocol](docs/qa/spike-protocol.md)，現況見 [spike-status](docs/qa/spike-status.md)，結果填 [spike-decisions](docs/qa/spike-decisions.md)
+  - 先由產品負責人確認 S1–S3 門檻（測前定案，不可測後挑）。
+  - S1 OG 預覽：6 組平台 × 連結；S2 LINE 內建瀏覽器身分存活：≥4 台裝置；S3 SSE：以 `scripts/sse-probe.mjs` 在 Cloudflare → Cloud Run 跑 120 分鐘。
+  - 前置：S2／S3 需要真實後端與具名網域，見下一項。
+
+- [ ] 正式環境尚未部署（2026-10-15 嘗試部署 Cloudflare Pages 時發現，故未執行）
+  - 後端（Cloud Run 或具名通道）尚無部署證據，`https://api.wishsync.tw` 不確定可連；同時確認 Cloud Run request timeout（預設 300s）不會截斷 SSE。
+  - 取得 Turnstile 網站金鑰（`NUXT_PUBLIC_TURNSTILE_SITE_KEY`，前端建置必填）與後端 `TURNSTILE_SECRET`。
+  - 定案正式網域（見 `docs/domain-names.md`）；Pages 專案 `wishsync-web` 已存在，正式部署會覆蓋其目前內容（疑似 demo）。
+  - 後端正式機密、`TRUSTED_PROXY`、S3／R2、`SHIPPING_ENC_KEY` 備份流程（遺失即無法解密收件資訊）。
+
+## 功能與後續
+
 - [x] 認捐（點數眾籌）逐筆可見度設定 — [#3](https://github.com/erictheng93/wishsync/issues/3)
   - 已完成：migration 0006 回填並保留原有欄位；建立時套帳號預設或指定 visibility，逐筆 PATCH；個人頁、錢包與資料匯出支援逐筆可見度；轉投保留設定，匿名認捐在個人頁僅本人可見。
 
