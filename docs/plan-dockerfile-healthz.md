@@ -1,5 +1,7 @@
 # 實作計畫：後端 Dockerfile 與 `/healthz`、`/readyz`
 
+> **狀態（2026-10-15）：§2、§3、§4 已實作並驗收；實作與驗證證據見 commit `e2593f5`、`bdc3daf`、`99513dc`。**
+
 對應 [deploy-backend-checklist §0.1、§0.2](deploy-backend-checklist.md)。實作由負責人進行，本文件同時是稽核的驗收標準。
 範圍刻意只含這兩項；背景工作排程（§0.3）、多實例冪等（§0.4）另案，但本計畫的 Dockerfile 與探針設定不得與其衝突。
 

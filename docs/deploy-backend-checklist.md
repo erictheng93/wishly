@@ -12,8 +12,8 @@
 
 | # | 缺口 | 影響 | 建議 |
 |---|---|---|---|
-| 0.1 | **沒有 Dockerfile／容器建置**（`find` 全 repo 無 Dockerfile） | Cloud Run 無法部署；CI 也沒有 build image 步驟 | 新增多階段 Dockerfile（`rust-toolchain.toml` 版本、`cargo build --release`、非 root、最終 image 只含 binary）；`BIND=0.0.0.0:8080` |
-| 0.2 | **沒有健康檢查端點**（`grep -i health apps/api/src` 無結果） | Cloud Run startup／liveness probe、外部監控無從探測 | 新增 `GET /healthz`（行程存活）與 `/readyz`（含 `SELECT 1`）；注意 `read_only` middleware 不應擋 GET |
+| 0.1 | ✅ 已解決（`apps/api/Dockerfile`、CI `image` job）。原缺口：**沒有 Dockerfile／容器建置** | Cloud Run 無法部署；CI 也沒有 build image 步驟 | 新增多階段 Dockerfile（`rust-toolchain.toml` 版本、`cargo build --release`、非 root、最終 image 只含 binary）；`BIND=0.0.0.0:8080` |
+| 0.2 | ✅ 已解決（`/healthz`、`/readyz`，`apps/api/src/health.rs`）。原缺口：**沒有健康檢查端點** | Cloud Run startup／liveness probe、外部監控無從探測 | 新增 `GET /healthz`（行程存活）與 `/readyz`（含 `SELECT 1`）；注意 `read_only` middleware 不應擋 GET |
 | 0.3 | **背景工作跑在行程內**（`main.rs` 的 `notify::spawn_worker`、`ratelimit::spawn_cleanup`），且 `docs/04` 規劃的 `POST /internal/jobs/tick`（Cloud Scheduler）**未實作** | Cloud Run 預設「請求期間才配置 CPU」：沒有請求時 worker 會被凍結 → 逾期認領不釋放、清單不自動結束、寄信佇列不送 | 二選一並寫進決策：(a) 服務設 `min-instances=1` ＋「CPU always allocated」；(b) 實作 `/internal/jobs/tick`＋Cloud Scheduler OIDC，行程內任務改由它觸發 |
 | 0.4 | 多實例同時跑 `spawn_cleanup`／`spawn_worker`：是否可重複執行未在文件中證明 | 擴縮到 >1 實例時可能重複寄信或重複處理 | 部署前確認 `expire_due`、`close_due`、`remind_closing`、`tick_funding`、寄信領取皆冪等或有 `SKIP LOCKED`／advisory lock；否則先固定 `max-instances=1` 並記錄 |
 | 0.5 | `docs/domain-names.md` 品牌網域尚未定案；程式與 README 預設 `wishsync.tw`、`api.wishsync.tw` | 網域未定就無法簽 OAuth redirect、Email 驗證網域、Turnstile hostname | 先定網域再做 §3、§5 |
@@ -45,7 +45,11 @@
 - [ ] 驗證：實際上傳一張圖，經 `S3_PUBLIC_BASE` 在瀏覽器開得到；頭像轉存（issue #6）能寫入。
 
 ### 2.3 Cloud Run
-- [ ] 區域 asia-east1；image 來自 Artifact Registry（§0.1）。
+- [ ] 區域 asia-east1；image 來自 Artifact Registry（§0.1；推送屬 CD，尚未建立）。
+- [ ] 探針：startup 與 liveness 皆 `GET /healthz`（port 8080）。啟動時會先跑 migration 才 listen，`failureThreshold × period` 需大於最長 migration 時間。外部監控打 `/readyz`。
+- [ ] **Cloudflare WAF 對外封鎖或限流 `/readyz`**（它查 DB，公開暴露可被當放大器）；Cloud Run 探針直連容器不受影響。
+- [ ] 終止寬限期：程式在收到 SIGTERM 後最多等 8 秒（`SHUTDOWN_GRACE`），Cloud Run 預設 10 秒；若調高 `terminationGracePeriodSeconds`，需同步調整常數。
+- [ ] 設 `RUST_LOG=info`（image 已預設；未設時只輸出 ERROR）。
 - [ ] `BIND=0.0.0.0:8080`；容器 port 一致。
 - [ ] **Request timeout 調高**：預設 300s，而 SSE 每條連線上限 30 分鐘（`dashboard.rs`）。設為 ≥ 1800s（上限 3600s），否則 S3 會在 5 分鐘被切斷。
 - [ ] 併發（concurrency）：SSE 長連線佔用併發名額，依預期同時在線人數設定，並與 `max-instances` 一起估算。

@@ -13,8 +13,7 @@
   - 定案正式網域（見 `docs/domain-names.md`）；Pages 專案 `wishsync-web` 已存在，正式部署會覆蓋其目前內容（疑似 demo）。
   - 後端正式機密、`TRUSTED_PROXY`、S3／R2、`SHIPPING_ENC_KEY` 備份流程（遺失即無法解密收件資訊）。
 - [ ] 後端可部署性缺口（詳見 [deploy-backend-checklist §0](docs/deploy-backend-checklist.md)）
-  - 新增 Dockerfile（多階段、非 root、`BIND=0.0.0.0:8080`），CI 補 build image。
-  - 新增 `GET /healthz`、`/readyz`（含 `SELECT 1`），不受 `read_only` 影響。
+  - [x] Dockerfile、CI build job、`/healthz`、`/readyz`、SIGTERM 優雅關閉（計畫見 [plan-dockerfile-healthz](docs/plan-dockerfile-healthz.md)）。仍待：推送 Artifact Registry 的 CD、Cloud Run 實測冷啟動與探針門檻。
   - 背景工作排程決策：目前在程序內（`notify::spawn_worker`、`ratelimit::spawn_cleanup`），Cloud Run 無請求時 CPU 被凍結會停擺（認領卡在保留中、清單不結案、信不寄）。二選一：`min-instances=1` ＋ CPU 常駐，或實作 `docs/04` 的 `/internal/jobs/tick` ＋ Cloud Scheduler OIDC。
   - 確認各工作在多實例下冪等（`expire_due`、`close_due`、`remind_closing`、`tick_funding`、寄信領取）；未確認前固定 `max-instances=1`。
   - Cloud Run request timeout 調到 ≥1800s（SSE 單連線上限 30 分鐘）。
