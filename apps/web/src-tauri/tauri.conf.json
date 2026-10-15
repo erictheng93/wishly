@@ -21,7 +21,10 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://api.wishsync.tw ipc: http://ipc.localhost; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' https://api.wishsync.tw ipc: http://ipc.localhost; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'",
+      "capabilities": [
+        "default"
+      ]
     }
   },
   "bundle": {
@@ -34,5 +37,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "wishsync"
+        ]
+      },
+      "mobile": [
+        {
+          "scheme": [
+            "wishsync"
+          ]
+        }
+      ]
+    }
   }
 }

@@ -43,7 +43,18 @@ fn session_token_clear() -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // 桌面端：第二次 deep link 會啟動第二個行程，須先註冊（且要在 deep-link 之前）才會轉送給既有視窗。
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        use tauri::Manager;
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+        }
+    }));
+    builder
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
@@ -51,6 +62,15 @@ pub fn run() {
             session_token_set,
             session_token_clear
         ])
+        .setup(|_app| {
+            // Windows / Linux 開發時沒有安裝包，執行期註冊 scheme（macOS 只認打包後的 .app）
+            #[cfg(all(debug_assertions, any(windows, target_os = "linux")))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                _app.deep_link().register_all()?;
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running WishSync");
 }

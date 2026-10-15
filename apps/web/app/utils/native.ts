@@ -56,3 +56,43 @@ export async function copyText(text: string) {
 
 /** 分享連結的網站網域：網頁版就是目前網域，原生殼用設定值 */
 export const siteOrigin = () => (__NATIVE__ ? useRuntimeConfig().public.siteUrl : location.origin)
+
+const CALLBACK = 'wishsync://auth'
+const b64url = (b: ArrayBuffer | Uint8Array) =>
+  btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+let cancelPending: (() => void) | null = null
+
+/**
+ * 原生殼 OAuth（系統瀏覽器 + deep link + PKCE）：先監聽 wishsync://auth，再開瀏覽器，等到 ?code=（或 ?error=）。
+ * 回傳一次性碼與 verifier，由呼叫端 POST /auth/native/exchange 兌換。
+ * 同時只保留一次進行中的嘗試（舊的以 'cancelled' 拒絕），否則過期嘗試會拿新的 deep link 去兌換並燒掉碼。
+ * ponytail: verifier 只放記憶體；若 OS 在使用者登入期間回收 App，需重新登入。
+ */
+export async function nativeOAuth(startUrl: (challenge: string) => string): Promise<{ code: string; verifier: string }> {
+  cancelPending?.()
+  const [{ onOpenUrl }, { openUrl }] = await Promise.all([import('@tauri-apps/plugin-deep-link'), import('@tauri-apps/plugin-opener')])
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)))
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
+  let settle!: (r: { code?: string; error?: string }) => void
+  const result = new Promise<{ code?: string; error?: string }>((r) => { settle = r })
+  const timer = setTimeout(() => settle({ error: 'timeout' }), 5 * 60_000)
+  const off = await onOpenUrl((urls) => {
+    for (const u of urls) {
+      if (!u.startsWith(CALLBACK)) continue
+      const p = new URL(u).searchParams
+      settle({ code: p.get('code') || undefined, error: p.get('error') || 'oauth_failed' })
+    }
+  })
+  const cancel = () => settle({ error: 'cancelled' })
+  cancelPending = cancel
+  try {
+    await openUrl(startUrl(challenge))
+    const r = await result
+    if (!r.code) throw new Error(r.error)
+    return { code: r.code, verifier }
+  } finally {
+    clearTimeout(timer)
+    off()
+    if (cancelPending === cancel) cancelPending = null
+  }
+}

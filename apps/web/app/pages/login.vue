@@ -8,12 +8,13 @@ const email = ref(''), password = ref('')
 const busy = ref(false)
 const err = ref('')
 const authError = useState<string>('auth-error', () => '')
-const loginError = computed(() => ({
+const OAUTH_ERRORS: Record<string, string> = {
   oauth_failed: '第三方登入失敗，請重試',
   oauth_unavailable: '此登入方式尚未開放',
   account_blocked: '帳號已停權，請聯絡客服',
   identity_in_use: '此登入方式或 Email 已屬於另一個帳號，請使用原帳號登入',
-}[String(route.query.error || authError.value)] || ''))
+}
+const loginError = computed(() => OAUTH_ERRORS[String(route.query.error || authError.value)] || '')
 const okMsg = route.query.reset ? '密碼已重設，請用新密碼登入' : ''
 const q = redirect === '/dashboard' ? {} : { redirect }
 onMounted(async () => {
@@ -34,6 +35,16 @@ async function submit() {
     err.value = e.code === 'INVALID_CREDENTIALS' ? '帳號或密碼錯誤' : e.status === 429 ? '嘗試次數過多，請稍後再試' : errMsg(e)
   } finally { busy.value = false }
 }
+
+// 網頁版整頁導向供應商；原生殼等 deep link 回來後直接就緒
+async function social(provider: 'google' | 'line') {
+  err.value = ''; busy.value = true
+  try {
+    if (await oauth(provider, redirect)) await navigateTo(redirect)
+  } catch (e: any) {
+    if (e.message !== 'cancelled') err.value = OAUTH_ERRORS[e.message] || (e.code === 'NATIVE_CODE_INVALID' ? errMsg(e) : '第三方登入失敗，請重試')
+  } finally { busy.value = false }
+}
 </script>
 <template>
   <main class="c-page">
@@ -49,9 +60,9 @@ async function submit() {
       <NuxtLink :to="{ path: '/register', query: q }">建立帳號</NuxtLink>
       <NuxtLink to="/forgot-password">忘記密碼</NuxtLink>
     </div>
-    <p v-if="!isNative()" class="c-center c-mute">或</p>
-    <button v-if="!isNative()" type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">使用 Google 繼續</button>
-    <button v-if="!isNative()" type="button" class="c-btn block c-mb" @click="oauth('line', redirect)">使用 LINE 繼續</button>
+    <p class="c-center c-mute">或</p>
+    <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">使用 Google 繼續</button>
+    <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')">使用 LINE 繼續</button>
     <p class="c-mute">送禮的朋友不需要登入，直接用分享連結即可。</p>
   </main>
 </template>

@@ -26,7 +26,12 @@ export function useAuth() {
   const verifyRegister = (email: string, code: string) => session('/auth/register/verify', { email, code })
   const requestReset = (email: string) => post('/auth/password/reset/request', { email })
   const confirmReset = (email: string, code: string, new_password: string) => post('/auth/password/reset/confirm', { email, code, new_password })
-  function oauth(provider: 'google' | 'line', redirect = '/dashboard', link = false) {
+  async function oauth(provider: 'google' | 'line', redirect = '/dashboard', link = false) {
+    // 原生殼：系統瀏覽器登入後以 deep link 回 App，再憑 verifier 兌換權杖（不支援 link）
+    if (isNative() && !link) {
+      const { code, verifier } = await nativeOAuth(c => `${base}/auth/oauth/${provider}/start?native=true&app_challenge=${c}`)
+      return session('/auth/native/exchange', { code, verifier })
+    }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
   return { oauth, user, fetchMe, logout, login, register, verifyRegister, requestReset, confirmReset }
