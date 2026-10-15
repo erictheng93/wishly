@@ -1,8 +1,14 @@
+mod file_store;
+
+#[cfg(not(target_os = "android"))]
 use keyring::Entry;
 
+#[cfg(not(target_os = "android"))]
 const SERVICE: &str = "tw.wishsync.app";
+#[cfg(not(target_os = "android"))]
 const USER: &str = "session";
 
+#[cfg(not(target_os = "android"))]
 fn entry() -> Result<Entry, String> {
     Entry::new(SERVICE, USER).map_err(|e| e.to_string())
 }
@@ -18,27 +24,63 @@ fn validate_token(t: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 權杖後端：桌面 / iOS 走 OS keychain；Android 沒有 keyring 後端，改存 App 私有目錄（見 file_store）。
+#[cfg(not(target_os = "android"))]
+mod backend {
+    pub fn get() -> Result<Option<String>, String> {
+        match super::entry()?.get_password() {
+            Ok(t) => Ok(Some(t)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+    pub fn set(t: &str) -> Result<(), String> {
+        super::entry()?.set_password(t).map_err(|e| e.to_string())
+    }
+    pub fn clear() -> Result<(), String> {
+        match super::entry()?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+mod backend {
+    use std::{path::PathBuf, sync::OnceLock};
+    static DIR: OnceLock<PathBuf> = OnceLock::new();
+    pub fn init(dir: PathBuf) {
+        let _ = DIR.set(dir);
+    }
+    fn dir() -> Result<&'static PathBuf, String> {
+        DIR.get()
+            .ok_or_else(|| "session store not initialised".to_string())
+    }
+    pub fn get() -> Result<Option<String>, String> {
+        crate::file_store::get(dir()?)
+    }
+    pub fn set(t: &str) -> Result<(), String> {
+        crate::file_store::set(dir()?, t)
+    }
+    pub fn clear() -> Result<(), String> {
+        crate::file_store::clear(dir()?)
+    }
+}
+
 #[tauri::command]
 fn session_token_get() -> Result<Option<String>, String> {
-    match entry()?.get_password() {
-        Ok(t) => Ok(Some(t)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(e.to_string()),
-    }
+    backend::get()
 }
 
 #[tauri::command]
 fn session_token_set(token: String) -> Result<(), String> {
     validate_token(&token)?;
-    entry()?.set_password(&token).map_err(|e| e.to_string())
+    backend::set(&token)
 }
 
 #[tauri::command]
 fn session_token_clear() -> Result<(), String> {
-    match entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    backend::clear()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,12 +104,18 @@ pub fn run() {
             session_token_set,
             session_token_clear
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            let _ = &app; // 僅 Android / Windows·Linux dev 會用到
+            #[cfg(target_os = "android")]
+            {
+                use tauri::Manager;
+                backend::init(app.path().app_local_data_dir()?);
+            }
             // Windows / Linux 開發時沒有安裝包，執行期註冊 scheme（macOS 只認打包後的 .app）
             #[cfg(all(debug_assertions, any(windows, target_os = "linux")))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                _app.deep_link().register_all()?;
+                app.deep_link().register_all()?;
             }
             Ok(())
         })
@@ -91,7 +139,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "android")))]
 mod command_tests {
     use super::*;
     use keyring::credential::{Credential, CredentialApi, CredentialBuilderApi};
