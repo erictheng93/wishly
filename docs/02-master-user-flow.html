@@ -127,11 +127,11 @@ flowchart LR
     PAGES["Pages Functions SSR - Nuxt<br/>OG meta 給 LINE/FB 爬蟲"]
     R2[("R2 物件儲存<br/>圖片")]
   end
-  subgraph GCP["GCP asia-east1 彰化"]
+  subgraph VPS["Linode / Akamai VPS 東京 - Dokploy"]
     direction TB
-    API["Rust API - axum + tokio + sqlx<br/>Cloud Run"]
-    PGB["PgBouncer<br/>transaction pooling"]
-    DB[("PostgreSQL + PostGIS<br/>Cloud SQL")]
+    API["Rust API - axum + tokio + sqlx<br/>Dokploy 容器"]
+    TUN["cloudflared<br/>Cloudflare Tunnel"]
+    DB[("PostgreSQL + PostGIS<br/>同機自管")]
   end
   MAIL["Email 供應商 Resend / SES<br/>OTP / 通知 MVP"]
   PH["PostHog<br/>行為分析 無 PII"]
@@ -147,12 +147,12 @@ flowchart LR
   GOOG["Google OAuth"]
   U -->|"HTTPS"| WAF --> CDN
   CDN -->|"app.wishsync.tw"| PAGES
-  CDN -->|"api.wishsync.tw 未命中"| API
+  CDN -->|"api.wishsync.tw 未命中"| TUN --> API
   PAGES -->|"SSR 取資料"| API
   U -->|"presigned PUT 直傳"| R2
   U -->|"公開圖片"| CDN
   CDN -.-> R2
-  API -->|"sqlx"| PGB --> DB
+  API -->|"sqlx"| DB
   API -->|"LISTEN/NOTIFY 直連"| DB
   API -->|"presign / HEAD"| R2
   API -->|"寄信"| MAIL
@@ -174,10 +174,10 @@ flowchart LR
 </pre>
 <ul>
 <li>單一 Rust 服務 + 單一 Postgres；MVP 不引入 Redis、不拆微服務。背景工作、job queue、SSE 扇出皆用 Postgres。</li>
-<li>Cloud Run 預設可從 <code>*.run.app</code> 直接存取而繞過 Cloudflare；必須限制 ingress 或要求 Cloudflare 以 Transform Rule 注入的 <code>X-Origin-Auth</code> 密鑰標頭，否則 WAF 與限流形同虛設。</li>
-<li>真實 client IP 只信任由 Cloudflare 帶入的 <code>CF-Connecting-IP</code>（且已通過 <code>X-Origin-Auth</code> 檢查）。</li>
+<li>後端經 Cloudflare Tunnel（cloudflared 出站連線）對外，VPS 不開放入站 80/443，來源不可被直接存取，WAF 與限流不會被繞過；<code>TRUSTED_PROXY=cloudflare</code> 的前提（無法偽造 <code>CF-Connecting-IP</code>）由此成立。VPS 防火牆須封鎖其他入站（SSH 限來源或改用 Tunnel / Tailscale）。</li>
+<li>真實 client IP 只信任由 Cloudflare 帶入的 <code>CF-Connecting-IP</code>（僅在 API 只能經 Tunnel 到達時可信）。</li>
 <li>金流 webhook（<code>POST /webhooks/payments/{provider}</code>）經 Cloudflare 進入；WAF 對此路徑放行金流商來源並排除一般 IP 限流，改由應用層驗簽保護。營運後台為 Pages 上的 <code>/admin/orders</code>，API 端以 <code>users.is_staff</code> 授權。</li>
-<li>LISTEN/NOTIFY 需要 session 級連線，必須<strong>直連</strong> Postgres，不可經 PgBouncer transaction pooling。</li>
+<li>LISTEN/NOTIFY 需要 session 級連線，必須<strong>直連</strong> Postgres；單機單實例不使用 PgBouncer，日後若引入，LISTEN 連線仍須直連。</li>
 </ul>
 
 <h2 id="s3">3. 角色與權限矩陣</h2>
@@ -484,7 +484,7 @@ sequenceDiagram
 </tbody></table>
 failed / cancelled 的訂單已觸發退點，品項回 open 或 expired，故不另有對外狀態。display_status 不含訂單金額、單號與收件資訊。</td></tr>
 <tr><td>驚喜模式</td><td>公開頁仍顯示 x/y，讓其他送禮者避免重複；驚喜模式遮罩的是<strong>建立者端</strong>（F7 dashboard 與通知），非公開頁。公開頁顯示「這是驚喜清單」提示；公開 DTO 回傳 <code>id</code>、<code>owner.id</code>、<code>surprise_mode</code>；前端以 <code>GET /me</code> 的 user id 比對 <code>owner.id</code>，若是建立者本人且 <code>surprise_mode=true</code> 則顯示「驚喜模式中」遮罩並隱藏認領數（回應仍可被 CDN 共用，因為不依使用者變化）。此為軟性防護，見待決問題。</td></tr>
-<tr><td>SSE</td><td><code>text/event-stream</code>、<code>Cache-Control: no-cache</code>、<code>X-Accel-Buffering: no</code>；事件 <code>item.updated</code>（payload：item_id、qty_claimed、qty_needed，（P2）pledged_points、target_points、funding_status、display_status，無個資）與 <code>wishlist.updated</code>（status、title 變更）；每 20 秒送註解心跳防 idle timeout；不支援 replay，斷線重連（EventSource 自動）後前端重抓一次快照。每 IP 同時最多 5 條連線。多 instance 扇出：各 instance 維持一條直連 Postgres 的 <code>LISTEN ws_events</code>，交易內以 <code>pg_notify</code>（COMMIT 才送達）發佈，instance 轉送給本機訂閱者。Cloud Run request timeout 設 3600 秒，client 自動重連。</td></tr>
+<tr><td>SSE</td><td><code>text/event-stream</code>、<code>Cache-Control: no-cache</code>、<code>X-Accel-Buffering: no</code>；事件 <code>item.updated</code>（payload：item_id、qty_claimed、qty_needed，（P2）pledged_points、target_points、funding_status、display_status，無個資）與 <code>wishlist.updated</code>（status、title 變更）；每 20 秒送註解心跳防 idle timeout；不支援 replay，斷線重連（EventSource 自動）後前端重抓一次快照。每 IP 同時最多 5 條連線。多 instance 扇出：各 instance 維持一條直連 Postgres 的 <code>LISTEN ws_events</code>，交易內以 <code>pg_notify</code>（COMMIT 才送達）發佈，instance 轉送給本機訂閱者。經 Cloudflare Tunnel 與 Traefik（Dokploy）轉送：須確認代理未緩衝、讀寫與 idle 逾時不會切斷長連線（Spike S3 實測）；伺服器每條連線最長 30 分鐘後主動結束，client 自動重連。</td></tr>
 <tr><td>OG 預覽</td><td>LINE / FB 爬蟲不執行 JS，故 <code>/s/{slug}</code> 必須在 Pages SSR 輸出 meta：<code>og:title</code>、<code>og:description</code>（含完成度文字）、<code>og:image</code>（封面圖，經 CDN，建議 1200x630）、<code>og:url</code>。爬蟲 UA 命中同一份快取，不另走特殊路徑。</td></tr>
 <tr><td>API</td><td><code>GET /public/wishlists/{slug}</code>、<code>GET /public/wishlists/{slug}/events</code>、<code>GET /guest/me</code></td></tr>
 <tr><td>交易邊界</td><td>純讀取，不開顯式交易；以單一查詢（或同一 snapshot 的 REPEATABLE READ READ ONLY 交易）取清單與品項，避免讀到不一致的 qty_claimed。SSE 連線不持有 DB 連線（僅共用 LISTEN 連線）。</td></tr>
@@ -1030,15 +1030,15 @@ sequenceDiagram
 </tbody></table>
 
 <h3 id="f9">F9 背景工作 <span class="badge p0">P0</span></h3>
-<p>原則：不引入 Redis 或外部 queue；以 Postgres 為唯一狀態來源，工作用 <code>SELECT … FOR UPDATE SKIP LOCKED</code> 搶列，多 instance 可同時跑且不重複處理。</p>
+<p>原則：不引入 Redis 或外部 queue；以 Postgres 為唯一狀態來源，工作用 <code>SELECT … FOR UPDATE SKIP LOCKED</code> 搶列，多 instance 可同時跑且不重複處理（目前部署為單實例，此為擴充時的保護）。</p>
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant CS as Cloud Scheduler 每分鐘
+  participant CS as 行程內 timer（tokio interval）
   participant A as Rust API (instance N)
   participant D as PostgreSQL
   participant M as Email / LINE
-  CS->>A: POST /internal/jobs/tick (OIDC 身分驗證)
+  CS->>A: interval 到期，觸發到期工作
   A->>D: pg_try_advisory_lock 取得各 job 的排程鎖 (搶不到就略過)
   Note over A,D: job 1 逾期 reserved 轉 expired
   A->>D: SELECT DISTINCT item_id 有逾期 claim 的品項 LIMIT 50
@@ -1082,10 +1082,10 @@ sequenceDiagram
 <tr><td><code>cleanup_orphan_uploads</code></td><td>每週</td><td>列舉 R2 <code>u/</code> 前綴中超過 24 小時且未被任何 wishlists / wishlist_items 引用的物件並刪除。</td><td>advisory lock</td></tr>
 </tbody></table>
 <table class="meta"><tbody>
-<tr><td>觸發方式</td><td>Cloud Run 會縮到 0 且請求外 CPU 受限，故 in-process 常駐 timer 不可靠。採 <strong>Cloud Scheduler 每分鐘呼叫內部端點 <code>POST /internal/jobs/tick</code></strong>（以 OIDC token 驗證，僅允許排程服務帳號，不在公開 API 清單內，亦不經 Cloudflare 公開路由）。tick 依「各 job 的 next_run」決定要跑哪些，各 job 先 <code>pg_try_advisory_lock</code>。替代方案：min-instances=1 並關閉 CPU throttling，以 tokio interval 內建執行。</td></tr>
+<tr><td>觸發方式</td><td><strong>已決（D49）：後端行程內以 tokio interval 常駐執行</strong>（<code>notify::spawn_worker</code>、<code>ratelimit::spawn_cleanup</code>）；VPS 上行程長駐，不受 serverless 縮減 CPU 影響。原規劃的 Cloud Scheduler + <code>POST /internal/jobs/tick</code> 不採用（契約保留於 docs/04，供日後多實例或外部排程使用）。各 job 仍須冪等；擴充為多實例前須先確認各工作可重複執行（SKIP LOCKED／advisory lock）。</td></tr>
 <tr><td>為何不用 Redis</td><td>吞吐量低（每分鐘數十到數百列），Postgres 的 <code>SKIP LOCKED</code> 足夠；且 outbox 與業務資料同交易，天然免除雙寫不一致。上限：outbox 達每秒數百筆持續寫入時再評估專用 queue。</td></tr>
 <tr><td>交易邊界</td><td>見時序圖：每個 item 一個短交易（批次 ≤ 50 items）；outbox 取列與標記 sending 為一個短交易，外部 I/O 在交易外，結果再開短交易回寫。</td></tr>
-<tr><td>例外 / 錯誤碼</td><td>內部端點：<code>UNAUTHORIZED</code> 401（OIDC 驗證失敗）。job 內錯誤只記錄與告警，不回給使用者；單一 item 失敗不影響批次內其他項目。</td></tr>
+<tr><td>例外 / 錯誤碼</td><td>內部端點（若啟用）：<code>UNAUTHORIZED</code> 401（OIDC 驗證失敗）。job 內錯誤只記錄與告警，不回給使用者；單一 item 失敗不影響批次內其他項目。</td></tr>
 <tr><td>冪等性</td><td>所有 job 以「條件式更新」設計，可安全重跑：expire 的 WHERE 含 <code>status='reserved' AND expires_at &lt;= now()</code>；清理為刪除過期列；outbox 以 dedupe_key 與租約防重。</td></tr>
 </tbody></table>
 
@@ -1723,7 +1723,7 @@ flowchart TD
 <pre class="mermaid">
 flowchart LR
   R["Request"] --> L1["request_id + tracing span"]
-  L1 --> L2["Origin 驗證<br/>X-Origin-Auth + 真實 IP"]
+  L1 --> L2["Origin 保護<br/>Cloudflare Tunnel + 真實 IP"]
   L2 --> L3["CORS + CSRF Origin 檢查"]
   L3 --> L4["唯讀模式閘門"]
   L4 --> L5["限流 應用層"]
@@ -1780,7 +1780,7 @@ flowchart LR
 <thead><tr><th>層</th><th>做法</th></tr></thead>
 <tbody>
 <tr><td>公開讀取走 CDN</td><td>公開 GET（清單、地圖、彙總）皆為 <code>public, s-maxage</code> 短 TTL（一般 10 秒，relief 尖峰 30~60 秒）+ <code>stale-while-revalidate</code> + <code>stale-if-error=600</code>；回應無 cookie、無個人化。尖峰時讀取請求絕大多數不到 origin，origin QPS ≈ 熱門 URL 數 / TTL。</td></tr>
-<tr><td>連線池上限</td><td>sqlx 每 instance <code>max_connections=10</code>、<code>acquire_timeout=3s</code>；Cloud Run <code>max-instances</code> 設上限（例如 20）→ 最多 200 條連到 PgBouncer；PgBouncer transaction pooling，<code>default_pool_size</code> ≈ 40 連到 Postgres（低於 <code>max_connections</code> 並預留管理用）。<strong>PgBouncer transaction mode 下需關閉 sqlx 的 prepared statement 快取</strong>（<code>statement_cache_capacity(0)</code>，或使用支援 <code>max_prepared_statements</code> 的 PgBouncer ≥ 1.21）。LISTEN 連線直連 Postgres（每 instance 1 條，不計入 pool）。取不到連線 → <code>SERVICE_UNAVAILABLE</code> 503 + <code>Retry-After</code>，不排隊堆積。</td></tr>
+<tr><td>連線池上限</td><td>sqlx 每 instance <code>max_connections=10</code>、<code>acquire_timeout=3s</code>；D49 為單機單實例直連同機 Postgres，不需 PgBouncer（Postgres <code>max_connections</code> 需大於 pool 並預留管理用）。若日後水平擴充並引入 PgBouncer transaction mode，需關閉 sqlx 的 prepared statement 快取（<code>statement_cache_capacity(0)</code>，或 PgBouncer ≥ 1.21 的 <code>max_prepared_statements</code>），LISTEN 連線直連。取不到連線 → <code>SERVICE_UNAVAILABLE</code> 503 + <code>Retry-After</code>，不排隊堆積。</td></tr>
 <tr><td>逾時</td><td><code>statement_timeout=5s</code>、<code>lock_timeout=2s</code>、<code>idle_in_transaction_session_timeout=10s</code>；API 全域請求逾時 10 秒（SSE 例外）。</td></tr>
 <tr><td>熱點列</td><td>熱門品項的 item 列是序列化點；交易保持短（無外部 I/O）、只更新必要欄位。單列約可承受每秒數百次更新；若仍不足，才考慮分片計數器（將 qty_claimed 拆多列再加總），目前不做。</td></tr>
 <tr><td>降級階梯</td><td>
@@ -1855,15 +1855,15 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <thead><tr><th>項目</th><th>內容</th></tr></thead>
 <tbody>
 <tr><td>環境</td><td><b>local</b>：docker compose（postgis 16 + MinIO 模擬 R2 + Mailpit 收信）。<b>staging</b>、<b>production</b>：各自獨立的 DB、R2 bucket、金流沙箱（staging 用沙箱、production 用正式金鑰）。</td></tr>
-<tr><td>CI/CD</td><td>GitHub Actions。後端：build image → 推 Artifact Registry → 先跑 <strong>Cloud Run Job 執行 sqlx migrate</strong> → 再部署 Cloud Run 新 revision。前端：Cloudflare Pages（Nitro preset <code>cloudflare_pages</code>，建置產出 <code>dist/</code>；<code>wrangler pages deploy dist</code> 或 Pages Git 整合；<code>wrangler.toml</code> 設 <code>pages_build_output_dir</code> 與 <code>nodejs_compat</code>；本機以 <code>wrangler pages dev dist</code> 預覽）每個 PR 產生 preview URL。</td></tr>
-<tr><td>遷移原則（expand → migrate → contract）</td><td>只允許<strong>向前相容</strong>的遷移，因為 migration 先於新程式碼上線，且 Cloud Run 滾動部署期間新舊 revision 並存：<br>
+<tr><td>CI/CD</td><td>GitHub Actions。後端：build image（CI 驗證可建置）→ 由 <strong>Dokploy</strong> 部署（Git 或映像來源）；<code>sqlx::migrate!</code> 於後端啟動時自動執行，失敗即行程結束、部署視為失敗。前端：Cloudflare Pages（Nitro preset <code>cloudflare_pages</code>，建置產出 <code>dist/</code>；<code>wrangler pages deploy dist</code> 或 Pages Git 整合；<code>wrangler.toml</code> 設 <code>pages_build_output_dir</code> 與 <code>nodejs_compat</code>；本機以 <code>wrangler pages dev dist</code> 預覽）每個 PR 產生 preview URL。</td></tr>
+<tr><td>遷移原則（expand → migrate → contract）</td><td>只允許<strong>向前相容</strong>的遷移，因為 migration 先於新程式碼上線，且部署期間（滾動或回滾）新舊版本可能短暫並存，回滾時資料庫已套用新 migration：<br>
 1) <b>expand</b>：只新增（可為 NULL 的欄位 / 新表 / 新索引，索引用 <code>CREATE INDEX CONCURRENTLY</code>），舊程式碼不受影響；<br>
 2) <b>migrate</b>：新程式碼雙寫 / 讀新欄位，背景回填舊資料（分批，避免長交易鎖表）；<br>
 3) <b>contract</b>：確認舊 revision 已下線一個版本後，才在後續 PR 刪除舊欄位 / 加 NOT NULL / 加 CHECK（先 <code>NOT VALID</code> 再 <code>VALIDATE</code>）。<br>
-禁止：同一版本內改名 / 刪除欄位、改變欄位型別、長時間 <code>ACCESS EXCLUSIVE</code> 鎖。<code>lock_timeout</code> 設 3 秒，遷移失敗即中止部署。回滾 = 回到前一個 Cloud Run revision（schema 因向前相容而仍可用）。</td></tr>
-<tr><td>機密</td><td>後端：GCP Secret Manager；前端：Cloudflare secrets。金流金鑰與 AEAD / KMS 金鑰不得進 repo；CI 用 OIDC 取得雲端權限，不存長期金鑰。</td></tr>
-<tr><td>備份</td><td>Cloud SQL 自動每日備份 + PITR 7 天；<strong>RPO ≤ 5 分鐘、RTO ≤ 1 小時</strong>；每季還原演練（還原到暫存實例並跑對帳查詢驗證）；R2 物件開啟版本保留 30 天。</td></tr>
-<tr><td>監控</td><td>Sentry（前後端錯誤，release 與 request_id 關聯）、OpenTelemetry traces、Cloud Monitoring 告警：5xx 率、p95 延遲、DB 連線池使用率、佇列堆積（notifications / outbox / purchase_orders pending）、<strong>對帳差異 ≠ 0 立即告警</strong>、job 未執行、金流 webhook 驗簽失敗暴增。</td></tr>
+禁止：同一版本內改名 / 刪除欄位、改變欄位型別、長時間 <code>ACCESS EXCLUSIVE</code> 鎖。<code>lock_timeout</code> 設 3 秒，遷移失敗即中止部署。回滾 = 回到 Dokploy 上前一個部署版本（schema 因向前相容而仍可用）。</td></tr>
+<tr><td>機密</td><td>後端：Dokploy 環境變數（伺服器上以受限權限保存）；前端：Cloudflare secrets。金流金鑰與 AEAD 金鑰不得進 repo；<strong>AEAD 金鑰（<code>SHIPPING_ENC_KEY</code>）備份須與資料庫備份分開保管</strong>，否則備份外洩即同時外洩密文與金鑰。</td></tr>
+<tr><td>備份</td><td>自管 PostgreSQL（D49）：備份至 R2（異地、與 VPS 不同供應商）；<strong>目標 RPO ≤ 5 分鐘、RTO ≤ 1 小時</strong>。RPO ≤ 5 分鐘需要 WAL 歸檔（PITR）；若只用排程邏輯備份，RPO 等於備份間隔，須由產品負責人明確接受。每季還原演練（還原到暫存實例並跑對帳查詢驗證）；R2 物件開啟版本保留 30 天。Linode 的整機備份不等於資料庫一致性備份。</td></tr>
+<tr><td>監控</td><td>Sentry（前後端錯誤，release 與 request_id 關聯）、OpenTelemetry traces、外部監控與告警（探針 <code>/readyz</code>）：5xx 率、p95 延遲、DB 連線池使用率、佇列堆積（notifications / outbox / purchase_orders pending）、<strong>對帳差異 ≠ 0 立即告警</strong>、job 未執行、金流 webhook 驗簽失敗暴增。</td></tr>
 </tbody></table>
 
 <h3 id="s69">6.9 行為分析：伺服器事件 <span class="badge p0">P0</span></h3>
@@ -1955,7 +1955,7 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 
 <h2 id="s8">8. 待決問題</h2>
 <ol>
-<li><b>已決</b>：眾籌改為點數錢包 + 達標自動購買（v0.2），P2；MVP 只有數量認領。眾籌一律硬上限，履約為 catalog 自動下單與 concierge 人工代購並行，截止未達標由捐贈者選擇（預設退回）。內部端點 <code>POST /internal/jobs/tick</code> 採 Cloud Scheduler + OIDC；驚喜模式解鎖為 <code>event_date</code> 當日 00:00 Asia/Taipei，公開頁維持顯示 x/y 並以前端軟性遮蔽（已知限制：建立者可用無痕視窗看到）；同 guest 對同品項僅一筆有效認領；relief 認捐沿用 claims + receipts。</li>
+<li><b>已決</b>：眾籌改為點數錢包 + 達標自動購買（v0.2），P2；MVP 只有數量認領。眾籌一律硬上限，履約為 catalog 自動下單與 concierge 人工代購並行，截止未達標由捐贈者選擇（預設退回）。內部端點 <code>POST /internal/jobs/tick</code> 不採 Cloud Scheduler，改由後端行程內排程（D49）；驚喜模式解鎖為 <code>event_date</code> 當日 00:00 Asia/Taipei，公開頁維持顯示 x/y 並以前端軟性遮蔽（已知限制：建立者可用無痕視窗看到）；同 guest 對同品項僅一筆有效認領；relief 認捐沿用 claims + receipts。</li>
 <li><b>已決（D22 補充）</b>：撤回在 open，或 expired 且在 7 天選擇期內可用，其餘回 <code>CONTRIBUTION_LOCKED</code>；對 expired 品項認捐回 <code>FUNDING_EXPIRED</code>；<code>pledged_points</code> = pledged + captured 的點數加總；補充欄位（<code>contributions.refunded_points</code> / <code>wishlist_id</code>、<code>outbox_events</code>、<code>cash_refund_requests.destination_enc</code>、<code>wishlist_items.expired_at</code>、<code>purchase_orders.attempts / next_attempt_at / locked_until</code>、ledger UNIQUE）已納入 Schema；金額欄位 <code>*_amount</code>、點數欄位 <code>*_points</code>；<code>purchase_orders.amount</code> 初值為 target、staff 以 PATCH <code>amount</code> 回報實際花費；現金退款後台為 <code>/admin/cash-refunds</code>；公開 DTO 含 <code>id</code>、<code>owner.id</code>、<code>surprise_mode</code> 供前端判斷驚喜遮罩。</li>
 <li><b>法規阻斷項</b> <span class="badge p2">P2</span>：儲值預收款的禮券履約保證（銀行保證或信託）、不得記載使用期限、單一用途不可轉讓、發票開立時點（儲值或兌換），需律師與會計師審閱後才能上線。</li>
 <li><b>緩衝與服務費</b>：<code>target_points</code> 的價格波動緩衝比例與人工代購服務費 8% 的最終數值；目錄商品價格在眾籌期間變動時，現行處理為下單時超過 target 即失敗退點。</li>
@@ -1978,7 +1978,7 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <li><b>Turnstile / 人機驗證</b>：首次認領是否要求 Cloudflare Turnstile？會增加摩擦但可防洗單；目前僅以限流防護。</li>
 <li><b>清單生命週期細節</b>：closed → active 是否允許重新開啟（本文件允許）；<code>closes_at</code> 自動關閉（已支援，預設不設期限）；archived 資料保留 90 天後匿名化是否符合隱私政策與個資法要求；claim 在 closed 後 guest 是否仍可取消（本文件：不可）。</li>
 <li><b>冪等性範圍</b>：規格只強制 claims / contributions / receipts。本文件建議 <code>POST /wishlists</code>、<code>POST /wishlists/{id}/items</code>、<code>POST /orgs</code>、<code>POST /orgs/{id}/sites</code> 也接受 Idempotency-Key（非必填），請 API 文件決定。</li>
-<li><b>Postgres 託管選型</b>：Cloud SQL / Neon / Supabase 皆支援 PostGIS，但 LISTEN/NOTIFY 直連與 PgBouncer 的相容性因供應商而異（Supabase、Neon 的 pooler 與直連端點不同），選型後需實測 SSE 扇出。</li>
+<li><b>Postgres 部署（已決，D49）</b>：與後端同機自管，LISTEN/NOTIFY 直連無相容性問題；風險轉為備份、還原與單點故障，見備份列與 <code>docs/deploy-backend-checklist.md</code>。</li>
 </ol>
 
 </div></main>

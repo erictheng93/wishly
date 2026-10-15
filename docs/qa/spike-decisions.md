@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | S1 OG 預覽 | 未執行 | — | — | — | — |
 | S2 LINE 內建瀏覽器存活率 | 未執行 | — | — | — | — |
-| S3 SSE 經 Cloudflare → Cloud Run | 未執行 | — | — | — | — |
+| S3 SSE 經 Cloudflare → Tunnel → VPS | 未執行 | — | — | — | — |
 
 通過條件：結論為「通過」或「失敗＋備案已驗證」。只有這兩種才能解除 README 的 P0 阻擋。
 
@@ -18,7 +18,7 @@
 ```
 ### S? 名稱
 - 測試日期 / 測試者：
-- 受測部署 commit、網域、Cloud Run 請求逾時設定、Cloudflare 路由設定：
+- 受測部署 commit、網域、Traefik／Tunnel 逾時設定、Cloudflare 路由設定：
 - 環境與版本（裝置、OS、LINE 版本、網路）：
 - 樣本數與原始結果（連結到 evidence/）：
 - 各項指標實測值 vs 門檻（逐列）：

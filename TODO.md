@@ -4,19 +4,23 @@
 
 - [ ] Spike S1–S3 真機／真實鏈路驗收（無結案證據，補測優先於新功能）— 流程見 [spike-protocol](docs/qa/spike-protocol.md)，現況見 [spike-status](docs/qa/spike-status.md)，結果填 [spike-decisions](docs/qa/spike-decisions.md)
   - 先由產品負責人確認 S1–S3 門檻（測前定案，不可測後挑）。
-  - S1 OG 預覽：6 組平台 × 連結；S2 LINE 內建瀏覽器身分存活：≥4 台裝置；S3 SSE：以 `scripts/sse-probe.mjs` 在 Cloudflare → Cloud Run 跑 120 分鐘。
-  - 前置：S2／S3 需要真實後端與具名網域，見下一項。
+  - S1 OG 預覽：6 組平台 × 連結；S2 LINE 內建瀏覽器身分存活：≥4 台裝置；S3 SSE：以 `scripts/sse-probe.mjs` 在 Cloudflare → Tunnel → VPS 跑 120 分鐘。
+  - 前置：S2／S3 需要真實後端與具名網域，見下一項。S3 受測鏈路已改為 Cloudflare → Tunnel → VPS（D49），須在最終的 Dokploy／Traefik 組態上測。
 
 - [ ] 正式環境尚未部署（2026-10-15 嘗試部署 Cloudflare Pages 時發現，故未執行）
-  - 後端（Cloud Run 或具名通道）尚無部署證據，`https://api.wishsync.tw` 不確定可連；同時確認 Cloud Run request timeout（預設 300s）不會截斷 SSE。
+  - 後端（Linode VPS／Dokploy，D49）尚無部署證據，`https://api.wishsync.tw` 不確定可連；同時確認 Traefik／Tunnel 的逾時不會截斷 SSE。
   - 取得 Turnstile 網站金鑰（`NUXT_PUBLIC_TURNSTILE_SITE_KEY`，前端建置必填）與後端 `TURNSTILE_SECRET`。
   - 定案正式網域（見 `docs/domain-names.md`）；Pages 專案 `wishsync-web` 已存在，正式部署會覆蓋其目前內容（疑似 demo）。
-  - 後端正式機密、`TRUSTED_PROXY`、S3／R2、`SHIPPING_ENC_KEY` 備份流程（遺失即無法解密收件資訊）。
-- [ ] 後端可部署性缺口（詳見 [deploy-backend-checklist §0](docs/deploy-backend-checklist.md)）
-  - [x] Dockerfile、CI build job、`/healthz`、`/readyz`、SIGTERM 優雅關閉（計畫見 [plan-dockerfile-healthz](docs/plan-dockerfile-healthz.md)）。仍待：推送 Artifact Registry 的 CD、Cloud Run 實測冷啟動與探針門檻。
-  - 背景工作排程決策：目前在程序內（`notify::spawn_worker`、`ratelimit::spawn_cleanup`），Cloud Run 無請求時 CPU 被凍結會停擺（認領卡在保留中、清單不結案、信不寄）。二選一：`min-instances=1` ＋ CPU 常駐，或實作 `docs/04` 的 `/internal/jobs/tick` ＋ Cloud Scheduler OIDC。
-  - 確認各工作在多實例下冪等（`expire_due`、`close_due`、`remind_closing`、`tick_funding`、寄信領取）；未確認前固定 `max-instances=1`。
-  - Cloud Run request timeout 調到 ≥1800s（SSE 單連線上限 30 分鐘）。
+  - 後端正式機密、`TRUSTED_PROXY=cloudflare`（API 只能經 Tunnel 到達）、S3／R2、`SHIPPING_ENC_KEY` 備份流程（遺失即無法解密收件資訊）。
+- [ ] 後端可部署性（部署定案：Linode VPS 東京 + Dokploy + Cloudflare Tunnel，PRD D49；清單見 [deploy-backend-checklist](docs/deploy-backend-checklist.md)）
+  - [x] Dockerfile、CI build job、`/healthz`、`/readyz`、SIGTERM 優雅關閉。
+  - [x] 背景工作排程：VPS 行程長駐，維持行程內排程，不實作 `/internal/jobs/tick`（原 Cloud Run 疑慮不成立）。
+  - [ ] 背景任務 panic 會讓該任務靜默停止而行程仍存活：外層捕捉並重啟，或結束行程由 Dokploy 重啟；並加「逾期認領未釋放」告警（checklist §0.6）。
+  - [ ] **PostgreSQL 備份與還原**：WAL 歸檔或排程 dump 二選一並由產品負責人接受對應 RPO；備份至 R2；完成一次還原演練並記錄 RTO（checklist §2.1）。沒有可還原的備份不得開放真實使用者。
+  - [ ] VPS 加固：入站全拒絕（Tunnel 為出站）、SSH 限制、Dokploy 管理介面不公開、日誌輪替、安全更新（checklist §2.3）。
+  - [ ] 實機確認 Dokploy／Traefik／Tunnel 行為：備份機制、部署啟停順序、SSE 不被緩衝、`CF-Connecting-IP` 傳遞（checklist §10，與 Spike S3 同做）。
+  - [ ] 多實例（replicas>1）前先確認各背景工作冪等（checklist §0.4）；在此之前維持 1 個。
+  - [ ] `SHIPPING_ENC_KEY` 備份與資料庫備份分開保管（同機後威脅模型變弱）。
 
 ## 功能與後續
 

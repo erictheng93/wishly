@@ -1,5 +1,7 @@
 # 實作計畫：後端 Dockerfile 與 `/healthz`、`/readyz`
 
+> **部署平台更新（2026-10-15，PRD D49）：後端改部署在 Linode VPS + Dokploy + Cloudflare Tunnel，不再使用 Cloud Run。本計畫中「Cloud Run」「Cloud Scheduler」「Cloud Run 探針」的字樣為歷史脈絡；Dockerfile、探針與優雅關閉的設計不變，部署設定改見 [deploy-backend-checklist](deploy-backend-checklist.md) §2.4–§2.5。**
+>
 > **狀態（2026-10-15）：§2、§3、§4 已實作並驗收；實作與驗證證據見 commit `e2593f5`、`bdc3daf`、`99513dc`。**
 
 對應 [deploy-backend-checklist §0.1、§0.2](deploy-backend-checklist.md)。實作由負責人進行，本文件同時是稽核的驗收標準。

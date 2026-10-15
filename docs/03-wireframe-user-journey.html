@@ -2630,7 +2630,7 @@ async function waitTopup(before) {
 <ol>
 <li><b>完成度定義</b>：由伺服器回傳 <code>completion_pct</code>，前端不自行計算；<b>已決</b>：<code>completion_pct = items_done / items_total</code>（quantity 品項認滿、crowdfund 品項 funding_status 達標即算完成），另有 <code>claimed_pct</code>、<code>funded_pct</code>，定義見《Master User Flow》F7。</li>
 <li><b>Background Sync 支援</b>：iOS Safari 與 LINE in-app browser 不支援，P2 離線佇列需前景重送後備；是否接受「iOS 需開著頁面才同步」？</li>
-<li><b>SSE 在 LINE in-app browser 與 Cloudflare 的穩定性</b>：SSE 由 api.wishsync.tw 提供（Cloud Run 逾時上限、Cloudflare 代理緩衝），需實測；輪詢退路已寫入 7.3。</li>
+<li><b>SSE 在 LINE in-app browser 與 Cloudflare 的穩定性</b>：SSE 由 api.wishsync.tw 提供（Cloudflare Tunnel 與 Traefik 的逾時與緩衝設定），需實測；輪詢退路已寫入 7.3。</li>
 <li><b>首次認領 3 次點擊</b>：若要求暱稱必填，首次訪客是「點我要送 → 輸入暱稱（輸入不算點擊但需鍵盤）→ 確認」。是否允許暱稱預設為「匿名朋友」以真正做到 2 次點擊？</li>
 <li><b>OG 圖產生位置</b>：Cloudflare Pages Functions（satori）或後端 Rust（resvg）？影響字型（Noto Sans TC 檔案大，約數 MB）與冷啟動。</li>
 <li><b>地圖供應商</b>：MapLibre + 哪個圖磚來源（OSM 公共圖磚不適合商用流量；MapTiler、自架 PMTiles on R2）？</li>
@@ -2763,7 +2763,7 @@ async function waitTopup(before) {
 <tbody>
 <tr><td>S1 Nuxt SSR on Cloudflare + OG</td><td>LINE / FB / iMessage 貼 /s/{slug} 連結的預覽</td><td>三者皆顯示正確標題、描述、圖片；SSR 回應含完整 OG meta</td><td>調整 meta 輸出與快取；必要時以 Worker 對爬蟲 UA 回預渲染 HTML</td></tr>
 <tr><td>S2 LINE in-app browser</td><td>cookie、localStorage、<code>ws_guest</code> 存活率；<code>openExternalBrowser=1</code> 行為</td><td>以 <code>X-Guest-Token</code> 為主的流程在重開 LINE 後仍可找回認領（通過率門檻由 PRD 設定）</td><td>強化 X-Guest-Token 與 Email 管理連結（認領 sheet 的 Email 欄位）</td></tr>
-<tr><td>S3 SSE 穩定度</td><td>SSE 經 Cloudflare → Cloud Run 的連線穩定度</td><td>連線可持續並自動重連，事件延遲在目標內</td><td>改為輪詢（7.3 已設計退路）</td></tr>
+<tr><td>S3 SSE 穩定度</td><td>SSE 經 Cloudflare → Tunnel → VPS（Dokploy / Traefik）→ API 的連線穩定度</td><td>連線可持續並自動重連，事件延遲在目標內</td><td>改為輪詢（7.3 已設計退路）</td></tr>
 </tbody></table></div>
 
 </main>

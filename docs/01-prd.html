@@ -73,6 +73,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>日期</td><td>2026-10-08</td></tr>
 <tr><td>狀態</td><td>Draft</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏：行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。部署平台為 Cloudflare Pages（使用者基於成本決定，D48）。</td></tr>
+<tr><td>後端部署定案（2026-10-15，D49）</td><td>後端與 PostgreSQL 同機部署於 Linode（Akamai）VPS 東京節點，以 Dokploy 管理，經 Cloudflare Tunnel 對外；取代原 GCP Cloud Run / Cloud SQL / Cloud Scheduler 規劃。背景工作維持後端行程內排程。影響：備份（RPO / RTO 須自行達成並演練）、SSE 鏈路（Cloudflare → Tunnel → Traefik → API，Spike S3 的受測鏈路隨之改變）、金鑰與資料庫同機的威脅模型。見 <code>docs/deploy-backend-checklist.md</code>。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值、電子禮物卡、回饋星星、企業禮券；點數改為分批（point lots）管理；8.7 法規依 D30 更新；P2 細分為 P2-A / B / C / D。</td></tr>
 <tr><td>v0.2 變更</td><td>眾籌改為點數錢包與達標自動購買，移到 Phase 2；MVP 只做數量認領。移除平台外收款與建立者收款、確認流程，眾籌一律硬上限。新增 D16 點數規則與法規上線前阻斷項、營運代購人員 Persona、錢包 / 認捐 / 自動下單 / 代購 / 退點相關需求。</td></tr>
 <tr><td>相關文件</td><td>主用戶流程、線框圖、Schema / API 文件（見 <a href="index.html">文件索引</a>）。名稱、枚舉、API 路徑、前端路由以共用對齊規格為準。</td></tr>
@@ -182,23 +183,23 @@ header.top,main{padding-left:16px;padding-right:16px}
 <thead><tr><th>選擇</th><th>評分</th><th>評價</th><th>風險</th><th>建議</th></tr></thead>
 <tbody>
 <tr><td>Nuxt 3/4 + TypeScript</td><td>4</td><td>Vue 生態成熟、SSR / 路由 / PWA 模組完整，適合 <code>/s/{slug}</code> 的 OG 預覽。</td><td>LINE / FB 爬蟲不執行 JS，若為純 SPA 則 OG 全失效。</td><td>採用。<code>/s/{slug}</code> 必須 SSR（或邊緣預渲染），其餘頁面可 SPA。</td></tr>
-<tr><td>Cloudflare Pages 部署</td><td>4</td><td><b>已決（使用者基於成本決定，D48）。</b>Nuxt 在 Cloudflare 上可完整 SSR，並非只能跑 SPA；Nitro preset <code>cloudflare_pages</code>，建置產出 <code>dist/</code>（<code>_worker.js</code>、<code>_routes.json</code>、<code>_headers</code>）；本機預覽 <code>npx wrangler pages dev dist</code>，部署 <code>npx wrangler pages deploy dist</code> 或 Pages Git 整合；wrangler 設定 <code>pages_build_output_dir: "./dist"</code>、<code>compatibility_flags: ["nodejs_compat"]</code>；每個 PR 有 Pages preview URL。<br><b>成本事實：</b>Pages 靜態資源免費且不限量；Pages Functions（SSR）以 Workers 請求計費，免費方案與 Workers 共用每日 100,000 次。Workers + Static Assets 費用結構相同，改用 Workers 並無成本優勢，且其多出的 Cron / Durable Objects 本專案不需要（排程在 Cloud Run + Cloud Scheduler）。<br><b>驗證紀錄：</b>2026-10-08 以 Nuxt 4.0.0 + Wrangler 4.148.0 在本機（workerd 執行環境）實測：<code>cloudflare_pages</code> preset 經 <code>wrangler pages dev</code>，以不執行 JS 的爬蟲 UA 請求 <code>/s/{slug}</code>，SSR HTML 已含 <code>&lt;title&gt;</code>、<code>og:title</code>、<code>og:description</code>，server route 執行於 Cloudflare-Workers runtime；另測 <code>cloudflare_module</code> 經 <code>wrangler dev</code> 亦通過，且執行期環境變數可覆寫 runtimeConfig。<b>尚未在正式 Cloudflare 帳號部署，也尚未用真實 LINE / FB 爬蟲測試</b>，仍屬 Spike S1。</td><td>Workers runtime 非完整 Node；Nitro 官方文件現推薦 Workers，為已知取捨，不影響本專案。</td><td>採用 Cloudflare Pages。<b>備案：</b>Workers（<code>cloudflare_module</code>）；未來若需要 Pages 不支援的功能再遷移，Nuxt 只需換 preset。SSR 頁面設短 TTL 快取。</td></tr>
+<tr><td>Cloudflare Pages 部署</td><td>4</td><td><b>已決（使用者基於成本決定，D48）。</b>Nuxt 在 Cloudflare 上可完整 SSR，並非只能跑 SPA；Nitro preset <code>cloudflare_pages</code>，建置產出 <code>dist/</code>（<code>_worker.js</code>、<code>_routes.json</code>、<code>_headers</code>）；本機預覽 <code>npx wrangler pages dev dist</code>，部署 <code>npx wrangler pages deploy dist</code> 或 Pages Git 整合；wrangler 設定 <code>pages_build_output_dir: "./dist"</code>、<code>compatibility_flags: ["nodejs_compat"]</code>；每個 PR 有 Pages preview URL。<br><b>成本事實：</b>Pages 靜態資源免費且不限量；Pages Functions（SSR）以 Workers 請求計費，免費方案與 Workers 共用每日 100,000 次。Workers + Static Assets 費用結構相同，改用 Workers 並無成本優勢，且其多出的 Cron / Durable Objects 本專案不需要（排程在後端行程內，D49）。<br><b>驗證紀錄：</b>2026-10-08 以 Nuxt 4.0.0 + Wrangler 4.148.0 在本機（workerd 執行環境）實測：<code>cloudflare_pages</code> preset 經 <code>wrangler pages dev</code>，以不執行 JS 的爬蟲 UA 請求 <code>/s/{slug}</code>，SSR HTML 已含 <code>&lt;title&gt;</code>、<code>og:title</code>、<code>og:description</code>，server route 執行於 Cloudflare-Workers runtime；另測 <code>cloudflare_module</code> 經 <code>wrangler dev</code> 亦通過，且執行期環境變數可覆寫 runtimeConfig。<b>尚未在正式 Cloudflare 帳號部署，也尚未用真實 LINE / FB 爬蟲測試</b>，仍屬 Spike S1。</td><td>Workers runtime 非完整 Node；Nitro 官方文件現推薦 Workers，為已知取捨，不影響本專案。</td><td>採用 Cloudflare Pages。<b>備案：</b>Workers（<code>cloudflare_module</code>）；未來若需要 Pages 不支援的功能再遷移，Nuxt 只需換 preset。SSR 頁面設短 TTL 快取。</td></tr>
 <tr><td>PWA（Service Worker）</td><td>3</td><td>加入主畫面、靜態資源快取成本低。</td><td>LINE in-app browser 不支援安裝 PWA，Service Worker 行為受限；iOS 限制多。</td><td>MVP 僅做 manifest + 靜態快取；不依賴 SW 完成核心流程。離線佇列（Background Sync）延至 P2，且須有 Safari 降級方案。</td></tr>
 <tr><td>Rust 後端</td><td>4</td><td>效能與記憶體安全足夠，單機高併發穩定。</td><td>開發速度較慢、招募與維護成本較高；團隊熟悉度是決定因素。</td><td>採用 <b>axum + tokio + sqlx + tower</b>。天災高併發真正的瓶頸在 DB 與讀取流量而非語言，靠 CDN 快取、限流、讀寫分離解決。</td></tr>
-<tr><td>Rust 部署位置</td><td>2 / 4</td><td>Rust→Wasm 跑在 Workers 連 Postgres（Hyperdrive）可行但受限。</td><td>Wasm 目標生態限制（sqlx、tokio 支援不完整）、除錯困難。</td><td><b>不建議</b> Workers 方案。建議 GCP Cloud Run asia-east1（彰化）或 Fly.io（東京等）跑原生容器，自動擴縮。</td></tr>
-<tr><td>PostgreSQL + PostGIS</td><td>5</td><td>正確選擇：交易一致性（併發認領）+ 地理查詢（據點 bbox / near）。</td><td>連線數與寫入熱點（熱門品項 row 鎖競爭）。</td><td>Cloud SQL / Neon / Supabase 擇一（需支援 PostGIS）；PgBouncer；熱點使用條件式 UPDATE 而非長交易。</td></tr>
+<tr><td>Rust 部署位置</td><td>2 / 4</td><td>Rust→Wasm 跑在 Workers 連 Postgres（Hyperdrive）可行但受限。</td><td>Wasm 目標生態限制（sqlx、tokio 支援不完整）、除錯困難。</td><td><b>不建議</b> Workers 方案。<b>已決（D49）：</b>Linode（Akamai）VPS 東京節點，以 Dokploy 管理原生容器，經 Cloudflare Tunnel 對外；單機單實例，不自動擴縮，容量到頂再評估拆分。</td></tr>
+<tr><td>PostgreSQL + PostGIS</td><td>5</td><td>正確選擇：交易一致性（併發認領）+ 地理查詢（據點 bbox / near）。</td><td>連線數與寫入熱點（熱門品項 row 鎖競爭）。</td><td><b>已決（D49）：</b>與後端同機的自管 PostgreSQL 16（Dokploy 資料庫服務，需含 PostGIS）；單實例連線數有限，不需 PgBouncer；熱點使用條件式 UPDATE 而非長交易。備份與還原演練須自行負責。</td></tr>
 <tr><td>金流（TapPay / 綠界） <span class="badge p2">P2</span></td><td>4</td><td>兩者皆支援信用卡、LINE Pay、Apple Pay 儲值，台灣在地、文件完整；可擇一，避免雙供應商初期複雜度。</td><td>webhook 重送 / 亂序 / 偽造；對帳與發票串接；退款流程。</td><td>採用其一（待比較費率與發票服務）。<code>POST /webhooks/payments/{provider}</code> 必須驗簽，並以 <code>provider_txn_id</code>（UNIQUE）冪等入帳；儲值入帳與 <code>point_ledger</code> 同一交易。不在前端信任付款結果。</td></tr>
 <tr><td>點數帳本（Postgres） <span class="badge p2">P2</span></td><td>4</td><td>關聯式交易最適合錢包：<code>point_ledger</code> 只增不改，<code>point_wallets.balance</code> 為快取，以 ledger 加總為準。</td><td>熱門品項與錢包列鎖競爭；死結。</td><td>固定鎖順序 wishlist (FOR SHARE) → wallet (FOR UPDATE) → item，短交易；每日對帳 job 比對 balance 與 ledger；下單用 outbox 模式觸發 job。</td></tr>
 <tr><td>Cloudflare R2</td><td>5</td><td>S3 相容、零出口費，適合圖片；presigned PUT 直傳減輕後端。</td><td>需處理圖片大小 / 類型驗證與惡意檔案。</td><td>採用。限制 MIME 與大小；公開圖片經 CDN。</td></tr>
 <tr><td>通知</td><td>-</td><td>MVP 即需 Email（建立者認領通知、訪客確認信）。</td><td>LINE Notify 已於 2025-03-31 終止；Messaging API 需對方加官方帳號好友。</td><td><span class="badge p0">P0</span> Email 用 Resend 或 AWS SES，以 <code>notifications</code> outbox 發送；<span class="badge p1">P1</span> 加 LINE Messaging API（對建立者為主）。訪客通知以 Email 為主。</td></tr>
-<tr><td>監控與告警</td><td>-</td><td>無監控則尖峰時無法判斷瓶頸。</td><td>金流與帳本問題需即時發現。</td><td>Sentry（前後端錯誤）+ OpenTelemetry traces + Cloud Monitoring 告警（5xx 率、p95、DB 連線、佇列堆積、對帳差異 &ne; 0 立即告警）；P0 即導入。</td></tr>
-<tr><td>CI/CD</td><td>-</td><td>GitHub Actions；後端 build image 推 Artifact Registry，先跑 Cloud Run Job 執行 <code>sqlx migrate</code>（僅向前相容：expand → migrate → contract），再部署 Cloud Run；前端 Cloudflare Pages 每個 PR 產生 preview URL。</td><td>遷移破壞相容性會造成停機。</td><td>採用。機密放 GCP Secret Manager（後端）與 Cloudflare secrets（前端），金流與 AEAD 金鑰不得進 repo。</td></tr>
-<tr><td>備份與環境</td><td>-</td><td>local（docker compose：postgis 16 + MinIO 模擬 R2 + Mailpit）、staging、production，各自獨立 DB、R2 bucket、金流沙箱。Cloud SQL 每日備份 + PITR 7 天。</td><td>未演練的備份等於沒有備份。</td><td>RPO &le; 5 分鐘、RTO &le; 1 小時；每季還原演練；R2 物件版本保留 30 天。</td></tr>
+<tr><td>監控與告警</td><td>-</td><td>無監控則尖峰時無法判斷瓶頸。</td><td>金流與帳本問題需即時發現。</td><td>Sentry（前後端錯誤）+ OpenTelemetry traces + 外部監控與告警（5xx 率、p95、DB 連線、佇列堆積、對帳差異 &ne; 0 立即告警）；P0 即導入。</td></tr>
+<tr><td>CI/CD</td><td>-</td><td>GitHub Actions；後端 build image 後由 Dokploy 部署（migration 於啟動時自動執行；僅向前相容：expand → migrate → contract）；前端 Cloudflare Pages 每個 PR 產生 preview URL。</td><td>遷移破壞相容性會造成停機。</td><td>採用。機密放 Dokploy 環境變數（後端）與 Cloudflare secrets（前端），金流與 AEAD 金鑰不得進 repo，且 AEAD 金鑰備份不得與資料庫備份放在同一處。</td></tr>
+<tr><td>備份與環境</td><td>-</td><td>local（docker compose：postgis 16 + MinIO 模擬 R2 + Mailpit）、staging、production，各自獨立 DB、R2 bucket、金流沙箱。PostgreSQL 備份由自管機制負責（見 D49；Dokploy 內建備份是否支援 PITR 須實測）。</td><td>未演練的備份等於沒有備份。</td><td>RPO &le; 5 分鐘、RTO &le; 1 小時；每季還原演練；R2 物件版本保留 30 天。</td></tr>
 <tr><td>行為分析</td><td>-</td><td>PostHog Cloud（或自架）；前端事件 + 後端伺服器事件，轉換以後端為準。</td><td>誤送 PII。</td><td>P0 導入。不送 PII：user / guest 以不可逆雜湊 ID；不記錄聯絡方式與收件地址。</td></tr>
 <tr><td>Redis / 微服務</td><td>-</td><td>MVP 不需要。</td><td>過早引入增加維運。</td><td>單一 Rust 服務 + 單一 Postgres；限流用 Cloudflare 規則 + 服務內 tower 層；快取用 CDN。</td></tr>
 </tbody></table>
-<div class="callout"><b>技術 Spike（MVP 開工前 1 週，D45）：</b>S1 Nuxt SSR on Cloudflare + OG（LINE / FB / iMessage 貼連結顯示正確預覽）；S2 LINE in-app browser 的 cookie、localStorage、<code>ws_guest</code> 存活率與 <code>openExternalBrowser=1</code> 行為；S3 SSE 經 Cloudflare 到 Cloud Run 的連線穩定度與輪詢退路。通過標準與備案見 10 路線圖。</div>
-<div class="callout warn"><b class="h">SSE 與 CDN 注意：</b>即時更新使用 SSE 長連線，不可被 CDN 快取，且 Cloud Run 有請求逾時與併發連線限制。需規劃重連（<code>Last-Event-ID</code>）、逾時前主動重連，並在尖峰時降級為輪詢。</div>
+<div class="callout"><b>技術 Spike（MVP 開工前 1 週，D45）：</b>S1 Nuxt SSR on Cloudflare + OG（LINE / FB / iMessage 貼連結顯示正確預覽）；S2 LINE in-app browser 的 cookie、localStorage、<code>ws_guest</code> 存活率與 <code>openExternalBrowser=1</code> 行為；S3 SSE 經 Cloudflare → Tunnel → VPS（Dokploy / Traefik）→ API 的連線穩定度與輪詢退路（D49 前原規格為 Cloud Run）。通過標準與備案見 10 路線圖。</div>
+<div class="callout warn"><b class="h">SSE 與 CDN 注意：</b>即時更新使用 SSE 長連線，不可被 CDN 快取，且反向代理（Traefik）與 Cloudflare 對長連線有逾時設定，單機有檔案描述符與記憶體上限。需規劃重連（<code>Last-Event-ID</code>）、逾時前主動重連，並在尖峰時降級為輪詢。</div>
 
 <h2 id="s5">5. 使用者角色 Persona</h2>
 <table>
@@ -619,10 +620,10 @@ header.top,main{padding-left:16px;padding-right:16px}
 <h3>8.8 環境與備份（D38）</h3>
 <ul>
 <li>環境：local（docker compose：postgis 16 + MinIO 模擬 R2 + Mailpit 收信）、staging、production；各自獨立 DB、R2 bucket、金流沙箱。</li>
-<li>CI/CD 以 GitHub Actions：後端 build image、推 Artifact Registry、先跑 Cloud Run Job 執行 <code>sqlx migrate</code>（僅允許向前相容：expand → migrate → contract）、再部署 Cloud Run；前端 Cloudflare Pages 每個 PR 產生 preview URL。</li>
-<li>機密：GCP Secret Manager（後端）、Cloudflare secrets（前端）；金流與 AEAD 金鑰不得進 repo。</li>
-<li>備份：Cloud SQL 每日備份 + PITR 7 天；RPO &le; 5 分鐘、RTO &le; 1 小時；每季還原演練；R2 物件版本保留 30 天。</li>
-<li>監控：Sentry、OpenTelemetry traces、Cloud Monitoring 告警（5xx 率、p95、DB 連線、佇列堆積、對帳差異 &ne; 0 立即告警）。</li>
+<li>CI/CD 以 GitHub Actions：後端 build image，由 Dokploy 部署（migration 於後端啟動時自動執行；僅允許向前相容：expand → migrate → contract）；前端 Cloudflare Pages 每個 PR 產生 preview URL。</li>
+<li>機密：Dokploy 環境變數（後端）、Cloudflare secrets（前端）；金流與 AEAD 金鑰不得進 repo，AEAD 金鑰備份不得與資料庫備份放在同一處。</li>
+<li>備份：自管 PostgreSQL，備份至 R2（異地）；RPO &le; 5 分鐘需 WAL 歸檔才能達成，僅排程邏輯備份時 RPO 等於備份間隔，須明確取捨並記錄；RTO &le; 1 小時；每季還原演練；R2 物件版本保留 30 天。</li>
+<li>監控：Sentry、OpenTelemetry traces、外部監控與告警（5xx 率、p95、DB 連線、佇列堆積、對帳差異 &ne; 0 立即告警）。</li>
 </ul>
 <h3>8.9 測試策略摘要（D37）</h3>
 <ul>
@@ -674,7 +675,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <table>
 <thead><tr><th>階段</th><th>範圍</th><th>估計</th><th>退出條件</th></tr></thead>
 <tbody>
-<tr><td>Spike（D45）</td><td>MVP 開工前 1 週。S1 Nuxt SSR on Cloudflare + OG：LINE / FB / iMessage 貼連結顯示正確預覽（通過：三者皆出現標題與封面圖；失敗備案：邊緣預渲染 OG 專用路由）。S2 LINE in-app browser：cookie、localStorage、<code>ws_guest</code> 存活率與 <code>openExternalBrowser=1</code> 行為（通過：重新開啟後認領仍可識別；失敗備案：強化 <code>X-Guest-Token</code> + Email 管理連結）。S3 SSE 經 Cloudflare 到 Cloud Run 連線穩定度（通過：長連線穩定並可自動重連；失敗備案：改輪詢）</td><td>1 週</td><td>三項 Spike 結論寫入技術決策紀錄</td></tr>
+<tr><td>Spike（D45）</td><td>MVP 開工前 1 週。S1 Nuxt SSR on Cloudflare + OG：LINE / FB / iMessage 貼連結顯示正確預覽（通過：三者皆出現標題與封面圖；失敗備案：邊緣預渲染 OG 專用路由）。S2 LINE in-app browser：cookie、localStorage、<code>ws_guest</code> 存活率與 <code>openExternalBrowser=1</code> 行為（通過：重新開啟後認領仍可識別；失敗備案：強化 <code>X-Guest-Token</code> + Email 管理連結）。S3 SSE 經 Cloudflare → Tunnel → VPS 連線穩定度（通過：長連線穩定並可自動重連；失敗備案：改輪詢）</td><td>1 週</td><td>三項 Spike 結論寫入技術決策紀錄</td></tr>
 <tr><td>高保真設計（D33）</td><td>與 MVP 開發並行：線框為低保真，MVP 上線前需高保真設計與 design tokens（色彩、字級、間距、元件）</td><td>並行約 4-6 週（設計師）</td><td>design tokens 與核心頁面高保真稿完成</td></tr>
 <tr><td><span class="badge p0">P0</span> MVP / Phase 1</td><td>FR-01 至 FR-18、FR-52 至 FR-59：登入、personal + registry、<b>僅數量型認領</b>、驚喜模式、儀表板、OG 分享、SSE、PWA 基本、監控、行為分析、檢舉下架與 EXIF 去除、營運後台、Email 通知、帳號刪除與匯出、法律文件、環境與 CI/CD</td><td>約 14-16 週（含 8 週封閉測試）</td><td>30 張真實清單、轉換率與零超額達標、壓測通過 8.1</td></tr>
 <tr><td><b>Go / No-Go（D32）</b></td><td>MVP 封閉測試 8 週後評估，<b>全部達成才啟動 P2-A</b>：已發佈清單 &ge; 300；分享頁到認領轉換率 &ge; 25%；&ge; 40% 清單至少有 1 筆認領；D30 法規意見書已取得。以上數字為假設，待確認。</td><td>評估 1 週</td><td>決策會議與紀錄</td></tr>
@@ -698,7 +699,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>目錄商家名單</b>：初期合作哪些商家？是否有 API、庫存與價格同步能力？</li>
 <li><b>已決（訪客換裝置找回）</b>：MVP 最小版為認領確認信的管理連結（FR-56），P1 為完整版（FR-30）。</li>
 <li><b>訪客通知渠道（維持）</b>：LINE Messaging API 需對方加官方帳號好友，故訪客通知以 Email 為主（已定）。</li>
-<li><b>技術風險（SSE 在 Cloud Run 與 CDN）</b>：逾時與連線數限制下，SSE 設重連機制，尖峰時降級為輪詢；保留為技術風險追蹤。</li>
+<li><b>技術風險（SSE 經 Tunnel / 反向代理與 CDN）</b>：逾時與連線數限制下，SSE 設重連機制，尖峰時降級為輪詢；保留為技術風險追蹤。</li>
 <li><b>已決（Cloudflare 部署形態，D48）</b>：Cloudflare Pages（使用者決定，成本考量）；Workers 列為備案。</li>
 <li><b>救災試點夥伴</b>：由誰擔任？成功標準與資料所有權、免責為何？</li>
 <li><b>已決（認領逾期）</b>：<code>wishlists.claim_ttl_hours</code>，personal / registry 預設 NULL（不逾期），relief 預設 48；<code>claims.expires_at</code> 由此計算，purchased 後清除，背景 job 轉 <code>expired</code> 並回補 <code>qty_claimed</code>。</li>

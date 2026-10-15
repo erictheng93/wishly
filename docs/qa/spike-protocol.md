@@ -42,9 +42,9 @@ done
 
 失敗備案：存活率 < 95% → 認領成功頁與 sheet 把「寄管理連結到 Email」升為預設展開並提示；記錄決策後以備案重跑情境 A、B（需達標）。
 
-## S3：SSE 經 Cloudflare → Cloud Run 的穩定度
+## S3：SSE 經 Cloudflare → Tunnel → VPS（Dokploy／Traefik）的穩定度
 
-**前置檢查（先記錄，這常是失敗主因）**：Cloud Run 請求逾時設定值（預設 300 s，需 ≥ 3600 s 或明確接受重連）、CPU 是否在無請求時被節流、是否設 `min-instances`、Cloudflare 是否對該路由啟用緩衝／壓縮。伺服器本身每條連線最長 30 分鐘（`dashboard.rs`），所以**至少要連續跑 120 分鐘**才能看到 ≥ 3 次正常重連。
+**前置檢查（先記錄，這常是失敗主因）**：cloudflared（Tunnel）版本與設定、Traefik entryPoint 的 read／write／idle 逾時、各層是否緩衝或壓縮 `text/event-stream`、Cloudflare 是否對該路由啟用緩衝／壓縮、VPS 的檔案描述符與記憶體上限。伺服器本身每條連線最長 30 分鐘（`dashboard.rs`），所以**至少要連續跑 120 分鐘**才能看到 ≥ 3 次正常重連。
 
 用 `scripts/sse-probe.mjs`，在**目標鏈路**上同時跑兩個探針：辦公室有線網路 1 個、手機行動網路（tethering）1 個；測試清單用大量數量的品項。
 
@@ -64,14 +64,14 @@ DURATION_MIN=120 TRIGGER_EVERY_S=60 OUT=spike-s3-<net>.jsonl node scripts/sse-pr
 | 前景／背景（人工，各 1 次） | iOS Safari 與 LINE IAB：切背景 5 分鐘再回前景，30 秒內資料收斂（SSE 或輪詢） |
 | 降級路徑（人工） | 開飛航模式 30 秒再恢復：連續失敗 2 次後切輪詢（15 s），恢復後 ≤ 20 s 資料收斂 |
 
-失敗備案：改輪詢（`useWishlistEvents` 已有）。切換後量測輪詢的資料收斂延遲 p95 ≤ 20 s，並記錄 Cloud Run 請求成本影響。
+失敗備案：改輪詢（`useWishlistEvents` 已有）。切換後量測輪詢的資料收斂延遲 p95 ≤ 20 s，並記錄 VPS 的 CPU、記憶體與連線數影響。
 
 ## 證據規格（每項 Spike 都要有）
 
-放在 `docs/qa/evidence/<spike>-<yyyymmdd>/`（大檔另存並附連結）：原始紀錄（`.jsonl`、curl 輸出）、截圖（可遮蔽暱稱、Email、權杖）、裝置與版本表、部署 commit 與 Cloud Run／Cloudflare 設定截圖。**不得包含 session、guest 或存取權杖。**
+放在 `docs/qa/evidence/<spike>-<yyyymmdd>/`（大檔另存並附連結）：原始紀錄（`.jsonl`、curl 輸出）、截圖（可遮蔽暱稱、Email、權杖）、裝置與版本表、部署 commit 與 Dokploy／Traefik／Tunnel／Cloudflare 設定截圖。**不得包含 session、guest 或存取權杖。**
 
 ## 待確認（產品負責人）
 
 1. S2 存活率 95%、樣本 40 次是否可接受（PRD 未給數字）。
 2. S3 的延遲 p95 ≤ 5 s 是否符合產品期望（PRD 未量化）。
-3. 實測用的 Cloudflare 帳號、API 網域與 Cloud Run 專案由誰提供；iOS／Android 裝置清單由誰提供。
+3. 實測用的 Cloudflare 帳號、API 網域與 Linode VPS（Dokploy）由誰提供；iOS／Android 裝置清單由誰提供。
