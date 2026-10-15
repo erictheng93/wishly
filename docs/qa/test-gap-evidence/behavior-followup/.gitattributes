@@ -1,3 +1,0 @@
-# Audit stdout and mutation diffs preserve exact bytes.
-*.log -whitespace
-*.patch -whitespace

@@ -181,7 +181,7 @@
 ## 9. 與 Spike 的關係
 
 S3 受測鏈路已因 D49 改為 **Cloudflare → Tunnel → VPS（Dokploy／Traefik）→ API**，原規格的 Cloud Run 不再適用。**這是驗收條件的變更，已記錄於 PRD，但 Spike 門檻（120 分鐘、0 次 >30 s 間隔、事件延遲 p50≤2 s／p95≤5 s／max≤10 s）不變。**
-S2／S3 的前置就是本清單 §2–§5；完成 §7.1–§7.10 後，依 [spike-protocol](qa/spike-protocol.md) 執行，結果填入 [spike-decisions](qa/spike-decisions.md)。S3 必須在**最終的** Dokploy／Traefik／Tunnel 組態上測，換設定後要重測。
+S2／S3 的前置就是本清單 §2–§5；完成 §7.1–§7.10 後，依 `git show 5c13bb9:docs/qa/spike-protocol.md` 的門檻執行（docs/qa 已移除，結果請另行記錄）。S3 必須在**最終的** Dokploy／Traefik／Tunnel 組態上測，換設定後要重測。
 
 ## 10. 未驗證的假設（本文件不聲稱已成立）
 

@@ -1,9 +1,0 @@
-
- RUN  v5.0.3 /Users/eric/Documents/Code/Wishlist/apps/web
-
-
- Test Files  1 passed (1)
-      Tests  1 passed | 9 skipped (10)
-   Start at  00:58:36
-   Duration  245ms (environment 45%, transform 30%, import 17%, tests 7%, worker 1%)
-

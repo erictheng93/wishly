@@ -2,7 +2,7 @@
 
 ## P0 上線阻擋
 
-- [ ] Spike S1–S3 真機／真實鏈路驗收（無結案證據，補測優先於新功能）— 流程見 [spike-protocol](docs/qa/spike-protocol.md)，現況見 [spike-status](docs/qa/spike-status.md)，結果填 [spike-decisions](docs/qa/spike-decisions.md)
+- [ ] Spike S1–S3 真機／真實鏈路驗收（無結案證據，補測優先於新功能）— 門檻與規程見 `git show 5c13bb9:docs/qa/spike-protocol.md`（docs/qa 已移除）
   - 先由產品負責人確認 S1–S3 門檻（測前定案，不可測後挑）。
   - S1 OG 預覽：6 組平台 × 連結；S2 LINE 內建瀏覽器身分存活：≥4 台裝置；S3 SSE：以 `scripts/sse-probe.mjs` 在 Cloudflare → Tunnel → VPS 跑 120 分鐘。
   - 前置：S2／S3 需要真實後端與具名網域，見下一項。S3 受測鏈路已改為 Cloudflare → Tunnel → VPS（D49），須在最終的 Dokploy／Traefik 組態上測。

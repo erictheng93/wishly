@@ -73,7 +73,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 後端一般測試也會驗證真實 SMTP 寄送，請先啟動 `docker compose up -d db mailpit`。`scripts/cargo.sh` 已設定容器連到宿主的 SMTP 與 Mailpit API；直接跑 cargo 預設使用 localhost。
 
-CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。npm audit 在獨立 `web-audit` job 保留失敗訊號，每週一另行重查，不影響 web 的 typecheck／test／build；上游修補前不要將此 job 列為必要 PR 檢查。完整範圍、更新基準流程、mutation 證據與上游追蹤記錄於 [測試缺口稽核](docs/qa/test-gaps-audit.md)。
+CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。npm audit 在獨立 `web-audit` job 保留失敗訊號，每週一另行重查，不影響 web 的 typecheck／test／build；上游修補前不要將此 job 列為必要 PR 檢查。完整範圍、更新基準流程、mutation 證據與上游追蹤記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）。
 
 刪除已覆蓋的程式碼也會改變覆蓋率的分子與分母；若比例低於基準減 0.5pp，API gate 會變紅。刻意調整測試範圍或程式碼時，請重新量測並同步更新 baseline，勿將此結果視為 flaky。上游 npm advisory 由 [issue #7](https://github.com/erictheng93/wishsync/issues/7) 追蹤。
 
@@ -183,7 +183,7 @@ npx playwright show-report                                      # 開啟上次�
 
 ## 開發順序
 
-**P0 上線阻擋（2026-10-12 查核）：S1–S3 尚無可追溯的真機結案證據，均未驗收；補測與技術決策結案優先於新功能。** 見 [Spike 證據查核與補測順序](docs/qa/spike-status.md)。
+**P0 上線阻擋（2026-10-12 查核）：S1–S3 尚無可追溯的真機結案證據，均未驗收；補測與技術決策結案優先於新功能。** 見 `git show 5c13bb9:docs/qa/spike-status.md`（文件已自 repo 移除）。
 
 0. 骨架與 CI → 1. 技術原型 S1–S3（真實 Pages 帳號、LINE 預覽 / 內建瀏覽器 cookie / SSE，見 `docs/03` 第 14 節）
 → 2. 垂直切片：公開分享頁 → 訪客認領 → 創建者登入與編輯 → 進度儀表板 / 驚喜模式 / 即時更新 → MVP 附加功能

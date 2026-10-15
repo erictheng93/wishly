@@ -1,9 +1,0 @@
-   Compiling wishsync-api v0.1.0 (/Users/eric/Documents/Code/Wishlist/apps/api)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.44s
-     Running tests/closes_at.rs (apps/api/target/debug/deps/closes_at-1d32522d551a7f27)
-
-running 1 test
-test close_due_purges_due_public_lists_and_keeps_future_lists_cached ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.82s
-

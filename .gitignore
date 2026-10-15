@@ -8,7 +8,6 @@ node_modules/
 dist/
 .impeccable/
 *.log
-!docs/qa/test-gap-evidence/**/*.log
 playwright-report/
 test-results/
 apps/web/qa/out/

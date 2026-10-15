@@ -1,8 +1,0 @@
-unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpc7qgvg3q/output/unit)
-unit: invalid-mutant (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmp9mvm4le5/output/unit)
-..unit: killed (/var/folders/xb/_8nn_t397ts0s1b98ljbrjfr0000gn/T/tmpkr9pdw5t/output/unit)
-.
-----------------------------------------------------------------------
-Ran 3 tests in 0.008s
-
-OK
