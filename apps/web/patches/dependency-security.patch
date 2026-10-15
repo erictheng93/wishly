@@ -1,0 +1,121 @@
+--- a/node_modules/braces/lib/parse.js
++++ b/node_modules/braces/lib/parse.js
+@@ -55,6 +55,10 @@
+
+   const advance = () => input[index++];
+   const push = node => {
++    if (stack.length > 100) {
++      throw new SyntaxError('Nesting depth exceeds maximum of 100');
++    }
++
+     if (node.type === 'text' && prev.type === 'dot') {
+       prev.type = 'text';
+     }
+--- a/node_modules/braces/lib/compile.js
++++ b/node_modules/braces/lib/compile.js
+@@ -4,7 +4,11 @@
+ const utils = require('./utils');
+
+ const compile = (ast, options = {}) => {
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth > 100) {
++      throw new SyntaxError('Nesting depth exceeds maximum of 100');
++    }
++
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     const invalid = invalidBlock === true || invalidNode === true;
+@@ -47,7 +51,7 @@
+
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += walk(child, node);
++        output += walk(child, node, depth + 1);
+       }
+     }
+
+--- a/node_modules/braces/lib/expand.js
++++ b/node_modules/braces/lib/expand.js
+@@ -33,13 +33,21 @@
+ const expand = (ast, options = {}) => {
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth > 100) {
++      throw new SyntaxError('Nesting depth exceeds maximum of 100');
++    }
++
+     node.queue = [];
+
++    let parentDepth = 0;
+     let p = parent;
+     let q = parent.queue;
+
+     while (p.type !== 'brace' && p.type !== 'root' && p.parent) {
++      if (++parentDepth > 100) {
++        throw new SyntaxError('Nesting depth exceeds maximum of 100');
++      }
+       p = p.parent;
+       q = p.queue;
+     }
+@@ -74,8 +82,12 @@
+     const enclose = utils.encloseBrace(node);
+     let queue = node.queue;
+     let block = node;
++    let blockDepth = 0;
+
+     while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
++      if (++blockDepth > 100) {
++        throw new SyntaxError('Nesting depth exceeds maximum of 100');
++      }
+       block = block.parent;
+       queue = block.queue;
+     }
+@@ -100,7 +112,7 @@
+       }
+
+       if (child.nodes) {
+-        walk(child, node);
++        walk(child, node, depth + 1);
+       }
+     }
+
+--- a/node_modules/braces/lib/stringify.js
++++ b/node_modules/braces/lib/stringify.js
+@@ -3,7 +3,11 @@
+ const utils = require('./utils');
+
+ module.exports = (ast, options = {}) => {
+-  const stringify = (node, parent = {}) => {
++  const stringify = (node, parent = {}, depth = 0) => {
++    if (depth > 100) {
++      throw new SyntaxError('Nesting depth exceeds maximum of 100');
++    }
++
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     let output = '';
+@@ -21,7 +25,7 @@
+
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += stringify(child);
++        output += stringify(child, {}, depth + 1);
+       }
+     }
+     return output;
+--- a/node_modules/node-forge/lib/rsa.js
++++ b/node_modules/node-forge/lib/rsa.js
+@@ -1172,7 +1172,9 @@
+           var capture = {};
+           var errors = [];
+           if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
+-            obj.value.length !== 2) {
++            obj.value.length !== 2 ||
++            obj.value[0].value.length !== (('parameters' in capture) ? 2 : 1) ||
++            ('parameters' in capture && capture.parameters !== '')) {
+             var error = new Error(
+               'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 ' +
+               'DigestInfo value.');

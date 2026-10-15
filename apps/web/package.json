@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "nuxt prepare",
+    "postinstall": "node scripts/patch-dependencies.mjs && nuxt prepare",
     "dev": "nuxt dev",
     "build": "nuxt build",
     "preview": "npm run build && wrangler pages dev dist",
