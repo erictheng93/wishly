@@ -4,7 +4,7 @@
 
 ```
 使用者 → Cloudflare（WAF／CDN）→ Tunnel（cloudflared，出站連線）→ Traefik（Dokploy）→ wishsync-api :8080 → PostgreSQL（同機）
-前端：Cloudflare Pages（app.<域名>）        圖片：R2（S3_PUBLIC_BASE）
+前端：Cloudflare Pages（app.<域名>）        圖片：Cloudflare R2（S3_PUBLIC_BASE，自訂網域）
 ```
 
 本文件只列「上線前必須成立的條件」，每項附驗證方式。勾選請附日期與證據（指令輸出、截圖、commit），否則視為未完成。
@@ -49,12 +49,21 @@
 - [ ] Linode 整機備份／快照視為輔助，不等於資料庫一致性備份。
 - [ ] 單點故障認知：整機掛掉全站掛掉；寫下恢復步驟（新 VPS → Dokploy → 還原 DB → 設環境變數 → Tunnel）並計時。
 
-### 2.2 物件儲存（Cloudflare R2）
-- [ ] bucket 建立；CORS 允許前端網域 PUT（presigned 直傳）。
-- [ ] `S3_PUBLIC_BASE` 為對外可讀網域（自訂網域經 CDN）。
-- [ ] 存取金鑰僅限該 bucket；staging／production 分開。
-- [ ] 物件版本保留 30 天。
-- [ ] 驗證：上傳一張圖，經 `S3_PUBLIC_BASE` 在瀏覽器開得到；頭像轉存（issue #6）能寫入。
+### 2.2 物件儲存（Cloudflare R2，已決）
+程式以手寫 SigV4 對接 S3 相容儲存（`uploads.rs`，**path-style**），所以 R2 不需改程式。流程：前端 presigned PUT 到 `incoming/{user_id}/…` → 後端 confirm 時去 EXIF／GPS 重新編碼，寫入公開 key（`covers/…`、`items/…`）→ 刪除 `incoming/`。
+
+- [ ] bucket 建立；**建立時選擇 location hint（APAC）**——之後無法變更（**需於 Cloudflare 後台確認**）。staging／production 各自獨立 bucket。
+- [ ] 環境變數：`S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`、`S3_REGION=auto`、`S3_BUCKET`、`S3_PUBLIC_BASE=https://<media 自訂網域>`。
+- [ ] API Token：只限該 bucket 的 Object Read & Write，不給帳號層級權限；與其他用途的 token 分開。程式啟動後會嘗試 `PUT /{bucket}`（`ensure_bucket`，結果被忽略）：在受限 token 下會被拒絕，屬預期，不影響運作。
+- [ ] **公開讀取用自訂網域綁定 bucket**（例如 `media.<域名>`），不要使用 `r2.dev` 公開網址（有速率限制、不適合正式環境）。
+- [ ] ⚠ **`incoming/` 不得對外可讀**：bucket 一旦公開，所有前綴都可讀，而 `incoming/` 放的是**尚未去除 EXIF／GPS** 的原圖，且確認前會停留。兩道防線都要做：
+  1. Cloudflare WAF 規則：對 `media.<域名>` 的 `URI Path starts with /incoming/` 一律封鎖。
+  2. R2 物件生命週期規則：前綴 `incoming/` 於 1 天後刪除（兜住上傳後未 confirm 的殘留）。
+  - 驗證：用瀏覽器直接開一個 `incoming/…` 物件網址得到 403／404。
+- [ ] CORS：允許前端網域對 bucket 的 `PUT`，允許標頭 `Content-Type`（presigned PUT 簽入 content-type 與 content-length）。
+- [ ] **需實測**：R2 對「簽入 `content-length` 的 presigned PUT」的行為（`presign()` 會把 `content-length` 與 `content-type` 簽進 SignedHeaders）；以真實 R2 與瀏覽器上傳一張圖驗證，包含超過 `Content-Length` 宣告大小時被拒絕。
+- [ ] 物件版本與備份：PRD 要求 R2 物件版本保留 30 天——R2 的版本控制／保護機制與設定方式需於後台確認後寫入決策。
+- [ ] 驗證：上傳一張圖，經 `S3_PUBLIC_BASE` 在瀏覽器開得到；確認重新編碼後的檔案不含 EXIF；頭像轉存（issue #6）能寫入。
 
 ### 2.3 VPS 主機
 - [ ] Linode 東京節點；OS 為受支援 LTS；`unattended-upgrades`（或等效）啟用安全更新。

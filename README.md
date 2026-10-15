@@ -121,7 +121,7 @@ npx playwright show-report                                      # 開啟上次�
   - `NATIVE_REDIRECT`：原生殼 OAuth 完成後導回 App 的 deep link 基底（預設 `wishsync://auth`）。流程：App 帶 `start?native=true&app_challenge=<S256>` 開系統瀏覽器 → callback 302 到 `wishsync://auth?code=…`（失敗為 `?error=…`）→ App 以 `POST /auth/native/exchange {code, verifier}`（需 `X-Native-Client` 且 Origin ∈ `NATIVE_ORIGINS`）換 `session_token`；碼 60 秒、單次使用、只存雜湊。
   - `TRUSTED_PROXY`：`cloudflare` 或 `none`。dev 預設 `none`；**production 必須明確設定**，未設或其他值會拒絕啟動（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）。設 `cloudflare` 時信任 `CF-Connecting-IP`，所以 API 不可被直接存取，否則該標頭可被偽造；若 `BIND` 不是回送位址，啟動時會印出 WARN。
   - `TURNSTILE_SECRET`：production 必填；檢舉的 `turnstile_token` 會送 siteverify 驗證，失敗回 403 `FORBIDDEN`。dev/test 不設則略過驗證（接受任何 token，含前端的 `dev-bypass`）。`TURNSTILE_VERIFY_URL` 僅測試時覆寫。
-  - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。
+  - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。production 使用 Cloudflare R2：`S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`、`S3_REGION=auto`（程式以 path-style 簽名）、`S3_PUBLIC_BASE` 為綁定 bucket 的自訂網域；API Token 只給該 bucket 的 Object Read & Write。`incoming/` 前綴放尚未去 EXIF 的原圖，**不得對外公開**，見 `docs/deploy-backend-checklist.md` §2.2。
   - `CF_ZONE_ID`、`CF_CACHE_PURGE_TOKEN`：`TRUSTED_PROXY=cloudflare` 的 production **必填**（token 只需 Zone → Cache Purge 權限）。清單改成好友 / 指定 / 密碼 / 私人、封存、下架、刪帳號時，後端立即清除該清單公開網址的邊緣快取。沒有自己 zone 的快速通道才可明確設 `CDN_PURGE=off` 略過。見下方〈CDN 快取與受限清單〉。
   - `SHIPPING_ENC_KEY`：收件資訊加密金鑰，**production 必填**，必須是 base64 編碼的 32 bytes，否則拒絕啟動。dev / test 不設時使用固定的開發金鑰。詳見下方〈收件資訊加密金鑰〉。
 

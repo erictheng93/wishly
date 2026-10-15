@@ -21,6 +21,7 @@
   - [ ] 實機確認 Dokploy／Traefik／Tunnel 行為：備份機制、部署啟停順序、SSE 不被緩衝、`CF-Connecting-IP` 傳遞（checklist §10，與 Spike S3 同做）。
   - [ ] 多實例（replicas>1）前先確認各背景工作冪等（checklist §0.4）；在此之前維持 1 個。
   - [ ] `SHIPPING_ENC_KEY` 備份與資料庫備份分開保管（同機後威脅模型變弱）。
+  - [ ] R2 物件儲存（已決）：建立 bucket（location hint、獨立 staging／production）、bucket 限定 API Token、自訂網域公開讀取、CORS；**`incoming/` 以 WAF 封鎖並設 1 天生命週期**（內含未去 EXIF 的原圖）；以真實 R2 驗證 presigned PUT（簽入 content-length）（checklist §2.2）。
 
 ## 功能與後續
 

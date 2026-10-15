@@ -17,7 +17,7 @@
 | 無 `query!` 系列巨集（無 `.sqlx/` 離線快取） | grep | 建置不需要連 DB |
 | TLS 全為 rustls（sqlx `tls-rustls`、reqwest `rustls-tls`）、`image` 無原生相依 | `Cargo.toml` | 不需 openssl／libpq；runtime 只需 glibc |
 | 單一 binary `wishsync-api`（`src/main.rs`）；`examples/seed_demo.rs` 不該進 image | `Cargo.toml`、`ls` | `cargo build --release --bin wishsync-api` |
-| 預設 `BIND=127.0.0.1:8080`，production 容器需明確設 `0.0.0.0:8080` | `config.rs`、README | 不在 image 內寫死，由 Cloud Run 環境變數設定；但 Dockerfile 要 `EXPOSE 8080` 並在文件註明 |
+| 預設 `BIND=127.0.0.1:8080`，production 容器需明確設 `0.0.0.0:8080` | `config.rs`、README | 不在 image 內寫死，由部署平台（Dokploy）環境變數設定；但 Dockerfile 要 `EXPOSE 8080` 並在文件註明 |
 | `tracing_subscriber::EnvFilter::from_default_env()`，**未設 `RUST_LOG` 時預設只輸出 ERROR** | `main.rs:6-8` | 部署必須設 `RUST_LOG=info`，否則 Cloud Logging 幾乎沒有內容。可在 Dockerfile `ENV RUST_LOG=info` 當預設 |
 | middleware 順序：`read_only`（GET/HEAD/OPTIONS 視為安全）→ CORS → problem_json → security_headers | `lib.rs:app()` | `/healthz` 為 GET，不會被唯讀擋；會被加上 `Cache-Control: no-store`（正好） |
 | 路由全部 `nest("/api/v1", …)` | `lib.rs` | 探針掛在**根路徑**（不在 `/api/v1` 下），避免與公開 API 契約混在一起 |
@@ -34,7 +34,7 @@
 4. `cargo build --release --locked --bin wishsync-api`；`--locked` 確保不偷升級依賴。
 5. **runtime**：`gcr.io/distroless/cc-debian12:nonroot`（含 glibc、CA 憑證，無 shell，非 root）。只 COPY 一個 binary。
 6. `ENV RUST_LOG=info`、`EXPOSE 8080`、`USER nonroot`、`ENTRYPOINT ["/wishsync-api"]`。
-7. **不寫 `HEALTHCHECK`**：distroless 無 curl／shell；Cloud Run 的探針在服務設定中指定（見 §3.4），不用 image 內建。
+7. **不寫 `HEALTHCHECK`**：distroless 無 curl／shell；探針由部署平台與外部監控設定（見 §3.4），不用 image 內建。
 8. 不放任何機密；`APP_ENV` 不在 image 內設定（未設即 production，fail closed）。
 
 ### 同時新增 `.dockerignore`（repo 根）
@@ -57,7 +57,7 @@
 | `GET /healthz` | **liveness**／startup | 不碰 DB，行程能回應即 200 | 行程卡死 → 重啟 |
 | `GET /readyz` | readiness／監控 | `SELECT 1`（pool 取連線＋查詢，**2 秒逾時**） | DB 不可達 → 503，不重啟 |
 
-不合併的原因：若 liveness 依賴 DB，DB 短暫故障會讓 Cloud Run 把所有實例全部重啟，把局部故障放大成全面停擺。
+不合併的原因：若 liveness 依賴 DB，DB 短暫故障會讓編排層把服務不斷重啟，把局部故障放大成全面停擺。
 
 ### 3.2 實作位置與行為
 - 檔案：新增 `apps/api/src/health.rs`，提供 `routes()`；在 `lib.rs::app()` 以 **`.merge(health::routes())` 掛在 `/api/v1` nest 之外**。（CLAUDE.md：新增模組只改 `lib.rs`。）
@@ -76,10 +76,10 @@
 - 不把探針放進 OpenAPI／`docs/04` 公開契約；於 `docs/04` 的「內部端點」旁以一行註記即可。
 
 ### 3.4 部署設定（寫入 checklist §2.3，不是程式碼）
-- Cloud Run **startup probe**：`GET /healthz`，`failureThreshold` 配合 migration 時間（啟動時會先跑 `sqlx::migrate!`，大 migration 會延後 listen；`bind` 在 migrate 之後，所以探針在 migrate 完成前連線被拒屬正常）。
+- 啟動探針（若平台支援）：`GET /healthz`，`failureThreshold` 配合 migration 時間（啟動時會先跑 `sqlx::migrate!`，大 migration 會延後 listen；`bind` 在 migrate 之後，所以探針在 migrate 完成前連線被拒屬正常）。
 - **liveness probe**：`GET /healthz`。
 - 外部監控（Cloudflare Health Check／Uptime）打 `/readyz`。
-- **Cloudflare WAF 規則：對外封鎖或限流 `/readyz`**（它會查 DB，公開暴露可被當作放大器）。Cloud Run 探針直連容器，不經 Cloudflare，不受此規則影響。`/healthz` 無 IO，可開放。
+- **Cloudflare WAF 規則：對外封鎖或限流 `/readyz`**（它會查 DB，公開暴露可被當作放大器）。平台內部探針直連容器，不經 Cloudflare，不受此規則影響。`/healthz` 無 IO，可開放。
 
 ### 3.5 測試（`apps/api/tests/health.rs`，沿用 `#[sqlx::test(migrations = "../../db/migrations")]` 與既有 oneshot 寫法）
 - [ ] `GET /healthz` → 200，body 為 `{"status":"ok"}`，帶 `cache-control: no-store`。
@@ -92,9 +92,9 @@
 
 ## 4. 選配但建議一併處理：SIGTERM 優雅關閉
 
-Cloud Run 縮容／發新 revision 時送 SIGTERM，預設 10 秒後強殺。現況 `axum::serve` 無 graceful shutdown，進行中的認領 POST 會被切斷（有 Idempotency-Key，客戶端重試可恢復，但體驗差）。
+換版／停止容器時（Dokploy／`docker stop`）送 SIGTERM，預設 10 秒後強殺。現況 `axum::serve` 無 graceful shutdown，進行中的認領 POST 會被切斷（有 Idempotency-Key，客戶端重試可恢復，但體驗差）。
 - 做法：`axum::serve(...).with_graceful_shutdown(shutdown_signal())`，`shutdown_signal` 等待 `tokio::signal::unix::signal(SignalKind::terminate())` 與 ctrl-c（tokio 已啟用 `signal`）。
-- 注意 SSE 單連線最長 30 分鐘，graceful shutdown 會等連線結束 → 必須搭配 `with_graceful_shutdown` 之外的強制上限（Cloud Run 的 termination grace period 會兜底），不可無限等待。
+- 注意 SSE 單連線最長 30 分鐘，graceful shutdown 會等連線結束 → 必須搭配 `with_graceful_shutdown` 之外的強制上限（容器的停止寬限期會兜底），不可無限等待。
 - 這項會觸及 `main.rs`，與 §0.3 的排程決策（背景工作是否要隨 SIGTERM 停止）相關，**建議與 §0.3 一起做**。若只想先交付探針與 image，可延後，不影響本計畫驗收。
 
 ## 5. 建議提交切分（atomic）
@@ -108,5 +108,5 @@ Cloud Run 縮容／發新 revision 時送 SIGTERM，預設 10 秒後強殺。現
 ## 6. 風險與未知
 - `rust:1.99.0` 官方映像的標籤是否存在需在實作時確認（以 `docker pull` 為準）；不存在時改用 `rustup` 在 builder 內安裝指定版本。
 - distroless/cc 的 glibc 與 builder 的 glibc 需同為 Debian 12；若日後 base 升級，兩邊要同步。
-- 尚未量測冷啟動時間（含 migration），startup probe 門檻需待首次在 Cloud Run 實測後調整。
+- 尚未量測冷啟動時間（含 migration），啟動探針門檻需待首次在 VPS 實測後調整。
 - 本計畫不含映像漏洞掃描與簽章（供應鏈），上線前另列。
