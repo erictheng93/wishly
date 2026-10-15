@@ -30,6 +30,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/otp/verify", post(otp_verify))
         .route("/auth/oauth/{provider}/start", get(oauth_start))
         .route("/auth/oauth/{provider}/callback", get(oauth_callback))
+        .route("/auth/native/exchange", post(native_exchange))
         .route("/auth/logout", post(logout))
         .merge(crate::auth_ext::routes())
         .merge(crate::identities::routes())
@@ -735,6 +736,10 @@ struct StartQ {
     redirect: Option<String>,
     #[serde(default)]
     link: bool,
+    /// 原生殼：完成後以 deep link 帶一次性碼回 App（須搭配 app_challenge；不支援 link）
+    #[serde(default)]
+    native: bool,
+    app_challenge: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -746,6 +751,20 @@ struct OAuthState {
     issued_at: i64,
     link_user: Option<Uuid>,
     session_hash: Option<String>,
+    #[serde(default)]
+    app_challenge: Option<String>,
+}
+
+/// 原生殼 deep link 基底（App 註冊的 scheme）；結果以 ?code= 或 ?error= 附帶。
+fn native_redirect() -> String {
+    env("NATIVE_REDIRECT", "wishsync://auth")
+}
+
+/// PKCE S256 的 challenge 為 43 字元 base64url。
+fn valid_challenge(c: &str) -> bool {
+    c.len() == 43
+        && c.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 async fn oauth_start(
@@ -761,6 +780,20 @@ async fn oauth_start(
             "provider 須為 line 或 google",
         ));
     }
+    let app_challenge = if q.native {
+        match q.app_challenge.as_deref() {
+            Some(c) if valid_challenge(c) && !q.link => Some(c.to_string()),
+            _ => {
+                return Err(AppError::invalid(
+                    "/app_challenge",
+                    "FORMAT",
+                    "native 需要 43 字元的 app_challenge，且不可與 link 併用",
+                ))
+            }
+        }
+    } else {
+        None
+    };
     let (link_user, session_hash) = if q.link {
         let u = CurrentUser::from_request_parts(&mut parts, &st).await?;
         crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
@@ -843,6 +876,7 @@ async fn oauth_start(
             issued_at: chrono::Utc::now().timestamp(),
             link_user,
             session_hash,
+            app_challenge,
         })
         .unwrap(),
     );
@@ -917,21 +951,26 @@ async fn oauth_callback(
         q.state.as_deref(),
     );
     let linking = state.as_ref().is_some_and(|s| s.link_user.is_some());
+    let native = state.as_ref().is_some_and(|s| s.app_challenge.is_some());
     let fail = |error: &str| {
         let mut response = (
             StatusCode::FOUND,
             AppendHeaders([
                 (
                     header::LOCATION,
-                    format!(
-                        "{}/{}?error={error}",
-                        app_url(),
-                        if linking && error != "account_blocked" {
-                            "settings"
-                        } else {
-                            "login"
-                        }
-                    ),
+                    if native {
+                        format!("{}?error={error}", native_redirect())
+                    } else {
+                        format!(
+                            "{}/{}?error={error}",
+                            app_url(),
+                            if linking && error != "account_blocked" {
+                                "settings"
+                            } else {
+                                "login"
+                            }
+                        )
+                    },
                 ),
                 (header::SET_COOKIE, clear.clone()),
             ]),
@@ -1013,25 +1052,43 @@ async fn oauth_callback(
             Err(error) => return Ok(fail(oauth_error(error))),
         }
     }
-    let login = async {
-        let (uid, _) = upsert_identity(
-            &st.pool,
-            &provider,
-            &sub,
-            email.as_deref(),
-            &name,
-            picture.as_deref(),
+    let uid = match upsert_identity(
+        &st.pool,
+        &provider,
+        &sub,
+        email.as_deref(),
+        &name,
+        picture.as_deref(),
+    )
+    .await
+    {
+        Ok((uid, _)) => uid,
+        Err(error) => return Ok(fail(oauth_error(error))),
+    };
+    // 原生殼：不在這裡建 session（瀏覽器的 cookie 對 App 無用），改發一次性碼，由 App 憑 verifier 兌換。
+    if let Some(challenge) = &s.app_challenge {
+        let code = rand_b64(32);
+        sqlx::query("INSERT INTO native_auth_codes (code_hash, user_id, challenge, expires_at) VALUES ($1,$2,$3, now() + interval '60 seconds')")
+            .bind(hash_token(&code)).bind(uid).bind(challenge).execute(&st.pool).await?;
+        return Ok((
+            StatusCode::FOUND,
+            AppendHeaders([
+                (
+                    header::LOCATION,
+                    format!("{}?code={code}", native_redirect()),
+                ),
+                (header::SET_COOKIE, clear),
+            ]),
         )
-        .await?;
-        new_session(
-            &st.pool,
-            uid,
-            headers
-                .get(header::USER_AGENT)
-                .and_then(|v| v.to_str().ok()),
-        )
-        .await
+            .into_response());
     }
+    let login = new_session(
+        &st.pool,
+        uid,
+        headers
+            .get(header::USER_AGENT)
+            .and_then(|v| v.to_str().ok()),
+    )
     .await;
     let token = match login {
         Ok(token) => token,
@@ -1046,6 +1103,38 @@ async fn oauth_callback(
         ]),
     )
         .into_response())
+}
+
+#[derive(Deserialize)]
+struct ExchangeReq {
+    code: String,
+    verifier: String,
+}
+
+/// 原生殼以 deep link 帶回的一次性碼 + PKCE verifier 兌換 session 權杖。
+/// 碼先刪除再驗證：不論成敗都只能用一次，攔截者只有一次機會且沒有 verifier。
+async fn native_exchange(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(r): Json<ExchangeReq>,
+) -> Result<Response, AppError> {
+    if !native_client(&headers) {
+        return Err(AppError::problem(403, "NATIVE_ONLY", "僅限原生客戶端"));
+    }
+    let invalid =
+        || AppError::problem(400, "NATIVE_CODE_INVALID", "登入碼無效或已過期，請重新登入");
+    let (uid, challenge): (Uuid, String) = sqlx::query_as(
+        "DELETE FROM native_auth_codes WHERE code_hash=$1 AND expires_at > now() RETURNING user_id, challenge",
+    )
+    .bind(hash_token(&r.code))
+    .fetch_optional(&st.pool)
+    .await?
+    .ok_or_else(invalid)?;
+    let expect = B64.encode(Sha256::digest(r.verifier.as_bytes()));
+    if !crate::config::ct_eq(expect.as_bytes(), challenge.as_bytes()) {
+        return Err(invalid());
+    }
+    session_response(&st.pool, &headers, uid, false).await
 }
 
 #[cfg(test)]
@@ -1086,6 +1175,7 @@ mod tests {
                 issued_at: chrono::Utc::now().timestamp(),
                 link_user: None,
                 session_hash: None,
+                app_challenge: None,
             })
             .unwrap(),
         );

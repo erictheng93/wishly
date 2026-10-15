@@ -51,6 +51,9 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM idempotency_keys WHERE created_at < now() - interval '24 hours'")
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM native_auth_codes WHERE expires_at < now()")
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM rate_limits WHERE window_start < now() - interval '2 days'")
         .execute(pool)
         .await?;
