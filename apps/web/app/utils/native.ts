@@ -64,32 +64,32 @@ let cancelPending: (() => void) | null = null
 
 /**
  * 原生殼 OAuth（系統瀏覽器 + deep link + PKCE）：先監聽 wishsync://auth，再開瀏覽器，等到 ?code=（或 ?error=）。
- * 回傳一次性碼與 verifier，由呼叫端 POST /auth/native/exchange 兌換。
+ * 登入回 ?code=（連同 verifier 交呼叫端 POST /auth/native/exchange 兌換）；綁定回 ?linked=<provider>。
  * 同時只保留一次進行中的嘗試（舊的以 'cancelled' 拒絕），否則過期嘗試會拿新的 deep link 去兌換並燒掉碼。
  * ponytail: verifier 只放記憶體；若 OS 在使用者登入期間回收 App，需重新登入。
  */
-export async function nativeOAuth(startUrl: (challenge: string) => string): Promise<{ code: string; verifier: string }> {
+export async function nativeOAuth(startUrl: (challenge: string) => string | Promise<string>): Promise<{ code?: string; linked?: string; verifier: string }> {
   cancelPending?.()
   const [{ onOpenUrl }, { openUrl }] = await Promise.all([import('@tauri-apps/plugin-deep-link'), import('@tauri-apps/plugin-opener')])
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)))
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
-  let settle!: (r: { code?: string; error?: string }) => void
-  const result = new Promise<{ code?: string; error?: string }>((r) => { settle = r })
+  let settle!: (r: { code?: string; linked?: string; error?: string }) => void
+  const result = new Promise<{ code?: string; linked?: string; error?: string }>((r) => { settle = r })
   const timer = setTimeout(() => settle({ error: 'timeout' }), 5 * 60_000)
   const off = await onOpenUrl((urls) => {
     for (const u of urls) {
       if (!u.startsWith(CALLBACK)) continue
       const p = new URL(u).searchParams
-      settle({ code: p.get('code') || undefined, error: p.get('error') || 'oauth_failed' })
+      settle({ code: p.get('code') || undefined, linked: p.get('linked') || undefined, error: p.get('error') || 'oauth_failed' })
     }
   })
   const cancel = () => settle({ error: 'cancelled' })
   cancelPending = cancel
   try {
-    await openUrl(startUrl(challenge))
+    await openUrl(await startUrl(challenge))
     const r = await result
-    if (!r.code) throw new Error(r.error)
-    return { code: r.code, verifier }
+    if (!r.code && !r.linked) throw new Error(r.error)
+    return { code: r.code, linked: r.linked, verifier }
   } finally {
     clearTimeout(timer)
     off()

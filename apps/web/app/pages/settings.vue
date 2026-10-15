@@ -19,9 +19,20 @@ const profileUrl = computed(() => user.value?.handle ? `${siteOrigin()}/u/${user
 const hBad = computed(() => !!handle.value && !isValidHandle(handle.value))
 const exporting = ref(false)
 const showDel = ref(false), word = ref(''), delBusy = ref(false), delErr = ref('')
+const LINK_ERRORS: Record<string, string> = { oauth_failed: '綁定失敗，請重新操作並確認登入帳號', oauth_unavailable: '此登入方式尚未開放', identity_in_use: '此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。', provider_already_linked: '已綁定此登入方式，請先解除後再更換' }
+// 網頁版整頁導向供應商再回來；原生殼等 deep link 回來後就地更新
+async function linkOAuth(p: (typeof providers)[number]) {
+  if (identityBusy.value || p.provider === 'email') return
+  identityBusy.value = true; identityErr.value = identityMsg.value = ''
+  try {
+    await oauth(p.provider, '/settings', true)
+    if (isNative()) identityMsg.value = `已綁定 ${p.label}`
+  } catch (e: any) {
+    if (e.message !== 'cancelled') identityErr.value = LINK_ERRORS[e.message] || errMsg(e)
+  } finally { identityBusy.value = false }
+}
 onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
-  const errors: Record<string, string> = { oauth_failed: '綁定失敗，請重新操作並確認登入帳號', oauth_unavailable: '此登入方式尚未開放', identity_in_use: '此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。', provider_already_linked: '已綁定此登入方式，請先解除後再更換' }
-  identityErr.value = errors[String(route.query.error)] ?? ''
+  identityErr.value = LINK_ERRORS[String(route.query.error)] ?? ''
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = `已綁定 ${label}`
 })
@@ -120,11 +131,10 @@ async function remove() {
           <li v-for="p in providers" :key="p.provider" class="c-row">
             <span class="c-grow">{{ p.label }} <small class="c-mute">{{ linked.has(p.provider) ? '已綁定' : '未綁定' }}</small></span>
             <button v-if="linked.has(p.provider)" type="button" class="c-btn" :aria-label="`解除 ${p.label} 綁定`" :disabled="identityBusy || linked.size <= 1" @click="removingProvider = p.provider; identityErr = ''">解除綁定</button>
-            <button v-else-if="p.provider !== 'email' && !isNative()" type="button" class="c-btn" :disabled="identityBusy" @click="oauth(p.provider, '/settings', true)">綁定 {{ p.label }}</button>
+            <button v-else-if="p.provider !== 'email'" type="button" class="c-btn" :disabled="identityBusy" @click="linkOAuth(p)">綁定 {{ p.label }}</button>
           </li>
         </ul>
         <p v-if="linked.size <= 1" class="c-mute">先新增另一種登入方式，才能解除目前的方式。</p>
-        <p v-if="isNative()" class="c-mute">Google／LINE 綁定請使用網頁版。</p>
         <form v-if="!linked.has('email')" @submit.prevent="sentEmail ? verifyLinkEmail() : sendLinkEmail()">
           <label class="c-field"><span>綁定 Email</span><input v-model="linkEmail" type="email" autocomplete="email" maxlength="254" :disabled="!!sentEmail || identityBusy" required></label>
           <template v-if="sentEmail">

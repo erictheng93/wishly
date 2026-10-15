@@ -31,6 +31,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/oauth/{provider}/start", get(oauth_start))
         .route("/auth/oauth/{provider}/callback", get(oauth_callback))
         .route("/auth/native/exchange", post(native_exchange))
+        .route("/auth/oauth/{provider}/link-ticket", post(link_ticket))
         .route("/auth/logout", post(logout))
         .merge(crate::auth_ext::routes())
         .merge(crate::identities::routes())
@@ -740,6 +741,8 @@ struct StartQ {
     #[serde(default)]
     native: bool,
     app_challenge: Option<String>,
+    /// 原生殼綁定：由 POST /auth/oauth/{provider}/link-ticket 取得的一次性 ticket
+    ticket: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -782,19 +785,34 @@ async fn oauth_start(
     }
     let app_challenge = if q.native {
         match q.app_challenge.as_deref() {
-            Some(c) if valid_challenge(c) && !q.link => Some(c.to_string()),
+            Some(c) if valid_challenge(c) => Some(c.to_string()),
             _ => {
                 return Err(AppError::invalid(
                     "/app_challenge",
                     "FORMAT",
-                    "native 需要 43 字元的 app_challenge，且不可與 link 併用",
+                    "native 需要 43 字元的 app_challenge",
                 ))
             }
         }
     } else {
         None
     };
-    let (link_user, session_hash) = if q.link {
+    let (link_user, session_hash) = if let (true, Some(challenge)) = (q.link, &app_challenge) {
+        // 原生殼：系統瀏覽器沒有 session，改以 App 預先換好的 ticket 帶出身分（單次、綁 app_challenge）
+        let ticket = q
+            .ticket
+            .as_deref()
+            .ok_or_else(|| AppError::invalid("/ticket", "REQUIRED", "原生綁定需要 ticket"))?;
+        let row: Option<(Uuid, Option<Vec<u8>>)> = sqlx::query_as(
+            "DELETE FROM native_auth_codes WHERE code_hash=$1 AND purpose='link' AND challenge=$2 AND expires_at > now() RETURNING user_id, session_hash",
+        )
+        .bind(hash_token(ticket))
+        .bind(challenge)
+        .fetch_optional(&st.pool)
+        .await?;
+        let (uid, sh) = row.ok_or(AppError::Unauthorized)?;
+        (Some(uid), sh.map(hex::encode))
+    } else if q.link {
         let u = CurrentUser::from_request_parts(&mut parts, &st).await?;
         crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
         (
@@ -822,11 +840,15 @@ async fn oauth_start(
             StatusCode::FOUND,
             [(
                 header::LOCATION,
-                format!(
-                    "{}/{}?error=oauth_unavailable",
-                    app_url(),
-                    if q.link { "settings" } else { "login" }
-                ),
+                if app_challenge.is_some() {
+                    format!("{}?error=oauth_unavailable", native_redirect())
+                } else {
+                    format!(
+                        "{}/{}?error=oauth_unavailable",
+                        app_url(),
+                        if q.link { "settings" } else { "login" }
+                    )
+                },
             )],
         )
             .into_response()
@@ -998,7 +1020,12 @@ async fn oauth_callback(
     {
         return Ok(fail("oauth_failed"));
     }
-    let session_hash = crate::session::session_token(&headers).map(|t| hash_token(&t));
+    // 原生殼綁定：callback 在系統瀏覽器，沒有 session；身分與 session 已由 ticket 簽進 state
+    let session_hash = if s.app_challenge.is_some() {
+        s.session_hash.as_deref().and_then(|h| hex::decode(h).ok())
+    } else {
+        crate::session::session_token(&headers).map(|t| hash_token(&t))
+    };
     if let Some(id) = s.link_user {
         if session_hash.as_ref().map(hex::encode) != s.session_hash {
             return Ok(fail("oauth_failed"));
@@ -1042,7 +1069,11 @@ async fn oauth_callback(
                     AppendHeaders([
                         (
                             header::LOCATION,
-                            format!("{}/settings?linked={provider}", app_url()),
+                            if s.app_challenge.is_some() {
+                                format!("{}?linked={provider}", native_redirect())
+                            } else {
+                                format!("{}/settings?linked={provider}", app_url())
+                            },
                         ),
                         (header::SET_COOKIE, clear),
                     ]),
@@ -1106,6 +1137,44 @@ async fn oauth_callback(
 }
 
 #[derive(Deserialize)]
+struct TicketReq {
+    app_challenge: String,
+}
+
+/// 原生殼綁定第三方帳號：以 Bearer 身分換一張 60 秒、單次、綁 app_challenge 與目前 session 的 ticket。
+async fn link_ticket(
+    State(st): State<AppState>,
+    Path(provider): Path<String>,
+    headers: HeaderMap,
+    u: CurrentUser,
+    Json(r): Json<TicketReq>,
+) -> Result<Json<Value>, AppError> {
+    if !native_client(&headers) {
+        return Err(AppError::problem(403, "NATIVE_ONLY", "僅限原生客戶端"));
+    }
+    if provider != "line" && provider != "google" {
+        return Err(AppError::invalid(
+            "/provider",
+            "ENUM",
+            "provider 須為 line 或 google",
+        ));
+    }
+    if !valid_challenge(&r.app_challenge) {
+        return Err(AppError::invalid(
+            "/app_challenge",
+            "FORMAT",
+            "需要 43 字元的 app_challenge",
+        ));
+    }
+    crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
+    let session_hash = crate::session::session_token(&headers).map(|t| hash_token(&t));
+    let ticket = rand_b64(32);
+    sqlx::query("INSERT INTO native_auth_codes (code_hash, user_id, challenge, expires_at, purpose, session_hash) VALUES ($1,$2,$3, now() + interval '60 seconds','link',$4)")
+        .bind(hash_token(&ticket)).bind(u.id).bind(&r.app_challenge).bind(session_hash).execute(&st.pool).await?;
+    Ok(Json(json!({ "ticket": ticket })))
+}
+
+#[derive(Deserialize)]
 struct ExchangeReq {
     code: String,
     verifier: String,
@@ -1124,7 +1193,7 @@ async fn native_exchange(
     let invalid =
         || AppError::problem(400, "NATIVE_CODE_INVALID", "登入碼無效或已過期，請重新登入");
     let (uid, challenge): (Uuid, String) = sqlx::query_as(
-        "DELETE FROM native_auth_codes WHERE code_hash=$1 AND expires_at > now() RETURNING user_id, challenge",
+        "DELETE FROM native_auth_codes WHERE code_hash=$1 AND purpose='login' AND expires_at > now() RETURNING user_id, challenge",
     )
     .bind(hash_token(&r.code))
     .fetch_optional(&st.pool)

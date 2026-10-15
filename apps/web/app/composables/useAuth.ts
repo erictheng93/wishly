@@ -27,10 +27,16 @@ export function useAuth() {
   const requestReset = (email: string) => post('/auth/password/reset/request', { email })
   const confirmReset = (email: string, code: string, new_password: string) => post('/auth/password/reset/confirm', { email, code, new_password })
   async function oauth(provider: 'google' | 'line', redirect = '/dashboard', link = false) {
-    // 原生殼：系統瀏覽器登入後以 deep link 回 App，再憑 verifier 兌換權杖（不支援 link）
-    if (isNative() && !link) {
-      const { code, verifier } = await nativeOAuth(c => `${base}/auth/oauth/${provider}/start?native=true&app_challenge=${c}`)
-      return session('/auth/native/exchange', { code, verifier })
+    // 原生殼：系統瀏覽器完成後以 deep link 回 App。登入憑 verifier 兌換權杖；
+    // 綁定因瀏覽器沒有 session，先以 Bearer 換一張綁 app_challenge 的一次性 ticket
+    if (isNative()) {
+      const start = `${base}/auth/oauth/${provider}/start?native=true`
+      const r = await nativeOAuth(async (c) => {
+        if (!link) return `${start}&app_challenge=${c}`
+        const { ticket } = await api(`/auth/oauth/${provider}/link-ticket`, { method: 'POST', body: { app_challenge: c }, noRedirect: true })
+        return `${start}&link=true&app_challenge=${c}&ticket=${encodeURIComponent(ticket)}`
+      })
+      return link ? fetchMe(true) : session('/auth/native/exchange', { code: r.code, verifier: r.verifier })
     }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
