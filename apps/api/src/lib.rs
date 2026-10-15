@@ -11,6 +11,7 @@ pub mod dashboard;
 pub mod error;
 pub mod friends;
 pub mod guest;
+pub mod health;
 pub mod idempotency;
 pub mod identities;
 pub mod notify;
@@ -38,6 +39,7 @@ pub struct AppState {
 /// 各模組各自提供 `routes()`，在此合併；新增模組只動這一處。
 pub fn app(state: AppState) -> Router {
     Router::new()
+        .merge(health::routes())
         .nest(
             "/api/v1",
             Router::new()
