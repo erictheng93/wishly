@@ -122,7 +122,7 @@ it('fund submits trimmed message and list access; busy state prevents another cl
   expect(api).toHaveBeenCalledTimes(1)
   expect(api.mock.calls[0]).toEqual(['/items/item/contributions', {
     method: 'POST', headers: { 'Idempotency-Key': expect.any(String), 'X-List-Access': 'list-access' }, noRedirect: true,
-    body: { points: 300, message: '生日快樂', is_anonymous: true },
+    body: { points: 300, message: '生日快樂', is_anonymous: true, visibility: 'private' },
   }])
   request.resolve({ id: 'funded', points: 300 }); await flush()
   expect(done).toHaveBeenCalledWith({ id: 'funded', points: 300 })
@@ -159,4 +159,23 @@ it('offline sheets disable their submit buttons', async () => {
   mounted!.unmount()
   const fundEl = await fund(false)
   expect(fundEl.querySelector<HTMLButtonElement>('button.g-btn:not(.ghost)')!.disabled).toBe(true)
+})
+
+it('fund visibility defaults to the account setting and the user can change it before submitting', async () => {
+  const el = await fund()
+  const select = el.querySelector<HTMLSelectElement>('#fv')!
+  expect(select.value).toBe('private')
+  select.value = 'public'; select.dispatchEvent(new Event('change', { bubbles: true })); await nextTick()
+  api.mockClear(); api.mockResolvedValue({ id: 'funded' })
+  await input(el, '#fp', '100'); await submit(el); await flush()
+  expect(api.mock.calls[0][1].body).toMatchObject({ points: 100, visibility: 'public' })
+})
+
+it('fund without a loaded account default hides the picker and lets the server apply the default', async () => {
+  vi.stubGlobal('useAuth', () => ({ fetchMe: () => Promise.reject(new Error('offline')) }))
+  const el = await fund()
+  expect(el.querySelector('#fv')).toBeNull()
+  api.mockClear(); api.mockResolvedValue({ id: 'funded' })
+  await input(el, '#fp', '100'); await submit(el); await flush()
+  expect(api.mock.calls[0][1].body.visibility).toBeUndefined()
 })

@@ -5,6 +5,9 @@ import '~/assets/guest.css'
 const props = defineProps<{ item: any, online: boolean, slug: string, loggedInName?: string }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [] }>()
 const { api } = useApi()
+// 預設帶帳號的 default_claim_visibility（分享頁不會預先載入 /me，這裡自己抓）；載入前不送，由伺服器套預設
+const vis = ref<string | undefined>()
+useAuth().fetchMe().then(u => { vis.value ??= u?.default_claim_visibility }).catch(() => { /* 取不到就讓伺服器套預設 */ })
 
 const key = ref(crypto.randomUUID())
 const remaining = computed(() => props.item.remaining_points ?? 0)
@@ -27,7 +30,7 @@ async function submit() {
   try {
     const r = await api(`/items/${props.item.id}/contributions`, {
       method: 'POST', headers: { 'Idempotency-Key': key.value, ...(getActiveAccess() ? { 'X-List-Access': getActiveAccess()! } : {}) }, noRedirect: true, // 密碼清單權杖
-      body: { points: points.value, message: message.value.trim() || undefined, is_anonymous: anon.value },
+      body: { points: points.value, message: message.value.trim() || undefined, is_anonymous: anon.value, visibility: vis.value },
     })
     emit('done', r)
   } catch (e: any) {
@@ -62,6 +65,10 @@ async function submit() {
       <label for="fm">留言（選填）</label>
       <input id="fm" v-model="message" maxlength="200" :readonly="busy">
       <label class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">匿名贊助（頁面上顯示為「匿名朋友」）</label>
+      <template v-if="vis">
+        <label for="fv">這筆贊助誰看得到</label>
+        <select id="fv" v-model="vis" :disabled="busy"><option value="public">公開</option><option value="friends">僅好友</option><option value="private">私人</option></select>
+      </template>
       <p class="g-mute">點數用於平台代購，達標後由平台下單寄給壽星，不會轉成現金給建立者。</p>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}
         <NuxtLink v-if="needWallet" to="/me/wallet">查看我的點數</NuxtLink>
