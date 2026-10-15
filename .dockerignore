@@ -1,0 +1,13 @@
+**/target
+**/node_modules
+**/.git
+.git
+.github
+apps/web
+apps/api/tests
+apps/api/examples
+docs
+design
+scripts
+*.md
+.env
