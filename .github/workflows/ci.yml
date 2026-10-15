@@ -103,7 +103,13 @@ jobs:
       - run: cargo test --manifest-path apps/web/src-tauri/Cargo.toml --lib
       - uses: taiki-e/install-action@v2
         with: { tool: cargo-audit@0.22.2 }
-      - run: cargo audit --file apps/web/src-tauri/Cargo.lock
+      # 暫時接受既有 GTK3 依賴風險，待 Tauri #16170 整鏈升級後移除；不是漏洞修補。
+      # RUSTSEC-2024-0429：glib 的 Linux VariantStrIter 問題；發布 Linux 原生殼前須重評估。
+      # RUSTSEC-2024-0370：proc-macro-error 停止維護，無已知漏洞；不改用已封存的 error2。
+      - run: >-
+          cargo audit --file apps/web/src-tauri/Cargo.lock
+          --ignore RUSTSEC-2024-0429
+          --ignore RUSTSEC-2024-0370
   e2e:
     if: github.event_name != 'schedule'
     # Playwright 端對端測試（見 README「測試」）：真實的 API + Web + Postgres + Mailpit
