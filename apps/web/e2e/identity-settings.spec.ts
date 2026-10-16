@@ -5,9 +5,9 @@ test('註冊入口保留第三方登入與導向', async ({ page }) => {
   await page.goto('/register?redirect=/lists/new')
   await expect(page.getByRole('button', { name: '使用 Google 繼續' })).toBeVisible()
   await expect(page.getByRole('button', { name: '使用 LINE 繼續' })).toBeVisible()
-  await page.screenshot({ path: '/tmp/wishsync-register-desktop.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/wishly-register-desktop.png', fullPage: true })
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.screenshot({ path: '/tmp/wishsync-register-mobile.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/wishly-register-mobile.png', fullPage: true })
   let startUrl = ''
   await page.route('**/auth/oauth/google/start?**', route => { startUrl = route.request().url(); return route.abort() })
   await page.getByRole('button', { name: '使用 Google 繼續' }).click()
@@ -28,10 +28,10 @@ test('LINE 設定：補 Email、OTP 驗證、解除綁定及最後登入方式�
   await expect(logins.getByRole('button', { name: '解除 LINE 綁定' })).toBeDisabled()
   await expect(page.getByLabel(/有人認領時寄 Email/)).toBeDisabled()
   await expect(page.getByText('尚未綁定 Email，無法收取通知信或使用密碼重設。')).toBeVisible()
-  await page.screenshot({ path: '/tmp/wishsync-settings-desktop.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/wishly-settings-desktop.png', fullPage: true })
   await page.setViewportSize({ width: 390, height: 844 })
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await page.screenshot({ path: '/tmp/wishsync-settings-mobile.png', fullPage: true })
+  await page.screenshot({ path: '/tmp/wishly-settings-mobile.png', fullPage: true })
   const email = newEmail('link')
   await logins.getByLabel('綁定 Email').fill(email)
   await logins.getByRole('button', { name: '寄送綁定驗證碼' }).click()
@@ -53,7 +53,7 @@ for (const [error, message] of [
   test(`OAuth 登入錯誤顯示原因：${error}`, async ({ page }) => {
     await page.goto(`/login?error=${error}`)
     await expect(page.getByRole('alert')).toHaveText(message!)
-    if (error === 'account_blocked') await page.screenshot({ path: '/tmp/wishsync-account-blocked.png', fullPage: true })
+    if (error === 'account_blocked') await page.screenshot({ path: '/tmp/wishly-account-blocked.png', fullPage: true })
   })
 }
 

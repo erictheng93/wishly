@@ -4,7 +4,7 @@ mod file_store;
 use keyring::Entry;
 
 #[cfg(not(target_os = "android"))]
-const SERVICE: &str = "tw.wishsync.app";
+const SERVICE: &str = "tw.wishly.app";
 #[cfg(not(target_os = "android"))]
 const USER: &str = "session";
 
@@ -174,7 +174,7 @@ mod command_tests {
         ) -> keyring::Result<Box<Credential>> {
             assert_eq!(
                 (target, service, user),
-                (None, "tw.wishsync.app", "session")
+                (None, "tw.wishly.app", "session")
             );
             Ok(Box::new(Store(self.0.clone())))
         }

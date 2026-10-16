@@ -441,7 +441,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 </ul></div>
 <div class="story"><span class="id">US-29 購買與分享電子禮物卡（P2-B）</span>　身為送禮物卡的人，我想買禮物卡並用 LINE 傳給對方。
 <ul>
-<li><b>Given</b> 我已登入，<b>When</b> 我選擇面額（300 / 500 / 1,000 / 2,000 / 3,000）、數量 1 至 10 張、祝福語與卡面主題並付款，<b>Then</b> 建立 <code>gift_card_orders</code>，付款成功後產生禮物卡與分享連結 <code>https://app.wishsync.tw/g/{code}</code>；code 16 碼只在產生時顯示一次，DB 存 hash。</li>
+<li><b>Given</b> 我已登入，<b>When</b> 我選擇面額（300 / 500 / 1,000 / 2,000 / 3,000）、數量 1 至 10 張、祝福語與卡面主題並付款，<b>Then</b> 建立 <code>gift_card_orders</code>，付款成功後產生禮物卡與分享連結 <code>https://wishly.tw/g/{code}</code>；code 16 碼只在產生時顯示一次，DB 存 hash。</li>
 <li><b>Given</b> 我開啟 <code>/gift</code>，<b>When</b> 查看已購，<b>Then</b> <code>GET /gift-cards/purchased</code> 列出各卡狀態。</li>
 </ul></div>
 <div class="story"><span class="id">US-30 兌換禮物卡（P2-B）</span>　身為收卡者，我想兌換並使用點數。
@@ -712,7 +712,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>拒付風控參數</b>：新帳號 30 天內每日上限 NT$3,000、禮物卡延遲兌換最多 24 小時是否合適，待上線後依數據調整。</li>
 <li><b>救災組織驗證文件</b>：除立案證書與政府單位證明外是否接受其他佐證？審核 SLA 為何？</li>
 <li><b>未來方向（relief）</b>：可讓捐贈者用點數購買目錄物資直送據點，本版不做。</li>
-<li><b>品牌與網域</b>：wishsync.tw 是否已取得？</li>
+<li><b>品牌與網域</b>：已定案為 Wishly，網域 wishly.tw 已取得（Porkbun 註冊、DNS 託管於 Cloudflare）。</li>
 </ol>
 
 </div></main>

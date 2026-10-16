@@ -369,7 +369,7 @@ async fn closes_at_is_optional_and_enforced(pool: PgPool) {
         (409, Some("WISHLIST_CLOSED")),
         "{b}"
     );
-    assert_eq!(wishsync_api::wishlists::close_due(&pool).await.unwrap(), 1);
+    assert_eq!(wishly_api::wishlists::close_due(&pool).await.unwrap(), 1);
     let (_, _, b) = call(&pool, "GET", &uri, &ck(&t), None).await;
     assert_eq!(b["wishlist"]["status"], "closed");
     let (s, _, _) = call(

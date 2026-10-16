@@ -149,7 +149,7 @@ async fn native_oauth_code_exchange(pool: PgPool) {
     let (state, oc) = start(ch.clone()).await;
     let loc = callback(state, oc).await;
     let code = loc
-        .strip_prefix("wishsync://auth?code=")
+        .strip_prefix("wishly://auth?code=")
         .expect(&loc)
         .to_string();
 
@@ -171,7 +171,7 @@ async fn native_oauth_code_exchange(pool: PgPool) {
     let (state, oc) = start(ch).await;
     let code = callback(state, oc)
         .await
-        .strip_prefix("wishsync://auth?code=")
+        .strip_prefix("wishly://auth?code=")
         .unwrap()
         .to_string();
     let (st, _, body) = exchange(code.clone(), verifier.clone(), Some(TAURI)).await;
@@ -193,7 +193,7 @@ async fn native_oauth_code_exchange(pool: PgPool) {
     let (state, oc) = start(challenge(&verifier)).await;
     let code = callback(state, oc)
         .await
-        .strip_prefix("wishsync://auth?code=")
+        .strip_prefix("wishly://auth?code=")
         .unwrap()
         .to_string();
     sqlx::query("UPDATE native_auth_codes SET expires_at = now() - interval '1 second'")
@@ -214,7 +214,7 @@ async fn native_oauth_code_exchange(pool: PgPool) {
     .await;
     assert_eq!(
         h.get(header::LOCATION).unwrap(),
-        "wishsync://auth?error=oauth_failed"
+        "wishly://auth?error=oauth_failed"
     );
 }
 
@@ -374,7 +374,7 @@ async fn native_link_ticket_flow(pool: PgPool) {
     assert_eq!(st, 302);
     assert_eq!(
         h.get(header::LOCATION).unwrap(),
-        "wishsync://auth?linked=line"
+        "wishly://auth?linked=line"
     );
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_identities WHERE user_id=$1 AND provider='line' AND provider_uid='U-link-9'")
         .bind(me.id).fetch_one(&pool).await.unwrap();
@@ -435,6 +435,6 @@ async fn native_link_ticket_flow(pool: PgPool) {
     .await;
     assert_eq!(
         h.get(header::LOCATION).unwrap(),
-        "wishsync://auth?error=oauth_failed"
+        "wishly://auth?error=oauth_failed"
     );
 }

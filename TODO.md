@@ -8,7 +8,7 @@
   - 前置：S2／S3 需要真實後端與具名網域，見下一項。S3 受測鏈路已改為 Cloudflare → Tunnel → VPS（D49），須在最終的 Dokploy／Traefik 組態上測。
 
 - [ ] 正式環境尚未部署（2026-10-15 嘗試部署 Cloudflare Pages 時發現，故未執行）
-  - 後端（Linode VPS／Dokploy，D49）尚無部署證據，`https://api.wishsync.tw` 不確定可連；同時確認 Traefik／Tunnel 的逾時不會截斷 SSE。
+  - 後端（Linode VPS／Dokploy，D49）尚無部署證據，`https://api.wishly.tw` 不確定可連；同時確認 Traefik／Tunnel 的逾時不會截斷 SSE。
   - 取得 Turnstile 網站金鑰（`NUXT_PUBLIC_TURNSTILE_SITE_KEY`，前端建置必填）與後端 `TURNSTILE_SECRET`。
   - 定案正式網域（見 `docs/domain-names.md`）；Pages 專案 `wishsync-web` 已存在，正式部署會覆蓋其目前內容（疑似 demo）。
   - 後端正式機密、`TRUSTED_PROXY=cloudflare`（API 只能經 Tunnel 到達）、S3／R2、`SHIPPING_ENC_KEY` 備份流程（遺失即無法解密收件資訊）。
@@ -48,7 +48,7 @@
   - Android：`npm run tauri:android-init` 實際接上 `tauri android init` 並確認 `allowBackup="false"`；登入、重啟保持登入、登出清除。
   - 後端 `NATIVE_ORIGINS`、`NATIVE_REDIRECT` 與供應商憑證（可與 #6 一併驗）。
 
-- [ ] 原生殼：Universal Link／App Link（取代 `wishsync://` 自訂 scheme）
+- [ ] 原生殼：Universal Link／App Link（取代 `wishly://` 自訂 scheme）
   - 自訂 scheme 可被別的 App 搶註冊；目前靠 PKCE 讓攔截到的碼無法兌換，完整防護仍需 `apple-app-site-association`、`assetlinks.json`。
   - 需要正式網域（見 `docs/domain-names.md`）；同時可處理分享連結直接開 App。
 

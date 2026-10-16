@@ -42,7 +42,7 @@ cargo binstall sqlx-cli cargo-watch        # sqlx-cli：管理 migration；cargo
 docker compose up -d                 # PostGIS、MinIO（模擬 R2）、Mailpit（收 OTP 信：http://localhost:8025）
 
 # 後端（啟動時自動套用 migration）
-export DATABASE_URL=postgres://wishsync:wishsync@localhost:5432/wishsync
+export DATABASE_URL=postgres://wishly:wishly@localhost:5432/wishly
 export APP_ENV=dev   # 必填：未設即視為 production（缺機密 / 密鑰 <32 字元會拒絕啟動，見 apps/api/.env.example）
 cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080
 # 沒有 Rust：scripts/cargo.sh test
@@ -107,7 +107,7 @@ npx playwright show-report                                      # 開啟上次�
 ```
 
 隔離方式（不會干擾開發環境）：
-- 資料庫 `wishsync_e2e`：每次執行前由 `e2e/support/reset-db.mjs` DROP 後重建，API 啟動時自動套用 migrations；開發用的 `wishsync` 資料庫不受影響。
+- 資料庫 `wishly_e2e`：每次執行前由 `e2e/support/reset-db.mjs` DROP 後重建，API 啟動時自動套用 migrations；開發用的 `wishly` 資料庫不受影響。
 - API 用 `127.0.0.1:8081`、Web 用 `127.0.0.1:3012`（`playwright.config.ts` 的 `webServer` 啟動，且不重用既有伺服器；連接埠被佔用會直接失敗）。Web 是 production build + node-server（`e2e/.app` 是獨立 buildDir 的 Nuxt layer，不會覆蓋開發中的 `.nuxt`）。
 - 每個測試自建唯一資料（唯一 email、唯一清單），所以可平行（本機 3 workers、CI 2）。後端限流以身分計（email / guest / user），每 IP 的額度（新訪客 100/小時、檢舉 10/小時、登入失敗 30/15 分鐘）遠大於整個測試集的用量；後端不信任 `X-Forwarded-For`，所以測試也不靠它。
 - 同一 email 的 OTP 有 60 秒間隔（登入 / 註冊 / 重設共用），需要連續寄第二封時，測試用 `skipOtpCooldown(email)` 把舊紀錄往前推。
@@ -120,7 +120,7 @@ npx playwright show-report                                      # 開啟上次�
 - 後端：`DATABASE_URL`；其餘（SMTP、LINE Login 等）見 `apps/api/.env.example`
   - `BIND`：預設 `127.0.0.1:8080`（dev、production 皆是）。容器內部署需明確設 `BIND=0.0.0.0:8080`，且只讓 Cloudflare Tunnel / 內網可達。
   - `NATIVE_ORIGINS`：額外允許的 CORS 來源（逗號分隔），給 Tauri webview：`tauri://localhost`（macOS / iOS / Linux）、`http://tauri.localhost`（Windows / Android）。dev 預設全含；**production 未設就只允許 `APP_URL`**。原生殼不送 cookie，以 `X-Native-Client: 1` 登入取回 `session_token`，之後用 `Authorization: Bearer`（與 cookie 共用同一張 `sessions`）；只有 `Origin` 屬於 `NATIVE_ORIGINS` 才會發 `session_token`，網頁版 origin 即使送了 header 也拿不到。Tauri 殼在 `apps/web/src-tauri`（權杖存 OS keychain；Android 改存 App 私有目錄，見其 README），建置方式見其 `README.md`。
-  - `NATIVE_REDIRECT`：原生殼 OAuth 完成後導回 App 的 deep link 基底（預設 `wishsync://auth`）。流程：App 帶 `start?native=true&app_challenge=<S256>` 開系統瀏覽器 → callback 302 到 `wishsync://auth?code=…`（失敗為 `?error=…`）→ App 以 `POST /auth/native/exchange {code, verifier}`（需 `X-Native-Client` 且 Origin ∈ `NATIVE_ORIGINS`）換 `session_token`；碼 60 秒、單次使用、只存雜湊。
+  - `NATIVE_REDIRECT`：原生殼 OAuth 完成後導回 App 的 deep link 基底（預設 `wishly://auth`）。流程：App 帶 `start?native=true&app_challenge=<S256>` 開系統瀏覽器 → callback 302 到 `wishly://auth?code=…`（失敗為 `?error=…`）→ App 以 `POST /auth/native/exchange {code, verifier}`（需 `X-Native-Client` 且 Origin ∈ `NATIVE_ORIGINS`）換 `session_token`；碼 60 秒、單次使用、只存雜湊。
   - `TRUSTED_PROXY`：`cloudflare` 或 `none`。dev 預設 `none`；**production 必須明確設定**，未設或其他值會拒絕啟動（不設會讓所有使用者看起來來自同一 IP，使每 IP 限流變成全域限流）。設 `cloudflare` 時信任 `CF-Connecting-IP`，所以 API 不可被直接存取，否則該標頭可被偽造；若 `BIND` 不是回送位址，啟動時會印出 WARN。
   - `TURNSTILE_SECRET`：production 必填；檢舉的 `turnstile_token` 會送 siteverify 驗證，失敗回 403 `FORBIDDEN`。dev/test 不設則略過驗證（接受任何 token，含前端的 `dev-bypass`）。`TURNSTILE_VERIFY_URL` 僅測試時覆寫。
   - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。production 使用 Cloudflare R2：`S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`、`S3_REGION=auto`（程式以 path-style 簽名）、`S3_PUBLIC_BASE` 為綁定 bucket 的自訂網域；API Token 只給該 bucket 的 Object Read & Write。`incoming/` 前綴放尚未去 EXIF 的原圖，**不得對外公開**，見 `docs/deploy-backend-checklist.md` §2.2。
@@ -145,8 +145,8 @@ npx playwright show-report                                      # 開啟上次�
 
 | 指令（在 `apps/web`） | 建置時設定 | 行為 |
 |---|---|---|
-| `npm run deploy`（正式） | `NUXT_DEMO` 清空；API 預設 `https://api.wishsync.tw` | 分享連結走真實 API，`/s/demo` 不會有假資料 |
-| `npm run build:native`（Tauri 前端） | `NUXT_NATIVE=1`、`NUXT_PUBLIC_SITE_URL`（分享連結網域，預設 `https://wishsync.tw`）、`NUXT_PUBLIC_API_BASE` | 純 SPA 靜態檔 `.output/public`（無 SSR、無 service worker、隱藏第三方登入）；Tauri 的 `frontendDist` 指向它。尚未包 Tauri 專案 |
+| `npm run deploy`（正式） | `NUXT_DEMO` 清空；API 預設 `https://api.wishly.tw` | 分享連結走真實 API，`/s/demo` 不會有假資料 |
+| `npm run build:native`（Tauri 前端） | `NUXT_NATIVE=1`、`NUXT_PUBLIC_SITE_URL`（分享連結網域，預設 `https://wishly.tw`）、`NUXT_PUBLIC_API_BASE` | 純 SPA 靜態檔 `.output/public`（無 SSR、無 service worker、隱藏第三方登入）；Tauri 的 `frontendDist` 指向它。尚未包 Tauri 專案 |
 | `npm run deploy:demo`（示範） | `NUXT_DEMO=1`、`NUXT_PUBLIC_API_BASE=` | 僅 `/s/demo` 有同源假資料，其餘分享連結失敗；**不要給真實使用者** |
 
 - 正式 API 網域不同時，建置前設 `NUXT_PUBLIC_API_BASE=https://...`，或改 `nuxt.config.ts` 預設值。
@@ -169,7 +169,7 @@ npx playwright show-report                                      # 開啟上次�
 - **金絲雀**：用營運帳號建一份 friends 金絲雀清單、另一個帳號加為好友，部署後（或排程）跑：
 
   ```sh
-  API_BASE=https://api.wishsync.tw CANARY_SLUG=<friends 清單> CANARY_FRIEND_COOKIE='ws_session=<好友 session>' \
+  API_BASE=https://api.wishly.tw CANARY_SLUG=<friends 清單> CANARY_FRIEND_COOKIE='ws_session=<好友 session>' \
   CANARY_PUBLIC_SLUG=<public 清單> node scripts/cdn-canary.mjs   # 失敗 exit 1
   ```
 

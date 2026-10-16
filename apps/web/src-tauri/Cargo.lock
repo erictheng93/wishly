@@ -5098,7 +5098,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wishsync"
+name = "wishly"
 version = "0.1.0"
 dependencies = [
  "keyring",

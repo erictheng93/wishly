@@ -1,4 +1,4 @@
-// QA 探索共用工具：獨立資源 wishsync_qa / API :8082 / Web :3014
+// QA 探索共用工具：獨立資源 wishly_qa / API :8082 / Web :3014
 import { request as pwRequest, chromium } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -17,8 +17,8 @@ export const PASSWORD = 'qa-Passw0rd!'
 export const uid = () => randomBytes(4).toString('hex')
 export { chromium, pwRequest, randomUUID }
 
-export function sql(stmt, db = 'wishsync_qa') {
-  return execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'wishsync', '-d', db, '-v', 'ON_ERROR_STOP=1', '-tA', '-c', stmt], { cwd: ROOT, encoding: 'utf8' }).trim()
+export function sql(stmt, db = 'wishly_qa') {
+  return execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'wishly', '-d', db, '-v', 'ON_ERROR_STOP=1', '-tA', '-c', stmt], { cwd: ROOT, encoding: 'utf8' }).trim()
 }
 export const q = s => String(s).replace(/'/g, "''")
 

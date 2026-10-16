@@ -124,7 +124,7 @@ async fn problem_json(res: axum::response::Response) -> axum::response::Response
         _ => ("BAD_REQUEST", "請求格式不正確"),
     };
     let body = serde_json::json!({
-        "type": format!("https://wishsync.tw/problems/{}", code.to_lowercase().replace('_', "-")),
+        "type": format!("https://wishly.tw/problems/{}", code.to_lowercase().replace('_', "-")),
         "title": title, "status": st.as_u16(), "code": code, "detail": title,
     });
     let mut out = (st, axum::Json(body)).into_response();

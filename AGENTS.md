@@ -13,7 +13,7 @@ Wishly is a wishlist-sharing application with guest item claims.
 
 Run these from the repository root unless indicated otherwise:
 - `docker compose up -d`: start PostGIS, MinIO, and Mailpit.
-- Export `DATABASE_URL=postgres://wishsync:wishsync@localhost:5432/wishsync` and `APP_ENV=dev` before starting the API.
+- Export `DATABASE_URL=postgres://wishly:wishly@localhost:5432/wishly` and `APP_ENV=dev` before starting the API.
 - `cargo run --manifest-path apps/api/Cargo.toml`: serve the API on port 8080.
 - `cargo build --manifest-path apps/api/Cargo.toml`: compile the backend.
 - `cargo test --manifest-path apps/api/Cargo.toml`: run backend tests; `scripts/cargo.sh test` is the Docker alternative.

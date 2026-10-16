@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
-use wishsync_api::{app, AppState};
+use wishly_api::{app, AppState};
 
 use common::*;
 

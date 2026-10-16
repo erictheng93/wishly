@@ -8,7 +8,7 @@ use axum::{
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{claims, guest, ratelimit, reports, uploads, AppState};
+use wishly_api::{claims, guest, ratelimit, reports, uploads, AppState};
 
 fn app(pool: &PgPool) -> Router {
     Router::new()
@@ -206,7 +206,7 @@ async fn report_known_reporter_duplicate_returns_same_id(pool: PgPool) {
     let g: Uuid = sqlx::query_scalar(
         "INSERT INTO guests (guest_token_hash, display_name) VALUES ($1, 'g') RETURNING id",
     )
-    .bind(wishsync_api::session::hash_token("tok"))
+    .bind(wishly_api::session::hash_token("tok"))
     .fetch_one(&pool)
     .await
     .unwrap();

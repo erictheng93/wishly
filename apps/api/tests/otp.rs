@@ -11,9 +11,9 @@ use common::*;
 async fn recover_code(pool: &PgPool, email: &str) -> String {
     let code = "123456";
     sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE email=$2 AND consumed_at IS NULL")
-        .bind(wishsync_api::auth::code_hash(
+        .bind(wishly_api::auth::code_hash(
             code,
-            &wishsync_api::config::get().otp_pepper,
+            &wishly_api::config::get().otp_pepper,
         ))
         .bind(email)
         .execute(pool)

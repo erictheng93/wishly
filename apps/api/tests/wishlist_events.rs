@@ -36,7 +36,7 @@ async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    wishsync_api::dashboard::notify(&pool, wid).await.unwrap();
+    wishly_api::dashboard::notify(&pool, wid).await.unwrap();
     let mut got = String::new();
     while !got.contains("wishlist.updated") {
         let f = tokio::time::timeout(std::time::Duration::from_secs(5), body.frame())

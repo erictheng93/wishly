@@ -3,20 +3,20 @@ services:
   db:
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_USER: wishsync
-      POSTGRES_PASSWORD: wishsync
-      POSTGRES_DB: wishsync
+      POSTGRES_USER: wishly
+      POSTGRES_PASSWORD: wishly
+      POSTGRES_DB: wishly
     ports: ["5432:5432"]
     volumes: [db:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wishsync"]
+      test: ["CMD-SHELL", "pg_isready -U wishly"]
       interval: 2s
       retries: 30
   minio:
     image: bitnamilegacy/minio:latest   # minio/minio 已自 Docker Hub 下架
     environment:
-      MINIO_ROOT_USER: wishsync
-      MINIO_ROOT_PASSWORD: wishsync-secret
+      MINIO_ROOT_USER: wishly
+      MINIO_ROOT_PASSWORD: wishly-secret
     ports: ["9000:9000", "9001:9001"]
     volumes: [minio:/bitnami/minio/data]
   mailpit:

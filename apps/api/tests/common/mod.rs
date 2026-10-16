@@ -19,7 +19,7 @@ pub type Resp = (StatusCode, HeaderMap, Value);
 pub type Hdr = Vec<(&'static str, String)>;
 
 pub fn test_app(pool: &PgPool) -> Router {
-    wishsync_api::app(wishsync_api::AppState { pool: pool.clone() })
+    wishly_api::app(wishly_api::AppState { pool: pool.clone() })
 }
 
 /// URI 不含 /api/v1；可傳入隔離的 Router 或併發共用的 Router。
@@ -112,14 +112,14 @@ pub fn idem(key: Uuid) -> Hdr {
 }
 pub async fn grant(pool: &PgPool, user: Uuid, n: i64) {
     let mut tx = pool.begin().await.unwrap();
-    let wallet = wishsync_api::points::ensure_wallet(&mut tx, user)
+    let wallet = wishly_api::points::ensure_wallet(&mut tx, user)
         .await
         .unwrap();
-    wishsync_api::points::post(
+    wishly_api::points::post(
         &mut tx,
         wallet,
         n,
-        wishsync_api::points::Entry {
+        wishly_api::points::Entry {
             kind: "grant",
             ref_type: "manual",
             ref_id: None,
@@ -220,7 +220,7 @@ pub fn gt(token: &str) -> Hdr {
 pub async fn session(pool: &PgPool, id: Uuid) -> String {
     let token = Uuid::new_v4().to_string();
     sqlx::query("INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '1 day')")
-        .bind(id).bind(wishsync_api::session::hash_token(&token)).execute(pool).await.unwrap();
+        .bind(id).bind(wishly_api::session::hash_token(&token)).execute(pool).await.unwrap();
     token
 }
 
@@ -309,7 +309,7 @@ pub async fn claimed_wishlist(
         .await
         .unwrap();
     let g: Uuid = sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, contact) VALUES ($1, '秘密客', 'line:secret') RETURNING id")
-        .bind(wishsync_api::session::hash_token(&Uuid::new_v4().to_string())).fetch_one(pool).await.unwrap();
+        .bind(wishly_api::session::hash_token(&Uuid::new_v4().to_string())).fetch_one(pool).await.unwrap();
     sqlx::query(
         "INSERT INTO claims (item_id, guest_id, claimer_name, qty) VALUES ($1, $2, '秘密客', $3)",
     )

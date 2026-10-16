@@ -3,8 +3,8 @@
 # 連到 docker compose 的 db（host.docker.internal:5432）
 cd "$(dirname "$0")/../apps/api" || exit 1
 exec docker run --rm -v "$PWD/../..":/w -w /w/apps/api \
-  -v wishsync-cargo:/usr/local/cargo/registry -v wishsync-target:/w/apps/api/target \
-  -e DATABASE_URL="${DATABASE_URL:-postgres://wishsync:wishsync@host.docker.internal:5432/wishsync}" \
+  -v wishly-cargo:/usr/local/cargo/registry -v wishly-target:/w/apps/api/target \
+  -e DATABASE_URL="${DATABASE_URL:-postgres://wishly:wishly@host.docker.internal:5432/wishly}" \
   -e APP_ENV="${APP_ENV:-dev}" -e SMTP_HOST="${SMTP_HOST:-host.docker.internal}" \
   -e MAILPIT_API_BASE="${MAILPIT_API_BASE:-http://host.docker.internal:8025}" \
   -e SQLX_OFFLINE=false rust:1.99.0 cargo "$@"

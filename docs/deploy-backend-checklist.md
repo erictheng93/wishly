@@ -3,7 +3,7 @@
 **部署架構（PRD D49，2026-10-15 定案）**：前端 Cloudflare Pages；後端與 PostgreSQL 同機部署在 Linode（Akamai）VPS 東京節點，以 Dokploy 管理容器，經 Cloudflare Tunnel 對外；圖片用 Cloudflare R2。單機單實例。
 
 ```
-使用者 → Cloudflare（WAF／CDN）→ Tunnel（cloudflared，出站連線）→ Traefik（Dokploy）→ wishsync-api :8080 → PostgreSQL（同機）
+使用者 → Cloudflare（WAF／CDN）→ Tunnel（cloudflared，出站連線）→ Traefik（Dokploy）→ wishly-api :8080 → PostgreSQL（同機）
 前端：Cloudflare Pages（app.<域名>）        圖片：Cloudflare R2（S3_PUBLIC_BASE，自訂網域）
 ```
 

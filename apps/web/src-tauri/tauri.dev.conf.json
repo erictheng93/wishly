@@ -1,7 +1,7 @@
 {
   "app": {
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:8080 https://api.wishsync.tw ipc: http://ipc.localhost; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'",
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:8080 https://api.wishly.tw ipc: http://ipc.localhost; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'",
       "capabilities": [
         "default",
         "dev"

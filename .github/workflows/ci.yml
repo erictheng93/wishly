@@ -12,15 +12,15 @@ jobs:
     services:
       db:
         image: postgis/postgis:16-3.4
-        env: { POSTGRES_USER: wishsync, POSTGRES_PASSWORD: wishsync, POSTGRES_DB: wishsync }
+        env: { POSTGRES_USER: wishly, POSTGRES_PASSWORD: wishly, POSTGRES_DB: wishly }
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U wishsync" --health-interval 2s --health-retries 30
+          --health-cmd "pg_isready -U wishly" --health-interval 2s --health-retries 30
       mailpit:
         image: axllent/mailpit
         ports: ["1025:1025", "8025:8025"]
     env:
-      DATABASE_URL: postgres://wishsync:wishsync@localhost:5432/wishsync
+      DATABASE_URL: postgres://wishly:wishly@localhost:5432/wishly
       APP_ENV: dev
       SMTP_HOST: localhost
       MAILPIT_API_BASE: http://localhost:8025
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -f apps/api/Dockerfile -t wishsync-api:ci .
+      - run: docker build -f apps/api/Dockerfile -t wishly-api:ci .
   web:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -118,10 +118,10 @@ jobs:
     services:
       db:
         image: postgis/postgis:16-3.4
-        env: { POSTGRES_USER: wishsync, POSTGRES_PASSWORD: wishsync, POSTGRES_DB: wishsync }
+        env: { POSTGRES_USER: wishly, POSTGRES_PASSWORD: wishly, POSTGRES_DB: wishly }
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U wishsync" --health-interval 2s --health-retries 30
+          --health-cmd "pg_isready -U wishly" --health-interval 2s --health-retries 30
       mailpit:
         image: axllent/mailpit
         ports: ["1025:1025", "8025:8025"]
@@ -134,7 +134,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
-      # e2e/support/psql.mjs 用 psql 重建 wishsync_e2e 資料庫
+      # e2e/support/psql.mjs 用 psql 重建 wishly_e2e 資料庫
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: npx playwright install --with-deps chromium
       # 啟動 API / Web 由 playwright.config.ts 的 webServer 負責（cargo build + 重置資料庫 + nuxt build）

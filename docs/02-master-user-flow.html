@@ -146,8 +146,8 @@ flowchart LR
   LINE["LINE Login<br/>+ Messaging API P1"]
   GOOG["Google OAuth"]
   U -->|"HTTPS"| WAF --> CDN
-  CDN -->|"app.wishsync.tw"| PAGES
-  CDN -->|"api.wishsync.tw 未命中"| TUN --> API
+  CDN -->|"wishly.tw"| PAGES
+  CDN -->|"api.wishly.tw 未命中"| TUN --> API
   PAGES -->|"SSR 取資料"| API
   U -->|"presigned PUT 直傳"| R2
   U -->|"公開圖片"| CDN
@@ -1266,7 +1266,7 @@ sequenceDiagram
     B->>A: GET /gift-cards/orders/order_id
     A-->>B: status pending 或 paid
   end
-  A-->>B: paid 時回 cards[].share_url = https://app.wishsync.tw/g/code (可隨時重看補發, LINE 分享)
+  A-->>B: paid 時回 cards[].share_url = https://wishly.tw/g/code (可隨時重看補發, LINE 分享)
   R->>A: GET /public/gift-cards/code (SSR + OG 卡面預覽, no-store)
   A-->>R: 面額, 卡面, 祝福語, 寄送者暱稱, 可否兌換 (code 錯誤一律 404 GIFT_CARD_INVALID)
   R->>A: 登入後 POST /gift-cards/claim (code) + Idempotency-Key + Turnstile
@@ -1745,8 +1745,8 @@ flowchart LR
 </tbody></table>
 <ul>
 <li>以 axum extractor 表達權限：<code>StaffAuth</code>（MVP 起，檢查 <code>is_staff</code>）、<code>WebhookAuth</code>（P2，驗簽）、<code>OwnerAuth</code>、<code>OrgAuth(role≥…)</code>、<code>GuestAuth</code>（修改型，缺少即 401）、<code>OptionalGuest</code>（建立型，缺少則稍後建立新 guest）。handler 簽名即文件，漏接 extractor 無法通過編譯測試中的「所有 route 必須宣告 auth 類型」檢查。</li>
-<li>Cookie 僅由 <code>api.wishsync.tw</code> 設定（host-only）；app 與 api 同站（same-site），SameSite=Lax 下前端 fetch 需 <code>credentials:'include'</code>。Nuxt SSR 呼叫需要登入的端點時，由 Pages 轉送使用者的 Cookie header。</li>
-<li>CSRF：cookie 認證的非安全方法（POST/PATCH/PUT/DELETE）必須驗證 <code>Origin</code> ∈ 白名單（<code>https://app.wishsync.tw</code>），否則 403；以 <code>X-Guest-Token</code> header 認證者不受 CSRF 影響。CORS 僅允許該 origin 並 <code>Allow-Credentials</code>。</li>
+<li>Cookie 僅由 <code>api.wishly.tw</code> 設定（host-only）；app 與 api 同站（same-site），SameSite=Lax 下前端 fetch 需 <code>credentials:'include'</code>。Nuxt SSR 呼叫需要登入的端點時，由 Pages 轉送使用者的 Cookie header。</li>
+<li>CSRF：cookie 認證的非安全方法（POST/PATCH/PUT/DELETE）必須驗證 <code>Origin</code> ∈ 白名單（<code>https://wishly.tw</code>），否則 403；以 <code>X-Guest-Token</code> header 認證者不受 CSRF 影響。CORS 僅允許該 origin 並 <code>Allow-Credentials</code>。</li>
 <li>token 比對一律對 SHA-256 做索引等值查詢，不在應用層用 <code>==</code> 比較明文；明文 token 絕不寫入 log、audit_logs 或 trace。</li>
 </ul>
 
@@ -1889,7 +1889,7 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <p>事件在 COMMIT <strong>之後</strong>送出（回滾不送）；KPI 與事件的對照表在 PRD KPI 章節。</p>
 
 <h2 id="s7">7. 錯誤碼總表</h2>
-<p>格式：<code>application/problem+json</code>，欄位 <code>type</code>（<code>https://api.wishsync.tw/problems/{code 小寫連字號}</code>）、<code>title</code>、<code>status</code>、<code>detail</code>、<code>code</code>，擴充 <code>request_id</code>，驗證錯誤另附 <code>errors[]</code>（欄位路徑與訊息）。本表與 Schema/API 文件的錯誤碼一致。</p>
+<p>格式：<code>application/problem+json</code>，欄位 <code>type</code>（<code>https://api.wishly.tw/problems/{code 小寫連字號}</code>）、<code>title</code>、<code>status</code>、<code>detail</code>、<code>code</code>，擴充 <code>request_id</code>，驗證錯誤另附 <code>errors[]</code>（欄位路徑與訊息）。本表與 Schema/API 文件的錯誤碼一致。</p>
 <table>
 <thead><tr><th>code</th><th>HTTP</th><th>觸發情境</th></tr></thead>
 <tbody>

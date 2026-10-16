@@ -11,8 +11,8 @@ const useLocal = has('psql')
 export function psql(db, sql) {
   const base = ['-v', 'ON_ERROR_STOP=1', '-tA', '-c', sql]
   if (useLocal) {
-    const pw = process.env.E2E_PGPASSWORD ?? 'wishsync'
-    return execFileSync('psql', [`postgres://wishsync:${pw}@localhost:5432/${db}`, ...base], { encoding: 'utf8' })
+    const pw = process.env.E2E_PGPASSWORD ?? 'wishly'
+    return execFileSync('psql', [`postgres://wishly:${pw}@localhost:5432/${db}`, ...base], { encoding: 'utf8' })
   }
-  return execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'wishsync', '-d', db, ...base], { cwd: root, encoding: 'utf8' })
+  return execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'wishly', '-d', db, ...base], { cwd: root, encoding: 'utf8' })
 }

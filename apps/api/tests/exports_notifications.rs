@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::session::hash_token;
+use wishly_api::session::hash_token;
 
 use common::*;
 
@@ -79,7 +79,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    let tok = wishsync_api::account::unsub_token('u', u);
+    let tok = wishly_api::account::unsub_token('u', u);
     let before: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM notifications WHERE user_id=$1 AND status='pending'",
     )
@@ -139,7 +139,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
     assert!(off && pend == 0);
     // 訪客：清 email
     let g: Uuid = sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, email) VALUES ($1,'g','g@example.com') RETURNING id").bind(hash_token("g")).fetch_one(&pool).await.unwrap();
-    let gtok = wishsync_api::account::unsub_token('g', g);
+    let gtok = wishly_api::account::unsub_token('g', g);
     call(
         &pool,
         "GET",

@@ -44,7 +44,7 @@ export default defineConfig({
   webServer: [
     {
       name: 'api',
-      command: 'cargo build --manifest-path ../api/Cargo.toml && node e2e/support/reset-db.mjs && ../api/target/debug/wishsync-api',
+      command: 'cargo build --manifest-path ../api/Cargo.toml && node e2e/support/reset-db.mjs && ../api/target/debug/wishly-api',
       url: `${API}/api/v1/me`, // 未登入回 401；Playwright 視 2xx/3xx/400-403 為已啟動
       ignoreHTTPSErrors: true,
       reuseExistingServer: false,
@@ -52,7 +52,7 @@ export default defineConfig({
       stdout: 'pipe', stderr: 'pipe',
       env: {
         APP_ENV: 'dev',
-        DATABASE_URL: process.env.E2E_DATABASE_URL ?? 'postgres://wishsync:wishsync@localhost:5432/wishsync_e2e',
+        DATABASE_URL: process.env.E2E_DATABASE_URL ?? 'postgres://wishly:wishly@localhost:5432/wishly_e2e',
         BIND: new URL(API).host,
         APP_URL: WEB,
         RUST_LOG: 'warn',

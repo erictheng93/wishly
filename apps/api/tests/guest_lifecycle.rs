@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::session::hash_token;
+use wishly_api::session::hash_token;
 
 use common::*;
 
@@ -122,7 +122,7 @@ async fn guest_delete_and_recover(pool: PgPool) {
 #[test]
 fn confirmation_mail_has_recovery_and_unsubscribe_links() {
     let p = json!({ "recovery_token": "TOK", "unsubscribe_url": "http://x/u?token=1" });
-    let (_, body) = wishsync_api::notify::render("claim.confirmation", "", &p);
+    let (_, body) = wishly_api::notify::render("claim.confirmation", "", &p);
     assert!(
         body.contains("/me/claims#r=TOK") && body.contains("http://x/u?token=1"),
         "{body}"

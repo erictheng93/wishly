@@ -10,7 +10,7 @@ Wishly：願望清單，用連結分享，訪客免註冊即可認領品項，�
 docker compose up -d                       # PostGIS、MinIO（模擬 R2）、Mailpit（OTP 信 http://localhost:8025）
 
 # 後端 apps/api（Rust, axum + sqlx）；啟動時自動套用 db/migrations
-export DATABASE_URL=postgres://wishsync:wishsync@localhost:5432/wishsync
+export DATABASE_URL=postgres://wishly:wishly@localhost:5432/wishly
 export APP_ENV=dev                         # 必設：未設視為 production，缺機密會拒絕啟動
 cargo run --manifest-path apps/api/Cargo.toml          # :8080
 cargo test --manifest-path apps/api/Cargo.toml         # sqlx::test，每個測試獨立資料庫（需 DB 在跑）
@@ -25,7 +25,7 @@ node mocks/server.mjs                      # 訪客端契約 mock，:8080（slug
 
 ## 架構
 
-**後端**（`apps/api/src`，lib `wishsync_api`）：每個模組各自提供 `routes()`，由 `lib.rs::app()` 合併到 `/api/v1`；新增模組只改那裡。全域 middleware：`read_only`（`system_flags.read_only` 為真時非安全方法回 503，auth/admin system-flags 例外）與 CORS（只允許 `APP_URL` 並帶憑證）。`config.rs` 是全域單例（`config::init/get`），production 缺機密、`TRUSTED_PROXY`、S3 設定會啟動即失敗。
+**後端**（`apps/api/src`，lib `wishly_api`）：每個模組各自提供 `routes()`，由 `lib.rs::app()` 合併到 `/api/v1`；新增模組只改那裡。全域 middleware：`read_only`（`system_flags.read_only` 為真時非安全方法回 503，auth/admin system-flags 例外）與 CORS（只允許 `APP_URL` 並帶憑證）。`config.rs` 是全域單例（`config::init/get`），production 缺機密、`TRUSTED_PROXY`、S3 設定會啟動即失敗。
 
 - **兩種身分**：創建者用 cookie `ws_session`（`session::CurrentUser` extractor，DB 只存 SHA-256）；訪客用 `X-Guest-Token` header 優先、其次 `ws_guest` cookie（`guest.rs`，`Actor::Guest|User`）。
 - **認領（`claims.rs`）**：核心是超賣防護。鎖序固定 `wishlist_items`（條件式 UPDATE / FOR UPDATE）→ `claims`，改動時不可顛倒。寫入需 `Idempotency-Key`（UUID），`idempotency.rs` 的占位與業務寫入在同一交易，失敗 rollback 不留痕；重放回應帶 `Idempotency-Replayed`。逾期認領會釋放，另有 `ratelimit.rs`（DB 計數，背景清理）。

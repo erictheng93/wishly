@@ -135,13 +135,13 @@ impl S3 {
         let endpoint = g("S3_ENDPOINT", "http://localhost:9000")
             .trim_end_matches('/')
             .to_string();
-        let bucket = g("S3_BUCKET", "wishsync-media");
+        let bucket = g("S3_BUCKET", "wishly-media");
         let public_base = g("S3_PUBLIC_BASE", &format!("{endpoint}/{bucket}"));
         S3 {
             endpoint,
             bucket,
-            ak: g("S3_ACCESS_KEY", "wishsync"),
-            sk: g("S3_SECRET_KEY", "wishsync-secret"),
+            ak: g("S3_ACCESS_KEY", "wishly"),
+            sk: g("S3_SECRET_KEY", "wishly-secret"),
             region: g("S3_REGION", "us-east-1"),
             public_base,
         }

@@ -10,7 +10,7 @@ use common::{call, ck, user, TestUser};
 use serde_json::json;
 use sqlx::PgPool;
 use tokio::sync::mpsc;
-use wishsync_api::{config::Config, uploads::MAX_BYTES};
+use wishly_api::{config::Config, uploads::MAX_BYTES};
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: PgPool) {
@@ -32,7 +32,7 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
     cfg.s3.endpoint = format!("http://{}", listener.local_addr().unwrap());
     cfg.s3.bucket = "media".into();
     cfg.s3.public_base = "https://cdn.example.test/media".into();
-    wishsync_api::config::init(cfg);
+    wishly_api::config::init(cfg);
     let server = tokio::spawn(async move { axum::serve(listener, mock).await.unwrap() });
     let TestUser { id: alice, token } = user(&pool, "Alice").await;
     let TestUser {
@@ -94,7 +94,7 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
         assert_eq!(response.0, StatusCode::OK, "{}", response.2);
         let body = response.2;
         let key = body["object_key"].as_str().unwrap();
-        assert!(wishsync_api::uploads::valid_key(key));
+        assert!(wishly_api::uploads::valid_key(key));
         assert!(key.ends_with(&format!(".{extension}")));
         assert!(key.starts_with(if purpose == "cover" {
             "covers/"

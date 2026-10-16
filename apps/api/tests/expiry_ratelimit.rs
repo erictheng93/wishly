@@ -9,7 +9,7 @@ use axum::{
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{claims, guest, AppState};
+use wishly_api::{claims, guest, AppState};
 
 fn app(pool: &PgPool) -> Router {
     Router::new()

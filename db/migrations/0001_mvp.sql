@@ -1,4 +1,4 @@
--- WishSync M1（MVP）遷移：取自 docs/04 v0.4 最終 schema 的 MVP 子集
+-- Wishly M1（MVP）遷移：取自 docs/04 v0.4 最終 schema 的 MVP 子集
 -- 不含 relief（P2-D，PostGIS 屆時才建）與點數眾籌（P2-A）欄位；見 docs/04「MVP 遷移範圍」
 
 CREATE OR REPLACE FUNCTION uuid_v7() RETURNS uuid

@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{auth::code_hash, session::hash_token};
+use wishly_api::{auth::code_hash, session::hash_token};
 
 async fn provider_user(pool: &PgPool, provider: &str) -> common::TestUser {
     let common::TestUser { id, token } = common::user(pool, "LINE 測試").await;
@@ -213,7 +213,7 @@ async fn unlink_email_clears_contact_and_blocks_implicit_relink(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(payload["to"], "old@example.com", "安全信仍寄往解除前的信箱");
-    wishsync_api::notify::tick(&pool).await.unwrap();
+    wishly_api::notify::tick(&pool).await.unwrap();
     let status: String = sqlx::query_scalar(
         "SELECT status::text FROM notifications WHERE user_id=$1 AND kind='auth.identity_unlinked'",
     )
@@ -237,7 +237,7 @@ fn security_mail_explains_change_and_cannot_be_unsubscribed() {
         ("auth.identity_linked", "新增"),
         ("auth.identity_unlinked", "解除"),
     ] {
-        let (subject, body) = wishsync_api::notify::render(
+        let (subject, body) = wishly_api::notify::render(
             kind,
             "",
             &json!({"provider":"google","unsubscribe_url":"https://bad.example/unsubscribe"}),

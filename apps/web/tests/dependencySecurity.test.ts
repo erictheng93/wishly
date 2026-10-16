@@ -126,7 +126,7 @@ describe('GHSA-86w9-cpqp-85rv', () => {
 
 it('applies backports on fresh source, supports reruns, and refuses source or version drift', () => {
   const root = fileURLToPath(new URL('../', import.meta.url))
-  const directory = mkdtempSync(join(tmpdir(), 'wishsync-dependency-patches-'))
+  const directory = mkdtempSync(join(tmpdir(), 'wishly-dependency-patches-'))
   const run = (...args: string[]) => spawnSync(process.execPath, args, { cwd: directory, encoding: 'utf8' })
   try {
     mkdirSync(join(directory, 'scripts'))

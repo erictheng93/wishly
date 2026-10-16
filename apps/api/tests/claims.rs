@@ -8,7 +8,7 @@ use common::{assert_all_reconciled, call_app as call, item, ListOpts, TestList};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{claims, guest, public, AppState};
+use wishly_api::{claims, guest, public, AppState};
 
 /// 建立 owner + 清單（active）；回傳 slug / id
 async fn named_list(pool: &PgPool, slug: &str) -> TestList {

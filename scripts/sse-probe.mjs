@@ -2,7 +2,7 @@
 // Spike S3 量測：對目標鏈路（Cloudflare → Tunnel → VPS）持續連 SSE，記錄首位元組、心跳間隔、斷線與重連、事件延遲。
 // 事件延遲 = 「認領 POST 回應完成」到「SSE 收到對應 item.updated」。只在測試清單上用 TRIGGER，會建立真實認領。
 //
-//   API_BASE=https://api.wishsync.tw SLUG=AbCdEf1234 DURATION_MIN=120 \
+//   API_BASE=https://api.wishly.tw SLUG=AbCdEf1234 DURATION_MIN=120 \
 //   ITEM_ID=<uuid> TRIGGER_EVERY_S=60 OUT=spike-s3.jsonl node scripts/sse-probe.mjs
 //
 // 沒設 ITEM_ID 就只量連線（TTFB、心跳、斷線）。OUT 的每行是一筆原始事件，可直接附在證據裡。

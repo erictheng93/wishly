@@ -5,7 +5,7 @@ use chrono::{Duration, Utc};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::points;
+use wishly_api::points;
 
 use common::call;
 use common::{assert_all_reconciled, balance, ck, TestUser};
@@ -468,7 +468,7 @@ async fn shipping_address_masked_and_encrypted(pool: PgPool) {
         "收件資訊不得以明文存放"
     );
     assert_eq!(
-        wishsync_api::sealed::open_str(&a).as_deref(),
+        wishly_api::sealed::open_str(&a).as_deref(),
         Some("台北市大安區和平東路二段 1 號 3 樓")
     );
 

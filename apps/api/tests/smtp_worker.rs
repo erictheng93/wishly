@@ -3,14 +3,14 @@ mod common;
 use common::{user, wait_until, wishlist, ListOpts, TestList, TestUser};
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use wishsync_api::config::Config;
+use wishly_api::config::Config;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: PgPool) {
     let mut cfg = Config::dev();
     cfg.cf_account_id = None;
     cfg.cf_email_api_token = None;
-    wishsync_api::config::init(cfg);
+    wishly_api::config::init(cfg);
     let TestUser {
         id: owner,
         token: _,
@@ -27,11 +27,11 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .fetch_one(&pool)
         .await
         .unwrap();
-    wishsync_api::notify::enqueue_claim(&pool, wishlist)
+    wishly_api::notify::enqueue_claim(&pool, wishlist)
         .await
         .unwrap();
-    assert_eq!(wishsync_api::notify::tick(&pool).await.unwrap(), 1);
-    assert_eq!(wishsync_api::notify::tick(&pool).await.unwrap(), 0);
+    assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 1);
+    assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 0);
     let state: (String, i16, bool, Option<String>) = sqlx::query_as("SELECT status::text,attempts,sent_at IS NOT NULL,last_error FROM notifications WHERE user_id=$1").bind(owner).fetch_one(&pool).await.unwrap();
     assert_eq!(state, ("sent".into(), 1, true, None));
     let client = reqwest::Client::new();

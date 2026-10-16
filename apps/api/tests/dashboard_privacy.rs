@@ -121,8 +121,8 @@ async fn unified_pct_owner_names_list_fields_and_image_base(pool: PgPool) {
     assert_eq!(p["completion"]["completion_pct"], 40);
     assert_eq!(
         p["cover_image_url"],
-        wishsync_api::uploads::S3::get().public_url("covers/x.jpg")
+        wishly_api::uploads::S3::get().public_url("covers/x.jpg")
     );
-    assert_eq!(wishsync_api::wishlists::completion_pct(0, 0), 0);
+    assert_eq!(wishly_api::wishlists::completion_pct(0, 0), 0);
     assert_all_reconciled(&pool).await;
 }

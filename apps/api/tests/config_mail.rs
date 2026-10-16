@@ -10,7 +10,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
-use wishsync_api::config::{client_ip, Config};
+use wishly_api::config::{client_ip, Config};
 
 #[test]
 fn production_fails_closed() {
@@ -175,11 +175,11 @@ async fn cloudflare_email_request_format() {
     c.cf_account_id = Some("acct1".into());
     c.cf_email_api_token = Some("secret-token".into());
     c.cf_api_base = format!("http://{addr}");
-    c.mail_from = "Wishly <no-reply@wishsync.tw>".into();
-    wishsync_api::notify::send_mail(&c, "u@example.com", "主旨", "內文")
+    c.mail_from = "Wishly <no-reply@wishly.tw>".into();
+    wishly_api::notify::send_mail(&c, "u@example.com", "主旨", "內文")
         .await
         .unwrap();
-    let e = wishsync_api::notify::send_mail(&c, "bad@example.com", "s", "b")
+    let e = wishly_api::notify::send_mail(&c, "bad@example.com", "s", "b")
         .await
         .unwrap_err();
     assert!(!e.contains("secret-token"));
@@ -188,7 +188,7 @@ async fn cloudflare_email_request_format() {
     assert!(v[0].1.starts_with("application/json"));
     assert_eq!(
         v[0].2,
-        json!({"from": "Wishly <no-reply@wishsync.tw>", "to": "u@example.com", "subject": "主旨", "text": "內文"})
+        json!({"from": "Wishly <no-reply@wishly.tw>", "to": "u@example.com", "subject": "主旨", "text": "內文"})
     );
 }
 
@@ -214,15 +214,15 @@ async fn turnstile_verification() {
     c.turnstile_verify_url = format!("http://{addr}/verify");
     c.turnstile_secret = None; // Config::dev() 會讀環境變數，另一個測試正在設 TURNSTILE_SECRET
                                // 未設 secret（dev/test）：任何 token 都放行，也不打 siteverify
-    wishsync_api::reports::verify_turnstile(&c, Some("dev-bypass"), "1.2.3.4")
+    wishly_api::reports::verify_turnstile(&c, Some("dev-bypass"), "1.2.3.4")
         .await
         .unwrap();
-    wishsync_api::reports::verify_turnstile(&c, None, "1.2.3.4")
+    wishly_api::reports::verify_turnstile(&c, None, "1.2.3.4")
         .await
         .unwrap();
     assert!(seen.lock().unwrap().is_empty());
     c.turnstile_secret = Some("s3cret".into());
-    wishsync_api::reports::verify_turnstile(&c, Some("good"), "1.2.3.4")
+    wishly_api::reports::verify_turnstile(&c, Some("good"), "1.2.3.4")
         .await
         .unwrap();
     {
@@ -234,13 +234,13 @@ async fn turnstile_verification() {
         );
     }
     for t in [Some("bad"), Some("dev-bypass"), Some(""), None] {
-        let e = wishsync_api::reports::verify_turnstile(&c, t, "1.2.3.4")
+        let e = wishly_api::reports::verify_turnstile(&c, t, "1.2.3.4")
             .await
             .unwrap_err();
         assert!(
             matches!(
                 e,
-                wishsync_api::error::AppError::Problem { status: 403, .. }
+                wishly_api::error::AppError::Problem { status: 403, .. }
             ),
             "{t:?}"
         );
@@ -248,12 +248,12 @@ async fn turnstile_verification() {
     assert_eq!(seen.lock().unwrap().len(), 3); // good + bad + dev-bypass（空 / 缺 token 不打 siteverify）
                                                // siteverify 連不上 → 503，不放行
     c.turnstile_verify_url = "http://127.0.0.1:1/verify".into();
-    let e = wishsync_api::reports::verify_turnstile(&c, Some("good"), "1.2.3.4")
+    let e = wishly_api::reports::verify_turnstile(&c, Some("good"), "1.2.3.4")
         .await
         .unwrap_err();
     assert!(matches!(
         e,
-        wishsync_api::error::AppError::Problem { status: 503, .. }
+        wishly_api::error::AppError::Problem { status: 503, .. }
     ));
 }
 
@@ -277,16 +277,16 @@ async fn cloudflare_purge_request_format() {
     // 未設定 → 不打 API
     c.cf_zone_id = None;
     c.cf_purge_token = None;
-    wishsync_api::cdn::purge(&c, &["https://api.x.tw/api/v1/public/wishlists/abc".into()])
+    wishly_api::cdn::purge(&c, &["https://api.x.tw/api/v1/public/wishlists/abc".into()])
         .await
         .unwrap();
     assert!(seen.lock().unwrap().is_empty());
     c.cf_zone_id = Some("zone1".into());
     c.cf_purge_token = Some("purge-secret".into());
     let urls = vec!["https://api.x.tw/api/v1/public/wishlists/abc".to_string()];
-    wishsync_api::cdn::purge(&c, &urls).await.unwrap();
+    wishly_api::cdn::purge(&c, &urls).await.unwrap();
     c.cf_zone_id = Some("other".into());
-    let e = wishsync_api::cdn::purge(&c, &urls).await.unwrap_err();
+    let e = wishly_api::cdn::purge(&c, &urls).await.unwrap_err();
     assert!(e.contains("7003") && !e.contains("purge-secret"), "{e}");
     let v = seen.lock().unwrap();
     assert_eq!(

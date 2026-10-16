@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::wishlists;
+use wishly_api::wishlists;
 
 use common::ck;
 
@@ -206,7 +206,7 @@ async fn reminder_sent_once_and_rearmed_on_change(pool: PgPool) {
 
 #[test]
 fn closing_mail_renders_taipei_time() {
-    let (subject, body) = wishsync_api::notify::render(
+    let (subject, body) = wishly_api::notify::render(
         "wishlist.closing",
         "小愛的清單",
         &json!({ "closes_at": "2030-01-01T16:30:00Z" }),
@@ -270,7 +270,7 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
     } = common::user(&pool, "u").await;
     let wid: Uuid = deadline_list(&pool, o, "active", "now() - interval '1 minute'").await;
     sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $2, $2)")
-        .bind(wid).bind(wishsync_api::sealed::seal(b"x")).execute(&pool).await.unwrap();
+        .bind(wid).bind(wishly_api::sealed::seal(b"x")).execute(&pool).await.unwrap();
     let item: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, qty_needed, funding_mode, target_points, funding_status, funding_deadline, fulfillment_type)
          VALUES ($1, '推車', 1, 'crowdfund', 500, 'open', now() + interval '7 days', 'concierge') RETURNING id").bind(wid).fetch_one(&pool).await.unwrap();

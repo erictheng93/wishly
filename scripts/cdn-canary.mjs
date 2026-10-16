@@ -2,7 +2,7 @@
 // CDN 外洩金絲雀：部署後（或排程）對正式網域檢查「受限清單不會被 Cloudflare 快取後給陌生人看」。
 // 前置：用營運帳號建一份 visibility=friends 的金絲雀清單（至少 1 個品項），另一個金絲雀帳號加為好友。
 //
-//   API_BASE=https://api.wishsync.tw CANARY_SLUG=AbCdEf1234 \
+//   API_BASE=https://api.wishly.tw CANARY_SLUG=AbCdEf1234 \
 //   CANARY_FRIEND_COOKIE='ws_session=…'   # 選填但強烈建議：模擬「好友先載入」的真實外洩路徑
 //   CANARY_PUBLIC_SLUG=XyZ1234567         # 選填：一份 public 清單，順便確認公開快取仍正常
 //   node scripts/cdn-canary.mjs

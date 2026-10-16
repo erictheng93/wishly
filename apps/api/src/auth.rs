@@ -794,7 +794,7 @@ struct OAuthState {
 
 /// 原生殼 deep link 基底（App 註冊的 scheme）；結果以 ?code= 或 ?error= 附帶。
 fn native_redirect() -> String {
-    env("NATIVE_REDIRECT", "wishsync://auth")
+    env("NATIVE_REDIRECT", "wishly://auth")
 }
 
 /// PKCE S256 的 challenge 為 43 字元 base64url。

@@ -1,11 +1,11 @@
 [package]
-name = "wishsync"
+name = "wishly"
 version = "0.1.0"
 description = "Wishly desktop/mobile shell"
 edition = "2021"
 
 [lib]
-name = "wishsync_lib"
+name = "wishly_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

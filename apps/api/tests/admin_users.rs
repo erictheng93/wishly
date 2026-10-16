@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::session::hash_token;
+use wishly_api::session::hash_token;
 
 async fn email_user(pool: &PgPool, staff: bool, name: &str) -> (Uuid, String, String) {
     let common::TestUser { id, token } = if staff {
@@ -81,7 +81,7 @@ async fn suspension_revokes_sessions_blocks_login_and_is_audited(pool: PgPool) {
     assert!(revoked);
     // OTP 簽發與 OAuth 都經 new_session；測 OTP 不可重建登入。
     sqlx::query("INSERT INTO otp_challenges(email,code_hash,expires_at) VALUES ($1,$2,now()+interval '10 minutes')")
-        .bind(&email).bind(wishsync_api::auth::code_hash("123456", &wishsync_api::config::get().otp_pepper)).execute(&pool).await.unwrap();
+        .bind(&email).bind(wishly_api::auth::code_hash("123456", &wishly_api::config::get().otp_pepper)).execute(&pool).await.unwrap();
     assert_eq!(
         common::call(
             &pool,
@@ -545,7 +545,7 @@ async fn admin_unlink_clears_provider_email_and_notifies_user(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(n, 1);
-    let (next, _) = wishsync_api::auth::upsert_identity(
+    let (next, _) = wishly_api::auth::upsert_identity(
         &pool,
         "google",
         &format!("g-{id}"),

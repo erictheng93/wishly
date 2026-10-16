@@ -57,13 +57,13 @@ export async function copyText(text: string) {
 /** 分享連結的網站網域：網頁版就是目前網域，原生殼用設定值 */
 export const siteOrigin = () => (__NATIVE__ ? useRuntimeConfig().public.siteUrl : location.origin)
 
-const CALLBACK = 'wishsync://auth'
+const CALLBACK = 'wishly://auth'
 const b64url = (b: ArrayBuffer | Uint8Array) =>
   btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 let cancelPending: (() => void) | null = null
 
 /**
- * 原生殼 OAuth（系統瀏覽器 + deep link + PKCE）：先監聽 wishsync://auth，再開瀏覽器，等到 ?code=（或 ?error=）。
+ * 原生殼 OAuth（系統瀏覽器 + deep link + PKCE）：先監聽 wishly://auth，再開瀏覽器，等到 ?code=（或 ?error=）。
  * 登入回 ?code=（連同 verifier 交呼叫端 POST /auth/native/exchange 兌換）；綁定回 ?linked=<provider>。
  * 同時只保留一次進行中的嘗試（舊的以 'cancelled' 拒絕），否則過期嘗試會拿新的 deep link 去兌換並燒掉碼。
  * ponytail: verifier 只放記憶體；若 OS 在使用者登入期間回收 App，需重新登入。

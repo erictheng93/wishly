@@ -11,9 +11,9 @@ export default defineNuxtConfig({
     // 建置時讀取：NUXT_DEMO=1 才是 S1 示範（/s/demo 回固定資料），只有 npm run deploy:demo 會設
     demo: process.env.NUXT_DEMO ?? '',
     // 建置（production）預設指向正式 API；dev 預設本機。可用 NUXT_PUBLIC_API_BASE 覆寫（建置時或 Pages 後台變數）
-    public: { apiBase: process.env.NUXT_PUBLIC_API_BASE ?? (process.env.NODE_ENV === 'production' ? 'https://api.wishsync.tw' : 'http://localhost:8080'), turnstileSiteKey: '',
+    public: { apiBase: process.env.NUXT_PUBLIC_API_BASE ?? (process.env.NODE_ENV === 'production' ? 'https://api.wishly.tw' : 'http://localhost:8080'), turnstileSiteKey: '',
       // 原生殼沒有「網站網域」可用 location.origin，分享連結以此為準
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://wishsync.tw' },
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://wishly.tw' },
   },
   // 創建者頁面靠 cookie 驗證，只在 client 渲染；/s/** 維持 SSR（OG 預覽）
   routeRules: {

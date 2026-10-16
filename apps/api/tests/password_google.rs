@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::{collections::HashMap, sync::OnceLock};
 use uuid::Uuid;
-use wishsync_api::{app, AppState};
+use wishly_api::{app, AppState};
 
 static GOOGLE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -684,7 +684,7 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid) VALUES ($1,'line','manual-line')").bind(uid).execute(&pool).await.unwrap();
     let token = "manual-session";
     sqlx::query("INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,now()+interval '1 day')")
-        .bind(uid).bind(wishsync_api::session::hash_token(token)).execute(&pool).await.unwrap();
+        .bind(uid).bind(wishly_api::session::hash_token(token)).execute(&pool).await.unwrap();
     let session = format!("ws_session={token}");
     assert_eq!(
         common::call_app(&app, "GET", "/auth/oauth/google/start?link=true", &[], None)
@@ -728,7 +728,7 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
         .ends_with("/settings?error=oauth_failed"));
     // 相同 user 的另一個 session 也不能完成這次綁定。
     sqlx::query("INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,now()+interval '1 day')")
-        .bind(uid).bind(wishsync_api::session::hash_token("other-session")).execute(&pool).await.unwrap();
+        .bind(uid).bind(wishly_api::session::hash_token("other-session")).execute(&pool).await.unwrap();
     let (_, h, _) = common::call_app(
         &app,
         "GET",
@@ -846,7 +846,7 @@ async fn google_jwks_cache_respects_ttl_and_rotation() {
     let server = tokio::spawn(async { axum::serve(listener, mock).await.unwrap() });
     let t = id_token("cache", "cache@example.com", true, "gid", 3600);
     for _ in 0..2 {
-        assert!(wishsync_api::auth_ext::google_identity(&t, "ver")
+        assert!(wishly_api::auth_ext::google_identity(&t, "ver")
             .await
             .unwrap()
             .is_some());
@@ -858,14 +858,14 @@ async fn google_jwks_cache_respects_ttl_and_rotation() {
     let t = encode(&h, &json!({"iss":"https://accounts.google.com","aud":"gid","exp":chrono::Utc::now().timestamp()+3600,"sub":"cache"}), &EncodingKey::from_rsa_pem(RSA_PEM.as_bytes()).unwrap()).unwrap();
     ttl.store(0, Ordering::SeqCst);
     assert!(
-        wishsync_api::auth_ext::google_identity(&t, "ver")
+        wishly_api::auth_ext::google_identity(&t, "ver")
             .await
             .unwrap()
             .is_some(),
         "未知 kid 重新抓取，支援輪替"
     );
     assert_eq!(calls.load(Ordering::SeqCst), 2);
-    assert!(wishsync_api::auth_ext::google_identity(&t, "ver")
+    assert!(wishly_api::auth_ext::google_identity(&t, "ver")
         .await
         .unwrap()
         .is_some());

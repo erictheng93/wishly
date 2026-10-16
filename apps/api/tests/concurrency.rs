@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::{sync::Semaphore, task::JoinHandle};
 
 use uuid::Uuid;
-use wishsync_api::{app, AppState};
+use wishly_api::{app, AppState};
 
 // SQLx integration-test pools share a global 20-connection semaphore. Each
 // gated race needs up to 5 connections; leave capacity for fixture migrations.
@@ -92,7 +92,7 @@ async fn list(pool: &PgPool, owner: Uuid) -> Uuid {
         .await
         .unwrap();
     sqlx::query("INSERT INTO shipping_addresses(wishlist_id,recipient_name_enc,phone_enc,address_enc) VALUES($1,$2,$2,$2)")
-        .bind(id).bind(wishsync_api::sealed::seal(b"test address")).execute(pool).await.unwrap();
+        .bind(id).bind(wishly_api::sealed::seal(b"test address")).execute(pool).await.unwrap();
     id
 }
 async fn quantity(pool: &PgPool, wl: Uuid, qty: i32) -> Uuid {
@@ -184,11 +184,11 @@ async fn committed_key_replays(pool: &PgPool, key: Uuid, kind: &str) {
             .await
             .unwrap();
     let mut tx = pool.begin().await.unwrap();
-    let result = wishsync_api::idempotency::begin(&mut tx, &scope, key, &hash).await;
+    let result = wishly_api::idempotency::begin(&mut tx, &scope, key, &hash).await;
     tx.rollback().await.unwrap();
     match result {
-        Ok(wishsync_api::idempotency::Begin::Replay(201, _)) => (),
-        Err(wishsync_api::error::AppError::Db(sqlx::Error::Database(e)))
+        Ok(wishly_api::idempotency::Begin::Replay(201, _)) => (),
+        Err(wishly_api::error::AppError::Db(sqlx::Error::Database(e)))
             if e.code().as_deref() == Some("23505")
                 && e.constraint() == Some("idempotency_keys_pkey") =>
         {
@@ -510,7 +510,7 @@ async fn withdraw_vs_tick_refunds_exactly_once(pool: PgPool) {
         blocked(&pool, pid, "SELECT id FROM point_wallets", 1).await;
         let p = pool.clone();
         let mut tick = Some(tokio::spawn(async move {
-            wishsync_api::contributions::tick_funding(&p).await
+            wishly_api::contributions::tick_funding(&p).await
         }));
         if auto_refund {
             waiting(&pool, "SELECT id FROM point_wallets", 2).await;

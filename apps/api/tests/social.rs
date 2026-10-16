@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
-use wishsync_api::{app, AppState};
+use wishly_api::{app, AppState};
 
 /// (id, session token, email)
 async fn handle_user(pool: &PgPool, name: &str, handle: Option<&str>) -> (Uuid, String, String) {
@@ -220,7 +220,7 @@ async fn friend_request_flow_and_no_enumeration(pool: PgPool) {
 }
 
 async fn crate_are_friends(pool: &PgPool, a: Uuid, b: Uuid) -> bool {
-    wishsync_api::access::are_friends(pool, a, b).await.unwrap()
+    wishly_api::access::are_friends(pool, a, b).await.unwrap()
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

@@ -3,7 +3,7 @@ use axum::{http::HeaderMap, routing::post, Json, Router};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::Notify;
-use wishsync_api::config::Config;
+use wishly_api::config::Config;
 
 #[derive(Clone, Debug)]
 pub struct Purge {
@@ -47,7 +47,7 @@ pub fn init() -> &'static Arc<MockCdn> {
         config.cf_zone_id = Some("zone1".into());
         config.cf_purge_token = Some("test-purge-token".into());
         config.api_base_url = "https://api.example.test".into();
-        wishsync_api::config::init(config);
+        wishly_api::config::init(config);
         // SQLx tests have independent runtimes; this binary-wide server must outlive them.
         std::thread::spawn(move || {
             tokio::runtime::Builder::new_current_thread()

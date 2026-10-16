@@ -67,7 +67,7 @@ impl IntoResponse for AppError {
         } = self
         {
             let mut body = json!({
-                "type": format!("https://wishsync.tw/problems/{}", code.to_lowercase().replace('_', "-")),
+                "type": format!("https://wishly.tw/problems/{}", code.to_lowercase().replace('_', "-")),
                 "title": code, "status": status, "code": code, "detail": detail,
             });
             if let (Some(b), Some(x)) = (body.as_object_mut(), extra.as_object()) {
@@ -91,7 +91,7 @@ impl IntoResponse for AppError {
         {
             let st = StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
             let mut body = json!({
-                "type": format!("https://wishsync.tw/problems/{}", code.to_lowercase().replace('_', "-")),
+                "type": format!("https://wishly.tw/problems/{}", code.to_lowercase().replace('_', "-")),
                 "title": code, "status": status, "code": code, "detail": detail,
             });
             if let Some(e) = errors {
@@ -123,7 +123,7 @@ impl IntoResponse for AppError {
             }
         };
         let body = json!({
-            "type": format!("https://wishsync.tw/problems/{}", code.to_lowercase().replace('_', "-")),
+            "type": format!("https://wishly.tw/problems/{}", code.to_lowercase().replace('_', "-")),
             "title": title,
             "status": status.as_u16(),
             "code": code,

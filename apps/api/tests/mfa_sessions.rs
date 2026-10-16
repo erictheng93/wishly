@@ -23,7 +23,7 @@ async fn secret(pool: &PgPool, uid: Uuid) -> Vec<u8> {
         .fetch_one(pool)
         .await
         .unwrap();
-    wishsync_api::sealed::open(&s).unwrap()
+    wishly_api::sealed::open(&s).unwrap()
 }
 async fn audit_count(pool: &PgPool, uid: Uuid, action: &str) -> i64 {
     sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE actor_id=$1 AND action=$2")
@@ -195,7 +195,7 @@ async fn device_list_and_revoke(pool: PgPool) {
     assert_eq!(list.len(), 3);
     assert_eq!(list.iter().filter(|s| s["current"] == true).count(), 1);
     let other_id: Uuid = sqlx::query_scalar("SELECT id FROM sessions WHERE token_hash=$1")
-        .bind(wishsync_api::session::hash_token(&other))
+        .bind(wishly_api::session::hash_token(&other))
         .fetch_one(&pool)
         .await
         .unwrap();

@@ -18,7 +18,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request
   const url = new URL(req.url)
-  // 非 GET、跨來源（API 在 api.wishsync.tw、SSE、Turnstile 等）一律不攔截，交給瀏覽器直連
+  // 非 GET、跨來源（API 在 api.wishly.tw、SSE、Turnstile 等）一律不攔截，交給瀏覽器直連
   if (req.method !== 'GET' || url.origin !== location.origin) return
 
   // 導覽請求：network-only。分享頁 /s/*（SSR、LINE 爬蟲、即時進度）與已登入頁 HTML 絕不能是舊的、也不能跨使用者；

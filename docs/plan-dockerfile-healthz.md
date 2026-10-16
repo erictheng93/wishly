@@ -16,7 +16,7 @@
 | migrations 以 `sqlx::migrate!("../../db/migrations")` **編譯期內嵌** | `main.rs:22` | **build context 必須是 repo 根目錄**且含 `db/migrations`；Dockerfile 放 `apps/api/Dockerfile` 但以根為 context |
 | 無 `query!` 系列巨集（無 `.sqlx/` 離線快取） | grep | 建置不需要連 DB |
 | TLS 全為 rustls（sqlx `tls-rustls`、reqwest `rustls-tls`）、`image` 無原生相依 | `Cargo.toml` | 不需 openssl／libpq；runtime 只需 glibc |
-| 單一 binary `wishsync-api`（`src/main.rs`）；`examples/seed_demo.rs` 不該進 image | `Cargo.toml`、`ls` | `cargo build --release --bin wishsync-api` |
+| 單一 binary `wishly-api`（`src/main.rs`）；`examples/seed_demo.rs` 不該進 image | `Cargo.toml`、`ls` | `cargo build --release --bin wishly-api` |
 | 預設 `BIND=127.0.0.1:8080`，production 容器需明確設 `0.0.0.0:8080` | `config.rs`、README | 不在 image 內寫死，由部署平台（Dokploy）環境變數設定；但 Dockerfile 要 `EXPOSE 8080` 並在文件註明 |
 | `tracing_subscriber::EnvFilter::from_default_env()`，**未設 `RUST_LOG` 時預設只輸出 ERROR** | `main.rs:6-8` | 部署必須設 `RUST_LOG=info`，否則 Cloud Logging 幾乎沒有內容。可在 Dockerfile `ENV RUST_LOG=info` 當預設 |
 | middleware 順序：`read_only`（GET/HEAD/OPTIONS 視為安全）→ CORS → problem_json → security_headers | `lib.rs:app()` | `/healthz` 為 GET，不會被唯讀擋；會被加上 `Cache-Control: no-store`（正好） |
@@ -25,15 +25,15 @@
 
 ## 2. Dockerfile
 
-位置：`apps/api/Dockerfile`；建置指令（repo 根）：`docker build -f apps/api/Dockerfile -t wishsync-api .`
+位置：`apps/api/Dockerfile`；建置指令（repo 根）：`docker build -f apps/api/Dockerfile -t wishly-api .`
 
 ### 設計
 1. **builder**：`rust:1.99.0-bookworm`（與 runtime 同為 Debian 12 glibc，避免 glibc 版本不符）。
 2. **依賴快取層**：先 COPY `apps/api/Cargo.toml`、`Cargo.lock`，建立空的 `src/main.rs`／`src/lib.rs` 預先 `cargo build --release` 一次，再 COPY 真實原始碼。理由：依賴量大（sqlx、image、reqwest），不分層每次改一行都全編譯。**不引入 cargo-chef**（多一個工具，收益相同）。
 3. COPY 範圍：`apps/api/`（`src`、`Cargo.*`）與 `db/migrations/`，維持相對路徑 `../../db/migrations` 成立（builder 內路徑要保持 `/app/apps/api` 與 `/app/db/migrations`）。
-4. `cargo build --release --locked --bin wishsync-api`；`--locked` 確保不偷升級依賴。
+4. `cargo build --release --locked --bin wishly-api`；`--locked` 確保不偷升級依賴。
 5. **runtime**：`gcr.io/distroless/cc-debian12:nonroot`（含 glibc、CA 憑證，無 shell，非 root）。只 COPY 一個 binary。
-6. `ENV RUST_LOG=info`、`EXPOSE 8080`、`USER nonroot`、`ENTRYPOINT ["/wishsync-api"]`。
+6. `ENV RUST_LOG=info`、`EXPOSE 8080`、`USER nonroot`、`ENTRYPOINT ["/wishly-api"]`。
 7. **不寫 `HEALTHCHECK`**：distroless 無 curl／shell；探針由部署平台與外部監控設定（見 §3.4），不用 image 內建。
 8. 不放任何機密；`APP_ENV` 不在 image 內設定（未設即 production，fail closed）。
 

@@ -4,7 +4,7 @@ use axum::{http::StatusCode, Router};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
-use wishsync_api::{contributions, wallet, AppState};
+use wishly_api::{contributions, wallet, AppState};
 
 fn test_app(pool: &PgPool) -> Router {
     Router::new()
@@ -26,7 +26,7 @@ async fn list_with_shipping(pool: &PgPool, owner: Uuid) -> Uuid {
         .execute(pool)
         .await
         .unwrap();
-    let sealed = |s: &str| wishsync_api::sealed::seal(s.as_bytes());
+    let sealed = |s: &str| wishly_api::sealed::seal(s.as_bytes());
     sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $3, $4)")
         .bind(w).bind(sealed("王小米")).bind(sealed("0912345678")).bind(sealed("台北市大安區某路 1 號")).execute(pool).await.unwrap();
     w
@@ -777,7 +777,7 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
 
     // 未到期：不動
     assert_eq!(
-        wishsync_api::contributions::tick_funding(&pool)
+        wishly_api::contributions::tick_funding(&pool)
             .await
             .unwrap(),
         (0, 0)
@@ -790,7 +790,7 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(
-        wishsync_api::contributions::tick_funding(&pool)
+        wishly_api::contributions::tick_funding(&pool)
             .await
             .unwrap(),
         (1, 0)
@@ -805,7 +805,7 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
     assert_eq!(n, 2);
     // 重複執行：不再重複轉換 / 通知
     assert_eq!(
-        wishsync_api::contributions::tick_funding(&pool)
+        wishly_api::contributions::tick_funding(&pool)
             .await
             .unwrap(),
         (0, 0)
@@ -825,7 +825,7 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(
-        wishsync_api::contributions::tick_funding(&pool)
+        wishly_api::contributions::tick_funding(&pool)
             .await
             .unwrap(),
         (0, 2)
@@ -836,7 +836,7 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
     assert_eq!(item_row(&pool, fresh).await, (50, "open".into()));
     // 再跑不重複退點
     assert_eq!(
-        wishsync_api::contributions::tick_funding(&pool)
+        wishly_api::contributions::tick_funding(&pool)
             .await
             .unwrap(),
         (0, 0)
@@ -857,8 +857,8 @@ async fn tick_expires_then_auto_refunds_once(pool: PgPool) {
     .await
     .unwrap();
     let (r1, r2) = tokio::join!(
-        wishsync_api::contributions::tick_funding(&pool),
-        wishsync_api::contributions::tick_funding(&pool)
+        wishly_api::contributions::tick_funding(&pool),
+        wishly_api::contributions::tick_funding(&pool)
     );
     assert_eq!(r1.unwrap().0 + r2.unwrap().0, 1);
     assert_all_reconciled(&pool).await;
