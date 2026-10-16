@@ -10,7 +10,7 @@
 - [ ] 正式環境尚未部署（2026-10-15 嘗試部署 Cloudflare Pages 時發現，故未執行）
   - 後端（Linode VPS／Dokploy，D49）尚無部署證據，`https://api.wishly.tw` 不確定可連；同時確認 Traefik／Tunnel 的逾時不會截斷 SSE。
   - 取得 Turnstile 網站金鑰（`NUXT_PUBLIC_TURNSTILE_SITE_KEY`，前端建置必填）與後端 `TURNSTILE_SECRET`。
-  - 定案正式網域（見 `docs/domain-names.md`）；Pages 專案 `wishsync-web` 已存在，正式部署會覆蓋其目前內容（疑似 demo）。
+  - 定案正式網域（見 `docs/domain-names.md`）；Pages 專案 `wishly-web` 已存在（pages.dev 子網域仍為 wishsync-web），正式部署會覆蓋其目前內容（疑似 demo）。
   - 後端正式機密、`TRUSTED_PROXY=cloudflare`（API 只能經 Tunnel 到達）、S3／R2、`SHIPPING_ENC_KEY` 備份流程（遺失即無法解密收件資訊）。
 - [ ] 後端可部署性（部署定案：Linode VPS 東京 + Dokploy + Cloudflare Tunnel，PRD D49；清單見 [deploy-backend-checklist](docs/deploy-backend-checklist.md)）
   - [x] Dockerfile、CI build job、`/healthz`、`/readyz`（SIGTERM 優雅關閉曾實作，後因不需要而移除；換版時進行中請求會被切斷，可由 `Idempotency-Key` 重試恢復）。

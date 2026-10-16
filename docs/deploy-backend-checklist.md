@@ -124,7 +124,7 @@
 - [ ] WAF／速率限制規則；**對外封鎖或限流 `/readyz`**（它查 DB）；`/healthz` 可開放。
 - [ ] Turnstile widget 建立，hostname 含前端網域。
 - [ ] Email Service：網域驗證（SPF／DKIM／DMARC）通過；實際寄出 OTP 到外部信箱，未進垃圾信。
-- [ ] 前端 Pages：`NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_TURNSTILE_SITE_KEY` 為**建置時**變數（`npm run deploy` 缺 Turnstile key 會中止）。部署會取代現有 `wishsync-web`，先確認其內容（疑似 demo）可被取代。
+- [ ] 前端 Pages：`NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_TURNSTILE_SITE_KEY` 為**建置時**變數（`npm run deploy` 缺 Turnstile key 會中止）。部署會取代現有 `wishly-web`，先確認其內容（疑似 demo）可被取代。
 
 ## 5. 部署順序
 
