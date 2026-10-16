@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-WishSync is a wishlist-sharing application with guest item claims.
+Wishly is a wishlist-sharing application with guest item claims.
 - `apps/web/app/`: Nuxt 4 frontend; route pages, creator/guest components, composables, middleware, utilities, and CSS assets.
 - `apps/web/public/`: static assets; `apps/web/server/`: server routes; `apps/web/tests/`: frontend logic tests.
 - `apps/api/src/`: Rust 2021 API using axum and sqlx, organized by features such as authentication, wishlists, and claims. Integration tests live in `apps/api/tests/`.

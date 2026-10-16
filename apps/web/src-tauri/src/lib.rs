@@ -120,7 +120,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running WishSync");
+        .expect("error while running Wishly");
 }
 
 #[cfg(test)]

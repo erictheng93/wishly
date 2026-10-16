@@ -84,7 +84,7 @@ impl Config {
             smtp_port: var("SMTP_PORT")
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(1025),
-            mail_from: v("MAIL_FROM", "WishSync <no-reply@wishsync.tw>"),
+            mail_from: v("MAIL_FROM", "Wishly <no-reply@wishsync.tw>"),
             cf_account_id: var("CF_ACCOUNT_ID"),
             cf_email_api_token: var("CF_EMAIL_API_TOKEN"),
             cf_api_base: v("CF_API_BASE", "https://api.cloudflare.com/client/v4"),

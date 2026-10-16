@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "WishSync 願望清單",
-  "short_name": "WishSync",
+  "name": "Wishly 願望清單",
+  "short_name": "Wishly",
   "description": "建立願望清單、用連結分享，朋友免註冊即可認領，不重複送禮。",
   "lang": "zh-Hant-TW",
   "start_url": "/?source=pwa",

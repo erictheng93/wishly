@@ -1,4 +1,4 @@
-# WishSync 願望清單（MVP）
+# Wishly 願望清單（MVP）
 
 建立願望清單、用連結分享，親友免註冊即可認領品項，並確保不會重複認領（超賣防護）。
 
@@ -136,6 +136,7 @@ npx playwright show-report                                      # 開啟上次�
 - **遺失 = 地址全部讀不回來**：金鑰遺失或被換掉之後，所有已存的收件資訊和採購單上的地址快照都無法解密，營運就無法寄貨（後台採購單的收件資訊會是空的）。請像資料庫密碼一樣保管，至少備份在兩個獨立的地方（例如密碼管理器加上離線備份）。
 - **不要更換**：目前沒有金鑰輪替機制（`key_version` 固定為 1）。要輪替時須先實作「多把金鑰依 `key_version` 解密，加上背景重新加密」，不能直接替換環境變數的值。
 - **洩漏時**：攻擊者必須同時拿到金鑰和資料庫才能讀到地址。若確認金鑰外洩，請先實作輪替再重新加密，並評估是否需要通知受影響的使用者。
+- **也用於兩步驟驗證**：營運人員的 TOTP 密鑰（`users.totp_secret`）同樣以此金鑰加密。金鑰遺失時，已啟用的人無法通過驗證、也進不了後台，須由另一位營運人員在後台「使用者」重設兩步驟驗證；若沒有其他營運人員，直接在資料庫執行 `UPDATE users SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE id='<uuid>';`。
 - 前端：`NUXT_PUBLIC_API_BASE`（預設 `http://localhost:8080`）；`NUXT_PUBLIC_TURNSTILE_SITE_KEY`（檢舉用 Cloudflare Turnstile；未設定時檢舉送 `dev-bypass`，僅限本機 mock；**正式部署必填**，`npm run deploy` 缺少它會直接中止，`deploy:demo` 不受影響）
 
 ## 部署

@@ -47,7 +47,7 @@ pub(crate) fn verify_pw(p: &str, hash: &str) -> bool {
 static DUMMY_HASH: LazyLock<String> =
     LazyLock::new(|| hash_pw("dummy-password-for-timing").unwrap());
 
-fn check_pw(p: &str) -> Result<(), AppError> {
+pub(crate) fn check_pw(p: &str) -> Result<(), AppError> {
     if (8..=128).contains(&p.chars().count()) {
         Ok(())
     } else {
@@ -102,6 +102,7 @@ struct CodeReq {
 
 async fn register_verify(
     State(st): State<AppState>,
+    crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     headers: HeaderMap,
     Json(r): Json<CodeReq>,
 ) -> Result<Response, AppError> {
@@ -123,7 +124,7 @@ async fn register_verify(
         ));
     }
     tx.commit().await?;
-    session_response(&st.pool, &headers, uid, is_new).await
+    session_response(&st.pool, &headers, &ip, "register", uid, is_new).await
 }
 
 fn bad_credentials() -> AppError {
@@ -185,7 +186,7 @@ async fn login(
         .bind(&email)
         .execute(&st.pool)
         .await?;
-    session_response(&st.pool, &headers, uid, false).await
+    session_response(&st.pool, &headers, &ip, "password", uid, false).await
 }
 
 #[derive(Deserialize)]
@@ -225,6 +226,7 @@ struct ResetConfirm {
 
 async fn reset_confirm(
     State(st): State<AppState>,
+    crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<ResetConfirm>,
 ) -> Result<StatusCode, AppError> {
     let email = norm_email(&r.email)?;
@@ -266,7 +268,20 @@ async fn reset_confirm(
     if identity.is_none() {
         crate::identities::notify(&mut tx, uid, "auth.identity_linked", "email", Some(&email))
             .await?;
+    } else {
+        crate::identities::notify(&mut tx, uid, "auth.password_changed", "email", Some(&email))
+            .await?;
     }
+    crate::security::audit(
+        &mut *tx,
+        uid,
+        "auth.password_reset",
+        "users",
+        uid,
+        crate::security::inet(&ip).as_deref(),
+        json!({}),
+    )
+    .await?;
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id=$1 AND revoked_at IS NULL")
         .bind(uid)
         .execute(&mut *tx)

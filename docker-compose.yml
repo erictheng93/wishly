@@ -13,14 +13,15 @@ services:
       interval: 2s
       retries: 30
   minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
+    image: bitnamilegacy/minio:latest   # minio/minio 已自 Docker Hub 下架
     environment:
       MINIO_ROOT_USER: wishsync
       MINIO_ROOT_PASSWORD: wishsync-secret
     ports: ["9000:9000", "9001:9001"]
+    volumes: [minio:/bitnami/minio/data]
   mailpit:
     image: axllent/mailpit
     ports: ["1025:1025", "8025:8025"]
 volumes:
   db:
+  minio:

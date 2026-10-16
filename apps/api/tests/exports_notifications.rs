@@ -52,7 +52,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
     assert!(h["content-disposition"]
         .to_str()
         .unwrap()
-        .contains("wishsync-export-"));
+        .contains("wishly-export-"));
     assert_eq!(
         (
             v["wishlists"][0]["items"][0]["title"].as_str(),

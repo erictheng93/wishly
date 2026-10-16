@@ -161,6 +161,7 @@ http.createServer(async (req, res) => {
       return send(res, 200, { deleted: true, anonymized_at: now() }, { 'set-cookie': 'ws_session=; Max-Age=0; Path=/' })
     }
   }
+  if (p === '/me/sessions' && m === 'GET') { if (!authed()) return; return send(res, 200, { data: [{ id: token, user_agent: req.headers['user-agent'] || null, ip: '127.0.0.1', created_at: now(), last_seen_at: now(), current: true }] }) }
   if (p === '/me/export') { if (!authed()) return; return send(res, 200, { exported_at: now(), user: me, wishlists: [...lists.values()].filter((w) => w.owner.id === me.id).map((w) => ({ id: w.id, title: w.title, items: myItems(w) })), claims: [] }) }
 
   // ---- Wishlists ----

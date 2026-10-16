@@ -1,6 +1,7 @@
 //! Auth：Email OTP、LINE OAuth2（code flow + PKCE）、登出、GET/PATCH /me。簽發 session（DB 只存 SHA-256(token)）。
 use crate::{
     error::AppError,
+    ratelimit::Peer,
     session::{hash_token, CurrentUser},
     AppState,
 };
@@ -72,10 +73,13 @@ pub(crate) fn session_cookie(token: &str) -> String {
 }
 
 // ---------- session / identity ----------
+/// 簽發 session，同交易寫 audit `auth.login`（method：otp / password / register / line / google / native）。
 pub(crate) async fn new_session(
     pool: &PgPool,
     user_id: Uuid,
     ua: Option<&str>,
+    ip: &str,
+    method: &str,
 ) -> Result<String, AppError> {
     let mut tx = pool.begin().await?;
     let blocked: bool = sqlx::query_scalar(
@@ -95,8 +99,19 @@ pub(crate) async fn new_session(
     let mut b = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut b);
     let token = B64.encode(b);
-    sqlx::query("INSERT INTO sessions (user_id, token_hash, user_agent, expires_at) VALUES ($1,$2,$3, now() + make_interval(days => $4))")
-        .bind(user_id).bind(hash_token(&token)).bind(ua).bind(SESSION_DAYS as i32).execute(&mut *tx).await?;
+    let ip = crate::security::inet(ip);
+    let sid: Uuid = sqlx::query_scalar("INSERT INTO sessions (user_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4::inet, now() + make_interval(days => $5)) RETURNING id")
+        .bind(user_id).bind(hash_token(&token)).bind(ua).bind(&ip).bind(SESSION_DAYS as i32).fetch_one(&mut *tx).await?;
+    crate::security::audit(
+        &mut *tx,
+        user_id,
+        "auth.login",
+        "sessions",
+        sid,
+        ip.as_deref(),
+        json!({ "method": method }),
+    )
+    .await?;
     tx.commit().await?;
     Ok(token)
 }
@@ -335,10 +350,10 @@ pub(crate) async fn issue_otp_in_tx(
 
 pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
     let subject = match purpose {
-        "register" => "WishSync 註冊驗證碼",
-        "reset" => "WishSync 重設密碼驗證碼",
-        "link" => "WishSync 綁定 Email 驗證碼",
-        _ => "WishSync 登入驗證碼",
+        "register" => "Wishly 註冊驗證碼",
+        "reset" => "Wishly 重設密碼驗證碼",
+        "link" => "Wishly 綁定 Email 驗證碼",
+        _ => "Wishly 登入驗證碼",
     };
     tokio::spawn(send_mail(email.to_string(), code, subject)); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
 }
@@ -447,6 +462,8 @@ pub(crate) fn native_client(h: &HeaderMap) -> bool {
 pub(crate) async fn session_response(
     pool: &PgPool,
     headers: &HeaderMap,
+    ip: &str,
+    method: &str,
     uid: Uuid,
     is_new: bool,
 ) -> Result<Response, AppError> {
@@ -456,6 +473,8 @@ pub(crate) async fn session_response(
         headers
             .get(header::USER_AGENT)
             .and_then(|v| v.to_str().ok()),
+        ip,
+        method,
     )
     .await?;
     let u = user_json(pool, uid).await?;
@@ -469,6 +488,7 @@ pub(crate) async fn session_response(
 
 async fn otp_verify(
     State(st): State<AppState>,
+    Peer(ip): Peer,
     headers: HeaderMap,
     Json(r): Json<VerifyReq>,
 ) -> Result<Response, AppError> {
@@ -477,23 +497,31 @@ async fn otp_verify(
     let name = email.split('@').next().unwrap_or("user");
     let (uid, is_new) =
         upsert_identity(&st.pool, "email", &email, Some(&email), name, None).await?;
-    session_response(&st.pool, &headers, uid, is_new).await
+    session_response(&st.pool, &headers, &ip, "otp", uid, is_new).await
 }
 
 // ---------- logout / me ----------
 async fn logout(
-    _u: CurrentUser,
+    u: CurrentUser,
     State(st): State<AppState>,
-    headers: HeaderMap,
+    Peer(ip): Peer,
 ) -> Result<Response, AppError> {
-    if let Some(t) = crate::session::session_token(&headers) {
-        sqlx::query(
-            "UPDATE sessions SET revoked_at = now() WHERE token_hash=$1 AND revoked_at IS NULL",
-        )
-        .bind(hash_token(&t))
-        .execute(&st.pool)
+    let mut tx = st.pool.begin().await?;
+    sqlx::query("UPDATE sessions SET revoked_at = now() WHERE id=$1 AND revoked_at IS NULL")
+        .bind(u.session_id)
+        .execute(&mut *tx)
         .await?;
-    }
+    crate::security::audit(
+        &mut *tx,
+        u.id,
+        "auth.logout",
+        "sessions",
+        u.session_id,
+        crate::security::inet(&ip).as_deref(),
+        json!({}),
+    )
+    .await?;
+    tx.commit().await?;
     Ok((
         StatusCode::NO_CONTENT,
         [(
@@ -511,6 +539,10 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let (dn, email, avatar, staff, prefs, handle, dcv): (String, Option<String>, Option<String>, bool, Value, Option<String>, String) =
         sqlx::query_as("SELECT display_name, email, avatar_key, is_staff, notification_prefs, handle, default_claim_visibility::text FROM users WHERE id=$1 AND deleted_at IS NULL")
             .bind(id).fetch_optional(pool).await?.ok_or(AppError::Unauthorized)?;
+    let (mfa_enabled, has_password): (bool, bool) = sqlx::query_as(
+        "SELECT totp_enabled_at IS NOT NULL, EXISTS(SELECT 1 FROM auth_identities i WHERE i.user_id=$1 AND i.provider='email' AND i.password_hash IS NOT NULL)
+         FROM users WHERE id=$1")
+        .bind(id).fetch_one(pool).await?;
     let idents: Vec<String> = sqlx::query_scalar(
         "SELECT provider::text FROM auth_identities WHERE user_id=$1 ORDER BY created_at",
     )
@@ -520,13 +552,15 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let avatar_url = crate::uploads::avatar_url(avatar.as_deref());
     Ok(
         json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
-               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
+               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
                "orgs": [] }),
     ) // orgs 為 P2-D，MVP 恆空
 }
 
 async fn me(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, AppError> {
-    Ok(Json(user_json(&st.pool, u.id).await?))
+    let mut v = user_json(&st.pool, u.id).await?;
+    v["mfa_verified"] = json!(u.mfa); // 只有 GET /me 知道目前 session
+    Ok(Json(v))
 }
 
 fn some_opt<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
@@ -962,6 +996,7 @@ async fn oauth_callback(
     State(st): State<AppState>,
     Path(provider): Path<String>,
     Query(q): Query<CbQ>,
+    Peer(ip): Peer,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let clear = format!(
@@ -1119,6 +1154,8 @@ async fn oauth_callback(
         headers
             .get(header::USER_AGENT)
             .and_then(|v| v.to_str().ok()),
+        &ip,
+        &provider,
     )
     .await;
     let token = match login {
@@ -1184,6 +1221,7 @@ struct ExchangeReq {
 /// 碼先刪除再驗證：不論成敗都只能用一次，攔截者只有一次機會且沒有 verifier。
 async fn native_exchange(
     State(st): State<AppState>,
+    Peer(ip): Peer,
     headers: HeaderMap,
     Json(r): Json<ExchangeReq>,
 ) -> Result<Response, AppError> {
@@ -1203,7 +1241,7 @@ async fn native_exchange(
     if !crate::config::ct_eq(expect.as_bytes(), challenge.as_bytes()) {
         return Err(invalid());
     }
-    session_response(&st.pool, &headers, uid, false).await
+    session_response(&st.pool, &headers, &ip, "native", uid, false).await
 }
 
 #[cfg(test)]

@@ -154,7 +154,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     h.insert(
         header::CONTENT_DISPOSITION,
         HeaderValue::from_str(&format!(
-            "attachment; filename=\"wishsync-export-{}.json\"",
+            "attachment; filename=\"wishly-export-{}.json\"",
             now.format("%Y-%m-%d")
         ))
         .unwrap(),

@@ -3,7 +3,7 @@
 use crate::{error::AppError, session::CurrentUser, AppState};
 use axum::{
     extract::{FromRequestParts, Path, Query, State},
-    http::{header, request::Parts, HeaderValue},
+    http::{header, request::Parts, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, patch, post, put},
     Json, Router,
@@ -23,23 +23,27 @@ pub fn routes() -> Router<AppState> {
             delete(unlink_identity),
         )
         .route("/admin/users/{id}/recovery", post(recover_user))
+        .route("/admin/users/{id}/mfa", delete(reset_mfa))
         .route("/admin/audit-logs", get(list_audit_logs))
         .route("/admin/system-flags", get(list_flags))
         .route("/admin/system-flags/{key}", put(set_flag))
         .route("/admin/stats", get(stats))
 }
 
-/// 已登入且 is_staff；否則 401 / 403 STAFF_ONLY。
+/// 已登入且 is_staff；已啟用 TOTP 者此 session 須已通過驗證。否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。
+/// ponytail: 未啟用 TOTP 仍可進後台（前端軟性引導）；要全面強制時改成 `!u.mfa` 即可。
 pub struct Staff(pub Uuid);
 
 impl FromRequestParts<AppState> for Staff {
     type Rejection = AppError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
         let u = CurrentUser::from_request_parts(parts, st).await?;
-        if u.is_staff {
-            Ok(Staff(u.id))
-        } else {
+        if !u.is_staff {
             Err(AppError::problem(403, "STAFF_ONLY", "僅營運人員可使用"))
+        } else if u.mfa_enabled && !u.mfa {
+            Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"))
+        } else {
+            Ok(Staff(u.id))
         }
     }
 }
@@ -183,7 +187,7 @@ async fn list_users(
     }
     let qid = qs.and_then(|s| s.parse::<Uuid>().ok());
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
-        "SELECT u.id, jsonb_build_object('id', u.id, 'display_name', u.display_name, 'handle', u.handle, 'email', u.email, 'is_staff', u.is_staff,
+        "SELECT u.id, jsonb_build_object('id', u.id, 'display_name', u.display_name, 'handle', u.handle, 'email', u.email, 'is_staff', u.is_staff, 'mfa_enabled', u.totp_enabled_at IS NOT NULL,
            'blocked', u.blocked_at IS NOT NULL, 'blocked_at', u.blocked_at, 'deleted', u.deleted_at IS NOT NULL,
            'identities', (SELECT COALESCE(jsonb_agg(jsonb_build_object('provider', i.provider::text) ORDER BY i.provider::text), '[]') FROM auth_identities i WHERE i.user_id=u.id),
            'wishlist_count', (SELECT count(*) FROM wishlists w WHERE w.owner_id = u.id AND w.deleted_at IS NULL), 'created_at', u.created_at)
@@ -332,6 +336,32 @@ async fn unlink_identity(
     .await?;
     tx.commit().await?;
     Ok(Json(json!({"unlinked":true})))
+}
+
+/// 營運人員遺失驗證器時由另一位營運人員重設；撤銷其 session，下次登入重新設定。
+async fn reset_mfa(
+    State(st): State<AppState>,
+    Staff(sid): Staff,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Value>,
+) -> Result<StatusCode, AppError> {
+    let reason = operation_reason(&b)?;
+    let mut tx = staff_transaction(&st.pool, sid).await?;
+    sqlx::query("UPDATE users SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE id=$1 AND deleted_at IS NULL")
+        .bind(id).execute(&mut *tx).await?
+        .rows_affected().eq(&1).then_some(()).ok_or(AppError::NotFound)?;
+    revoke_sessions(&mut tx, id).await?;
+    audit(
+        &mut *tx,
+        sid,
+        "user.mfa_reset",
+        "users",
+        Some(id),
+        json!({"reason":reason}),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn recover_user(

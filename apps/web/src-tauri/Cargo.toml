@@ -1,7 +1,7 @@
 [package]
 name = "wishsync"
 version = "0.1.0"
-description = "WishSync desktop/mobile shell"
+description = "Wishly desktop/mobile shell"
 edition = "2021"
 
 [lib]

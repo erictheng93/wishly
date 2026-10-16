@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WishSync PRD 產品需求文件</title>
+<title>Wishly PRD 產品需求文件</title>
 <style>
 :root{--bg:#ffffff;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--accent:#0b7a75;--accent-soft:#e6f4f3;--warn:#b35900;--code-bg:#f6f8fa;--blue:#0a5cad;--blue-soft:#e3effb;--gray-soft:#eceff2;--zebra:#f6f8fa}
 @media (prefers-color-scheme: dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--border:#3d444d;--accent:#3fb8b1;--accent-soft:#12302f;--warn:#e3963e;--code-bg:#161b22;--blue:#6cb2f5;--blue-soft:#14283f;--gray-soft:#21262d;--zebra:#131920}}
@@ -61,14 +61,14 @@ header.top,main{padding-left:16px;padding-right:16px}
 <a href="#s10">10. 分期路線圖</a>
 <a href="#s11">11. 待決問題</a>
 </nav>
-<header class="top"><span class="t">WishSync（心願同步）PRD 產品需求文件</span><a href="index.html">← 文件索引</a></header>
+<header class="top"><span class="t">Wishly（心願同步）PRD 產品需求文件</span><a href="index.html">← 文件索引</a></header>
 <main><div class="wrap">
 
-<h1>WishSync 產品需求文件（PRD）</h1>
+<h1>Wishly 產品需求文件（PRD）</h1>
 
 <h2 id="s1">1. 文件資訊</h2>
 <table class="meta"><tbody>
-<tr><td>文件名稱</td><td>WishSync（心願同步）PRD</td></tr>
+<tr><td>文件名稱</td><td>Wishly（心願同步）PRD</td></tr>
 <tr><td>版本</td><td>v0.4</td></tr>
 <tr><td>日期</td><td>2026-10-08</td></tr>
 <tr><td>狀態</td><td>Draft</td></tr>
@@ -84,7 +84,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <h3>2.1 背景與問題陳述</h3>
 <p>送禮與捐助的共通痛點是「供需資訊不同步」：想要的人說不出口或沒有管道公開需求，想送的人不知道缺什麼、怕重複。三個典型情境：</p>
 <table>
-<thead><tr><th>情境</th><th>現況痛點</th><th>WishSync 解法</th></tr></thead>
+<thead><tr><th>情境</th><th>現況痛點</th><th>Wishly 解法</th></tr></thead>
 <tbody>
 <tr><td>一、生日（<code>personal</code>）</td><td>朋友不知道送什麼，怕與別人重複。</td><td>本人列清單，朋友開連結參考並認領；他人只看到「已認領」。</td></tr>
 <tr><td>二、孕婦（<code>registry</code>）</td><td>大家都送奶瓶，沒人送奶粉、紙尿褲、嬰兒車。</td><td>列出品項與數量（奶瓶 10、XX 品牌奶粉 2 罐、紙尿褲 5 包、嬰兒車 1），親友自行認領；嬰兒車等高價品，MVP 先以數量 1 認領，Phase 2 起可由多位親友以點數眾籌，達標後平台自動購買並寄給孕婦；孕婦可看完成度與誰認領了什麼（驚喜模式除外）。</td></tr>
@@ -113,7 +113,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <h2 id="s3">3. 想法評估（PM 觀點）</h2>
 <h3>3.1 市場現況與競品</h3>
 <table>
-<thead><tr><th>競品 / 做法</th><th>強項</th><th>弱點（WishSync 的切入點）</th></tr></thead>
+<thead><tr><th>競品 / 做法</th><th>強項</th><th>弱點（Wishly 的切入點）</th></tr></thead>
 <tbody>
 <tr><td>Amazon Wish List / Registry</td><td>商品庫、物流、信任度極高。</td><td>綁 Amazon 商店，台灣使用有限；非自家商品無法登記；無眾籌。</td></tr>
 <tr><td>MyRegistry</td><td>跨店加入商品，支援現金與眾籌基金。</td><td>以英文與美國市場為主；介面較重；台灣在地店家與付款方式缺乏支援。</td></tr>
@@ -132,9 +132,9 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>同一資料模型延伸到救災</b>：relief 據點 = 帶座標的 wishlist，不需另起一套系統。</li>
 </ol>
 <h3>3.2.1 效仿星巴克：儲值錢包、禮物卡、星禮程、企業採購</h3>
-<p>星巴克台灣的隨行卡（儲值卡）、電子禮物卡、星禮程（回饋星星）與企業採購，構成「預收現金 + 高留存 + 社交送禮」的飛輪。對應到 WishSync：</p>
+<p>星巴克台灣的隨行卡（儲值卡）、電子禮物卡、星禮程（回饋星星）與企業採購，構成「預收現金 + 高留存 + 社交送禮」的飛輪。對應到 Wishly：</p>
 <table>
-<thead><tr><th>星巴克做法</th><th>WishSync 對應</th><th>分期</th></tr></thead>
+<thead><tr><th>星巴克做法</th><th>Wishly 對應</th><th>分期</th></tr></thead>
 <tbody>
 <tr><td>隨行卡儲值與自動加值</td><td>點數錢包 + 自動儲值（餘額低於門檻時扣卡，每月上限預設 NT$10,000）</td><td>P2-A</td></tr>
 <tr><td>電子禮物卡（固定面額、祝福語、LINE 分享連結）</td><td>面額 300 / 500 / 1,000 / 2,000 / 3,000 的禮物卡，分享連結 <code>/g/{code}</code>；兌換後點數只能投入心願品項</td><td>P2-B</td></tr>
@@ -287,7 +287,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>Given</b> SSE 斷線，<b>When</b> 重連，<b>Then</b> 前端重新取得完整狀態。</li>
 </ul></div>
 
-<div class="story"><span class="id">US-10 PWA 基本</span>　身為使用者，我想把 WishSync 加入主畫面。
+<div class="story"><span class="id">US-10 PWA 基本</span>　身為使用者，我想把 Wishly 加入主畫面。
 <ul>
 <li><b>Given</b> 我使用 Chrome / Safari，<b>When</b> 符合 PWA 條件，<b>Then</b> 可加入主畫面，靜態資源可快取。</li>
 <li><b>Given</b> 我在 LINE in-app browser，<b>When</b> 使用核心流程，<b>Then</b> 不依賴 PWA 也能完成認領。</li>

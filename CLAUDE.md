@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-WishSync：願望清單，用連結分享，訪客免註冊即可認領品項，防超賣。文件與程式註解以繁體中文為主。完整設定與部署細節見 `README.md`；產品/契約規格在 `docs/`（PRD、流程、線框、`04-data-schema-api-contract.html` 的 API 契約，程式註解常以「契約 x.x」「D48」引用）。
+Wishly：願望清單，用連結分享，訪客免註冊即可認領品項，防超賣。文件與程式註解以繁體中文為主。完整設定與部署細節見 `README.md`；產品/契約規格在 `docs/`（PRD、流程、線框、`04-data-schema-api-contract.html` 的 API 契約，程式註解常以「契約 x.x」「D48」引用）。
 
 ## 指令
 

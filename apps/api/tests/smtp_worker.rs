@@ -81,7 +81,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
     assert_eq!(message["To"][0]["Address"], email);
     assert_eq!(
         message["Subject"],
-        "【WishSync】《SMTP integration wishlist》有 1 件新認領"
+        "【Wishly】《SMTP integration wishlist》有 1 件新認領"
     );
     let base = std::env::var("MAILPIT_API_BASE").unwrap_or_else(|_| "http://localhost:8025".into());
     let body: Value = client

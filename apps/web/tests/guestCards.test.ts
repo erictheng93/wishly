@@ -97,6 +97,6 @@ it('guest header routes home and to claim management without requiring sign in',
   mounted = mount(GuestTop, {}, { NuxtLink })
   const links = [...mounted.el.querySelectorAll('header a')]
   expect(links.map(a => [a.textContent, a.getAttribute('href')])).toEqual([
-    ['WishSync', '/'], ['我的認領', '/me/claims'],
+    ['Wishly', '/'], ['我的認領', '/me/claims'],
   ])
 })

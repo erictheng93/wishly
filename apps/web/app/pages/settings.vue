@@ -35,6 +35,7 @@ onMounted(async () => { await fetchMe(true); name.value = user.value?.display_na
   identityErr.value = LINK_ERRORS[String(route.query.error)] ?? ''
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = `已綁定 ${label}`
+  loadSessions()
 })
 
 async function sendLinkEmail() {
@@ -70,6 +71,40 @@ async function unlinkIdentity() {
   } catch (e) { identityErr.value = errMsg(e) } finally { identityBusy.value = false }
 }
 
+// 登入裝置
+const sessions = ref<any[]>([]), sessBusy = ref(false), sessErr = ref(''), sessMsg = ref('')
+const OS: [RegExp, string][] = [[/iPhone|iPad/, 'iOS'], [/Android/, 'Android'], [/Mac OS/, 'macOS'], [/Windows/, 'Windows'], [/Linux/, 'Linux']]
+const BROWSER: [RegExp, string][] = [[/Edg\//, 'Edge'], [/Chrome\//, 'Chrome'], [/Firefox\//, 'Firefox'], [/Safari\//, 'Safari']]
+function device(ua?: string | null) {
+  if (!ua) return '未知裝置'
+  const pick = (t: [RegExp, string][]) => t.find(([r]) => r.test(ua))?.[1]
+  return [pick(BROWSER), pick(OS)].filter(Boolean).join('・') || ua.slice(0, 60)
+}
+const when = (t: string) => new Date(t).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })
+async function loadSessions() {
+  try { sessions.value = (await api('/me/sessions')).data } catch (e) { sessErr.value = errMsg(e) }
+}
+async function revokeSession(id?: string) {
+  if (sessBusy.value) return
+  sessBusy.value = true; sessErr.value = sessMsg.value = ''
+  try {
+    if (id) { await api(`/me/sessions/${id}`, { method: 'DELETE' }); sessMsg.value = '已登出該裝置' }
+    else { const r = await api('/me/sessions', { method: 'DELETE' }); sessMsg.value = `已登出 ${r.revoked} 個其他裝置` }
+    await loadSessions()
+  } catch (e) { sessErr.value = errMsg(e) } finally { sessBusy.value = false }
+}
+// 變更密碼（需目前密碼；沒有密碼者走忘記密碼流程設定）
+const curPw = ref(''), newPw = ref(''), pwBusy = ref(false), pwErr = ref(''), pwMsg = ref('')
+async function changePassword() {
+  if (pwBusy.value) return
+  pwBusy.value = true; pwErr.value = pwMsg.value = ''
+  try {
+    await api('/me/password', { method: 'POST', body: { current_password: curPw.value, new_password: newPw.value } })
+    curPw.value = newPw.value = ''; pwMsg.value = '密碼已變更，其他裝置已登出'
+    await loadSessions()
+  } catch (e) { pwErr.value = errMsg(e) } finally { pwBusy.value = false }
+}
+
 async function toggle(ev: Event) {
   const v = (ev.target as HTMLInputElement).checked, old = !v
   user.value.notification_prefs = { ...user.value.notification_prefs, email_claims: v } // 樂觀更新
@@ -95,7 +130,7 @@ async function exportData() {
   try {
     const data = await api('/me/export')
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-    const a = Object.assign(document.createElement('a'), { href: url, download: `wishsync-export-${new Date().toISOString().slice(0, 10)}.json` })
+    const a = Object.assign(document.createElement('a'), { href: url, download: `wishly-export-${new Date().toISOString().slice(0, 10)}.json` })
     a.click(); URL.revokeObjectURL(url)
   } catch (e) { err.value = errMsg(e) } finally { exporting.value = false }
 }
@@ -146,10 +181,34 @@ async function remove() {
           </template>
           <button v-else class="c-btn primary block" :disabled="identityBusy">{{ identityBusy ? '寄送中…' : '寄送綁定驗證碼' }}</button>
         </form>
-        <p v-if="user.email" class="c-mute"><NuxtLink to="/forgot-password">設定／重設 Email 登入密碼</NuxtLink>（會登出所有裝置）</p>
+        <p v-if="user.email && !user.has_password" class="c-mute"><NuxtLink to="/forgot-password">設定 Email 登入密碼</NuxtLink>（以 Email 驗證碼設定，會登出所有裝置）</p>
         <p v-else class="c-mute">尚未綁定 Email，無法收取通知信或使用密碼重設。</p>
         <p v-if="identityErr && !removingProvider" class="c-err" role="alert">{{ identityErr }}</p>
         <p v-if="identityMsg" class="c-ok" role="status">{{ identityMsg }}</p>
+      </section>
+      <section v-if="user.has_password" class="c-card">
+        <h2 class="c-h2">變更密碼</h2>
+        <form @submit.prevent="changePassword">
+          <CreatorPasswordField v-model="curPw" label="目前密碼" autocomplete="current-password" />
+          <CreatorPasswordField v-model="newPw" label="新密碼" autocomplete="new-password" hint="8–128 字元。變更後會登出其他裝置。" />
+          <p v-if="pwErr" class="c-err" role="alert">{{ pwErr }}</p>
+          <p v-if="pwMsg" class="c-ok" role="status">{{ pwMsg }}</p>
+          <button class="c-btn" :disabled="pwBusy">{{ pwBusy ? '變更中…' : '變更密碼' }}</button>
+        </form>
+        <p class="c-mute"><NuxtLink to="/forgot-password">忘記目前密碼？</NuxtLink></p>
+      </section>
+      <section class="c-card" aria-labelledby="sessions-title">
+        <h2 id="sessions-title" class="c-h2">登入裝置</h2>
+        <ul class="identity-list">
+          <li v-for="s in sessions" :key="s.id" class="c-row">
+            <span class="c-grow">{{ device(s.user_agent) }} <small v-if="s.current" class="c-badge">目前裝置</small><br>
+              <small class="c-mute">最後使用 {{ when(s.last_seen_at) }}<template v-if="s.ip">・{{ s.ip }}</template>・登入於 {{ when(s.created_at) }}</small></span>
+            <button v-if="!s.current" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession(s.id)">登出</button>
+          </li>
+        </ul>
+        <button v-if="sessions.length > 1" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession()">登出其他所有裝置</button>
+        <p v-if="sessErr" class="c-err" role="alert">{{ sessErr }}</p>
+        <p v-if="sessMsg" class="c-ok" role="status">{{ sessMsg }}</p>
       </section>
       <section class="c-card">
         <h2 class="c-h2">個人頁與捐助</h2>

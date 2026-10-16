@@ -2,6 +2,7 @@
 definePageMeta({ middleware: 'staff' })
 useHead({ title: '營運後台' })
 const { api } = useApi()
+const { user: me } = useAuth()
 const tab = ref<'reports' | 'lists' | 'users' | 'flags'>('reports')
 const err = ref(''), msg = ref('')
 const mask = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2')
@@ -83,8 +84,8 @@ async function doUser() {
     const body: any = { reason: userReason.value.trim() }
     if (kind === 'blocked') body.blocked = !user.blocked
     if (kind === 'staff') body.is_staff = !user.is_staff
-    await api(kind === 'unlink' ? `${path}/identities/${provider}` : kind === 'recovery' ? `${path}/recovery` : path,
-      { method: kind === 'unlink' ? 'DELETE' : kind === 'recovery' ? 'POST' : 'PATCH', body })
+    await api(kind === 'unlink' ? `${path}/identities/${provider}` : kind === 'recovery' ? `${path}/recovery` : kind === 'mfa' ? `${path}/mfa` : path,
+      { method: kind === 'unlink' || kind === 'mfa' ? 'DELETE' : kind === 'recovery' ? 'POST' : 'PATCH', body })
     userAct.value = null; msg.value = kind === 'recovery' ? '已申請寄送復原驗證信，請使用者到忘記密碼頁完成重設' : `已完成：${title}`
     await Promise.all([searchUsers(), loadStats()])
   } catch (e) { userErr.value = errMsg(e) } finally { userBusy.value = false }
@@ -107,6 +108,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
 <template>
   <main class="c-page c-admin">
     <CreatorHeader title="營運後台" back="/dashboard"><span class="c-badge">STAFF</span></CreatorHeader>
+    <p v-if="me && !me.mfa_enabled" class="c-card" role="status">建議啟用兩步驟驗證：後台可停權、發放點數，帳號被盜影響很大。<NuxtLink to="/admin/mfa">現在設定</NuxtLink></p>
     <section class="c-card" aria-label="營運統計">
       <div class="c-row c-mb"><h2 class="c-h2 c-grow c-m0">營運概況</h2><button class="c-btn small" :disabled="statsBusy" @click="loadStats">{{ statsBusy ? '更新中…' : '更新統計' }}</button></div>
       <p v-if="statsErr" class="c-err" role="alert">{{ statsErr }}</p>
@@ -184,6 +186,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
           <button class="c-btn" @click="askUser(u, 'staff', u.is_staff ? '取消 staff' : '設為 staff')">{{ u.is_staff ? '取消 staff' : '設為 staff' }}</button>
           <button v-for="i in u.identities.filter((i: any) => i.provider !== 'email')" :key="i.provider" class="c-btn" :disabled="u.identities.length <= 1" @click="askUser(u, 'unlink', `解除 ${PROVIDER[i.provider]} 綁定`, i.provider)">解除 {{ PROVIDER[i.provider] }} 綁定</button>
           <button class="c-btn" :disabled="!u.email || u.blocked" @click="askUser(u, 'recovery', '寄送復原驗證信')">寄送復原驗證信</button>
+          <button v-if="u.mfa_enabled" class="c-btn" @click="askUser(u, 'mfa', '重設兩步驟驗證')">重設兩步驟驗證</button>
         </div>
         <p v-if="!u.email && !u.deleted" class="c-mute">無已驗證 Email；帳號復原須另行核驗身分。</p>
         <div class="c-mute">清單 {{ u.wishlist_count }}・{{ new Date(u.created_at).toLocaleDateString('zh-TW') }}</div>
@@ -199,7 +202,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
     <CreatorConfirm :open="!!mod" :title="mod?.hidden ? '恢復上架' : '下架清單'" :text="`清單：${mod?.title}`" :ok="mod?.hidden ? '恢復上架' : '下架此清單'" :danger="!mod?.hidden" :busy="modBusy" :disabled="!mod?.hidden && !reason.trim()" :error="modErr" @close="mod = null" @ok="doMod">
       <label v-if="mod && !mod.hidden" class="c-field"><span>下架原因（必填，會顯示給建立者）</span><input v-model="reason" maxlength="200"></label>
     </CreatorConfirm>
-    <CreatorConfirm :open="!!userAct" :title="userAct?.title || ''" :text="`對象：${userAct?.user.display_name}。停權、staff 變更與解除綁定會撤銷現有登入，使用者須重新登入。`" ok="確認執行" danger :busy="userBusy" :disabled="!userReason.trim()" :error="userErr" @close="!userBusy && (userAct = null)" @ok="doUser">
+    <CreatorConfirm :open="!!userAct" :title="userAct?.title || ''" :text="`對象：${userAct?.user.display_name}。停權、staff 變更、解除綁定與重設兩步驟驗證會撤銷現有登入，使用者須重新登入。`" ok="確認執行" danger :busy="userBusy" :disabled="!userReason.trim()" :error="userErr" @close="!userBusy && (userAct = null)" @ok="doUser">
       <label class="c-field"><span>操作原因</span><input v-model="userReason" maxlength="200" :disabled="userBusy" required></label>
     </CreatorConfirm>
     <CreatorConfirm :open="flagAsk" title="切換唯讀模式" :text="readOnly ? '確定關閉唯讀模式？' : '唯讀模式會影響全站寫入，確定開啟？'" :busy="flagBusy" danger @close="flagAsk = false" @ok="setFlag" />

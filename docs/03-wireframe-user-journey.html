@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WishSync 線框圖與用戶旅程</title>
+<title>Wishly 線框圖與用戶旅程</title>
 <style>
 :root{--bg:#ffffff;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--accent:#0b7a75;--accent-soft:#e6f4f3;--warn:#b35900;--code-bg:#f6f8fa;
 --blue:#0550ae;--blue-soft:#e3effd;--green:#1a7f37;--green-soft:#e2f5e7;--warn-soft:#fff1e0;--red:#b42318;--red-soft:#fdeceb;--g1:#eef1f4;--g2:#c3ccd5;--zebra:#f6f8fa;--on-accent:#ffffff}
@@ -169,9 +169,9 @@ main{padding:0 16px 60px}
 <a href="#s14">14. 部署與環境</a>
 </nav>
 <main>
-<header class="top"><span class="t">WishSync 線框圖與用戶旅程</span><a href="index.html">← 文件索引</a></header>
+<header class="top"><span class="t">Wishly 線框圖與用戶旅程</span><a href="index.html">← 文件索引</a></header>
 
-<h1>WishSync Wireframe / Mockup &amp; User Flow</h1>
+<h1>Wishly Wireframe / Mockup &amp; User Flow</h1>
 <p class="small">給前端 Vue / Nuxt 工程師的原型與流程說明。名稱、枚舉、API 路徑、前端路由皆對齊共用規格，不另行命名。</p>
 <div class="note w"><b>低保真聲明：</b>本文件的線框為<b>低保真</b>，只表達資訊架構、元件與狀態。MVP 上線前的高保真設計與 design tokens（色彩、字級、間距、元件）由設計師另行產出（路線圖並行項目），實作時以設計稿為準，本文的灰階與 accent 僅為示意。</div>
 
@@ -304,7 +304,7 @@ flowchart TD
 <div class="tw"><table>
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
-<tr><td>1 發現</td><td>朋友的 LINE 訊息帶來 WishSync 連結，或搜尋「待產清單 分享」</td><td>「上次收了三組奶瓶組，這次想先講清楚」</td><td>期待 / 略懷疑</td><td>首頁 /</td><td>首屏以「不重複、不尷尬」為訴求，放範例分享頁預覽</td></tr>
+<tr><td>1 發現</td><td>朋友的 LINE 訊息帶來 Wishly 連結，或搜尋「待產清單 分享」</td><td>「上次收了三組奶瓶組，這次想先講清楚」</td><td>期待 / 略懷疑</td><td>首頁 /</td><td>首屏以「不重複、不尷尬」為訴求，放範例分享頁預覽</td></tr>
 <tr><td>2 登入建立</td><td>選 LINE 登入；選 registry、輸入名稱「小愛的待產清單」、預產期</td><td>「不想再記一組密碼」</td><td>順暢</td><td>/login、/lists/new</td><td>LINE Login 置頂；registry 預設，活動日用日期選擇器</td></tr>
 <tr><td>3 加品項</td><td>逐項新增：奶瓶 ×10、奶粉 ×2（MVP 皆為數量認領）。<span class="ph p2">P2</span> 另加嬰兒推車：從商品目錄選，設為眾籌</td><td>「推車太貴，大家分攤比較好開口，但錢不要經過我的手」</td><td>認真 / 稍累</td><td>/lists/{id}/edit、新增品項 sheet</td><td>P0 眾籌選項灰掉標示 P2；P1 貼網址自動帶入標題與圖片；P2 CatalogPicker 直接算出 target_points</td></tr>
 <tr><td>4 設驚喜與收件地址</td><td>開驚喜模式；<span class="ph p2">P2</span> 有眾籌品項時填收件地址（發佈前必填）</td><td>「我想保留拆禮物的驚喜，但包裹要寄得到」</td><td>安心</td><td>建立頁開關、收件地址設定</td><td>解釋「活動日前只看完成度與彙總（已下單 N / 運送中 M）」；說明地址只有你與履約人員看得到，捐贈者看不到</td></tr>
@@ -821,7 +821,7 @@ flowchart TD
 <div class="wf">
 <div><div class="phone">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync<span class="sp"></span><div class="ic">登入</div></div>
+<div class="ab">Wishly<span class="sp"></span><div class="ic">登入</div></div>
 <div class="bd">
 <div style="font-size:22px;font-weight:700;line-height:1.3">想要的，剛好有人送。<br>不重複，不漏掉。</div>
 <div class="lbl">建立心願清單，傳給親友，他們不用註冊就能認領。</div>
@@ -967,7 +967,7 @@ flowchart TD
 <div class="phones">
 <div><div class="phone" style="min-height:760px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync<span class="sp"></span><div class="ic">我的認領</div></div>
+<div class="ab">Wishly<span class="sp"></span><div class="ic">我的認領</div></div>
 <div class="bd">
 <div><div style="font-size:19px;font-weight:700">小愛的待產清單</div><div class="lbl">預產期 2026/12/20・由 小愛 建立</div></div>
 <div><div class="row"><b>完成度 40%</b><span class="fl"></span><span class="lbl">4 / 10 項</span></div><div class="prog" role="progressbar" aria-valuenow="40"><i style="width:40%"></i></div></div>
@@ -980,7 +980,7 @@ flowchart TD
 </div><div class="cap">正常（品項依 剩餘優先 → 已滿 排序）</div></div>
 <div><div class="phone" style="min-height:760px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd">
 <div style="background:var(--warn-soft);border:1px solid var(--warn);border-radius:8px;padding:8px;color:var(--warn);font-size:12px">目前離線，顯示的是上次載入的內容，認領功能暫停。</div>
 <div style="font-size:19px;font-weight:700">小愛的待產清單</div>
@@ -992,7 +992,7 @@ flowchart TD
 </div></div><div class="cap">離線 / loading / LINE 引導橫幅</div></div>
 <div><div class="phone" style="min-height:560px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync<span class="sp"></span><div class="ic">我的認領</div></div>
+<div class="ab">Wishly<span class="sp"></span><div class="ic">我的認領</div></div>
 <div class="bd">
 <div style="font-size:19px;font-weight:700">小愛的待產清單</div>
 <div class="card"><div class="im">圖</div><div class="col"><b>寶寶奶瓶 240ml</b><span class="lbl">已認領 6 / 10・<b>你已認領 2 件</b></span><div class="prog s"><i style="width:60%"></i></div><div class="btn">修改我的認領</div></div></div>
@@ -1000,7 +1000,7 @@ flowchart TD
 </div></div><div class="cap">已認領過同品項：按鈕變「修改我的認領」</div></div>
 <div><div class="phone" style="min-height:560px">
 <div class="st"><span>9:41</span><span>Safari</span></div>
-<div class="ab">WishSync<span class="sp"></span><span class="b orange">驚喜模式中</span></div>
+<div class="ab">Wishly<span class="sp"></span><span class="b orange">驚喜模式中</span></div>
 <div class="bd">
 <div style="font-size:19px;font-weight:700">小愛的待產清單</div>
 <div class="lbl">你正以建立者身分瀏覽，解鎖前不顯示各品項進度。</div>
@@ -1021,7 +1021,7 @@ flowchart TD
 <div class="phones">
 <div><div class="phone" style="min-height:640px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>寶寶奶瓶 240ml</b></div></div></div>
 <div class="scrim"></div>
 <div class="sheet">
@@ -1037,7 +1037,7 @@ flowchart TD
 </div></div><div class="cap">ClaimSheet</div></div>
 <div><div class="phone" style="min-height:640px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>寶寶奶瓶 240ml</b></div></div></div>
 <div class="scrim"></div>
 <div class="sheet">
@@ -1095,7 +1095,7 @@ flowchart TD
 <div class="phones">
 <div><div class="phone" style="min-height:700px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>嬰兒推車</b></div></div></div>
 <div class="scrim"></div>
 <div class="sheet">
@@ -1112,7 +1112,7 @@ flowchart TD
 </div></div><div class="cap">餘額足夠</div></div>
 <div><div class="phone" style="min-height:700px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>嬰兒推車</b></div></div></div>
 <div class="scrim"></div>
 <div class="sheet">
@@ -1126,7 +1126,7 @@ flowchart TD
 </div></div><div class="cap">餘額不足（INSUFFICIENT_POINTS）</div></div>
 <div><div class="phone" style="min-height:700px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>嬰兒推車</b></div></div></div>
 <div class="scrim"></div>
 <div class="sheet">
@@ -1270,7 +1270,7 @@ flowchart TD
 <div class="wf">
 <div><div class="phone" style="min-height:860px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync<span class="sp"></span><div class="ic">我的認領</div></div>
+<div class="ab">Wishly<span class="sp"></span><div class="ic">我的認領</div></div>
 <div class="bd">
 <div class="card"><div class="im">圖</div><div class="col"><div class="row"><b class="fl">嬰兒推車</b><span class="b teal">募集中</span></div><span class="lbl">3,000 / 11,000 點・5 人投入・剩 12 天</span><div class="prog s" role="progressbar" aria-valuenow="27"><i style="width:27%"></i></div><div class="btn pri">加入眾籌</div></div></div>
 <div class="card"><div class="im">圖</div><div class="col"><div class="row"><b class="fl">嬰兒床</b><span class="b green">已達標</span></div><span class="lbl">12,000 / 12,000 點・等待下單</span><div class="prog s"><i style="width:100%"></i></div><div class="btn dis">已達標</div></div></div>
@@ -1593,7 +1593,7 @@ flowchart TD
 <div class="phones">
 <div><div class="phone" style="min-height:760px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd" style="align-items:center;text-align:center">
 <div class="lbl">小美 送你一張心願禮物卡</div>
 <div class="card" style="flex-direction:column;width:100%;background:var(--accent-soft);border-color:var(--accent);padding:20px"><b style="font-size:30px">500 點</b><span>祝寶寶健康平安</span><span class="lbl">來自 小美</span></div>
@@ -1603,7 +1603,7 @@ flowchart TD
 </div></div><div class="cap">未登入（已登入時按鈕為「兌換到我的錢包」）</div></div>
 <div><div class="phone" style="min-height:760px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd" style="align-items:center;text-align:center">
 <div style="width:64px;height:64px;border-radius:50%;background:var(--accent-soft);border:2px solid var(--accent);display:grid;place-items:center;font-size:28px;color:var(--accent)">✓</div>
 <b style="font-size:18px">兌換成功</b>
@@ -1729,7 +1729,7 @@ flowchart TD
 <div class="phones">
 <div><div class="phone" style="min-height:640px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd"><div class="card"><div class="im">圖</div><div class="col"><b>寶寶奶瓶 240ml</b></div></div></div>
 <div class="scrim"></div>
 <div class="sheet">
@@ -1747,7 +1747,7 @@ flowchart TD
 </div></div><div class="cap">檢舉 sheet（入口：公開頁頁尾「檢舉此清單」）</div></div>
 <div><div class="phone" style="min-height:640px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd" style="align-items:center;text-align:center;justify-content:center">
 <div style="width:64px;height:64px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;font-size:28px;color:var(--muted)">!</div>
 <b style="font-size:18px">此清單已被下架</b>
@@ -2056,25 +2056,25 @@ flowchart TD
 <div class="phones">
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd">
 <div style="margin:auto;display:flex;flex-direction:column;gap:10px;width:100%"><div style="text-align:center"><b style="font-size:17px">這份清單需要密碼</b></div><span class="lbl" style="text-align:center">由 小愛 建立。請向對方詢問密碼。</span><div><div class="lbl"><b>密碼</b></div><div class="inp">••••••</div></div><div style="color:var(--red);font-size:12px">密碼錯誤（WRONG_PASSWORD 示範）</div><div class="btn pri">解鎖</div></div>
 </div></div><div class="cap">PASSWORD_REQUIRED</div></div>
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd">
 <div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px;width:100%"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">🔒</div><b style="font-size:17px">請先登入</b><span class="lbl">此清單僅限特定對象，請先登入</span><div class="btn pri">登入後查看</div></div>
 </div></div><div class="cap">LOGIN_REQUIRED（friends / selected 未登入）</div></div>
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd">
 <div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px;width:100%"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">🔒</div><b style="font-size:17px">你沒有權限查看這份清單</b><span class="lbl">此清單僅限好友查看（擁有者：小愛）</span><div class="btn pri">前往 小愛 的頁面加好友</div></div>
 </div></div><div class="cap">FRIENDS_ONLY（擁有者有 handle 時才有按鈕）</div></div>
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
-<div class="ab">WishSync</div>
+<div class="ab">Wishly</div>
 <div class="bd">
 <div style="margin:auto;text-align:center;display:flex;flex-direction:column;gap:10px;width:100%"><div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--muted);display:grid;place-items:center;margin:0 auto;color:var(--muted)">🔒</div><b style="font-size:17px">你沒有權限查看這份清單</b><span class="lbl">此清單僅限指定對象查看</span></div>
 </div></div><div class="cap">NOT_ALLOWED</div></div>
@@ -2378,8 +2378,8 @@ async function waitTopup(before) {
 <p><span class="ph p0">P0</span> 基本 PWA：可加入主畫面、靜態資源快取。使用 <code>@vite-pwa/nuxt</code>。</p>
 <h3>8.1 manifest</h3>
 <pre class="code">{
-  "name": "WishSync 心願同步",
-  "short_name": "WishSync",
+  "name": "Wishly 心願同步",
+  "short_name": "Wishly",
   "start_url": "/me/claims?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -2441,7 +2441,7 @@ async function waitTopup(before) {
 </tbody></table></div>
 <h3>動態 OG 圖建議</h3>
 <ul>
-<li>以 Pages Functions（Workers runtime）上的 <code>satori</code> + <code>resvg-wasm</code>（或 <code>workers-og</code>）產生：左側封面圖（第一個品項圖或類型插圖）、右側清單名稱、完成度進度條與百分比、WishSync 標誌。</li>
+<li>以 Pages Functions（Workers runtime）上的 <code>satori</code> + <code>resvg-wasm</code>（或 <code>workers-og</code>）產生：左側封面圖（第一個品項圖或類型插圖）、右側清單名稱、完成度進度條與百分比、Wishly 標誌。</li>
 <li>快取：產生後存 R2 / Cache API，key = <code>{slug}-{完成度百分比}</code>；完成度改變時 URL 帶 <code>?v=40</code> 版本參數使 LINE/FB 重新抓取。TTL 短（5 分鐘 CDN）。</li>
 <li>後備：產生失敗回靜態預設圖，不可讓 OG 圖錯誤造成 meta 缺失。</li>
 <li>LINE 預覽快取很久：清單剛改名後舊預覽可能殘留，文件與客服 FAQ 需說明（可用 LINE 的重新抓取工具或 FB Sharing Debugger）。</li>
@@ -2453,7 +2453,7 @@ async function waitTopup(before) {
 <thead><tr><th>meta</th><th>內容規則</th><th>範例</th></tr></thead>
 <tbody>
 <tr><td><code>og:title</code></td><td>「{寄送者暱稱} 送你一張心願禮物卡」</td><td>小美 送你一張心願禮物卡</td></tr>
-<tr><td><code>og:description</code></td><td>「面額 {n} 點。兌換後可用來支持朋友的心願清單。」若有祝福語，附前 30 字；已兌換或無效時改通用文案「WishSync 心願禮物卡」，不洩漏是否存在</td><td>面額 500 點。兌換後可用來支持朋友的心願清單。</td></tr>
+<tr><td><code>og:description</code></td><td>「面額 {n} 點。兌換後可用來支持朋友的心願清單。」若有祝福語，附前 30 字；已兌換或無效時改通用文案「Wishly 心願禮物卡」，不洩漏是否存在</td><td>面額 500 點。兌換後可用來支持朋友的心願清單。</td></tr>
 <tr><td><code>og:image</code></td><td>1200×630，依卡面主題與面額產生卡面（<code>GiftCardPreview</code> 同款樣式）：<code>/og/g/{theme}-{faceValue}.png</code>。<b>圖片網址不含兌換碼</b>，可共用快取</td><td>—</td></tr>
 <tr><td><code>robots</code></td><td><code>noindex, nofollow, noarchive</code></td><td>—</td></tr>
 <tr><td>其他</td><td>og:url 與 canonical 含碼（分享連結本身即憑證），但回應標頭 <code>Referrer-Policy: no-referrer</code>、<code>Cache-Control: no-store</code>；錯誤碼一律 404 通用頁</td><td>—</td></tr>
@@ -2521,7 +2521,7 @@ async function waitTopup(before) {
 <tr><td>建立者認領通知（信件頁尾）</td><td>不想收到認領通知？<u>一鍵退訂</u>，或到帳號設定調整。</td></tr>
 <tr><td>建立者認領通知（驚喜模式）</td><td>你的清單有 2 件新認領。驚喜模式中，活動日前不會顯示內容。</td></tr>
 <tr><td>刪除帳號確認</td><td>你的 Email 與名稱會被移除，清單會封存並從公開移除。此動作無法復原。</td></tr>
-<tr><td>帳號已刪除</td><td>帳號已刪除。謝謝你曾經使用 WishSync。</td></tr>
+<tr><td>帳號已刪除</td><td>帳號已刪除。謝謝你曾經使用 Wishly。</td></tr>
 <tr><td>409 ACCOUNT_HAS_BALANCE</td><td>你的錢包還有點數，或有進行中的認捐。請先處理後再刪除帳號。</td></tr>
 <tr><td>409 GIFT_CARD_NOT_YET_CLAIMABLE</td><td>這張禮物卡尚未開放兌換，預計 10/09 14:00 起可兌換。</td></tr>
 <tr><td>409 TOPUP_LIMIT_EXCEEDED</td><td>新帳號每日儲值與購買禮物卡合計上限 NT$3,000，今天還能再用 NT$1,200。</td></tr>

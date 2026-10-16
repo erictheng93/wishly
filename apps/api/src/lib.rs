@@ -22,6 +22,7 @@ pub mod public;
 pub mod ratelimit;
 pub mod reports;
 pub mod sealed;
+pub mod security;
 pub mod session;
 pub mod uploads;
 pub mod validate;
@@ -56,6 +57,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(wishlists::routes())
                 .merge(uploads::routes())
                 .merge(auth::routes())
+                .merge(security::routes())
                 .merge(friends::routes())
                 .merge(profiles::routes()),
         )
@@ -167,7 +169,7 @@ fn cors() -> tower_http::cors::CorsLayer {
         .expose_headers([HeaderName::from_static("idempotency-replayed")])
 }
 
-/// system_flags.read_only = true → 非安全方法回 503 READ_ONLY_MODE（退訂 POST 放行：保護性的使用者操作，且只寫退訂偏好；admin system-flags、登出與登入除外：否則 staff 登出後無法登入來關閉唯讀）
+/// system_flags.read_only = true → 非安全方法回 503 READ_ONLY_MODE（退訂 POST 放行：保護性的使用者操作，且只寫退訂偏好；admin system-flags、登出、登入與兩步驟驗證除外：否則 staff 登出後無法登入來關閉唯讀）
 async fn read_only(
     axum::extract::State(st): axum::extract::State<AppState>,
     req: axum::extract::Request,
@@ -177,6 +179,7 @@ async fn read_only(
     let p = req.uri().path();
     let safe = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS)
         || p.starts_with("/api/v1/admin/system-flags")
+        || p.starts_with("/api/v1/auth/mfa/")
         || matches!(
             p,
             "/api/v1/auth/logout"

@@ -126,7 +126,7 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     for (id, uid, gid, channel, kind, payload, attempts) in rows {
         let security = matches!(
             kind.as_str(),
-            "auth.identity_linked" | "auth.identity_unlinked"
+            "auth.identity_linked" | "auth.identity_unlinked" | "auth.password_changed"
         );
         let to: Option<String> = if channel != "email" {
             None
@@ -220,6 +220,9 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
 
 /// 純函式：(主旨, 內文)。刻意只用數量，不帶品項 / 認領者。
 pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
+    if kind == "auth.password_changed" {
+        return ("【Wishly】密碼已變更".into(), format!("你的帳號 Email 登入密碼剛剛已變更，其他裝置已登出。\n若非本人操作，請立即使用「忘記密碼」重設。\n帳號設定：{}/settings\n這是帳號安全通知。", crate::config::get().app_url));
+    }
     if matches!(kind, "auth.identity_linked" | "auth.identity_unlinked") {
         let provider = match payload["provider"].as_str() {
             Some("google") => "Google",
@@ -232,7 +235,7 @@ pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
         } else {
             "解除"
         };
-        return ("【WishSync】登入方式已變更".into(), format!("你的帳號已{action} {provider} 登入方式。\n若非本人操作，請立即檢查帳號設定及重設密碼。\n帳號設定：{}/settings\n這是帳號安全通知。", crate::config::get().app_url));
+        return ("【Wishly】登入方式已變更".into(), format!("你的帳號已{action} {provider} 登入方式。\n若非本人操作，請立即檢查帳號設定及重設密碼。\n帳號設定：{}/settings\n這是帳號安全通知。", crate::config::get().app_url));
     }
     let n = payload.get("count").and_then(Value::as_i64).unwrap_or(1);
     let base = crate::config::get().app_url;
@@ -246,24 +249,24 @@ pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
         .unwrap_or("品項");
     let wallet = format!("{base}/me/wallet");
     let (subject, body) = match kind {
-        "crowdfund.funded" => (format!("【WishSync】《{item}》集資達標了"), format!("你支持的「{item}」（清單《{title}》）已集資達標，營運團隊會開始代購。\n查看我的點數與捐贈：{wallet}\n")),
-        "order.shipped" => (format!("【WishSync】《{item}》已出貨"), format!("你支持的「{item}」（清單《{title}》）已出貨。\n查看我的點數與捐贈：{wallet}\n")),
-        "order.delivered" => (format!("【WishSync】《{item}》已送達"), format!("你支持的「{item}」（清單《{title}》）已送達受贈者，謝謝你的心意。\n查看我的點數與捐贈：{wallet}\n")),
-        "order.failed" => (format!("【WishSync】《{item}》代購未成功，點數已退回"), format!("你支持的「{item}」（清單《{title}》）代購未成功，你捐出的點數已全數退回錢包。\n查看我的點數：{wallet}\n")),
-        "funding.expired" => (format!("【WishSync】《{item}》募集期限已到"), format!("「{item}」（清單《{title}》）在期限內未達標。你的點數會再保留 7 天：期間可到錢包撤回，或轉捐給同一份清單的其他品項；逾期未處理會自動退回錢包。\n處理我的捐贈：{wallet}\n")),
-        "item.removed" => (format!("【WishSync】《{item}》已被移除，點數已退回"), format!("清單《{title}》的建立者移除了「{item}」（或封存了清單），你捐出的點數已退回錢包。\n查看我的點數：{wallet}\n")),
-        "claim.digest" => (format!("【WishSync】《{title}》今日有 {n} 件新認領"), format!("你的清單《{title}》今日彙整：有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
-        "claim.created" => (format!("【WishSync】《{title}》有 {n} 件新認領"), format!("你的清單《{title}》有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
-        "claim.confirmation" => ("【WishSync】認領已確認".into(), format!("你的認領已記錄，謝謝你的心意。\n管理我的認領：{manage}\n")),
-        "claim.item_removed" => ("【WishSync】你認領的品項已被移除".into(), format!("清單《{title}》的建立者移除了你認領的品項，這筆認領已取消。\n查看其他品項：{manage}\n")),
+        "crowdfund.funded" => (format!("【Wishly】《{item}》集資達標了"), format!("你支持的「{item}」（清單《{title}》）已集資達標，營運團隊會開始代購。\n查看我的點數與捐贈：{wallet}\n")),
+        "order.shipped" => (format!("【Wishly】《{item}》已出貨"), format!("你支持的「{item}」（清單《{title}》）已出貨。\n查看我的點數與捐贈：{wallet}\n")),
+        "order.delivered" => (format!("【Wishly】《{item}》已送達"), format!("你支持的「{item}」（清單《{title}》）已送達受贈者，謝謝你的心意。\n查看我的點數與捐贈：{wallet}\n")),
+        "order.failed" => (format!("【Wishly】《{item}》代購未成功，點數已退回"), format!("你支持的「{item}」（清單《{title}》）代購未成功，你捐出的點數已全數退回錢包。\n查看我的點數：{wallet}\n")),
+        "funding.expired" => (format!("【Wishly】《{item}》募集期限已到"), format!("「{item}」（清單《{title}》）在期限內未達標。你的點數會再保留 7 天：期間可到錢包撤回，或轉捐給同一份清單的其他品項；逾期未處理會自動退回錢包。\n處理我的捐贈：{wallet}\n")),
+        "item.removed" => (format!("【Wishly】《{item}》已被移除，點數已退回"), format!("清單《{title}》的建立者移除了「{item}」（或封存了清單），你捐出的點數已退回錢包。\n查看我的點數：{wallet}\n")),
+        "claim.digest" => (format!("【Wishly】《{title}》今日有 {n} 件新認領"), format!("你的清單《{title}》今日彙整：有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
+        "claim.created" => (format!("【Wishly】《{title}》有 {n} 件新認領"), format!("你的清單《{title}》有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
+        "claim.confirmation" => ("【Wishly】認領已確認".into(), format!("你的認領已記錄，謝謝你的心意。\n管理我的認領：{manage}\n")),
+        "claim.item_removed" => ("【Wishly】你認領的品項已被移除".into(), format!("清單《{title}》的建立者移除了你認領的品項，這筆認領已取消。\n查看其他品項：{manage}\n")),
         "wishlist.closing" => {
             // 以台北時間顯示；解析失敗就只講「24 小時內」
             let at = payload.get("closes_at").and_then(Value::as_str).and_then(|t| t.parse::<chrono::DateTime<chrono::Utc>>().ok())
                 .map(|t| (t + chrono::Duration::hours(8)).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "24 小時內".into());
-            (format!("【WishSync】《{title}》即將結束"), format!("你的清單《{title}》將於 {at}（台北時間）自動結束，屆時訪客不能再認領。\n要延長或取消期限：{base}/dashboard\n"))
+            (format!("【Wishly】《{title}》即將結束"), format!("你的清單《{title}》將於 {at}（台北時間）自動結束，屆時訪客不能再認領。\n要延長或取消期限：{base}/dashboard\n"))
         }
-        "event.reminder" => (format!("【WishSync】《{title}》活動日快到了"), format!("你的清單《{title}》的活動日即將到來。\n{base}/dashboard\n")),
-        _ => ("【WishSync】通知".into(), format!("{base}\n")),
+        "event.reminder" => (format!("【Wishly】《{title}》活動日快到了"), format!("你的清單《{title}》的活動日即將到來。\n{base}/dashboard\n")),
+        _ => ("【Wishly】通知".into(), format!("{base}\n")),
     };
     match payload.get("unsubscribe_url").and_then(Value::as_str) {
         Some(u) => (subject, format!("{body}\n退訂此類通知：{u}\n")),

@@ -175,7 +175,7 @@ async fn cloudflare_email_request_format() {
     c.cf_account_id = Some("acct1".into());
     c.cf_email_api_token = Some("secret-token".into());
     c.cf_api_base = format!("http://{addr}");
-    c.mail_from = "WishSync <no-reply@wishsync.tw>".into();
+    c.mail_from = "Wishly <no-reply@wishsync.tw>".into();
     wishsync_api::notify::send_mail(&c, "u@example.com", "主旨", "內文")
         .await
         .unwrap();
@@ -188,7 +188,7 @@ async fn cloudflare_email_request_format() {
     assert!(v[0].1.starts_with("application/json"));
     assert_eq!(
         v[0].2,
-        json!({"from": "WishSync <no-reply@wishsync.tw>", "to": "u@example.com", "subject": "主旨", "text": "內文"})
+        json!({"from": "Wishly <no-reply@wishsync.tw>", "to": "u@example.com", "subject": "主旨", "text": "內文"})
     );
 }
 

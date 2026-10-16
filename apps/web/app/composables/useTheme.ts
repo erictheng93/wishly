@@ -1,5 +1,5 @@
-// 三態主題：auto（跟隨系統，tokens.css 的 prefers-color-scheme）→ light → dark。
-// 選擇存 localStorage 的 ws_theme 並設定 <html data-theme>；auto 則移除兩者。內嵌腳本在 nuxt.config.ts head。
+// 三態主題：auto（跟隨系統，tokens.css 的 prefers-color-scheme）→ light → dark；未選擇過時預設 light。
+// 選擇存 localStorage 的 ws_theme 並設定 <html data-theme>；auto 只移除 data-theme，ws_theme 存 'auto'。內嵌腳本在 nuxt.config.ts head。
 const KEY = 'ws_theme'
 export type ThemeMode = 'auto' | 'light' | 'dark'
 const ORDER: ThemeMode[] = ['auto', 'light', 'dark']
@@ -24,7 +24,7 @@ export function useTheme() {
     const next = ORDER[(ORDER.indexOf(read()) + 1) % ORDER.length]!
     const el = document.documentElement
     if (next === 'auto') delete el.dataset.theme; else el.dataset.theme = next
-    try { next === 'auto' ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, next) } catch { /* 無痕或封鎖儲存：只套用當次 */ }
+    try { localStorage.setItem(KEY, next) } catch { /* 無痕或封鎖儲存：只套用當次 */ }
     sync()
   }
   return { mode, sync, toggle }
