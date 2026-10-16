@@ -9,4 +9,4 @@
 
 CI 的 `npm run audit:security` 先執行原始 `npm audit --audit-level=high --json` 並保存完整 `npm-audit.json`。只有上述兩個公告的套件名稱、URL、受影響範圍、high 等級及已補丁安裝路徑完全符合，且所有 high 項目的依賴鏈都能追溯至它們時，才可能接受。接受前還必須通過唯讀版本／hash 檢查與安全回歸測試；額外未補丁副本、其他 high／critical 公告、公告範圍或等級變更、缺失依賴證據、掃描錯誤都會使 CI 失敗。原始版本警報仍保留於 artifact，已驗證的回補項目列在 job summary。這是有驗證前提的暫時例外，並非宣稱 npm registry 已發布修補版。
 
-正式修補版發布後，更新 lockfile，重新跑上述回歸測試及 typecheck／test:coverage／build／E2E，確認安全性與相容性後，移除對應補丁、版本／hash 檢查及最後不再需要的 postinstall 步驟。追蹤：[issue #7](https://github.com/erictheng93/wishsync/issues/7)。
+正式修補版發布後，更新 lockfile，重新跑上述回歸測試及 typecheck／test:coverage／build／E2E，確認安全性與相容性後，移除對應補丁、版本／hash 檢查及最後不再需要的 postinstall 步驟。追蹤：[issue #7](https://github.com/erictheng93/wishly/issues/7)。
