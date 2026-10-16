@@ -147,3 +147,26 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+  publish-image:
+    # main 的測試全綠後才推 GHCR（映像公開；標籤為 commit SHA，Dokploy 以 SHA 部署與回滾）。
+    # 首次推送後需到 GitHub 的 package 設定把 wishly-api 改為 Public（預設是私有）。
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [api, image, web, e2e]
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/erictheng93/wishly-api:${{ github.sha }}
+            ghcr.io/erictheng93/wishly-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
