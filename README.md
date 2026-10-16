@@ -179,7 +179,7 @@ npx playwright show-report                                      # 開啟上次�
 
 用來在手機或 LINE 上測試本機的後端。**這會把你電腦上的 API 經臨時網址公開**，請用獨立的資料庫與隨機機密，測完就關。
 
-1. 後端：用獨立資料庫、隨機的 `OTP_PEPPER` / `OAUTH_SECRET` / `UNSUB_SECRET`，`TRUSTED_PROXY=cloudflare`、`CDN_PURGE=off`（快速通道沒有自己的 zone）、`BIND=127.0.0.1:8090`、`APP_URL=https://qa.wishsync-web.pages.dev`。
+1. 後端：用獨立資料庫、隨機的 `OTP_PEPPER` / `OAUTH_SECRET` / `UNSUB_SECRET`，`TRUSTED_PROXY=cloudflare`、`CDN_PURGE=off`（快速通道沒有自己的 zone）、`BIND=127.0.0.1:8090`、`APP_URL=https://qa.wishly-web-5pd.pages.dev`。
 2. 通道：`cloudflared tunnel --url http://127.0.0.1:8090`，取得 `https://xxx.trycloudflare.com`。
 3. 前端：`NUXT_API_PROXY=https://xxx.trycloudflare.com npm run deploy:preview`（部署到 `qa` 預覽分支，不動正式網址；前端以同源代理連後端，cookie 才是第一方）。
 4. 限制：**快速通道不支援 SSE**，即時更新會自動退回每 15 秒輪詢；通道網址每次重開都會變，需要重新部署。要驗證 SSE 需使用有網域的具名通道。
