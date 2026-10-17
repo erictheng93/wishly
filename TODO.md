@@ -2,10 +2,12 @@
 
 ## P0 上線阻擋
 
-- [ ] Spike S1–S3 真機／真實鏈路驗收（無結案證據，補測優先於新功能）— 門檻與規程見 `git show 5c13bb9:docs/qa/spike-protocol.md`（docs/qa 已移除）
-  - 先由產品負責人確認 S1–S3 門檻（測前定案，不可測後挑）。
-  - S1 OG 預覽：6 組平台 × 連結；S2 LINE 內建瀏覽器身分存活：≥4 台裝置；S3 SSE：以 `scripts/sse-probe.mjs` 在 Cloudflare → Tunnel → VPS 跑 120 分鐘。
-  - 前置：S2／S3 需要真實後端與具名網域，見下一項。S3 受測鏈路已改為 Cloudflare → Tunnel → VPS（D49），須在最終的 Dokploy／Traefik 組態上測。
+- [ ] Spike S1–S3 真機／真實鏈路驗收（無結案證據，補測優先於新功能）— 門檻與結果紀錄見 [docs/spike-results.md](docs/spike-results.md)（門檻待產品負責人確認後凍結；後端與前端已部署）
+  - [ ] 前置（需產品負責人）：在正式環境建測試清單——① 一份 public、品項數量很大（如 needed=999）→ 取 slug 與品項 UUID（S3 觸發事件用）；② 一份「長中文標題＋封面圖」的 public 清單 slug；③ 一份 friends 或 password 清單（S1 受限預覽檢查）。S3 探針會對測試清單建立真實捐助（約 120 筆／120 分鐘），只能用測試清單。
+  - [ ] S1 OG 預覽：爬蟲 UA curl 檢查（Claude 可跑）＋ LINE／FB／iMessage 真機貼連結截圖（需人工），6 組全過。
+  - [ ] S2 LINE 內建瀏覽器身分存活：≥4 台真機（iOS×2、Android×2）× 5 輪 × 2 情境，存活率 ≥95%（需人工；Claude 無法執行）。
+  - [ ] S3 SSE：`scripts/sse-probe.mjs` 跑 120 分鐘（有線＋手機 tethering 各一）；先自 Dokploy 取 Traefik 逾時與緩衝設定、cloudflared 版本；另測背景 5 分鐘與飛航模式降級（人工）。
+  - [ ] 結論寫入 docs/spike-results.md 總表，證據放 `docs/spike-evidence/`；三項皆「通過」或「失敗＋備案已驗證」才解除 P0。
 
 - [ ] 正式環境尚未部署（2026-10-15 嘗試部署 Cloudflare Pages 時發現，故未執行）
   - 後端（Linode VPS／Dokploy，D49）尚無部署證據，`https://api.wishly.tw` 不確定可連；同時確認 Traefik／Tunnel 的逾時不會截斷 SSE。
