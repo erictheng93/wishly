@@ -34,9 +34,7 @@ async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    wishly_api::notify::enqueue_claim(&pool, wid)
-        .await
-        .unwrap();
+    wishly_api::notify::enqueue_claim(&pool, wid).await.unwrap();
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications")
         .fetch_one(&pool)
         .await

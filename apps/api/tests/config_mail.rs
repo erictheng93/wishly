@@ -238,10 +238,7 @@ async fn turnstile_verification() {
             .await
             .unwrap_err();
         assert!(
-            matches!(
-                e,
-                wishly_api::error::AppError::Problem { status: 403, .. }
-            ),
+            matches!(e, wishly_api::error::AppError::Problem { status: 403, .. }),
             "{t:?}"
         );
     }

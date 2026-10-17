@@ -172,10 +172,7 @@ mod command_tests {
             service: &str,
             user: &str,
         ) -> keyring::Result<Box<Credential>> {
-            assert_eq!(
-                (target, service, user),
-                (None, "tw.wishly.app", "session")
-            );
+            assert_eq!((target, service, user), (None, "tw.wishly.app", "session"));
             Ok(Box::new(Store(self.0.clone())))
         }
         fn as_any(&self) -> &dyn Any {
