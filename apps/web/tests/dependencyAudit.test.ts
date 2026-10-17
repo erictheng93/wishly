@@ -1,5 +1,8 @@
+import { spawnSync } from 'node:child_process'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { evaluateAudit } from '../scripts/audit-dependencies.mjs'
 
 const bracesUrl = 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm'
 const forgeUrl = 'https://github.com/advisories/GHSA-86w9-cpqp-85rv'
@@ -29,51 +32,34 @@ const knownReport = () => report(Object.fromEntries([
   ['nuxt', ['@nuxt/nitro-server', '@nuxt/vite-builder', '@nuxt/vite-server']],
 ].map(([name, via]) => [name, vulnerability(name as string, via as any[])])))
 
-describe('audit gate for verified local backports', () => {
-  it('accepts only the two backported advisories through all eleven cyclic dependency entries', () => {
-    expect(evaluateAudit(knownReport(), 1)).toEqual([forgeUrl, bracesUrl])
-  })
-
-  it('accepts a clean audit and preserves the existing high severity threshold', () => {
-    expect(evaluateAudit(report({}), 0)).toEqual([])
-    expect(evaluateAudit(report({ example: vulnerability('example', [
-      { ...advisory('example', 'https://github.com/advisories/GHSA-new-low-risk', '*'), severity: 'moderate' },
-    ], 'moderate') }), 0)).toEqual([])
-  })
-
-  it.each(['high', 'critical'])('rejects a new %s advisory even when known backports are present', severity => {
-    const current = knownReport()
-    current.vulnerabilities.example = vulnerability('example', [
-      { ...advisory('example', 'https://github.com/advisories/GHSA-new-advisory', '*'), severity },
-    ], severity)
-    expect(() => evaluateAudit(report(current.vulnerabilities), 1)).toThrow()
-  })
-
+describe('raw npm audit signal', () => {
   it.each([
-    ['new advisory in an already patched package', (r: any) => { r.vulnerabilities.braces.via.push(advisory('braces', 'https://github.com/advisories/GHSA-new-advisory', '*')) }],
-    ['changed affected range', (r: any) => { r.vulnerabilities.braces.via[0].range = '<=3.0.4' }],
-    ['raised advisory severity', (r: any) => { r.vulnerabilities.braces.via[0].severity = 'critical' }],
-    ['mismatched advisory package', (r: any) => { r.vulnerabilities.braces.via[0].dependency = 'other-package' }],
-    ['additional unpatched nested copy', (r: any) => { r.vulnerabilities.braces.nodes.push('node_modules/example/node_modules/braces') }],
-    ['missing dependency link', (r: any) => { r.vulnerabilities.nuxt.via.push('missing-package') }],
-    ['cycle without a backported root', (r: any) => { r.vulnerabilities.nuxt.via = ['nuxt'] }],
-    ['missing advisory evidence', (r: any) => { r.vulnerabilities.braces.via = [] }],
-    ['malformed via entry', (r: any) => { r.vulnerabilities.braces.via = [null] }],
-    ['mismatched severity counts', (r: any) => { r.metadata.vulnerabilities.high = 0 }],
-    ['registry error', (r: any) => { r.error = { code: 'ENOAUDIT', message: 'registry unavailable' } }],
-    ['unsupported report format', (r: any) => { r.auditReportVersion = 3 }],
-  ])('fails closed on %s', (_name, change) => {
-    const current = knownReport()
-    change(current)
-    expect(() => evaluateAudit(current, 1)).toThrow()
-  })
-
-  it.each([2, null])('rejects an unexpected npm exit status: %s', status => {
-    expect(() => evaluateAudit(knownReport(), status)).toThrow()
-  })
-
-  it('does not treat a failed scanner with an empty report as a clean scan', () => {
-    expect(() => evaluateAudit(report({}), 1)).toThrow()
-    expect(() => evaluateAudit({}, 1)).toThrow()
+    ['clean audit', report({}), 0],
+    ['the two locally backported advisories and their dependency chains', knownReport(), 1],
+    ['scanner failure', { error: { code: 'ENOAUDIT' } }, 2],
+  ])('preserves exit status and unfiltered JSON for %s', (_name, current, status) => {
+    const directory = mkdtempSync(join(tmpdir(), 'wishly-audit-'))
+    const output = JSON.stringify(current, null, 2) + '\n'
+    try {
+      mkdirSync(join(directory, 'scripts'))
+      mkdirSync(join(directory, 'bin'))
+      copyFileSync(new URL('../scripts/audit-dependencies.mjs', import.meta.url), join(directory, 'scripts/audit-dependencies.mjs'))
+      // The previous exception runner also invoked these after accepting known advisories.
+      writeFileSync(join(directory, 'scripts/patch-dependencies.mjs'), '')
+      writeFileSync(join(directory, 'bin/npm'), `#!/usr/bin/env node
+if (process.argv[2] === 'audit') {
+  process.stdout.write(${JSON.stringify(output)});
+  process.exitCode = ${status};
+}
+`, { mode: 0o755 })
+      const result = spawnSync(process.execPath, ['scripts/audit-dependencies.mjs'], {
+        cwd: directory, encoding: 'utf8',
+        env: { ...process.env, PATH: join(directory, 'bin') + delimiter + process.env.PATH },
+      })
+      expect(result.status, result.stderr).toBe(status)
+      expect(readFileSync(join(directory, 'npm-audit.json'), 'utf8')).toBe(output)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })

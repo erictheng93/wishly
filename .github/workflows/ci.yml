@@ -74,8 +74,8 @@ jobs:
           name: web-coverage
           path: apps/web/coverage/
   web-audit:
-    # Accept only backported advisories after verifying source hashes and security regressions.
-    # New high/critical advisories and audit errors still fail; retain the unfiltered JSON.
+    # Issue #7: keep raw audit failures visible, including locally backported advisories.
+    # Keep this independent and non-required until upstream fixes make the audit clean.
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
