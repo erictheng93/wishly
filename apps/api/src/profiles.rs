@@ -46,8 +46,8 @@ async fn profile(
     parts: Parts,
 ) -> Result<Json<Value>, AppError> {
     let viewer = access::viewer(&parts, &st).await?;
-    let (uid, name): (Uuid, String) = sqlx::query_as(
-        "SELECT id, display_name FROM users WHERE handle = $1 AND deleted_at IS NULL",
+    let (uid, name, bio, birthday, bv): (Uuid, String, Option<String>, Option<String>, String) = sqlx::query_as(
+        "SELECT id, display_name, bio, birthday, birthday_visibility::text FROM users WHERE handle = $1 AND deleted_at IS NULL",
     )
     .bind(handle.to_lowercase())
     .fetch_optional(&st.pool)
@@ -75,6 +75,8 @@ async fn profile(
             }
         }
     };
+
+    let birthday = birthday.filter(|_| bv == "public" || is_self || (bv == "friends" && friend));
 
     // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private/link/password 不列）
     // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）
@@ -135,7 +137,7 @@ async fn profile(
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
     Ok(Json(
-        json!({ "user": { "id": uid, "handle": handle.to_lowercase(), "display_name": name }, "relation": relation,
+        json!({ "user": { "id": uid, "handle": handle.to_lowercase(), "display_name": name, "bio": bio, "birthday": birthday }, "relation": relation,
                     "wishlists": wishlists, "donations": donations }),
     ))
 }

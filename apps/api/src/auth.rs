@@ -539,6 +539,11 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let (dn, email, avatar, staff, prefs, handle, dcv): (String, Option<String>, Option<String>, bool, Value, Option<String>, String) =
         sqlx::query_as("SELECT display_name, email, avatar_key, is_staff, notification_prefs, handle, default_claim_visibility::text FROM users WHERE id=$1 AND deleted_at IS NULL")
             .bind(id).fetch_optional(pool).await?.ok_or(AppError::Unauthorized)?;
+    let (bio, birthday, bv): (Option<String>, Option<String>, String) =
+        sqlx::query_as("SELECT bio, birthday, birthday_visibility::text FROM users WHERE id=$1")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
     let (mfa_enabled, has_password): (bool, bool) = sqlx::query_as(
         "SELECT totp_enabled_at IS NOT NULL, EXISTS(SELECT 1 FROM auth_identities i WHERE i.user_id=$1 AND i.provider='email' AND i.password_hash IS NOT NULL)
          FROM users WHERE id=$1")
@@ -552,7 +557,7 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let avatar_url = crate::uploads::avatar_url(avatar.as_deref());
     Ok(
         json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
-               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
+               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
                "orgs": [] }),
     ) // orgs 為 P2-D，MVP 恆空
 }
@@ -575,6 +580,24 @@ struct PatchMe {
     #[serde(default, deserialize_with = "some_opt")]
     handle: Option<Option<String>>,
     default_claim_visibility: Option<String>,
+    #[serde(default, deserialize_with = "some_opt")]
+    bio: Option<Option<String>>,
+    /// 'MM-DD'；null = 清除
+    #[serde(default, deserialize_with = "some_opt")]
+    birthday: Option<Option<String>>,
+    birthday_visibility: Option<String>,
+}
+
+fn share_level(v: &str, ptr: &'static str) -> Result<(), AppError> {
+    if ["public", "friends", "private"].contains(&v) {
+        Ok(())
+    } else {
+        Err(AppError::invalid(
+            ptr,
+            "ENUM",
+            "只能是 public / friends / private",
+        ))
+    }
 }
 
 async fn patch_me(
@@ -642,14 +665,46 @@ async fn patch_me(
         }
     }
     if let Some(v) = &p.default_claim_visibility {
-        if !["public", "friends", "private"].contains(&v.as_str()) {
+        share_level(v, "/default_claim_visibility")?;
+        sqlx::query("UPDATE users SET default_claim_visibility=$2::text::share_level WHERE id=$1")
+            .bind(u.id)
+            .bind(v)
+            .execute(&st.pool)
+            .await?;
+    }
+    if let Some(b) = p.bio {
+        // 空白視同清除
+        let b = b.map(|b| b.trim().to_string()).filter(|b| !b.is_empty());
+        if b.as_ref().is_some_and(|b| b.chars().count() > 160) {
+            return Err(AppError::invalid("/bio", "RANGE", "自我介紹最多 160 字"));
+        }
+        sqlx::query("UPDATE users SET bio=$2 WHERE id=$1")
+            .bind(u.id)
+            .bind(b)
+            .execute(&st.pool)
+            .await?;
+    }
+    if let Some(b) = p.birthday {
+        // 用閏年 2000 驗證，允許 02-29；格式須剛好 MM-DD
+        if b.as_deref().is_some_and(|b| {
+            b.len() != 5
+                || chrono::NaiveDate::parse_from_str(&format!("2000-{b}"), "%Y-%m-%d").is_err()
+        }) {
             return Err(AppError::invalid(
-                "/default_claim_visibility",
-                "ENUM",
-                "只能是 public / friends / private",
+                "/birthday",
+                "FORMAT",
+                "生日格式須為 MM-DD",
             ));
         }
-        sqlx::query("UPDATE users SET default_claim_visibility=$2::text::share_level WHERE id=$1")
+        sqlx::query("UPDATE users SET birthday=$2 WHERE id=$1")
+            .bind(u.id)
+            .bind(b)
+            .execute(&st.pool)
+            .await?;
+    }
+    if let Some(v) = &p.birthday_visibility {
+        share_level(v, "/birthday_visibility")?;
+        sqlx::query("UPDATE users SET birthday_visibility=$2::text::share_level WHERE id=$1")
             .bind(u.id)
             .bind(v)
             .execute(&st.pool)

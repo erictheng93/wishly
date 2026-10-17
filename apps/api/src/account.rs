@@ -120,7 +120,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
             retry_after: Some(3600),
         });
     }
-    let user: Value = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'display_name', display_name, 'email', email, 'created_at', created_at) FROM users WHERE id = $1")
+    let user: Value = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'display_name', display_name, 'email', email, 'bio', bio, 'birthday', birthday, 'created_at', created_at) FROM users WHERE id = $1")
         .bind(u.id).fetch_one(&st.pool).await?;
     let identities: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('provider', provider::text) FROM auth_identities WHERE user_id = $1 ORDER BY created_at")
         .bind(u.id).fetch_all(&st.pool).await?;
@@ -245,7 +245,7 @@ async fn delete_me(
     sqlx::query("UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')")
         .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
-        "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, notification_prefs = '{}'::jsonb,
+        "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")
         .bind(id).fetch_one(&mut *tx).await?;
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.delete', 'users', $1)")

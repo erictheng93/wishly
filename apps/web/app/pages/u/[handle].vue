@@ -37,7 +37,8 @@ const accept = () => run(async () => {
     <template v-else>
       <section class="c-card">
         <h2 class="c-h2">{{ p.user.display_name }}</h2>
-        <p class="c-mute">@{{ p.user.handle }}</p>
+        <p class="c-mute">@{{ p.user.handle }}<template v-if="p.user.birthday">・生日 {{ formatBirthday(p.user.birthday) }}</template></p>
+        <p v-if="p.user.bio" style="white-space:pre-line">{{ p.user.bio }}</p>
         <p v-if="err" class="c-err" role="alert">{{ err }}</p>
         <NuxtLink v-if="p.relation === 'self'" to="/settings" class="c-btn">編輯個人設定</NuxtLink>
         <span v-else-if="p.relation === 'friend'" class="c-badge active">好友</span>

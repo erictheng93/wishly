@@ -17,6 +17,9 @@ const name = ref(''), msg = ref(''), err = ref('')
 const handle = ref(''), dcv = ref('friends'), hMsg = ref(''), hErr = ref(''), copied = ref(false)
 const profileUrl = computed(() => user.value?.handle ? `${siteOrigin()}/u/${user.value.handle}` : '')
 const hBad = computed(() => !!handle.value && !isValidHandle(handle.value))
+const bio = ref(''), bMonth = ref(''), bDay = ref(''), bVis = ref('friends')
+const bDays = computed(() => daysInMonth(bMonth.value))
+const pad = (n: number) => String(n).padStart(2, '0')
 const exporting = ref(false)
 const showDel = ref(false), word = ref(''), delBusy = ref(false), delErr = ref('')
 const LINK_ERRORS: Record<string, string> = { oauth_failed: '綁定失敗，請重新操作並確認登入帳號', oauth_unavailable: '此登入方式尚未開放', identity_in_use: '此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。', provider_already_linked: '已綁定此登入方式，請先解除後再更換' }
@@ -31,7 +34,8 @@ async function linkOAuth(p: (typeof providers)[number]) {
     if (e.message !== 'cancelled') identityErr.value = LINK_ERRORS[e.message] || errMsg(e)
   } finally { identityBusy.value = false }
 }
-onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
+onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
+  bio.value = user.value?.bio ?? ''; [bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
   identityErr.value = LINK_ERRORS[String(route.query.error)] ?? ''
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = `已綁定 ${label}`
@@ -119,8 +123,13 @@ async function saveName() {
 async function saveSocial() {
   hMsg.value = hErr.value = ''
   if (hBad.value) { hErr.value = '代號只能用小寫英文、數字、底線，3–30 字'; return }
+  const birthday = toBirthday(bMonth.value, bDay.value)
+  if (birthday === undefined) { hErr.value = '生日請同時選月和日，或都不選'; return }
   try {
-    user.value = await api('/me', { method: 'PATCH', body: { handle: handle.value || null, default_claim_visibility: dcv.value } })
+    user.value = await api('/me', { method: 'PATCH', body: {
+      handle: handle.value || null, default_claim_visibility: dcv.value,
+      bio: bio.value.trim() || null, birthday, birthday_visibility: bVis.value } })
+    ;[bMonth.value = '', bDay.value = ''] = user.value.birthday?.split('-') ?? [] // 日被夾到月底時同步顯示
     hMsg.value = '已儲存'
   } catch (e: any) { hErr.value = apiErrMsg(e) }
 }
@@ -216,6 +225,16 @@ async function remove() {
           <label class="c-field"><span>帳號代號（個人頁網址，可留空）</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="例如：amy_wang"></label>
           <p v-if="hBad" class="c-err" role="alert">小寫英文、數字、底線，3–30 字</p>
           <p v-if="profileUrl" class="c-mute">你的個人頁：<NuxtLink :to="`/u/${user.handle}`">{{ profileUrl }}</NuxtLink> <button type="button" class="c-btn" @click="copyUrl">{{ copied ? '已複製' : '複製' }}</button></p>
+          <label class="c-field"><span>自我介紹（顯示在個人頁，可留空）</span><textarea v-model="bio" maxlength="160" rows="3" /></label>
+          <div class="c-field" role="group" aria-labelledby="bday-label"><span id="bday-label">生日（可留空，只記月日）</span>
+            <div class="c-row">
+              <select v-model="bMonth" aria-label="月"><option value="">月</option><option v-for="m in 12" :key="m" :value="pad(m)">{{ m }} 月</option></select>
+              <select v-model="bDay" aria-label="日"><option value="">日</option><option v-for="d in bDays" :key="d" :value="pad(d)">{{ d }} 日</option></select>
+            </div>
+          </div>
+          <label class="c-field"><span>生日誰看得到</span>
+            <select v-model="bVis"><option value="public">公開</option><option value="friends">僅好友</option><option value="private">只有自己</option></select>
+          </label>
           <label class="c-field"><span>捐助紀錄預設誰看得到</span>
             <select v-model="dcv"><option value="public">公開</option><option value="friends">僅好友</option><option value="private">私人</option></select>
           </label>

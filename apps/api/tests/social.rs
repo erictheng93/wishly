@@ -1446,3 +1446,83 @@ async fn profile_completion_counts_funded_crowdfund_item(pool: PgPool) {
     assert_eq!(v["wishlists"][0]["completion_pct"], 25); // 已達標眾籌算 1/1：1 / (3 + 1)
     common::assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn me_bio_birthday_and_profile_visibility(pool: PgPool) {
+    let (a, ta, _) = handle_user(&pool, "A", Some("alice")).await;
+    let (b, tb, _) = handle_user(&pool, "B", Some("bobby")).await;
+    let (_, tc, _) = handle_user(&pool, "C", Some("carol")).await;
+    befriend(&pool, a, b).await;
+    let patch = |body: Value| {
+        let (pool, ta) = (pool.clone(), ta.clone());
+        async move {
+            common::call(
+                &pool,
+                "PATCH",
+                "/me",
+                &[common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
+                Some(body),
+            )
+            .await
+        }
+    };
+    let (_, _, v) = common::call(&pool, "GET", "/me", &common::ck(&ta), None).await;
+    assert!(v["bio"].is_null() && v["birthday"].is_null());
+    assert_eq!(v["birthday_visibility"], "friends");
+
+    let (s, _, v) = patch(json!({ "bio": "  喜歡咖啡  ", "birthday": "02-29" })).await;
+    assert_eq!(
+        (s, v["bio"].as_str(), v["birthday"].as_str()),
+        (StatusCode::OK, Some("喜歡咖啡"), Some("02-29"))
+    );
+    for bad in [
+        json!({ "birthday": "02-30" }),
+        json!({ "birthday": "13-01" }),
+        json!({ "birthday": "2-1" }),
+        json!({ "birthday": "1990-02-01" }),
+        json!({ "bio": "字".repeat(161) }),
+        json!({ "birthday_visibility": "x" }),
+    ] {
+        assert_eq!(
+            patch(bad.clone()).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{bad}"
+        );
+    }
+
+    // 個人頁：bio 一律可見；生日依 birthday_visibility（預設僅好友）
+    let bday = |tok: Option<String>| {
+        let pool = pool.clone();
+        async move {
+            let h = tok.map(|t| common::ck(&t)).unwrap_or_default();
+            let (_, _, v) = common::call(&pool, "GET", "/users/alice", &h, None).await;
+            assert_eq!(v["user"]["bio"], "喜歡咖啡");
+            v["user"]["birthday"].as_str().map(String::from)
+        }
+    };
+    let see = |x: Option<String>| x.is_some();
+    assert_eq!(
+        [
+            see(bday(Some(ta.clone())).await),
+            see(bday(Some(tb.clone())).await),
+            see(bday(Some(tc.clone())).await),
+            see(bday(None).await)
+        ],
+        [true, true, false, false]
+    );
+    patch(json!({ "birthday_visibility": "public" })).await;
+    assert_eq!(bday(None).await.as_deref(), Some("02-29"));
+    patch(json!({ "birthday_visibility": "private" })).await;
+    assert_eq!(
+        [
+            see(bday(Some(ta.clone())).await),
+            see(bday(Some(tb.clone())).await)
+        ],
+        [true, false]
+    );
+
+    // 空白視同清除；null 清除生日
+    let (_, _, v) = patch(json!({ "bio": "   ", "birthday": null })).await;
+    assert!(v["bio"].is_null() && v["birthday"].is_null());
+    let _ = tb;
+}

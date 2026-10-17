@@ -41,6 +41,11 @@ async fn account_delete_anonymizes(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
+    sqlx::query("UPDATE users SET bio='hi', birthday='05-01' WHERE id=$1")
+        .bind(uid)
+        .execute(&pool)
+        .await
+        .unwrap();
     let _ = (slug, item);
 
     assert_eq!(
@@ -65,11 +70,11 @@ async fn account_delete_anonymizes(pool: PgPool) {
     .await;
     assert_eq!((s, &v["deleted"]), (StatusCode::OK, &json!(true)));
 
-    let (name, email, del, anon): (String, Option<String>, bool, bool) = sqlx::query_as(
-        "SELECT display_name, email, deleted_at IS NOT NULL, anonymized_at IS NOT NULL FROM users WHERE id = $1").bind(uid).fetch_one(&pool).await.unwrap();
+    let (name, email, del, anon, personal): (String, Option<String>, bool, bool, bool) = sqlx::query_as(
+        "SELECT display_name, email, deleted_at IS NOT NULL, anonymized_at IS NOT NULL, bio IS NOT NULL OR birthday IS NOT NULL FROM users WHERE id = $1").bind(uid).fetch_one(&pool).await.unwrap();
     assert_eq!(
-        (name.as_str(), email, del, anon),
-        ("已刪除的使用者", None, true, true)
+        (name.as_str(), email, del, anon, personal),
+        ("已刪除的使用者", None, true, true, false)
     );
     let (st, vis): (String, String) =
         sqlx::query_as("SELECT status::text, visibility::text FROM wishlists WHERE id = $1")
