@@ -126,6 +126,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <NuxtLink to="/admin/orders" class="c-btn c-grow">採購單佇列</NuxtLink>
       <NuxtLink to="/admin/wallets" class="c-btn c-grow">點數錢包</NuxtLink>
       <NuxtLink to="/admin/audit" class="c-btn c-grow">稽核紀錄</NuxtLink>
+      <NuxtLink to="/admin/analytics" class="c-btn c-grow">數據分析</NuxtLink>
     </div>
     <nav class="c-tabs" aria-label="後台功能">
       <button v-for="t in [['reports', '檢舉佇列'], ['lists', '清單搜尋'], ['users', '使用者'], ['flags', '系統旗標']]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>

@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/system-flags", get(list_flags))
         .route("/admin/system-flags/{key}", put(set_flag))
         .route("/admin/stats", get(stats))
+        .route("/admin/analytics", get(analytics))
 }
 
 /// 已登入且 is_staff；已啟用 TOTP 者此 session 須已通過驗證。否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。
@@ -523,4 +524,115 @@ pub async fn stats_json(pool: &PgPool) -> Result<Value, sqlx::Error> {
 
 async fn stats(State(st): State<AppState>, _s: Staff) -> Result<Json<Value>, AppError> {
     Ok(Json(stats_json(&st.pool).await?))
+}
+
+#[derive(Deserialize)]
+struct AnalyticsQ {
+    days: Option<i32>,
+}
+
+/// 營運分析：日界線 Asia/Taipei；distribution / birthday_month 小樣本（1..4）輸出 null（k=5）。
+async fn analytics(
+    State(st): State<AppState>,
+    _s: Staff,
+    Query(q): Query<AnalyticsQ>,
+) -> Result<Response, AppError> {
+    let days = q.days.unwrap_or(30);
+    if !(7..=365).contains(&days) {
+        return Err(AppError::invalid(
+            "/days",
+            "OUT_OF_RANGE",
+            "days 須介於 7 到 365",
+        ));
+    }
+    let (v,): (Value,) = sqlx::query_as(
+        "WITH b AS (SELECT (now() AT TIME ZONE 'Asia/Taipei')::date AS today),
+         r AS (SELECT today - ($1 - 1) AS d0, today FROM b),
+         -- 區間起點（含）的 timestamptz
+         lo AS (SELECT d0::timestamp AT TIME ZONE 'Asia/Taipei' AS t FROM r),
+         cu AS (SELECT * FROM users WHERE deleted_at IS NULL AND NOT is_staff),
+         wl AS (SELECT w.* FROM wishlists w JOIN cu ON cu.id = w.owner_id WHERE w.deleted_at IS NULL),
+         cohort AS (SELECT id, created_at FROM cu WHERE created_at >= (SELECT t FROM lo)),
+         pu AS (SELECT * FROM cu WHERE anonymized_at IS NULL),
+         rc AS (SELECT * FROM claims WHERE created_at >= (SELECT t FROM lo)),
+         -- 每日趨勢：各表只掃一次再依台北日期分組
+         ev(m, d) AS (
+           SELECT 'signups', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM cohort
+           UNION ALL SELECT 'wishlists', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM wl WHERE created_at >= (SELECT t FROM lo)
+           UNION ALL SELECT 'claims', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM rc
+           UNION ALL SELECT 'new_guests', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM guests WHERE created_at >= (SELECT t FROM lo)),
+         daily AS (
+           SELECT gs::date d,
+             count(*) FILTER (WHERE ev.m = 'signups') signups, count(*) FILTER (WHERE ev.m = 'wishlists') wishlists,
+             count(*) FILTER (WHERE ev.m = 'claims') claims, count(*) FILTER (WHERE ev.m = 'new_guests') new_guests
+           FROM r CROSS JOIN generate_series(r.d0, r.today, interval '1 day') gs LEFT JOIN ev ON ev.d = gs::date GROUP BY 1),
+         dist(kind, k, n) AS (
+           SELECT 'provider', ai.provider::text, count(DISTINCT ai.user_id) FROM auth_identities ai JOIN cu ON cu.id = ai.user_id GROUP BY 2
+           UNION ALL SELECT 'locale', locale, count(*) FROM cu GROUP BY 2
+           UNION ALL SELECT 'wishlist_type', type::text, count(*) FROM wl GROUP BY 2
+           UNION ALL SELECT 'wishlist_visibility', visibility::text, count(*) FROM wl GROUP BY 2
+           UNION ALL SELECT 'birthday_visibility', birthday_visibility::text, count(*) FROM pu WHERE birthday IS NOT NULL GROUP BY 2),
+         bm AS (
+           SELECT lpad(m::text, 2, '0') k, count(pu.id) n
+           FROM generate_series(1, 12) m LEFT JOIN pu ON substr(pu.birthday, 1, 2) = lpad(m::text, 2, '0') GROUP BY 1)
+         SELECT jsonb_build_object(
+           'range', (SELECT jsonb_build_object('from', d0, 'to', today, 'days', $1) FROM r),
+           'totals', jsonb_build_object(
+             'users', (SELECT count(*) FROM cu),
+             'guests', (SELECT count(*) FROM guests WHERE deleted_at IS NULL),
+             'wishlists', (SELECT count(*) FROM wl),
+             'friendships', (SELECT count(*) FROM friendships)),
+           'active', (SELECT jsonb_object_agg('d' || n, (
+               SELECT count(DISTINCT s.user_id) FROM sessions s JOIN cu ON cu.id = s.user_id
+               WHERE s.last_seen_at > now() - n * interval '1 day')) FROM unnest(ARRAY[1, 7, 30]) n),
+           'daily', (SELECT jsonb_agg(jsonb_build_object('date', d, 'signups', signups, 'wishlists', wishlists,
+               'claims', claims, 'new_guests', new_guests) ORDER BY d) FROM daily),
+           'funnel', jsonb_build_object(
+             'signed_up', (SELECT count(*) FROM cohort),
+             'created_list', (SELECT count(*) FROM cohort WHERE EXISTS (SELECT 1 FROM wl WHERE wl.owner_id = cohort.id)),
+             'published_list', (SELECT count(*) FROM cohort WHERE EXISTS (SELECT 1 FROM wl WHERE wl.owner_id = cohort.id AND wl.status <> 'draft')),
+             'received_claim', (SELECT count(*) FROM cohort WHERE EXISTS (
+                SELECT 1 FROM wl JOIN wishlist_items i ON i.wishlist_id = wl.id
+                WHERE wl.owner_id = cohort.id AND (EXISTS (SELECT 1 FROM claims c WHERE c.item_id = i.id)
+                  OR EXISTS (SELECT 1 FROM contributions k WHERE k.item_id = i.id))))),
+           'claims', jsonb_build_object(
+             'by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM rc GROUP BY 1) t),
+             'by_actor', jsonb_build_object(
+               'guest', (SELECT count(*) FROM rc WHERE guest_id IS NOT NULL),
+               'user', (SELECT count(*) FROM rc WHERE user_id IS NOT NULL))),
+           'trust', jsonb_build_object(
+             'reports', (SELECT count(*) FROM content_reports WHERE created_at >= (SELECT t FROM lo)),
+             'reports_by_reason', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT reason::text s, count(*) n FROM content_reports WHERE created_at >= (SELECT t FROM lo) GROUP BY 1) t),
+             'login_failures', (SELECT count(*) FROM login_failures WHERE created_at >= (SELECT t FROM lo))),
+           'profile', jsonb_build_object(
+             'users', (SELECT count(*) FROM pu),
+             'with_bio', (SELECT count(*) FROM pu WHERE bio IS NOT NULL),
+             'with_birthday', (SELECT count(*) FROM pu WHERE birthday IS NOT NULL),
+             'with_avatar', (SELECT count(*) FROM pu WHERE avatar_key IS NOT NULL),
+             'upcoming_birthdays_30d', (SELECT count(*) FROM pu WHERE birthday IN (
+                SELECT to_char((SELECT today FROM b) + i, 'MM-DD') FROM generate_series(0, 29) i))),
+           'birthday_month', (SELECT jsonb_object_agg(k, CASE WHEN n BETWEEN 1 AND 4 THEN NULL ELSE to_jsonb(n) END) FROM bm),
+           'distribution', (SELECT jsonb_object_agg(kind, o) FROM (
+               SELECT kind, jsonb_object_agg(k, CASE WHEN n < 5 THEN NULL ELSE to_jsonb(n) END) o FROM dist GROUP BY kind) t))",
+    )
+    .bind(days)
+    .fetch_one(&st.pool)
+    .await?;
+    let mut v = v;
+    // 空桶整組省略後，前端仍需要五個鍵
+    for k in [
+        "provider",
+        "locale",
+        "wishlist_type",
+        "wishlist_visibility",
+        "birthday_visibility",
+    ] {
+        if v["distribution"].get(k).is_none() {
+            v["distribution"][k] = json!({});
+        }
+    }
+    let mut res = Json(v).into_response();
+    res.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(res)
 }
