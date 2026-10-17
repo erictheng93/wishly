@@ -36,6 +36,7 @@
 - [ ] `cloudflared` 容器確認 restart policy 為 always；Tunnel 掉線告警（Tunnel 是單點，掛掉全站不可達）。
 - [ ] 記錄並設定提醒：GHCR 讀取 PAT 的**到期日**；R2 S3 Token 若有到期日也一併記錄（到期會讓重新部署／上傳突然失敗）。
 - [ ] VPS 記憶體實測：`free -h`（DB、Dokploy、cloudflared、後端同機執行）。
+- [ ] **每月檢查一次 braces／node-forge 兩個公告是否有修補版**（issue #7；CI `web-audit` 因此刻意維持紅燈）：`gh api /advisories/GHSA-vfj7-8cjw-p6xm` 與 `/advisories/GHSA-86w9-cpqp-85rv` 看 `first_patched_version`，並 `npm view braces version`、`npm view node-forge version`。有修補版後依 `apps/web/patches/README.md` 更新 lockfile、重跑驗證、移除暫時補丁並關閉 #7。上次檢查：2026-10-17（兩者皆無修補版）。
 
 ---
 
