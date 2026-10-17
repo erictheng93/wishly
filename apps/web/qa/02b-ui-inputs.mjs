@@ -56,7 +56,7 @@ const T = await createList(U, { title: '互動測試', items: [{ title: '雙擊�
 const open = async (page, name) => { await page.locator('li.g-card', { hasText: name }).getByRole('button', { name: '我要送' }).click() }
 { // 31-40 字暱稱
   const ctx = await newCtx(browser); const page = await ctx.newPage(); await page.goto(`/s/${T.slug}`, { waitUntil: 'networkidle' })
-  await open(page, '長暱稱品項'); const d = page.getByRole('dialog'); await d.getByLabel('你的暱稱（必填）').fill('あ'.repeat(35)); await d.getByRole('button', { name: '確認認領' }).click(); await page.waitForTimeout(800)
+  await open(page, '長暱稱品項'); const d = page.getByRole('dialog'); await d.getByLabel('你的暱稱（必填）').fill('あ'.repeat(35)); await d.getByRole('button', { name: '確認捐助' }).click(); await page.waitForTimeout(800)
   log('02b.jsonl', { tag: 'nick35', sheetText: (await d.innerText().catch(() => '')).slice(0, 300), inputMaxlength: await d.getByLabel('你的暱稱（必填）').getAttribute('maxlength').catch(() => null) })
   await page.screenshot({ path: `${OUT}/shots/in__nick35.png` }); await ctx.close()
 }
@@ -73,9 +73,9 @@ const open = async (page, name) => { await page.locator('li.g-card', { hasText: 
   const ctx = await newCtx(browser); const page = await ctx.newPage(); const posts = []
   page.on('request', r => { if (r.method() === 'POST' && /claims/.test(r.url())) posts.push(r.headers()['idempotency-key']) })
   await page.goto(`/s/${T.slug}`, { waitUntil: 'networkidle' }); await open(page, '雙擊品項'); const d = page.getByRole('dialog')
-  await d.getByLabel('你的暱稱（必填）').fill('雙擊哥'); await d.getByRole('button', { name: '確認認領' }).dblclick(); await page.waitForTimeout(1500)
+  await d.getByLabel('你的暱稱（必填）').fill('雙擊哥'); await d.getByRole('button', { name: '確認捐助' }).dblclick(); await page.waitForTimeout(1500)
   const n = sql(`select count(*) from claims c join wishlist_items i on i.id=c.item_id where i.id='${T.items[0].id}'`)
-  log('02b.jsonl', { tag: 'dblclick-claim', posts: posts.length, distinctKeys: new Set(posts).size, claimsInDb: n, success: await page.getByRole('heading', { name: '✓ 認領成功！' }).isVisible() })
+  log('02b.jsonl', { tag: 'dblclick-claim', posts: posts.length, distinctKeys: new Set(posts).size, claimsInDb: n, success: await page.getByRole('heading', { name: '✓ 捐助成功！' }).isVisible() })
   // 雙擊「我要送」
   await ctx.close()
 }
@@ -84,15 +84,15 @@ const open = async (page, name) => { await page.locator('li.g-card', { hasText: 
   page.on('request', r => { if (r.method() === 'POST' && /claims/.test(r.url())) posts.push(r.headers()['idempotency-key']) })
   await page.goto(`/s/${T.slug}`, { waitUntil: 'networkidle' }); await open(page, '離線品項'); const d = page.getByRole('dialog')
   await d.getByLabel('你的暱稱（必填）').fill('離線哥')
-  await ctx.setOffline(true); await d.getByRole('button', { name: '確認認領' }).click(); await page.waitForTimeout(1200)
+  await ctx.setOffline(true); await d.getByRole('button', { name: '確認捐助' }).click(); await page.waitForTimeout(1200)
   const offlineText = await page.locator('body').innerText()
   const msg = await d.locator('.g-banner.err').innerText().catch(() => '(none)')
-  const btnDisabled = await d.getByRole('button', { name: /確認認領|離線中|送出中/ }).first().innerText().catch(() => '?')
+  const btnDisabled = await d.getByRole('button', { name: /確認捐助|離線中|送出中/ }).first().innerText().catch(() => '?')
   await page.screenshot({ path: `${OUT}/shots/in__offline-submit.png` })
   await ctx.setOffline(false); await page.waitForTimeout(800)
-  await d.getByRole('button', { name: /確認認領/ }).click().catch(e => log('02b.jsonl', { tag: 'offline-retry-click-fail', e: String(e).slice(0, 100) }))
+  await d.getByRole('button', { name: /確認捐助/ }).click().catch(e => log('02b.jsonl', { tag: 'offline-retry-click-fail', e: String(e).slice(0, 100) }))
   await page.waitForTimeout(1500)
-  log('02b.jsonl', { tag: 'offline-submit', msg, btn: btnDisabled, posts, success: await page.getByRole('heading', { name: '✓ 認領成功！' }).isVisible(), claimsInDb: sql(`select count(*) from claims where item_id='${T.items[1].id}'`) })
+  log('02b.jsonl', { tag: 'offline-submit', msg, btn: btnDisabled, posts, success: await page.getByRole('heading', { name: '✓ 捐助成功！' }).isVisible(), claimsInDb: sql(`select count(*) from claims where item_id='${T.items[1].id}'`) })
   await ctx.close()
 }
 await browser.close()

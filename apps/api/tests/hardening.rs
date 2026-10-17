@@ -44,7 +44,7 @@ async fn lost_first_response_replay_reissues_usable_token(pool: PgPool) {
     let (s1, _, b1) = claim(&pool, it, key, vec![], body.clone()).await;
     assert_eq!(s1, StatusCode::CREATED);
     let old = b1["guest_token"].as_str().unwrap().to_string();
-    // 以同 key 重送 → 同一認領 + 新 token + Set-Cookie
+    // 以同 key 重送 → 同一捐助 + 新 token + Set-Cookie
     let (s2, h2, b2) = claim(&pool, it, key, vec![], body.clone()).await;
     assert_eq!(s2, StatusCode::CREATED);
     assert_eq!(h2["idempotency-replayed"], "true");
@@ -55,7 +55,7 @@ async fn lost_first_response_replay_reissues_usable_token(pool: PgPool) {
         .unwrap()
         .starts_with(&format!("ws_guest={new};")));
     assert_eq!(b1["claim"]["id"], b2["claim"]["id"]);
-    // 新 token 看得到該認領；舊 token 失效
+    // 新 token 看得到該捐助；舊 token 失效
     let (s, _, me) = call(&pool, "GET", "/guest/me", &gt(&new), None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(me["claims"][0]["claim"]["id"], b1["claim"]["id"]);
@@ -383,7 +383,7 @@ async fn force_delete_cleans_up_claims(pool: PgPool) {
     let TestUser {
         id: cu,
         token: ctok,
-    } = user(&pool, "u").await; // 登入使用者認領（有 email）
+    } = user(&pool, "u").await; // 登入使用者捐助（有 email）
     let (s, _, _) = claim(&pool, it, Uuid::new_v4(), ck(&ctok), json!({"qty": 1})).await;
     assert_eq!(s, StatusCode::CREATED);
     assert!(a["guest_token"].is_string());

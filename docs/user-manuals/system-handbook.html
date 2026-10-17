@@ -86,9 +86,9 @@ th{background:var(--bg-alt);white-space:nowrap}
 <li class="l2"><a href="#c-friends">4.9 好友與個人頁</a></li>
 <li class="l2"><a href="#c-settings">4.10 帳號設定</a></li>
 <li class="l1"><a href="#guest">5. 訪客與贊助者手冊</a></li>
-<li class="l2"><a href="#g-claim">5.1 免註冊認領</a></li>
-<li class="l2"><a href="#g-manage">5.2 管理我的認領</a></li>
-<li class="l2"><a href="#g-fund">5.3 用點數贊助</a></li>
+<li class="l2"><a href="#g-claim">5.1 免註冊捐助</a></li>
+<li class="l2"><a href="#g-manage">5.2 管理我的捐助</a></li>
+<li class="l2"><a href="#g-fund">5.3 心願眾籌</a></li>
 <li class="l2"><a href="#g-report">5.4 檢舉清單</a></li>
 <li class="l1"><a href="#staff">6. 營運後台手冊</a></li>
 <li class="l1"><a href="#rules">7. 業務規則與狀態機</a></li>
@@ -115,7 +115,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <main>
 <header class="cover">
 <h1>Wishly 系統手冊</h1>
-<p>願望清單用連結分享，訪客免註冊即可認領品項，並確保不會超賣。</p>
+<p>願望清單用連結分享，訪客免註冊即可捐助品項，並確保不會超賣。</p>
 </header>
 <div class="meta">
 <div><b>文件對象</b>創建者、訪客、營運人員、開發與維運</div>
@@ -131,9 +131,9 @@ th{background:var(--bg-alt);white-space:nowrap}
 
 <!-- ========================================================= 1 -->
 <h2 id="overview">1. 系統概覽</h2>
-<p>Wishly（心願同步）解決「想要的人說不出口、想送的人怕重複」。建立者列出品項與數量，用一條連結分享到 LINE / FB / 簡訊；朋友點開即可認領，不必安裝、不必註冊。系統保證同一品項不會被超額認領，並即時更新完成度。</p>
+<p>Wishly（心願同步）解決「想要的人說不出口、想送的人怕重複」。建立者列出品項與數量，用一條連結分享到 LINE / FB / 簡訊；朋友點開即可捐助，不必安裝、不必註冊。系統保證同一品項不會被超額捐助，並即時更新完成度。</p>
 <pre><code>建立者  建清單 → 加品項 → 發佈 → 複製連結傳到群組
-訪客    點連結 → 看清單 → 輸入暱稱 → 認領（30 秒內，免註冊）
+訪客    點連結 → 看清單 → 輸入暱稱 → 捐助（30 秒內，免註冊）
 系統    條件式 UPDATE 防超賣 → SSE 即時推播 → Email 通知建立者
 大件品  登入使用者以「點數」多人湊 → 達標後平台代購寄出</code></pre>
 
@@ -143,12 +143,12 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>Email＋密碼註冊 / 登入（OTP 驗證）</td><td><span class="tag live">已實作</span></td><td>OTP 僅用於註冊驗證與忘記密碼，不是登入方式</td></tr>
 <tr><td>Google / LINE 登入與綁定</td><td><span class="tag live">已實作</span></td><td>可在設定頁綁定 / 解除，至少保留一種</td></tr>
 <tr><td>清單 CRUD、品項 CRUD、排序、圖片上傳</td><td><span class="tag live">已實作</span></td><td>類型 <code>personal</code>（個人心願）/ <code>registry</code>（禮物登記）</td></tr>
-<tr><td>訪客免註冊數量認領</td><td><span class="tag live">已實作</span></td><td>含修改、取消、狀態標記、逾期釋放、冪等重送</td></tr>
+<tr><td>訪客免註冊數量捐助</td><td><span class="tag live">已實作</span></td><td>含修改、取消、狀態標記、逾期釋放、冪等重送</td></tr>
 <tr><td>清單可見性 6 種</td><td><span class="tag live">已實作</span></td><td>public / link / friends / selected / password / private</td></tr>
 <tr><td>驚喜模式、自動結束時間</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>即時更新（SSE，失敗退輪詢）</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>好友、邀請連結、個人頁、指定名單</td><td><span class="tag live">已實作</span></td><td></td></tr>
-<tr><td>點數眾籌（認捐、撤回、轉投、達標、採購、差額退回）</td><td><span class="tag live">已實作</span></td><td>點數目前<b>只能由營運人工發放</b></td></tr>
+<tr><td>心願眾籌（認捐、撤回、轉投、達標、採購、差額退回）</td><td><span class="tag live">已實作</span></td><td>點數目前<b>只能由營運人工發放</b></td></tr>
 <tr><td>營運後台：檢舉、下架、使用者、旗標、稽核、採購單、錢包</td><td><span class="tag live">已實作</span></td><td>staff 可啟用 TOTP 兩步驟驗證</td></tr>
 <tr><td>Email 通知 outbox、一鍵退訂</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>帳號刪除、資料匯出</td><td><span class="tag live">已實作</span></td><td></td></tr>
@@ -160,28 +160,28 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>LINE Messaging API 通知</td><td><span class="tag plan">規劃中</span></td><td>目前通知僅 Email</td></tr>
 </table>
 <div class="box warn"><b class="t">上線前阻擋項（README 2026-10-12 查核）</b>
-技術 Spike S1–S3（Cloudflare Pages SSR 與 LINE / FB 預覽、LINE 內建瀏覽器 cookie、SSE 經 Tunnel 的穩定度）<b>尚無可追溯的真機結案證據，均未驗收</b>。點數眾籌的法規（禮券履約保證、單一用途點數）也列為上線前阻斷項，需律師與會計師審閱（PRD 8.7）。</div>
+技術 Spike S1–S3（Cloudflare Pages SSR 與 LINE / FB 預覽、LINE 內建瀏覽器 cookie、SSE 經 Tunnel 的穩定度）<b>尚無可追溯的真機結案證據，均未驗收</b>。心願眾籌的法規（禮券履約保證、單一用途點數）也列為上線前阻斷項，需律師與會計師審閱（PRD 8.7）。</div>
 
 <h3 id="roles">1.2 使用者角色</h3>
 <table>
 <tr><th>角色</th><th>身分憑證</th><th>能做什麼</th></tr>
-<tr><td><b>訪客</b></td><td><code>ws_guest</code> cookie 或 <code>X-Guest-Token</code></td><td>瀏覽可見的清單、認領數量型品項、管理自己的認領、檢舉清單</td></tr>
-<tr><td><b>創建者（已登入使用者）</b></td><td><code>ws_session</code> cookie 或 <code>Authorization: Bearer</code></td><td>建立 / 管理清單與品項、看進度、好友、設定；也能認領別人的清單、用點數贊助</td></tr>
+<tr><td><b>訪客</b></td><td><code>ws_guest</code> cookie 或 <code>X-Guest-Token</code></td><td>瀏覽可見的清單、捐助數量型品項、管理自己的捐助、檢舉清單</td></tr>
+<tr><td><b>創建者（已登入使用者）</b></td><td><code>ws_session</code> cookie 或 <code>Authorization: Bearer</code></td><td>建立 / 管理清單與品項、看進度、好友、設定；也能捐助別人的清單、心願眾籌</td></tr>
 <tr><td><b>營運人員（staff）</b></td><td>使用者帳號 + <code>users.is_staff</code></td><td>後台全部功能；啟用 TOTP 後須通過兩步驟驗證</td></tr>
-<tr><td><b>系統</b></td><td>背景工作</td><td>釋放逾期認領、結束到期清單、截止眾籌、寄信；稽核紀錄的 <code>actor_type = system</code></td></tr>
+<tr><td><b>系統</b></td><td>背景工作</td><td>釋放逾期捐助、結束到期清單、截止眾籌、寄信；稽核紀錄的 <code>actor_type = system</code></td></tr>
 </table>
 
 <h3 id="glossary">1.3 名詞對照</h3>
 <table>
 <tr><th>名詞</th><th>意義</th></tr>
 <tr><td>清單 wishlist</td><td>一組品項的集合；有 10 碼 <code>slug</code>，分享網址為 <code>/s/{slug}</code></td></tr>
-<tr><td>品項 item</td><td>清單內一項想要的東西；取得方式為 <code>quantity</code>（數量認領）或 <code>crowdfund</code>（點數眾籌）</td></tr>
-<tr><td>認領 claim</td><td>某人承諾送出某品項的 N 件；狀態 reserved → purchased → delivered，或 cancelled / expired</td></tr>
+<tr><td>品項 item</td><td>清單內一項想要的東西；取得方式為 <code>quantity</code>（數量捐助）或 <code>crowdfund</code>（心願眾籌）</td></tr>
+<tr><td>捐助 claim</td><td>某人承諾送出某品項的 N 件；狀態 reserved → purchased → delivered，或 cancelled / expired</td></tr>
 <tr><td>認捐 contribution</td><td>以點數贊助眾籌品項的一筆紀錄；pledged → captured，或 released / reallocated</td></tr>
 <tr><td>點數</td><td>1 點 = NT$1。只能投入心願品項，不能提領、不能轉讓給受捐者</td></tr>
 <tr><td>錢包 / 帳本</td><td><code>point_wallets</code> 存餘額；<code>point_ledger</code> 只增不改，每次異動寫一筆</td></tr>
 <tr><td>採購單 purchase order</td><td>眾籌達標後建立，由營運人工代購並推進狀態</td></tr>
-<tr><td>完成度</td><td><code>sum(已認領)/sum(需求) × 100</code> 四捨五入；眾籌品項「達標」才算 1/1</td></tr>
+<tr><td>完成度</td><td><code>sum(已捐助)/sum(需求) × 100</code> 四捨五入；眾籌品項「達標」才算 1/1</td></tr>
 <tr><td>驚喜模式</td><td>活動日之前建立者只看得到完成度，看不到誰送了什麼</td></tr>
 <tr><td>staff</td><td>營運人員；第一位須在資料庫設定 <code>is_staff = true</code></td></tr>
 <tr><td>契約 / D 編號</td><td>程式註解中的「契約 4.1」「D48」指 <code>docs/04</code> 章節與 PRD 決策編號</td></tr>
@@ -198,7 +198,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>物件儲存</td><td>Cloudflare R2（本機 MinIO）</td><td>手寫 SigV4 presigned PUT，path-style</td></tr>
 <tr><td>Email</td><td>Cloudflare Email Service（本機 SMTP → Mailpit）</td><td>經 <code>notifications</code> outbox 寄出</td></tr>
 <tr><td>人機驗證</td><td>Cloudflare Turnstile</td><td>用於檢舉</td></tr>
-<tr><td>原生殼</td><td>Tauri（<code>apps/web/src-tauri</code>）</td><td>純 SPA 建置，權杖存 OS keychain</td></tr>
+<tr><td>原生殼</td><td>Tauri（<code>apps/web/src-tauri</code>）</td><td>純 SPA 建置；權杖桌面 / iOS 存 OS keychain，Android 存 App 私有目錄</td></tr>
 <tr><td>測試</td><td><code>sqlx::test</code>、Vitest、Playwright、mutation runner</td><td>見第 12 章</td></tr>
 </table>
 
@@ -209,15 +209,14 @@ th{background:var(--bg-alt);white-space:nowrap}
   │
   └─ API ──▶ Cloudflare（WAF / CDN）
                └─▶ Cloudflare Tunnel（cloudflared，出站連線）
-                     └─▶ Traefik（Dokploy）
-                           └─▶ wishly-api :8080  ──▶ PostgreSQL（同機）
+                     └─▶ wishly-api :8080（Tunnel 直連 API 容器，不經 Traefik）──▶ PostgreSQL（同機）
                                        │
                                        ├─▶ Cloudflare R2（圖片，自訂網域公開讀取）
                                        └─▶ Cloudflare Email Service / Turnstile / Cache Purge API</code></pre>
 <ul>
 <li>後端與資料庫在同一台 Linode（東京）VPS，以 Dokploy 管理；<b>單機單實例</b>（replicas 必須維持 1）。</li>
 <li>前端與 API 須在同一個 registrable domain，因為 <code>ws_session</code> 為 <code>SameSite=Lax</code> 且不帶 <code>Domain</code>。</li>
-<li>API 網域預設 <code>https://api.wishly.tw</code>。</li>
+<li>API 網域預設 <code>https://api.wishly.tw</code>。Tunnel 的 Published application 直接指向 API 容器（依 <code>docs/deploy-verification-2026-10-17.md</code>），Traefik 不在路徑上；<code>docs/deploy-backend-checklist.md</code> 中關於 Traefik 的描述為撰寫時的假設。</li>
 </ul>
 
 <h3 id="repo">2.3 專案結構</h3>
@@ -238,7 +237,7 @@ scripts/             cargo.sh、mutate.sh/py、coverage、cdn-canary、sse-probe
 <table>
 <tr><th>後端模組</th><th>職責</th></tr>
 <tr><td><code>public.rs</code> / <code>access.rs</code></td><td>公開 / 受限清單讀取、密碼解鎖；可見性判斷集中在 <code>check_wishlist</code></td></tr>
-<tr><td><code>claims.rs</code></td><td>數量認領；超賣防護核心；逾期釋放 <code>expire_due</code></td></tr>
+<tr><td><code>claims.rs</code></td><td>數量捐助；超賣防護核心；逾期釋放 <code>expire_due</code></td></tr>
 <tr><td><code>contributions.rs</code> / <code>points.rs</code> / <code>wallet.rs</code></td><td>點數認捐、錢包與帳本（<code>points::post</code> 是唯一可改餘額處）</td></tr>
 <tr><td><code>wishlists.rs</code></td><td>清單與品項 CRUD、收件資訊、指定名單、<code>close_due</code> / <code>remind_closing</code></td></tr>
 <tr><td><code>dashboard.rs</code></td><td>進度儀表板、SSE 事件流</td></tr>
@@ -254,8 +253,8 @@ scripts/             cargo.sh、mutate.sh/py、coverage、cdn-canary、sse-probe
 <ul>
 <li><b>創建者</b>：cookie <code>ws_session</code>（30 天）。資料庫只存 SHA-256 雜湊。原生殼不送 cookie，改用 <code>Authorization: Bearer</code>，與 cookie 共用同一張 <code>sessions</code>。</li>
 <li><b>訪客</b>：<code>X-Guest-Token</code> header 優先，其次 <code>ws_guest</code> cookie（1 年，HttpOnly）。後端只存雜湊；前端同時把權杖放 localStorage 當備援（LINE 內建瀏覽器 cookie 不穩）。</li>
-<li>已登入使用者認領時以帳號名稱進行，不再問暱稱，並可設定該筆認領的公開層級。</li>
-<li>明確以 header 帶失效訪客權杖回 <code>401</code>；只有 cookie 帶的失效權杖視為匿名，避免舊 cookie 永遠擋住認領。</li>
+<li>已登入使用者捐助時以帳號名稱進行，不再問暱稱，並可設定該筆捐助的公開層級。</li>
+<li>明確以 header 帶失效訪客權杖回 <code>401</code>；只有 cookie 帶的失效權杖視為匿名，避免舊 cookie 永遠擋住捐助。</li>
 </ul>
 
 <!-- ========================================================= 3 -->
@@ -288,13 +287,13 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 </ol>
 <ul>
 <li>同一 Email 每小時最多寄 5 封驗證碼，兩封之間至少間隔 60 秒（登入 / 註冊 / 重設共用）。</li>
-<li>Email 已註冊會回 <code>EMAIL_EXISTS</code>，請直接登入或用「忘記密碼」。</li>
+<li>寄驗證碼階段不論 Email 是否已註冊都回成功（不洩漏帳號是否存在）。輸入驗證碼後，只有該 Email 的登入方式已有密碼才回 <code>EMAIL_EXISTS</code>（請直接登入或用「忘記密碼」）；已有帳號但尚無密碼者，可藉此流程完成密碼設定。</li>
 <li>登入失敗：同一 Email＋IP 15 分鐘內 5 次即鎖定；同 Email 跨 IP 累計 20 次、同 IP 累計 30 次也會鎖定（回 <code>429</code>，建議 5 分鐘後再試）。成功登入或重設密碼會清除該 Email 的失敗紀錄。</li>
 </ul>
 <h4>忘記密碼</h4>
 <p>到 <code>/forgot-password</code> 輸入 Email，收驗證碼後設定新密碼。重設成功會登出所有裝置。沒有已驗證 Email 的帳號（例如只用 LINE 登入）無法用此方式找回。</p>
 <h4>Google / LINE</h4>
-<p>登入或註冊頁的「使用 Google 繼續」「使用 LINE 繼續」。若 Google 提供的 Email 已驗證且與既有帳號相同，會自動連結到該帳號。原生殼不提供第三方登入入口，請用網頁版。</p>
+<p>登入或註冊頁的「使用 Google 繼續」「使用 LINE 繼續」。若 Google 提供的 Email 已驗證且與既有帳號相同，會自動連結到該帳號。原生版（Tauri）同樣提供：以系統瀏覽器完成登入（PKCE），再由 deep link 返回 App。</p>
 
 <h3 id="c-create">4.2 建立清單</h3>
 <p>在 <code>/dashboard</code> 按「＋ 建立清單」（<code>/lists/new</code>）：</p>
@@ -304,10 +303,10 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>清單名稱</td><td>必填，1–100 字</td></tr>
 <tr><td>說明</td><td>選填；介面限 300 字（API 上限 2000）</td></tr>
 <tr><td>封面圖</td><td>選填；jpg / png / webp，5 MB 內</td></tr>
-<tr><td>活動日</td><td>選填，須為今日之後（台北時間）。眾籌品項未填截止時間時，預設用活動日當天 23:59</td></tr>
+<tr><td>活動日</td><td>選填。一般清單介面允許選今天，API 僅限制在 2000-01-01～2100-12-31；只有<b>驚喜模式</b>要求活動日在今日之後（台北時間）。眾籌品項未填截止時間時，預設用活動日當天 23:59</td></tr>
 <tr><td>自動結束時間</td><td>選填，須在現在之後；到時清單自動變為「已結束」。留空＝不設期限</td></tr>
 <tr><td>驚喜模式</td><td>需設定活動日，見 <a href="#c-surprise">4.5</a></td></tr>
-<tr><td>顯示認領者暱稱</td><td>預設關閉；開啟後其他訪客可在品項上看到認領者暱稱</td></tr>
+<tr><td>顯示捐助者暱稱</td><td>預設關閉；開啟後其他訪客可在品項上看到捐助者暱稱</td></tr>
 <tr><td>誰可以看</td><td>見 <a href="#c-visibility">4.4</a>；預設「知道連結」</td></tr>
 </table>
 <p>按「建立並新增品項」後清單以<b>草稿</b>（<code>draft</code>）建立並進入編輯頁。草稿狀態朋友打開會看到「找不到」。</p>
@@ -320,13 +319,13 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>品牌 / 規格 / 商品網址</td><td>選填（100 / 200 / 2000 字）；訪客看到「商品連結」（<code>rel="noopener nofollow"</code>）</td></tr>
 <tr><td>圖片</td><td>選填；上傳後先為「處理中」，後端去除 EXIF / GPS 並重新編碼後才顯示。未通過會標示「圖片未通過，請換一張」</td></tr>
 <tr><td>優先度</td><td>高 / 中 / 低（預設中）</td></tr>
-<tr><td>取得方式</td><td><b>數量認領</b>：設「需要數量」1–99、可填參考價格<br><b>點數眾籌</b>：設「目標點數」（1 點 = NT$1）與「募集截止」，需先填收件資訊，見下方</td></tr>
+<tr><td>取得方式</td><td><b>數量捐助</b>：設「需要數量」1–99、可填參考價格<br><b>心願眾籌</b>：設「目標點數」（1 點 = NT$1）與「募集截止」，需先填收件資訊，見下方</td></tr>
 </table>
 <ul>
-<li><b>排序</b>：品項卡片的 ↑ ↓ 按鈕調整順序；訪客端會把「已被認領完」的品項排到最後。</li>
-<li><b>修改數量</b>：不可低於已被認領的數量（<code>QTY_BELOW_CLAIMED</code>）。驚喜鎖定期間不能調降數量。</li>
-<li><b>刪除品項</b>：若已有認領，第一次刪除會提示；再按一次「連同認領一併刪除」會取消這些認領。驚喜鎖定期間不能刪除品項。已有認捐的眾籌品項刪除時，pledged 的點數會退回捐贈者錢包並通知。</li>
-<li><b>取得方式一旦有人認領 / 贊助就不能切換</b>；眾籌達標或截止後不能改目標與期限。</li>
+<li><b>排序</b>：品項卡片的 ↑ ↓ 按鈕調整順序；訪客端會把「已被捐助完」的品項排到最後。</li>
+<li><b>修改數量</b>：不可低於已被捐助的數量（<code>QTY_BELOW_CLAIMED</code>）。驚喜鎖定期間不能調降數量。</li>
+<li><b>刪除品項</b>：若已有捐助，第一次刪除會提示；再按一次「連同捐助一併刪除」會取消這些捐助。驚喜鎖定期間不能刪除品項。已有認捐的眾籌品項刪除時，pledged 的點數會退回捐贈者錢包並通知。</li>
+<li><b>取得方式一旦有人捐助 / 贊助就不能切換</b>；眾籌達標或截止後不能改目標與期限。</li>
 <li><b>並行編輯保護</b>：儲存時會帶 <code>expected_updated_at</code>；若資料已被其他地方修改，回 <code>STALE_VERSION</code>，畫面會提示「重新載入」。</li>
 </ul>
 <h4>眾籌品項與收件資訊</h4>
@@ -355,8 +354,8 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <p>適合生日 / 婚禮：活動日之前你只看得到整體完成度，看不到誰送了什麼，保留驚喜。</p>
 <ul>
 <li>建立時必須填<b>未來的活動日</b>。鎖定持續到活動日當天 00:00（台北時間）。</li>
-<li>鎖定期間：進度頁只顯示整體完成度與倒數；各品項進度顯示「進度已隱藏」；認領者資訊不可見；匯出資料中的各品項認領數為空；通知信只寫「有 N 件新認領」，不含品項與認領者。</li>
-<li>鎖定期間不能關閉驚喜模式、不能刪除品項或調降數量；你只能在解鎖後標記「已送達」或取消認領。</li>
+<li>鎖定期間：進度頁只顯示整體完成度與倒數；各品項進度顯示「進度已隱藏」；捐助者資訊不可見；匯出資料中的各品項捐助數為空；通知信只寫「有 N 件新捐助」，不含品項與捐助者。</li>
+<li>鎖定期間不能關閉驚喜模式、不能刪除品項或調降數量；你只能在解鎖後標記「已送達」或取消捐助。</li>
 <li>眾籌品項的完成度只在「達標」那一刻跳動，不會隨每筆認捐洩漏進度。</li>
 <li>已知限制（契約 D4）：公開頁仍回傳 x/y，由前端對建立者本人做軟性遮罩；技術上能繞過的是建立者本人的瀏覽器，不是其他訪客。</li>
 </ul>
@@ -366,7 +365,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <li>至少新增 1 個品項後，編輯頁底部按「發佈並分享」。</li>
 <li>若不符發佈條件，系統回 <code>WISHLIST_NOT_PUBLISHABLE</code> 並逐條列出缺漏（沒有品項、標題空白、驚喜模式活動日已過、含眾籌品項卻沒填收件資訊）。</li>
 <li>發佈成功後出現「分享你的清單」視窗：複製連結、用 LINE 傳、簡訊、Facebook，或讓朋友掃 QR code。</li>
-<li>勾選「連結加上 <code>openExternalBrowser=1</code>」可讓 LINE 內開啟時改用預設瀏覽器，認領紀錄比較不會遺失。</li>
+<li>勾選「連結加上 <code>openExternalBrowser=1</code>」可讓 LINE 內開啟時改用預設瀏覽器，捐助紀錄比較不會遺失。</li>
 </ol>
 <p>貼到 LINE / FB 時，預覽標題為「幫{你的名稱}挑禮物｜{清單名稱}」，描述會帶目前完成度與剩餘項數。</p>
 
@@ -374,28 +373,28 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <p><code>/lists/{id}/progress</code> 會即時更新（SSE；連續失敗 2 次自動改為定時輪詢，畫面顯示「即時更新中」或「定時更新中」）：</p>
 <ul>
 <li>整體完成度長條、完成項數、數量與點數進度。</li>
-<li><b>數量型品項</b>：每筆認領的認領者、數量、留言；可「標為已送達」或「取消認領」（取消會把數量釋出給別人）。</li>
+<li><b>數量型品項</b>：每筆捐助的捐助者、數量、留言；可「標為已送達」或「取消捐助」（取消會把數量釋出給別人）。</li>
 <li><b>眾籌品項</b>：已募 / 目標、截止時間、捐款者名單（匿名者顯示「匿名朋友」）、採購進度（狀態、物流單號、下單 / 出貨 / 送達時間）、因實際花費較低而退回的差額。</li>
 <li>最下方有「眾籌採購彙總」：已達標、已下單、運送中、已送達的項數。</li>
-<li>認領時看得到認領者聯絡方式（訪客選填，只有建立者看得到）。</li>
+<li>進度頁的捐助明細只有姓名、數量、狀態、留言與時間；訪客選填的聯絡方式目前<b>不會</b>顯示在進度頁。</li>
 </ul>
-<p>收到通知：訪客認領後第一封<b>即時寄出</b>，之後同一清單的新認領<b>合併為每日台北 09:00 的彙整信</b>。在「帳號設定 → 通知」可關閉，或點信中的一鍵退訂連結。</p>
+<p>收到通知：訪客捐助後第一封<b>即時寄出</b>，之後同一清單的新捐助<b>合併為每日台北 09:00 的彙整信</b>。在「帳號設定 → 通知」可關閉，或點信中的一鍵退訂連結。</p>
 
 <h3 id="c-lifecycle">4.8 結束、重開、封存</h3>
 <div class="flow"><span>draft 草稿</span><i>→</i><span>active 使用中</span><i>⇄</i><span>closed 已結束</span><i>→</i><span class="end">archived 已封存</span></div>
 <table>
 <tr><th>動作</th><th>效果</th></tr>
 <tr><td>發佈（draft → active）</td><td>需通過發佈檢查；朋友可開啟</td></tr>
-<tr><td>結束清單（active → closed）</td><td>不再接受認領 / 認捐，品項不可修改；頁面顯示「這份清單已結束」。到了「自動結束時間」會自動結束，結束前 24 小時寄提醒信</td></tr>
-<tr><td>重新開放（closed → active）</td><td>若自動結束時間已過，須先修改該時間，否則下一輪背景工作又會關閉它</td></tr>
-<tr><td>封存（任何非 archived → archived）</td><td>在儀表板按「封存」；公開頁立即失效，<b>既有認領保留</b>；進行中的認捐點數會退回捐贈者錢包。封存不可復原</td></tr>
+<tr><td>結束清單（active → closed）</td><td>不再接受捐助 / 認捐，品項不可修改；頁面顯示「這份清單已結束」。到了「自動結束時間」會自動結束，結束前 24 小時寄提醒信</td></tr>
+<tr><td>重新開放（closed → active）</td><td>若自動結束時間已過，API 會直接拒絕重新開放（<code>VALIDATION_FAILED</code>，「請延後或清除後再開啟」），須先延後或清除結束時間</td></tr>
+<tr><td>封存（任何非 archived → archived）</td><td>在儀表板按「封存」；公開頁立即失效，<b>既有捐助保留</b>；進行中的認捐點數會退回捐贈者錢包。封存不可復原</td></tr>
 </table>
 <p>被營運下架（<code>hidden</code>）的清單，儀表板與編輯頁會顯示下架原因；分享停用，公開頁回 <code>410</code>。若有誤判請聯絡客服申訴。</p>
 
 <h3 id="c-friends">4.9 好友與個人頁</h3>
 <ul>
 <li><b>加好友</b>（<code>/friends</code>）：輸入對方 Email 或 <code>@handle</code> 送邀請。為避免洩漏帳號是否存在，不論對方有沒有帳號都顯示「若對方有帳號，已送出邀請」。對方在「收到的邀請」按接受或婉拒。</li>
-<li><b>邀請連結</b>：產生 7 天有效的連結 / QR；重新產生會讓舊連結失效，也可撤銷。對方開 <code>/invite/{token}</code> 登入後即成為好友；接受自己的連結回 <code>SELF_INVITE</code>。</li>
+<li><b>邀請連結</b>：產生 7 天有效的連結 / QR；重新產生會讓舊連結失效，也可撤銷。對方開 <code>/invite/{token}</code> 登入後須再按「成為好友」才會建立好友關係；接受自己的連結回 <code>SELF_INVITE</code>。</li>
 <li><b>解除好友</b>：對方立即看不到你「僅好友」的清單，你在對方「指定名單」中的權限也一併移除。</li>
 <li><b>個人頁</b>（<code>/u/{handle}</code>）：顯示你可被對方看到的公開清單與捐助紀錄，並依關係顯示「送出好友邀請 / 接受 / 已是好友」。需先在設定頁設定「帳號代號」。</li>
 <li>捐助紀錄的可見度分<b>公開 / 僅好友 / 私人</b>；匿名認捐在個人頁僅本人可見。</li>
@@ -410,8 +409,8 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>變更密碼</td><td>輸入目前密碼與新密碼（8–128 字元）。成功後其他裝置登出；15 分鐘內最多 5 次嘗試。僅有 Email 但還沒密碼的人，用「設定 Email 登入密碼」走驗證碼流程（會登出所有裝置）</td></tr>
 <tr><td>登入裝置</td><td>列出所有 session（裝置、最後使用、IP）；可登出單一裝置或「登出其他所有裝置」</td></tr>
 <tr><td>個人頁與捐助</td><td>設定帳號代號（小寫英文、數字、底線，3–30 字，唯一）；設定「捐助紀錄預設誰看得到」</td></tr>
-<tr><td>通知</td><td>開關「有人認領時寄 Email」。沒有 Email 的帳號此開關停用</td></tr>
-<tr><td>匯出資料</td><td>下載 JSON：個人資料、登入方式、清單與品項、你的認領、錢包與認捐。每帳號每日最多 3 次。他人資料不會出現</td></tr>
+<tr><td>通知</td><td>開關「有人捐助時寄 Email」。沒有 Email 的帳號此開關停用</td></tr>
+<tr><td>匯出資料</td><td>下載 JSON：個人資料、登入方式、清單與品項、你的捐助、錢包與認捐。每帳號每日最多 3 次。他人資料不會出現</td></tr>
 <tr><td>刪除帳號</td><td>輸入「刪除」確認。你的 Email、名稱與登入方式被移除，清單封存並從公開移除，所有 session 登出。若仍有進行中（pledged）的認捐或點數餘額，會回 <code>ACCOUNT_HAS_POINTS</code>，須先撤回認捐並聯絡客服處理餘額。已 captured（採購中）的認捐不阻擋刪除</td></tr>
 </table>
 <div class="box warn"><b class="t">沒有 Email 的 LINE 帳號</b>可以使用，但收不到通知信、不能用密碼重設找回。建議在失去 LINE 登入能力前，先綁定 Email 或另一種登入方式。</div>
@@ -419,37 +418,37 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <!-- ========================================================= 5 -->
 <h2 id="guest">5. 訪客與贊助者手冊</h2>
 
-<h3 id="g-claim">5.1 免註冊認領</h3>
+<h3 id="g-claim">5.1 免註冊捐助</h3>
 <ol class="steps">
 <li>點開朋友分享的連結（<code>/s/{slug}</code>）。看得到清單標題、說明、完成度與各品項。受限清單可能要求登入或輸入密碼。</li>
 <li>在想送的品項按「<b>我要送</b>」，選數量（1–99，不超過剩餘量）。</li>
-<li>填<b>暱稱</b>（首次必填，至多 30 字）。可選填：聯絡方式（LINE ID 或電話，只有建立者看得到，至多 80 字）、Email（收確認信與「管理我的認領」連結）、留言（至多 200 字）。</li>
-<li>按「確認認領」。成功後出現「✓ 認領成功！」畫面。</li>
+<li>填<b>暱稱</b>（首次必填，至多 30 字）。可選填：聯絡方式（LINE ID 或電話，至多 80 字；目前僅儲存，建立者進度頁不顯示）、Email（收確認信與「管理我的捐助」連結）、留言（至多 200 字）。</li>
+<li>按「確認捐助」。成功後出現「✓ 捐助成功！」畫面。</li>
 </ol>
 <ul>
-<li><b>不需註冊</b>；已登入使用者則以帳號名稱認領，並可選這筆認領的公開層級（公開 / 僅好友 / 私人）。</li>
-<li><b>不會超賣</b>：兩人同時搶最後一件，只有一人成功，另一人看到「抱歉，只剩 N 個了」或「剛剛被別人認領完了」。</li>
-<li><b>同一品項只能有一筆有效認領</b>；再次認領會自動切換成「修改我的認領」。</li>
-<li>建立者不能認領自己的清單。已結束的清單不再接受認領。</li>
-<li>網路不穩重送是安全的：同一份認領使用同一把 <code>Idempotency-Key</code>，重送不會重複扣量。</li>
+<li><b>不需註冊</b>；已登入使用者則以帳號名稱捐助，並可選這筆捐助的公開層級（公開 / 僅好友 / 私人）。</li>
+<li><b>不會超賣</b>：兩人同時搶最後一件，只有一人成功，另一人看到「抱歉，只剩 N 個了」或「剛剛被別人捐助完了」。</li>
+<li><b>同一品項只能有一筆有效捐助</b>；再次捐助會自動切換成「修改我的捐助」。</li>
+<li>建立者不能捐助自己的清單。已結束的清單不再接受捐助。</li>
+<li>網路不穩重送是安全的：同一份捐助使用同一把 <code>Idempotency-Key</code>，重送不會重複扣量。</li>
 </ul>
-<div class="box warn"><b class="t">在 LINE 內建瀏覽器</b>認領身分存放在瀏覽器儲存空間，LINE 關閉後可能找不到。看到提示時點右上角「⋯」→「用預設瀏覽器開啟」；或在認領時填 Email，之後從確認信的連結找回。若成功畫面顯示「這個瀏覽器沒有保存到身分」，請截圖保存。</div>
+<div class="box warn"><b class="t">在 LINE 內建瀏覽器</b>捐助身分存放在瀏覽器儲存空間，LINE 關閉後可能找不到。看到提示時點右上角「⋯」→「用預設瀏覽器開啟」；或在捐助時填 Email，之後從確認信的連結找回。若成功畫面顯示「這個瀏覽器沒有保存到身分」，請截圖保存。</div>
 
-<h3 id="g-manage">5.2 管理我的認領（<code>/me/claims</code>）</h3>
-<div class="flow"><span>已認領 reserved</span><i>→</i><span>已購買 purchased</span><i>→</i><span class="end">已送達 delivered</span></div>
+<h3 id="g-manage">5.2 管理我的捐助（<code>/me/claims</code>）</h3>
+<div class="flow"><span>已捐助 reserved</span><i>→</i><span>已購買 purchased</span><i>→</i><span class="end">已送達 delivered</span></div>
 <ul>
-<li>認領後可按「標記已購買」「標記已送達」；「取消」可在送達前隨時使用（已購買取消時建立者會收到通知）。取消後數量立即歸還給其他人。</li>
-<li>可改暱稱（僅限未登入的訪客）、調整這筆認領誰看得到（僅登入者）。</li>
-<li>「過去的紀錄」收納已取消 / 已逾期的認領。</li>
-<li><b>換裝置找回</b>：確認信中的「管理我的認領」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
-<li><b>刪除暱稱與聯絡方式</b>：頁面底部可抹除個資，認領紀錄保留為「已刪除的訪客」，此裝置之後無法再管理。</li>
-<li>若建立者設定了「認領保留時數」，逾期未標記購買的認領會自動釋放（<code>expired</code>）。</li>
+<li>捐助後可按「標記已購買」「標記已送達」；「取消」可在送達前隨時使用（目前取消不會寄通知信給建立者，只有進度頁的即時刷新）。取消後數量立即歸還給其他人。</li>
+<li>可改暱稱（僅限未登入的訪客）、調整這筆捐助誰看得到（僅登入者）。</li>
+<li>「過去的紀錄」收納已取消 / 已逾期的捐助。</li>
+<li><b>換裝置找回</b>：確認信中的「管理我的捐助」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
+<li><b>刪除暱稱與聯絡方式</b>：頁面底部可抹除個資，捐助紀錄保留為「已刪除的訪客」，此裝置之後無法再管理。</li>
+<li>若建立者設定了「捐助保留時數」，逾期未標記購買的捐助會自動釋放（<code>expired</code>）。</li>
 </ul>
 
-<h3 id="g-fund">5.3 用點數贊助（眾籌品項）</h3>
+<h3 id="g-fund">5.3 心願眾籌（眾籌品項）</h3>
 <p>眾籌品項顯示「已募 X / 目標 Y 點」與進度條。贊助<b>需要登入</b>（未登入會導向登入頁，登入後回到本頁）。</p>
 <ol class="steps">
-<li>在眾籌品項按「用點數贊助」，輸入點數（1 到剩餘額之間的整數；可按「剩餘全額」）。</li>
+<li>在眾籌品項按「心願眾籌」，輸入點數（1 到剩餘額之間的整數；可按「剩餘全額」）。</li>
 <li>選填留言（至多 200 字）、勾選「匿名贊助」（頁面顯示為「匿名朋友」）、選這筆贊助誰看得到。</li>
 <li>確認後點數從錢包扣出，狀態為 <b>pledged</b>（認捐中）。餘額不足會顯示還缺多少。</li>
 <li>達標的那一刻，所有 pledged 轉為 <b>captured</b>，平台建立採購單；你會收到 Email 通知，之後依序收到出貨、送達通知。</li>
@@ -459,7 +458,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <ul>
 <li><b>可用點數</b>、<b>認捐中</b>點數；錢包被凍結時顯示「已凍結」，不能新增贊助，但退點仍會入帳。</li>
 <li><b>撤回</b>：品項達標前（仍為 pledged）隨時可撤回，點數立即回到錢包。已達標（captured）則回 <code>CONTRIBUTION_LOCKED</code>。</li>
-<li><b>轉投</b>：把 pledged 的點數轉到<b>同一份清單</b>另一個募集中的眾籌品項，不異動錢包。</li>
+<li><b>轉投</b>：只在<b>來源品項已截止未達標（<code>expired</code>）且仍在 7 天選擇期內</b>時可用；目標須是同一份（使用中）清單另一個募集中、尚未截止的眾籌品項，且須能承接<b>整筆</b>點數（不超過其剩餘額）。不異動錢包；原認捐標為 <code>reallocated</code> 並建立一筆新認捐。</li>
 <li><b>截止未達標</b>：品項變為 <code>expired</code>，有 <b>7 天選擇期</b>讓你撤回或轉投；逾期未處理則自動退回錢包。</li>
 <li><b>差額退回</b>：實際採購金額低於目標時，差額依各 captured 認捐的點數比例（最大餘數法，總和恆等於差額）退回。</li>
 <li><b>採購失敗 / 取消</b>：已扣用的點數全額退回，並通知捐贈者。</li>
@@ -484,7 +483,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 </ul>
 
 <h3>6.2 營運概況</h3>
-<p>顯示使用者數、清單總數、使用中清單、已下架清單、待處理檢舉；展開可看認領狀態、通知狀態與最近 7 天稽核動作分佈。</p>
+<p>顯示使用者數、清單總數、使用中清單、已下架清單、待處理檢舉；展開可看捐助狀態、通知狀態與最近 7 天稽核動作分佈。</p>
 
 <h3>6.3 檢舉佇列與下架</h3>
 <ol class="steps">
@@ -499,7 +498,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <p>可用 Email、名稱、handle、UUID 搜尋，並依登入來源 / 帳號狀態篩選。Email 預設遮罩，可按「顯示」。每個動作都必須填寫<b>操作原因</b>並留下稽核。</p>
 <table>
 <tr><th>動作</th><th>效果</th></tr>
-<tr><td>停權 / 解除停權</td><td>撤銷該帳號所有 session；清單、認領、帳務紀錄保留，<b>不會自動下架清單</b>。被停權者登入看到 <code>account_blocked</code> 提示</td></tr>
+<tr><td>停權 / 解除停權</td><td>撤銷該帳號所有 session；清單、捐助、帳務紀錄保留，<b>不會自動下架清單</b>。被停權者登入看到 <code>account_blocked</code> 提示</td></tr>
 <tr><td>設為 / 取消 staff</td><td>撤銷該帳號現有登入，須重新登入</td></tr>
 <tr><td>解除 LINE / Google 綁定</td><td>至少須保留一種登入方式；會更新聯絡 Email 並寄安全通知，撤銷該帳號所有 session</td></tr>
 <tr><td>寄送復原驗證信</td><td>僅向既有已驗證 Email 寄出密碼重設驗證信，使用者到忘記密碼頁完成重設。無 Email 帳號須另行核驗身分，後台<b>不能直接換綁</b></td></tr>
@@ -514,8 +513,8 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>標記已下單</td><td>必填<b>商家訂單編號</b>與<b>實際金額</b>（不可超過目標點數）。低於目標的差額依認捐比例自動退回捐贈者</td></tr>
 <tr><td>標記已出貨</td><td>物流單號選填；通知捐贈者</td></tr>
 <tr><td>標記已送達</td><td>品項標為已履行；通知捐贈者</td></tr>
-<tr><td>標記失敗</td><td>必填原因（至多 200 字）。已扣用點數全額退回，品項回到募集中（未過期）或已截止，通知捐贈者</td></tr>
-<tr><td>取消採購</td><td>同上，改為取消</td></tr>
+<tr><td>標記失敗</td><td>僅 <code>pending</code>、<code>placed</code> 可用（已出貨、已送達後不能失敗或取消）。必填原因（至多 200 字）。已扣用點數全額退回，品項回到募集中（未過期）或已截止，通知捐贈者</td></tr>
+<tr><td>取消採購</td><td>同上限制（僅 <code>pending</code>、<code>placed</code>），改為取消</td></tr>
 </table>
 <p>狀態已被他人更新時回 <code>INVALID_STATE_TRANSITION</code>，請重新整理再操作。</p>
 
@@ -527,7 +526,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 </ul>
 
 <h3>6.7 系統旗標與唯讀模式</h3>
-<p>「系統旗標」分頁目前只有 <code>read_only</code>。開啟後，全站所有非安全方法（POST / PATCH / PUT / DELETE）回 <code>503 READ_ONLY_MODE</code>，例外：登入相關端點與後台旗標操作本身。用於資料庫維運或事故止血。開啟 / 關閉都需二次確認，並寫入稽核。</p>
+<p>「系統旗標」分頁目前只有 <code>read_only</code>。開啟後，全站所有非安全方法（POST / PATCH / PUT / DELETE）回 <code>503 READ_ONLY_MODE</code>，例外（放行）：登入、登出、登入 OTP、兩步驟驗證、後台旗標操作，以及<b>退訂</b> <code>POST /unsubscribe</code>。用於資料庫維運或事故止血。開啟 / 關閉都需二次確認，並寫入稽核。</p>
 
 <h3>6.8 稽核紀錄（<code>/admin/audit</code>）</h3>
 <p>可用操作者 UUID、動作、對象類型（須完整匹配）、對象 UUID、起訖日期查詢；日期以<b>台北時區</b>計算且包含結束日。每筆可展開「操作內容」(diff)。</p>
@@ -539,14 +538,14 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <div class="flow"><span>draft</span><i>→</i><span>active</span><i>⇄</i><span>closed</span><i>→</i><span class="end">archived</span></div>
 <p>允許的轉換：draft→active、active→closed、closed→active、draft / active / closed → archived。其他一律 <code>VALIDATION_FAILED</code>（<code>TRANSITION</code>）。另有獨立欄位 <code>moderation_status</code>（<code>ok</code> / <code>hidden</code>）；<code>DELETE /wishlists/{id}</code> 的語意是封存。</p>
 
-<h3>7.2 認領（數量型）</h3>
+<h3>7.2 捐助（數量型）</h3>
 <div class="flow"><span>reserved</span><i>→</i><span>purchased</span><i>→</i><span class="end">delivered</span></div>
 <ul>
-<li>允許：reserved→purchased；reserved / purchased→delivered；reserved / purchased→cancelled。其餘回 <code>INVALID_STATE_TRANSITION</code>；已 delivered 重送同一目標狀態視為成功（冪等）；重複取消回 204。</li>
+<li>允許：reserved→purchased；reserved / purchased→delivered；reserved / purchased→cancelled。其餘回 <code>INVALID_STATE_TRANSITION</code>；<b>只有重複取消是冪等</b>（回 204）；已 delivered 再送 delivered、或對 delivered 做其他轉換，都回 <code>INVALID_STATE_TRANSITION</code>。</li>
 <li>改數量只允許 reserved / purchased，且清單須為 active。</li>
-<li><b>誰能標記</b>：認領者本人；清單擁有者只能在驚喜解鎖後標記「已送達」或取消。</li>
-<li><b>逾期釋放</b>：若清單設了 <code>claim_ttl_hours</code>，認領時寫入 <code>expires_at</code>；背景工作把逾期的 reserved 設為 <code>expired</code> 並回補數量。進入 purchased / delivered 後 <code>expires_at</code> 清除。</li>
-<li>不設 <code>claim_ttl_hours</code>（預設）＝認領不逾期。創建者介面目前未提供此欄位，需經 API 設定（<code>1–8760</code> 小時）。</li>
+<li><b>誰能標記</b>：捐助者本人；清單擁有者只能在驚喜解鎖後標記「已送達」或取消。</li>
+<li><b>逾期釋放</b>：若清單設了 <code>claim_ttl_hours</code>，捐助時寫入 <code>expires_at</code>；背景工作把逾期的 reserved 設為 <code>expired</code> 並回補數量。進入 purchased / delivered 後 <code>expires_at</code> 清除。</li>
+<li>不設 <code>claim_ttl_hours</code>（預設）＝捐助不逾期。創建者介面目前未提供此欄位，需經 API 設定（<code>1–8760</code> 小時）。</li>
 </ul>
 <h4>超賣防護（為什麼不會多賣）</h4>
 <pre><code>-- 條件式 UPDATE：同一列在交易內被鎖，只有一筆能讓條件成立
@@ -557,10 +556,10 @@ RETURNING qty_needed, qty_claimed;
 <ul>
 <li>鎖序固定：<code>wishlist_items</code> → <code>claims</code>。改動時不可顛倒。</li>
 <li>寫入需 <code>Idempotency-Key</code>（UUID）。占位與業務寫入在<b>同一交易</b>，失敗 rollback 不留痕；24 小時內同鍵同內容回原結果（帶 <code>Idempotency-Replayed</code>），內容不同回 <code>IDEMPOTENCY_CONFLICT</code>。</li>
-<li>資料庫以 partial unique index 保證同一人對同一品項只有一筆有效認領（<code>CLAIM_ALREADY_EXISTS</code>）。</li>
+<li>資料庫以 partial unique index 保證同一人對同一品項只有一筆有效捐助（<code>CLAIM_ALREADY_EXISTS</code>）。</li>
 </ul>
 
-<h3>7.3 點數眾籌</h3>
+<h3>7.3 心願眾籌</h3>
 <pre><code>品項 funding_status:  open ──達標──▶ funded ──送達──▶ fulfilled
                        │
                        └─截止未達標─▶ expired（7 天選擇期後自動退點）
@@ -589,19 +588,19 @@ RETURNING qty_needed, qty_claimed;
 <h3>7.5 通知</h3>
 <table>
 <tr><th>種類（kind）</th><th>對象</th><th>時機</th></tr>
-<tr><td><code>claim.created</code></td><td>建立者</td><td>每份清單<b>第一筆</b>認領，立即</td></tr>
-<tr><td><code>claim.digest</code></td><td>建立者</td><td>之後的認領合併，每日台北 09:00 一封（count 累加）</td></tr>
-<tr><td><code>claim.confirmation</code></td><td>訪客</td><td>認領時填了 Email；含「管理我的認領」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
-<tr><td><code>claim.item_removed</code></td><td>訪客</td><td>你認領的品項被建立者刪除</td></tr>
+<tr><td><code>claim.created</code></td><td>建立者</td><td>每份清單<b>第一筆</b>捐助，立即</td></tr>
+<tr><td><code>claim.digest</code></td><td>建立者</td><td>之後的捐助合併，每日台北 09:00 一封（count 累加）</td></tr>
+<tr><td><code>claim.confirmation</code></td><td>訪客</td><td>捐助時填了 Email；含「管理我的捐助」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
+<tr><td><code>claim.item_removed</code></td><td>訪客</td><td>你捐助的品項被建立者刪除</td></tr>
 <tr><td><code>wishlist.closing</code></td><td>建立者</td><td>自動結束前 24 小時（一次）</td></tr>
-<tr><td><code>event.reminder</code></td><td>建立者</td><td>活動日將至</td></tr>
+<tr><td><code>event.reminder</code></td><td>建立者</td><td>僅有信件模板，<b>尚未接入自動提醒</b>（沒有排程或觸發流程建立此通知）</td></tr>
 <tr><td><code>crowdfund.funded</code> / <code>order.shipped</code> / <code>order.delivered</code> / <code>order.failed</code> / <code>funding.expired</code> / <code>item.removed</code></td><td>捐贈者</td><td>眾籌達標、出貨、送達、失敗、截止、品項被刪除</td></tr>
 <tr><td><code>auth.identity_linked</code> / <code>auth.identity_unlinked</code> / <code>auth.password_changed</code></td><td>本人</td><td>安全通知，<b>不受退訂影響</b>，寄往變更當下的已驗證信箱</td></tr>
 </table>
 <ul>
-<li>通知內容刻意不含品項與認領者名稱（驚喜模式天然不洩漏）；眾籌通知可含品項名稱，因為捐贈者本來就知道。</li>
+<li>通知內容刻意不含品項與捐助者名稱（驚喜模式天然不洩漏）；眾籌通知可含品項名稱，因為捐贈者本來就知道。</li>
 <li>outbox 機制：背景 worker 每 5 秒輪詢，一次領 20 筆；領取時 <code>attempts+1</code> 並把 <code>scheduled_at</code> 推後 1 分鐘當租約，最多重試 3 次。</li>
-<li>一鍵退訂：信中連結為 <code>GET /unsubscribe?token=…</code>（只轉址、不變更狀態，避免信件掃描器誤退訂），確認頁 POST 才生效。權杖 1 年有效。創建者退訂 = 關閉認領通知；訪客退訂 = 清除其 Email。</li>
+<li>一鍵退訂：信中連結為 <code>GET /unsubscribe?token=…</code>（只轉址、不變更狀態，避免信件掃描器誤退訂），確認頁 POST 才生效。權杖 1 年有效。創建者退訂 = 關閉捐助通知；訪客退訂 = 清除其 Email。</li>
 </ul>
 
 <h3>7.6 圖片</h3>
@@ -609,7 +608,7 @@ RETURNING qty_needed, qty_claimed;
 <li>前端 <code>POST /uploads/presign</code>（<code>purpose</code> = <code>cover</code> / <code>item</code>；只接受 jpeg / png / webp，至多 5 MB），取得 5 分鐘有效的 presigned PUT 網址。</li>
 <li>瀏覽器直接 PUT 到 R2 的 <code>incoming/{user_id}/…</code>（尚未去 EXIF，<b>不得公開</b>）。</li>
 <li><code>POST /uploads/confirm</code>：後端重新編碼、去除 EXIF / GPS，寫入公開 key（<code>covers/…</code>、<code>items/…</code>），刪除 <code>incoming/</code>。</li>
-<li>確認前圖片狀態為 <code>pending</code>（創建者端每 4 秒輪詢），失敗為 <code>rejected</code>。DB 只存 object key。</li>
+<li><code>/uploads/confirm</code> 是<b>同步處理</b>：成功才回 <code>image_status: ready</code> 與公開網址並寫入欄位；失敗直接回 422 <code>IMAGE_REJECTED</code>（或 404 / 502），並刪除 <code>incoming/</code> 物件。DB 只存 object key。<code>pending</code> / <code>rejected</code> 狀態值保留於資料模型，正常上傳流程不經背景處理；介面仍保留對 <code>pending</code> 的輪詢。</li>
 <li>每使用者每小時最多 60 次 presign。OAuth 頭像另有轉存流程（僅 HTTPS 的 Google / LINE 來源，5 MB 上限，不跟隨重新導向）。</li>
 </ol>
 
@@ -620,7 +619,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><th>群組</th><th>資料表</th><th>用途</th></tr>
 <tr><td rowspan="5">身分</td><td><code>users</code></td><td>帳號；<code>is_staff</code>、<code>blocked_at</code>、<code>handle</code>、<code>notification_prefs</code>、<code>default_claim_visibility</code>、<code>totp_*</code></td></tr>
 <tr><td><code>auth_identities</code></td><td>登入方式（email / line / google）；Email 的密碼雜湊在此</td></tr>
-<tr><td><code>otp_challenges</code></td><td>驗證碼（雜湊 + pepper）；用途：register / reset / link</td></tr>
+<tr><td><code>otp_challenges</code></td><td>驗證碼（雜湊 + pepper）；用途：register / login / reset / link</td></tr>
 <tr><td><code>sessions</code></td><td>登入 session（只存 token 雜湊）；<code>mfa_at</code></td></tr>
 <tr><td><code>native_auth_codes</code></td><td>原生殼 OAuth 一次性碼（60 秒、只存雜湊）</td></tr>
 <tr><td rowspan="2">訪客</td><td><code>guests</code></td><td>訪客身分（暱稱、選填聯絡方式與 Email、權杖雜湊）</td></tr>
@@ -628,7 +627,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td rowspan="3">清單</td><td><code>wishlists</code></td><td>清單；類型 / 狀態 / 可見性 / 驚喜 / <code>closes_at</code> / <code>moderation_*</code> / 密碼雜湊</td></tr>
 <tr><td><code>wishlist_items</code></td><td>品項；數量欄位與眾籌欄位（<code>target_points</code>、<code>pledged_points</code>、<code>funding_status</code>、<code>funding_deadline</code>…）</td></tr>
 <tr><td><code>wishlist_allowed_users</code></td><td>「指定好友」名單</td></tr>
-<tr><td>認領</td><td><code>claims</code></td><td>認領；<code>guest_id</code> 或 <code>user_id</code> 擇一；<code>visibility</code>、<code>expires_at</code></td></tr>
+<tr><td>捐助</td><td><code>claims</code></td><td>捐助；<code>guest_id</code> 或 <code>user_id</code> 擇一；<code>visibility</code>、<code>expires_at</code></td></tr>
 <tr><td rowspan="6">點數</td><td><code>point_wallets</code></td><td>每使用者一個錢包；<code>balance</code>、<code>status</code>（active / frozen）</td></tr>
 <tr><td><code>point_ledger</code></td><td>帳本，只增不改；entry type：grant / pledge / release / refund / adjustment</td></tr>
 <tr><td><code>contributions</code></td><td>認捐；<code>points</code>、<code>refunded_points</code>、<code>visibility</code>、<code>is_anonymous</code></td></tr>
@@ -650,8 +649,8 @@ RETURNING qty_needed, qty_claimed;
 <tr><td><code>0001_mvp</code></td><td>核心 14 張表與列舉</td></tr>
 <tr><td><code>0002_password</code></td><td>Email 密碼登入</td></tr>
 <tr><td><code>0003_ratelimit</code></td><td><code>rate_limits</code></td></tr>
-<tr><td><code>0004_crowdfund</code></td><td>點數眾籌、錢包、帳本、收件資訊、採購單</td></tr>
-<tr><td><code>0005_social</code></td><td>好友、指定名單、可見性擴為 6 值、認領公開層級</td></tr>
+<tr><td><code>0004_crowdfund</code></td><td>心願眾籌、錢包、帳本、收件資訊、採購單</td></tr>
+<tr><td><code>0005_social</code></td><td>好友、指定名單、可見性擴為 6 值、捐助公開層級</td></tr>
 <tr><td><code>0006_contribution_visibility</code></td><td>認捐公開層級</td></tr>
 <tr><td><code>0007_identity_linking</code></td><td>登入方式綁定（OTP link 用途）</td></tr>
 <tr><td><code>0008_admin_users</code></td><td><code>users.blocked_at</code></td></tr>
@@ -671,10 +670,10 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>創建者認證</td><td>cookie <code>ws_session</code>；原生殼用 <code>Authorization: Bearer &lt;session_token&gt;</code></td></tr>
 <tr><td>訪客認證</td><td><code>X-Guest-Token</code>（優先）或 cookie <code>ws_guest</code></td></tr>
 <tr><td>密碼清單</td><td><code>X-List-Access</code>（SSE 用 <code>?access=</code>）；由 <code>POST /public/wishlists/{slug}/unlock</code> 取得</td></tr>
-<tr><td>冪等</td><td>建立型 POST（認領、認捐、營運發點）必帶 <code>Idempotency-Key: &lt;UUID&gt;</code>；缺少回 <code>IDEMPOTENCY_KEY_REQUIRED</code>；重放回應帶 <code>Idempotency-Replayed</code></td></tr>
+<tr><td>冪等</td><td>建立型 POST（捐助、認捐、營運發點）必帶 <code>Idempotency-Key: &lt;UUID&gt;</code>；缺少回 <code>IDEMPOTENCY_KEY_REQUIRED</code>；重放回應帶 <code>Idempotency-Replayed</code></td></tr>
 <tr><td>並行編輯</td><td>PATCH 清單 / 品項可帶 <code>expected_updated_at</code>；不符回 <code>409 STALE_VERSION</code></td></tr>
 <tr><td>分頁</td><td>游標式：<code>?limit=1..100&amp;cursor=…</code>，回 <code>{ data: [...], next_cursor }</code></td></tr>
-<tr><td>錯誤</td><td>RFC 9457 <code>application/problem+json</code>：<code>type</code>、<code>title</code>、<code>status</code>、<code>code</code>、<code>detail</code>，驗證錯誤另有 <code>errors[]</code>（<code>pointer</code>、<code>code</code>、<code>detail</code>）；限流附 <code>Retry-After</code></td></tr>
+<tr><td>錯誤</td><td>RFC 9457 <code>application/problem+json</code>：<code>type</code>、<code>title</code>、<code>status</code>、<code>code</code>、選用的 <code>detail</code>（部分錯誤沒有，例如 404 / 401 / 410 的簡式回應），驗證錯誤另有 <code>errors[]</code>（框架產生的 422 不一定帶）（<code>pointer</code>、<code>code</code>、<code>detail</code>）；限流附 <code>Retry-After</code></td></tr>
 <tr><td>CORS</td><td>只允許 <code>APP_URL</code>（與 <code>NATIVE_ORIGINS</code>）並帶憑證</td></tr>
 <tr><td>安全標頭</td><td>所有回應加 <code>X-Content-Type-Options: nosniff</code>、<code>Referrer-Policy: no-referrer</code> 等；已自行設定者（如公開清單的 <code>Cache-Control</code>）不覆蓋</td></tr>
 <tr><td>唯讀模式</td><td><code>read_only</code> 為真時非安全方法回 <code>503 READ_ONLY_MODE</code></td></tr>
@@ -691,9 +690,9 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>POST</td><td><code>/public/wishlists/{slug}/unlock</code></td><td>—</td><td>密碼清單解鎖，回存取權杖</td></tr>
 <tr><td>GET</td><td><code>/public/wishlists/{slug}/events</code></td><td>—</td><td>SSE 事件流（<code>item.updated</code>、<code>wishlist.updated</code>…）；每連線最長 30 分鐘、15 秒心跳、<code>retry: 5s</code></td></tr>
 <tr><td>POST</td><td><code>/public/wishlists/{slug}/reports</code></td><td>—</td><td>檢舉（Turnstile）</td></tr>
-<tr><td>POST</td><td><code>/items/{id}/claims</code></td><td>G/U</td><td>認領（需 Idempotency-Key）</td></tr>
+<tr><td>POST</td><td><code>/items/{id}/claims</code></td><td>G/U</td><td>捐助（需 Idempotency-Key）</td></tr>
 <tr><td>PATCH / DELETE</td><td><code>/claims/{id}</code></td><td>G/U</td><td>修改數量 / 備註 / 狀態 / 公開層級；取消</td></tr>
-<tr><td>GET / PATCH / DELETE</td><td><code>/guest/me</code></td><td>G</td><td>我的認領 / 改暱稱 / 刪除個資</td></tr>
+<tr><td>GET / PATCH / DELETE</td><td><code>/guest/me</code></td><td>G</td><td>我的捐助 / 改暱稱 / 刪除個資</td></tr>
 <tr><td>POST</td><td><code>/guest/recover</code></td><td>—</td><td>用一次性恢復權杖換發訪客權杖</td></tr>
 <tr><td>GET</td><td><code>/users/{handle}</code></td><td>選用</td><td>個人頁（依關係顯示）</td></tr>
 <tr><td>GET / POST</td><td><code>/unsubscribe</code></td><td>—</td><td>GET 轉址；POST 退訂</td></tr>
@@ -725,7 +724,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>GET / PUT</td><td><code>/wishlists/{id}/shipping-address</code></td><td>收件資訊（讀回為遮罩值）</td></tr>
 <tr><td>GET / PUT</td><td><code>/wishlists/{id}/allowed-users</code></td><td>指定名單</td></tr>
 <tr><td>POST</td><td><code>/wishlists/{id}/items</code>、<code>/items/reorder</code></td><td>新增品項 / 重排</td></tr>
-<tr><td>PATCH / DELETE</td><td><code>/items/{item_id}</code></td><td>更新 / 刪除（<code>?force=true</code> 連同認領）</td></tr>
+<tr><td>PATCH / DELETE</td><td><code>/items/{item_id}</code></td><td>更新 / 刪除（<code>?force=true</code> 連同捐助）</td></tr>
 <tr><td>POST</td><td><code>/uploads/presign</code>、<code>/uploads/confirm</code></td><td>圖片上傳</td></tr>
 </table>
 <h4>點數與社交</h4>
@@ -766,18 +765,18 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>403</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code>、<code>PASSWORD_REQUIRED</code></td><td>清單可見性不足；body 附 <code>visibility</code> 與 <code>owner</code>。<code>private</code> 一律 404</td></tr>
 <tr><td>404</td><td><code>NOT_FOUND</code></td><td>不存在、已刪除或無權查看</td></tr>
 <tr><td>409</td><td><code>ITEM_FULLY_CLAIMED</code></td><td>剩餘數量不足，附 <code>remaining</code></td></tr>
-<tr><td>409</td><td><code>CLAIM_ALREADY_EXISTS</code></td><td>已有有效認領，請改用 PATCH</td></tr>
+<tr><td>409</td><td><code>CLAIM_ALREADY_EXISTS</code></td><td>已有有效捐助，請改用 PATCH</td></tr>
 <tr><td>409</td><td><code>WISHLIST_CLOSED</code></td><td>清單已結束 / 封存</td></tr>
 <tr><td>409</td><td><code>IDEMPOTENCY_CONFLICT</code></td><td>同鍵不同內容，或前一次仍處理中</td></tr>
 <tr><td>409</td><td><code>STALE_VERSION</code></td><td>資料已被修改，請重新載入</td></tr>
-<tr><td>409</td><td><code>QTY_BELOW_CLAIMED</code>、<code>ITEM_HAS_CLAIMS</code></td><td>數量低於已認領；品項已有認領 / 認捐不可刪除或變更模式</td></tr>
+<tr><td>409</td><td><code>QTY_BELOW_CLAIMED</code>、<code>ITEM_HAS_CLAIMS</code></td><td>數量低於已捐助；品項已有捐助 / 認捐不可刪除或變更模式</td></tr>
 <tr><td>409</td><td><code>WISHLIST_NOT_PUBLISHABLE</code></td><td>不符發佈條件，<code>errors[]</code> 列出缺漏</td></tr>
 <tr><td>409</td><td><code>SHIPPING_ADDRESS_REQUIRED</code></td><td>眾籌清單缺收件資訊</td></tr>
 <tr><td>409</td><td><code>FUNDING_MODE_MISMATCH</code>、<code>FUNDING_LOCKED</code>、<code>FUNDING_EXPIRED</code>、<code>ITEM_FUNDED</code></td><td>品項模式不符；已達標 / 截止不可改目標；眾籌已截止；已達標</td></tr>
 <tr><td>409</td><td><code>CROWDFUND_TARGET_EXCEEDED</code>、<code>INSUFFICIENT_POINTS</code></td><td>超過剩餘額（附 <code>remaining_points</code>）；餘額不足（附 <code>balance</code>）</td></tr>
 <tr><td>409</td><td><code>CONTRIBUTION_LOCKED</code>、<code>REALLOCATION_NOT_ALLOWED</code></td><td>已達標不可撤回；轉投條件不符</td></tr>
 <tr><td>409</td><td><code>WALLET_FROZEN</code></td><td>錢包凍結，不能認捐</td></tr>
-<tr><td>409</td><td><code>INVALID_STATE_TRANSITION</code></td><td>認領 / 採購單狀態機不允許</td></tr>
+<tr><td>409</td><td><code>INVALID_STATE_TRANSITION</code></td><td>捐助 / 採購單狀態機不允許</td></tr>
 <tr><td>409</td><td><code>EMAIL_EXISTS</code>、<code>HANDLE_TAKEN</code>、<code>IDENTITY_IN_USE</code>、<code>LAST_IDENTITY</code></td><td>Email 已註冊；代號被占用；登入方式屬於他人；不可解除最後一種</td></tr>
 <tr><td>409</td><td><code>ACCOUNT_HAS_POINTS</code>、<code>MFA_NOT_SET_UP</code></td><td>刪帳號前須處理認捐 / 餘額；尚未設定 TOTP</td></tr>
 <tr><td>410</td><td><code>WISHLIST_REMOVED</code></td><td>清單已被下架；body 不含原因</td></tr>
@@ -793,7 +792,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><th>項目</th><th>限制</th></tr>
 <tr><td>登入失敗</td><td>同 (Email, IP) 15 分鐘 5 次；同 Email 20 次；同 IP 30 次</td></tr>
 <tr><td>驗證碼寄送</td><td>每 Email 每小時 5 封、間隔 60 秒；有效 10 分鐘、最多 5 次嘗試</td></tr>
-<tr><td>認領</td><td>每身分每小時 30 次；每身分每清單每小時 15 次</td></tr>
+<tr><td>捐助</td><td>每身分每小時 30 次；每身分每清單每小時 15 次</td></tr>
 <tr><td>認捐</td><td>每使用者每分鐘 30 次</td></tr>
 <tr><td>密碼清單解鎖</td><td>同 slug＋IP 每 15 分鐘 10 次</td></tr>
 <tr><td>檢舉</td><td>每 IP 每小時 10 次；同清單同 IP 每日 1 次</td></tr>
@@ -805,7 +804,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>資料匯出</td><td>每帳號每日 3 次</td></tr>
 <tr><td>Session / 訪客權杖</td><td>session 30 天；<code>ws_guest</code> 1 年；恢復權杖 30 天一次性；好友邀請 7 天；原生殼 OAuth 碼 60 秒；冪等鍵 24 小時；presigned URL 5 分鐘</td></tr>
 </table>
-<p>限流以 <b>DB 計數</b>實作（<code>rate_limits</code>），每 5 分鐘由背景任務清理；每 IP 限額依賴正確的 <code>TRUSTED_PROXY</code> 設定。</p>
+<p>限流以 <b>DB 計數</b>實作（<code>rate_limits</code>），由背景任務每小時清理（每 12 個 5 分鐘 tick）；每 IP 限額依賴正確的 <code>TRUSTED_PROXY</code> 設定。</p>
 
 <!-- ========================================================= 10 -->
 <h2 id="security">10. 安全與隱私</h2>
@@ -815,13 +814,13 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>防帳號列舉</td><td>登入錯誤不區分無帳號與密碼錯；好友邀請不論對方有無帳號都回同一訊息；OTP 錯誤不區分原因；<code>private</code> 清單回 404 而非 403</td></tr>
 <tr><td>CDN 快取隔離</td><td>可快取路徑不讀任何身分；非 public 回應另帶 <code>CDN-Cache-Control: no-store</code>；清單降級可見性時主動清除邊緣快取</td></tr>
 <tr><td>收件資訊</td><td>應用層 XChaCha20-Poly1305 加密（金鑰 <code>SHIPPING_ENC_KEY</code>）；資料庫、備份、log 都沒有明文；營運讀取明文會寫稽核</td></tr>
-<tr><td>輸入防護</td><td>文字統一經 <code>validate::text</code>（去除零寬 / 控制字元）；圖片重新編碼去 EXIF / GPS；商品連結以 <code>rel="noopener nofollow"</code> 開啟</td></tr>
+<tr><td>輸入防護</td><td>文字欄位多數經 <code>validate::text</code>：拒絕控制字元（多行欄位保留換行 / Tab）與雙向覆寫字元；只剩空白 / 零寬字元者視為空字串，正常文字中夾雜的零寬字元不會被移除；並非所有文字欄位都經此函式；圖片重新編碼去 EXIF / GPS；商品連結以 <code>rel="noopener nofollow"</code> 開啟</td></tr>
 <tr><td>人機驗證</td><td>檢舉使用 Turnstile；production 必設 <code>TURNSTILE_SECRET</code></td></tr>
 <tr><td>IP 可信度</td><td><code>TRUSTED_PROXY=cloudflare</code> 時信任 <code>CF-Connecting-IP</code>，因此<b>API 只能經 Tunnel 到達</b>，否則該標頭可被偽造</td></tr>
 <tr><td>後台</td><td>staff 守衛、可選 TOTP、所有動作稽核、停權 / staff 變更 / 解除綁定須填原因；最後一位 staff 受保護</td></tr>
-<tr><td>原生殼</td><td><code>session_token</code> 只在請求 <code>Origin</code> 屬於 <code>NATIVE_ORIGINS</code> 時發出；權杖存 OS keychain；OAuth 碼 60 秒、單次、PKCE（S256）</td></tr>
+<tr><td>原生殼</td><td><code>session_token</code> 只在請求 <code>Origin</code> 屬於 <code>NATIVE_ORIGINS</code> 時發出；權杖桌面 / iOS 存 OS keychain，Android 無 keyring 後端，改存 App 私有目錄（權限 0600，僅靠 OS 沙箱保護，尚未用 Android Keystore 加密，root 或允許備份時可被取出）；OAuth 碼 60 秒、單次、PKCE（S256）</td></tr>
 <tr><td>Fail closed</td><td><code>APP_ENV</code> 未設即視為 production；缺機密、<code>TRUSTED_PROXY</code>、S3 / Turnstile / 加密金鑰設定即拒絕啟動</td></tr>
-<tr><td>個資</td><td>訪客聯絡方式只有建立者看得到；訪客可自行抹除；帳號刪除移除 Email 與名稱並取消待寄通知；匯出僅含本人資料。隱私與服務條款見 <code>/privacy</code>、<code>/terms</code></td></tr>
+<tr><td>個資</td><td>訪客聯絡方式不對其他訪客公開、進度頁也不顯示；訪客可自行抹除；帳號刪除移除 Email 與名稱並取消待寄通知；匯出僅含本人資料。隱私與服務條款見 <code>/privacy</code>、<code>/terms</code></td></tr>
 <tr><td>供應鏈</td><td>CI 跑 <code>cargo audit</code> 與 <code>npm audit</code>；前端對 <code>braces</code> / <code>node-forge</code> 套用本地安全補丁（<code>apps/web/patches</code>），原始 audit 仍會報警，由 issue #7 追蹤</td></tr>
 </table>
 
@@ -836,7 +835,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td><code>APP_ENV</code></td><td>必填 <code>production</code></td><td>未設即視為 production；本機務必設 <code>dev</code></td></tr>
 <tr><td><code>DATABASE_URL</code></td><td>必填</td><td></td></tr>
 <tr><td><code>BIND</code></td><td>容器內 <code>0.0.0.0:8080</code></td><td>預設 <code>127.0.0.1:8080</code>；非回送位址啟動會印 WARN，前提是只有 Tunnel / 內網可達</td></tr>
-<tr><td><code>APP_URL</code> / <code>API_BASE_URL</code></td><td>必填</td><td>前端 / API 正式網址；CORS 只允許 <code>APP_URL</code></td></tr>
+<tr><td><code>APP_URL</code> / <code>API_BASE_URL</code></td><td>必填</td><td>前端 / API 正式網址；CORS 允許 <code>APP_URL</code> 與明確設定的 <code>NATIVE_ORIGINS</code></td></tr>
 <tr><td><code>OTP_PEPPER</code>、<code>OAUTH_SECRET</code>、<code>UNSUB_SECRET</code></td><td>必填，各自獨立 ≥32 字元</td><td><code>openssl rand -hex 32</code>。更換 <code>UNSUB_SECRET</code> 會使既有退訂連結與密碼清單存取權杖失效</td></tr>
 <tr><td><code>CF_ACCOUNT_ID</code>、<code>CF_EMAIL_API_TOKEN</code>、<code>MAIL_FROM</code></td><td>必填</td><td>寄信；<code>MAIL_FROM</code> 網域須已驗證。dev 用 <code>SMTP_HOST</code> / <code>SMTP_PORT</code>（Mailpit）</td></tr>
 <tr><td><code>TRUSTED_PROXY</code></td><td>必填 <code>cloudflare</code></td><td>或 <code>none</code>；未設拒絕啟動</td></tr>
@@ -850,7 +849,7 @@ RETURNING qty_needed, qty_claimed;
 <h4>前端（建置時變數）</h4>
 <table>
 <tr><th>變數</th><th>說明</th></tr>
-<tr><td><code>NUXT_PUBLIC_API_BASE</code></td><td>API 網址；預設 <code>http://localhost:8080</code>（<code>npm run deploy</code> 預設 <code>https://api.wishly.tw</code>）</td></tr>
+<tr><td><code>NUXT_PUBLIC_API_BASE</code></td><td>API 網址；dev 預設 <code>http://localhost:8080</code>，所有 production build（不限 <code>npm run deploy</code>）預設 <code>https://api.wishly.tw</code></td></tr>
 <tr><td><code>NUXT_PUBLIC_TURNSTILE_SITE_KEY</code></td><td>檢舉用；<b>正式部署必填</b>，<code>npm run deploy</code> 缺少會中止</td></tr>
 <tr><td><code>NUXT_DEMO</code></td><td>僅 <code>deploy:demo</code> 設為 1，啟用 <code>/s/demo</code> 假資料；<b>勿給真實使用者</b></td></tr>
 <tr><td><code>NUXT_NATIVE</code>、<code>NUXT_PUBLIC_SITE_URL</code></td><td>原生殼建置（純 SPA）與分享連結網域</td></tr>
@@ -866,12 +865,12 @@ RETURNING qty_needed, qty_claimed;
 <li>確認 <code>/readyz</code>（<code>SELECT 1</code>，2 秒逾時）回 200；<code>/healthz</code> 不碰 DB。</li>
 <li>用好友帳號實際開一次好友限定清單，確認 CDN 隔離（見 11.3）。</li>
 </ol>
-<div class="box warn"><b class="t">換版行為</b>程式不處理 SIGTERM，收到終止訊號即結束，進行中的請求會被切斷；認領有 <code>Idempotency-Key</code>，客戶端重試可恢復。回滾時 migration 不會倒退，因此 migration 必須向前相容。</div>
+<div class="box warn"><b class="t">換版行為</b>程式不處理 SIGTERM，收到終止訊號即結束，進行中的請求會被切斷；捐助有 <code>Idempotency-Key</code>，客戶端重試可恢復。回滾時 migration 不會倒退，因此 migration 必須向前相容。</div>
 <h4>前端</h4>
 <pre><code>cd apps/web
 npm run deploy         # 正式：NUXT_DEMO 清空；分享連結走真實 API
 npm run deploy:demo    # 示範：只有 /s/demo 有假資料
-npm run build:native   # Tauri 前端：NUXT_NATIVE=1，純 SPA、無 SSR、隱藏第三方登入</code></pre>
+npm run build:native   # Tauri 前端：NUXT_NATIVE=1，純 SPA、無 SSR、無 service worker</code></pre>
 <p><b>部署順序</b>：先前端、再後端（前端讀 <code>/restricted</code> 得 404 時會退回舊路徑，所以前端可單獨先上）。新增創建者路由時，要把它加進 <code>nuxt.config.ts</code> 的 <code>routeRules</code>（<code>ssr: false</code>）清單。</p>
 <h4>臨時公開測試（本機後端 + 快速通道）</h4>
 <p>會把你電腦上的 API 經臨時網址公開，請用獨立資料庫與隨機機密，測完就關：<code>TRUSTED_PROXY=cloudflare</code>、<code>CDN_PURGE=off</code>、<code>APP_URL</code> 指向 Pages 預覽分支；<code>cloudflared tunnel --url http://127.0.0.1:8090</code>；前端 <code>NUXT_API_PROXY=… npm run deploy:preview</code>。快速通道<b>不支援 SSE</b>，即時更新會退回每 15 秒輪詢。</p>
@@ -897,9 +896,9 @@ node scripts/cdn-canary.mjs      # 失敗 exit 1</code></pre>
 <table>
 <tr><th>任務</th><th>頻率</th><th>內容</th></tr>
 <tr><td><code>notify::spawn_worker</code></td><td>每 5 秒</td><td>領取到期通知並寄出，失敗最多重試 3 次</td></tr>
-<tr><td><code>ratelimit::spawn_cleanup</code></td><td>每 5 分鐘</td><td>清理過期冪等鍵（&gt;24h）與限流計數（&gt;2 天）；同時執行 <code>claims::expire_due</code>（釋放逾期認領）、<code>wishlists::close_due</code>（結束到期清單，並清 CDN）、<code>wishlists::remind_closing</code>（結束前 24h 提醒）、<code>contributions::tick_funding</code>（眾籌截止與 7 天選擇期自動退點）</td></tr>
+<tr><td><code>ratelimit::spawn_cleanup</code></td><td>每 5 分鐘（清理每小時）</td><td>每 5 分鐘執行 <code>claims::expire_due</code>（釋放逾期捐助）、<code>wishlists::close_due</code>（結束到期清單，並清 CDN）、<code>wishlists::remind_closing</code>（結束前 24h 提醒）、<code>contributions::tick_funding</code>（眾籌截止與 7 天選擇期自動退點）</td></tr>
 </table>
-<div class="box warn"><b class="t">已知風險</b>任務迴圈若 panic 會靜默終止，而行程仍存活（<code>/healthz</code> 仍 200）。建議加上「逾期認領未釋放」告警，或讓行程在背景任務結束時退出由 Dokploy 重啟（檢查清單 §0.6）。擴充為多實例前須先確認各任務的冪等性（大多已用列鎖下重檢條件設計）。</div>
+<div class="box warn"><b class="t">已知風險</b>任務迴圈若 panic 會靜默終止，而行程仍存活（<code>/healthz</code> 仍 200）。建議加上「逾期捐助未釋放」告警，或讓行程在背景任務結束時退出由 Dokploy 重啟（檢查清單 §0.6）。擴充為多實例前須先確認各任務的冪等性（大多已用列鎖下重檢條件設計）。</div>
 
 <h3 id="keys">11.5 金鑰與備份</h3>
 <ul>
@@ -913,7 +912,7 @@ node scripts/cdn-canary.mjs      # 失敗 exit 1</code></pre>
 <h3 id="runbook">11.6 事件處理手冊</h3>
 <table>
 <tr><th>情境</th><th>處理</th></tr>
-<tr><td>需要止血 / 資料庫維運</td><td>後台「系統旗標」開啟 <code>read_only</code>（全站寫入回 503）。若後台本身進不去，直接在 DB 執行 <code>UPDATE system_flags SET value='true'::jsonb WHERE key='read_only';</code></td></tr>
+<tr><td>需要止血 / 資料庫維運</td><td>後台「系統旗標」開啟 <code>read_only</code>（除上述放行端點外，非安全方法回 503）。若後台本身進不去，直接在 DB 執行 <code>UPDATE system_flags SET value='true'::jsonb WHERE key='read_only';</code></td></tr>
 <tr><td>使用者回報被誤封</td><td>後台「使用者」→ 解除停權（需填原因）；使用者須重新登入</td></tr>
 <tr><td>使用者回報清單被下架</td><td>後台「清單搜尋」找到清單，確認原因；誤判則「恢復上架」</td></tr>
 <tr><td>staff 手機遺失（TOTP）</td><td>另一位 staff：後台「使用者」→「重設兩步驟驗證」。沒有其他 staff：<br><code>UPDATE users SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE id='&lt;uuid&gt;';</code></td></tr>
@@ -934,21 +933,24 @@ cargo test --manifest-path apps/api/Cargo.toml                      # 每個測�
 cargo test --manifest-path apps/api/Cargo.toml --test claims &lt;name&gt;  # 單一測試檔 / 單一測試
 scripts/cargo.sh test                                               # 沒裝 Rust 時用 Docker
 sh scripts/coverage-api.sh                                          # 覆蓋率（門檻 = 基準 − 0.5pp）
-scripts/mutate.sh --list | scripts/mutate.sh all                    # mutation
+scripts/mutate.sh --list                                            # 列出 mutant
+scripts/mutate.sh all                                               # 全部 mutation
 
 # 前端（apps/web）
 npm run typecheck &amp;&amp; npm run test:coverage &amp;&amp; npm run build      # CI 的 web job
 npx vitest run tests/errors.test.ts                                # 單一測試
-npm run e2e | e2e:ui | e2e:headed                                  # Playwright</code></pre>
+npm run e2e                                                         # Playwright 全部
+npm run e2e:ui                                                      # UI 模式
+npm run e2e:headed                                                  # 顯示瀏覽器</code></pre>
 <h3>12.2 CI（<code>.github/workflows/ci.yml</code>）</h3>
 <ul>
 <li><b>api</b>：Rust 1.99.0 的 fmt、clippy（warnings 視為錯誤）、測試、覆蓋率（cargo-llvm-cov 0.9.1，版本不符拒絕）、cargo-audit 0.22.2、<code>scripts/mutate.sh all</code>（上傳 receipts / patch / logs）。</li>
-<li><b>image</b>：驗證後端 Docker 映像可建置。 <b>web</b>：typecheck → 覆蓋率 → build。 <b>native</b>：原生殼建置。 <b>web-audit</b>：<code>npm run audit:security</code>，每週一重查，保留原始 exit code（上游修補前維持非 required）。 <b>e2e</b>：Playwright，失敗上傳報告與 trace。 <b>publish-image</b>：main 測試全綠後推 GHCR。</li>
+<li><b>image</b>：驗證後端 Docker 映像可建置。 <b>web</b>：typecheck → 覆蓋率 → build。 <b>native</b>：僅對 <code>src-tauri</code> 做 Rust fmt / clippy / 測試 / audit，<b>不含</b>完整原生打包。 <b>web-audit</b>：<code>npm run audit:security</code>，每週一重查，保留原始 exit code（上游修補前維持非 required）。 <b>e2e</b>：Playwright，失敗上傳報告與 trace。 <b>publish-image</b>：main 的 api / image / web / e2e 全綠後推 GHCR（<b>不要求 native 成功</b>）。</li>
 </ul>
 <h3>12.3 守則（改動前必讀）</h3>
 <ul>
 <li><b>併發防護的回歸測試</b>：改動鎖序或併發相關 SQL（<code>FOR UPDATE</code> / <code>FOR SHARE</code>、<code>ON CONFLICT</code>）時，須在 <code>scripts/mutate.py</code> 補對應 mutant，並確認 <code>scripts/mutate.sh all</code> 全數 killed（還原後 SHA 一致）。輸出在 <code>apps/api/target/mutations/</code>，勿與相同 SQLx test path 的一般測試併跑。</li>
-<li><b>鎖序不可顛倒</b>：認領 <code>wishlist_items → claims</code>；點數 <code>wishlists(FOR SHARE) → point_wallets(依 id) → wishlist_items → contributions</code>。</li>
+<li><b>鎖序不可顛倒</b>：捐助 <code>wishlist_items → claims</code>；點數 <code>wishlists(FOR SHARE) → point_wallets(依 id) → wishlist_items → contributions</code>。</li>
 <li><b>餘額只經 <code>points::post</code></b>；帳本只增不改。</li>
 <li><b>受限內容不得進可快取路徑</b>：<code>GET /public/wishlists/{slug}</code> 不可讀 cookie / <code>X-List-Access</code>。清單不再可公開提供時呼叫 <code>cdn::purge_wishlists</code>。</li>
 <li>新增後端模組：只改 <code>lib.rs</code> 合併 <code>routes()</code>；錯誤統一走 <code>error.rs</code> 的 problem+json。</li>
@@ -970,7 +972,7 @@ npm run e2e | e2e:ui | e2e:headed                                  # Playwright<
 <li>Tauri 專案在 <code>apps/web/src-tauri</code>，建置細節見其 README。</li>
 </ul>
 <h3>12.6 前端主題</h3>
-<p>「紅白實驗室」：白底、紅 <code>#c8102e</code>、直角、警示斜紋進度條；token 在 <code>assets/tokens.css</code>，訪客端樣式前綴 <code>g-</code>、創建者端 <code>c-</code>。支援深色模式（跟隨系統，可手動切換）。</p>
+<p>「紅白實驗室」：白底、紅 <code>#c8102e</code>、直角、警示斜紋進度條；token 在 <code>assets/tokens.css</code>，訪客端樣式前綴 <code>g-</code>、創建者端 <code>c-</code>。支援深色模式：三態 auto（跟隨系統）/ light / dark，可手動切換；<b>未選擇過時預設為淺色</b>。</p>
 
 <!-- ========================================================= 13 -->
 <h2 id="faq">13. 疑難排解</h2>
@@ -981,9 +983,9 @@ npm run e2e | e2e:ui | e2e:headed                                  # Playwright<
 <tr><td>朋友看到「請先登入」/「無權限」</td><td>可見性是 friends / selected：對方須登入且為好友 / 在名單內。改成 link 或 public 即可</td></tr>
 <tr><td>發佈失敗</td><td>看紅字列出的缺漏：至少 1 個品項、含眾籌要收件資訊、驚喜模式活動日要在今日之後</td></tr>
 <tr><td>儲存時顯示「已在其他地方被修改」</td><td>你在別的分頁 / 裝置改過，按「重新載入」</td></tr>
-<tr><td>無法調降數量 / 刪除品項</td><td>數量不得低於已認領量；驚喜鎖定期間不能刪除或調降</td></tr>
+<tr><td>無法調降數量 / 刪除品項</td><td>數量不得低於已捐助量；驚喜鎖定期間不能刪除或調降</td></tr>
 <tr><td>圖片一直「處理中」</td><td>後端正在去 EXIF 與重新編碼，頁面每 4 秒自動重查；若變「未通過」請換 jpg / png / webp 且 5 MB 內</td></tr>
-<tr><td>沒收到認領通知</td><td>認領通知預設只在第一筆即時，之後為每日 09:00 彙整；檢查設定頁通知開關與 Email 是否已綁定、垃圾信匣</td></tr>
+<tr><td>沒收到捐助通知</td><td>捐助通知預設只在第一筆即時，之後為每日 09:00 彙整；檢查設定頁通知開關與 Email 是否已綁定、垃圾信匣</td></tr>
 <tr><td>收到驗證碼信很慢或沒收到</td><td>同 Email 60 秒內不能重寄；每小時最多 5 封</td></tr>
 <tr><td>無法解除某登入方式</td><td>必須至少保留一種；先綁另一種</td></tr>
 <tr><td>無法刪除帳號</td><td>仍有進行中的認捐或點數餘額，先到「我的點數」撤回</td></tr>
@@ -992,14 +994,14 @@ npm run e2e | e2e:ui | e2e:headed                                  # Playwright<
 <h3>訪客 / 贊助者</h3>
 <table>
 <tr><th>症狀</th><th>可能原因 / 解法</th></tr>
-<tr><td>「抱歉，只剩 N 個了」</td><td>別人剛認領；調低數量或選別項</td></tr>
-<tr><td>「你已經認領過這個品項」</td><td>同一品項只能一筆有效認領；已為你切換到「修改」</td></tr>
-<tr><td>找不到之前的認領</td><td>換了瀏覽器或在 LINE 內建瀏覽器；用確認信中的「管理我的認領」連結（一次性、30 天）。沒填 Email 就無法找回</td></tr>
-<tr><td>認領後顯示無法保存身分</td><td>瀏覽器停用儲存；請截圖保存，並改用預設瀏覽器</td></tr>
+<tr><td>「抱歉，只剩 N 個了」</td><td>別人剛捐助；調低數量或選別項</td></tr>
+<tr><td>「你已經捐助過這個品項」</td><td>同一品項只能一筆有效捐助；已為你切換到「修改」</td></tr>
+<tr><td>找不到之前的捐助</td><td>換了瀏覽器或在 LINE 內建瀏覽器；用確認信中的「管理我的捐助」連結（一次性、30 天）。沒填 Email 就無法找回</td></tr>
+<tr><td>捐助後顯示無法保存身分</td><td>瀏覽器停用儲存；請截圖保存，並改用預設瀏覽器</td></tr>
 <tr><td>無法贊助：餘額不足</td><td>點數目前由平台發放，請聯絡客服</td></tr>
 <tr><td>無法贊助：錢包凍結</td><td>聯絡客服</td></tr>
 <tr><td>無法撤回認捐</td><td>品項已達標（captured）或過了截止後 7 天選擇期</td></tr>
-<tr><td>頁面顯示離線</td><td>網路中斷；恢復後自動重連。認領功能在離線時暫停</td></tr>
+<tr><td>頁面顯示離線</td><td>網路中斷；恢復後自動重連。捐助功能在離線時暫停</td></tr>
 <tr><td>即時更新沒動</td><td>SSE 連續失敗 2 次會自動改每 15 秒輪詢；重新整理即可</td></tr>
 </table>
 <h3>開發者</h3>
@@ -1022,7 +1024,7 @@ npm run e2e | e2e:ui | e2e:headed                                  # Playwright<
 <tr><th>路由</th><th>對象</th><th>渲染</th><th>說明</th></tr>
 <tr><td><code>/</code></td><td>所有人</td><td>SSR</td><td>首頁 landing</td></tr>
 <tr><td><code>/s/{slug}</code></td><td>訪客 / 全部</td><td><b>SSR</b></td><td>分享頁（OG 預覽）</td></tr>
-<tr><td><code>/me/claims</code></td><td>訪客 / 使用者</td><td>SPA</td><td>我的認領</td></tr>
+<tr><td><code>/me/claims</code></td><td>訪客 / 使用者</td><td>SPA</td><td>我的捐助</td></tr>
 <tr><td><code>/login</code> <code>/register</code> <code>/forgot-password</code></td><td>創建者</td><td>SPA</td><td>驗證</td></tr>
 <tr><td><code>/dashboard</code> <code>/lists/new</code> <code>/lists/{id}/edit</code> <code>/lists/{id}/progress</code></td><td>創建者</td><td>SPA</td><td>清單管理</td></tr>
 <tr><td><code>/me/wallet</code> <code>/friends</code> <code>/invite/{token}</code> <code>/u/{handle}</code> <code>/settings</code></td><td>使用者</td><td>SPA</td><td>錢包、社交、設定</td></tr>
@@ -1053,14 +1055,14 @@ npm run e2e | e2e:ui | e2e:headed                                  # Playwright<
 <h3>14.3 已知限制與規劃中事項</h3>
 <ul>
 <li>點數無儲值管道（僅營運發放）；自動儲值、禮物卡、回饋星星、企業禮券、目錄商品自動下單、relief 救災、LINE Messaging API 通知皆未實作。</li>
-<li>訪客登入後，其先前 guest 認領<b>不會合併</b>到使用者帳號（契約待決問題）。</li>
+<li>訪客登入後，其先前 guest 捐助<b>不會合併</b>到使用者帳號（契約待決問題）。</li>
 <li>兩個既有帳號不會因綁定而合併資料。</li>
 <li>驚喜模式對建立者本人為前端軟性遮罩（契約 D4）。</li>
 <li>單機單實例；背景任務 panic 會靜默停止；無 SIGTERM 優雅關閉。</li>
 <li><code>SHIPPING_ENC_KEY</code> 無輪替機制。</li>
 <li>Spike S1–S3 尚無真機結案證據（上線阻擋）；點數法規審閱未完成。</li>
 <li>活動日與眾籌截止固定以 Asia/Taipei 計算，無 per-wishlist 時區。</li>
-<li>創建者介面未提供「認領保留時數」設定。</li>
+<li>創建者介面未提供「捐助保留時數」設定。</li>
 </ul>
 <h3>14.4 相關文件</h3>
 <table>

@@ -33,15 +33,15 @@ await step('S1', async () => {
   await page.mouse.click(195, 60); await page.waitForTimeout(300)
   L('S1.backdrop-click', { sheetOpen: await page.locator('.g-sheet').isVisible().catch(() => false) })
   // 成功畫面後 reload / back
-  await openCard(page, '品項一'); await page.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('歷史哥'); await page.getByRole('button', { name: '確認認領' }).click()
-  await page.getByRole('heading', { name: '✓ 認領成功！' }).waitFor()
+  await openCard(page, '品項一'); await page.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('歷史哥'); await page.getByRole('button', { name: '確認捐助' }).click()
+  await page.getByRole('heading', { name: '✓ 捐助成功！' }).waitFor()
   const succFocus = await page.evaluate(() => document.activeElement?.tagName)
   let succEsc = 0; for (let i = 0; i < 6; i++) { await page.keyboard.press('Tab'); if (!(await page.evaluate(() => !!document.activeElement?.closest('[role=dialog]')))) succEsc++ }
   await page.keyboard.press('Escape'); await page.waitForTimeout(300)
-  L('S1.success-overlay-a11y', { focusOnOpen: succFocus, tabsOutside: succEsc, of: 6, stillOpenAfterEsc: await page.getByRole('heading', { name: '✓ 認領成功！' }).isVisible() })
+  L('S1.success-overlay-a11y', { focusOnOpen: succFocus, tabsOutside: succEsc, of: 6, stillOpenAfterEsc: await page.getByRole('heading', { name: '✓ 捐助成功！' }).isVisible() })
   await page.goBack(); await page.waitForTimeout(500); L('S1.back-from-success', { url: page.url().replace(WEB, '') })
   await page.goForward(); await page.waitForTimeout(800)
-  await page.reload({ waitUntil: 'networkidle' }); L('S1.reload-after-success', { mineShown: await page.getByText('你已認領 1 件').isVisible() })
+  await page.reload({ waitUntil: 'networkidle' }); L('S1.reload-after-success', { mineShown: await page.getByText('你已捐助 1 件').isVisible() })
   L('S1.console', { sink: sink.filter(s => !/401/.test(s.text)).slice(0, 5) })
   await ctx.close()
 })
@@ -117,8 +117,8 @@ await step('S4', async () => {
     if (kind === 'hidden') await S.api.patch(`admin/wishlists/${T.id}/moderation`, { data: { moderation_status: 'hidden', reason: 'q' } })
     if (kind === 'itemdeleted') await U.api.delete(`items/${T.items[0].id}`)
     await page.waitForTimeout(kind === 'closed' ? 1500 : 500)
-    await d.getByRole('button', { name: '確認認領' }).click(); await page.waitForTimeout(1200)
-    const msg = await d.locator('.g-banner.err').innerText().catch(() => '(none)'); const succ = await page.getByRole('heading', { name: '✓ 認領成功！' }).isVisible()
+    await d.getByRole('button', { name: '確認捐助' }).click(); await page.waitForTimeout(1200)
+    const msg = await d.locator('.g-banner.err').innerText().catch(() => '(none)'); const succ = await page.getByRole('heading', { name: '✓ 捐助成功！' }).isVisible()
     await page.screenshot({ path: `${OUT}/shots/s4__${kind}-claim.png` })
     // 重新整理後
     await page.reload({ waitUntil: 'networkidle' }).catch(() => {})
@@ -178,7 +178,7 @@ await step('S6', async () => {
   // 驚喜期間：擁有者改數量/刪除
   const del = await U.api.delete(`items/${T.items[0].id}`); out.deleteWhileLocked = del.status()
   const dn = await U.api.patch(`items/${T.items[0].id}`, { data: { qty_needed: 1 } }); out.shrinkWhileLocked = dn.status()
-  // 擁有者以 API 取消他人認領（鎖定中應 403）
+  // 擁有者以 API 取消他人捐助（鎖定中應 403）
   const oc = await U.api.delete(`claims/${g.claimId}`); out.ownerCancelWhileLocked = oc.status()
   // 把 event_date 改成昨天（模擬活動日已過）
   sql(`update wishlists set event_date = (now() at time zone 'Asia/Taipei')::date - 1 where id='${T.id}'`)
@@ -205,18 +205,18 @@ await step('S8', async () => {
   const email = `s8-${uid()}@example.com`
   const ctx = await newCtx(browser); const page = await ctx.newPage()
   await page.goto(`/s/${T.slug}`, { waitUntil: 'networkidle' }); await openCard(page, '甲'); const d = page.getByRole('dialog')
-  await d.getByLabel('你的暱稱（必填）').fill('搬家哥'); await d.getByLabel(/^Email/).fill(email); await page.getByRole('button', { name: '確認認領' }).click(); await page.getByRole('heading', { name: '✓ 認領成功！' }).waitFor()
+  await d.getByLabel('你的暱稱（必填）').fill('搬家哥'); await d.getByLabel(/^Email/).fill(email); await page.getByRole('button', { name: '確認捐助' }).click(); await page.getByRole('heading', { name: '✓ 捐助成功！' }).waitFor()
   const doneText = await page.locator('.g-sheet').innerText()
   await page.getByRole('button', { name: '回到清單繼續看' }).click()
-  const mail = await waitForMail(email, { subject: /認領已確認/ }); const link = mail.text.match(/https?:\/\/\S+\/me\/claims#r=\S+/)?.[0]
+  const mail = await waitForMail(email, { subject: /捐助已確認/ }); const link = mail.text.match(/https?:\/\/\S+\/me\/claims#r=\S+/)?.[0]
   const out = { confirmMail: !!link, doneBanner: doneText.slice(0, 160).replace(/\n/g, '|') }
   // 清除 localStorage + cookie
   await ctx.clearCookies(); await page.evaluate(() => { localStorage.clear(); sessionStorage.clear() }); await page.reload({ waitUntil: 'networkidle' })
-  out.afterClear_mineShown = await page.getByText('你已認領').isVisible().catch(() => false)
+  out.afterClear_mineShown = await page.getByText('你已捐助').isVisible().catch(() => false)
   out.afterClear_buttonOnClaimedItem = await page.locator('li.g-card', { hasText: '甲' }).locator('button').first().innerText()
-  // 可再次認領同一品項（新 guest）
-  await openCard(page, '甲'); await page.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('搬家哥二號'); await page.getByRole('button', { name: '確認認領' }).click(); await page.waitForTimeout(1200)
-  out.duplicateClaimAfterClear = await page.getByRole('heading', { name: '✓ 認領成功！' }).isVisible(); out.claimsOnItemA = sql(`select count(*) from claims where item_id='${T.items[0].id}' and status='reserved'`)
+  // 可再次捐助同一品項（新 guest）
+  await openCard(page, '甲'); await page.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('搬家哥二號'); await page.getByRole('button', { name: '確認捐助' }).click(); await page.waitForTimeout(1200)
+  out.duplicateClaimAfterClear = await page.getByRole('heading', { name: '✓ 捐助成功！' }).isVisible(); out.claimsOnItemA = sql(`select count(*) from claims where item_id='${T.items[0].id}' and status='reserved'`)
   // 恢復連結
   const ctx2 = await newCtx(browser); const p2 = await ctx2.newPage()
   await p2.goto(link.replace(/^https?:\/\/[^/]+/, WEB), { waitUntil: 'networkidle' }); await p2.waitForTimeout(800)
@@ -228,7 +228,7 @@ await step('S8', async () => {
   const ctx3 = await newCtx(browser); const p3 = await ctx3.newPage(); await p3.addInitScript(t => localStorage.setItem('ws_guest_token', t), g.token)
   await p3.goto(`/s/${T.slug}`, { waitUntil: 'networkidle' }); await openCard(p3, '乙'); const d3 = p3.getByRole('dialog')
   out.staleToken_nameFieldShown = await d3.getByLabel('你的暱稱（必填）').isVisible().catch(() => false)
-  await d3.getByRole('button', { name: '確認認領' }).click(); await p3.waitForTimeout(1000)
+  await d3.getByRole('button', { name: '確認捐助' }).click(); await p3.waitForTimeout(1000)
   out.staleToken_msg = await d3.locator('.g-banner.err').innerText().catch(() => '(none)'); await p3.screenshot({ path: OUT + '/shots/s8__stale-token.png' })
   L('S8', out); await ctx.close(); await ctx2.close(); await ctx3.close()
 })

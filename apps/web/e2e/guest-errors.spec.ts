@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 import { createList, registerUser } from './helpers'
 import { hydrated } from './support/hydrate'
 
-// F-05 / F-01 防呆 / F-10：訪客認領的錯誤處理（瀏覽器端請求用 page.route 注入錯誤；SSR 仍打真實 API）
+// F-05 / F-01 防呆 / F-10：訪客捐助的錯誤處理（瀏覽器端請求用 page.route 注入錯誤；SSR 仍打真實 API）
 const CLAIMS = '**/api/v1/items/*/claims'
 const TOKEN_KEY = 'ws_guest_token'
 const ls = (page: Page) => page.evaluate(k => localStorage.getItem(k), TOKEN_KEY)
@@ -22,7 +22,7 @@ async function open(page: Page, staleToken = false) {
   await page.getByRole('button', { name: '我要送' }).click()
   await page.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('阿明')
 }
-const submit = (page: Page) => page.getByRole('button', { name: '確認認領' }).click()
+const submit = (page: Page) => page.getByRole('button', { name: '確認捐助' }).click()
 const json = (route: Route, status: number, body: object) => route.fulfill({
   status, contentType: 'application/json', body: JSON.stringify(body),
   headers: { 'access-control-allow-origin': route.request().headers().origin ?? '*', 'access-control-allow-credentials': 'true' },
@@ -38,7 +38,7 @@ test('失效的 guest token：401 → 清掉 token、以新訪客自動重試一
   })
   await open(page, true)
   await submit(page)
-  await expect(page.getByRole('heading', { name: '✓ 認領成功！' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
   expect(seen).toHaveLength(2)
   expect(seen[0]).toBe('stale-token-value')
   expect(seen[1]).toBeUndefined()
@@ -80,7 +80,7 @@ test('201 但沒有 guest_token 且本機沒有 token：成功頁顯示警告，
   })
   await open(page)
   await submit(page)
-  const ok = page.getByRole('dialog', { name: '✓ 認領成功！' })
+  const ok = page.getByRole('dialog', { name: '✓ 捐助成功！' })
   await expect(ok).toContainText('沒有保存到身分')
   await expect(ok).not.toContainText('已存在此裝置')
 })

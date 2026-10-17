@@ -60,7 +60,7 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-/// 每 5 分鐘釋放逾期認領；每 12 個 tick（1 小時）清除過期資料
+/// 每 5 分鐘釋放逾期捐助；每 12 個 tick（1 小時）清除過期資料
 pub fn spawn_cleanup(pool: PgPool) {
     tokio::spawn(async move {
         let mut t = tokio::time::interval(std::time::Duration::from_secs(300));

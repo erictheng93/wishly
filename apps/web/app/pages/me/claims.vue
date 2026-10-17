@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-useSeoMeta({ title: '我的認領', robots: 'noindex' })
+useSeoMeta({ title: '我的捐助', robots: 'noindex' })
 const { api } = useGuest()
 const state = ref<'loading' | 'ok' | 'empty' | 'error'>('loading')
 const guest = ref<any>(null), rows = ref<any[]>([]), recoverFailed = ref(false), msg = ref('')
 const editing = ref(false), nick = ref('')
-const label: Record<string, string> = { reserved: '已認領', purchased: '已購買', delivered: '已送達', cancelled: '已取消', expired: '已逾期' }
+const label: Record<string, string> = { reserved: '已捐助', purchased: '已購買', delivered: '已送達', cancelled: '已取消', expired: '已逾期' }
 const active = computed(() => rows.value.filter(r => ['reserved', 'purchased', 'delivered'].includes(r.claim.status)))
 const past = computed(() => rows.value.filter(r => !active.value.includes(r)))
 const groups = computed(() => {
@@ -36,13 +36,13 @@ onMounted(async () => {
 const guard = async (f: () => Promise<any>) => { msg.value = ''; try { await f() } catch (e: any) { msg.value = e.detail } }
 const setStatus = (r: any, status: string) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { status } })).claim) })
 const cancel = (r: any) => {
-  const t = r.claim.status === 'purchased' ? '建立者會收到通知，確定要取消認領？' : '確定要取消這筆認領？'
+  const t = r.claim.status === 'purchased' ? '建立者會收到通知，確定要取消捐助？' : '確定要取消這筆捐助？'
   if (confirm(t)) guard(async () => { await api(`/claims/${r.claim.id}`, { method: 'DELETE' }); r.claim.status = 'cancelled' })
 }
 const setVis = (r: any, ev: Event) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { visibility: (ev.target as HTMLSelectElement).value } })).claim) })
 const saveNick = () => guard(async () => { guest.value = (await api('/guest/me', { method: 'PATCH', body: { display_name: nick.value } })).guest; editing.value = false })
 const wipe = () => {
-  if (confirm('確定刪除你的暱稱與聯絡方式？認領紀錄會保留為「已刪除的訪客」，且此裝置之後無法再管理。')) guard(async () => {
+  if (confirm('確定刪除你的暱稱與聯絡方式？捐助紀錄會保留為「已刪除的訪客」，且此裝置之後無法再管理。')) guard(async () => {
     await api('/guest/me', { method: 'DELETE' }); setGuestToken(null); guest.value = null; rows.value = []; state.value = 'empty'
   })
 }
@@ -51,14 +51,14 @@ const wipe = () => {
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <h1>我的認領</h1>
+    <h1>我的捐助</h1>
     <div v-if="recoverFailed" class="g-banner err" role="alert">這個管理連結已失效（只能使用一次，且 30 天內有效）。請回到朋友分享的清單連結，或聯絡客服。</div>
     <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
     <p v-if="state === 'loading'" class="g-mute">載入中…</p>
     <div v-else-if="state === 'error'" class="g-center"><p>讀取失敗</p><button class="g-btn" @click="load">重試</button></div>
     <div v-else-if="state === 'empty'" class="g-center">
-      <p>你還沒有認領任何東西。收到朋友的清單連結後，就能在這裡管理。</p>
-      <p class="g-mute">看不到之前的認領？可能是在不同瀏覽器或 LINE 內建瀏覽器。留過 Email 的認領，可從確認信的「管理我的認領」連結回來。</p>
+      <p>你還沒有捐助任何東西。收到朋友的清單連結後，就能在這裡管理。</p>
+      <p class="g-mute">看不到之前的捐助？可能是在不同瀏覽器或 LINE 內建瀏覽器。留過 Email 的捐助，可從確認信的「管理我的捐助」連結回來。</p>
     </div>
     <template v-else>
       <div class="g-card" v-if="guest">

@@ -76,7 +76,7 @@ async fn claim_mail_per_email_limit_still_creates_claim(pool: PgPool) {
         assert_eq!(
             claim(&a, *it, "victim@example.com", &format!("10.0.0.{n}")).await,
             StatusCode::CREATED
-        ); // 認領本身都成功
+        ); // 捐助本身都成功
     }
     assert_eq!(mails(&pool).await, 3); // 同 email 每小時只寄 3 封
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM claims")

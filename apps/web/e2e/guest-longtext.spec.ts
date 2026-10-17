@@ -30,7 +30,7 @@ test.describe('無 JavaScript', () => {
   test.use({ javaScriptEnabled: false })
   test('內容可看、顯示說明、「我要送」不顯示', async ({ page }) => {
     await page.goto(`/s/${slug}`)
-    await expect(page.getByText('需要 JavaScript 才能認領；你仍可查看清單內容')).toBeVisible()
+    await expect(page.getByText('需要 JavaScript 才能捐助；你仍可查看清單內容')).toBeVisible()
     await expect(page.getByRole('button', { name: '我要送' })).toBeHidden()
     await expect(page.getByRole('heading', { level: 1 })).toContainText(W(20))
   })
@@ -40,5 +40,5 @@ test('有 JS 時不顯示無 JS 說明', async ({ page }) => {
   await page.goto(`/s/${slug}`)
   await hydrated(page)
   await expect(page.getByRole('button', { name: '我要送' })).toBeVisible()
-  await expect(page.getByText('需要 JavaScript 才能認領')).toBeHidden()
+  await expect(page.getByText('需要 JavaScript 才能捐助')).toBeHidden()
 })

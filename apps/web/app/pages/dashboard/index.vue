@@ -61,6 +61,6 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
     </div>
     <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">載入更多</button>
     <NuxtLink v-if="visible.length" to="/lists/new" class="c-btn primary c-fab">＋ 新建</NuxtLink>
-    <CreatorConfirm :open="!!del" title="封存清單" :text="`封存「${del?.title}」後，公開頁會立即失效，朋友無法再開啟（既有認領仍保留）。`" ok="確認封存" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
+    <CreatorConfirm :open="!!del" title="封存清單" :text="`封存「${del?.title}」後，公開頁會立即失效，朋友無法再開啟（既有捐助仍保留）。`" ok="確認封存" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
   </main>
 </template>

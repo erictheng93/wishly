@@ -1,4 +1,4 @@
-//! 共用 fixture 的選項、輸送介面與認領狀態定義。
+//! 共用 fixture 的選項、輸送介面與捐助狀態定義。
 mod common;
 use axum::{http::HeaderMap, routing::post, Json, Router};
 use common::*;

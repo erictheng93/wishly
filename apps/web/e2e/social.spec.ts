@@ -22,7 +22,7 @@ async function listWith(owner: User, visibility: string, extra: Record<string, u
   return l
 }
 const claimApi = async (u: User, itemId: string, visibility: string) =>
-  ok(await u.api.post(`items/${itemId}/claims`, { data: { qty: 1, visibility }, headers: { 'Idempotency-Key': crypto.randomUUID() } }), '認領')
+  ok(await u.api.post(`items/${itemId}/claims`, { data: { qty: 1, visibility }, headers: { 'Idempotency-Key': crypto.randomUUID() } }), '捐助')
 async function pageFor(browser: Browser, u?: User): Promise<Page> {
   const ctx = await browser.newContext()
   if (u) await loginBrowser(ctx, u)
@@ -74,7 +74,7 @@ test('好友：邀請連結 + QR → 未登入開連結帶 redirect → 登入�
   await closeAll([a, b, c])
 })
 
-test('僅好友清單：匿名請先登入、非好友被擋並可前往個人頁、好友可看並認領（可見度預設帶帳號設定）', async ({ browser }) => {
+test('僅好友清單：匿名請先登入、非好友被擋並可前往個人頁、好友可看並捐助（可見度預設帶帳號設定）', async ({ browser }) => {
   const owner = await withHandle('fo'), friend = await registerUser({ tag: 'ff' }), stranger = await registerUser({ tag: 'fs' })
   await befriend(owner, friend)
   await ok(await friend.api.patch('me', { data: { default_claim_visibility: 'friends' } }), '帳號預設可見度')
@@ -97,12 +97,12 @@ test('僅好友清單：匿名請先登入、非好友被擋並可前往個人�
   await pf.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
   const sheet = pf.getByRole('dialog')
   await expect(sheet.getByLabel('這筆捐助誰看得到')).toHaveValue('friends') // 帳號預設
-  await sheet.getByRole('button', { name: '確認認領' }).click()
-  await expect(pf.getByRole('heading', { name: '✓ 認領成功！' })).toBeVisible()
+  await sheet.getByRole('button', { name: '確認捐助' }).click()
+  await expect(pf.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
   await closeAll([owner, friend, stranger])
 })
 
-test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變清單名）→ 訪客認領', async ({ browser }) => {
+test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變清單名）→ 訪客捐助', async ({ browser }) => {
   const owner = await registerUser({ tag: 'po' })
   const list = await listWith(owner, 'password', { access_password: 'open-sesame-1' })
   const p = await pageFor(browser)
@@ -122,8 +122,8 @@ test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變�
 
   await p.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
   await p.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('密碼訪客')
-  await p.getByRole('dialog').getByRole('button', { name: '確認認領' }).click()
-  await expect(p.getByRole('heading', { name: '✓ 認領成功！' })).toBeVisible()
+  await p.getByRole('dialog').getByRole('button', { name: '確認捐助' }).click()
+  await expect(p.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
   await closeAll([owner])
 })
 

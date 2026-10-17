@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-// 「用點數贊助」bottom sheet（契約 POST /items/{id}/contributions）。需要登入；Idempotency-Key 於開啟時產生，
+// 「心願眾籌」bottom sheet（契約 POST /items/{id}/contributions）。需要登入；Idempotency-Key 於開啟時產生，
 // 確定性失敗後換新 key（body 可能已改），網路失敗才沿用同一把重試。
 const props = defineProps<{ item: any, online: boolean, slug: string, loggedInName?: string }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [] }>()
@@ -51,7 +51,7 @@ async function submit() {
     <form class="g-sheet" @submit.prevent="submit">
       <div class="g-item">
         <img v-if="item.image_url" class="g-thumb" :src="item.image_url" alt="">
-        <div class="g-body"><div id="fund-title" class="g-title">用點數贊助「{{ item.title }}」</div>
+        <div class="g-body"><div id="fund-title" class="g-title">心願眾籌「{{ item.title }}」</div>
           <div class="g-mute">還差 {{ fmtPts(remaining) }} 點達標<template v-if="item.funding_deadline">・募集至 {{ fmtTime(item.funding_deadline) }}</template></div></div>
       </div>
       <p class="g-mute">以 {{ loggedInName || '你的帳號' }} 的身分贊助。<template v-if="balance != null">目前餘額 <b class="g-num">{{ fmtPts(balance) }}</b> 點。</template>達標前可在「我的點數」撤回。</p>

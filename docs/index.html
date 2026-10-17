@@ -41,13 +41,13 @@ th{background:var(--code-bg)}
 <table>
 <tr><th>項目</th><th>約定</th></tr>
 <tr><td>清單類型</td><td>personal（生日）· registry（孕婦／婚禮）· relief（救災，Phase 2）</td></tr>
-<tr><td>品項模式</td><td>quantity（數量認領，送禮者自行購買）· crowdfund（點數眾籌，Phase 2）</td></tr>
+<tr><td>品項模式</td><td>quantity（數量捐助，送禮者自行購買）· crowdfund（心願眾籌，Phase 2）</td></tr>
 <tr><td>點數</td><td>1 點 = NT$1，只能投入心願品項，任何人都無法提領給受捐者；達標後由平台自動下單（目錄商品）或人工代購</td></tr>
 <tr><td>點數來源</td><td>儲值（可退現金）· 禮物卡兌換（不可退現金）· 星星兌換的贊助點數（90 天到期）；認捐扣點順序：贊助 → 禮物卡 → 儲值</td></tr>
-<tr><td>認領狀態</td><td>reserved → purchased → delivered；cancelled／expired</td></tr>
+<tr><td>捐助狀態</td><td>reserved → purchased → delivered；cancelled／expired</td></tr>
 <tr><td>認捐狀態</td><td>pledged → captured（達標下單）；released（退回錢包）／reallocated（轉投其他品項）</td></tr>
 <tr><td>品項募集狀態</td><td>open → funded → fulfilled；expired（截止未達標）</td></tr>
-<tr><td>分期</td><td>P0 MVP（personal + registry 數量認領）· P1（連結預覽、通知、換裝置找回）· P2-A 錢包＋眾籌＋自動儲值 · P2-B 禮物卡＋回饋星星 · P2-C 企業禮券 · P2-D 救災</td></tr>
+<tr><td>分期</td><td>P0 MVP（personal + registry 數量捐助）· P1（連結預覽、通知、換裝置找回）· P2-A 錢包＋眾籌＋自動儲值 · P2-B 禮物卡＋回饋星星 · P2-C 企業禮券 · P2-D 救災</td></tr>
 <tr><td>清單可見性</td><td>public · link（預設）· friends · selected · password · private；公開路徑 <code>/public/…</code> 可被 CDN 快取、不讀 cookie，受限內容走 <code>/restricted/…</code>（no-store）</td></tr>
 <tr><td>前端路由</td><td>以實作為準：/lists/new、/lists/{id}/edit、/lists/{id}/progress、/settings、/me/wallet（對照表見 03 的 5.37）</td></tr>
 <tr><td>API</td><td><code>https://api.wishly.tw/api/v1</code>，錯誤格式 RFC 9457 problem+json，建立類 POST 必須帶 Idempotency-Key</td></tr>

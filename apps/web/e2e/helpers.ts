@@ -98,11 +98,11 @@ export async function uiLogin(page: Page, email: string, password: string) {
 }
 
 // ---------- 訪客 ----------
-/** 以 API 作為新訪客認領；回傳 guest token 與 claim */
+/** 以 API 作為新訪客捐助；回傳 guest token 與 claim */
 export async function guestClaim(itemId: string, qty = 1, name = `訪客${uid().slice(0, 4)}`) {
   const api = await pwRequest.newContext({ baseURL: API + '/api/v1/' })
   try {
-    const r = await must(await api.post(`items/${itemId}/claims`, { data: { qty, display_name: name }, headers: { 'Idempotency-Key': crypto.randomUUID() } }), '訪客認領')
+    const r = await must(await api.post(`items/${itemId}/claims`, { data: { qty, display_name: name }, headers: { 'Idempotency-Key': crypto.randomUUID() } }), '訪客捐助')
     return await r.json()
   } finally { await api.dispose() }
 }
@@ -119,12 +119,12 @@ export function watchProblems(page: Page, ignore: RegExp[] = []) {
   return problems
 }
 
-/** 透過 UI 認領品項（未登入訪客）。回傳後停在成功畫面 */
+/** 透過 UI 捐助品項（未登入訪客）。回傳後停在成功畫面 */
 export async function claimViaUi(page: Page, itemTitle: string, name: string, qty = 1) {
   const sheet = page.getByRole('dialog')
   await page.locator('li.g-card', { hasText: itemTitle }).getByRole('button', { name: '我要送' }).click()
   await sheet.getByLabel('你的暱稱（必填）').fill(name)
   for (let i = 1; i < qty; i++) await sheet.getByRole('button', { name: '增加' }).click()
-  await sheet.getByRole('button', { name: '確認認領' }).click()
-  await expect(page.getByRole('heading', { name: '✓ 認領成功！' })).toBeVisible()
+  await sheet.getByRole('button', { name: '確認捐助' }).click()
+  await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
 }

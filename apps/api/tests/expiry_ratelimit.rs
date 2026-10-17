@@ -1,4 +1,4 @@
-//! 認領逾期釋放（FR-08）與認領端點限流。
+//! 捐助逾期釋放（FR-08）與捐助端點限流。
 mod common;
 use axum::{
     body::Body,
@@ -37,7 +37,7 @@ fn post_claim(item: Uuid, key: Uuid) -> Request<Body> {
         .unwrap()
 }
 
-/// 直接塞認領並同步 qty_claimed；回傳 claim id
+/// 直接塞捐助並同步 qty_claimed；回傳 claim id
 async fn seed_claim(pool: &PgPool, item: Uuid, qty: i32, status: &str, expires: &str) -> Uuid {
     let g: Uuid = sqlx::query_scalar(
         "INSERT INTO guests (guest_token_hash, display_name) VALUES ($1, 'g') RETURNING id",
@@ -116,7 +116,7 @@ async fn expire_due_concurrent_and_vs_cancel(pool: PgPool) {
     let rs = futures_util::future::join_all((0..4).map(|_| claims::expire_due(&pool))).await;
     assert_eq!(rs.into_iter().map(|r| r.unwrap()).sum::<usize>(), 2);
     assert_eq!(qty(&pool, it).await, 0);
-    // 已 expired 的認領再被取消：狀態轉換被拒，不會二次回補
+    // 已 expired 的捐助再被取消：狀態轉換被拒，不會二次回補
     let g: Uuid = sqlx::query_scalar("SELECT guest_id FROM claims WHERE id = $1")
         .bind(c1)
         .fetch_one(&pool)
@@ -240,7 +240,7 @@ async fn claim_per_wishlist_limit_is_per_identity(pool: PgPool) {
     assert!(limited(
         &call_with_ip(&a, post_claim_as(its[16], Uuid::new_v4(), &tok), "7.7.7.7").await
     ));
-    // 同 IP、同清單的其他人照常認領（場地 Wi-Fi 的賓客）
+    // 同 IP、同清單的其他人照常捐助（場地 Wi-Fi 的賓客）
     for it in &its[17..20] {
         assert_eq!(
             call_with_ip(&a, post_claim(*it, Uuid::new_v4()), "7.7.7.7")

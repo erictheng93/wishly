@@ -7,14 +7,14 @@ const step = async (tag, fn) => { try { await fn() } catch (e) { L(tag + ':SCRIP
 sql('delete from rate_limits')
 const openCard = async (page, name) => page.locator('li.g-card', { hasText: name }).getByRole('button', { name: '我要送' }).click()
 
-// ---- S7 逾期認領 ----
+// ---- S7 逾期捐助 ----
 await step('S7', async () => {
   const U = await registerUser({ tag: 's7' }); const T = await createList(U, { title: 'S7 清單', extra: { claim_ttl_hours: 1 }, items: [{ title: '限時品項', qty: 6 }] })
   const g = await guestClaim(T.items[0].id, 2, '逾期客'); const out = { expiresAt: g.body.claim.expires_at }
   sql(`update claims set expires_at = now() - interval '1 minute' where id='${g.claimId}'`)
   const pub = async () => (await (await (await guestApi()).get(`public/wishlists/${T.slug}`)).json()).items[0].qty_claimed
   out.claimedBeforeJob = await pub()
-  // 另一訪客此時想認領：應該被擋（job 尚未跑）
+  // 另一訪客此時想捐助：應該被擋（job 尚未跑）
   const g2 = await guestClaim(T.items[0].id, 1, '想搶的人'); out.otherGuestWhileExpiredUnreleased = g2.status
   // 逾期但尚未釋放時，原訪客改為已購買 → 是否「救回」
   const ga = g.api; const hdr = { 'X-Guest-Token': g.token }

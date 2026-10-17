@@ -28,7 +28,7 @@ it('quantity card exposes inventory, priority and a safe product link and opens 
   expect(el.textContent).toContain('2 / 5')
   expect(el.textContent).toContain('優先度 高')
   expect(el.textContent).toContain('品牌・500ml')
-  expect(el.textContent).toContain('送禮者 已認領')
+  expect(el.textContent).toContain('送禮者 已捐助')
   expect(el.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('40')
   const product = el.querySelector<HTMLAnchorElement>('a')!
   expect(product.href).toBe('https://shop.example/bottle')
@@ -41,8 +41,8 @@ it('quantity card exposes inventory, priority and a safe product link and opens 
 
 it('my existing claim can be edited even when the quantity is fully claimed', () => {
   const el = card({ ...quantity, is_fully_claimed: true, qty_claimed: 5 }, { mine: { qty: 2 } })
-  expect(el.textContent).toContain('你已認領 2 件')
-  expect(el.querySelector('button')!.textContent).toContain('修改我的認領')
+  expect(el.textContent).toContain('你已捐助 2 件')
+  expect(el.querySelector('button')!.textContent).toContain('修改我的捐助')
   el.querySelector<HTMLButtonElement>('button')!.click()
   expect(claim).toHaveBeenCalledOnce()
 })
@@ -82,7 +82,7 @@ it.each([
 it.each([quantity, crowdfunding])('masked card hides contribution details, progress, product link and actions', item => {
   const el = card(item, { masked: true })
   expect(el.textContent).toContain('驚喜模式中')
-  expect(el.textContent).toContain('建立者不可認領自己的清單')
+  expect(el.textContent).toContain('建立者不可捐助自己的清單')
   expect(el.textContent).not.toContain('送禮者')
   expect(el.textContent).not.toContain('贊助者')
   expect(el.querySelector('[role="progressbar"]')).toBeNull()
@@ -97,6 +97,6 @@ it('guest header routes home and to claim management without requiring sign in',
   mounted = mount(GuestTop, {}, { NuxtLink })
   const links = [...mounted.el.querySelectorAll('header a')]
   expect(links.map(a => [a.textContent, a.getAttribute('href')])).toEqual([
-    ['Wishly', '/'], ['我的認領', '/me/claims'],
+    ['Wishly', '/'], ['我的捐助', '/me/claims'],
   ])
 })

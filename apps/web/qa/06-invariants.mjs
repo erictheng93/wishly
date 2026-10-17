@@ -2,7 +2,7 @@ import { registerUser, createList, guestClaim, guestApi, sql, q, log, OUT, rando
 const L = (tag, o) => { console.log(tag, JSON.stringify(o).slice(0, 600)); log('06.jsonl', { tag, ...o }) }
 sql('delete from rate_limits')
 const U = await registerUser({ tag: 'inv' }), S = await registerUser({ tag: 'invs', staff: true })
-// 1 併發超賣：40 個匿名同時認領 qty=5 的品項
+// 1 併發超賣：40 個匿名同時捐助 qty=5 的品項
 const T = await createList(U, { title: '併發', items: [{ title: '搶', qty: 5 }, { title: '二', qty: 3 }] })
 const res = await Promise.all(Array.from({ length: 40 }, async (_, i) => { const a = await guestApi(); const r = await a.post(`items/${T.items[0].id}/claims`, { data: { qty: 1, display_name: 'p' + i }, headers: { 'Idempotency-Key': randomUUID() } }); return r.status() }))
 L('concurrent', { s201: res.filter(x => x === 201).length, s409: res.filter(x => x === 409).length, other: res.filter(x => ![201, 409].includes(x)), dbClaimed: sql(`select qty_claimed from wishlist_items where id='${T.items[0].id}'`) })
@@ -10,11 +10,11 @@ L('concurrent', { s201: res.filter(x => x === 201).length, s409: res.filter(x =>
 const g = await guestClaim(T.items[1].id, 1, '改量客'); const h = { 'X-Guest-Token': g.token }
 const ups = await Promise.all([2, 3, 3, 1, 2, 3].map(async qty => (await (await guestApi()).patch(`claims/${g.claimId}`, { data: { qty }, headers: h })).status()))
 L('concurrent-patch', { statuses: ups, claimed: sql(`select qty_claimed from wishlist_items where id='${T.items[1].id}'`), claimQty: sql(`select qty from claims where id='${g.claimId}'`) })
-// 2 強制刪除有認領的品項
+// 2 強制刪除有捐助的品項
 const F = await createList(U, { title: '強刪', items: [{ title: '將被刪', qty: 4 }] }); const gf = await guestClaim(F.items[0].id, 2, '被取消客')
 const noforce = (await U.api.delete(`items/${F.items[0].id}`)).status(); const force = (await U.api.delete(`items/${F.items[0].id}?force=true`)).status()
 L('force-delete', { noforce, force, claimStatus: sql(`select status from claims where id='${gf.claimId}'`), itemQtyClaimedAfter: sql(`select qty_claimed from wishlist_items where id='${F.items[0].id}'`), auditForCancel: sql(`select count(*) from audit_logs where entity_id='${gf.claimId}' and action<>'claim.create'`), guestMe: JSON.stringify((await (await (await guestApi()).get('guest/me', { headers: { 'X-Guest-Token': gf.token } })).json()).claims.map(c => c.claim.status)) })
-// 3 owner 取消認領 + 標記 delivered
+// 3 owner 取消捐助 + 標記 delivered
 const O = await createList(U, { title: '擁有者操作', items: [{ title: '甲', qty: 3 }] }); const go = await guestClaim(O.items[0].id, 2, '甲客'); const go2 = await guestClaim(O.items[0].id, 1, '乙客')
 L('owner-actions', { deliver: (await U.api.patch(`claims/${go.claimId}`, { data: { status: 'delivered' } })).status(), cancel: (await U.api.delete(`claims/${go2.claimId}`)).status(), claimed: sql(`select qty_claimed from wishlist_items where id='${O.items[0].id}'`), audits: sql(`select string_agg(action||':'||actor_type, ',') from audit_logs where entity_id in ('${go.claimId}','${go2.claimId}')`) })
 // 4 檢舉處理 + 稽核

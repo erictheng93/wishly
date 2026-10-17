@@ -20,7 +20,7 @@ test.describe('LINE 內建瀏覽器', () => {
     await owner.api.dispose()
   })
 
-  test('localStorage 被禁用：仍可認領，改用 cookie 備援保存', async ({ page }) => {
+  test('localStorage 被禁用：仍可捐助，改用 cookie 備援保存', async ({ page }) => {
     const owner = await registerUser()
     const list = await createList(owner)
     await page.addInitScript(() => {
@@ -30,16 +30,16 @@ test.describe('LINE 內建瀏覽器', () => {
     const card = page.locator('li.g-card', { hasText: '奶瓶' })
     await card.getByRole('button', { name: '我要送' }).click()
     await page.getByLabel('你的暱稱（必填）').fill('LINE 使用者')
-    await page.getByRole('button', { name: '確認認領' }).click()
-    await expect(page.getByRole('heading', { name: '✓ 認領成功！' })).toBeVisible()
-    await expect(page.getByText('LINE 內建瀏覽器關閉後，認領紀錄可能找不到')).toBeVisible()
+    await page.getByRole('button', { name: '確認捐助' }).click()
+    await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
+    await expect(page.getByText('LINE 內建瀏覽器關閉後，捐助紀錄可能找不到')).toBeVisible()
     await page.getByRole('button', { name: '回到清單繼續看' }).click()
     await page.reload() // cookie 備援讓重新整理後仍認得
-    await expect(card.getByRole('button', { name: '修改我的認領' })).toBeVisible()
+    await expect(card.getByRole('button', { name: '修改我的捐助' })).toBeVisible()
     await owner.api.dispose()
   })
 
-  test('所有本機儲存都不可用：認領仍成功，提示截圖保存；留 Email 則寄管理連結', async ({ page }) => {
+  test('所有本機儲存都不可用：捐助仍成功，提示截圖保存；留 Email 則寄管理連結', async ({ page }) => {
     const owner = await registerUser()
     const list = await createList(owner)
     await page.addInitScript(() => {
@@ -55,11 +55,11 @@ test.describe('LINE 內建瀏覽器', () => {
     const email = `e2e-line-${Date.now()}@example.com`
     await dlg.getByLabel('你的暱稱（必填）').fill('無儲存的人')
     await dlg.getByLabel(/^Email（選填）/).fill(email)
-    await dlg.getByRole('button', { name: '確認認領' }).click()
-    await expect(page.getByRole('heading', { name: '✓ 認領成功！' })).toBeVisible()
+    await dlg.getByRole('button', { name: '確認捐助' }).click()
+    await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
     await expect(page.getByText('無法儲存於此裝置，請截圖保存')).toBeVisible()
     await expect(page.getByText(/已寄出管理連結到 e\*\*\*@example\.com/)).toBeVisible()
-    const mail = await waitForMail(email, { subject: /認領已確認/ })
+    const mail = await waitForMail(email, { subject: /捐助已確認/ })
     expect(mail.text).toMatch(/\/me\/claims#r=[\w-]+/) // 管理連結
     await owner.api.dispose()
   })

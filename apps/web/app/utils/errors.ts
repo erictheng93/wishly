@@ -12,7 +12,7 @@ export function apiErrMsg(e: { code?: string, status?: number, detail?: string }
   const s = e.status ?? 0
   if (e.code === 'NETWORK' || e.status === 0) return '網路不穩，再試一次'
   if (e.code === 'WISHLIST_REMOVED' || s === 410) return '這份清單已被下架'
-  if (e.code === 'UNAUTHORIZED' || s === 401) return '你的身分已失效，請重新整理頁面後再試；若要找回之前的認領，請用確認信中的連結'
+  if (e.code === 'UNAUTHORIZED' || s === 401) return '你的身分已失效，請重新整理頁面後再試；若要找回之前的捐助，請用確認信中的連結'
   if (e.code === 'HANDLE_TAKEN') return '這個帳號代號已被使用，換一個試試'
   if (e.code === 'SELF_INVITE') return '這是你自己的邀請連結，請分享給朋友'
   if (e.code === 'LOGIN_REQUIRED') return '請先登入才能查看這份清單'
@@ -23,7 +23,7 @@ export function apiErrMsg(e: { code?: string, status?: number, detail?: string }
   if (e.code === 'NOT_FRIEND') return '只能選擇已成為好友的人'
   if (e.code === 'RATE_LIMITED' || s === 429) return '操作太頻繁，請稍後再試'
   if (s === 503) return '系統維護中，請稍後再試'
-  if (s === 404) return e.code === 'CLAIM_NOT_FOUND' ? '這筆認領已不存在' : '這個品項已不存在，請重新整理頁面'
+  if (s === 404) return e.code === 'CLAIM_NOT_FOUND' ? '這筆捐助已不存在' : '這個品項已不存在，請重新整理頁面'
   if (e.detail && s < 500) return e.detail
   if (s >= 500) return '系統暫時發生問題，請稍後再試'
   return e.detail || '發生錯誤，請稍後再試'

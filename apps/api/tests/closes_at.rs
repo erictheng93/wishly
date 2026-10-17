@@ -1,4 +1,4 @@
-//! 清單自動結束時間 closes_at：建立 / 驗證、到期掃描、到期前提醒、認領與認捐即時擋、公開頁。
+//! 清單自動結束時間 closes_at：建立 / 驗證、到期掃描、到期前提醒、捐助與認捐即時擋、公開頁。
 mod common;
 use axum::http::StatusCode;
 use serde_json::json;
@@ -256,7 +256,7 @@ async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(n, 0, "被擋的認領不留痕");
+    assert_eq!(n, 0, "被擋的捐助不留痕");
     common::assert_all_reconciled(&pool).await;
 }
 

@@ -205,7 +205,7 @@ async fn idempotency_key_replay_and_conflict(pool: PgPool) {
     .await;
     assert_eq!(s2, StatusCode::CREATED);
     assert_eq!(h2["idempotency-replayed"], "true");
-    // F-01：anon 首次認領的重播改為對同一 guest 重簽新 token（回應 + Set-Cookie）；舊 token 失效；idempotency_keys 仍不存明文
+    // F-01：anon 首次捐助的重播改為對同一 guest 重簽新 token（回應 + Set-Cookie）；舊 token 失效；idempotency_keys 仍不存明文
     assert!(
         b1["guest_token"].is_string()
             && b2["guest_token"].is_string()
@@ -271,7 +271,7 @@ async fn claim_lifecycle(pool: PgPool) {
     let tok = b["guest_token"].as_str().unwrap().to_string();
     let cid = b["claim"]["id"].as_str().unwrap().to_string();
 
-    // 重複認領 → CLAIM_ALREADY_EXISTS（附 claim_id）
+    // 重複捐助 → CLAIM_ALREADY_EXISTS（附 claim_id）
     let (s, _, e) = call(
         &app,
         "POST",
@@ -338,7 +338,7 @@ async fn claim_lifecycle(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(q, 0);
-    // 取消後可再認領（partial unique 只算有效）
+    // 取消後可再捐助（partial unique 只算有效）
     let (s, _, _) = call(
         &app,
         "POST",

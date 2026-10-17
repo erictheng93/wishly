@@ -94,7 +94,7 @@ rl.lockoutIsPerEmail = '見上：任何人連續 5 次錯誤即鎖該 email 5 �
 const rc = []; for (let i = 0; i < 12; i++) { const r = await (await guestApi()).post(`public/wishlists/${LA.slug}/reports`, { data: { reason: 'other', detail: 'rl' + i } }); rc.push(r.status()) } rl.reportSameList = rc.join(',')
 const LC = []; for (let i = 0; i < 12; i++) { const l = await createList(B, { title: 'rl' + i, items: [{ title: 'x', qty: 1 }] }); LC.push(l) }
 const rc2 = []; for (const l of LC) { const r = await (await guestApi()).post(`public/wishlists/${l.slug}/reports`, { data: { reason: 'other' } }); rc2.push(r.status()) } rl.reportManyLists = rc2.join(',')
-// 認領：同一 guest 15 次 / 同清單
+// 捐助：同一 guest 15 次 / 同清單
 const LD = await createList(B, { title: 'rl-claim', items: Array.from({ length: 20 }, (_, i) => ({ title: 'i' + i, qty: 3 })) })
 const first = await guestClaim(LD.items[0].id, 1, '限流客'); const cs = [first.status]
 for (let i = 1; i < 20; i++) { const r = await first.api.post(`items/${LD.items[i].id}/claims`, { data: { qty: 1 }, headers: { 'Idempotency-Key': randomUUID(), 'X-Guest-Token': first.token } }); cs.push(r.status()) } rl.claimsSameGuestSameList = cs.join(',')

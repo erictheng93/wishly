@@ -25,7 +25,7 @@
 | 0.3 | 背景工作在 Cloud Run 會被凍結 | ✅ **因部署決策而不成立**：VPS 行程長駐，`spawn_worker`／`spawn_cleanup` 照常運作，不實作 `/internal/jobs/tick`。仍有小風險見 §0.6 |
 | 0.4 | 多實例是否冪等 | ⏸ 單實例時不成立；**擴充為多實例前必須先確認**（`expire_due`、`close_due`、`remind_closing`、`tick_funding`、寄信領取）。在此之前 Dokploy 的 replicas 必須維持 1 |
 | 0.5 | 網域未定 | ⛔ 仍待定（`docs/domain-names.md`）；前端與 API 須同一 registrable domain |
-| 0.6 | 背景任務 panic 會靜默終止 | ⚠ `tokio::spawn` 的迴圈若 panic，該任務就此停止而行程仍存活（`/healthz` 仍 200）。需決定：任務外層加 panic 捕捉並重啟，或讓行程在背景任務結束時退出由 Dokploy 重啟；並加「逾期認領未釋放」告警（§6） |
+| 0.6 | 背景任務 panic 會靜默終止 | ⚠ `tokio::spawn` 的迴圈若 panic，該任務就此停止而行程仍存活（`/healthz` 仍 200）。需決定：任務外層加 panic 捕捉並重啟，或讓行程在背景任務結束時退出由 Dokploy 重啟；並加「逾期捐助未釋放」告警（§6） |
 
 ---
 
@@ -34,7 +34,7 @@
 - [x] 正式網域與子網域（2026-10-17 定案並上線）：`wishly.tw`（Pages，apex，無 `app.` 子網域）、`api.wishly.tw`（Tunnel）、`media.wishly.tw`（R2）。`ws_session` 為 `SameSite=Lax` 且不帶 `Domain`，前端與 API 必須同一 registrable domain。
 - [ ] **RPO／RTO 取捨（見 §2.1）**：PRD 目標 RPO ≤ 5 分鐘、RTO ≤ 1 小時。RPO ≤ 5 分鐘需要 WAL 歸檔；只用排程備份則 RPO 等於備份間隔。由產品負責人明確選擇並寫入 PRD。
 - [ ] 環境：staging 與 production 是否同一台 VPS（以不同 Dokploy 專案與資料庫隔離）還是兩台？同機的 staging 會與正式搶資源。
-- [ ] VPS 規格（CPU／RAM／磁碟）與單機容量上限的預期（SSE 連線數、尖峰認領 QPS）。
+- [ ] VPS 規格（CPU／RAM／磁碟）與單機容量上限的預期（SSE 連線數、尖峰捐助 QPS）。
 
 ## 2. 基礎設施
 
@@ -80,7 +80,7 @@
 - [ ] **replicas = 1**（見 §0.4）。
 - [ ] 環境變數放在 Dokploy（§3），不在 repo；確認匯出／備份 Dokploy 設定的方式（遺失 Dokploy 設定 = 遺失全部機密）。
 - [ ] 重啟策略：失敗自動重啟；理解「migration 失敗 → 行程退出 → 反覆重啟」是預期行為，值班手冊寫明並設告警。
-- [ ] 換版行為：程式**不處理 SIGTERM**（已移除優雅關閉，2026-10-15），收到終止訊號即結束，進行中的請求會被切斷；認領有 `Idempotency-Key`，客戶端重試可恢復。**需實測**：Dokploy 部署新版時是否先啟新容器再停舊容器（短暫兩個實例並存，會影響背景工作與 migration 順序）。
+- [ ] 換版行為：程式**不處理 SIGTERM**（已移除優雅關閉，2026-10-15），收到終止訊號即結束，進行中的請求會被切斷；捐助有 `Idempotency-Key`，客戶端重試可恢復。**需實測**：Dokploy 部署新版時是否先啟新容器再停舊容器（短暫兩個實例並存，會影響背景工作與 migration 順序）。
 - [ ] 回滾：保留前一個部署版本，確認一鍵回滾可用且 migration 僅向前相容（§8）。
 - [ ] `RUST_LOG=info`（image 已預設）；日誌可在 Dokploy 檢視並有保存期限。
 
@@ -148,7 +148,7 @@
 - [ ] 監控與告警（外部監控打 `/readyz`，不要只靠主機內部）：
   - 服務：5xx 比率、延遲 p95、`/readyz` 失敗。
   - 主機：磁碟使用率（含 WAL／備份）、記憶體、CPU、Postgres 連線數、容器重啟次數。
-  - 業務：寄信佇列積壓、**逾期認領未釋放數量**（偵測 §0.6 的靜默停擺）、Tunnel 狀態。
+  - 業務：寄信佇列積壓、**逾期捐助未釋放數量**（偵測 §0.6 的靜默停擺）、Tunnel 狀態。
   - 備份：**備份成功與時間新鮮度**（備份靜默失敗是最常見的事故）。
 - [ ] 事故聯絡人與值班方式；VPS 單點故障的恢復手冊（§2.1）。
 
@@ -158,7 +158,7 @@
 |---|---|---|
 | 7.1 | 服務存活與 DB 連得上 | `curl https://<api>/healthz`；`/readyz`（從內網或允許來源） |
 | 7.2 | 註冊／登入 OTP 實際收信 | 以真實信箱走 F1；確認 `Set-Cookie` 含 `Secure; HttpOnly; SameSite=Lax` |
-| 7.3 | 建清單、訪客認領、防超賣 | 在 staging 走一遍；正式環境不跑會寫入大量資料的 E2E |
+| 7.3 | 建清單、訪客捐助、防超賣 | 在 staging 走一遍；正式環境不跑會寫入大量資料的 E2E |
 | 7.4 | 限流以真實用戶 IP 計 | 兩個不同 IP 各打超過額度，確認互不影響（`TRUSTED_PROXY` 與 `CF-Connecting-IP` 生效） |
 | 7.5 | **API 不可繞過 Tunnel** | 對 VPS 公網 IP 直連 80／443／8080 全部失敗 |
 | 7.6 | CDN 金絲雀 | `scripts/cdn-canary.mjs` exit 0 |
@@ -166,10 +166,10 @@
 | 7.8 | 圖片上傳與讀取 | 上傳→經 `S3_PUBLIC_BASE` 顯示 |
 | 7.9 | 檢舉＋Turnstile | 送出檢舉成功；偽造 token 得 403 |
 | 7.10 | SSE 長連線 | `scripts/sse-probe.mjs` 跑 ≥ 40 分鐘，確認越過 30 分鐘上限會重連（完整驗收是 Spike S3：120 分鐘） |
-| 7.11 | 背景工作實際在跑 | 建一筆短效期認領，確認到期後自動釋放 |
+| 7.11 | 背景工作實際在跑 | 建一筆短效期捐助，確認到期後自動釋放 |
 | 7.12 | OAuth | Google／LINE 實際登入一次（issue #6） |
 | 7.13 | **備份還原演練** | 還原到暫存實例，跑對帳查詢，記錄實際 RTO |
-| 7.14 | 換版期間的影響 | 在 Dokploy 重新部署時，記錄進行中請求的失敗數；確認客戶端重試後認領狀態一致 |
+| 7.14 | 換版期間的影響 | 在 Dokploy 重新部署時，記錄進行中請求的失敗數；確認客戶端重試後捐助狀態一致 |
 | 7.15 | 重啟自癒 | 手動 kill 容器，確認自動重啟、資料不遺失、Tunnel 恢復 |
 
 ## 8. 回滾
@@ -189,6 +189,6 @@ S2／S3 的前置就是本清單 §2–§5；完成 §7.1–§7.10 後，依 `gi
 
 - Dokploy 內建備份的實際機制（是否 `pg_dump`、可否 PITR、排程最短間隔）、部署新版時的啟停順序、管理介面預設暴露方式——均**需實機確認**。
 - Tunnel → Traefik → axum 這條路徑對 SSE 的緩衝、逾時與 `CF-Connecting-IP` 傳遞行為，無任何量測資料（即 Spike S3）。
-- 後端在該 VPS 規格下的容量（併發認領、SSE 連線數、`image` 解碼對 CPU 的影響）無量測資料。
+- 後端在該 VPS 規格下的容量（併發捐助、SSE 連線數、`image` 解碼對 CPU 的影響）無量測資料。
 - `lib.rs` 的 CORS／Origin 檢查是否符合 `docs/04` 所述（非 GET 驗證 `Origin`）——未在本次查核中逐項驗證。
 - 金流、電子發票、法遵（PRD P2 前 Go/No-Go）不在本清單範圍。

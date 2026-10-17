@@ -25,7 +25,7 @@ async function save() {
 </script>
 <template>
   <div class="c-mt12">
-    <p class="c-mute">點數眾籌達標後，由平台代購並寄到這裡。只有你與負責下單的營運人員看得到，朋友永遠看不到。</p>
+    <p class="c-mute">心願眾籌達標後，由平台代購並寄到這裡。只有你與負責下單的營運人員看得到，朋友永遠看不到。</p>
     <dl v-if="cur?.has_shipping_address" class="c-dl"><dt>收件人</dt><dd>{{ cur.recipient_name }}</dd><dt>電話</dt><dd>{{ cur.phone }}</dd><dt>地址</dt><dd>{{ cur.address }}</dd></dl>
     <p v-else-if="cur" class="c-err">尚未填寫。含眾籌品項的清單必須先填寫才能發佈。</p>
     <form @submit.prevent="save">

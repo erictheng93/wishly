@@ -1,4 +1,4 @@
-//! F-08 刪帳號取消認領、F-12 problem+json、F-18 安全標頭、F-24 登入鎖定、F-26 退訂 POST
+//! F-08 刪帳號取消捐助、F-12 problem+json、F-18 安全標頭、F-24 登入鎖定、F-26 退訂 POST
 mod common;
 use axum::{
     body::Body,

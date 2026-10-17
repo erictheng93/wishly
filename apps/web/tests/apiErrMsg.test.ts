@@ -12,7 +12,7 @@ describe('apiErrMsg（依 code / status，不依賴 detail）', () => {
   ])('%j', (e, part) => expect(apiErrMsg(e)).toContain(part))
   it('code 優先於 detail；沒有 detail 也有文案', () => {
     expect(apiErrMsg({ status: 410, code: 'WISHLIST_REMOVED', detail: '' })).toBe('這份清單已被下架')
-    expect(apiErrMsg({ status: 404, code: 'CLAIM_NOT_FOUND' })).toBe('這筆認領已不存在')
+    expect(apiErrMsg({ status: 404, code: 'CLAIM_NOT_FOUND' })).toBe('這筆捐助已不存在')
   })
   it('驗證類錯誤沿用 detail；未知 5xx 才用泛用文案', () => {
     expect(apiErrMsg({ status: 422, code: 'VALIDATION_FAILED', detail: '暱稱需為 1–30 字' })).toBe('暱稱需為 1–30 字')

@@ -65,9 +65,9 @@ async fn guest_id(parts: &Parts, st: &AppState) -> Result<Option<Uuid>, AppError
             .await?;
     match row {
         Some((id,)) => Ok(Some(id)),
-        // 明確用 header 帶了失效 token → 401（避免靜默建立新訪客而丟失既有認領）。
+        // 明確用 header 帶了失效 token → 401（避免靜默建立新訪客而丟失既有捐助）。
         // 只有 cookie 帶的失效 token（HttpOnly，前端清不掉；訪客刪除資料或用恢復連結換發後會殘留）→ 視為匿名，
-        // 新訪客的 Set-Cookie 會覆蓋它；否則使用者會被一個清不掉的舊 cookie 永遠擋在認領外。
+        // 新訪客的 Set-Cookie 會覆蓋它；否則使用者會被一個清不掉的舊 cookie 永遠擋在捐助外。
         None if from_cookie => Ok(None),
         None => Err(AppError::Unauthorized),
     }
@@ -129,7 +129,7 @@ struct Row {
     wl_status: String,
 }
 
-/// 登入使用者認領時身分是 User（claims.user_id），也要看得到自己的認領；訪客則走 guest_id。
+/// 登入使用者捐助時身分是 User（claims.user_id），也要看得到自己的捐助；訪客則走 guest_id。
 async fn me(
     State(st): State<AppState>,
     MaybeActor(actor): MaybeActor,

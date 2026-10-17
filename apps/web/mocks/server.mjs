@@ -7,7 +7,7 @@ const items = [
   { id: 'i1', title: '玻璃奶瓶 240ml', brand: 'Pigeon', spec: '寬口徑 / 3 入裝', image_url: null, product_url: 'https://example.com', unit_price_amount: 450, priority: 'high', qty_needed: 10, qty_claimed: 6 },
   { id: 'i2', title: 'NB 尿布 2 包', brand: null, spec: null, image_url: null, product_url: null, unit_price_amount: 300, priority: 'medium', qty_needed: 2, qty_claimed: 1 },
   { id: 'i3', title: '奶粉 1 號 800g', brand: null, spec: null, image_url: null, product_url: null, unit_price_amount: 800, priority: 'low', qty_needed: 2, qty_claimed: 2 },
-  // 點數眾籌品項（P2-A）：沒有後端也能預覽卡片；/me 回 401，所以點「用點數贊助」會導到登入頁
+  // 心願眾籌品項（P2-A）：沒有後端也能預覽卡片；/me 回 401，所以點「心願眾籌」會導到登入頁
   { id: 'i4', title: 'Combi 嬰兒推車', brand: 'Combi', spec: null, image_url: null, product_url: null, unit_price_amount: null, priority: 'high', qty_needed: 1, qty_claimed: 0,
     funding_mode: 'crowdfund', target_points: 9800, pledged_points: 6300, remaining_points: 3500, funding_status: 'open', display_status: 'open', funding_deadline: '2026-12-19T15:59:00Z',
     contributors: [{ display_name: '阿明', points: 3000 }, { display_name: '匿名朋友', points: 1300 }, { display_name: '小華', points: 2000 }] },
@@ -52,13 +52,13 @@ http.createServer(async (req, res) => {
     const key = req.headers['idempotency-key']; if (!key) return err(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', '缺少 Idempotency-Key')
     if (idem.has(key)) return send(res, 201, idem.get(key))
     const it = items.find(i => i.id === m[1]); if (!it) return err(res, 404, 'NOT_FOUND', '找不到品項')
-    if (!guest && !body.display_name) return err(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/display_name', code: 'REQUIRED', detail: '首次認領需填寫暱稱' }] })
+    if (!guest && !body.display_name) return err(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/display_name', code: 'REQUIRED', detail: '首次捐助需填寫暱稱' }] })
     if (!(body.qty >= 1 && body.qty <= 99)) return err(res, 422, 'VALIDATION_FAILED', 'qty 不正確', { errors: [{ pointer: '/qty', code: 'RANGE', detail: 'qty 必須介於 1 與 99' }] })
     const rem = it.qty_needed - it.qty_claimed
-    if (body.qty > rem) return err(res, 409, 'ITEM_FULLY_CLAIMED', `此品項剩餘 ${rem} 件，無法再認領 ${body.qty} 件。`, { remaining: rem })
+    if (body.qty > rem) return err(res, 409, 'ITEM_FULLY_CLAIMED', `此品項剩餘 ${rem} 件，無法再捐助 ${body.qty} 件。`, { remaining: rem })
     let gt, g = guest
     if (!g) { gt = randomBytes(32).toString('base64url'); g = { name: body.display_name, contact: body.contact }; guests.set(gt, g); g.token = gt }
-    if ([...claims.values()].some(c => c.guest === g && c.item_id === it.id && c.status !== 'cancelled')) return err(res, 409, 'CLAIM_ALREADY_EXISTS', '已認領過', { claim_id: [...claims.values()].find(c => c.guest === g && c.item_id === it.id).id })
+    if ([...claims.values()].some(c => c.guest === g && c.item_id === it.id && c.status !== 'cancelled')) return err(res, 409, 'CLAIM_ALREADY_EXISTS', '已捐助過', { claim_id: [...claims.values()].find(c => c.guest === g && c.item_id === it.id).id })
     it.qty_claimed += body.qty
     const c = { id: 'c' + ++n, item_id: it.id, qty: body.qty, status: 'reserved', name: g.name, note: body.note ?? null, at: new Date().toISOString(), guest: g }
     claims.set(c.id, c); broadcast(it)
@@ -66,7 +66,7 @@ http.createServer(async (req, res) => {
     idem.set(key, out); return send(res, 201, out)
   }
   if ((m = p.match(/^\/claims\/([^/]+)$/))) {
-    const c = claims.get(m[1]); if (!guest) return err(res, 401, 'UNAUTHORIZED', '請先認領')
+    const c = claims.get(m[1]); if (!guest) return err(res, 401, 'UNAUTHORIZED', '請先捐助')
     if (!c || c.guest !== guest) return err(res, 404, 'NOT_FOUND', '找不到')
     const it = items.find(i => i.id === c.item_id)
     if (req.method === 'DELETE') { if (c.status !== 'cancelled') { it.qty_claimed -= c.qty; c.status = 'cancelled'; broadcast(it) } return send(res, 204) }

@@ -1,6 +1,6 @@
-//! Email 通知 outbox：認領模組呼叫 `enqueue_claim`（寫 notifications，docs/04 4.10），
+//! Email 通知 outbox：捐助模組呼叫 `enqueue_claim`（寫 notifications，docs/04 4.10），
 //! 背景 worker `spawn_worker` 輪詢到期通知，經 SMTP（預設 Mailpit localhost:1025）寄出。
-//! 內容刻意不含品項與認領者，只寫「有 N 件新認領」，所以驚喜模式下天然不洩漏。
+//! 內容刻意不含品項與捐助者，只寫「有 N 件新捐助」，所以驚喜模式下天然不洩漏。
 use crate::config::Config;
 use lettre::{
     message::header::ContentType, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use std::time::Duration;
 use uuid::Uuid;
 
-/// 認領成功的同一交易內呼叫：第一筆即時 claim.created；之後合併為每日台北 09:00 的 claim.digest（count 累加）。
+/// 捐助成功的同一交易內呼叫：第一筆即時 claim.created；之後合併為每日台北 09:00 的 claim.digest（count 累加）。
 /// 建立者關閉 email_claims 或已刪除則不寫。
 pub async fn enqueue_claim<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
@@ -218,7 +218,7 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     Ok(n)
 }
 
-/// 純函式：(主旨, 內文)。刻意只用數量，不帶品項 / 認領者。
+/// 純函式：(主旨, 內文)。刻意只用數量，不帶品項 / 捐助者。
 pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
     if kind == "auth.password_changed" {
         return ("【Wishly】密碼已變更".into(), format!("你的帳號 Email 登入密碼剛剛已變更，其他裝置已登出。\n若非本人操作，請立即使用「忘記密碼」重設。\n帳號設定：{}/settings\n這是帳號安全通知。", crate::config::get().app_url));
@@ -255,15 +255,15 @@ pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
         "order.failed" => (format!("【Wishly】《{item}》代購未成功，點數已退回"), format!("你支持的「{item}」（清單《{title}》）代購未成功，你捐出的點數已全數退回錢包。\n查看我的點數：{wallet}\n")),
         "funding.expired" => (format!("【Wishly】《{item}》募集期限已到"), format!("「{item}」（清單《{title}》）在期限內未達標。你的點數會再保留 7 天：期間可到錢包撤回，或轉捐給同一份清單的其他品項；逾期未處理會自動退回錢包。\n處理我的捐贈：{wallet}\n")),
         "item.removed" => (format!("【Wishly】《{item}》已被移除，點數已退回"), format!("清單《{title}》的建立者移除了「{item}」（或封存了清單），你捐出的點數已退回錢包。\n查看我的點數：{wallet}\n")),
-        "claim.digest" => (format!("【Wishly】《{title}》今日有 {n} 件新認領"), format!("你的清單《{title}》今日彙整：有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
-        "claim.created" => (format!("【Wishly】《{title}》有 {n} 件新認領"), format!("你的清單《{title}》有 {n} 件新認領。\n登入查看：{base}/dashboard\n")),
-        "claim.confirmation" => ("【Wishly】認領已確認".into(), format!("你的認領已記錄，謝謝你的心意。\n管理我的認領：{manage}\n")),
-        "claim.item_removed" => ("【Wishly】你認領的品項已被移除".into(), format!("清單《{title}》的建立者移除了你認領的品項，這筆認領已取消。\n查看其他品項：{manage}\n")),
+        "claim.digest" => (format!("【Wishly】《{title}》今日有 {n} 件新捐助"), format!("你的清單《{title}》今日彙整：有 {n} 件新捐助。\n登入查看：{base}/dashboard\n")),
+        "claim.created" => (format!("【Wishly】《{title}》有 {n} 件新捐助"), format!("你的清單《{title}》有 {n} 件新捐助。\n登入查看：{base}/dashboard\n")),
+        "claim.confirmation" => ("【Wishly】捐助已確認".into(), format!("你的捐助已記錄，謝謝你的心意。\n管理我的捐助：{manage}\n")),
+        "claim.item_removed" => ("【Wishly】你捐助的品項已被移除".into(), format!("清單《{title}》的建立者移除了你捐助的品項，這筆捐助已取消。\n查看其他品項：{manage}\n")),
         "wishlist.closing" => {
             // 以台北時間顯示；解析失敗就只講「24 小時內」
             let at = payload.get("closes_at").and_then(Value::as_str).and_then(|t| t.parse::<chrono::DateTime<chrono::Utc>>().ok())
                 .map(|t| (t + chrono::Duration::hours(8)).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "24 小時內".into());
-            (format!("【Wishly】《{title}》即將結束"), format!("你的清單《{title}》將於 {at}（台北時間）自動結束，屆時訪客不能再認領。\n要延長或取消期限：{base}/dashboard\n"))
+            (format!("【Wishly】《{title}》即將結束"), format!("你的清單《{title}》將於 {at}（台北時間）自動結束，屆時訪客不能再捐助。\n要延長或取消期限：{base}/dashboard\n"))
         }
         "event.reminder" => (format!("【Wishly】《{title}》活動日快到了"), format!("你的清單《{title}》的活動日即將到來。\n{base}/dashboard\n")),
         _ => ("【Wishly】通知".into(), format!("{base}\n")),

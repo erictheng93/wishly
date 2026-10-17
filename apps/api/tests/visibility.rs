@@ -1,4 +1,4 @@
-//! 清單可見性：6 種 visibility × 擁有者/匿名/好友/非好友/名單/密碼；認領門檻、unlock、快取標頭、allowed-users
+//! 清單可見性：6 種 visibility × 擁有者/匿名/好友/非好友/名單/密碼；捐助門檻、unlock、快取標頭、allowed-users
 mod common;
 use axum::{
     body::Body,

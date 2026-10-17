@@ -6,7 +6,7 @@ const f = reactive<any>({})
 const imageKey = ref<string | null>(null)
 const version = ref<string | null>(null)
 const upBusy = ref(false), busy = ref(false), err = ref(''), stale = ref(false), needAddr = ref(false)
-// 已有認領 / 認捐的品項不能改取得方式；眾籌達標後不能改目標與期限（後端同樣會擋）
+// 已有捐助 / 認捐的品項不能改取得方式；眾籌達標後不能改目標與期限（後端同樣會擋）
 const modeLocked = computed(() => !!props.item && (props.item.qty_claimed > 0 || props.item.pledged_points > 0))
 const fundLocked = computed(() => !!props.item && props.item.funding_mode === 'crowdfund' && props.item.funding_status !== 'open')
 const crowd = computed(() => f.funding_mode === 'crowdfund')
@@ -60,8 +60,8 @@ async function save() {
       <label class="c-field"><span>規格（選填）</span><input v-model="f.spec" maxlength="200"></label>
       <label class="c-field"><span>商品網址（選填）</span><input v-model="f.product_url" type="url" maxlength="2000" placeholder="https://"></label>
       <div class="c-field"><span>取得方式</span>
-        <div class="c-seg" style="margin:0"><label v-for="m in [['quantity', '數量認領'], ['crowdfund', '點數眾籌']]" :key="m[0]"><input v-model="f.funding_mode" type="radio" name="funding_mode" :value="m[0]" :disabled="modeLocked"><span>{{ m[1] }}</span></label></div>
-        <p v-if="modeLocked" class="c-mute c-small">已有人認領或贊助，無法切換取得方式。</p>
+        <div class="c-seg" style="margin:0"><label v-for="m in [['quantity', '數量捐助'], ['crowdfund', '心願眾籌']]" :key="m[0]"><input v-model="f.funding_mode" type="radio" name="funding_mode" :value="m[0]" :disabled="modeLocked"><span>{{ m[1] }}</span></label></div>
+        <p v-if="modeLocked" class="c-mute c-small">已有人捐助或贊助，無法切換取得方式。</p>
       </div>
       <template v-if="crowd">
         <label class="c-field"><span>目標點數（必填，1 點 = NT$1）{{ item?.pledged_points ? `（已募 ${item.pledged_points}）` : '' }}</span><input v-model="f.target_points" type="number" inputmode="numeric" :min="(item?.pledged_points || 0) + 1" max="10000000" :disabled="fundLocked" required></label>
@@ -71,7 +71,7 @@ async function save() {
         <p v-if="fundLocked" class="c-mute">已達標或截止，目標與期限無法修改。</p>
       </template>
       <template v-else>
-        <label class="c-field"><span>需要數量{{ item?.qty_claimed ? `（已被認領 ${item.qty_claimed}）` : '' }}</span><input v-model="f.qty_needed" type="number" inputmode="numeric" :min="item?.qty_claimed || 1" max="99"></label>
+        <label class="c-field"><span>需要數量{{ item?.qty_claimed ? `（已被捐助 ${item.qty_claimed}）` : '' }}</span><input v-model="f.qty_needed" type="number" inputmode="numeric" :min="item?.qty_claimed || 1" max="99"></label>
         <label class="c-field"><span>參考價格 NT$（選填）</span><input v-model="f.unit_price_amount" type="number" inputmode="numeric" min="0"></label>
       </template>
       <div class="c-field"><span>優先度</span>

@@ -60,7 +60,7 @@ async fn surprise_dashboard_hides_claimers(pool: PgPool) {
         .0,
         StatusCode::UNAUTHORIZED
     );
-    // 活動日已過 → 解鎖，看得到認領者
+    // 活動日已過 → 解鎖，看得到捐助者
     sqlx::query("UPDATE wishlists SET event_date = current_date - 1 WHERE id = $1")
         .bind(wid)
         .execute(&pool)

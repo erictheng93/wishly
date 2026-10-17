@@ -25,17 +25,17 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
       </template>
       <template v-else>
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: item.progress_percent + '%' }" /></div>
-        <div class="g-mute">已認領 <b class="g-num">{{ item.qty_claimed }} / {{ item.qty_needed }}</b><template v-if="mine">・你已認領 {{ mine.qty }} 件</template></div>
-        <div v-if="item.claimers?.length" class="g-mute">{{ item.claimers.map((c: any) => c.display_name).join('、') }} 已認領</div>
+        <div class="g-mute">已捐助 <b class="g-num">{{ item.qty_claimed }} / {{ item.qty_needed }}</b><template v-if="mine">・你已捐助 {{ mine.qty }} 件</template></div>
+        <div v-if="item.claimers?.length" class="g-mute">{{ item.claimers.map((c: any) => c.display_name).join('、') }} 已捐助</div>
       </template>
       <div class="g-actions">
-        <span v-if="masked" class="g-mute">建立者不可認領自己的清單</span>
+        <span v-if="masked" class="g-mute">建立者不可捐助自己的清單</span>
         <template v-else-if="crowd">
-          <button v-if="ds === 'open' && !closed" class="g-btn sm js-claim" :disabled="!online" @click="$emit('fund')">用點數贊助</button>
+          <button v-if="ds === 'open' && !closed" class="g-btn sm js-claim" :disabled="!online" @click="$emit('fund')">心願眾籌</button>
           <span v-else-if="ds && ds !== 'open'" class="g-mute">{{ ds === 'expired' ? '募集已截止' : '已募集完成' }}</span>
         </template>
-        <button v-else-if="mine && !closed" class="g-btn ghost sm js-claim" :disabled="!online" @click="$emit('claim')">修改我的認領</button>
-        <span v-else-if="full" class="g-mute">已被認領完</span>
+        <button v-else-if="mine && !closed" class="g-btn ghost sm js-claim" :disabled="!online" @click="$emit('claim')">修改我的捐助</button>
+        <span v-else-if="full" class="g-mute">已被捐助完</span>
         <button v-else-if="!closed" class="g-btn sm js-claim" :disabled="!online" @click="$emit('claim')">我要送</button>
         <a v-if="item.product_url && !masked" :href="item.product_url" target="_blank" rel="noopener nofollow" class="g-link">商品連結</a>
       </div>

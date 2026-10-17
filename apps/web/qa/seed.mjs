@@ -12,7 +12,7 @@ const closed = await createList(A, { title: '已結束清單', items: [{ title: 
 const surprise = await createList(A, { title: '驚喜生日清單', surprise: true, items: [{ title: '驚喜禮物', qty: 2 }] })
 const hidden = await createList(B, { title: '將被下架的清單', items: [{ title: '違規品項', qty: 1 }] })
 const other = await createList(B, { title: 'B 的清單', items: [{ title: 'B 的品項', qty: 2 }] })
-// 訪客認領
+// 訪客捐助
 const g1 = await guestClaim(active.items[0].id, 1, '阿明', { note: '我會買 Pigeon', contact: 'line:aming' })
 const g2 = await guestClaim(surprise.items[0].id, 1, '驚喜客')
 const g3 = await guestClaim(other.items[0].id, 1, 'B 的訪客')

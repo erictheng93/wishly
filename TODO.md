@@ -15,7 +15,7 @@
 - [ ] 後端可部署性（部署定案：Linode VPS 東京 + Dokploy + Cloudflare Tunnel，PRD D49；清單見 [deploy-backend-checklist](docs/deploy-backend-checklist.md)）
   - [x] Dockerfile、CI build job、`/healthz`、`/readyz`（SIGTERM 優雅關閉曾實作，後因不需要而移除；換版時進行中請求會被切斷，可由 `Idempotency-Key` 重試恢復）。
   - [x] 背景工作排程：VPS 行程長駐，維持行程內排程，不實作 `/internal/jobs/tick`（原 Cloud Run 疑慮不成立）。
-  - [ ] 背景任務 panic 會讓該任務靜默停止而行程仍存活：外層捕捉並重啟，或結束行程由 Dokploy 重啟；並加「逾期認領未釋放」告警（checklist §0.6）。
+  - [ ] 背景任務 panic 會讓該任務靜默停止而行程仍存活：外層捕捉並重啟，或結束行程由 Dokploy 重啟；並加「逾期捐助未釋放」告警（checklist §0.6）。
   - [ ] **PostgreSQL 備份與還原**：WAL 歸檔或排程 dump 二選一並由產品負責人接受對應 RPO；備份至 R2；完成一次還原演練並記錄 RTO（checklist §2.1）。沒有可還原的備份不得開放真實使用者。
   - [ ] VPS 加固：入站全拒絕（Tunnel 為出站）、SSH 限制、Dokploy 管理介面不公開、日誌輪替、安全更新（checklist §2.3）。
   - [ ] 實機確認 Dokploy／Traefik／Tunnel 行為：備份機制、部署啟停順序、SSE 不被緩衝、`CF-Connecting-IP` 傳遞（checklist §10，與 Spike S3 同做）。
@@ -25,7 +25,7 @@
 
 ## 功能與後續
 
-- [x] 認捐（點數眾籌）逐筆可見度設定 — [#3](https://github.com/erictheng93/wishly/issues/3)
+- [x] 認捐（心願眾籌）逐筆可見度設定 — [#3](https://github.com/erictheng93/wishly/issues/3)
   - 已完成：migration 0006 回填並保留原有欄位；建立時套帳號預設或指定 visibility，逐筆 PATCH；個人頁、錢包與資料匯出支援逐筆可見度；轉投保留設定，匿名認捐在個人頁僅本人可見。
 
 - [x] FundSheet 增加認捐當下的「誰看得到」欄位（issue #3 後續）：預設帶帳號 default_claim_visibility，可在送出前調整。

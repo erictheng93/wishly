@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-// 認領 / 修改認領 bottom sheet（docs 03 §5.7）。Idempotency-Key 於開啟時產生，重試沿用。
+// 捐助 / 修改捐助 bottom sheet（docs 03 §5.7）。Idempotency-Key 於開啟時產生，重試沿用。
 const props = defineProps<{ item: any, mine: any | null, online: boolean, loggedInName?: string }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [remaining: number], switchEdit: [] }>()
 const { api, newKey } = useGuest()
@@ -40,7 +40,7 @@ async function submit() {
     }
     let persisted = true
     if (r.guest_token) persisted = setGuestToken(r.guest_token)
-    // 防呆：新認領卻沒拿到 token、本機也沒有（且不是登入帳號）→ 之後管不到這份認領，成功頁要警告而非謊稱已存
+    // 防呆：新捐助卻沒拿到 token、本機也沒有（且不是登入帳號）→ 之後管不到這份捐助，成功頁要警告而非謊稱已存
     const lost = !editing && !r.guest_token && !getGuestToken() && !props.loggedInName
     if (name.value.trim()) setPref('ws_nickname', name.value.trim())
     emit('done', { ...r, persisted, lost, email: email.value, name: name.value.trim() })
@@ -50,10 +50,10 @@ async function submit() {
       const rem = (e.data.remaining ?? 0) + (props.mine?.qty ?? 0)
       emit('stale', e.data.remaining ?? 0)
       max.value = rem; qty.value = Math.min(qty.value, rem) || 1
-      msg.value = rem > 0 ? `抱歉，只剩 ${rem} 個了。` : '剛剛被別人認領完了。'
+      msg.value = rem > 0 ? `抱歉，只剩 ${rem} 個了。` : '剛剛被別人捐助完了。'
       if (rem <= 0) setTimeout(() => emit('close'), 1200)
     } else if (c === 'CLAIM_ALREADY_EXISTS') {
-      msg.value = '你已經認領過這個品項，已幫你切換到修改'
+      msg.value = '你已經捐助過這個品項，已幫你切換到修改'
       emit('switchEdit')
     } else if (c === 'VALIDATION_FAILED') {
       for (const x of e.data.errors ?? []) errs.value[x.pointer.slice(1)] = x.detail
@@ -69,7 +69,7 @@ async function submit() {
     <form class="g-sheet" @submit.prevent="submit">
       <div class="g-item">
         <img v-if="item.image_url" class="g-thumb" :src="item.image_url" alt="">
-        <div class="g-body"><div id="claim-title" class="g-title">{{ editing ? '修改認領' : '認領' }}「{{ item.title }}」</div>
+        <div class="g-body"><div id="claim-title" class="g-title">{{ editing ? '修改捐助' : '捐助' }}「{{ item.title }}」</div>
           <div class="g-mute">還缺 {{ item.qty_remaining }} 個，你要送幾個？</div></div>
       </div>
       <div class="g-step">
@@ -79,7 +79,7 @@ async function submit() {
       </div>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
       <template v-if="!editing">
-        <p v-if="loggedInName" class="g-mute">以 {{ loggedInName }} 的身分認領</p>
+        <p v-if="loggedInName" class="g-mute">以 {{ loggedInName }} 的身分捐助</p>
         <template v-else>
           <label for="cn">你的暱稱（必填）</label>
           <input id="cn" v-model="name" maxlength="30" :readonly="busy" :required="needName" placeholder="例如：阿明" autocomplete="nickname">
@@ -91,14 +91,14 @@ async function submit() {
         </template>
         <label for="cc">聯絡方式（選填，只有建立者看得到）</label>
         <input id="cc" v-model="contact" maxlength="80" :readonly="busy" placeholder="LINE ID 或電話">
-        <label for="ce">Email（選填）：可收到確認信與「管理我的認領」連結，換手機也找得回來</label>
+        <label for="ce">Email（選填）：可收到確認信與「管理我的捐助」連結，換手機也找得回來</label>
         <input id="ce" v-model="email" type="email" :readonly="busy" placeholder="name@example.com" autocomplete="email">
         <div v-if="errs.email" class="g-field-err">{{ errs.email }}</div>
       </template>
       <label for="cm">留言（選填）</label>
       <input id="cm" v-model="note" maxlength="200" :readonly="busy">
-      <p class="g-mute">不需註冊。認領後可隨時修改或取消。我們如何使用你的資料：<NuxtLink to="/privacy#collect" target="_blank">個資蒐集告知</NuxtLink><span class="g-nowrap">（不需勾選）</span></p>
-      <button class="g-btn" :disabled="busy || !online">{{ !online ? '離線中，暫時無法認領' : busy ? '送出中…' : editing ? '儲存修改' : '確認認領' }}</button>
+      <p class="g-mute">不需註冊。捐助後可隨時修改或取消。我們如何使用你的資料：<NuxtLink to="/privacy#collect" target="_blank">個資蒐集告知</NuxtLink><span class="g-nowrap">（不需勾選）</span></p>
+      <button class="g-btn" :disabled="busy || !online">{{ !online ? '離線中，暫時無法捐助' : busy ? '送出中…' : editing ? '儲存修改' : '確認捐助' }}</button>
       <button type="button" class="g-link" @click="emit('close')">取消</button>
     </form>
   </GuestDialog>

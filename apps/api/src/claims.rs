@@ -1,4 +1,4 @@
-//! 認領：POST /items/{id}/claims、PATCH/DELETE /claims/{id}（契約 4.1 / 4.2、F4 / F5）。
+//! 捐助：POST /items/{id}/claims、PATCH/DELETE /claims/{id}（契約 4.1 / 4.2、F4 / F5）。
 //! 鎖序：wishlist_items（條件式 UPDATE / FOR UPDATE）→ claims。
 use crate::{
     error::AppError,
@@ -43,7 +43,7 @@ pub struct ClaimRow {
     pub purchased_at: Option<DateTime<Utc>>,
     pub delivered_at: Option<DateTime<Utc>>,
     pub cancelled_at: Option<DateTime<Utc>>,
-    /// 登入者認領的公開層級（public/friends/private）；訪客認領為 null
+    /// 登入者捐助的公開層級（public/friends/private）；訪客捐助為 null
     pub visibility: Option<String>,
 }
 
@@ -106,7 +106,7 @@ fn full(remaining: i32, want: i32) -> AppError {
     AppError::Extra {
         status: 409,
         code: "ITEM_FULLY_CLAIMED",
-        detail: format!("此品項剩餘 {remaining} 件，無法再認領 {want} 件。"),
+        detail: format!("此品項剩餘 {remaining} 件，無法再捐助 {want} 件。"),
         extra: json!({ "remaining": remaining }),
     }
 }
@@ -185,7 +185,7 @@ async fn create(
         ));
     }
 
-    // 存取判斷（看得到才能認領）：好友/名單/密碼清單；品項不存在則交給後面的 diagnose 回 404
+    // 存取判斷（看得到才能捐助）：好友/名單/密碼清單；品項不存在則交給後面的 diagnose 回 404
     let wl: Option<(Uuid, Uuid, String, Option<String>)> = sqlx::query_as(
         "SELECT w.id, w.owner_id, w.visibility::text, w.access_password_hash FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
          WHERE i.id = $1 AND i.deleted_at IS NULL AND w.deleted_at IS NULL").bind(item_id).fetch_optional(&st.pool).await?;
@@ -222,7 +222,7 @@ async fn create(
     if let idempotency::Begin::Replay(s, mut b) =
         idempotency::begin(&mut tx, &scope, key, &hash).await?
     {
-        // F-01：首次認領建立了 guest 的那次（scope=anon），回應可能已遺失 → 對同一 guest 重新簽發新 token（舊 token 失效）。
+        // F-01：首次捐助建立了 guest 的那次（scope=anon），回應可能已遺失 → 對同一 guest 重新簽發新 token（舊 token 失效）。
         // 明文只存在這次回應；idempotency_keys 只存 guest_id（非機密）。key 是客戶端產生的 UUID，只有送出者知道。
         let gid = b
             .as_object_mut()
@@ -239,9 +239,9 @@ async fn create(
         }
         return Ok(json_resp(s, &b, true));
     }
-    // 限流放在重播判斷之後：重播只回放已存的回應、不產生新認領，不消耗額度（也讓網路重試不會被誤擋）。
+    // 限流放在重播判斷之後：重播只回放已存的回應、不產生新捐助，不消耗額度（也讓網路重試不會被誤擋）。
     // 超限時 tx 隨 return 回滾，idempotency key 不會被占用，額度重置後可用同 key 重試。
-    // 計數與認領同一個 tx（不另佔連線，避免併發時 pool 耗盡死結；429 時計數一併回滾，只算成功放行的請求）。
+    // 計數與捐助同一個 tx（不另佔連線，避免併發時 pool 耗盡死結；429 時計數一併回滾，只算成功放行的請求）。
     // 以「身分」計數，不以 IP：派對場地 Wi-Fi、電信商 CGNAT 會讓很多真人共用同一個 IP。
     // 既有 guest / 登入使用者：各自每小時 30 次、同一清單 15 次；只有「建立全新 guest」才按 IP 計（每小時 100 個）。
     let who = match actor {
@@ -277,7 +277,7 @@ async fn create(
     let name: String = match actor {
         Some(Actor::User(u)) => {
             user_id = Some(u);
-            // 使用者 → 清單：刪帳號先鎖 users，認領的 FK 不能反向等待。
+            // 使用者 → 清單：刪帳號先鎖 users，捐助的 FK 不能反向等待。
             sqlx::query_scalar(
                 "SELECT display_name FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE",
             )
@@ -296,7 +296,7 @@ async fn create(
         None => {
             let name = dn
                 .ok_or_else(|| {
-                    AppError::invalid("/display_name", "REQUIRED", "首次認領需填寫暱稱")
+                    AppError::invalid("/display_name", "REQUIRED", "首次捐助需填寫暱稱")
                 })?
                 .to_owned();
             let (tok, h) = guest::new_token();
@@ -323,7 +323,7 @@ async fn create(
             .await?;
     }
     // 4.1 (b)：條件式 UPDATE 取得 item row lock 並驗證剩餘量。
-    // 偏差：加 moderation_status='ok' 與 visibility<>'private'，下架/私人清單不可認領。
+    // 偏差：加 moderation_status='ok' 與 visibility<>'private'，下架/私人清單不可捐助。
     let upd: Option<(i32, i32, Option<i32>)> = sqlx::query_as(
         "UPDATE wishlist_items i SET qty_claimed = i.qty_claimed + $2
          FROM wishlists w
@@ -354,7 +354,7 @@ async fn create(
             return Err(AppError::Extra {
                 status: 409,
                 code: "CLAIM_ALREADY_EXISTS",
-                detail: "你已認領過此品項，請改用修改數量".into(),
+                detail: "你已捐助過此品項，請改用修改數量".into(),
                 extra: json!({ "claim_id": id }),
             });
         }
@@ -388,7 +388,7 @@ async fn create(
     idempotency::finish(&mut tx, &scope, key, 201, &stored).await?;
     let wid = wishlist_of(&mut tx, item_id).await?;
     // 訪客有留 Email → 確認信（恢復權杖於寄信時才產生，明文不落庫）。
-    // 濫用限流：超限只是不寄信，認領本身照常成功。
+    // 濫用限流：超限只是不寄信，捐助本身照常成功。
     let guest_email: Option<String> = match guest_id {
         Some(g) => {
             sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL")
@@ -429,10 +429,10 @@ async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, A
         Some((_, _, _, m, ..)) if m == "hidden" => AppError::WishlistRemoved,
         Some((_, s, v, ..)) if s == "draft" || v == "private" => AppError::NotFound,
         Some((_, s, ..)) if s != "active" => {
-            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受認領")
+            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受捐助")
         }
         Some((_, _, _, _, f, _)) if f != "quantity" => {
-            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是數量型認領")
+            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是數量型捐助")
         }
         Some((.., remaining)) => full(remaining, want),
     })
@@ -545,13 +545,13 @@ async fn apply(
         Actor::Guest(g) => guest_id == Some(g),
         Actor::User(u) => user_id == Some(u),
     };
-    // 清單擁有者（F5）：只能推進 delivered 或取消；驚喜鎖定期間看不到認領，一律禁止
+    // 清單擁有者（F5）：只能推進 delivered 或取消；驚喜鎖定期間看不到捐助，一律禁止
     let by_owner = !mine && matches!(actor, Actor::User(u) if u == owner_id);
     if !mine && !by_owner {
         return Err(AppError::problem(
             403,
             "FORBIDDEN",
-            "只有認領者本人可以操作",
+            "只有捐助者本人可以操作",
         ));
     }
     if by_owner
@@ -564,7 +564,7 @@ async fn apply(
         return Err(AppError::problem(
             403,
             "FORBIDDEN",
-            "清單擁有者只能在驚喜解鎖後標記已送達或取消認領",
+            "清單擁有者只能在驚喜解鎖後標記已送達或取消捐助",
         ));
     }
 
@@ -572,7 +572,7 @@ async fn apply(
         return Err(AppError::invalid(
             "/visibility",
             "NOT_APPLICABLE",
-            "訪客認領沒有公開層級設定",
+            "訪客捐助沒有公開層級設定",
         ));
     }
     let bad = || AppError::problem(409, "INVALID_STATE_TRANSITION", "不允許的狀態轉換");
@@ -673,7 +673,7 @@ async fn wishlist_of(tx: &mut Transaction<'_, Postgres>, item_id: Uuid) -> Resul
     )
 }
 
-/// FR-08：把逾期的 reserved 認領設為 expired 並回補 qty_claimed，回傳釋放的認領數。
+/// FR-08：把逾期的 reserved 捐助設為 expired 並回補 qty_claimed，回傳釋放的捐助數。
 /// 鎖序同 apply()：先鎖 item（依 id 排序）再動 claim；UPDATE ... WHERE status='reserved' 保證多實例 / 與取消競態時只回補一次。
 pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
     let mut tx = pool.begin().await?;

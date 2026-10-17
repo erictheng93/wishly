@@ -115,8 +115,8 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <dl class="admin-stats">
         <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`">{{ stats?.[key] ?? '–' }}</dd></div>
       </dl>
-      <details v-if="stats"><summary>認領、通知與最近 7 天營運動作</summary>
-        <div v-for="(name, key) in { claims_by_status: '認領狀態', notifications_by_status: '通知狀態', audit_last_7d: '最近 7 天稽核動作' }" :key="key" class="c-mt">
+      <details v-if="stats"><summary>捐助、通知與最近 7 天營運動作</summary>
+        <div v-for="(name, key) in { claims_by_status: '捐助狀態', notifications_by_status: '通知狀態', audit_last_7d: '最近 7 天稽核動作' }" :key="key" class="c-mt">
           <strong>{{ name }}</strong><ul><li v-for="(count, status) in stats[key]" :key="status">{{ status }}：{{ count }}</li></ul>
           <p v-if="!Object.keys(stats[key] || {}).length" class="c-mute">目前沒有紀錄</p>
         </div>

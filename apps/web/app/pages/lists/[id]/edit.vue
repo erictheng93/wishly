@@ -73,7 +73,7 @@ async function remove(force = false) {
   delBusy.value = true; delErr.value = ''
   try { await api(`/items/${del.value.id}`, { method: 'DELETE', query: force ? { force: true } : {} }); del.value = null; await load(true) }
   catch (e: any) {
-    if (e.code === 'ITEM_HAS_CLAIMS' && !force) delErr.value = '此品項已有認領。若仍要刪除，認領將一併取消，請再按一次確認。'
+    if (e.code === 'ITEM_HAS_CLAIMS' && !force) delErr.value = '此品項已有捐助。若仍要刪除，捐助將一併取消，請再按一次確認。'
     else delErr.value = errMsg(e)
     if (e.code === 'ITEM_HAS_CLAIMS') del.value.force = true
   } finally { delBusy.value = false }
@@ -115,8 +115,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <div v-else class="c-thumb">{{ i.image_status === 'pending' ? '處理中' : '無圖' }}</div>
           <div class="c-grow">
             <strong>{{ i.title }}</strong>
-            <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">點數眾籌 {{ fmtPts(i.pledged_points) }} / {{ fmtPts(i.target_points) }} 點<template v-if="i.funding_deadline">・至 {{ fmtTime(i.funding_deadline) }}</template>・優先度{{ { high: '高', medium: '中', low: '低' }[i.priority as string] || '' }}</div>
-            <div v-else class="c-mute">需要 {{ i.qty_needed }}・數量認領・優先度{{ { high: '高', medium: '中', low: '低' }[i.priority as string] || '' }}</div>
+            <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">心願眾籌 {{ fmtPts(i.pledged_points) }} / {{ fmtPts(i.target_points) }} 點<template v-if="i.funding_deadline">・至 {{ fmtTime(i.funding_deadline) }}</template>・優先度{{ { high: '高', medium: '中', low: '低' }[i.priority as string] || '' }}</div>
+            <div v-else class="c-mute">需要 {{ i.qty_needed }}・數量捐助・優先度{{ { high: '高', medium: '中', low: '低' }[i.priority as string] || '' }}</div>
             <CreatorStatusBadge v-if="i.image_status === 'pending' || i.image_status === 'rejected'" :v="i.image_status" />
             <div v-if="i.image_status === 'rejected'" class="c-err">圖片未通過，請換一張</div>
           </div>
@@ -134,7 +134,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <aside>
 
       <details ref="addrEl" class="c-card" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
-        <summary>收件資訊（點數眾籌用）<span v-if="w.has_shipping_address" class="c-badge active">已填寫</span></summary>
+        <summary>收件資訊（心願眾籌用）<span v-if="w.has_shipping_address" class="c-badge active">已填寫</span></summary>
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
 
@@ -145,7 +145,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <label class="c-field"><span>說明</span><textarea v-model="meta.description" rows="2" /></label>
           <label class="c-field"><span>活動日</span><input v-model="meta.event_date" type="date"></label>
           <label class="c-field"><span>自動結束時間（選填，留空＝不設期限）</span><input v-model="meta.closes_at" type="datetime-local"></label>
-          <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>顯示認領者暱稱給其他訪客</span></label>
+          <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>顯示捐助者暱稱給其他訪客</span></label>
           <CreatorVisibilityPicker v-model:visibility="meta.visibility" v-model:password="meta.password" v-model:users="allowed" :has-password="w.has_password" />
           <p class="c-mute">驚喜模式：{{ w.surprise_mode ? (w.surprise_locked ? '開啟中（鎖定至活動日，無法關閉）' : '開啟中（已解鎖）') : '未開啟' }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
@@ -165,7 +165,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     </template>
 
     <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
-    <CreatorConfirm :open="!!del" title="刪除品項" :text="`確定刪除「${del?.title}」？`" :ok="del?.force ? '連同認領一併刪除' : '刪除'" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
+    <CreatorConfirm :open="!!del" title="刪除品項" :text="`確定刪除「${del?.title}」？`" :ok="del?.force ? '連同捐助一併刪除' : '刪除'" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
     <CreatorSheet :open="showShare" title="分享你的清單" @close="showShare = false">
       <p v-if="w?.status === 'draft'" class="c-err">尚未發佈，朋友打開會看到不存在。</p>
       <p class="c-mute">{{ visDesc(w?.visibility) }}</p>

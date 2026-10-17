@@ -41,6 +41,6 @@ async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 2);
     let (_, body) = wishly_api::notify::render("claim.digest", "清單", &json!({"count": 2}));
-    assert!(body.contains("2 件新認領"));
+    assert!(body.contains("2 件新捐助"));
     assert_all_reconciled(&pool).await;
 }

@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 import { createList, loginBrowser, makeStaff, registerUser, sql, type User } from './helpers'
 
-// P2-A 點數眾籌：真實 API + Web + DB，跑完「設定 → 發點 → 贊助 → 撤回 → 達標 → 捐款者名單 → 採購 → 差額退回」與「截止後轉投」。
+// P2-A 心願眾籌：真實 API + Web + DB，跑完「設定 → 發點 → 贊助 → 撤回 → 達標 → 捐款者名單 → 採購 → 差額退回」與「截止後轉投」。
 // 每個測試自建使用者與清單，可平行。
 
 const ADDR = { recipient_name: '王小米', phone: '0912345678', address: '台北市大安區和平東路二段 1 號 3 樓' }
@@ -47,7 +47,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   const fillCrowdfund = async () => {
     await op.getByRole('button', { name: '＋ 新增品項' }).click()
     await op.getByLabel('名稱（必填）').fill('嬰兒推車')
-    await op.getByLabel('點數眾籌').check()
+    await op.getByLabel('心願眾籌').check()
     await op.getByLabel(/目標點數/).fill('1000')
     await op.getByLabel(/募集截止/).fill(taipeiInput(7))
     await op.getByRole('button', { name: '儲存品項' }).click()
@@ -86,7 +86,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   // ---- 未登入訪客按贊助 → 導去登入 ----
   const guest = await (await browser.newContext()).newPage()
   await guest.goto(`/s/${slug}`)
-  await card(guest, '嬰兒推車').getByRole('button', { name: '用點數贊助' }).click()
+  await card(guest, '嬰兒推車').getByRole('button', { name: '心願眾籌' }).click()
   await expect(guest).toHaveURL(/\/login\?redirect=/)
 
   // ---- 阿美：在分享頁贊助 400，再到「我的點數」撤回 ----
@@ -100,7 +100,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   await ap.goto(`/s/${slug}`)
   await meRequest
   await expect(card(ap, '嬰兒推車')).toContainText('已募 0 / 1,000 點')
-  await card(ap, '嬰兒推車').getByRole('button', { name: '用點數贊助' }).click()
+  await card(ap, '嬰兒推車').getByRole('button', { name: '心願眾籌' }).click()
   releaseMe()
   const fund = ap.getByRole('dialog')
   await expect(fund).toBeVisible()
@@ -122,7 +122,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   // ---- 阿本：匿名贊助剩餘的 400，剛好達標 ----
   const bp = await pageAs(browser, ben)
   await bp.goto(`/s/${slug}`)
-  await card(bp, '嬰兒推車').getByRole('button', { name: '用點數贊助' }).click()
+  await card(bp, '嬰兒推車').getByRole('button', { name: '心願眾籌' }).click()
   const bf = bp.getByRole('dialog')
   await expect(bf).toBeVisible()
   await bf.getByLabel('贊助點數').fill('400')

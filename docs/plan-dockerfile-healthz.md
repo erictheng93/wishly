@@ -94,7 +94,7 @@
 
 > **2026-10-15：已實作（`e2593f5`）後依決定移除**；換版時進行中的請求會被切斷，客戶端以 `Idempotency-Key` 重試。以下為當時的設計紀錄。
 
-換版／停止容器時（Dokploy／`docker stop`）送 SIGTERM，預設 10 秒後強殺。現況 `axum::serve` 無 graceful shutdown，進行中的認領 POST 會被切斷（有 Idempotency-Key，客戶端重試可恢復，但體驗差）。
+換版／停止容器時（Dokploy／`docker stop`）送 SIGTERM，預設 10 秒後強殺。現況 `axum::serve` 無 graceful shutdown，進行中的捐助 POST 會被切斷（有 Idempotency-Key，客戶端重試可恢復，但體驗差）。
 - 做法：`axum::serve(...).with_graceful_shutdown(shutdown_signal())`，`shutdown_signal` 等待 `tokio::signal::unix::signal(SignalKind::terminate())` 與 ctrl-c（tokio 已啟用 `signal`）。
 - 注意 SSE 單連線最長 30 分鐘，graceful shutdown 會等連線結束 → 必須搭配 `with_graceful_shutdown` 之外的強制上限（容器的停止寬限期會兜底），不可無限等待。
 - 這項會觸及 `main.rs`，與 §0.3 的排程決策（背景工作是否要隨 SIGTERM 停止）相關，**建議與 §0.3 一起做**。若只想先交付探針與 image，可延後，不影響本計畫驗收。

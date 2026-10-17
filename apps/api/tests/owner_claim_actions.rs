@@ -1,4 +1,4 @@
-//! 擁有者推進與取消認領。
+//! 擁有者推進與取消捐助。
 mod common;
 use axum::http::StatusCode;
 use serde_json::json;
@@ -80,7 +80,7 @@ async fn owner_delivers_and_cancels_claims(pool: PgPool) {
         call(&pool, "DELETE", &url(c1), &ck(&ot), None).await.0,
         StatusCode::CONFLICT
     );
-    // 取消別人的認領 → 回補、audit
+    // 取消別人的捐助 → 回補、audit
     assert_eq!(
         call(&pool, "DELETE", &url(c2), &ck(&ot), None).await.0,
         StatusCode::NO_CONTENT

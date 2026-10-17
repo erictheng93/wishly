@@ -6,7 +6,7 @@ const { user, fetchMe } = useAuth()
 const p = ref<any>(null), state = ref<'loading' | 'ok' | 'gone' | 'error'>('loading')
 const busy = ref(false), err = ref('')
 const vis: Record<string, string> = { public: '公開', friends: '僅好友', selected: '指定好友', link: '連結' }
-const status: Record<string, string> = { reserved: '已認領', purchased: '已購買', delivered: '已送達', ...CONTRIBUTION_STATUS }
+const status: Record<string, string> = { reserved: '已捐助', purchased: '已購買', delivered: '已送達', ...CONTRIBUTION_STATUS }
 useHead(() => ({ title: p.value ? `${p.value.user.display_name} 的心願` : '個人頁', meta: [{ name: 'robots', content: 'noindex' }] }))
 
 // 匿名也要能看：不走 useApi 的 401 轉址，直接帶 cookie 呼叫

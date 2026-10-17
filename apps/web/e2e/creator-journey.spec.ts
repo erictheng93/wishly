@@ -80,7 +80,7 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await ctx.close()
   })
 
-  await test.step('分享頁顯示結束時間；到期後訪客無法認領（不必等背景 job）', async () => {
+  await test.step('分享頁顯示結束時間；到期後訪客無法捐助（不必等背景 job）', async () => {
     const ctx = await browser.newContext()
     const guest = await ctx.newPage()
     await guest.goto(shareUrl)
@@ -91,7 +91,7 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await guest.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
     const dialog = guest.getByRole('dialog')
     await dialog.getByLabel('你的暱稱（必填）').fill('遲到的朋友')
-    await dialog.getByRole('button', { name: '確認認領' }).click()
+    await dialog.getByRole('button', { name: '確認捐助' }).click()
     await expect(guest.getByText(/已結束/).first()).toBeVisible()
     await ctx.close()
   })

@@ -124,7 +124,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
         .bind(u.id).fetch_one(&st.pool).await?;
     let identities: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('provider', provider::text) FROM auth_identities WHERE user_id = $1 ORDER BY created_at")
         .bind(u.id).fetch_all(&st.pool).await?;
-    // 驚喜鎖定期間不含品項認領數；只匯出本人的認領（不含他人資料）
+    // 驚喜鎖定期間不含品項捐助數；只匯出本人的捐助（不含他人資料）
     let wishlists: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title, 'type', w.type::text, 'status', w.status::text,
            'event_date', w.event_date, 'surprise_mode', w.surprise_mode, 'created_at', w.created_at,
@@ -213,7 +213,7 @@ async fn delete_me(
         .bind(id).fetch_all(&mut *tx).await?;
     let (archived, slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().unzip();
     crate::wishlists::release_pledged(&mut tx, &archived).await?; // 別人捐在這些清單上、尚未達標的點數退回各自錢包
-                                                                  // F-08：取消他人清單上的 reserved 認領並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。
+                                                                  // F-08：取消他人清單上的 reserved 捐助並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE user_id = $1 AND status = 'reserved') ORDER BY id FOR UPDATE")
         .bind(id).execute(&mut *tx).await?;
     let wids: Vec<Uuid> = sqlx::query_scalar(

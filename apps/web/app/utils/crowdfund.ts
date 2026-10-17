@@ -1,4 +1,4 @@
-// P2-A 點數眾籌：純函式（文案對應、時間格式、錯誤歸因、表單轉換），可單元測試
+// P2-A 心願眾籌：純函式（文案對應、時間格式、錯誤歸因、表單轉換），可單元測試
 export const DISPLAY_STATUS: Record<string, string> = { open: '募集中', funded: '已達標', ordered: '已下單', shipped: '運送中', delivered: '已送達', expired: '已截止' }
 export const displayStatusLabel = (s?: string | null) => (s && DISPLAY_STATUS[s]) || ''
 
@@ -45,7 +45,7 @@ export function contributionErr(code: string, body: any = {}, fallback = '贊助
     case 'WALLET_FROZEN': return { msg: '你的點數錢包已被凍結，暫時無法贊助，請聯絡客服' }
     case 'WISHLIST_CLOSED': return { msg: '這份清單已結束，無法再贊助' }
     case 'WISHLIST_REMOVED': return { msg: '這份清單已被下架' }
-    case 'FUNDING_MODE_MISMATCH': return { msg: '這個品項不是點數眾籌，請改用「我要送」' }
+    case 'FUNDING_MODE_MISMATCH': return { msg: '這個品項不是心願眾籌，請改用「我要送」' }
     case 'IDEMPOTENCY_CONFLICT': return { msg: '請求重複，請關閉後重新操作' }
     case 'RATE_LIMITED': return { msg: '操作太頻繁，請稍後再試' }
     case 'NETWORK': return { msg: '網路不穩，再試一次' }

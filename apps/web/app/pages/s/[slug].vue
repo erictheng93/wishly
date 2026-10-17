@@ -8,7 +8,7 @@ const { api } = useGuest()
 const listUrl = `${apiBase}/api/v1/public/wishlists/${slug}`
 
 // 不用 useFetch 的 error 拋出：404 / 410 在頁內顯示，並設正確 HTTP 狀態碼（410 需 noindex、不洩漏標題）
-// cache: 'no-cache'：API 回的 Cache-Control 帶 stale-while-revalidate（給 CDN 用），瀏覽器會先吐舊資料；認領後的 refresh() 必須是新的（仍會用 ETag 回 304）
+// cache: 'no-cache'：API 回的 Cache-Control 帶 stale-while-revalidate（給 CDN 用），瀏覽器會先吐舊資料；捐助後的 refresh() 必須是新的（仍會用 ETag 回 304）
 const { data: fetched, error, refresh } = await useFetch<any>(`${apiBase}/api/v1/public/wishlists/${slug}`, { credentials: 'omit', cache: 'no-cache' })
 // 404 找不到 / 410 下架 / 其他（5xx、網路、逾時）= 暫時無法載入，回 503，避免爬蟲與快取把暫時性錯誤記成「不存在」
 // 暫時性錯誤（5xx / 網路）時保留上次成功的內容，不要讓 15 秒輪詢的一次失敗把整頁換成錯誤畫面；404 / 410 才清空
@@ -60,7 +60,7 @@ if (data.value) {
     title: () => data.value?.title,
     ogTitle: () => `幫${data.value?.owner?.display_name ?? '朋友'}挑禮物｜${data.value?.title}`,
     description: () => data.value?.description ?? undefined,
-    ogDescription: () => `已完成 ${data.value?.completion?.completion_pct ?? 0}%，還有 ${left()} 項等你認領。不用註冊，點開就能選。`,
+    ogDescription: () => `已完成 ${data.value?.completion?.completion_pct ?? 0}%，還有 ${left()} 項等你捐助。不用註冊，點開就能選。`,
     // ponytail: 預設圖為靜態檔；動態 /og/{slug}.png（含清單名稱與完成度）之後再做
     ogImage: () => data.value?.cover_image_url ?? `${origin}/og-default.png`,
     ogImageWidth: 1200, ogImageHeight: 630,
@@ -79,21 +79,21 @@ const closed = computed(() => data.value?.status === 'closed')
 
 // --- 線上狀態 / LINE 引導 ---
 const online = ref(true), mode = ref<LiveMode>('connecting'), lineHint = ref(false)
-// --- 我的認領（有 token 時 GET /guest/me）---
+// --- 我的捐助（有 token 時 GET /guest/me）---
 const myClaims = ref<Record<string, any>>({})
 async function loadMine() {
-  try { // 不先檢查 token：登入使用者靠 session cookie 認領，沒有 guest token
+  try { // 不先檢查 token：登入使用者靠 session cookie 捐助，沒有 guest token
     const r = await api('/guest/me?limit=100')
     myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, c.claim]))
   } catch { /* 401：token 失效，當作沒有 */ }
 }
 // 建立者本人 + 驚喜模式 → 軟性遮蔽（GET /me 比對 owner.id）
 const isOwner = ref(false)
-const me = ref<any>(null) // 已登入使用者：認領以帳號名稱進行，不再問暱稱
+const me = ref<any>(null) // 已登入使用者：捐助以帳號名稱進行，不再問暱稱
 const masked = computed(() => isOwner.value && !!data.value?.surprise_mode)
 
 let live: ReturnType<typeof createLiveRefresh> | undefined
-// 認領 sheet 在建立時決定訪客/登入模式：開啟前先等 /me 回來，避免登入者手快點到而被當成訪客（不問可見性、改問暱稱）
+// 捐助 sheet 在建立時決定訪客/登入模式：開啟前先等 /me 回來，避免登入者手快點到而被當成訪客（不問可見性、改問暱稱）
 let meReady: Promise<void> = Promise.resolve()
 async function openClaim(it: any) { await meReady; sheetItem.value = it }
 onMounted(async () => {
@@ -126,7 +126,7 @@ function startLive() {
 onBeforeUnmount(() => { live?.stop(); setActiveAccess(null) })
 
 
-// --- 認領 sheet / 成功 overlay ---
+// --- 捐助 sheet / 成功 overlay ---
 const sheetItem = ref<any>(null), done = ref<any>(null), reporting = ref(false), toast = ref('')
 const sheetMine = computed(() => sheetItem.value ? myClaims.value[sheetItem.value.id] ?? null : null)
 function onDone(r: any) {
@@ -157,7 +157,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="gone" class="g-center"><h1>此清單已被下架</h1><p class="g-mute">這份清單因違反服務條款已被移除，目前無法瀏覽或認領。</p><NuxtLink to="/">回首頁</NuxtLink></div>
+    <div v-if="gone" class="g-center"><h1>此清單已被下架</h1><p class="g-mute">這份清單因違反服務條款已被移除，目前無法瀏覽或捐助。</p><NuxtLink to="/">回首頁</NuxtLink></div>
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">載入中…</div>
     <div v-else-if="forbidden" class="g-center">
       <template v-if="gate.code === 'PASSWORD_REQUIRED'">
@@ -180,9 +180,9 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <div v-else-if="failed && !data" class="g-center"><h1>系統暫時無法載入，請稍後再試</h1><button class="g-btn" @click="reload()">重新載入</button></div>
     <div v-else-if="!data" class="g-center"><h1>找不到這份清單</h1><NuxtLink to="/">回首頁</NuxtLink></div>
     <template v-else>
-      <div class="g-banner g-nojs">需要 JavaScript 才能認領；你仍可查看清單內容</div>
-      <div v-if="!online" class="g-banner">目前離線，顯示的是上次載入的內容，認領功能暫停。</div>
-      <div v-if="lineHint" class="g-banner">想把認領保存起來？點右上角 ⋯ 選「用預設瀏覽器開啟」，之後比較不會找不到。 <button class="g-link" @click="dismissHint">知道了</button></div>
+      <div class="g-banner g-nojs">需要 JavaScript 才能捐助；你仍可查看清單內容</div>
+      <div v-if="!online" class="g-banner">目前離線，顯示的是上次載入的內容，捐助功能暫停。</div>
+      <div v-if="lineHint" class="g-banner">想把捐助保存起來？點右上角 ⋯ 選「用預設瀏覽器開啟」，之後比較不會找不到。 <button class="g-link" @click="dismissHint">知道了</button></div>
       <div v-if="closed" class="g-banner">這份清單已結束</div>
       <img v-if="data.cover_image_url" :src="data.cover_image_url" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
@@ -221,14 +221,14 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <GuestReportSheet v-if="reporting" :slug="slug" @close="reporting = false" @sent="reporting = false; toast = '已收到檢舉，我們會盡快處理'" />
 
     <GuestDialog v-if="done" labelledby="done-title" @close="done = null"><div class="g-sheet center">
-      <h1 id="done-title" class="ok">✓ 認領成功！</h1>
-      <p>你認領了 {{ done.title }} × {{ done.claim.qty }}<template v-if="done.name || done.claim.claimer_name">，謝謝你，{{ done.claim.claimer_name }}</template></p>
-      <div v-if="done.lost" class="g-banner err" role="alert">認領已送出，但這個瀏覽器沒有保存到身分，之後可能無法在這裡修改或取消。請先截圖保存；若有填 Email，可用確認信中的「管理我的認領」連結找回，也可以重新整理頁面確認。</div>
-      <div v-else-if="!done.persisted" class="g-banner err">無法儲存於此裝置，請截圖保存。換瀏覽器後可能找不到這份認領。</div>
-      <div v-else class="g-banner ok">這份認領已存在此裝置，可在「我的認領」查看、標記已購買或取消。</div>
+      <h1 id="done-title" class="ok">✓ 捐助成功！</h1>
+      <p>你捐助了 {{ done.title }} × {{ done.claim.qty }}<template v-if="done.name || done.claim.claimer_name">，謝謝你，{{ done.claim.claimer_name }}</template></p>
+      <div v-if="done.lost" class="g-banner err" role="alert">捐助已送出，但這個瀏覽器沒有保存到身分，之後可能無法在這裡修改或取消。請先截圖保存；若有填 Email，可用確認信中的「管理我的捐助」連結找回，也可以重新整理頁面確認。</div>
+      <div v-else-if="!done.persisted" class="g-banner err">無法儲存於此裝置，請截圖保存。換瀏覽器後可能找不到這份捐助。</div>
+      <div v-else class="g-banner ok">這份捐助已存在此裝置，可在「我的捐助」查看、標記已購買或取消。</div>
       <p v-if="done.email" class="g-mute">已寄出管理連結到 {{ maskedEmail(done.email) }}</p>
-      <div v-if="isLineBrowser()" class="g-banner">LINE 內建瀏覽器關閉後，認領紀錄可能找不到。點右上角 ⋯ →「用預設瀏覽器開啟」。</div>
-      <NuxtLink class="g-btn block" to="/me/claims">查看我的認領</NuxtLink>
+      <div v-if="isLineBrowser()" class="g-banner">LINE 內建瀏覽器關閉後，捐助紀錄可能找不到。點右上角 ⋯ →「用預設瀏覽器開啟」。</div>
+      <NuxtLink class="g-btn block" to="/me/claims">查看我的捐助</NuxtLink>
       <button class="g-link" @click="done = null">回到清單繼續看</button>
     </div></GuestDialog>
     <div v-if="toast" class="g-banner g-toast" role="status" @click="toast = ''">{{ toast }}</div>

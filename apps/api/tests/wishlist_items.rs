@@ -127,7 +127,7 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     assert_eq!(got["wishlist"]["title"], "寶寶清單");
     assert_eq!(got["items"][0]["qty_claimed"], 0);
 
-    // qty_needed 不得低於已認領
+    // qty_needed 不得低於已捐助
     sqlx::query("UPDATE wishlist_items SET qty_claimed=2 WHERE id=$1")
         .bind(Uuid::parse_str(&iid).unwrap())
         .execute(&pool)
@@ -165,7 +165,7 @@ async fn owner_only_and_item_rules(pool: PgPool) {
         200
     );
 
-    // 有認領的品項刪除需 force
+    // 有捐助的品項刪除需 force
     let (st, _, e) = call_app(&app, "DELETE", &iu, &ck(&a), None).await;
     assert_eq!(
         (st, e["code"].as_str()),

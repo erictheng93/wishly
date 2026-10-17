@@ -226,11 +226,11 @@ async function remove() {
       </section>
       <section class="c-card">
         <h2 class="c-h2">通知</h2>
-        <label class="c-switch"><input type="checkbox" :checked="!!user.email && user.notification_prefs?.email_claims" :disabled="!user.email" @change="toggle"><span>有人認領時寄 Email<br><small class="c-mute">第一筆即時通知，之後每日彙整一封。驚喜模式下只寫「有 N 件新認領」。</small></span></label>
+        <label class="c-switch"><input type="checkbox" :checked="!!user.email && user.notification_prefs?.email_claims" :disabled="!user.email" @change="toggle"><span>有人捐助時寄 Email<br><small class="c-mute">第一筆即時通知，之後每日彙整一封。驚喜模式下只寫「有 N 件新捐助」。</small></span></label>
       </section>
       <section class="c-card">
         <h2 class="c-h2">匯出資料</h2>
-        <p class="c-mute">包含個人資料、清單與認領紀錄（JSON）。</p>
+        <p class="c-mute">包含個人資料、清單與捐助紀錄（JSON）。</p>
         <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? '匯出中…' : '匯出我的資料' }}</button>
       </section>
       <section class="c-card">

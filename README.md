@@ -1,6 +1,6 @@
 # Wishly 願望清單（MVP）
 
-建立願望清單、用連結分享，親友免註冊即可認領品項，並確保不會重複認領（超賣防護）。
+建立願望清單、用連結分享，親友免註冊即可捐助品項，並確保不會重複捐助（超賣防護）。
 
 ## 結構
 
@@ -62,7 +62,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 `/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄。
 
 - 第一位 staff 需由資料庫設定 `users.is_staff = true`；之後可在後台設為／取消 staff。最後一位有效 staff 不可被停權、降權或自行刪帳號。
-- 停權、staff 變更與營運解除綁定會撤銷現有登入；解鎖後需重新登入。停權保留清單、認領與帳務紀錄，不會自動下架清單。
+- 停權、staff 變更與營運解除綁定會撤銷現有登入；解鎖後需重新登入。停權保留清單、捐助與帳務紀錄，不會自動下架清單。
 - 使用者支援 Email、名稱、handle、UUID 查詢，以及登入來源／帳號狀態篩選。停權、staff 變更、解除綁定與復原協助必須填寫原因並留下稽核。
 - 解除 LINE／Google 綁定至少須保留一種登入方式，並更新聯絡 Email、寄送安全通知。復原協助僅向既有已驗證 Email 寄送密碼重設驗證信；無 Email 帳號須另行核驗身分，後台不能直接換綁。
 - 新增 migration `0008_admin_users.sql`（`users.blocked_at`），由 API 啟動時套用，無新增環境變數。稽核日期依台北時區且包含結束日。
@@ -88,7 +88,7 @@ cd apps/web && npm run typecheck && npm run test:coverage && npm run build   # C
 
 ### 端對端測試（Playwright）
 
-`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（訪客認領、防超賣、點數眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試等）。
+`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（訪客捐助、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試等）。
 
 前置條件：
 - `docker compose up -d db mailpit`（Postgres 在 5432、Mailpit 在 8025；OTP 信從 Mailpit HTTP API 讀取）。
@@ -189,5 +189,5 @@ npx playwright show-report                                      # 開啟上次�
 **P0 上線阻擋（2026-10-12 查核）：S1–S3 尚無可追溯的真機結案證據，均未驗收；補測與技術決策結案優先於新功能。** 見 `git show 5c13bb9:docs/qa/spike-status.md`（文件已自 repo 移除）。
 
 0. 骨架與 CI → 1. 技術原型 S1–S3（真實 Pages 帳號、LINE 預覽 / 內建瀏覽器 cookie / SSE，見 `docs/03` 第 14 節）
-→ 2. 垂直切片：公開分享頁 → 訪客認領 → 創建者登入與編輯 → 進度儀表板 / 驚喜模式 / 即時更新 → MVP 附加功能
+→ 2. 垂直切片：公開分享頁 → 訪客捐助 → 創建者登入與編輯 → 進度儀表板 / 驚喜模式 / 即時更新 → MVP 附加功能
 → 3. 封閉測試 8 週，依 PRD 的 go / no-go 標準決定是否進入第二期。

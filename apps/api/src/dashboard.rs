@@ -1,9 +1,9 @@
 //! 公開頁 SSE 即時更新。（擁有者儀表板 GET /wishlists/{id}/dashboard 由 wishlists.rs 實作。）
 //!
-//! SSE 機制：認領 / 清單變更後呼叫 `dashboard::notify(executor, wishlist_id)`（Postgres
+//! SSE 機制：捐助 / 清單變更後呼叫 `dashboard::notify(executor, wishlist_id)`（Postgres
 //! `pg_notify('wishlist_events', id)`，在交易內呼叫則 commit 後才送出）。每個 process 只開一條
 //! PgListener（首位訂閱者出現時惰性啟動），轉成 tokio broadcast；各 SSE 連線收到自己清單的 id
-//! 就重新查詢並只推「有變動」的品項 + wishlist.updated。事件只含數量彙總，不含認領者。
+//! 就重新查詢並只推「有變動」的品項 + wishlist.updated。事件只含數量彙總，不含捐助者。
 use crate::{error::AppError, AppState};
 use axum::{
     extract::{Path, Query, State},
@@ -46,7 +46,7 @@ static BUS: OnceCell<broadcast::Sender<Uuid>> = OnceCell::const_new();
 
 async fn bus(pool: &PgPool) -> Result<&'static broadcast::Sender<Uuid>, sqlx::Error> {
     BUS.get_or_try_init(|| async {
-        // 回應 SSE 之前完成 LISTEN，避免首個認領通知在 listener 啟動前遺失。
+        // 回應 SSE 之前完成 LISTEN，避免首個捐助通知在 listener 啟動前遺失。
         let mut listener = sqlx::postgres::PgListener::connect_with(pool).await?;
         listener.listen(CHANNEL).await?;
         let (tx, _) = broadcast::channel(256);

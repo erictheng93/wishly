@@ -318,10 +318,10 @@ curl http://104.105.138.208:8080/healthz → 連線失敗（HTTP 000，逾時）
 | `content-type` | `text/event-stream`（未被轉換） |
 | TTFB | 1562 ms（單次） |
 | 位元組間隔 p50／max／超過 30 秒 | 14982 ms／15477 ms／**0** |
-| 觸發事件延遲（認領 POST 完成 → SSE 收到 `item.updated`） | 804 ms（n=1） |
+| 觸發事件延遲（捐助 POST 完成 → SSE 收到 `item.updated`） | 804 ms（n=1） |
 
 - 心跳約每 15 秒，**沒有被緩衝**；Tunnel → Cloudflare 路徑可傳遞 SSE。
-- 「4 次觸發只收到 1 次事件」**不是故障**：第 1 次認領 201 並收到事件；後 3 次回 409（品項數量 1，已被認領）→ 沒有狀態變化所以沒有事件。探針的 `events_missed` 在此測試設計下會誤報。
+- 「4 次觸發只收到 1 次事件」**不是故障**：第 1 次捐助 201 並收到事件；後 3 次回 409（品項數量 1，已被捐助）→ 沒有狀態變化所以沒有事件。探針的 `events_missed` 在此測試設計下會誤報。
 - **限制**：伺服器每條連線上限 30 分鐘，要驗證越過上限後的重連行為至少需跑 > 30 分鐘；Spike S3 驗收門檻是 120 分鐘。**本次只是短測，不是驗收。**
 
 ### 延遲觀察（未定論）
@@ -339,6 +339,7 @@ curl http://104.105.138.208:8080/healthz → 連線失敗（HTTP 000，逾時）
 - 事件：Dokploy `api` 的 Environment 編輯器在某次載入時**未遮蔽**，Playwright 快照把全部 18 行（含值）讀進代理程式的輸出，進入本機對話紀錄與送往模型的上下文。**未寫入 repo，未提交、未推送。**
 - 受影響：`DATABASE_URL`（含資料庫密碼）、`OTP_PEPPER`、`OAUTH_SECRET`、`UNSUB_SECRET`、`SHIPPING_ENC_KEY`、`TURNSTILE_SECRET`。此後的檢查改為只讀鍵名／行數。
 - 同一份快照也被 Playwright 存成本機檔案（`apps/web/.playwright-cli/page-*.yml`），當時**未被 gitignore 且未追蹤**（從未被提交）。2026-10-17 已刪除該檔，並把 `.playwright-cli/` 加進 `.gitignore`；殘留檢查（以環境變數鍵名與 DB 連線字串樣式全 repo 搜尋）無其他副本。**教訓：對含機密的頁面，不要存快照，只用 `eval` 取鍵名或行數。**
+- 事後核查（2026-10-17）：①git 歷史與遠端：全歷史搜尋 DB 密碼片段 0 次命中，`OTP_PEPPER=` 僅出現在示例檔（`dev-pepper`／空值）；`origin/main` 停在 `40febd1`，早於快照產生時間，**機密從未推上 GitHub**。②本機磁碟：搜尋 `~/Documents/Code`、`~/.playwright-cli`、暫存區與 Playwright 快取，無含機密樣式的檔案。③程式碼索引（codebase-memory）：原本曾把快照收成 `Route` 節點（含連線字串明文），檔案刪除後索引已於 07:21Z 重建，查詢機密樣式的節點為 0；repo 內無持久化索引檔。④GitHub：repo 為公開，secret scanning 與 push protection 皆開啟（僅涵蓋已知 token 格式，見 `TODO.md` P1）。
 - 對話紀錄（`~/.claude/projects/…/*.jsonl`）仍含這些值，位於使用者本機，無法由代理程式清除；這是建議輪替的原因。
 - 為何現在輪替成本最低：資料量極少，且 `SHIPPING_ENC_KEY` 尚無已加密的真實資料（一旦有真實收件資訊就不能再換，沒有輪替機制）。
 - 更正先前的說法：**資料庫密碼可以不重建 `db` 服務就輪替**——`POSTGRES_PASSWORD` 只在資料目錄初始化時使用，用 `ALTER ROLE wishly PASSWORD '…'` 並同步更新 Dokploy 的 `DATABASE_URL` 即可（`db` 服務的環境變數同步更新以免日後重建不一致）。
@@ -362,7 +363,7 @@ curl http://104.105.138.208:8080/healthz → 連線失敗（HTTP 000，逾時）
 ### 12.3 驗證留下的測試資料（正式環境）
 
 - 一個測試帳號（負責人信箱）。
-- 一份清單「部署驗證用清單」（目前可見度「知道連結」）、1 個品項、1 筆認領。
+- 一份清單「部署驗證用清單」（目前可見度「知道連結」）、1 個品項、1 筆捐助。
 - R2：一張封面圖（公開 key `covers/…webp`）。
 - 尚未刪除，由負責人決定。
 

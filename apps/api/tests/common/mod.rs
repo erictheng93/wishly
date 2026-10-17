@@ -368,7 +368,7 @@ pub async fn quantity_wishlist(
     (list, ids)
 }
 
-/// 建立指定數量的訪客認領。
+/// 建立指定數量的訪客捐助。
 pub async fn guest_claim(pool: &PgPool, item: Uuid, qty: i32) -> (String, Uuid) {
     guest_claim_with_email(pool, item, qty, None).await
 }

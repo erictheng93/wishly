@@ -1,4 +1,4 @@
-//! 社群：好友（申請/邀請/解除）、個人頁清單與捐助可見性、handle 與認領 visibility
+//! 社群：好友（申請/邀請/解除）、個人頁清單與捐助可見性、handle 與捐助 visibility
 mod common;
 use axum::{
     body::Body,
@@ -48,7 +48,7 @@ async fn list(pool: &PgPool, owner: Uuid, vis: &'static str, surprise: bool) -> 
     (wid, it)
 }
 
-/// 直接寫入使用者認領
+/// 直接寫入使用者捐助
 async fn user_claim(pool: &PgPool, item: Uuid, user: Uuid, vis: &str) -> Uuid {
     let mut tx = pool.begin().await.unwrap();
     sqlx::query("UPDATE wishlist_items SET qty_claimed=qty_claimed+1 WHERE id=$1")
@@ -876,7 +876,7 @@ async fn profile_donations_visibility(pool: PgPool) {
     )
     .await;
     assert!(titles(&v).contains(&("清單-friends".to_string(), false)));
-    // 已取消的認領不列
+    // 已取消的捐助不列
     sqlx::query("UPDATE claims SET status='cancelled' WHERE item_id=$1")
         .bind(link_item)
         .execute(&pool)

@@ -27,7 +27,7 @@ test('公開頁面（訪客可見）', async ({ page }) => {
   ] as const) {
     await test.step(path, () => check(page, path, ready))
   }
-  await test.step('/s/{slug} 的認領 sheet 與成功畫面', async () => {
+  await test.step('/s/{slug} 的捐助 sheet 與成功畫面', async () => {
     await page.goto(`/s/${list.slug}`)
     await page.locator('li.g-card').first().getByRole('button', { name: '我要送' }).click()
     const { sw, iw } = await noHScroll(page)

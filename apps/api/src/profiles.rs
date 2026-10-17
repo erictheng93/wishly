@@ -101,8 +101,8 @@ async fn profile(
         })
         .collect();
 
-    // 捐助 = 認領 ∪ 點數認捐。可見性（$3=本人、$4=與捐助者為好友，與 access::claim_visible 同語意）：
-    //   認領看 c.visibility；認捐看 k.visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
+    // 捐助 = 捐助 ∪ 點數認捐。可見性（$3=本人、$4=與捐助者為好友，與 access::claim_visible 同語意）：
+    //   捐助看 c.visibility；認捐看 k.visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
     // 清單條件兩者共用：對觀看者可存取（public/link；friends/selected 依觀看者或擁有者）、排除驚喜鎖定；link 清單不給 slug。
     let rows: Vec<Donation> = sqlx::query_as(
         "WITH d AS (

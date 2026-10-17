@@ -22,7 +22,7 @@ const scenes = {
   ],
   guest: [
     ['s-active-mine', `/s/${seed.active.slug}`],
-    ['s-claim-edit', `/s/${seed.active.slug}`, async page => { await page.locator('li.g-card', { hasText: '奶瓶組' }).getByRole('button', { name: '修改我的認領' }).click(); await page.waitForTimeout(250) }],
+    ['s-claim-edit', `/s/${seed.active.slug}`, async page => { await page.locator('li.g-card', { hasText: '奶瓶組' }).getByRole('button', { name: '修改我的捐助' }).click(); await page.waitForTimeout(250) }],
     ['me-claims', '/me/claims'],
   ],
   creator: [

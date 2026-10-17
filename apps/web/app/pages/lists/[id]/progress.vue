@@ -55,7 +55,7 @@ const pct = computed(() => d.value?.totals?.completion_pct ?? 0)
 const busyClaim = ref('')
 const claimErr = ref('')
 async function setStatus(c: any, status: 'delivered' | 'cancelled') {
-  if (status === 'cancelled' && !confirm(`確定要取消「${c.claimer_name || '訪客'}」的認領嗎？數量會釋出給其他人。`)) return
+  if (status === 'cancelled' && !confirm(`確定要取消「${c.claimer_name || '訪客'}」的捐助嗎？數量會釋出給其他人。`)) return
   busyClaim.value = c.id; claimErr.value = ''
   try { await api(`/claims/${c.id}`, { method: 'PATCH', body: { status } }); await load() }
   catch (e) { claimErr.value = errMsg(e) } finally { busyClaim.value = '' }
@@ -84,7 +84,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
       </section>
 
       <p v-if="!d.totals.item_count" class="c-center c-mute">尚無品項</p>
-      <p v-else-if="!locked && !d.totals.qty_claimed && !d.totals.pledged_points" class="c-center c-mute">還沒有人認領或贊助，去分享連結吧</p>
+      <p v-else-if="!locked && !d.totals.qty_claimed && !d.totals.pledged_points" class="c-center c-mute">還沒有人捐助或贊助，去分享連結吧</p>
       <p v-if="claimErr" class="c-err" role="alert">{{ claimErr }}</p>
 
       <h2 class="c-h2">品項明細</h2>
@@ -138,7 +138,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
             <CreatorStatusBadge :v="c.status" />
             <template v-if="c.status === 'reserved' || c.status === 'purchased'">
               <button class="c-btn" :disabled="busyClaim === c.id" @click="setStatus(c, 'delivered')">標為已送達</button>
-              <button class="c-btn danger" :disabled="busyClaim === c.id" @click="setStatus(c, 'cancelled')">取消認領</button>
+              <button class="c-btn danger" :disabled="busyClaim === c.id" @click="setStatus(c, 'cancelled')">取消捐助</button>
             </template>
           </li>
         </ul>

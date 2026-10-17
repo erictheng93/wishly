@@ -24,7 +24,7 @@ async fn list(pool: &PgPool, owner: Uuid, surprise: bool, off: i32) -> (Uuid, Uu
     (wid, it)
 }
 
-/// 訪客認領；回傳 (guest_token, claim_id)
+/// 訪客捐助；回傳 (guest_token, claim_id)
 async fn claim(pool: &PgPool, item: Uuid, email: Option<&str>) -> (String, Uuid) {
     let (s, _, b) = call(
         pool,
@@ -67,7 +67,7 @@ async fn surprise_lock_errors_do_not_reveal_claims(pool: PgPool) {
             (403, Some("FORBIDDEN")),
             "{b}"
         );
-        // 調降（無論低於或高於已認領）同樣回通用錯誤，回應完全相同
+        // 調降（無論低於或高於已捐助）同樣回通用錯誤，回應完全相同
         for q in [1, 2] {
             let (s, _, b) = call(
                 &pool,
@@ -287,7 +287,7 @@ async fn optimistic_concurrency(pool: PgPool) {
     common::assert_all_reconciled(&pool).await;
 }
 
-/// closes_at：預設不設期限；設了之後到期即擋認領、sweep 轉 closed；過去時間不可設、不可帶著過期值重開
+/// closes_at：預設不設期限；設了之後到期即擋捐助、sweep 轉 closed；過去時間不可設、不可帶著過期值重開
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn closes_at_is_optional_and_enforced(pool: PgPool) {
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
@@ -320,7 +320,7 @@ async fn closes_at_is_optional_and_enforced(pool: PgPool) {
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["closes_at"], "2999-01-01T00:00:00Z");
 
-    // 繞過 API 把期限改成過去：認領立即被擋（不等 sweep），sweep 後轉 closed 並可由創建者重開
+    // 繞過 API 把期限改成過去：捐助立即被擋（不等 sweep），sweep 後轉 closed 並可由創建者重開
     sqlx::query("UPDATE wishlists SET closes_at = now() - interval '1 minute' WHERE id = $1")
         .bind(wid)
         .execute(&pool)

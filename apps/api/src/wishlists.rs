@@ -556,7 +556,7 @@ impl I {
             "catalog_product_id": null, "price_snapshot_amount": self.price_snapshot_amount, "expired_at": self.expired_at,
             "order_status": self.order_status.as_ref().filter(|_| !locked),
             "sort_order": self.sort_order, "created_at": self.created_at,
-            // 認領會推進品項 updated_at；鎖定期間遮蔽，避免由其變化推知有人認領
+            // 捐助會推進品項 updated_at；鎖定期間遮蔽，避免由其變化推知有人捐助
             "updated_at": if locked { self.created_at } else { self.updated_at },
         })
     }
@@ -719,7 +719,7 @@ async fn update(
         w.status = new.into();
     }
     // 只在「進入 active」（發佈 / 重開）時擋已過的結束時間，否則下個 tick 又被關掉；
-    // 本來就 active 但已到期、尚未被背景 job 掃到的清單，編輯其他欄位照常放行（有效狀態已是 closed，認領早被 SQL 擋住）。
+    // 本來就 active 但已到期、尚未被背景 job 掃到的清單，編輯其他欄位照常放行（有效狀態已是 closed，捐助早被 SQL 擋住）。
     if !was_active && w.status == "active" && w.closes_at.is_some_and(|t| t <= Utc::now()) {
         return Err(AppError::invalid(
             "/closes_at",
@@ -750,7 +750,7 @@ async fn update(
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
 }
 
-/// closes_at 到期 → active 轉 closed（同手動關閉；冪等，多實例安全）。認領 / 認捐路徑另外即時檢查 closes_at，這裡只負責狀態與快取。
+/// closes_at 到期 → active 轉 closed（同手動關閉；冪等，多實例安全）。捐助 / 認捐路徑另外即時檢查 closes_at，這裡只負責狀態與快取。
 pub async fn close_due(pool: &PgPool) -> Result<usize, sqlx::Error> {
     let rows: Vec<(Uuid, String)> = sqlx::query_as(
         "UPDATE wishlists SET status = 'closed', closed_at = now()
@@ -1294,7 +1294,7 @@ async fn apply_funding(
         if locked {
             return Err(surprise_locked_err());
         }
-        // 已有認領或認捐（含曾經有過）就不能換模式
+        // 已有捐助或認捐（含曾經有過）就不能換模式
         let used: bool = sqlx::query_scalar(
             "SELECT $2 > 0 OR $3 > 0 OR EXISTS (SELECT 1 FROM contributions WHERE item_id = $1)
                  OR EXISTS (SELECT 1 FROM claims WHERE item_id = $1 AND status IN ('reserved', 'purchased', 'delivered'))")
@@ -1303,7 +1303,7 @@ async fn apply_funding(
             return Err(AppError::problem(
                 409,
                 "FUNDING_MODE_LOCKED",
-                "品項已有認領或認捐，無法變更募集方式。",
+                "品項已有捐助或認捐，無法變更募集方式。",
             ));
         }
         if mode == "crowdfund" {
@@ -1376,7 +1376,7 @@ async fn item_update(
         return Err(closed());
     }
     let mut tx = st.pool.begin().await?;
-    // 鎖住品項後再讀：funding 規則（已有認捐 / pledged_points）要看到最新值，並與認領 / 認捐的條件式 UPDATE 互斥
+    // 鎖住品項後再讀：funding 規則（已有認捐 / pledged_points）要看到最新值，並與捐助 / 認捐的條件式 UPDATE 互斥
     let mut i: I = sqlx::query_as(&format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL FOR UPDATE"
     ))
@@ -1394,11 +1394,11 @@ async fn item_update(
     let exp = if locked { None } else { expected(m)? };
     apply_item(m, &mut i)?;
     apply_funding(&mut tx, m, &mut i, event, locked).await?;
-    // 驚喜鎖定：不論有無認領，一律禁止調降（否則 QTY_BELOW_CLAIMED 會洩漏「有人認領」）
+    // 驚喜鎖定：不論有無捐助，一律禁止調降（否則 QTY_BELOW_CLAIMED 會洩漏「有人捐助」）
     if locked && i.qty_needed < old_qty {
         return Err(surprise_locked_err());
     }
-    // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與認領競爭
+    // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與捐助競爭
     let res = sqlx::query("UPDATE wishlist_items SET title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
                  unit_price_amount=$9, priority=$10::item_priority, qty_needed=$11, funding_mode=$13::funding_mode, target_points=$14,
                  funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18
@@ -1417,7 +1417,7 @@ async fn item_update(
         return Err(match cur {
             None => AppError::NotFound,
             Some((u, _)) if exp.is_some_and(|e| e != u) => stale(),
-            _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已認領數量。"),
+            _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已捐助數量。"),
         });
     }
     crate::dashboard::notify(&mut *tx, i.wishlist_id).await?;
@@ -1442,12 +1442,12 @@ async fn item_delete(
 ) -> R<StatusCode> {
     let (item, _, locked) = owned_item(&st.pool, id, u.id).await?;
     let wid = item.wishlist_id;
-    // 驚喜鎖定：一律禁止刪除，回應與有無認領無關
+    // 驚喜鎖定：一律禁止刪除，回應與有無捐助無關
     if locked {
         return Err(surprise_locked_err());
     }
     let mut tx = st.pool.begin().await?;
-    // 清單 → 錢包 → 品項 → 認領：所有品項都與進行中的認領 / 認捐互斥。
+    // 清單 → 錢包 → 品項 → 捐助：所有品項都與進行中的捐助 / 認捐互斥。
     sqlx::query("SELECT id FROM wishlists WHERE id=$1 FOR UPDATE")
         .bind(wid)
         .execute(&mut *tx)
@@ -1500,10 +1500,10 @@ async fn item_delete(
             return Err(AppError::problem(
                 409,
                 "ITEM_HAS_CLAIMS",
-                "品項已有進行中的認領，需帶 force=true 才能刪除。",
+                "品項已有進行中的捐助，需帶 force=true 才能刪除。",
             ));
         }
-        // F-09：被取消的認領逐筆寫 audit、通知有 email 的認領者（中性內容）
+        // F-09：被取消的捐助逐筆寫 audit、通知有 email 的捐助者（中性內容）
         let cancelled: Vec<(Uuid, i32, Option<Uuid>, Option<Uuid>)> = sqlx::query_as(
             "UPDATE claims SET status='cancelled', cancelled_at=now() WHERE item_id=$1 AND status IN ('reserved','purchased')
              RETURNING id, qty, guest_id, user_id").bind(id).fetch_all(&mut *tx).await?;

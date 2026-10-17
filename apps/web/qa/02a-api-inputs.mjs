@@ -39,14 +39,14 @@ for (const [k, v] of Object.entries({ neg: -5, frac: 9.99, big: 1e12, huge: 1e19
   const r = await U.api.post(`wishlists/${base.id}/items`, { data: { title: 'price:' + k, unit_price_amount: v, qty_needed: 1 } })
   R('unit_price:' + k, r.status(), { body: r.ok() ? 'ok' : (await r.text()).slice(0, 100) })
 }
-// 認領數量
+// 捐助數量
 const item = base.items[0]
 for (const [k, v] of Object.entries({ zero: 0, neg: -1, frac: 1.5, str: '2', max99: 99, over100: 100, big: 2147483648, nul: null, miss: undefined })) {
   const r = await (await guestApi()).post(`items/${item.id}/claims`, { data: { qty: v, display_name: 'Q' + k }, headers: { 'Idempotency-Key': randomUUID() } })
   R('claim.qty:' + k, r.status(), { body: (await r.text()).slice(0, 140) })
 }
-// 認領欄位（暱稱/備註/聯絡/email）
-const f2 = await createList(U, { title: '認領欄位測試', items: Array.from({ length: 1 }, () => ({ title: '品', qty: 500 })), showNames: true })
+// 捐助欄位（暱稱/備註/聯絡/email）
+const f2 = await createList(U, { title: '捐助欄位測試', items: Array.from({ length: 1 }, () => ({ title: '品', qty: 500 })), showNames: true })
 for (const [k, v] of Object.entries(P)) {
   for (const f of ['display_name', 'note', 'contact']) {
     const data = { qty: 1, display_name: '訪客', [f]: v }

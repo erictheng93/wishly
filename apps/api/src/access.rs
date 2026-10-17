@@ -1,4 +1,4 @@
-//! 清單與捐助的可見性判斷（0004_social）。所有對外讀取/認領/SSE/檢舉都經 `check_wishlist`。
+//! 清單與捐助的可見性判斷（0004_social）。所有對外讀取/捐助/SSE/檢舉都經 `check_wishlist`。
 use crate::{error::AppError, session::hash_token, AppState};
 use axum::http::request::Parts;
 use hmac::{Hmac, Mac};
@@ -121,7 +121,7 @@ async fn deny(
     })
 }
 
-/// 捐助（認領）是否對 viewer 可見：public 任何人；friends 需為認領者好友；private 只有本人。
+/// 捐助（捐助）是否對 viewer 可見：public 任何人；friends 需為捐助者好友；private 只有本人。
 pub async fn claim_visible(
     pool: &sqlx::PgPool,
     level: &str,

@@ -43,7 +43,7 @@ async function submit() {
       <label class="c-field"><span>自動結束時間（選填，留空＝不設期限）</span><input v-model="f.closes_at" type="datetime-local" :min="nowLocal"></label>
       <p v-if="dateErr" class="c-err" role="alert">{{ dateErr }}</p>
       <label class="c-switch"><input v-model="f.surprise_mode" type="checkbox"><span>驚喜模式<br><small class="c-mute">活動日前，你只看得到完成度，看不到誰送了什麼。需設定活動日。</small></span></label>
-      <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>顯示認領者暱稱給其他訪客<br><small class="c-mute">預設關閉</small></span></label>
+      <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>顯示捐助者暱稱給其他訪客<br><small class="c-mute">預設關閉</small></span></label>
       <CreatorVisibilityPicker v-model:visibility="f.visibility" v-model:password="f.password" v-model:users="allowed" />
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
       <button class="c-btn primary block" :disabled="busy || upBusy || !f.title.trim()">{{ busy ? '建立中…' : '建立並新增品項' }}</button>

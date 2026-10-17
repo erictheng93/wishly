@@ -81,7 +81,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
     assert_eq!(message["To"][0]["Address"], email);
     assert_eq!(
         message["Subject"],
-        "【Wishly】《SMTP integration wishlist》有 1 件新認領"
+        "【Wishly】《SMTP integration wishlist》有 1 件新捐助"
     );
     let base = std::env::var("MAILPIT_API_BASE").unwrap_or_else(|_| "http://localhost:8025".into());
     let body: Value = client
@@ -99,7 +99,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .await
         .unwrap();
     let text = body["Text"].as_str().unwrap();
-    assert!(text.contains("有 1 件新認領"));
+    assert!(text.contains("有 1 件新捐助"));
     assert!(text.contains("/api/v1/unsubscribe?token="));
     assert!(!text.contains("Secret Gift") && !text.contains("Secret Owner"));
     let payload: Value = sqlx::query_scalar("SELECT payload FROM notifications WHERE user_id=$1")

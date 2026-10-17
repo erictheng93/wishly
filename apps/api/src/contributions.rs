@@ -308,7 +308,7 @@ async fn diagnose(pool: &PgPool, item_id: Uuid, want: i64) -> Result<Option<AppE
             AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受認捐")
         }
         Some((_, _, _, _, mode, ..)) if mode != "crowdfund" => {
-            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是點數眾籌")
+            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是心願眾籌")
         }
         Some((_, _, _, _, _, Some(fs), ..)) if fs == "funded" || fs == "fulfilled" => {
             AppError::problem(409, "ITEM_FUNDED", "此品項已達標")

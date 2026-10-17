@@ -86,7 +86,7 @@ async function reallocate() {
       </section>
 
       <h2 class="c-h2">我的認捐</h2>
-      <p v-if="!contribs.length" class="c-center c-mute">還沒有認捐紀錄。打開朋友分享的清單，就能用點數贊助。</p>
+      <p v-if="!contribs.length" class="c-center c-mute">還沒有認捐紀錄。打開朋友分享的清單，就能參與心願眾籌。</p>
       <article v-for="r in contribs" :key="r.contribution.id" class="c-card">
         <div class="c-row">
           <img v-if="r.item.image_url" class="c-thumb" :src="r.item.image_url" alt="">

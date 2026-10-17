@@ -14,7 +14,7 @@ async fn account_delete_anonymizes(pool: PgPool) {
         token: tok,
     } = user(&pool, "小米").await;
     let (wid, slug, item) = claimed_wishlist(&pool, uid, false, 30, 2, 1).await;
-    // 此使用者在別人清單上的認領
+    // 此使用者在別人清單上的捐助
     let TestUser {
         id: other,
         token: _,

@@ -44,7 +44,7 @@ export const setPref = (k: string, v: string) => safe(() => localStorage.setItem
 
 export function useGuest() {
   const { public: { apiBase } } = useRuntimeConfig()
-  // retryAsNewGuest：401 時（本機 token 已失效）清掉 token，不帶 header 重試一次（以新訪客身分）；只給「建立新認領」這類可安全重送的請求用
+  // retryAsNewGuest：401 時（本機 token 已失效）清掉 token，不帶 header 重試一次（以新訪客身分）；只給「建立新捐助」這類可安全重送的請求用
   async function api<T = any>(path: string, opt: { method?: string, body?: any, headers?: Record<string, string>, retryAsNewGuest?: boolean, access?: string } = {}): Promise<T> {
     const headers: Record<string, string> = { ...opt.headers }
     const tk = getGuestToken()

@@ -26,11 +26,13 @@
 ## P1 — 安全與可用性（上線前）
 
 - [ ] **輪替驗證過程中外露的機密**（見驗證紀錄 §12.1）：`DATABASE_URL` 的 DB 密碼（用 `ALTER ROLE wishly PASSWORD …`，不必重建 `db` 服務，並同步更新 `db` 服務與 `api` 的環境變數）、`OTP_PEPPER`、`OAUTH_SECRET`、`UNSUB_SECRET`、`TURNSTILE_SECRET`（Cloudflare 上 Roll）。**`SHIPPING_ENC_KEY` 在有真實收件資訊之前輪替最便宜，之後就不能換了**，請先決定。新值只放密碼管理器與 Dokploy，不貼給任何人或代理程式。
+- [ ] **機密外洩防線（本 repo 為公開）**：GitHub secret scanning 與 push protection 已開（2026-10-17 以 `gh api` 確認），但它們只認已知服務商的 token 格式，**認不出十六進位密鑰、`postgres://` 連線字串、Turnstile secret**。補上通用掃描：CI 加 `gitleaks`（或 `trufflehog`）掃 PR 與 push，並建議本機 pre-commit 掃 staged 檔。同時固定提交習慣：只用 `git add <指定檔案>`，不用 `git add .`／`-A`。
+- [ ] **瀏覽器自動化工具的輸出不得含機密**：操作含機密的頁面（Dokploy 環境變數、Cloudflare Token 頁、GitHub PAT 頁）時，不存快照，只用 `eval` 取鍵名／行數；工具的暫存目錄（`.playwright-cli/`）已加進 `.gitignore`，但這只防誤提交，不防機密進入對話上下文。
 - [ ] **`/readyz` 對外限流或封鎖**（它查 DB，目前公網可達並回 200）。`/healthz` 可開放。外部監控改走允許來源。
 - [ ] Dokploy 管理員啟用 **2FA**；確認管理介面（3000）只透過 SSH 通道進入。
 - [ ] **SSH 22 加固**：限來源 IP、僅金鑰登入、關閉密碼登入、fail2ban。注意**不要動外層防火牆既有規則**（Docker 已發布 80/443/3000，靠它擋住）。
 - [ ] 確認 80／443／3000 不可從公網直連（目前只驗證了 8080，見驗證紀錄 §5.3）。
-- [ ] 外部監控與告警：打 `/readyz` 的外部探測；5xx 比率、p95 延遲、磁碟（含 WAL／備份）、記憶體、容器重啟次數、Tunnel 狀態、寄信佇列積壓、逾期認領未釋放數量。
+- [ ] 外部監控與告警：打 `/readyz` 的外部探測；5xx 比率、p95 延遲、磁碟（含 WAL／備份）、記憶體、容器重啟次數、Tunnel 狀態、寄信佇列積壓、逾期捐助未釋放數量。
 - [ ] `cloudflared` 容器確認 restart policy 為 always；Tunnel 掉線告警（Tunnel 是單點，掛掉全站不可達）。
 - [ ] 記錄並設定提醒：GHCR 讀取 PAT 的**到期日**；R2 S3 Token 若有到期日也一併記錄（到期會讓重新部署／上傳突然失敗）。
 - [ ] VPS 記憶體實測：`free -h`（DB、Dokploy、cloudflared、後端同機執行）。
@@ -41,13 +43,13 @@
 
 驗收（清單 §7，**未驗證**的項目）：
 - [ ] **SSE 完整驗收**：`DURATION_MIN` ≥ 40 確認越過 30 分鐘上限會重連；Spike S3 為 120 分鐘，門檻 0 次 > 30 s 間隔、事件延遲 p50≤2 s／p95≤5 s／max≤10 s。**注意 `events_missed` 在單一品項 `quantity=1` 下會誤報**（後續觸發回 409 不產生事件），測試前換成數量足夠的品項。
-- [ ] §7.3 訪客認領與防超賣（staging 走一遍，不要在正式環境跑大量寫入）。
+- [ ] §7.3 訪客捐助與防超賣（staging 走一遍，不要在正式環境跑大量寫入）。
 - [ ] §7.4 限流以真實用戶 IP 計（兩個不同 IP 互不影響；驗證 `TRUSTED_PROXY` 與 `CF-Connecting-IP`）。
 - [ ] §7.6 `scripts/cdn-canary.mjs` exit 0。
 - [ ] §7.9 檢舉＋Turnstile：偽造 token 得 403。
-- [ ] §7.11 背景工作：建一筆短效期認領，確認到期自動釋放。
+- [ ] §7.11 背景工作：建一筆短效期捐助，確認到期自動釋放。
 - [ ] §7.12 Google／LINE OAuth 各登入一次（issue #6）。
-- [ ] §7.14 重新部署期間進行中請求的失敗數與認領一致性。
+- [ ] §7.14 重新部署期間進行中請求的失敗數與捐助一致性。
 - [ ] §7.15 手動 kill 容器，確認自動重啟、Tunnel 恢復。
 - [ ] 延遲：從**其他網路／機器**重測 `api.wishly.tw`（本次從單一網路量到 connect 最高 5 秒、`cf-ray` 為 SJC，判斷是本機網路抖動但無法定論）。
 - [ ] 寄信：用 Gmail 以外的信箱測 OTP；確認不進垃圾信。穩定後再決定 DMARC 是否維持 `p=reject`（觀察期先 `p=none`；注意 SPF 因 `cf-bounce` 子網域在嚴格對齊下不對齊，DMARC 靠 DKIM 通過）。
@@ -62,9 +64,8 @@ CI／部署流程：
 
 ## P3 — 整理與一致性
 
-- [ ] 刪除或保留驗證用測試資料（帳號、清單「部署驗證用清單」、品項、認領、R2 封面圖）。
+- [ ] 刪除或保留驗證用測試資料（帳號、清單「部署驗證用清單」、品項、捐助、R2 封面圖）。
 - [ ] Problem `type` URI 統一：後端 `https://wishly.tw/problems/…` vs `docs/04` 的 `https://api.wishly.tw/problems/…`。
-- [ ] `.playwright-cli/`、`apps/web/.playwright-cli/` 加入 `.gitignore`。
 - [ ] 本機開發環境：`apps/api/.env` 仍是舊網域；本機 DB 需 `docker compose down -v && docker compose up -d` 才套用新帳號（會清掉本機資料，由使用者決定）。
 - [ ] Tauri 原生殼：識別碼 `tw.wishly.app`、scheme `wishly://` 已更名，尚未編譯驗證。
 - [ ] `www.wishly.tw` 是否需要導向 `wishly.tw`。
