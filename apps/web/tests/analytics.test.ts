@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barRows, fmtCount, funnelSteps, pct } from '../app/utils/analytics'
+import { barRows, fmtCount, funnelSteps, mean, pct, retentionRows } from '../app/utils/analytics'
 
 describe('analytics helpers', () => {
   it('pct guards null and zero', () => {
@@ -30,5 +30,20 @@ describe('analytics helpers', () => {
     expect(s.map(x => x.step)).toEqual(['–', '50%', '20%', '0%'])
     expect(s[1]!.w).toBe(50)
     expect(funnelSteps({ signed_up: 0, created_list: 0, published_list: 0, received_claim: 0 }).map(x => x.step)).toEqual(['–', '–', '–', '–'])
+  })
+  it('mean to 1 decimal, empty guard', () => {
+    expect(mean([1, 2, 4])).toBe('2.3')
+    expect(mean([0, 0])).toBe('0.0')
+    expect(mean([])).toBe('–')
+  })
+  it('retentionRows rates, zero cohort, missing keys', () => {
+    const r = retentionRows({ d1: { cohort: 8, retained: 2 }, d7: { cohort: 3, retained: 1 }, d30: { cohort: 0, retained: 0 } })
+    expect(r.map(x => x.label)).toEqual(['次日留存（第 1 天）', '第 7–13 天', '第 30–59 天'])
+    expect(r.map(x => x.pct)).toEqual(['25%', '33%', '–'])
+    expect(r[0]).toMatchObject({ cohort: 8, retained: 2, w: 25 })
+    expect(r[2]!.w).toBe(0)
+    const none = retentionRows(undefined)
+    expect(none.map(x => [x.cohort, x.retained, x.pct, x.w])).toEqual([[0, 0, '–', 0], [0, 0, '–', 0], [0, 0, '–', 0]])
+    expect(retentionRows({ d1: { cohort: 4, retained: 4 } })[1]).toMatchObject({ cohort: 0, pct: '–' })
   })
 })

@@ -33,6 +33,19 @@ export function funnelSteps(f: Record<string, number> | undefined): FunnelStep[]
   })
 }
 
+/** 平均（1 位小數字串）；空陣列回「–」。 */
+export const mean = (xs: number[]): string => xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : '–'
+
+export interface RetentionRow { key: string; label: string; cohort: number; retained: number; pct: string; w: number }
+const RETENTION_LABEL: Record<string, string> = { d1: '次日留存（第 1 天）', d7: '第 7–13 天', d30: '第 30–59 天' }
+/** 留存列；缺 retention（舊 API）或缺鍵視為 0。cohort 為 0 時 pct 為「–」、條寬 0。 */
+export function retentionRows(r: Record<string, { cohort?: number; retained?: number } | undefined> | undefined): RetentionRow[] {
+  return Object.entries(RETENTION_LABEL).map(([key, label]) => {
+    const cohort = r?.[key]?.cohort ?? 0, retained = r?.[key]?.retained ?? 0
+    return { key, label, cohort, retained, pct: pct(retained, cohort), w: cohort > 0 ? Math.min(100, retained / cohort * 100) : 0 }
+  })
+}
+
 export const L = {
   claimStatus: { reserved: '已認領', purchased: '已購買', delivered: '已送達', cancelled: '已取消', expired: '已逾期' },
   actor: { guest: '訪客', user: '會員' },

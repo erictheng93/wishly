@@ -204,6 +204,10 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    sqlx::query("DELETE FROM user_activity_days WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM otp_challenges WHERE link_user_id=$1 OR email = (SELECT email FROM users WHERE id = $1)").bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM auth_identities WHERE user_id = $1")
         .bind(id)

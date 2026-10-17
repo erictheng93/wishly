@@ -617,10 +617,11 @@ RETURNING qty_needed, qty_claimed;
 <p>PostgreSQL 16。主鍵為 UUID v7（<code>uuid_v7()</code> 由 migration 自行建立）。時間欄位一律 <code>timestamptz</code>。</p>
 <table>
 <tr><th>群組</th><th>資料表</th><th>用途</th></tr>
-<tr><td rowspan="5">身分</td><td><code>users</code></td><td>帳號；<code>is_staff</code>、<code>blocked_at</code>、<code>handle</code>、<code>notification_prefs</code>、<code>default_claim_visibility</code>、<code>totp_*</code></td></tr>
+<tr><td rowspan="6">身分</td><td><code>users</code></td><td>帳號；<code>is_staff</code>、<code>blocked_at</code>、<code>handle</code>、<code>notification_prefs</code>、<code>default_claim_visibility</code>、<code>totp_*</code></td></tr>
 <tr><td><code>auth_identities</code></td><td>登入方式（email / line / google）；Email 的密碼雜湊在此</td></tr>
 <tr><td><code>otp_challenges</code></td><td>驗證碼（雜湊 + pepper）；用途：register / login / reset / link</td></tr>
 <tr><td><code>sessions</code></td><td>登入 session（只存 token 雜湊）；<code>mfa_at</code></td></tr>
+<tr><td><code>user_activity_days</code></td><td>每日活躍（使用者 × 台北日，只存日期；保留 400 天，刪帳即刪）</td></tr>
 <tr><td><code>native_auth_codes</code></td><td>原生殼 OAuth 一次性碼（60 秒、只存雜湊）</td></tr>
 <tr><td rowspan="2">訪客</td><td><code>guests</code></td><td>訪客身分（暱稱、選填聯絡方式與 Email、權杖雜湊）</td></tr>
 <tr><td><code>guest_recovery_tokens</code></td><td>一次性恢復權杖（30 天）</td></tr>
@@ -657,6 +658,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td><code>0009</code> / <code>0010</code></td><td><code>closes_at</code> 與結束前提醒</td></tr>
 <tr><td><code>0011</code> / <code>0012</code></td><td>原生殼 OAuth 一次性碼與綁定票</td></tr>
 <tr><td><code>0013_account_security</code></td><td>TOTP 與 <code>sessions.mfa_at</code></td></tr>
+<tr><td><code>0015_user_activity_days</code></td><td>每日活躍紀錄（DAU 歷史與留存）</td></tr>
 </table>
 <div class="box warn"><b class="t">Migration 規則</b>只向前相容（expand → migrate → contract），因為啟動時自動套用、回滾部署時資料庫不會倒退。新增 migration 檔名依序 <code>000N_*.sql</code>。</div>
 

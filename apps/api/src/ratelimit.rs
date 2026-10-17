@@ -57,6 +57,12 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM rate_limits WHERE window_start < now() - interval '2 days'")
         .execute(pool)
         .await?;
+    // 每日活躍紀錄只留 400 天
+    sqlx::query(
+        "DELETE FROM user_activity_days WHERE day < (now() AT TIME ZONE 'Asia/Taipei')::date - 400",
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

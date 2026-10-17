@@ -553,6 +553,8 @@ async fn analytics(
          cu AS (SELECT * FROM users WHERE deleted_at IS NULL AND NOT is_staff),
          wl AS (SELECT w.* FROM wishlists w JOIN cu ON cu.id = w.owner_id WHERE w.deleted_at IS NULL),
          cohort AS (SELECT id, created_at FROM cu WHERE created_at >= (SELECT t FROM lo)),
+         -- 留存 cohort：台北註冊日落在區間內
+         ccu AS (SELECT id, (created_at AT TIME ZONE 'Asia/Taipei')::date AS s FROM cohort),
          pu AS (SELECT * FROM cu WHERE anonymized_at IS NULL),
          rc AS (SELECT * FROM claims WHERE created_at >= (SELECT t FROM lo)),
          -- 每日趨勢：各表只掃一次再依台北日期分組
@@ -564,8 +566,9 @@ async fn analytics(
          daily AS (
            SELECT gs::date d,
              count(*) FILTER (WHERE ev.m = 'signups') signups, count(*) FILTER (WHERE ev.m = 'wishlists') wishlists,
-             count(*) FILTER (WHERE ev.m = 'claims') claims, count(*) FILTER (WHERE ev.m = 'new_guests') new_guests
-           FROM r CROSS JOIN generate_series(r.d0, r.today, interval '1 day') gs LEFT JOIN ev ON ev.d = gs::date GROUP BY 1),
+             count(*) FILTER (WHERE ev.m = 'claims') claims, count(*) FILTER (WHERE ev.m = 'new_guests') new_guests,
+             (SELECT count(DISTINCT a.user_id) FROM user_activity_days a JOIN cu ON cu.id = a.user_id WHERE a.day = gs::date) active_users
+           FROM r CROSS JOIN generate_series(r.d0, r.today, interval '1 day') gs LEFT JOIN ev ON ev.d = gs::date GROUP BY gs),
          dist(kind, k, n) AS (
            SELECT 'provider', ai.provider::text, count(DISTINCT ai.user_id) FROM auth_identities ai JOIN cu ON cu.id = ai.user_id GROUP BY 2
            UNION ALL SELECT 'locale', locale, count(*) FROM cu GROUP BY 2
@@ -583,10 +586,16 @@ async fn analytics(
              'wishlists', (SELECT count(*) FROM wl),
              'friendships', (SELECT count(*) FROM friendships)),
            'active', (SELECT jsonb_object_agg('d' || n, (
-               SELECT count(DISTINCT s.user_id) FROM sessions s JOIN cu ON cu.id = s.user_id
-               WHERE s.last_seen_at > now() - n * interval '1 day')) FROM unnest(ARRAY[1, 7, 30]) n),
+               SELECT count(DISTINCT a.user_id) FROM user_activity_days a JOIN cu ON cu.id = a.user_id
+               WHERE a.day > (SELECT today FROM b) - n)) FROM unnest(ARRAY[1, 7, 30]) n),
            'daily', (SELECT jsonb_agg(jsonb_build_object('date', d, 'signups', signups, 'wishlists', wishlists,
-               'claims', claims, 'new_guests', new_guests) ORDER BY d) FROM daily),
+               'claims', claims, 'new_guests', new_guests, 'active_users', active_users) ORDER BY d) FROM daily),
+           -- 留存：區間內註冊且視窗已完整結束者為 cohort；視窗內任一天活躍即 retained
+           'retention', (SELECT jsonb_object_agg('d' || w.k, jsonb_build_object(
+               'cohort', (SELECT count(*) FROM ccu WHERE ccu.s + w.hi < (SELECT today FROM b)),
+               'retained', (SELECT count(*) FROM ccu WHERE ccu.s + w.hi < (SELECT today FROM b) AND EXISTS (
+                  SELECT 1 FROM user_activity_days a WHERE a.user_id = ccu.id AND a.day BETWEEN ccu.s + w.lo AND ccu.s + w.hi))))
+             FROM (VALUES (1, 1, 1), (7, 7, 13), (30, 30, 59)) w(k, lo, hi)),
            'funnel', jsonb_build_object(
              'signed_up', (SELECT count(*) FROM cohort),
              'created_list', (SELECT count(*) FROM cohort WHERE EXISTS (SELECT 1 FROM wl WHERE wl.owner_id = cohort.id)),

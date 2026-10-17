@@ -18,10 +18,10 @@ const TILES = computed(() => {
   const d = data.value
   return d ? [
     ['使用者', d.totals.users], ['訪客', d.totals.guests], ['清單', d.totals.wishlists], ['好友關係', d.totals.friendships],
-    ['近 1 天活躍', d.active.d1], ['近 7 天活躍', d.active.d7], ['近 30 天活躍', d.active.d30],
+    ['今天活躍', d.active.d1], ['近 7 天活躍', d.active.d7], ['近 30 天活躍', d.active.d30],
   ] as [string, number][] : []
 })
-const METRICS = [['signups', '註冊'], ['wishlists', '新清單'], ['claims', '捐助'], ['new_guests', '新訪客']] as const
+const METRICS = [['active_users', '活躍使用者'], ['signups', '註冊'], ['wishlists', '新清單'], ['claims', '捐助'], ['new_guests', '新訪客']] as const
 const W = 200, H = 48
 // 折線座標；單日區間（理論上不會）避免除以 0
 function chart(key: string) {
@@ -30,10 +30,11 @@ function chart(key: string) {
   const x = (i: number) => rows.length > 1 ? i / (rows.length - 1) * W : W / 2
   const y = (v: number) => H - 2 - v / max * (H - 6)
   const pts = rows.map((r, i) => `${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`).join(' ')
-  return { pts, area: rows.length ? `0,${H} ${pts} ${W},${H}` : '', max, sum: rows.reduce((s, r) => s + r[key], 0), step: W / Math.max(1, rows.length) }
+  return { pts, area: rows.length ? `0,${H} ${pts} ${W},${H}` : '', max, sum: rows.reduce((s, r) => s + r[key], 0), avg: mean(rows.map(r => r[key])), step: W / Math.max(1, rows.length) }
 }
 const charts = computed(() => METRICS.map(([k, name]) => ({ k, name, ...chart(k) })))
 const funnel = computed(() => funnelSteps(data.value?.funnel))
+const retention = computed(() => retentionRows(data.value?.retention))
 const groups = computed(() => {
   const d = data.value
   if (!d) return []
@@ -76,8 +77,8 @@ const profile = computed(() => {
         <h2 class="c-h2">每日趨勢</h2>
         <div class="an-multi">
           <figure v-for="c in charts" :key="c.k" class="an-fig">
-            <figcaption><strong>{{ c.name }}</strong><span class="c-mute">合計 {{ fmtCount(c.sum) }}・單日最高 {{ c.max === 1 && !c.sum ? 0 : c.max }}</span></figcaption>
-            <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="an-svg" role="img" :aria-label="`${c.name}每日趨勢，合計 ${c.sum}`">
+            <figcaption><strong>{{ c.name }}</strong><span class="c-mute">{{ c.k === 'active_users' ? `平均 ${c.avg}` : `合計 ${fmtCount(c.sum)}` }}・單日最高 {{ c.max === 1 && !c.sum ? 0 : c.max }}</span></figcaption>
+            <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="an-svg" role="img" :aria-label="`${c.name}每日趨勢，${c.k === 'active_users' ? '平均 ' + c.avg : '合計 ' + c.sum}`">
               <line x1="0" :x2="W" :y1="H - 1" :y2="H - 1" class="an-axis" />
               <polygon :points="c.area" class="an-area" />
               <polyline :points="c.pts" class="an-line" vector-effect="non-scaling-stroke" />
@@ -95,6 +96,17 @@ const profile = computed(() => {
           <span class="an-l">{{ s.label }}</span>
           <span class="an-track"><span class="an-bar" :style="{ width: s.w + '%' }" /></span>
           <span class="an-v">{{ fmtCount(s.v) }}<small class="c-mute"> {{ s.step }}</small></span>
+        </div>
+      </section>
+
+      <section class="c-card" aria-label="留存">
+        <h2 class="c-h2">留存</h2>
+        <p class="c-mute">對象為區間內註冊、且觀察期已結束的使用者。</p>
+        <p v-if="retention.every(x => !x.cohort)" class="c-mute">區間內尚無已滿觀察期的新使用者</p>
+        <div v-for="x in retention" :key="x.key" class="an-row">
+          <span class="an-l">{{ x.label }}</span>
+          <span class="an-track"><span class="an-bar" :style="{ width: x.w + '%' }" /></span>
+          <span class="an-v">{{ x.cohort ? x.pct : '–' }}<small v-if="x.cohort" class="c-mute"> {{ fmtCount(x.retained) }}/{{ fmtCount(x.cohort) }}</small></span>
         </div>
       </section>
 
