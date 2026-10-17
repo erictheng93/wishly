@@ -896,7 +896,7 @@ node scripts/cdn-canary.mjs      # 失敗 exit 1</code></pre>
 <table>
 <tr><th>任務</th><th>頻率</th><th>內容</th></tr>
 <tr><td><code>notify::spawn_worker</code></td><td>每 5 秒</td><td>領取到期通知並寄出，失敗最多重試 3 次</td></tr>
-<tr><td><code>ratelimit::spawn_cleanup</code></td><td>每 5 分鐘（清理每小時）</td><td>每 5 分鐘執行 <code>claims::expire_due</code>（釋放逾期捐助）、<code>wishlists::close_due</code>（結束到期清單，並清 CDN）、<code>wishlists::remind_closing</code>（結束前 24h 提醒）、<code>contributions::tick_funding</code>（眾籌截止與 7 天選擇期自動退點）</td></tr>
+<tr><td><code>ratelimit::spawn_cleanup</code></td><td>每 5 分鐘（清理每小時）</td><td>每 5 分鐘執行 <code>claims::expire_due</code>（釋放逾期捐助）、<code>wishlists::close_due</code>（結束到期清單，並清 CDN）、<code>wishlists::remind_closing</code>（結束前 24h 提醒）、<code>contributions::tick_funding</code>（眾籌截止與 7 天選擇期自動退點）；另每 12 個 tick（約每小時）清理過期冪等鍵（&gt;24h）與限流計數（&gt;2 天）</td></tr>
 </table>
 <div class="box warn"><b class="t">已知風險</b>任務迴圈若 panic 會靜默終止，而行程仍存活（<code>/healthz</code> 仍 200）。建議加上「逾期捐助未釋放」告警，或讓行程在背景任務結束時退出由 Dokploy 重啟（檢查清單 §0.6）。擴充為多實例前須先確認各任務的冪等性（大多已用列鎖下重檢條件設計）。</div>
 
@@ -904,6 +904,7 @@ node scripts/cdn-canary.mjs      # 失敗 exit 1</code></pre>
 <ul>
 <li><b><code>SHIPPING_ENC_KEY</code></b>：每個環境各自產生、不共用、不進 repo。<b>遺失 = 所有收件資訊與採購單地址快照永遠無法解密</b>，營運無法寄貨。請備份在至少兩個獨立的地方（密碼管理器 + 離線備份），且<b>不與資料庫備份放在同一處</b>。目前<b>沒有輪替機制</b>（<code>key_version</code> 固定為 1）；要輪替須先實作「多把金鑰依 key_version 解密 + 背景重新加密」，不能直接換環境變數。金鑰外洩時，攻擊者仍須同時取得資料庫才能讀到地址。</li>
 <li>這把金鑰同時加密 staff 的 TOTP 密鑰。</li>
+<li><div class="box danger" style="margin:0 0 8px"><b class="t">現況：尚無任何備份（P0）</b>依 <code>docs/deploy-verification-2026-10-17.md</code>，正式環境已有真實資料寫入，但<b>目前沒有任何資料庫備份，也沒做過還原演練</b>。這是優先級最高的未完成項（<code>docs/TODO.md</code> P0）；另有驗證過程中外露機密的輪替待辦（P1）。以下為目標與建議，<b>尚未達成</b>。</div></li>
 <li><b>資料庫備份</b>：PRD 目標 RPO ≤ 5 分鐘、RTO ≤ 1 小時。RPO ≤ 5 分鐘需要 WAL 歸檔（pgBackRest / WAL-G → R2）；僅排程 <code>pg_dump</code> 則 RPO 等於備份間隔，須由產品負責人明確取捨。備份目的地應在不同供應商 / 帳號，且至少每季做一次還原演練並記錄實際 RTO。<b>未演練的備份等於沒有備份。</b></li>
 <li><b>R2</b>：<code>incoming/</code> 前綴不得對外公開（WAF 封鎖 + 1 天生命週期刪除）；API Token 只給該 bucket 的 Object Read &amp; Write。</li>
 <li><b>單點故障</b>：整機掛掉全站掛掉；請預先寫下並計時恢復步驟（新 VPS → Dokploy → 還原 DB → 設環境變數 → Tunnel）。</li>
