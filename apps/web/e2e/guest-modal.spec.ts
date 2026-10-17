@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createList, registerUser } from './helpers'
+import { createList, registerUser, signInPage } from './helpers'
 import { hydrated } from './support/hydrate'
 
 // F-02：捐助 sheet / 成功 overlay / 檢舉 sheet 是真正的 modal（原生 <dialog>）
@@ -15,7 +15,9 @@ test.describe('modal 鍵盤行為', () => {
     await owner.api.dispose()
   })
 
-  test('捐助 sheet：初始焦點在暱稱、Tab 不離開、Esc 關閉、焦點回到觸發按鈕、有 accessible name', async ({ page }) => {
+  test.beforeEach(async ({ page }) => { await signInPage(page) }) // 認捐需登入：每個案例都是已登入會員
+
+  test('捐助 sheet：初始焦點在留言欄、Tab 不離開、Esc 關閉、焦點回到觸發按鈕、有 accessible name', async ({ page }) => {
     await page.goto(`/s/${slug}`)
     await hydrated(page)
     const trigger = page.getByRole('button', { name: '我要送' })
@@ -23,7 +25,7 @@ test.describe('modal 鍵盤行為', () => {
     await trigger.click()
     const dialog = page.getByRole('dialog', { name: /捐助「奶瓶組」/ })
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByLabel('你的暱稱（必填）')).toBeFocused()
+    await expect(dialog.getByLabel('留言（選填）')).toBeFocused()
     for (let i = 0; i < 16; i++) { await page.keyboard.press('Tab'); expect(await inDialog(page), `Tab #${i + 1}`).toBe(true) }
     for (let i = 0; i < 16; i++) { await page.keyboard.press('Shift+Tab'); expect(await inDialog(page), `Shift+Tab #${i + 1}`).toBe(true) }
     await page.keyboard.press('Escape')
@@ -36,13 +38,13 @@ test.describe('modal 鍵盤行為', () => {
     await hydrated(page)
     await page.getByRole('button', { name: '我要送' }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByLabel('你的暱稱（必填）').fill('小明')
+    await dialog.getByLabel('留言（選填）').fill('小明')
     const asked: string[] = []
     page.once('dialog', d => { asked.push(d.message()); void d.dismiss() })
     await page.keyboard.press('Escape')
     await expect.poll(() => asked.length).toBe(1)
     await expect(dialog).toBeVisible()
-    expect(await dialog.getByLabel('你的暱稱（必填）').inputValue()).toBe('小明')
+    expect(await dialog.getByLabel('留言（選填）').inputValue()).toBe('小明')
     page.once('dialog', d => { asked.push(d.message()); void d.dismiss() })
     await page.mouse.click(4, 4) // 背景
     await expect.poll(() => asked.length).toBe(2)
@@ -74,8 +76,7 @@ test.describe('modal 鍵盤行為', () => {
     await expect(report).toBeFocused()
 
     await page.getByRole('button', { name: '我要送' }).click()
-    await page.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('阿華')
-    await page.getByRole('button', { name: '確認捐助' }).click()
+        await page.getByRole('button', { name: '確認捐助' }).click()
     const ok = page.getByRole('dialog', { name: '✓ 捐助成功！' })
     await expect(ok).toBeVisible()
     expect(await focusedInDialog(page)).toBe(true)

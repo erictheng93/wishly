@@ -1,7 +1,6 @@
 //! 集中式輸入驗證（F-03 / F-11 / F-16 / F-17）。回傳 422 VALIDATION_FAILED 並指出欄位 pointer。
 use crate::error::AppError;
 use chrono::NaiveDate;
-use std::str::FromStr;
 
 fn zero_width(c: char) -> bool {
     matches!(c, '\u{200B}'..='\u{200D}' | '\u{2060}' | '\u{FEFF}')
@@ -28,21 +27,6 @@ pub fn text(s: &str, pointer: &str, multi: bool) -> Result<String, AppError> {
         return Ok(String::new());
     }
     Ok(s.to_string())
-}
-
-/// 可寄送的 Email（lettre::Address 解析）；回傳小寫、trim 後的值。
-pub fn email(s: &str, pointer: &str) -> Result<String, AppError> {
-    let e = s.trim().to_lowercase();
-    let ok = e.len() <= 200
-        && !e
-            .chars()
-            .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>'))
-        && lettre::Address::from_str(&e).is_ok();
-    if ok {
-        Ok(e)
-    } else {
-        Err(AppError::invalid(pointer, "FORMAT", "Email 格式不正確"))
-    }
 }
 
 /// 活動日限制 2000-01-01..2100-12-31

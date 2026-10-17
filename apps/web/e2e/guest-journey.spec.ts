@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
-import { createList, registerUser } from './helpers'
+import { createList, registerUser, signInPage } from './helpers'
 
-test('訪客旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → 修改 → 取消', async ({ page, request }) => {
+test('會員認捐旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → 修改 → 取消', async ({ page, request }) => {
   const owner = await registerUser({ name: '小愛' })
   const list = await createList(owner, { title: '小愛的待產清單', items: [{ title: '奶瓶組', qty: 3 }, { title: '嬰兒帽', qty: 1 }] })
   const card = page.locator('li.g-card', { hasText: '奶瓶組' })
@@ -13,7 +13,7 @@ test('訪客旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → �
     const html = await res.text()
     const meta = (p: string) => html.match(new RegExp(`<meta[^>]+(?:property|name)="${p}"[^>]+content="([^"]*)"`))?.[1]
     expect(meta('og:title')).toBe('幫小愛挑禮物｜小愛的待產清單')
-    expect(meta('og:description')).toContain('不用註冊')
+    expect(meta('og:description')).toContain('登入會員後即可認捐')
     expect(meta('og:type')).toBe('website')
     expect(meta('og:url')).toContain(`/s/${list.slug}`)
     expect(meta('og:image')).toMatch(/^https?:\/\/.+\.(png|jpg)/)
@@ -21,6 +21,7 @@ test('訪客旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → �
     expect(html).toContain('<h1>小愛的待產清單</h1>') // 內容也在首次 HTML 內
   })
 
+  const member = await signInPage(page)
   await test.step('開啟分享頁，看到兩個品項與 0% 進度', async () => {
     await page.goto(`/s/${list.slug}`)
     await expect(page.getByRole('heading', { level: 1, name: '小愛的待產清單' })).toBeVisible()
@@ -28,25 +29,19 @@ test('訪客旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → �
     await expect(card).toContainText('0 / 3')
   })
 
-  await test.step('暱稱必填：空白被瀏覽器擋下、純空白被前端驗證擋下', async () => {
+  await test.step('登入會員後開啟認捐：沒有暱稱 / 聯絡方式 / Email 欄位，以帳號名稱捐助', async () => {
     await card.getByRole('button', { name: '我要送' }).click()
     await expect(dialog.getByText('捐助「奶瓶組」')).toBeVisible()
-    await dialog.getByRole('button', { name: '確認捐助' }).click()
-    await expect(dialog).toBeVisible() // 原生 required 阻止送出
-    await expect(dialog.getByLabel('你的暱稱（必填）')).toHaveJSProperty('validity.valueMissing', true)
-    await dialog.getByLabel('你的暱稱（必填）').fill('   ')
-    await dialog.getByRole('button', { name: '確認捐助' }).click()
-    await expect(dialog.getByText('請填暱稱')).toBeVisible()
+    await expect(dialog.getByText(`以 ${member.name} 的身分捐助`)).toBeVisible()
+    await expect(dialog.getByLabel(/暱稱|聯絡方式|Email/)).toHaveCount(0)
   })
 
-  await test.step('填暱稱、數量 2，捐助成功', async () => {
-    await dialog.getByLabel('你的暱稱（必填）').fill('阿明')
+  await test.step('數量 2，捐助成功', async () => {
     await dialog.getByRole('button', { name: '增加' }).click()
     await expect(dialog.locator('.g-step b')).toHaveText('2')
     await dialog.getByRole('button', { name: '確認捐助' }).click()
     await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
     await expect(page.getByText('你捐助了 奶瓶組 × 2')).toBeVisible()
-    await expect(page.getByText('這份捐助已存在此裝置')).toBeVisible()
     await page.getByRole('button', { name: '回到清單繼續看' }).click()
     await expect(card).toContainText('2 / 3')
   })
@@ -62,7 +57,7 @@ test('訪客旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → �
     await expect(page).toHaveURL(/\/me\/claims$/)
     await expect(page.getByRole('link', { name: '小愛的待產清單' })).toBeVisible()
     await expect(page.getByText('奶瓶組 × 2')).toBeVisible()
-    await expect(page.getByText('阿明')).toBeVisible()
+    await expect(page.getByText(member.name)).toBeVisible()
   })
 
   await test.step('回清單修改數量為 1', async () => {
@@ -86,5 +81,5 @@ test('訪客旅程：SSR meta → 捐助 → 重新整理 → 我的捐助 → �
     await expect(card).toContainText('0 / 3')
     await expect(card.getByRole('button', { name: '我要送' })).toBeVisible()
   })
-  await owner.api.dispose()
+  await Promise.all([owner.api.dispose(), member.api.dispose()])
 })

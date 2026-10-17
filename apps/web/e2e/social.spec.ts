@@ -91,7 +91,7 @@ test('僅好友清單：匿名請先登入、非好友被擋並可前往個人�
   await expect(ps.getByRole('link', { name: new RegExp(`前往 ${owner.name} 的頁面加好友`) })).toHaveAttribute('href', `/u/${owner.handle}`)
 
   const pf = await pageFor(browser, friend)
-  // 不等 /me：頁面開啟 sheet 前會自己等登入身分（回歸測試：手快點「我要送」不能被當成訪客）
+  // 不等 /me：頁面開啟 sheet 前會自己等登入身分（回歸測試：手快點「我要送」要等到身分確認，不能誤判成未登入）
   await pf.goto(`/s/${list.slug}`); await hydrated(pf)
   await expect(pf.getByRole('heading', { level: 1, name: list.title })).toBeVisible()
   await pf.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
@@ -102,10 +102,10 @@ test('僅好友清單：匿名請先登入、非好友被擋並可前往個人�
   await closeAll([owner, friend, stranger])
 })
 
-test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變清單名）→ 訪客捐助', async ({ browser }) => {
-  const owner = await registerUser({ tag: 'po' })
+test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變清單名）→ 會員捐助', async ({ browser }) => {
+  const owner = await registerUser({ tag: 'po' }), member = await registerUser({ tag: 'pm' })
   const list = await listWith(owner, 'password', { access_password: 'open-sesame-1' })
-  const p = await pageFor(browser)
+  const p = await pageFor(browser, member)
   await p.goto(`/s/${list.slug}`); await hydrated(p)
   await expect(p.getByRole('heading', { name: '這份清單需要密碼' })).toBeVisible()
   await expect(p).toHaveTitle(/需要權限才能查看/)
@@ -121,10 +121,9 @@ test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變�
   await expect(p).toHaveTitle(new RegExp(list.title))
 
   await p.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
-  await p.getByRole('dialog').getByLabel('你的暱稱（必填）').fill('密碼訪客')
   await p.getByRole('dialog').getByRole('button', { name: '確認捐助' }).click()
   await expect(p.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
-  await closeAll([owner])
+  await closeAll([owner, member])
 })
 
 test('個人頁 /u/{handle}：公開 / 僅好友清單依身分可見；捐助依可見度與清單類型呈現', async ({ browser }) => {

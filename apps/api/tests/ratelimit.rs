@@ -32,24 +32,6 @@ async fn call_with_ip(app: &Router, mut req: Request<Body>, ip: Option<&str>) ->
     common::call_request(app, req).await
 }
 
-async fn claim(app: &Router, item: Uuid, email: &str, ip: &str) -> StatusCode {
-    let r = Request::post(format!("/api/v1/items/{item}/claims"))
-        .header("content-type", "application/json")
-        .header("idempotency-key", Uuid::new_v4().to_string())
-        .body(Body::from(
-            json!({"qty": 1, "display_name": "x", "email": email}).to_string(),
-        ))
-        .unwrap();
-    call_with_ip(app, r, Some(ip)).await.0
-}
-
-async fn mails(pool: &PgPool) -> i64 {
-    sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'claim.confirmation'")
-        .fetch_one(pool)
-        .await
-        .unwrap()
-}
-
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn check_blocks_with_retry_after(pool: PgPool) {
     for _ in 0..2 {
@@ -65,85 +47,6 @@ async fn check_blocks_with_retry_after(pool: PgPool) {
         .unwrap();
     assert!((1..=3600).contains(&ra));
     ratelimit::check(&pool, "other", 2, 3600).await.unwrap(); // key 獨立
-    common::assert_all_reconciled(&pool).await;
-}
-
-#[sqlx::test(migrations = "../../db/migrations")]
-async fn claim_mail_per_email_limit_still_creates_claim(pool: PgPool) {
-    let a = app(&pool);
-    let (_, items) = common::quantity_wishlist(&pool, "RlMail0001", 5, 5).await;
-    for (n, it) in items.iter().enumerate() {
-        assert_eq!(
-            claim(&a, *it, "victim@example.com", &format!("10.0.0.{n}")).await,
-            StatusCode::CREATED
-        ); // 捐助本身都成功
-    }
-    assert_eq!(mails(&pool).await, 3); // 同 email 每小時只寄 3 封
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM claims")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(n, 5);
-    common::assert_all_reconciled(&pool).await;
-}
-
-#[sqlx::test(migrations = "../../db/migrations")]
-async fn claim_mail_per_guest_daily_limit(pool: PgPool) {
-    let a = app(&pool);
-    let (_, items) = common::quantity_wishlist(&pool, "RlGuest001", 13, 5).await;
-    let r = Request::post(format!("/api/v1/items/{}/claims", items[0]))
-        .header("content-type", "application/json")
-        .header("idempotency-key", Uuid::new_v4().to_string())
-        .body(Body::from(
-            json!({"qty": 1, "display_name": "x", "email": "g@example.com"}).to_string(),
-        ))
-        .unwrap();
-    let (_, _, b) = call_with_ip(&a, r, Some("1.1.1.1")).await;
-    let tok = b["guest_token"].as_str().unwrap().to_string();
-    for it in &items[1..12] {
-        let r = Request::post(format!("/api/v1/items/{it}/claims"))
-            .header("content-type", "application/json")
-            .header("idempotency-key", Uuid::new_v4().to_string())
-            .header("x-guest-token", &tok)
-            .body(Body::from(json!({"qty": 1}).to_string()))
-            .unwrap();
-        assert_eq!(
-            call_with_ip(&a, r, Some("1.1.1.1")).await.0,
-            StatusCode::CREATED
-        );
-    }
-    // email 先到上限 3；以 guest 維度驗證：把 email 計數歸零再看 guest 計數
-    sqlx::query("DELETE FROM rate_limits WHERE key LIKE 'claim_mail:%'")
-        .execute(&pool)
-        .await
-        .unwrap();
-    let g: Uuid = sqlx::query_scalar("SELECT id FROM guests")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let n: i32 = sqlx::query_scalar("SELECT count FROM rate_limits WHERE key = $1")
-        .bind(format!("claim_guest:{g}"))
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(n, 3); // 3 次（第 4 次起 email 先擋、短路不再計 guest）
-    sqlx::query("UPDATE rate_limits SET count = 10 WHERE key = $1")
-        .bind(format!("claim_guest:{g}"))
-        .execute(&pool)
-        .await
-        .unwrap();
-    let before = mails(&pool).await;
-    let r = Request::post(format!("/api/v1/items/{}/claims", items[12]))
-        .header("content-type", "application/json")
-        .header("idempotency-key", Uuid::new_v4().to_string())
-        .header("x-guest-token", &tok)
-        .body(Body::from(json!({"qty": 1}).to_string()))
-        .unwrap();
-    assert_eq!(
-        call_with_ip(&a, r, Some("1.1.1.1")).await.0,
-        StatusCode::CREATED
-    );
-    assert_eq!(mails(&pool).await, before); // 超過每日 10 封：不寄
     common::assert_all_reconciled(&pool).await;
 }
 

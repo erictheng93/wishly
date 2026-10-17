@@ -57,8 +57,8 @@ const wipe = () => {
     <p v-if="state === 'loading'" class="g-mute">載入中…</p>
     <div v-else-if="state === 'error'" class="g-center"><p>讀取失敗</p><button class="g-btn" @click="load">重試</button></div>
     <div v-else-if="state === 'empty'" class="g-center">
-      <p>你還沒有捐助任何東西。收到朋友的清單連結後，就能在這裡管理。</p>
-      <p class="g-mute">看不到之前的捐助？可能是在不同瀏覽器或 LINE 內建瀏覽器。留過 Email 的捐助，可從確認信的「管理我的捐助」連結回來。</p>
+      <p>你還沒有捐助任何東西。收到朋友的清單連結後，登入會員即可認捐，並在這裡管理。</p>
+      <p class="g-mute">看不到之前以訪客身分的捐助？可能是在不同瀏覽器或 LINE 內建瀏覽器。留過 Email 的捐助，可從確認信的「管理我的捐助」連結回來。</p>
     </div>
     <template v-else>
       <div class="g-card" v-if="guest">

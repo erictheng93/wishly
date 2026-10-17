@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
-import { claimViaUi, createList, loginBrowser, registerUser } from './helpers'
+import { claimViaUi, createList, loginBrowser, registerUser, signInPage } from './helpers'
 
-test('即時更新：創建者開著進度頁，訪客捐助後不重新整理就看到變化', async ({ browser }) => {
+test('即時更新：創建者開著進度頁，會員認捐後不重新整理就看到變化', async ({ browser }) => {
   const owner = await registerUser()
   const list = await createList(owner, { showNames: true, items: [{ title: '推車', qty: 3 }, { title: '尿布', qty: 1 }] })
   const ownerCtx = await browser.newContext(), guestCtx = await browser.newContext()
@@ -15,9 +15,10 @@ test('即時更新：創建者開著進度頁，訪客捐助後不重新整理�
     await op.evaluate(() => { (window as any).__noReload = true }) // 之後確認沒有整頁重載
   })
 
-  await test.step('訪客在另一個 context 捐助 2 件', async () => {
+  const donor = await signInPage(gp, { name: '阿花' })
+  await test.step('會員在另一個 context 認捐 2 件', async () => {
     await gp.goto(`/s/${list.slug}`)
-    await claimViaUi(gp, '推車', '阿花', 2)
+    await claimViaUi(gp, '推車', 2)
   })
 
   await test.step('創建者頁面自動出現捐助者與更新後的進度', async () => {
@@ -28,13 +29,13 @@ test('即時更新：創建者開著進度頁，訪客捐助後不重新整理�
     expect(await op.evaluate(() => (window as any).__noReload)).toBe(true)
   })
 
-  await test.step('訪客取消後，創建者頁面再次自動更新', async () => {
+  await test.step('會員取消後，創建者頁面再次自動更新', async () => {
     gp.once('dialog', d => d.accept())
     await gp.goto('/me/claims')
     await gp.getByRole('button', { name: '取消', exact: true }).click()
     await expect(op.getByText('數量 0 / 4')).toBeVisible()
   })
-  await Promise.all([ownerCtx.close(), guestCtx.close(), owner.api.dispose()])
+  await Promise.all([ownerCtx.close(), guestCtx.close(), owner.api.dispose(), donor.api.dispose()])
 })
 
 test('驚喜模式：進度頁遮蔽捐助者，訪客頁正常', async ({ browser, request }) => {
@@ -44,10 +45,11 @@ test('驚喜模式：進度頁遮蔽捐助者，訪客頁正常', async ({ brows
   await loginBrowser(ownerCtx, owner)
   const op = await ownerCtx.newPage(), gp = await guestCtx.newPage()
 
-  await test.step('訪客頁正常：看得到進度、可以捐助', async () => {
+  const donor = await signInPage(gp, { name: '神秘朋友' })
+  await test.step('訪客頁正常：看得到進度、會員可以捐助', async () => {
     await gp.goto(`/s/${list.slug}`)
     await expect(gp.locator('li.g-card', { hasText: '生日蛋糕' })).toContainText('0 / 2')
-    await claimViaUi(gp, '生日蛋糕', '神秘朋友', 1)
+    await claimViaUi(gp, '生日蛋糕', 1)
     await gp.getByRole('button', { name: '回到清單繼續看' }).click()
     await expect(gp.locator('li.g-card', { hasText: '生日蛋糕' })).toContainText('1 / 2')
   })
@@ -75,5 +77,5 @@ test('驚喜模式：進度頁遮蔽捐助者，訪客頁正常', async ({ brows
     await expect(op.getByText('建立者不可捐助自己的清單')).toBeVisible()
     await expect(op.getByRole('button', { name: '我要送' })).toHaveCount(0)
   })
-  await Promise.all([ownerCtx.close(), guestCtx.close(), owner.api.dispose()])
+  await Promise.all([ownerCtx.close(), guestCtx.close(), owner.api.dispose(), donor.api.dispose()])
 })

@@ -2,8 +2,7 @@
 useHead({ title: '建立帳號' })
 const route = useRoute()
 const { register, verifyRegister, oauth } = useAuth()
-const raw = String(route.query.redirect || '')
-const redirect = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
+const redirect = safeRedirect(route.query.redirect)
 const step = ref<'form' | 'otp'>('form')
 const email = ref(''), password = ref(''), name = ref(''), code = ref('')
 const otp = ref<{ focus: () => void }>()

@@ -22,7 +22,7 @@ async fn no_confirmation_without_email(pool: PgPool) {
     )
     .await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    guest_claim(&pool, it, 1).await;
+    user_claim(&pool, it, 1).await;
     let n: i64 =
         sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='claim.confirmation'")
             .fetch_one(&pool)
@@ -46,7 +46,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
     )
     .await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    guest_claim(&pool, it, 1).await;
+    user_claim(&pool, it, 1).await;
     let (s, h, v) = call(&pool, "GET", "/me/export", &ck(&t), None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(h["content-disposition"]

@@ -52,12 +52,13 @@ async fn public_page_happy_and_masking(pool: PgPool) {
         .unwrap();
     let bottle = item(&pool, f.id, "玻璃奶瓶", 10).await;
     item(&pool, f.id, "推車", 2).await;
+    let ming = common::user(&pool, "小明").await;
     let (st, _, c) = call(
         &app,
         "POST",
         &format!("/items/{}/claims", bottle),
-        &common::idem(Uuid::new_v4()),
-        Some(json!({"qty": 5, "display_name": "小明"})),
+        &[common::ck(&ming.token), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty": 5, "visibility": "public"})), // 會員預設層級非 public 時公開頁會匿名
     )
     .await;
     assert_eq!(st, StatusCode::CREATED, "{c}");
@@ -137,16 +138,21 @@ async fn oversell_only_one_wins(pool: PgPool) {
     let app = test_app(&pool);
     let f = named_list(&pool, "Race000001").await;
     let it = item(&pool, f.id, "最後一件", 1).await;
-    let tasks: Vec<_> = (0..8)
-        .map(|n| {
+    let mut users = vec![];
+    for n in 0..8 {
+        users.push(common::user(&pool, &format!("g{n}")).await);
+    }
+    let tasks: Vec<_> = users
+        .into_iter()
+        .map(|u| {
             let app = app.clone();
             tokio::spawn(async move {
                 call(
                     &app,
                     "POST",
                     &format!("/items/{}/claims", it),
-                    &common::idem(Uuid::new_v4()),
-                    Some(json!({"qty": 1, "display_name": format!("g{n}")})),
+                    &[common::ck(&u.token), common::idem(Uuid::new_v4())].concat(),
+                    Some(json!({"qty": 1})),
                 )
                 .await
             })
@@ -168,12 +174,12 @@ async fn oversell_only_one_wins(pool: PgPool) {
     let (claimed, n): (i32, i64) = sqlx::query_as("SELECT i.qty_claimed, (SELECT count(*) FROM claims WHERE item_id = i.id) FROM wishlist_items i WHERE i.id = $1")
         .bind(it).fetch_one(&pool).await.unwrap();
     assert_eq!((claimed, n), (1, 1));
-    // 失敗請求不留下孤兒 guest
+    // 新認捐不再建立 guest
     let guests: i64 = sqlx::query_scalar("SELECT count(*) FROM guests")
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(guests, 1);
+    assert_eq!(guests, 0);
     assert_all_reconciled(&pool).await;
 }
 
@@ -183,44 +189,31 @@ async fn idempotency_key_replay_and_conflict(pool: PgPool) {
     let f = named_list(&pool, "Idem000001").await;
     let it = item(&pool, f.id, "奶瓶", 5).await;
     let key = Uuid::new_v4();
-    let body = json!({"qty": 2, "display_name": "小明"});
+    let body = json!({"qty": 2});
+    let ming = common::user(&pool, "小明").await;
+    let hdr = |k: Uuid| [common::ck(&ming.token), common::idem(k)].concat();
 
     let (s1, h1, b1) = call(
         &app,
         "POST",
         &format!("/items/{}/claims", it),
-        &common::idem(key),
+        &hdr(key),
         Some(body.clone()),
     )
     .await;
     assert_eq!(s1, StatusCode::CREATED);
-    assert!(h1.contains_key("set-cookie") && h1.contains_key("location"));
+    assert!(h1.contains_key("location") && !h1.contains_key("set-cookie"));
     let (s2, h2, b2) = call(
         &app,
         "POST",
         &format!("/items/{}/claims", it),
-        &common::idem(key),
+        &hdr(key),
         Some(body.clone()),
     )
     .await;
     assert_eq!(s2, StatusCode::CREATED);
     assert_eq!(h2["idempotency-replayed"], "true");
-    // F-01：anon 首次捐助的重播改為對同一 guest 重簽新 token（回應 + Set-Cookie）；舊 token 失效；idempotency_keys 仍不存明文
-    assert!(
-        b1["guest_token"].is_string()
-            && b2["guest_token"].is_string()
-            && b1["guest_token"] != b2["guest_token"]
-            && h2.contains_key("set-cookie")
-    );
-    assert!(b2.get("_guest_id").is_none());
-    assert_eq!(b1["claim"], b2["claim"]);
-    let stored: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM idempotency_keys WHERE response_body::text LIKE '%guest_token%'",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(stored, 0);
+    assert_eq!(b1, b2);
     let (n, q): (i64, i32) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM claims), qty_claimed FROM wishlist_items WHERE id = $1",
     )
@@ -234,8 +227,8 @@ async fn idempotency_key_replay_and_conflict(pool: PgPool) {
         &app,
         "POST",
         &format!("/items/{}/claims", it),
-        &common::idem(key),
-        Some(json!({"qty": 3, "display_name": "小明"})),
+        &hdr(key),
+        Some(json!({"qty": 3})),
     )
     .await;
     assert_eq!(
@@ -245,6 +238,7 @@ async fn idempotency_key_replay_and_conflict(pool: PgPool) {
 
     // 缺 key
     let r = Request::post(format!("/api/v1/items/{it}/claims"))
+        .header("cookie", format!("ws_session={}", ming.token))
         .body(Body::from(body.to_string()))
         .unwrap();
     let (s4, _, b4) = common::call_request(&app, r).await;
@@ -260,15 +254,17 @@ async fn claim_lifecycle(pool: PgPool) {
     let app = test_app(&pool);
     let f = named_list(&pool, "Life000001").await;
     let it = item(&pool, f.id, "奶瓶", 3).await;
-    let (_, _, b) = call(
+    let ming = common::user(&pool, "小明").await;
+    let tok = ming.token.clone();
+    let (s, _, b) = call(
         &app,
         "POST",
         &format!("/items/{}/claims", it),
-        &common::idem(Uuid::new_v4()),
-        Some(json!({"qty": 1, "display_name": "小明"})),
+        &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty": 1})),
     )
     .await;
-    let tok = b["guest_token"].as_str().unwrap().to_string();
+    assert_eq!(s, StatusCode::CREATED, "{b}");
     let cid = b["claim"]["id"].as_str().unwrap().to_string();
 
     // 重複捐助 → CLAIM_ALREADY_EXISTS（附 claim_id）
@@ -276,7 +272,7 @@ async fn claim_lifecycle(pool: PgPool) {
         &app,
         "POST",
         &format!("/items/{}/claims", it),
-        &[common::gt(&tok), common::idem(Uuid::new_v4())].concat(),
+        &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
         Some(json!({"qty": 1})),
     )
     .await;
@@ -294,7 +290,7 @@ async fn claim_lifecycle(pool: PgPool) {
         &app,
         "PATCH",
         &url,
-        &common::gt(&tok),
+        &common::ck(&tok),
         Some(json!({"qty": 4})),
     )
     .await;
@@ -306,7 +302,7 @@ async fn claim_lifecycle(pool: PgPool) {
         &app,
         "PATCH",
         &url,
-        &common::gt(&tok),
+        &common::ck(&tok),
         Some(json!({"qty": 3, "status": "purchased"})),
     )
     .await;
@@ -318,18 +314,12 @@ async fn claim_lifecycle(pool: PgPool) {
         ),
         ("purchased", 3)
     );
-    // 他人不可改；無 token 401
+    // 他人不可改；未登入 401
     let (s, _, _) = call(&app, "PATCH", &url, &[], Some(json!({"note": "x"}))).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
-    // GET /guest/me
-    let (s, h, me) = call(&app, "GET", "/guest/me", &common::gt(&tok), None).await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(h["cache-control"], "private, no-store");
-    assert_eq!(me["claims"][0]["item"]["title"], "奶瓶");
-    assert_eq!(me["claims"][0]["wishlist"]["slug"], "Life000001");
     // 取消回補，重複 DELETE 冪等
     for _ in 0..2 {
-        let (s, _, _) = call(&app, "DELETE", &url, &common::gt(&tok), Some(Value::Null)).await;
+        let (s, _, _) = call(&app, "DELETE", &url, &common::ck(&tok), Some(Value::Null)).await;
         assert_eq!(s, StatusCode::NO_CONTENT);
     }
     let q: i32 = sqlx::query_scalar("SELECT qty_claimed FROM wishlist_items WHERE id = $1")
@@ -343,7 +333,7 @@ async fn claim_lifecycle(pool: PgPool) {
         &app,
         "POST",
         &format!("/items/{}/claims", it),
-        &[common::gt(&tok), common::idem(Uuid::new_v4())].concat(),
+        &[common::ck(&tok), common::idem(Uuid::new_v4())].concat(),
         Some(json!({"qty": 1})),
     )
     .await;

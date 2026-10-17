@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createList, guestClaim, loginBrowser, makeStaff, registerUser, watchProblems } from './helpers'
+import { createList, loginBrowser, memberClaim, signInPage, makeStaff, registerUser, watchProblems } from './helpers'
 
 // 主要頁面在 390 寬：無橫向捲動、無 console error / pageerror、無 4xx/5xx 請求（預期內的除外）
 test.use({ viewport: { width: 390, height: 844 } })
@@ -19,7 +19,7 @@ async function check(page: Page, path: string, ready: () => Promise<void>, ignor
 test('公開頁面（訪客可見）', async ({ page }) => {
   const owner = await registerUser()
   const list = await createList(owner, { items: [{ title: '一個名字很長很長很長很長很長很長很長很長很長很長的品項名稱用來測試換行', qty: 5 }, { title: 'B', qty: 1 }] })
-  await guestClaim(list.items[1].id, 1)
+  await memberClaim(list.items[1].id, 1)
   const h1 = () => expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   for (const [path, ready] of [
     ['/', h1], ['/login', h1], ['/register', h1], ['/forgot-password', h1], ['/terms', h1], ['/privacy', h1],
@@ -27,7 +27,8 @@ test('公開頁面（訪客可見）', async ({ page }) => {
   ] as const) {
     await test.step(path, () => check(page, path, ready))
   }
-  await test.step('/s/{slug} 的捐助 sheet 與成功畫面', async () => {
+  await test.step('/s/{slug} 的捐助 sheet（需登入會員）', async () => {
+    const member = await signInPage(page)
     await page.goto(`/s/${list.slug}`)
     await page.locator('li.g-card').first().getByRole('button', { name: '我要送' }).click()
     const { sw, iw } = await noHScroll(page)
@@ -36,6 +37,7 @@ test('公開頁面（訪客可見）', async ({ page }) => {
     const box = await page.getByRole('dialog').boundingBox()
     expect(box!.x).toBeGreaterThanOrEqual(0)
     expect(box!.x + box!.width).toBeLessThanOrEqual(iw)
+    await member.api.dispose()
   })
   await owner.api.dispose()
 })
@@ -43,7 +45,7 @@ test('公開頁面（訪客可見）', async ({ page }) => {
 test('創建者與後台頁面', async ({ page, context }) => {
   const owner = await registerUser()
   const list = await createList(owner, { items: [{ title: '奶瓶', qty: 2 }] })
-  await guestClaim(list.items[0].id, 1, '訪客甲')
+  await memberClaim(list.items[0].id, 1)
   makeStaff(owner.email)
   await loginBrowser(context, owner)
   const h1 = () => expect(page.getByRole('heading', { level: 1 })).toBeVisible()

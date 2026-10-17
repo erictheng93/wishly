@@ -14,6 +14,7 @@ async fn read_only_mode_blocks_writes(pool: PgPool) {
         token: staff,
     } = staff(&pool, "u").await;
     let TestUser { id: o, token: ot } = user(&pool, "u").await;
+    let TestUser { id: _, token: dt } = user(&pool, "donor").await; // 登出 ot 後仍可認捐的會員
     let wl = wishlist(
         &pool,
         o,
@@ -50,8 +51,8 @@ async fn read_only_mode_blocks_writes(pool: PgPool) {
         &pool,
         "POST",
         &format!("/items/{it}/claims"),
-        &[("idempotency-key", Uuid::new_v4().to_string())],
-        Some(json!({"qty":1,"display_name":"x"})),
+        &[ck(&dt), idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty":1})),
     )
     .await;
     assert_eq!(
@@ -92,17 +93,17 @@ async fn read_only_mode_blocks_writes(pool: PgPool) {
         .0,
         StatusCode::OK
     );
-    assert_eq!(claim_status(&pool, it).await, StatusCode::CREATED);
+    assert_eq!(claim_status(&pool, it, &dt).await, StatusCode::CREATED);
     assert_all_reconciled(&pool).await;
 }
 
-async fn claim_status(pool: &PgPool, it: Uuid) -> StatusCode {
+async fn claim_status(pool: &PgPool, it: Uuid, token: &str) -> StatusCode {
     call(
         pool,
         "POST",
         &format!("/items/{it}/claims"),
-        &[("idempotency-key", Uuid::new_v4().to_string())],
-        Some(json!({"qty":1,"display_name":"x"})),
+        &[ck(token), idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty":1})),
     )
     .await
     .0

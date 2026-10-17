@@ -23,8 +23,8 @@ async fn owner_delivers_and_cancels_claims(pool: PgPool) {
     .await;
     let wid = wl.id;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    let (_, c1) = guest_claim(&pool, it, 1).await;
-    let (_, c2) = guest_claim(&pool, it, 1).await;
+    let (_, c1) = user_claim(&pool, it, 1).await;
+    let (_, c2) = user_claim(&pool, it, 1).await;
     let url = |c: Uuid| format!("/claims/{c}");
     // 路人 / 擁有者改數量或 purchased → 403
     assert_eq!(
@@ -109,7 +109,7 @@ async fn owner_delivers_and_cancels_claims(pool: PgPool) {
     )
     .await;
     let it2 = item(&pool, wl.id, "奶瓶", 3).await;
-    let (_, c3) = guest_claim(&pool, it2, 1).await;
+    let (_, c3) = user_claim(&pool, it2, 1).await;
     assert_eq!(
         call(&pool, "DELETE", &url(c3), &ck(&ot), None).await.0,
         StatusCode::FORBIDDEN

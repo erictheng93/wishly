@@ -370,16 +370,17 @@ async fn claim_requires_access(pool: PgPool) {
                 "POST",
                 &format!("/items/{it}/claims"),
                 &h,
-                Some(json!({ "qty": 1, "display_name": "小明" })),
+                Some(json!({ "qty": 1 })),
             )
             .await
         }
     };
     let (_, _, it) = mk(&pool, &c, "friends", None).await;
+    // 認捐一律需登入：未登入 401
     let (s, _, v) = claim(it, vec![]).await;
     assert_eq!(
         (s, v["code"].as_str()),
-        (StatusCode::FORBIDDEN, Some("LOGIN_REQUIRED"))
+        (StatusCode::UNAUTHORIZED, Some("UNAUTHORIZED"))
     );
     assert_eq!(
         claim(it, ck(&c.stranger.token)).await.0,
@@ -395,7 +396,11 @@ async fn claim_requires_access(pool: PgPool) {
     assert_eq!(claim(it, ck(&c.allowed.token)).await.0, StatusCode::CREATED);
 
     let (_, slug, it) = mk(&pool, &c, "password", Some("correct-horse")).await;
-    assert_eq!(claim(it, vec![]).await.2["code"], "PASSWORD_REQUIRED");
+    assert_eq!(claim(it, vec![]).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        claim(it, ck(&c.stranger.token)).await.2["code"],
+        "PASSWORD_REQUIRED"
+    );
     let (_, _, v) = call(
         &pool,
         "POST",
@@ -406,7 +411,12 @@ async fn claim_requires_access(pool: PgPool) {
     .await;
     let tok = v["access_token"].as_str().unwrap().to_string();
     assert_eq!(
-        claim(it, vec![("x-list-access", tok)]).await.0,
+        claim(
+            it,
+            [ck(&c.stranger.token), vec![("x-list-access", tok)]].concat()
+        )
+        .await
+        .0,
         StatusCode::CREATED
     );
 
@@ -416,7 +426,11 @@ async fn claim_requires_access(pool: PgPool) {
         StatusCode::NOT_FOUND
     );
     let (_, _, it) = mk(&pool, &c, "public", None).await;
-    assert_eq!(claim(it, vec![]).await.0, StatusCode::CREATED);
+    assert_eq!(claim(it, vec![]).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        claim(it, ck(&c.stranger.token)).await.0,
+        StatusCode::CREATED
+    );
     assert_all_reconciled(&pool).await;
     tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
         .await

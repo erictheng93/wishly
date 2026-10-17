@@ -86,7 +86,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <li class="l2"><a href="#c-friends">4.9 好友與個人頁</a></li>
 <li class="l2"><a href="#c-settings">4.10 帳號設定</a></li>
 <li class="l1"><a href="#guest">5. 訪客與贊助者手冊</a></li>
-<li class="l2"><a href="#g-claim">5.1 免註冊捐助</a></li>
+<li class="l2"><a href="#g-claim">5.1 登入後認捐</a></li>
 <li class="l2"><a href="#g-manage">5.2 管理我的捐助</a></li>
 <li class="l2"><a href="#g-fund">5.3 心願眾籌</a></li>
 <li class="l2"><a href="#g-report">5.4 檢舉清單</a></li>
@@ -115,7 +115,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <main>
 <header class="cover">
 <h1>Wishly 系統手冊</h1>
-<p>願望清單用連結分享，訪客免註冊即可捐助品項，並確保不會超賣。</p>
+<p>願望清單用連結分享，訪客可免登入瀏覽，登入後即可認捐品項（D50），並確保不會超賣。</p>
 </header>
 <div class="meta">
 <div><b>文件對象</b>創建者、訪客、營運人員、開發與維運</div>
@@ -131,9 +131,9 @@ th{background:var(--bg-alt);white-space:nowrap}
 
 <!-- ========================================================= 1 -->
 <h2 id="overview">1. 系統概覽</h2>
-<p>Wishly（心願同步）解決「想要的人說不出口、想送的人怕重複」。建立者列出品項與數量，用一條連結分享到 LINE / FB / 簡訊；朋友點開即可捐助，不必安裝、不必註冊。系統保證同一品項不會被超額捐助，並即時更新完成度。</p>
+<p>Wishly（心願同步）解決「想要的人說不出口、想送的人怕重複」。建立者列出品項與數量，用一條連結分享到 LINE / FB / 簡訊；朋友點開即可瀏覽，不必安裝；認捐時需登入（D50），登入後回到原品項即可完成。系統保證同一品項不會被超額捐助，並即時更新完成度。</p>
 <pre><code>建立者  建清單 → 加品項 → 發佈 → 複製連結傳到群組
-訪客    點連結 → 看清單 → 輸入暱稱 → 捐助（30 秒內，免註冊）
+訪客    點連結 → 看清單（免登入）→ 登入 / 註冊 → 回原品項捐助（D50：認捐需登入）
 系統    條件式 UPDATE 防超賣 → SSE 即時推播 → Email 通知建立者
 大件品  登入使用者以「點數」多人湊 → 達標後平台代購寄出</code></pre>
 
@@ -143,7 +143,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>Email＋密碼註冊 / 登入（OTP 驗證）</td><td><span class="tag live">已實作</span></td><td>OTP 僅用於註冊驗證與忘記密碼，不是登入方式</td></tr>
 <tr><td>Google / LINE 登入與綁定</td><td><span class="tag live">已實作</span></td><td>可在設定頁綁定 / 解除，至少保留一種</td></tr>
 <tr><td>清單 CRUD、品項 CRUD、排序、圖片上傳</td><td><span class="tag live">已實作</span></td><td>類型 <code>personal</code>（個人心願）/ <code>registry</code>（禮物登記）</td></tr>
-<tr><td>訪客免註冊數量捐助</td><td><span class="tag live">已實作</span></td><td>含修改、取消、狀態標記、逾期釋放、冪等重送</td></tr>
+<tr><td>登入後數量認捐（D50；原訪客免註冊）</td><td><span class="tag live">已實作</span></td><td>含修改、取消、狀態標記、逾期釋放、冪等重送；既有訪客認捐（舊資料）仍可管理但不可增量</td></tr>
 <tr><td>清單可見性 6 種</td><td><span class="tag live">已實作</span></td><td>public / link / friends / selected / password / private</td></tr>
 <tr><td>驚喜模式、自動結束時間</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>即時更新（SSE，失敗退輪詢）</td><td><span class="tag live">已實作</span></td><td></td></tr>
@@ -165,7 +165,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <h3 id="roles">1.2 使用者角色</h3>
 <table>
 <tr><th>角色</th><th>身分憑證</th><th>能做什麼</th></tr>
-<tr><td><b>訪客</b></td><td><code>ws_guest</code> cookie 或 <code>X-Guest-Token</code></td><td>瀏覽可見的清單、捐助數量型品項、管理自己的捐助、檢舉清單</td></tr>
+<tr><td><b>訪客</b></td><td><code>ws_guest</code> cookie 或 <code>X-Guest-Token</code></td><td>瀏覽可見的清單、檢舉清單；D50 起不能新增認捐（須登入），舊訪客認捐僅可查看、取消、減量（legacy）</td></tr>
 <tr><td><b>創建者（已登入使用者）</b></td><td><code>ws_session</code> cookie 或 <code>Authorization: Bearer</code></td><td>建立 / 管理清單與品項、看進度、好友、設定；也能捐助別人的清單、心願眾籌</td></tr>
 <tr><td><b>營運人員（staff）</b></td><td>使用者帳號 + <code>users.is_staff</code></td><td>後台全部功能；啟用 TOTP 後須通過兩步驟驗證</td></tr>
 <tr><td><b>系統</b></td><td>背景工作</td><td>釋放逾期捐助、結束到期清單、截止眾籌、寄信；稽核紀錄的 <code>actor_type = system</code></td></tr>
@@ -252,8 +252,8 @@ scripts/             cargo.sh、mutate.sh/py、coverage、cdn-canary、sse-probe
 <h3 id="identity-model">2.4 兩種身分</h3>
 <ul>
 <li><b>創建者</b>：cookie <code>ws_session</code>（30 天）。資料庫只存 SHA-256 雜湊。原生殼不送 cookie，改用 <code>Authorization: Bearer</code>，與 cookie 共用同一張 <code>sessions</code>。</li>
-<li><b>訪客</b>：<code>X-Guest-Token</code> header 優先，其次 <code>ws_guest</code> cookie（1 年，HttpOnly）。後端只存雜湊；前端同時把權杖放 localStorage 當備援（LINE 內建瀏覽器 cookie 不穩）。</li>
-<li>已登入使用者捐助時以帳號名稱進行，不再問暱稱，並可設定該筆捐助的公開層級。</li>
+<li><b>訪客（legacy，D50）</b>：僅用於管理 D50 前既有的訪客認捐，不能新增認捐或增量；<code>X-Guest-Token</code> header 優先，其次 <code>ws_guest</code> cookie（1 年，HttpOnly）。後端只存雜湊；前端同時把權杖放 localStorage 當備援（LINE 內建瀏覽器 cookie 不穩）。</li>
+<li>認捐一律需登入（D50），以帳號名稱進行，不再問暱稱，並可設定該筆捐助的公開層級；未登入呼叫 <code>POST /items/{id}/claims</code> 回 <code>401</code> 且不寫入任何資料。</li>
 <li>明確以 header 帶失效訪客權杖回 <code>401</code>；只有 cookie 帶的失效權杖視為匿名，避免舊 cookie 永遠擋住捐助。</li>
 </ul>
 
@@ -418,30 +418,31 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <!-- ========================================================= 5 -->
 <h2 id="guest">5. 訪客與贊助者手冊</h2>
 
-<h3 id="g-claim">5.1 免註冊捐助</h3>
+<h3 id="g-claim">5.1 登入後認捐</h3>
+<div class="box note"><b class="t">D50（2026-10-18）：訪客僅能瀏覽，認捐需登入</b>產品負責人決定：認捐需要消耗點數，未登入無法紀錄點數。目前數量認捐本身並未扣點數（只有心願眾籌扣點），此規則先讓認捐綁定會員身分。</div>
 <ol class="steps">
 <li>點開朋友分享的連結（<code>/s/{slug}</code>）。看得到清單標題、說明、完成度與各品項。受限清單可能要求登入或輸入密碼。</li>
-<li>在想送的品項按「<b>我要送</b>」，選數量（1–99，不超過剩餘量）。</li>
-<li>填<b>暱稱</b>（首次必填，至多 30 字）。可選填：聯絡方式（LINE ID 或電話，至多 80 字；目前僅儲存，建立者進度頁不顯示）、Email（收確認信與「管理我的捐助」連結）、留言（至多 200 字）。</li>
+<li>在想送的品項按「<b>我要送</b>」；未登入時按鈕為「<b>登入後認捐</b>」，登入或註冊後會回到原品項。選數量（1–99，不超過剩餘量）。</li>
+<li>可選填留言（至多 200 字）與這筆捐助的公開層級；不再填暱稱、聯絡方式或 Email，名稱採帳號名稱。</li>
 <li>按「確認捐助」。成功後出現「✓ 捐助成功！」畫面。</li>
 </ol>
 <ul>
-<li><b>不需註冊</b>；已登入使用者則以帳號名稱捐助，並可選這筆捐助的公開層級（公開 / 僅好友 / 私人）。</li>
+<li><b>瀏覽免登入、認捐需登入</b>；可選這筆捐助的公開層級（公開 / 僅好友 / 私人）。</li>
 <li><b>不會超賣</b>：兩人同時搶最後一件，只有一人成功，另一人看到「抱歉，只剩 N 個了」或「剛剛被別人捐助完了」。</li>
 <li><b>同一品項只能有一筆有效捐助</b>；再次捐助會自動切換成「修改我的捐助」。</li>
 <li>建立者不能捐助自己的清單。已結束的清單不再接受捐助。</li>
 <li>網路不穩重送是安全的：同一份捐助使用同一把 <code>Idempotency-Key</code>，重送不會重複扣量。</li>
 </ul>
-<div class="box warn"><b class="t">在 LINE 內建瀏覽器</b>捐助身分存放在瀏覽器儲存空間，LINE 關閉後可能找不到。看到提示時點右上角「⋯」→「用預設瀏覽器開啟」；或在捐助時填 Email，之後從確認信的連結找回。若成功畫面顯示「這個瀏覽器沒有保存到身分」，請截圖保存。</div>
+<div class="box warn"><b class="t">在 LINE 內建瀏覽器</b>登入狀態存放在瀏覽器儲存空間，LINE 關閉後可能需重新登入；可點右上角「⋯」→「用預設瀏覽器開啟」。會員的捐助綁定帳號，換裝置登入即可管理。以下「換裝置找回」僅適用 D50 前的舊訪客捐助。</div>
 
 <h3 id="g-manage">5.2 管理我的捐助（<code>/me/claims</code>）</h3>
 <div class="flow"><span>已捐助 reserved</span><i>→</i><span>已購買 purchased</span><i>→</i><span class="end">已送達 delivered</span></div>
 <ul>
 <li>捐助後可按「標記已購買」「標記已送達」；「取消」可在送達前隨時使用（目前取消不會寄通知信給建立者，只有進度頁的即時刷新）。取消後數量立即歸還給其他人。</li>
-<li>可改暱稱（僅限未登入的訪客）、調整這筆捐助誰看得到（僅登入者）。</li>
+<li>可調整這筆捐助誰看得到（僅登入者）；舊訪客捐助（D50 前）可改暱稱，可減量、取消，但<b>不能增加數量</b>（須登入）。</li>
 <li>「過去的紀錄」收納已取消 / 已逾期的捐助。</li>
-<li><b>換裝置找回</b>：確認信中的「管理我的捐助」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
-<li><b>刪除暱稱與聯絡方式</b>：頁面底部可抹除個資，捐助紀錄保留為「已刪除的訪客」，此裝置之後無法再管理。</li>
+<li><b>換裝置找回（舊訪客捐助）</b>：確認信中的「管理我的捐助」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
+<li><b>刪除暱稱與聯絡方式（舊訪客）</b>：頁面底部可抹除個資，捐助紀錄保留為「已刪除的訪客」，此裝置之後無法再管理。</li>
 <li>若建立者設定了「捐助保留時數」，逾期未標記購買的捐助會自動釋放（<code>expired</code>）。</li>
 </ul>
 
@@ -590,7 +591,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><th>種類（kind）</th><th>對象</th><th>時機</th></tr>
 <tr><td><code>claim.created</code></td><td>建立者</td><td>每份清單<b>第一筆</b>捐助，立即</td></tr>
 <tr><td><code>claim.digest</code></td><td>建立者</td><td>之後的捐助合併，每日台北 09:00 一封（count 累加）</td></tr>
-<tr><td><code>claim.confirmation</code></td><td>訪客</td><td>捐助時填了 Email；含「管理我的捐助」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
+<tr><td><code>claim.confirmation</code></td><td>訪客（legacy）</td><td>D50 前捐助時填了 Email（D50 起不再產生）；含「管理我的捐助」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
 <tr><td><code>claim.item_removed</code></td><td>訪客</td><td>你捐助的品項被建立者刪除</td></tr>
 <tr><td><code>wishlist.closing</code></td><td>建立者</td><td>自動結束前 24 小時（一次）</td></tr>
 <tr><td><code>event.reminder</code></td><td>建立者</td><td>僅有信件模板，<b>尚未接入自動提醒</b>（沒有排程或觸發流程建立此通知）</td></tr>
@@ -694,8 +695,8 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>POST</td><td><code>/public/wishlists/{slug}/reports</code></td><td>—</td><td>檢舉（Turnstile）</td></tr>
 <tr><td>POST</td><td><code>/items/{id}/claims</code></td><td>G/U</td><td>捐助（需 Idempotency-Key）</td></tr>
 <tr><td>PATCH / DELETE</td><td><code>/claims/{id}</code></td><td>G/U</td><td>修改數量 / 備註 / 狀態 / 公開層級；取消</td></tr>
-<tr><td>GET / PATCH / DELETE</td><td><code>/guest/me</code></td><td>G</td><td>我的捐助 / 改暱稱 / 刪除個資</td></tr>
-<tr><td>POST</td><td><code>/guest/recover</code></td><td>—</td><td>用一次性恢復權杖換發訪客權杖</td></tr>
+<tr><td>GET / PATCH / DELETE</td><td><code>/guest/me</code></td><td>G</td><td>我的捐助 / 改暱稱 / 刪除個資（legacy：舊訪客資料，D50）</td></tr>
+<tr><td>POST</td><td><code>/guest/recover</code></td><td>—</td><td>用一次性恢復權杖換發訪客權杖（legacy，D50）</td></tr>
 <tr><td>GET</td><td><code>/users/{handle}</code></td><td>選用</td><td>個人頁（依關係顯示）</td></tr>
 <tr><td>GET / POST</td><td><code>/unsubscribe</code></td><td>—</td><td>GET 轉址；POST 退訂</td></tr>
 </table>
@@ -1058,7 +1059,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <h3>14.3 已知限制與規劃中事項</h3>
 <ul>
 <li>點數無儲值管道（僅營運發放）；自動儲值、禮物卡、回饋星星、企業禮券、目錄商品自動下單、relief 救災、LINE Messaging API 通知皆未實作。</li>
-<li>訪客登入後，其先前 guest 捐助<b>不會合併</b>到使用者帳號（契約待決問題）。</li>
+<li>訪客登入後，其先前 guest 捐助<b>不會合併</b>到使用者帳號（契約待決問題）；D50 後舊訪客捐助僅保留管理權（查看、取消、減量），不可增量。</li>
 <li>兩個既有帳號不會因綁定而合併資料。</li>
 <li>驚喜模式對建立者本人為前端軟性遮罩（契約 D4）。</li>
 <li>單機單實例；背景任務 panic 會靜默停止；無 SIGTERM 優雅關閉。</li>

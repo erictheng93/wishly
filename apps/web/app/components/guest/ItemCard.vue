@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean }>()
+const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean, loginTo?: any }>() // loginTo 有值 = 未登入，認捐鈕改為前往登入
 defineEmits<{ claim: [], fund: [] }>()
 const prio: Record<string, string> = { high: '高', medium: '中', low: '低' }
 const crowd = computed(() => props.item.funding_mode === 'crowdfund')
@@ -36,6 +36,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
         </template>
         <button v-else-if="mine && !closed" class="g-btn ghost sm js-claim" :disabled="!online" @click="$emit('claim')">修改我的捐助</button>
         <span v-else-if="full" class="g-mute">已被捐助完</span>
+        <NuxtLink v-else-if="!closed && loginTo" class="g-btn sm" :to="loginTo">登入後認捐</NuxtLink>
         <button v-else-if="!closed" class="g-btn sm js-claim" :disabled="!online" @click="$emit('claim')">我要送</button>
         <a v-if="item.product_url && !masked" :href="item.product_url" target="_blank" rel="noopener nofollow" class="g-link">商品連結</a>
       </div>

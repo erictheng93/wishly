@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createList, guestClaim, loginBrowser, makeStaff, registerUser } from './helpers'
+import { createList, loginBrowser, memberClaim, makeStaff, registerUser } from './helpers'
 
 // RWD：手機 / 平板 / 桌面三種寬度的版面行為（斷點見 app/assets/tokens.css）
 const SIZES = { small320: { width: 320, height: 568 }, phone: { width: 390, height: 844 }, tablet: { width: 820, height: 1180 }, desktop: { width: 1440, height: 900 } } as const
@@ -9,7 +9,7 @@ for (const [name, vp] of Object.entries(SIZES)) {
     await page.setViewportSize(vp)
     const owner = await registerUser()
     const list = await createList(owner, { items: [{ title: '奶瓶', qty: 2 }, { title: '尿布', qty: 3 }] })
-    await guestClaim(list.items[0].id, 1, '訪客甲')
+    await memberClaim(list.items[0].id, 1)
     makeStaff(owner.email)
     await loginBrowser(context, owner)
     const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)

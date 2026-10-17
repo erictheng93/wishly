@@ -60,7 +60,7 @@ if (data.value) {
     title: () => data.value?.title,
     ogTitle: () => `幫${data.value?.owner?.display_name ?? '朋友'}挑禮物｜${data.value?.title}`,
     description: () => data.value?.description ?? undefined,
-    ogDescription: () => `已完成 ${data.value?.completion?.completion_pct ?? 0}%，還有 ${left()} 項等你捐助。不用註冊，點開就能選。`,
+    ogDescription: () => `已完成 ${data.value?.completion?.completion_pct ?? 0}%，還有 ${left()} 項等你捐助。瀏覽不用註冊，登入會員後即可認捐。`,
     // ponytail: 預設圖為靜態檔；動態 /og/{slug}.png（含清單名稱與完成度）之後再做
     ogImage: () => data.value?.cover_image_url ?? `${origin}/og-default.png`,
     ogImageWidth: 1200, ogImageHeight: 630,
@@ -93,9 +93,14 @@ const me = ref<any>(null) // 已登入使用者：捐助以帳號名稱進行，
 const masked = computed(() => isOwner.value && !!data.value?.surprise_mode)
 
 let live: ReturnType<typeof createLiveRefresh> | undefined
-// 捐助 sheet 在建立時決定訪客/登入模式：開啟前先等 /me 回來，避免登入者手快點到而被當成訪客（不問可見性、改問暱稱）
+// 認捐需登入：開啟前先等 /me 回來；未登入（含只有舊訪客 token）一律導去登入並帶回本頁。SSR 一律先當未登入渲染（按鈕為登入連結），client 確認登入後才換成「我要送」
 let meReady: Promise<void> = Promise.resolve()
-async function openClaim(it: any) { await meReady; sheetItem.value = it }
+const loginTo = computed(() => me.value ? undefined : loginUrl(route.fullPath))
+const toLogin = () => navigateTo(loginUrl(route.fullPath))
+// 認捐被回 401 = session 已失效：清掉本頁與全域（ClaimSheet 的 fetchMe 會快取）的登入狀態，否則登入頁會以為還登入著而把人彈回來
+const auth = useAuth()
+function onLoginExpired() { sheetItem.value = null; me.value = null; auth.user.value = null; toLogin() }
+async function openClaim(it: any) { await meReady; if (!me.value) return toLogin(); sheetItem.value = it }
 onMounted(async () => {
   online.value = navigator.onLine
   addEventListener('online', () => { online.value = true; reload() }); addEventListener('offline', () => (online.value = false))
@@ -140,7 +145,7 @@ const fundId = ref<string | null>(null), funded = ref<any>(null)
 const fundItem = computed(() => items.value.find(i => i.id === fundId.value) ?? null) // 取即時資料（SSE / refresh 會換掉物件）
 async function onFund(it: any) {
   await meReady
-  if (!me.value) return navigateTo({ path: '/login', query: { redirect: `/s/${slug}` } })
+  if (!me.value) return toLogin()
   fundId.value = it.id
 }
 function onFunded(r: any) {
@@ -150,7 +155,6 @@ function onFunded(r: any) {
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
 function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }
-const maskedEmail = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2')
 function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = false }
 </script>
 
@@ -196,8 +200,10 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
       </template>
       <p v-if="!items.length" class="g-center g-mute">建立者還在準備清單，晚點再回來看看</p>
+      <p v-if="loginTo && items.length && !closed" class="g-mute">認捐需要登入會員。<NuxtLink :to="loginTo">登入</NuxtLink></p>
       <ul class="c-list g-grid">
-        <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" :closed="closed" :online="online" @claim="openClaim(it)" @fund="onFund(it)" />
+        <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
+          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
@@ -207,7 +213,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     </template>
 
     <GuestClaimSheet v-if="sheetItem" :key="sheetItem.id + (sheetMine?.id ?? '')" :item="sheetItem" :mine="sheetMine" :online="online" :logged-in-name="me?.display_name"
-      @close="sheetItem = null" @done="onDone" @stale="onStale" @switch-edit="onSwitchEdit" />
+      @close="sheetItem = null" @done="onDone" @stale="onStale" @switch-edit="onSwitchEdit" @login="onLoginExpired" />
     <GuestFundSheet v-if="fundItem" :key="fundItem.id" :item="fundItem" :slug="slug" :online="online" :logged-in-name="me?.display_name"
       @close="fundId = null" @done="onFunded" @stale="refresh()" />
     <GuestDialog v-if="funded" labelledby="funded-title" @close="funded = null"><div class="g-sheet center">
@@ -222,12 +228,9 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 
     <GuestDialog v-if="done" labelledby="done-title" @close="done = null"><div class="g-sheet center">
       <h1 id="done-title" class="ok">✓ 捐助成功！</h1>
-      <p>你捐助了 {{ done.title }} × {{ done.claim.qty }}<template v-if="done.name || done.claim.claimer_name">，謝謝你，{{ done.claim.claimer_name }}</template></p>
-      <div v-if="done.lost" class="g-banner err" role="alert">捐助已送出，但這個瀏覽器沒有保存到身分，之後可能無法在這裡修改或取消。請先截圖保存；若有填 Email，可用確認信中的「管理我的捐助」連結找回，也可以重新整理頁面確認。</div>
-      <div v-else-if="!done.persisted" class="g-banner err">無法儲存於此裝置，請截圖保存。換瀏覽器後可能找不到這份捐助。</div>
-      <div v-else class="g-banner ok">這份捐助已存在此裝置，可在「我的捐助」查看、標記已購買或取消。</div>
-      <p v-if="done.email" class="g-mute">已寄出管理連結到 {{ maskedEmail(done.email) }}</p>
-      <div v-if="isLineBrowser()" class="g-banner">LINE 內建瀏覽器關閉後，捐助紀錄可能找不到。點右上角 ⋯ →「用預設瀏覽器開啟」。</div>
+      <p>你捐助了 {{ done.title }} × {{ done.claim.qty }}，謝謝你</p>
+      <div class="g-banner ok">可在「我的捐助」查看、標記已購買或取消。</div>
+      <div v-if="isLineBrowser()" class="g-banner">LINE 內建瀏覽器請保持登入狀態；點右上角 ⋯ →「用預設瀏覽器開啟」會更穩定。</div>
       <NuxtLink class="g-btn block" to="/me/claims">查看我的捐助</NuxtLink>
       <button class="g-link" @click="done = null">回到清單繼續看</button>
     </div></GuestDialog>

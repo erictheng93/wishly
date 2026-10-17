@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ApiError, useGuest, setGuestToken, setActiveAccess } from '../app/composables/useGuest'
+import { ApiError, useGuest, setGuestToken, getGuestToken, setActiveAccess } from '../app/composables/useGuest'
 
 const fetch = vi.fn()
 beforeEach(() => {
@@ -36,23 +36,14 @@ it('explicit list access overrides active access', async () => {
   expect(fetch.mock.calls[0]![1].headers).toEqual({ 'X-List-Access': 'explicit' })
 })
 
-it('expired token retries only once as new guest and preserves idempotency key', async () => {
-  setGuestToken('expired')
-  fetch.mockRejectedValueOnce({ response: { status: 401 }, data: { code: 'UNAUTHORIZED' } }).mockResolvedValueOnce({ id: 'created' })
-  expect(await useGuest().api('/items/item/claims', { method: 'POST', headers: { 'Idempotency-Key': 'same' }, body: { qty: 2 }, retryAsNewGuest: true })).toEqual({ id: 'created' })
-  expect(fetch.mock.calls[0]![1].headers['X-Guest-Token']).toBe('expired')
-  expect(fetch.mock.calls[1]![1]).toMatchObject({ headers: { 'Idempotency-Key': 'same' }, body: { qty: 2 }, credentials: 'include' })
-  expect(fetch.mock.calls[1]![1].headers).not.toHaveProperty('X-Guest-Token')
-})
-
-it('does not silently retry management operations or loop on repeated unauthorized responses', async () => {
-  setGuestToken('expired')
+it('401 clears a stale guest token, but keepToken preserves it (claim POST 401 means not signed in)', async () => {
   fetch.mockRejectedValue({ response: { status: 401 }, data: { code: 'UNAUTHORIZED' } })
+  setGuestToken('legacy')
+  await expect(useGuest().api('/items/item/claims', { method: 'POST', keepToken: true })).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' })
+  expect(getGuestToken()).toBe('legacy')
   await expect(useGuest().api('/claims/old', { method: 'DELETE' })).rejects.toMatchObject({ status: 401 })
-  expect(fetch).toHaveBeenCalledTimes(1)
-  setGuestToken('expired')
-  await expect(useGuest().api('/items/item/claims', { retryAsNewGuest: true })).rejects.toMatchObject({ status: 401 })
-  expect(fetch).toHaveBeenCalledTimes(3)
+  expect(getGuestToken()).toBeNull()
+  expect(fetch).toHaveBeenCalledTimes(2) // 從不自動重送
 })
 
 it('turns disconnected transport into a typed NETWORK error', async () => {

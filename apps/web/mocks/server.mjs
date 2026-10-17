@@ -13,7 +13,7 @@ const items = [
     contributors: [{ display_name: '阿明', points: 3000 }, { display_name: '匿名朋友', points: 1300 }, { display_name: '小華', points: 2000 }] },
 ]
 const view = i => { const r = i.qty_needed - i.qty_claimed; return { funding_mode: 'quantity', ...i, qty_remaining: r, is_fully_claimed: r <= 0, progress_percent: i.target_points ? Math.floor(i.pledged_points / i.target_points * 100) : Math.round(i.qty_claimed / i.qty_needed * 100) } }
-const guests = new Map(), claims = new Map(), idem = new Map(), sse = new Set()
+const mockUser = { name: '登入會員' }, guests = new Map(), claims = new Map(), idem = new Map(), sse = new Set()
 let n = 0
 
 const send = (res, st, body, type = 'application/json') => { res.writeHead(st, { 'content-type': type }); res.end(body === undefined ? '' : JSON.stringify(body)) }
@@ -49,20 +49,19 @@ http.createServer(async (req, res) => {
     return send(res, 201, { id: 'r' + ++n, status: 'open' })
   }
   if ((m = p.match(/^\/items\/([^/]+)\/claims$/)) && req.method === 'POST') {
+    if (!/(^|;\s*)ws_session=/.test(req.headers.cookie ?? '') && !req.headers.authorization) return err(res, 401, 'UNAUTHORIZED', '請先登入') // 認捐需登入會員（本 mock 沒有登入流程，帶 ws_session cookie 即視為已登入）
     const key = req.headers['idempotency-key']; if (!key) return err(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', '缺少 Idempotency-Key')
     if (idem.has(key)) return send(res, 201, idem.get(key))
     const it = items.find(i => i.id === m[1]); if (!it) return err(res, 404, 'NOT_FOUND', '找不到品項')
-    if (!guest && !body.display_name) return err(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/display_name', code: 'REQUIRED', detail: '首次捐助需填寫暱稱' }] })
     if (!(body.qty >= 1 && body.qty <= 99)) return err(res, 422, 'VALIDATION_FAILED', 'qty 不正確', { errors: [{ pointer: '/qty', code: 'RANGE', detail: 'qty 必須介於 1 與 99' }] })
     const rem = it.qty_needed - it.qty_claimed
     if (body.qty > rem) return err(res, 409, 'ITEM_FULLY_CLAIMED', `此品項剩餘 ${rem} 件，無法再捐助 ${body.qty} 件。`, { remaining: rem })
-    let gt, g = guest
-    if (!g) { gt = randomBytes(32).toString('base64url'); g = { name: body.display_name, contact: body.contact }; guests.set(gt, g); g.token = gt }
+    const g = mockUser
     if ([...claims.values()].some(c => c.guest === g && c.item_id === it.id && c.status !== 'cancelled')) return err(res, 409, 'CLAIM_ALREADY_EXISTS', '已捐助過', { claim_id: [...claims.values()].find(c => c.guest === g && c.item_id === it.id).id })
     it.qty_claimed += body.qty
     const c = { id: 'c' + ++n, item_id: it.id, qty: body.qty, status: 'reserved', name: g.name, note: body.note ?? null, at: new Date().toISOString(), guest: g }
     claims.set(c.id, c); broadcast(it)
-    const out = { claim: claimOut(c), item: { id: it.id, ...pick(it) }, ...(gt ? { guest_token: gt } : {}) }
+    const out = { claim: claimOut(c), item: { id: it.id, ...pick(it) } }
     idem.set(key, out); return send(res, 201, out)
   }
   if ((m = p.match(/^\/claims\/([^/]+)$/))) {

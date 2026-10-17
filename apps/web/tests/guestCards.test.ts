@@ -39,6 +39,16 @@ it('quantity card exposes inventory, priority and a safe product link and opens 
   expect(fund).not.toHaveBeenCalled()
 })
 
+it('signed-out quantity card shows a login link instead of the claim button', () => {
+  const NuxtLink = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: JSON.stringify(props.to) }, slots.default?.()) })
+  mounted = mount(ItemCard, { item: quantity, mine: null, masked: false, closed: false, online: true, loginTo: { path: '/login', query: { redirect: '/s/a' } } }, { NuxtLink },
+    { deriveDisplayStatus, displayStatusLabel, fmtPts, fmtTime })
+  const el = mounted.el
+  expect(el.querySelector('button.js-claim')).toBeNull()
+  const a = [...el.querySelectorAll('a')].find(x => x.textContent === '登入後認捐')!
+  expect(JSON.parse(a.getAttribute('href')!)).toEqual({ path: '/login', query: { redirect: '/s/a' } })
+})
+
 it('my existing claim can be edited even when the quantity is fully claimed', () => {
   const el = card({ ...quantity, is_fully_claimed: true, qty_claimed: 5 }, { mine: { qty: 2 } })
   expect(el.textContent).toContain('你已捐助 2 件')

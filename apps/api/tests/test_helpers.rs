@@ -68,7 +68,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
         )
     );
     let it = item(&pool, wl.id, "quantity", 5).await;
-    let (_, claim) = guest_claim(&pool, it, 3).await;
+    let (_, claim) = user_claim(&pool, it, 3).await;
     for status in ["reserved", "purchased", "delivered"] {
         sqlx::query("UPDATE claims SET status=$2::claim_status WHERE id=$1")
             .bind(claim)

@@ -1,6 +1,6 @@
 # Wishly 願望清單（MVP）
 
-建立願望清單、用連結分享，親友免註冊即可捐助品項，並確保不會重複捐助（超賣防護）。
+建立願望清單、用連結分享，親友免登入即可瀏覽，登入後即可認捐品項（訪客僅能瀏覽，D50），並確保不會重複捐助（超賣防護）。
 
 ## 結構
 
@@ -88,7 +88,7 @@ cd apps/web && npm run typecheck && npm run test:coverage && npm run build   # C
 
 ### 端對端測試（Playwright）
 
-`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（訪客捐助、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試等）。
+`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（認捐一律以註冊會員身分進行，OTP 從 Mailpit 取，helper 為 `signInPage` / `memberClaim`；登入會員認捐、未登入「登入後認捐」導引與登入後導回、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試等）。
 
 前置條件：
 - `docker compose up -d db mailpit`（Postgres 在 5432、Mailpit 在 8025；OTP 信從 Mailpit HTTP API 讀取）。
@@ -102,14 +102,14 @@ npm run e2e            # 全部（desktop-chromium + mobile，最後執行 admin
 npx playwright test --project=admin --no-deps  # 只跑後台（含唯讀旗標，不與其他 E2E 同時執行）
 npm run e2e:ui         # Playwright UI 模式
 npm run e2e:headed     # 顯示瀏覽器
-npx playwright test guest-journey --project=desktop-chromium   # 單一檔案
+npx playwright test guest-journey --project=desktop-chromium   # 單一檔案（會員認捐旅程；login-to-claim 為未登入導引）
 npx playwright show-report                                      # 開啟上次的 HTML 報告
 ```
 
 隔離方式（不會干擾開發環境）：
 - 資料庫 `wishly_e2e`：每次執行前由 `e2e/support/reset-db.mjs` DROP 後重建，API 啟動時自動套用 migrations；開發用的 `wishly` 資料庫不受影響。
 - API 用 `127.0.0.1:8081`、Web 用 `127.0.0.1:3012`（`playwright.config.ts` 的 `webServer` 啟動，且不重用既有伺服器；連接埠被佔用會直接失敗）。Web 是 production build + node-server（`e2e/.app` 是獨立 buildDir 的 Nuxt layer，不會覆蓋開發中的 `.nuxt`）。
-- 每個測試自建唯一資料（唯一 email、唯一清單），所以可平行（本機 3 workers、CI 2）。後端限流以身分計（email / guest / user），每 IP 的額度（新訪客 100/小時、檢舉 10/小時、登入失敗 30/15 分鐘）遠大於整個測試集的用量；後端不信任 `X-Forwarded-For`，所以測試也不靠它。
+- 每個測試自建唯一資料（唯一 email、唯一清單），所以可平行（本機 3 workers、CI 2）。後端限流以身分計（email / user；舊訪客身分僅剩管理既有捐助），每 IP 的額度（檢舉 10/小時、登入失敗 30/15 分鐘）遠大於整個測試集的用量；後端不信任 `X-Forwarded-For`，所以測試也不靠它。
 - 同一 email 的 OTP 有 60 秒間隔（登入 / 註冊 / 重設共用），需要連續寄第二封時，測試用 `skipOtpCooldown(email)` 把舊紀錄往前推。
 - 測試初始 staff 權限由 `makeStaff(email)` 以 psql 設定 `users.is_staff`。後台 `admin` project 依賴其他 project 完成後才執行，避免唯讀旗標影響平行測試。
 

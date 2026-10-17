@@ -1,4 +1,4 @@
-//! F-01 / F-03 / F-09 / F-11 / F-16 / F-17：冪等重播重簽 token、集中式文字驗證、Email、日期範圍、強制刪除善後
+//! F-01 / F-03 / F-09 / F-16 / F-17：冪等重播、集中式文字驗證、日期範圍、強制刪除善後
 mod common;
 use axum::http::StatusCode;
 use serde_json::{json, Value};
@@ -32,47 +32,32 @@ fn field(b: &Value) -> &str {
 
 // ---------- F-01 ----------
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn lost_first_response_replay_reissues_usable_token(pool: PgPool) {
+async fn lost_first_response_replay_returns_same_claim(pool: PgPool) {
     let TestUser {
         id: owner,
         token: _,
     } = user(&pool, "u").await;
     let (_, _, it) = fixture(&pool, owner).await;
+    let me = user(&pool, "小明").await;
     let key = Uuid::new_v4();
-    let body = json!({"qty": 2, "display_name": "小明"});
-    // 首次回應「遺失」：伺服器已處理，客戶端沒拿到 token（這裡直接丟掉 b1 的 token 以外的資訊，只留來驗證舊 token 失效）
-    let (s1, _, b1) = claim(&pool, it, key, vec![], body.clone()).await;
+    let body = json!({"qty": 2});
+    // 首次回應「遺失」：伺服器已處理，客戶端以同 key 重送
+    let (s1, _, b1) = claim(&pool, it, key, ck(&me.token), body.clone()).await;
     assert_eq!(s1, StatusCode::CREATED);
-    let old = b1["guest_token"].as_str().unwrap().to_string();
-    // 以同 key 重送 → 同一捐助 + 新 token + Set-Cookie
-    let (s2, h2, b2) = claim(&pool, it, key, vec![], body.clone()).await;
+    let (s2, h2, b2) = claim(&pool, it, key, ck(&me.token), body.clone()).await;
     assert_eq!(s2, StatusCode::CREATED);
     assert_eq!(h2["idempotency-replayed"], "true");
-    let new = b2["guest_token"].as_str().unwrap().to_string();
-    assert_ne!(new, old);
-    assert!(h2["set-cookie"]
-        .to_str()
-        .unwrap()
-        .starts_with(&format!("ws_guest={new};")));
-    assert_eq!(b1["claim"]["id"], b2["claim"]["id"]);
-    // 新 token 看得到該捐助；舊 token 失效
-    let (s, _, me) = call(&pool, "GET", "/guest/me", &gt(&new), None).await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(me["claims"][0]["claim"]["id"], b1["claim"]["id"]);
-    assert_eq!(
-        call(&pool, "GET", "/guest/me", &gt(&old), None).await.0,
-        StatusCode::UNAUTHORIZED
-    );
-    // 仍沒有重複 guest / claim，且 idempotency_keys 不存明文 token
-    let (g, c): (i64, i64) =
-        sqlx::query_as("SELECT (SELECT count(*) FROM guests), (SELECT count(*) FROM claims)")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!((g, c), (1, 1));
-    let leaked: i64 = sqlx::query_scalar("SELECT count(*) FROM idempotency_keys WHERE response_body::text LIKE $1 OR response_body::text LIKE $2")
-        .bind(format!("%{old}%")).bind(format!("%{new}%")).fetch_one(&pool).await.unwrap();
-    assert_eq!(leaked, 0);
+    assert!(!h2.contains_key("set-cookie"));
+    assert_eq!(b1, b2);
+    // 沒有重複 claim、沒有 guest，qty_claimed 只加一次
+    let (g, c, q): (i64, i64, i32) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM guests), (SELECT count(*) FROM claims), qty_claimed FROM wishlist_items WHERE id=$1",
+    )
+    .bind(it)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((g, c, q), (0, 1, 2));
     assert_all_reconciled(&pool).await;
 }
 
@@ -203,17 +188,16 @@ async fn text_validation_claims_reports_slug(pool: PgPool) {
         token: _,
     } = user(&pool, "u").await;
     let (_, slug, it) = fixture(&pool, owner).await;
+    let me = user(&pool, "小明").await;
     for (k, v) in [
-        ("display_name", "a\u{0}b"),
-        ("display_name", "\u{200b}"),
-        ("display_name", "a\u{202e}b"),
         ("note", "a\u{0}b"),
-        ("contact", "a\u{7}b"),
-        ("contact", "a\nb"),
+        ("note", "a\u{7}b"),
+        ("note", "a\u{202e}b"),
+        ("note", "\u{200b}\u{200d}x\u{feff}\u{0}"),
     ] {
-        let mut body = json!({"qty": 1, "display_name": "小明"});
+        let mut body = json!({"qty": 1});
         body[k] = json!(v);
-        let (s, _, b) = claim(&pool, it, Uuid::new_v4(), vec![], body).await;
+        let (s, _, b) = claim(&pool, it, Uuid::new_v4(), ck(&me.token), body).await;
         assert_eq!(
             (s, field(&b)),
             (StatusCode::UNPROCESSABLE_ENTITY, format!("/{k}").as_str()),
@@ -225,14 +209,14 @@ async fn text_validation_claims_reports_slug(pool: PgPool) {
         &pool,
         it,
         Uuid::new_v4(),
-        vec![],
-        json!({"qty": 1, "display_name": "小明", "note": "a\nb"}),
+        ck(&me.token),
+        json!({"qty": 1, "note": "a\nb"}),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    // 失敗請求不留下 guest
+    // 失敗請求不留下 claim
     assert_eq!(
-        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM guests")
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM claims")
             .fetch_one(&pool)
             .await
             .unwrap(),
@@ -270,54 +254,6 @@ async fn text_validation_claims_reports_slug(pool: PgPool) {
         .0,
         StatusCode::NOT_FOUND
     );
-    assert_all_reconciled(&pool).await;
-}
-
-// ---------- F-11 ----------
-#[sqlx::test(migrations = "../../db/migrations")]
-async fn claim_email_must_be_deliverable(pool: PgPool) {
-    let TestUser {
-        id: owner,
-        token: _,
-    } = user(&pool, "u").await;
-    let (_, _, it) = fixture(&pool, owner).await;
-    for e in [
-        "a b@c.com",
-        "<script>@x.com",
-        "a@b.com\r\nBcc: x@y.com",
-        "no-at",
-        "a@",
-        "@b.com",
-        "a@b@c.com",
-    ] {
-        let (s, _, b) = claim(
-            &pool,
-            it,
-            Uuid::new_v4(),
-            vec![],
-            json!({"qty": 1, "display_name": "小明", "email": e}),
-        )
-        .await;
-        assert_eq!(
-            (s, field(&b)),
-            (StatusCode::UNPROCESSABLE_ENTITY, "/email"),
-            "{e:?}"
-        );
-    }
-    let (s, _, _) = claim(
-        &pool,
-        it,
-        Uuid::new_v4(),
-        vec![],
-        json!({"qty": 1, "display_name": "小明", "email": " Ok@Example.com "}),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    let e: String = sqlx::query_scalar("SELECT email FROM guests")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(e, "ok@example.com");
     assert_all_reconciled(&pool).await;
 }
 
@@ -364,29 +300,15 @@ async fn force_delete_cleans_up_claims(pool: PgPool) {
         token: tok,
     } = user(&pool, "u").await;
     let (wid, _, it) = fixture(&pool, owner).await;
-    let (_, _, a) = claim(
-        &pool,
-        it,
-        Uuid::new_v4(),
-        vec![],
-        json!({"qty": 2, "display_name": "甲", "email": "a@example.com"}),
-    )
-    .await;
-    let (_, _, _b) = claim(
-        &pool,
-        it,
-        Uuid::new_v4(),
-        vec![],
-        json!({"qty": 1, "display_name": "乙"}),
-    )
-    .await;
+    // 舊訪客甲（有 email）、乙（無 email）+ 登入使用者各一筆
+    legacy_guest_claim(&pool, it, 2, Some("a@example.com")).await;
+    legacy_guest_claim(&pool, it, 1, None).await;
     let TestUser {
         id: cu,
         token: ctok,
     } = user(&pool, "u").await; // 登入使用者捐助（有 email）
     let (s, _, _) = claim(&pool, it, Uuid::new_v4(), ck(&ctok), json!({"qty": 1})).await;
     assert_eq!(s, StatusCode::CREATED);
-    assert!(a["guest_token"].is_string());
     let h = ck(&tok);
     // 無 force 仍 409
     assert_eq!(
@@ -453,14 +375,9 @@ async fn force_delete_still_forbidden_while_surprise_locked(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    claim(
-        &pool,
-        it,
-        Uuid::new_v4(),
-        vec![],
-        json!({"qty": 1, "display_name": "甲"}),
-    )
-    .await;
+    let me = user(&pool, "甲").await;
+    let (s, _, _) = claim(&pool, it, Uuid::new_v4(), ck(&me.token), json!({"qty": 1})).await;
+    assert_eq!(s, StatusCode::CREATED);
     assert_eq!(
         call(
             &pool,

@@ -19,7 +19,7 @@ async fn dashboard_locked_totals_and_moderation(pool: PgPool) {
     .await;
     let wid = wl.id;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    guest_claim(&pool, it, 1).await;
+    user_claim(&pool, it, 1).await;
     let (_, _, v) = call(
         &pool,
         "GET",

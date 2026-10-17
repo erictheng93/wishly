@@ -22,10 +22,10 @@ async fn guest_delete_and_recover(pool: PgPool) {
     )
     .await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    let (tok, cid) = guest_claim_with_email(&pool, it, 1, Some("a@example.com")).await;
-    // 確認信已入佇列
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='claim.confirmation' AND guest_id IS NOT NULL").fetch_one(&pool).await.unwrap();
-    assert_eq!(n, 1);
+    let (tok, cid) = legacy_guest_claim(&pool, it, 1, Some("a@example.com")).await;
+    // 舊資料可能仍有待發的確認信（新認捐不再建立）；刪除時必須取消
+    sqlx::query("INSERT INTO notifications (guest_id, channel, kind, payload) SELECT guest_id, 'email', 'claim.confirmation', jsonb_build_object('claim_id', id) FROM claims WHERE id=$1")
+        .bind(cid).execute(&pool).await.unwrap();
     // 找回：一次性、換發新 token、舊 token 失效
     let gid: Uuid = sqlx::query_scalar("SELECT guest_id FROM claims WHERE id=$1")
         .bind(cid)

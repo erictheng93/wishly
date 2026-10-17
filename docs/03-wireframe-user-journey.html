@@ -196,8 +196,8 @@ main{padding:0 16px 60px}
 <thead><tr><th>原則</th><td style="font-weight:700;background:var(--code-bg)">具體落實</td></tr></thead>
 <tbody>
 <tr><th>行動優先</th><td>以 375px 寬為基準設計，桌面僅置中放大（最大 480px 單欄 + 兩側留白）。主要動作放在拇指可及的下半部；表單一律用 bottom sheet，不跳全頁。</td></tr>
-<tr><th>3 次點擊內完成捐助</th><td>點 LINE 連結進入 /s/{slug}（0 次）→ 點「我要送」（1）→ 在 sheet 填暱稱、按「確認捐助」（2）→ 成功頁。數量預設 1、暱稱可由 localStorage 帶入，因此回訪者實際為 2 次。</td></tr>
-<tr><th>免註冊</th><td>數量型捐助的送禮者全程不出現登入、註冊字樣；身分由 guest_token（localStorage + <code>X-Guest-Token</code>）維持。建立者需登入；<b>P2 眾籌投點需登入</b>（錢包要跨裝置、可退款、開發票），登入後以 <code>?redirect=</code> 回到原品項。</td></tr>
+<tr><th>3 次點擊內完成捐助</th><td>點 LINE 連結進入 /s/{slug}（0 次）→ 點「我要送」（1）→ 在 sheet 按「確認捐助」（2）→ 成功頁（已登入會員；D50 起 sheet 不再填暱稱）。未登入者按鈕為「登入後認捐」，登入後以 <code>?redirect=</code> 回到原品項，多出登入步驟，不計入 3 次點擊。</td></tr>
+<tr><th>免登入瀏覽、認捐需登入（D50）</th><td>訪客僅能瀏覽清單；數量認捐與眾籌投點一律需登入（負責人理由：認捐需要消耗點數，未登入無法紀錄點數；目前數量認捐尚未扣點），登入後以 <code>?redirect=</code> 回到原品項。ClaimSheet 不再收暱稱、聯絡方式、Email。D50 前的訪客認捐（舊資料）仍可在 /me/claims 以 guest_token 管理。</td></tr>
 <tr><th>LINE in-app browser 相容</th><td>不依賴 cookie 存活（以 header 為主）；不依賴 <code>beforeinstallprompt</code>、Background Sync、Web Share（LINE 內建瀏覽器支援度不一，需特性偵測並提供「複製連結」後備）；第三方 OAuth 跳轉前提示。</td></tr>
 <tr><th>WCAG 2.1 AA</th><td>文字對比 ≥ 4.5:1（大字 3:1）；進度條需有文字值（<code>role="progressbar"</code> + <code>aria-valuenow</code>），不單靠顏色；狀態徽章同時有文字與色彩；bottom sheet 為 <code>role="dialog" aria-modal</code>，焦點鎖定、Esc 關閉、關閉後焦點回到觸發按鈕；尊重 <code>prefers-reduced-motion</code>。</td></tr>
 <tr><th>觸控目標 ≥ 44px</th><td>所有按鈕、stepper、chip、列表可點區域最小 44×44 CSS px，相鄰目標間距 ≥ 8px。本文線框已按此尺寸繪製。</td></tr>
@@ -205,7 +205,7 @@ main{padding:0 16px 60px}
 </tbody></table></div>
 
 <h2 id="s2">2. 資訊架構 / Sitemap</h2>
-<p>四個使用者世界：營運人員（is_staff，/admin，MVP 即提供）、建立者（需登入，<code>wishly.tw</code>）、訪客（免登入，/s 與 /me/claims）、P2 眾籌捐贈者與禮物卡購買 / 兌換者（需登入，/me/wallet、/gift、/g/{code}、/rewards）。<span class="ph p2">P2</span> 為點數錢包、禮物卡、星星、企業禮券、營運後台與救災模組。</p>
+<p>四個使用者世界：營運人員（is_staff，/admin，MVP 即提供）、建立者（需登入，<code>wishly.tw</code>）、訪客（免登入瀏覽 /s；舊訪客認捐於 /me/claims 管理）、P2 眾籌捐贈者與禮物卡購買 / 兌換者（需登入，/me/wallet、/gift、/g/{code}、/rewards）。<span class="ph p2">P2</span> 為點數錢包、禮物卡、星星、企業禮券、營運後台與救災模組。</p>
 <pre class="mermaid">
 flowchart TD
   H["/ 首頁"]
@@ -239,7 +239,7 @@ flowchart TD
   N -->|"建立後"| E
   E -->|"分享"| SH["ShareSheet"]
   SH -.->|"連結散布 LINE FB 簡訊"| S
-  S -->|"我要送"| CS["ClaimSheet"]
+  S -->|"我要送（未登入顯示 登入後認捐）"| CS["ClaimSheet"]
   S -->|"加入眾籌 P2 需登入"| FS["ContributeSheet P2"]
   CS --> OK["捐助成功頁"]
   OK --> M
@@ -314,13 +314,13 @@ flowchart TD
 </tbody></table></div>
 
 <h3>3.2 親友送禮者（阿明，小愛的同事）<span class="ph p0">P0</span></h3>
-<p class="small">目標：從 LINE 點開到捐助完成，30 秒內，不註冊。</p>
+<p class="small">目標：從 LINE 點開、瀏覽、登入到捐助完成；已登入者 30 秒內（D50：認捐需登入）。</p>
 <div class="tw"><table>
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
-<tr><td>1 收到連結</td><td>在群組看到預覽卡，點開</td><td>「是什麼？要註冊嗎？」</td><td>好奇 / 怕麻煩</td><td>LINE OG 預覽卡</td><td>OG 標題直接寫「幫小愛挑禮物（已完成 40%）」</td></tr>
+<tr><td>1 收到連結</td><td>在群組看到預覽卡，點開</td><td>「是什麼？要註冊嗎？」（可先瀏覽，認捐時才需登入）</td><td>好奇 / 怕麻煩</td><td>LINE OG 預覽卡</td><td>OG 標題直接寫「幫小愛挑禮物（已完成 40%）」</td></tr>
 <tr><td>2 瀏覽</td><td>在 LINE in-app browser 滑清單，看哪些還沒被認</td><td>「奶瓶還缺幾個？不想跟別人重複」</td><td>專注</td><td>/s/{slug}</td><td>已滿品項灰掉並排到底；即時更新（SSE）</td></tr>
-<tr><td>3 捐助</td><td>點「我要送」，數量 2、輸入暱稱「阿明」，確認</td><td>「希望一次成功」</td><td>謹慎</td><td>ClaimSheet</td><td>暱稱記住；聯絡方式選填且說明用途</td></tr>
+<tr><td>3 捐助</td><td>點「登入後認捐」，以 LINE / Email 登入後回到原品項，數量 2，確認</td><td>「希望一次成功」</td><td>謹慎</td><td>/login?redirect、ClaimSheet</td><td>登入後導回原品項並保留所選數量；名稱採帳號暱稱，不再填聯絡方式</td></tr>
 <tr><td>4 成功</td><td>看到成功頁與提示「已存在此裝置」</td><td>「我買完怎麼回來標記？」</td><td>放心</td><td>捐助成功頁、/me/claims</td><td>加入主畫面 / 用預設瀏覽器開啟引導（避免換瀏覽器遺失）</td></tr>
 <tr><td>5 購買與回報</td><td>買完後回到 /me/claims 標記「已購買」</td><td>「幫她確認我有買了」</td><td>輕鬆</td><td>/me/claims</td><td>P1 提醒通知；一鍵標記</td></tr>
 <tr><td>6 遇到阻礙</td><td>搶不贏：已被認完；或網路差送出失敗</td><td>「那我換別的」</td><td>失望 / 煩</td><td>錯誤提示</td><td>409 時自動重新整理並推薦其他品項；網路錯誤保留輸入可重試（Idempotency-Key 不變）</td></tr>
@@ -411,7 +411,7 @@ flowchart TD
 <div class="tw"><table>
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
-<tr><td>1 點開連結</td><td>LINE 點開 /s/{slug}，看到「請先登入」</td><td>「不是說免註冊嗎？」</td><td>疑惑</td><td>門檻頁（LOGIN_REQUIRED）</td><td>門檻頁說明「這份清單只開放給好友」並顯示建立者名稱；訪客無需註冊的承諾只適用 link / public / password 清單</td></tr>
+<tr><td>1 點開連結</td><td>LINE 點開 /s/{slug}，看到「請先登入」</td><td>「不是說瀏覽免登入嗎？」</td><td>疑惑</td><td>門檻頁（LOGIN_REQUIRED）</td><td>門檻頁說明「這份清單只開放給好友」並顯示建立者名稱；免登入瀏覽只適用 link / public / password 清單；認捐一律需登入（D50）</td></tr>
 <tr><td>2 登入</td><td>用 LINE / Google 或 Email 登入，帶 redirect 回清單</td><td>「登入完就能看吧」</td><td>耐心</td><td>/login?redirect=</td><td>LINE / Google 置頂；已有帳號者一步完成</td></tr>
 <tr><td>3 被擋（非好友）</td><td>看到「此清單僅限好友查看（擁有者：小愛）」</td><td>「我要怎麼加她？」</td><td>卡關</td><td>門檻頁（FRIENDS_ONLY）</td><td>「前往小愛的頁面加好友」直連 /u/{handle}；若小愛沒設 handle 則提示請她傳邀請連結</td></tr>
 <tr><td>4 加好友</td><td>在個人頁送出好友邀請，或點小愛先前傳的邀請連結直接成為好友</td><td>「等她接受」</td><td>等待</td><td>/u/{handle}、/invite/{token}</td><td>邀請連結一步到位（登入後即互為好友）；申請需對方接受，會提示「已送出邀請」</td></tr>
@@ -419,14 +419,14 @@ flowchart TD
 <tr><td>6 事後</td><td>到 /me/claims 標記已購買，必要時調整可見度</td><td>「幫她確認我有買」</td><td>輕鬆</td><td>/me/claims</td><td>登入者的捐助與帳號綁定，換裝置也找得到（不需管理連結）</td></tr>
 </tbody></table></div>
 
-<h3>3.10 密碼清單的訪客（阿嬤的朋友，免註冊）<span class="ph p0">P0</span></h3>
+<h3>3.10 密碼清單的訪客（阿嬤的朋友，免註冊瀏覽、認捐需登入）<span class="ph p0">P0</span></h3>
 <p class="small">目標：建立者想「有連結也不能亂看」，但不想要求親友註冊。她把清單設為密碼保護，並用口頭或群組私訊告知密碼。</p>
 <div class="tw"><table>
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
 <tr><td>1 點開</td><td>點開連結，看到「這份清單需要密碼」與建立者名稱</td><td>「密碼是什麼？」</td><td>停頓</td><td>門檻頁（PASSWORD_REQUIRED）</td><td>顯示「由 小愛 建立。請向對方詢問密碼。」</td></tr>
 <tr><td>2 輸入</td><td>輸入密碼；錯誤顯示「密碼錯誤」</td><td>「大小寫嗎？」</td><td>略急</td><td>解鎖表單</td><td>密碼欄可顯示 / 隱藏；錯太多次顯示稍後再試（每 slug + IP 15 分鐘 10 次）</td></tr>
-<tr><td>3 瀏覽與捐助</td><td>解鎖後與一般清單相同；權杖存 sessionStorage，關閉分頁即失效</td><td>「跟平常一樣」</td><td>順暢</td><td>/s/{slug}</td><td>免登入捐助（guest token）；即時更新 SSE 帶權杖</td></tr>
+<tr><td>3 瀏覽與捐助</td><td>解鎖後與一般清單相同；權杖存 sessionStorage，關閉分頁即失效</td><td>「跟平常一樣」</td><td>順暢</td><td>/s/{slug}</td><td>免登入瀏覽、認捐需登入（D50）；即時更新 SSE 帶權杖</td></tr>
 <tr><td>4 密碼被更換</td><td>建立者改了密碼，舊權杖失效，頁面回到輸入密碼</td><td>「又要輸入一次？」</td><td>小煩</td><td>門檻頁</td><td>既有捐助不受影響；在 /me/claims 仍可管理</td></tr>
 </tbody></table></div>
 
@@ -467,7 +467,7 @@ flowchart TD
   N --> O["完成"]
 </pre>
 
-<h3>4.2 訪客捐助（含已被捐助完、網路錯誤）<span class="ph p0">P0</span></h3>
+<h3>4.2 登入後認捐（含未登入導登入、已被捐助完、網路錯誤）<span class="ph p0">P0</span></h3>
 <pre class="mermaid">
 flowchart TD
   A["LINE 點開連結"] --> B["SSR 載入 /s/slug"]
@@ -476,15 +476,19 @@ flowchart TD
   B --> C["瀏覽品項 訂閱 SSE"]
   C --> D{"品項已滿?"}
   D -->|"是"| D1["按鈕灰掉 顯示已被捐助完"]
-  D -->|"否"| E["點 我要送"]
-  E --> F["ClaimSheet 數量 暱稱 聯絡 留言"]
+  D -->|"否"| E["點 我要送 / 登入後認捐"]
+  E --> E1{"已登入?"}
+  E1 -->|"否"| E2["導向 /login?redirect=原品項<br/>登入或註冊後回來"]
+  E2 --> E
+  E1 -->|"是"| F["ClaimSheet 數量 留言"]
   F --> F1{"表單驗證"}
-  F1 -->|"暱稱空白"| F2["欄位錯誤提示"]
+  F1 -->|"數量超限"| F2["欄位錯誤提示"]
   F2 --> F
   F1 -->|"通過"| G["樂觀更新 qty_claimed 加 n"]
   G --> H["POST /items/id/claims 帶 Idempotency-Key"]
-  H -->|"201"| I["存 guest_token 到 localStorage"]
-  I --> J["捐助成功頁"]
+  H -->|"201"| J["捐助成功頁"]
+  H -->|"401 UNAUTHORIZED<br/>(登入已過期)"| U["回滾 導向 /login?redirect= 登入後回原品項"]
+  U --> E
   H -->|"409 CLAIM_ALREADY_EXISTS"| CA["回滾 提示已捐助過 改開修改我的捐助"]
   CA --> CA1["PATCH /claims/id 改數量"]
   H -->|"409 ITEM_FULLY_CLAIMED"| K["回滾樂觀更新 重抓品項"]
@@ -1011,7 +1015,7 @@ flowchart TD
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>PublicHeader、WishlistCard（標題區）、ProgressBar、ItemCard（public 模式）、StatusBadge、OfflineBanner、InAppBrowserHint、ClaimSheet（見 5.7）；<span class="ph p2">P2</span> 眾籌品項卡片與 ContributeSheet（見 5.9、5.14）</td></tr>
 <tr><th>狀態</th><td>loading：SSR 已帶資料，hydration 後 SSE 連線；SSE 重連中顯示灰點。empty：品項為 0 時顯示「建立者還在準備清單，晚點再回來看看」。error：404 / private → 「找不到這份清單」；<code>WISHLIST_CLOSED</code> → 唯讀橫幅「這份清單已結束」。已滿：按鈕灰掉、顯示「已被捐助完」、卡片排序至底。離線：橫幅 + 按鈕停用。品項 <code>image_status</code> 非 ready（pending / rejected / none）時公開頁一律顯示灰色佔位圖（pending 時可帶「圖片處理中」，不顯示尚未去除 EXIF 的圖片）；ready 後由 SSE <code>item.updated</code> 或下次載入替換。<code>WISHLIST_REMOVED</code>（410）→ 顯示下架頁（見 5.26）。頁尾固定有「檢舉此清單」（見 5.26）、服務條款與隱私權政策連結。</td></tr>
-<tr><th>互動</th><td>完成度採伺服器回傳的 <code>completion_pct</code>（前端不自行計算）。SSE <code>item.updated</code> 事件就地更新該卡（進度條動畫 300ms，reduced-motion 則無動畫）；<code>wishlist.updated</code> 重抓整份。若 <code>show_claimer_names</code> 為 true，卡片下方顯示「阿明、小美 已捐助」。若訪客有 <code>guest_token</code> 且對該品項有捐助，卡片顯示「你已捐助 2 件」按鈕由「我要送」變為「修改我的捐助」（開啟同一個 sheet 的編輯模式，送出走 PATCH <code>/claims/{claim_id}</code>）。若仍誤送 POST，API 回 409 <code>CLAIM_ALREADY_EXISTS</code>，前端提示「你已經捐助過這個品項，已幫你切換到修改」。建立者本人（<code>GET /me</code> 的 user.id 等於公開頁回傳的 <code>owner.id</code>，且 <code>surprise_mode</code> 為 true）開啟自己 surprise_mode 鎖定中的公開頁時，品項 x/y 以「驚喜模式中」遮罩取代（軟性遮蔽；已知限制：建立者可用無痕視窗看到，接受）。</td></tr>
+<tr><th>互動</th><td>完成度採伺服器回傳的 <code>completion_pct</code>（前端不自行計算）。SSE <code>item.updated</code> 事件就地更新該卡（進度條動畫 300ms，reduced-motion 則無動畫）；<code>wishlist.updated</code> 重抓整份。若 <code>show_claimer_names</code> 為 true，卡片下方顯示「阿明、小美 已捐助」。若使用者已登入（或持舊 <code>guest_token</code>）且對該品項有捐助，卡片顯示「你已捐助 2 件」按鈕由「我要送」變為「修改我的捐助」（開啟同一個 sheet 的編輯模式，送出走 PATCH <code>/claims/{claim_id}</code>）。若仍誤送 POST，API 回 409 <code>CLAIM_ALREADY_EXISTS</code>，前端提示「你已經捐助過這個品項，已幫你切換到修改」。建立者本人（<code>GET /me</code> 的 user.id 等於公開頁回傳的 <code>owner.id</code>，且 <code>surprise_mode</code> 為 true）開啟自己 surprise_mode 鎖定中的公開頁時，品項 x/y 以「驚喜模式中」遮罩取代（軟性遮蔽；已知限制：建立者可用無痕視窗看到，接受）。</td></tr>
 <tr><th>API</th><td>GET <code>/public/wishlists/{slug}</code>（SSR 於 server 取用）；GET <code>/public/wishlists/{slug}/events</code>（SSE）；GET <code>/guest/me</code>（有 token 時，標示自己的捐助）</td></tr>
 </tbody></table></div></div></div>
 
@@ -1028,12 +1032,10 @@ flowchart TD
 <div class="grab"></div><b>捐助「寶寶奶瓶 240ml」</b>
 <div class="lbl">還缺 4 個，你要送幾個？</div>
 <div class="stp"><span>－</span><span class="v">2</span><span>＋</span></div>
-<div><div class="lbl"><b>你的暱稱</b>（必填）</div><div class="inp">阿明</div></div>
-<div><div class="lbl">聯絡方式（選填，只有建立者看得到）</div><div class="inp">LINE ID 或電話</div></div>
-<div><div class="lbl">Email（選填）：留 Email 可收到確認信與「管理我的捐助」連結，換手機也找得回來</div><div class="inp">name@example.com</div></div>
+<div><div class="lbl">以 阿明 捐助（已登入帳號名稱）</div></div>
 <div><div class="lbl">留言（選填）</div><div class="inp">恭喜！</div></div>
 <div class="btn pri">確認捐助</div>
-<div class="lbl" style="text-align:center">不需註冊。捐助後可隨時修改或取消。<br>我們如何使用你的資料：<b style="text-decoration:underline">個資蒐集告知</b>（不需勾選）</div>
+<div class="lbl" style="text-align:center">捐助後可隨時於 /me/claims 修改或取消。<br>我們如何使用你的資料：<b style="text-decoration:underline">個資蒐集告知</b>（不需勾選）</div>
 </div></div><div class="cap">ClaimSheet</div></div>
 <div><div class="phone" style="min-height:640px">
 <div class="st"><span>9:41</span><span>LINE</span></div>
@@ -1050,9 +1052,9 @@ flowchart TD
 </div>
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>BottomSheet（基底）、ClaimSheet、QtyStepper（min 1、max = 剩餘量）、TextField ×3、InlineAlert</td></tr>
-<tr><th>狀態</th><td>idle / submitting（按鈕 spinner，欄位唯讀）/ error-validation（暱稱空白、字數超限）/ error-409（見右圖，stepper max 重設為最新剩餘；剩 0 則關閉 sheet 並把卡片灰掉）/ error-network（「網路不穩，再試一次」，保留輸入與同一個 Idempotency-Key）/ error-429 / offline（送出停用）。已滿品項不會開啟此 sheet。</td></tr>
-<tr><th>互動</th><td>開啟時暱稱預填 localStorage 的 <code>ws_nickname</code>，焦點落在「確認捐助」（有暱稱）或暱稱欄（無）。送出：先樂觀更新卡片 <code>qty_claimed</code>，成功後關 sheet 並導向成功頁；失敗則回滾。送出鍵於請求期間停用防連點；Idempotency-Key 在 sheet 開啟時產生（<code>crypto.randomUUID()</code>），重試沿用，成功或關閉後重產。暱稱與聯絡方式欄位旁顯示「個資蒐集告知」連結（連到 /privacy 對應段落，開新分頁或 sheet），<b>不強制勾選</b>。填了 Email 時，成功後寄出確認信，內含「管理我的捐助」連結（一次性恢復權杖）與退訂連結（等同換裝置找回的最小版）；Email 不顯示給其他訪客。Email 欄位預設空白，不從 localStorage 帶入。</td></tr>
-<tr><th>API</th><td>POST <code>/items/{item_id}/claims</code>（headers: <code>Idempotency-Key</code>、<code>X-Guest-Token</code>（若已有）；body: qty, display_name, contact, note, email（選填）；回應含首次的 guest_token）。錯誤：<code>ITEM_FULLY_CLAIMED</code>(409)、<code>VALIDATION_FAILED</code>、<code>RATE_LIMITED</code>、<code>WISHLIST_CLOSED</code>、<code>IDEMPOTENCY_CONFLICT</code>、<code>CLAIM_ALREADY_EXISTS</code>(409，同一訪客對同品項已有有效捐助，改用 PATCH <code>/claims/{claim_id}</code>)、<code>READ_ONLY_MODE</code>(503)</td></tr>
+<tr><th>狀態</th><td>idle / submitting（按鈕 spinner，欄位唯讀）/ error-validation（數量超限）/ error-401（未登入或登入過期，導登入並帶 redirect）/ error-409（見右圖，stepper max 重設為最新剩餘；剩 0 則關閉 sheet 並把卡片灰掉）/ error-network（「網路不穩，再試一次」，保留輸入與同一個 Idempotency-Key）/ error-429 / offline（送出停用）。已滿品項不會開啟此 sheet。</td></tr>
+<tr><th>互動</th><td>D50：僅已登入者能開啟此 sheet（未登入的按鈕為「登入後認捐」，導 <code>/login?redirect=</code>）；不再有暱稱、聯絡方式、Email 欄位，名稱採帳號暱稱，焦點落在「確認捐助」。送出：先樂觀更新卡片 <code>qty_claimed</code>，成功後關 sheet 並導向成功頁；失敗則回滾。送出鍵於請求期間停用防連點；Idempotency-Key 在 sheet 開啟時產生（<code>crypto.randomUUID()</code>），重試沿用，成功或關閉後重產。sheet 底部保留「個資蒐集告知」連結（連到 /privacy 對應段落），<b>不強制勾選</b>。不再寄訪客確認信與恢復權杖（會員登入後 /me/claims 即可跨裝置管理）。</td></tr>
+<tr><th>API</th><td>POST <code>/items/{item_id}/claims</code>（headers: <code>Idempotency-Key</code>、<code>ws_session</code> cookie 或 <code>Authorization: Bearer</code>；body: qty, note；D50 起移除 display_name、contact、email，回應不含 guest_token）。錯誤：<code>UNAUTHORIZED</code>(401，未登入，不寫入任何資料，前端導 <code>/login?redirect=</code>)、<code>ITEM_FULLY_CLAIMED</code>(409)、<code>VALIDATION_FAILED</code>、<code>RATE_LIMITED</code>、<code>WISHLIST_CLOSED</code>、<code>IDEMPOTENCY_CONFLICT</code>、<code>CLAIM_ALREADY_EXISTS</code>(409，同一使用者對同品項已有有效捐助，改用 PATCH <code>/claims/{claim_id}</code>)、<code>READ_ONLY_MODE</code>(503)</td></tr>
 </tbody></table></div></div></div>
 
 <!-- 5.8 SUCCESS -->
@@ -1163,6 +1165,7 @@ flowchart TD
 <div class="lbl" style="text-align:center">沒看到之前的捐助？可能是在不同瀏覽器。<b>怎麼找回？</b>（留過 Email 的捐助，可從確認信的管理連結回來）</div>
 </div></div><div class="cap">/me/claims</div></div>
 <div class="spec"><div class="tw"><table><tbody>
+<tr><th>說明</th><td><b>D50：</b>此頁對會員顯示其所有認捐；對持舊 guest token 的既有訪客（D50 前認捐）保留查看、取消、減量、改備註，增量（PATCH qty 大於現值）回 401 並導登入。</td></tr>
 <tr><th>元件</th><td>GuestHeader、ClaimGroup（依清單分組）、ClaimRow（含 ItemThumb、StatusBadge、動作按鈕）、NicknameEditor、RecoverHelp、<span class="ph p0">P0</span> 刪除我的暱稱與聯絡方式（<code>DELETE /guest/me</code>，二次確認；claims 保留為「已刪除的訪客」）</td></tr>
 <tr><th>狀態</th><td>loading：骨架；empty：「你還沒有捐助任何東西。收到朋友的清單連結後，就能在這裡管理。」；error：重試；無 guest_token：顯示 empty 並提示可能換了瀏覽器；已取消 / 已逾期項目收合在「過去的紀錄」。離線：顯示快取清單，動作停用。</td></tr>
 <tr><th>互動</th><td><b>信件管理連結進入</b>（<code>/me/claims#r={token}</code>）：頁面載入時由前端讀 hash、以 <code>history.replaceState</code> 清除後呼叫 POST <code>/guest/recover</code>，成功即取得新的 guest token（存 localStorage，伺服器同時設 ws_guest cookie）並載入捐助；無效、過期、已用一律 404 <code>NOT_FOUND</code>，顯示頂部「管理連結已失效」提示（見上圖）而非一般空狀態，不揭露失效原因。流程見 4.11。「標記已購買」→ PATCH claim status=purchased（樂觀更新）；purchased 後出現「標記已送達」→ PATCH status=delivered（捐助者本人、owner、org owner/coordinator 皆可標記）；「取消」二次確認後 DELETE（庫存釋回，其他訪客即時看到）。reserved 才可取消；purchased 以後取消需確認文案「建立者會收到通知」。點品項回該 /s/{slug}。</td></tr>
@@ -1260,7 +1263,7 @@ flowchart TD
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>SiteHeader、CategoryTabs、UrgencyGroup、NeedCard（= ItemCard relief 變體）、PledgeSheet（= ClaimSheet）、ReceiptSheet、SyncQueueBadge</td></tr>
 <tr><th>狀態</th><td><b>組織驗證</b>：<code>verification_status=verified</code> 的組織據點顯示「已驗證組織」徽章（文字 + 圖示）；未驗證組織的據點只能是 link 可見，不上地圖、不出現在據點列表，建立 public 據點時 API 回 403 <code>ORG_NOT_VERIFIED</code>，/org/{id} 顯示「驗證審核中」並說明限制。loading / empty（「這個據點目前沒有需求」）/ error / 已滿（已被認捐完，灰掉）/ site_status=paused（頂部橫幅「此據點暫停接收物資」，認捐停用）/ closed（唯讀）/ 離線（認捐停用，志工登記實收走佇列）。</td></tr>
-<tr><th>互動</th><td>需求依 <code>relief_urgency</code>（critical → low）分組，組內依 <code>relief_category</code> 排序。「我要認捐」沿用訪客免註冊的 ClaimSheet（數量 stepper + 暱稱，不收集災民個資）。「登記實收」僅對 org_role 為 volunteer / coordinator / owner 顯示。離線佇列：IndexedDB 存放請求與其 Idempotency-Key，連線恢復（<code>online</code> 事件 / Background Sync）後重送；iOS Safari 無 Background Sync，改在 App 前景時 flush。</td></tr>
+<tr><th>互動</th><td>需求依 <code>relief_urgency</code>（critical → low）分組，組內依 <code>relief_category</code> 排序。「我要認捐」沿用 ClaimSheet（數量 stepper，需登入，D50；不收集災民個資）。「登記實收」僅對 org_role 為 volunteer / coordinator / owner 顯示。離線佇列：IndexedDB 存放請求與其 Idempotency-Key，連線恢復（<code>online</code> 事件 / Background Sync）後重送；iOS Safari 無 Background Sync，改在 App 前景時 flush。</td></tr>
 <tr><th>API</th><td>GET <code>/public/wishlists/{slug}</code>（據點即 relief 型 wishlist，路由直接使用 slug；GET /public/relief/sites 每筆已回傳 slug）；POST <code>/items/{item_id}/claims</code>（認捐）；POST <code>/items/{item_id}/receipts</code>（實收）；PATCH <code>/sites/{id}</code>（coordinator / owner 調整狀態與緊急度）；SSE <code>/public/wishlists/{slug}/events</code></td></tr>
 </tbody></table></div></div></div>
 
@@ -2108,7 +2111,7 @@ flowchart TD
 <div class="ab">‹ 我的捐助</div>
 <div class="bd">
 <div class="card" style="flex-direction:column"><div class="row"><b class="fl">奶瓶 240ml × 2</b><span class="b teal">已捐助</span></div><div class="lbl">送給 小愛・小愛的待產清單</div><div class="lbl"><b>誰看得到</b></div><div class="inp">僅好友　▾</div><div class="row"><div class="btn fl ghost">標記已購買</div><div class="btn fl ghost">取消捐助</div></div></div>
-<div class="lbl">訪客捐助（未登入）沒有「誰看得到」，也不會出現在任何個人頁。</div>
+<div class="lbl">舊訪客捐助（D50 前、無帳號）沒有「誰看得到」，也不會出現在任何個人頁。</div>
 </div></div><div class="cap">/me/claims（登入者每筆可調整）</div></div>
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
@@ -2125,12 +2128,12 @@ flowchart TD
 <div class="scrim"></div>
 <div class="sheet">
 <div class="grab"></div><b>我要送</b><div class="stp"><span>−</span><span class="v">2</span><span>＋</span></div><div class="lbl">以 阿凱 捐助（已登入）</div><div><div class="lbl"><b>誰看得到這筆捐助</b></div><div class="inp">僅好友　▾（預設來自帳號設定）</div></div><div class="btn pri">確認捐助</div>
-</div></div><div class="cap">ClaimSheet（登入者多一個可見度欄位，訪客不顯示）</div></div>
+</div></div><div class="cap">ClaimSheet（D50：僅登入者能開啟，含可見度欄位）</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>HandleField（即時格式檢查）、CopyProfileUrl、SelectRow（default_claim_visibility）、ClaimVisibilitySelect、ContributionVisibilitySelect</td></tr>
 <tr><th>狀態</th><td>handle 格式不符時前端即顯示錯誤並停用儲存；<code>HANDLE_TAKEN</code> 409；儲存成功「已儲存」；handle 可清空（關閉個人頁，連結 404）。</td></tr>
-<tr><th>互動</th><td>登入者開啟 ClaimSheet 時，名稱帶入帳號名稱、可見度預設帶帳號設定（載入前不送欄位，由伺服器套預設）。手快在 /me 載入完成前點「我要送」不會被當成訪客（以 <code>loggedInName</code> 判斷）。改帳號預設<b>不會回溯</b>既有捐助或點數認捐。/me/wallet 每筆認捐的「誰看得到」可選公開 / 僅好友 / 私人，PATCH 僅限本人；儲存中停用選單、失敗還原並顯示錯誤。匿名認捐在個人頁仍僅本人可見。轉投保留原筆可見度。</td></tr>
+<tr><th>互動</th><td>登入者開啟 ClaimSheet 時，名稱帶入帳號名稱、可見度預設帶帳號設定（載入前不送欄位，由伺服器套預設）。手快在 /me 載入完成前點「我要送」不會被當成未登入（以 <code>loggedInName</code> 判斷）；真正未登入者按鈕為「登入後認捐」。改帳號預設<b>不會回溯</b>既有捐助或點數認捐。/me/wallet 每筆認捐的「誰看得到」可選公開 / 僅好友 / 私人，PATCH 僅限本人；儲存中停用選單、失敗還原並顯示錯誤。匿名認捐在個人頁仍僅本人可見。轉投保留原筆可見度。</td></tr>
 <tr><th>API</th><td>PATCH <code>/me</code>（handle、default_claim_visibility）；POST <code>/items/{id}/claims</code>（visibility，僅登入者）；PATCH <code>/claims/{id}</code>（visibility）；POST <code>/items/{id}/contributions</code>（visibility，選填）；GET <code>/wallet/contributions</code>（每筆含 visibility）；PATCH <code>/contributions/{id}</code>（visibility）。</td></tr>
 </tbody></table></div></div>
 </div>
@@ -2289,7 +2292,7 @@ sequenceDiagram
   try {
     const res = await api(`/items/${item.id}/claims`, {
       method: 'POST', body: form, headers: { 'Idempotency-Key': key } })
-    guest.setToken(res.guest_token); return res.claim   // 2. 成功
+    return res.claim                           // 2. 成功（D50：不再有 guest_token；401 導登入）
   } catch (e) {
     Object.assign(item, snapshot)              // 3. 回滾
     if (e.code === 'ITEM_FULLY_CLAIMED') {
@@ -2425,7 +2428,7 @@ async function waitTopup(before) {
 <tr><td>Android Chrome</td><td>捕捉 <code>beforeinstallprompt</code></td><td>以自訂按鈕呼叫 <code>prompt()</code></td></tr>
 <tr><td>已安裝</td><td><code>matchMedia('(display-mode: standalone)')</code> 或 <code>navigator.standalone</code></td><td>不顯示提示</td></tr>
 </tbody></table></div>
-<div class="note w"><b>重要風險：</b>LINE 內建瀏覽器與預設瀏覽器的 localStorage / cookie 互不相通。在 LINE 內捐助後改用 Safari 開啟，將看不到 /me/claims。對策：成功頁引導外開、/me/claims 空狀態說明、以及（P1 待決）提供「用捐助時的暱稱 + 聯絡方式找回」或一次性回復連結。</div>
+<div class="note w"><b>重要風險（D50 後僅涉及舊訪客認捐；會員登入後跨裝置不受影響）：</b>LINE 內建瀏覽器與預設瀏覽器的 localStorage / cookie 互不相通。在 LINE 內捐助後改用 Safari 開啟，將看不到 /me/claims。對策：成功頁引導外開、/me/claims 空狀態說明、以及（P1 待決）提供「用捐助時的暱稱 + 聯絡方式找回」或一次性回復連結。</div>
 
 <h2 id="s9">9. OG / 分享預覽規格</h2>
 <p>/s/{slug} 與 <span class="ph p2">P2-B</span> /g/{code} <b>必須 SSR</b>（部署於 Cloudflare Pages，由 Pages Functions 執行 SSR，見第 14 節），使 LINE、Facebook、iMessage 爬蟲（不執行 JS）取得完整 meta。<b>驗證紀錄（D48，如實）：</b>2026-10-08 以 Nuxt 4.0.0 + Wrangler 4.148.0 在本機（workerd 執行環境）實測，<code>cloudflare_pages</code> preset 經 <code>wrangler pages dev</code>，以不執行 JS 的爬蟲 UA 請求 /s/{slug}，SSR HTML 已含 <code>&lt;title&gt;</code>、og:title、og:description，server route 執行於 Cloudflare Workers runtime；另測 <code>cloudflare_module</code> 經 <code>wrangler dev</code> 亦通過。<b>尚未在正式 Cloudflare 帳號部署，也尚未用真實 LINE / FB 爬蟲測試，仍屬 Spike S1。</b></p>
@@ -2513,7 +2516,7 @@ async function waitTopup(before) {
 <tr><td>410 WISHLIST_REMOVED</td><td>此清單已被下架。這份清單因違反服務條款已被移除，目前無法瀏覽或捐助。</td></tr>
 <tr><td>dashboard 下架提示</td><td>這份清單已於 10/08 被下架。原因：疑似詐騙。若有誤判，請聯絡客服申訴。</td></tr>
 <tr><td>圖片上傳提示</td><td>上傳後會移除照片裡的位置等隱藏資訊。請勿上傳含個人資料的照片。</td></tr>
-<tr><td>個資蒐集告知（捐助 sheet）</td><td>你填的暱稱與聯絡方式只會給清單建立者看。我們如何使用你的資料，請看「個資蒐集告知」。</td></tr>
+<tr><td>個資蒐集告知（捐助 sheet）</td><td>你的帳號名稱會依清單設定顯示給清單建立者。我們如何使用你的資料，請看「個資蒐集告知」。</td></tr>
 <tr><td>留 Email（捐助）</td><td>留 Email 可收到確認信與「管理我的捐助」連結，換手機也找得回來。</td></tr>
 <tr><td>捐助確認信（Email）</td><td>你已捐助「寶寶奶瓶 240ml × 2」。點這裡管理我的捐助：{連結}（連結只能使用一次，30 天內有效）。不想再收到通知？<u>一鍵退訂</u></td></tr>
 <tr><td>退訂成功</td><td>已為你取消這類 Email 通知。之後想重新開啟，可以到帳號設定。</td></tr>
@@ -2631,7 +2634,7 @@ async function waitTopup(before) {
 <li><b>完成度定義</b>：由伺服器回傳 <code>completion_pct</code>，前端不自行計算；<b>已決</b>：<code>completion_pct = items_done / items_total</code>（quantity 品項認滿、crowdfund 品項 funding_status 達標即算完成），另有 <code>claimed_pct</code>、<code>funded_pct</code>，定義見《Master User Flow》F7。</li>
 <li><b>Background Sync 支援</b>：iOS Safari 與 LINE in-app browser 不支援，P2 離線佇列需前景重送後備；是否接受「iOS 需開著頁面才同步」？</li>
 <li><b>SSE 在 LINE in-app browser 與 Cloudflare 的穩定性</b>：SSE 由 api.wishly.tw 提供（Cloudflare Tunnel 與 Traefik 的逾時與緩衝設定），需實測；輪詢退路已寫入 7.3。</li>
-<li><b>首次捐助 3 次點擊</b>：若要求暱稱必填，首次訪客是「點我要送 → 輸入暱稱（輸入不算點擊但需鍵盤）→ 確認」。是否允許暱稱預設為「匿名朋友」以真正做到 2 次點擊？</li>
+<li><b>首次捐助 3 次點擊</b>：D50 起認捐需登入且不再填暱稱，首次訪客多一個登入步驟（LINE / Email OTP），點擊數與轉換率須在封閉測試觀察。</li>
 <li><b>OG 圖產生位置</b>：Cloudflare Pages Functions（satori）或後端 Rust（resvg）？影響字型（Noto Sans TC 檔案大，約數 MB）與冷啟動。</li>
 <li><b>地圖供應商</b>：MapLibre + 哪個圖磚來源（OSM 公共圖磚不適合商用流量；MapTiler、自架 PMTiles on R2）？</li>
 <li><b>manifest start_url</b>：靜態 manifest 只能選一個，目前以訪客的 /me/claims 為優先；建立者安裝後會落在此頁，是否可接受（可在頁面內依登入狀態導向 /dashboard）？</li>
@@ -2650,7 +2653,8 @@ async function waitTopup(before) {
 <h3>已決事項（依審查裁決）</h3>
 <ul>
 <li>D47：新增 <code>GIFT_CARD_NOT_YET_CLAIMABLE</code>（附 claimable_at）與 <code>TOPUP_LIMIT_EXCEEDED</code>（附 limit_amount、remaining_amount；新帳號每日 NT$3,000 涵蓋手動儲值、自動儲值、禮物卡購買，不含企業禮券）；管理連結改為一次性恢復權杖（<code>#r=</code> → POST <code>/guest/recover</code>）；一鍵退訂 <code>/unsubscribe?token=</code>；通知偏好 <code>notification_prefs.email_claims</code>；<code>image_status</code> 佔位；發票用巢狀 <code>invoice</code> 物件；錢包解凍與欠款結案 API。</li>
-<li>D15 / D39：換裝置找回捐助改為 MVP 最小版——捐助時選填 Email，寄確認信與「管理我的捐助」連結；P1 再做完整版。</li>
+<li>D15 / D39：換裝置找回捐助改為 MVP 最小版——捐助時選填 Email，寄確認信與「管理我的捐助」連結；P1 再做完整版。<b>（D50 後僅適用舊訪客資料：新認捐須登入，不再收 Email。）</b></li>
+<li>D50（2026-10-18）：訪客僅能瀏覽，認捐需登入。負責人理由：「認捐需要消耗點數，未登入無法紀錄點數。」目前數量認捐並未扣點。分享頁按鈕為「登入後認捐」，POST claims 未登入回 401 並導 <code>/login?redirect=</code>；ClaimSheet 移除暱稱 / 聯絡方式 / Email；/me/claims 對舊訪客認捐保留查看、取消、減量，不可增量（PATCH 增量回 401）。</li>
 <li>D33 至 D46（v0.4）：低保真聲明與高保真另案；檢舉與 410 下架；MVP /admin 營運後台；Email 通知（MVP）；帳號刪除與資料匯出；圖片去 EXIF；信用卡 3DS 與錢包凍結；電子發票選項；救災組織驗證徽章；部署平台：D44 改 Workers 已由 D48 撤銷，定案 Cloudflare Pages（Workers 為備案）；Spike S1 至 S3。</li>
 <li>D22：公開 API 與 SSE 直接回傳 <code>display_status</code>，徽章不再前端推導；未達標選「退回錢包」呼叫 DELETE <code>/contributions/{id}</code>（選擇期 7 天內），投點到已截止品項回 <code>FUNDING_EXPIRED</code>。</li>
 <li>D22：儲值 body 為 <code>{amount, method}</code>，快選與上下限由 <code>GET /config/public</code> 提供；營運後台以 <code>amount</code> 回報實際花費；代購 SLA 3 個工作天；「我的認捐」使用 <code>GET /wallet/contributions</code>。</li>
@@ -2660,7 +2664,7 @@ async function waitTopup(before) {
 <li>驚喜模式：鎖定期間建立者端只回整體彙總與眾籌訂單狀態；公開頁仍顯示 x/y，建立者本人看到「驚喜模式中」遮罩（D4、D18）。</li>
 <li>v0.2：眾籌改為點數錢包 + 達標自動購買，移到 P2；點數不會到受捐者手上，眾籌一律硬上限，用 <code>pledged_points</code> / <code>target_points</code>；已移除 payout_methods、我已付款、確認收款、reference_code、allow_overfund（D16 至 D21）。</li>
 <li>delivered：捐助者本人、owner、org owner/coordinator 皆可標記（D5）。</li>
-<li>同一訪客同品項只能一筆有效捐助，重複 POST 回 409 <code>CLAIM_ALREADY_EXISTS</code>（D6）。</li>
+<li>同一使用者同品項只能一筆有效捐助，重複 POST 回 409 <code>CLAIM_ALREADY_EXISTS</code>（D6）。</li>
 <li>relief 據點路由 <code>/relief/sites/{slug}</code>；認捐沿用 claims（reserved 已認捐、purchased 運送中、delivered 已實收）（D11、D12）。</li>
 <li>發佈 = PATCH <code>/wishlists/{id}</code> status=active，不符條件回 409 <code>WISHLIST_NOT_PUBLISHABLE</code>（D13）。</li>
 </ul>
@@ -2675,7 +2679,7 @@ async function waitTopup(before) {
 <tr><td><code>share_clicked</code></td><td>client</td><td>5.5 ShareSheet 各按鈕</td><td>channel: line | fb | copy | qr, external_browser_flag</td><td>P0</td></tr>
 <tr><td><code>public_viewed</code></td><td>client + server</td><td>/s/{slug} 載入（SSR 時 server 計一次）</td><td>referrer_type（line | fb | sms | direct | other）, is_in_app_browser, is_creator_viewing</td><td>P0</td></tr>
 <tr><td><code>claim_sheet_opened</code></td><td>client</td><td>5.7 點「我要送」</td><td>funding_mode, has_existing_claim</td><td>P0</td></tr>
-<tr><td><code>claim_succeeded</code></td><td>server</td><td>POST /items/{id}/claims 201</td><td>qty, is_new_guest, has_email, has_contact（布林）</td><td>P0</td></tr>
+<tr><td><code>claim_succeeded</code></td><td>server</td><td>POST /items/{id}/claims 201</td><td>qty（D50 起不再有 is_new_guest、has_email、has_contact）</td><td>P0</td></tr>
 <tr><td><code>claim_failed</code></td><td>client</td><td>捐助 sheet 錯誤</td><td>code（ITEM_FULLY_CLAIMED, VALIDATION_FAILED, RATE_LIMITED, network…）</td><td>P0</td></tr>
 <tr><td><code>claim_status_changed</code></td><td>server</td><td>PATCH / DELETE claims</td><td>from, to（reserved, purchased, delivered, cancelled）</td><td>P0</td></tr>
 <tr><td><code>pwa_install_prompted</code> / <code>pwa_installed</code></td><td>client</td><td>5.8 InstallHint 顯示 / appinstalled 事件</td><td>platform: ios | android, context</td><td>P0</td></tr>
@@ -2715,7 +2719,7 @@ async function waitTopup(before) {
 <div class="tw"><table>
 <thead><tr><th>情境</th><th>設定</th><th>斷言</th></tr></thead>
 <tbody>
-<tr><td>3 次點擊內完成捐助</td><td>手機 viewport + LINE UA，免登入</td><td>點「我要送」→ 填暱稱 → 確認 → 成功頁；點擊數 ≤ 3；顯示 InstallHint 的 LINE 版（外開引導），不出現加入主畫面提示</td></tr>
+<tr><td>3 次點擊內完成捐助</td><td>手機 viewport + LINE UA，已登入（D50）</td><td>點「我要送」→ 確認 → 成功頁；點擊數 ≤ 3；未登入則顯示「登入後認捐」並導登入、登入後回原品項；顯示 InstallHint 的 LINE 版（外開引導），不出現加入主畫面提示</td></tr>
 <tr><td>409 回滾</td><td>route mock 回 <code>ITEM_FULLY_CLAIMED</code>（problem+json）</td><td>樂觀更新被回滾、重抓剩餘量、sheet 顯示「只剩 n 個」；剩 0 時卡片灰掉</td></tr>
 <tr><td>重複捐助</td><td>mock 回 <code>CLAIM_ALREADY_EXISTS</code></td><td>切換為「修改我的捐助」</td></tr>
 <tr><td>網路錯誤重試</td><td>第一次 abort，第二次成功</td><td>輸入保留；兩次請求的 Idempotency-Key 相同；只扣一次</td></tr>
@@ -2724,7 +2728,7 @@ async function waitTopup(before) {
 <tr><td>410 下架</td><td>mock 410 <code>WISHLIST_REMOVED</code></td><td>顯示下架頁、無 OG 標題洩漏、SSE 不重連</td></tr>
 <tr><td>檢舉</td><td>mock Turnstile</td><td>送出成功 toast；429 顯示倒數</td></tr>
 <tr><td>驚喜模式</td><td>API 回 null 欄位 / 建立者本人</td><td>渲染 SurpriseMask，DOM 內沒有隱藏的真實數字</td></tr>
-<tr><td>guest_token 存活</td><td>清除 cookie 只保留 localStorage</td><td>仍可在 /me/claims 看到捐助（靠 <code>X-Guest-Token</code>）</td></tr>
+<tr><td>guest_token 存活（legacy）</td><td>清除 cookie 只保留 localStorage（舊訪客資料）</td><td>仍可在 /me/claims 看到舊捐助（靠 <code>X-Guest-Token</code>）；新認捐不再簽發 guest_token</td></tr>
 <tr><td>刪除帳號</td><td>已登入</td><td>需輸入確認字樣；P2 有餘額時顯示 <code>ACCOUNT_HAS_BALANCE</code> 阻擋</td></tr>
 <tr><td>事件白名單</td><td>攔截 PostHog 請求</td><td>事件名與屬性皆在 12 節白名單內，不含暱稱與聯絡方式</td></tr>
 <tr><td>密碼註冊與登入</td><td>全新 Email；Mailpit 取得 OTP</td><td>註冊 → 輸入 OTP → 進 /dashboard；登出後以密碼登入成功；錯誤密碼顯示「帳號或密碼錯誤」；重複 Email 驗證顯示「此 Email 已註冊」</td></tr>
@@ -2733,7 +2737,7 @@ async function waitTopup(before) {
 <tr><td>好友清單</td><td>visibility=friends</td><td>未登入「請先登入」→ 登入後非好友「僅限好友」→ 成為好友後可看；解除好友後再次被擋</td></tr>
 <tr><td>指定清單</td><td>visibility=selected 名單含甲不含乙</td><td>甲可看、乙 NOT_ALLOWED；解除好友後甲被自動移出名單</td></tr>
 <tr><td>邀請連結</td><td>甲產生連結、乙開啟</td><td>未登入顯示「登入後成為好友」；登入後成為好友；自己開啟 SELF_INVITE；撤銷後 404；重新產生後舊連結失效</td></tr>
-<tr><td>個人頁可見度</td><td>甲有 public / friends 清單與 public / friends / private 捐助</td><td>匿名只見 public；好友多見 friends；本人全見；訪客捐助不出現；匿名認捐只有本人看得到</td></tr>
+<tr><td>個人頁可見度</td><td>甲有 public / friends 清單與 public / friends / private 捐助</td><td>匿名只見 public；好友多見 friends；本人全見；舊訪客捐助不出現；匿名認捐只有本人看得到</td></tr>
 <tr><td>CDN 邊界</td><td>受限清單</td><td><code>/public/wishlists/{slug}</code> 不讀 cookie（回 403 或公開內容）；<code>/restricted</code> 一律 no-store；收緊可見性後公開路徑立即 403（腳本 <code>scripts/cdn-canary.mjs</code>）</td></tr>
 <tr><td><span class="ph p2">P2-A</span> 投點流程</td><td>mock <code>INSUFFICIENT_POINTS</code>、<code>CROWDFUND_TARGET_EXCEEDED</code>、<code>ITEM_FUNDED</code>、<code>WALLET_FROZEN</code></td><td>儲值後回到原 sheet 並保留輸入；自動帶入 remaining_points；回滾餘額；凍結時停用</td></tr>
 </tbody></table></div>
@@ -2762,7 +2766,7 @@ async function waitTopup(before) {
 <thead><tr><th>Spike</th><th>內容</th><th>通過標準</th><th>失敗備案</th></tr></thead>
 <tbody>
 <tr><td>S1 Nuxt SSR on Cloudflare + OG</td><td>LINE / FB / iMessage 貼 /s/{slug} 連結的預覽</td><td>三者皆顯示正確標題、描述、圖片；SSR 回應含完整 OG meta</td><td>調整 meta 輸出與快取；必要時以 Worker 對爬蟲 UA 回預渲染 HTML</td></tr>
-<tr><td>S2 LINE in-app browser</td><td>cookie、localStorage、<code>ws_guest</code> 存活率；<code>openExternalBrowser=1</code> 行為</td><td>以 <code>X-Guest-Token</code> 為主的流程在重開 LINE 後仍可找回捐助（通過率門檻由 PRD 設定）</td><td>強化 X-Guest-Token 與 Email 管理連結（捐助 sheet 的 Email 欄位）</td></tr>
+<tr><td>S2 LINE in-app browser</td><td>cookie、localStorage、<code>ws_guest</code> 存活率；<code>openExternalBrowser=1</code> 行為</td><td>（D50 後僅涉及舊訪客資料）以 <code>X-Guest-Token</code> 管理舊捐助的流程在重開 LINE 後仍可找回（通過率門檻由 PRD 設定）；會員登入 session 存活率另測</td><td>強化 X-Guest-Token 與 Email 管理連結（捐助 sheet 的 Email 欄位）</td></tr>
 <tr><td>S3 SSE 穩定度</td><td>SSE 經 Cloudflare → Tunnel → VPS（Dokploy / Traefik）→ API 的連線穩定度</td><td>連線可持續並自動重連，事件延遲在目標內</td><td>改為輪詢（7.3 已設計退路）</td></tr>
 </tbody></table></div>
 

@@ -73,6 +73,21 @@ async fn guest_id(parts: &Parts, st: &AppState) -> Result<Option<Uuid>, AppError
     }
 }
 
+/// 請求同時帶的舊訪客身分（不論是否已登入）；失效 token 視為沒有。
+/// 用於已登入會員管理自己登入前留下的舊訪客捐助（MaybeActor 會優先取會員身分）。
+pub struct LegacyGuest(pub Option<Uuid>);
+
+impl FromRequestParts<AppState> for LegacyGuest {
+    type Rejection = AppError;
+    async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
+        match guest_id(parts, st).await {
+            Ok(g) => Ok(LegacyGuest(g)),
+            Err(AppError::Db(e)) => Err(e.into()),
+            Err(_) => Ok(LegacyGuest(None)),
+        }
+    }
+}
+
 /// 有效 ws_session → User；否則有 guest token → Guest；皆無 → None
 pub struct MaybeActor(pub Option<Actor>);
 

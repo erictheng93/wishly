@@ -1,4 +1,5 @@
 import { apiErrMsg } from '../utils/errors'
+import { nativeHeaders } from '../utils/native'
 // 訪客 token 儲存 + API 呼叫。
 // LINE in-app browser 的 localStorage / cookie 可能被清掉或停用，所以依序寫入多處、讀取時取第一個有值的：
 //   localStorage -> JS cookie(ws_guest_js) -> sessionStorage -> 記憶體。
@@ -44,9 +45,9 @@ export const setPref = (k: string, v: string) => safe(() => localStorage.setItem
 
 export function useGuest() {
   const { public: { apiBase } } = useRuntimeConfig()
-  // retryAsNewGuest：401 時（本機 token 已失效）清掉 token，不帶 header 重試一次（以新訪客身分）；只給「建立新捐助」這類可安全重送的請求用
-  async function api<T = any>(path: string, opt: { method?: string, body?: any, headers?: Record<string, string>, retryAsNewGuest?: boolean, access?: string } = {}): Promise<T> {
-    const headers: Record<string, string> = { ...opt.headers }
+  // keepToken：401 時不清本機訪客 token。新增捐助需登入會員，其 401 只代表「沒登入」，不能讓舊訪客因此失去既有捐助的管理權
+  async function api<T = any>(path: string, opt: { method?: string, body?: any, headers?: Record<string, string>, keepToken?: boolean, access?: string } = {}): Promise<T> {
+    const headers: Record<string, string> = { ...nativeHeaders(), ...opt.headers } // 原生殼：登入會員以 Bearer 驗證
     const tk = getGuestToken()
     if (tk) headers['X-Guest-Token'] = tk
     const acc = opt.access ?? activeAccess
@@ -57,10 +58,7 @@ export function useGuest() {
       const d = e?.data ?? {}
       if (!e?.response) throw new ApiError(0, 'NETWORK', apiErrMsg({ code: 'NETWORK' }))
       const status = e.response.status
-      if (status === 401 && tk) {
-        setGuestToken(null)
-        if (opt.retryAsNewGuest) return api<T>(path, { ...opt, retryAsNewGuest: false })
-      }
+      if (status === 401 && tk && !opt.keepToken) setGuestToken(null)
       const code = d.code ?? 'UNKNOWN'
       throw new ApiError(status, code, apiErrMsg({ status, code, detail: d.detail }), d)
     }

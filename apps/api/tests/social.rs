@@ -1080,19 +1080,9 @@ async fn claim_visibility_default_override_patch(pool: PgPool) {
         .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    // 訪客：create 帶 visibility 被忽略（null）；PATCH visibility → 422
-    let (s, _, v) = common::call(
-        &pool,
-        "POST",
-        &format!("/items/{i3}/claims"),
-        &[vec![], common::idem(Uuid::new_v4())].concat(),
-        Some(json!({ "qty": 1, "display_name": "客", "visibility": "public" })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{v}");
-    assert!(v["claim"]["visibility"].is_null());
-    let gtok = v["guest_token"].as_str().unwrap().to_string();
-    let gcid = v["claim"]["id"].as_str().unwrap().to_string();
+    // 舊訪客捐助：PATCH visibility → 422
+    let (gtok, gcid) = common::legacy_guest_claim(&pool, i3, 1, None).await;
+    let gcid = gcid.to_string();
     let req = Request::builder()
         .method("PATCH")
         .uri(format!("/api/v1/claims/{gcid}"))

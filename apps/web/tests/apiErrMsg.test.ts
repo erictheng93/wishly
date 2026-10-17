@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { apiErrMsg } from '../app/utils/errors'
 
 describe('apiErrMsg（依 code / status，不依賴 detail）', () => {
+  it('403 LEGACY_CLAIM_READONLY：原樣顯示後端 detail，不用泛用訊息', () => {
+    const detail = '舊訪客捐助無法增加數量，請以會員身分另行認捐'
+    expect(apiErrMsg({ status: 403, code: 'LEGACY_CLAIM_READONLY', detail })).toBe(detail)
+  })
   it.each([
     [{ status: 401, code: 'UNAUTHORIZED' }, '身分已失效'],
     [{ status: 404, code: 'NOT_FOUND' }, '這個品項已不存在'],

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { newEmail, PASSWORD, skipOtpCooldown, sql, uid, waitForOtp } from './helpers'
+import { newEmail, PASSWORD, signInPage, skipOtpCooldown, sql, uid, waitForOtp } from './helpers'
 
 test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分享連結 → 登出/登入 → 忘記密碼', async ({ page, browser }) => {
   const email = newEmail('creator'), name = `阿美${uid().slice(0, 3)}`, title = `寶寶滿月 ${uid().slice(0, 4)}`
@@ -80,9 +80,10 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await ctx.close()
   })
 
-  await test.step('分享頁顯示結束時間；到期後訪客無法捐助（不必等背景 job）', async () => {
+  await test.step('分享頁顯示結束時間；到期後會員也無法捐助（不必等背景 job）', async () => {
     const ctx = await browser.newContext()
     const guest = await ctx.newPage()
+    const member = await signInPage(guest) // 認捐需登入會員
     await guest.goto(shareUrl)
     await expect(guest.getByText(/結束・/)).toBeVisible()
     const slug = shareUrl.split('/').pop()!
@@ -90,9 +91,9 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await guest.goto(shareUrl)
     await guest.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
     const dialog = guest.getByRole('dialog')
-    await dialog.getByLabel('你的暱稱（必填）').fill('遲到的朋友')
     await dialog.getByRole('button', { name: '確認捐助' }).click()
     await expect(guest.getByText(/已結束/).first()).toBeVisible()
+    await member.api.dispose()
     await ctx.close()
   })
 

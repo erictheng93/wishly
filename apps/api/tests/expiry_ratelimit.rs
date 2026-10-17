@@ -27,16 +27,6 @@ async fn call_with_ip(app: &Router, mut req: Request<Body>, ip: &str) -> common:
 
 use common::quantity_wishlist as wishlist;
 
-fn post_claim(item: Uuid, key: Uuid) -> Request<Body> {
-    Request::post(format!("/api/v1/items/{item}/claims"))
-        .header("content-type", "application/json")
-        .header("idempotency-key", key.to_string())
-        .body(Body::from(
-            json!({"qty": 1, "display_name": "x"}).to_string(),
-        ))
-        .unwrap()
-}
-
 /// 直接塞捐助並同步 qty_claimed；回傳 claim id
 async fn seed_claim(pool: &PgPool, item: Uuid, qty: i32, status: &str, expires: &str) -> Uuid {
     let g: Uuid = sqlx::query_scalar(
@@ -150,16 +140,13 @@ fn post_claim_as(item: Uuid, key: Uuid, token: &str) -> Request<Body> {
     Request::post(format!("/api/v1/items/{item}/claims"))
         .header("content-type", "application/json")
         .header("idempotency-key", key.to_string())
-        .header("x-guest-token", token)
+        .header("cookie", format!("ws_session={token}"))
         .body(Body::from(json!({"qty": 1}).to_string()))
         .unwrap()
 }
 
-/// 建一個 guest 並回傳 token
-async fn new_guest(a: &Router, item: Uuid, ip: &str) -> String {
-    let (s, _, b) = call_with_ip(a, post_claim(item, Uuid::new_v4()), ip).await;
-    assert_eq!(s, StatusCode::CREATED);
-    b["guest_token"].as_str().unwrap().to_string()
+async fn new_user(pool: &PgPool) -> String {
+    common::user(pool, "x").await.token
 }
 
 fn limited(r: &common::Resp) -> bool {
@@ -176,8 +163,8 @@ async fn claim_limit_is_per_identity_and_replay_free(pool: PgPool) {
     for w in 0..5 {
         its.extend(wishlist(&pool, &format!("RlId{w:06}"), 7, 100).await.1);
     }
-    let tok = new_guest(&a, its[0], "5.5.5.5").await; // 第 1 次（建立 guest 的那次）
-                                                      // 同 key 重播：不消耗額度
+    let tok = new_user(&pool).await;
+    // 同 key 重播：只消耗一次額度
     let k = Uuid::new_v4();
     assert_eq!(
         call_with_ip(&a, post_claim_as(its[1], k, &tok), "5.5.5.5")
@@ -193,7 +180,7 @@ async fn claim_limit_is_per_identity_and_replay_free(pool: PgPool) {
             StatusCode::CREATED
         );
     }
-    // 建立 guest 的那次按 IP 計、不計入該 guest；之後共 30 次：已計 1 次（its[1]），再 29 次成功，下一次 429
+    // 已計 1 次（its[1]），再 29 次成功，下一次 429
     for it in &its[2..31] {
         assert_eq!(
             call_with_ip(&a, post_claim_as(*it, Uuid::new_v4(), &tok), "5.5.5.5")
@@ -206,7 +193,7 @@ async fn claim_limit_is_per_identity_and_replay_free(pool: PgPool) {
         &call_with_ip(&a, post_claim_as(its[31], Uuid::new_v4(), &tok), "5.5.5.5").await
     ));
     // 同一個 IP 的另一個人不受影響（派對 Wi-Fi / CGNAT）
-    let tok2 = new_guest(&a, its[32], "5.5.5.5").await;
+    let tok2 = new_user(&pool).await;
     assert_eq!(
         call_with_ip(&a, post_claim_as(its[33], Uuid::new_v4(), &tok2), "5.5.5.5")
             .await
@@ -227,9 +214,9 @@ async fn claim_limit_is_per_identity_and_replay_free(pool: PgPool) {
 async fn claim_per_wishlist_limit_is_per_identity(pool: PgPool) {
     let a = app(&pool);
     let (_, its) = wishlist(&pool, "RlWl000001", 20, 100).await;
-    let tok = new_guest(&a, its[0], "7.7.7.7").await;
-    // 建立 guest 那次不計；其後同清單 15 次成功，第 16 次 429
-    for it in &its[1..16] {
+    let tok = new_user(&pool).await;
+    // 同清單 15 次成功，第 16 次 429
+    for it in &its[..15] {
         assert_eq!(
             call_with_ip(&a, post_claim_as(*it, Uuid::new_v4(), &tok), "7.7.7.7")
                 .await
@@ -238,40 +225,17 @@ async fn claim_per_wishlist_limit_is_per_identity(pool: PgPool) {
         );
     }
     assert!(limited(
-        &call_with_ip(&a, post_claim_as(its[16], Uuid::new_v4(), &tok), "7.7.7.7").await
+        &call_with_ip(&a, post_claim_as(its[15], Uuid::new_v4(), &tok), "7.7.7.7").await
     ));
     // 同 IP、同清單的其他人照常捐助（場地 Wi-Fi 的賓客）
-    for it in &its[17..20] {
+    let other = new_user(&pool).await;
+    for it in &its[16..20] {
         assert_eq!(
-            call_with_ip(&a, post_claim(*it, Uuid::new_v4()), "7.7.7.7")
+            call_with_ip(&a, post_claim_as(*it, Uuid::new_v4(), &other), "7.7.7.7")
                 .await
                 .0,
             StatusCode::CREATED
         );
     }
-    common::assert_all_reconciled(&pool).await;
-}
-
-#[sqlx::test(migrations = "../../db/migrations")]
-async fn new_guest_limit_is_per_ip(pool: PgPool) {
-    let a = app(&pool);
-    let (_, its) = wishlist(&pool, "RlNew00001", 101, 100).await;
-    for it in &its[..100] {
-        assert_eq!(
-            call_with_ip(&a, post_claim(*it, Uuid::new_v4()), "4.4.4.4")
-                .await
-                .0,
-            StatusCode::CREATED
-        );
-    }
-    assert!(limited(
-        &call_with_ip(&a, post_claim(its[100], Uuid::new_v4()), "4.4.4.4").await
-    )); // 同 IP 第 101 個新 guest
-    assert_eq!(
-        call_with_ip(&a, post_claim(its[100], Uuid::new_v4()), "3.3.3.3")
-            .await
-            .0,
-        StatusCode::CREATED
-    ); // 換 IP 可以
     common::assert_all_reconciled(&pool).await;
 }

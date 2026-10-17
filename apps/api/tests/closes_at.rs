@@ -231,15 +231,17 @@ async fn expired_list_rejects_claims_before_sweep(pool: PgPool) {
     for w in [ok, late] {
         ids.push(sqlx::query_scalar::<_, Uuid>("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1, '奶瓶', 2) RETURNING id").bind(w).fetch_one(&pool).await.unwrap());
     }
+    let donor = common::user(&pool, "小明").await;
     let claim = |item: Uuid| {
         let pool = pool.clone();
+        let token = donor.token.clone();
         async move {
             common::call(
                 &pool,
                 "POST",
                 &format!("/items/{item}/claims"),
-                &[("idempotency-key", Uuid::new_v4().to_string())],
-                Some(json!({ "qty": 1, "display_name": "小明" })),
+                &[common::ck(&token), common::idem(Uuid::new_v4())].concat(),
+                Some(json!({ "qty": 1 })),
             )
             .await
         }

@@ -2,8 +2,7 @@
 useHead({ title: '登入' })
 const route = useRoute()
 const { user, fetchMe, login, oauth } = useAuth()
-const raw = String(route.query.redirect || '')
-const redirect = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
+const redirect = safeRedirect(route.query.redirect)
 const email = ref(''), password = ref('')
 const busy = ref(false)
 const err = ref('')
@@ -63,6 +62,6 @@ async function social(provider: 'google' | 'line') {
     <p class="c-center c-mute">或</p>
     <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">使用 Google 繼續</button>
     <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')">使用 LINE 繼續</button>
-    <p class="c-mute">送禮的朋友不需要登入，直接用分享連結即可。</p>
+    <p class="c-mute">瀏覽朋友分享的清單不需要帳號；要認捐品項，請先登入會員。</p>
   </main>
 </template>

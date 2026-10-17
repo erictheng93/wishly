@@ -205,6 +205,10 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
         id: owner,
         token: _,
     } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: donor,
+    } = common::user(&pool, "donor").await;
     let it = quantity(&pool, list(&pool, owner).await, 5).await;
     let app = app(AppState { pool: pool.clone() });
     let key = Uuid::new_v4();
@@ -212,8 +216,8 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
         (
             "POST",
             format!("/items/{it}/claims"),
-            common::idem(key),
-            Some(json!({"qty":2,"display_name":"guest"})),
+            [common::ck(&donor), common::idem(key)].concat(),
+            Some(json!({"qty":2})),
         )
     };
     let (gate, pid) = gate(&pool, "wishlist_items", it).await;
@@ -225,7 +229,7 @@ async fn same_key_claim_requests_overlap_and_claim_once(pool: PgPool) {
     let (sa, _, ba) = finish(a).await;
     let (sb, h, bb) = finish(b).await;
     let state: (i32,i64,i64) = sqlx::query_as("SELECT qty_claimed,(SELECT count(*) FROM claims),(SELECT count(*) FROM guests) FROM wishlist_items WHERE id=$1").bind(it).fetch_one(&pool).await.unwrap();
-    assert_eq!(state, (2, 1, 1));
+    assert_eq!(state, (2, 1, 0));
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
             "SELECT count(*) FROM idempotency_keys WHERE response_status=201"
@@ -1383,9 +1387,13 @@ async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool)
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: PgPool) {
+async fn account_delete_vs_user_claim_locks_owner_before_notification_fk(pool: PgPool) {
     let _slot = RACE_SLOTS.acquire().await.unwrap();
     let TestUser { id: owner, token } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: claimant,
+        token: claimant_token,
+    } = common::user(&pool, "claimant").await;
     let wl = list(&pool, owner).await;
     let it = quantity(&pool, wl, 5).await;
     let app = app(AppState { pool: pool.clone() });
@@ -1395,8 +1403,8 @@ async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: 
         (
             "POST",
             format!("/items/{it}/claims"),
-            common::idem(Uuid::new_v4()),
-            Some(json!({"qty":2,"display_name":"guest"})),
+            [common::ck(&claimant_token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"qty":2})),
         ),
     );
     blocked(&pool, pid, "FOR SHARE", 1).await;
@@ -1420,7 +1428,17 @@ async fn account_delete_vs_guest_claim_locks_owner_before_notification_fk(pool: 
     assert_eq!(dr.0, StatusCode::OK, "{}", dr.2);
     let row: (bool,String,i32) = sqlx::query_as("SELECT u.deleted_at IS NOT NULL,w.status::text,i.qty_claimed FROM users u JOIN wishlists w ON w.owner_id=u.id JOIN wishlist_items i ON i.wishlist_id=w.id WHERE i.id=$1").bind(it).fetch_one(&pool).await.unwrap();
     assert_eq!(row, (true, "archived".into(), 2));
-    assert_eq!(sqlx::query_scalar::<_,i64>("SELECT count(*) FROM claims WHERE item_id=$1 AND status='reserved' AND guest_id IS NOT NULL").bind(it).fetch_one(&pool).await.unwrap(),1);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM claims WHERE item_id=$1 AND status='reserved' AND user_id=$2"
+        )
+        .bind(it)
+        .bind(claimant)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        1
+    );
     reconciled(&pool).await;
     common::assert_all_reconciled(&pool).await;
 }

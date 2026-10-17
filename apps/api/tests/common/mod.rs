@@ -322,25 +322,25 @@ pub async fn claimed_wishlist(
     (wid, list.slug, item)
 }
 
-pub async fn guest_claim_with_email(
+/// 舊資料訪客捐助（新認捐已需登入）：直接以 SQL 建 guest + reserved claim，並維持 qty_claimed 一致。
+pub async fn legacy_guest_claim(
     pool: &PgPool,
     item: Uuid,
     qty: i32,
     email: Option<&str>,
 ) -> (String, Uuid) {
-    let (s, _, b) = call(
-        pool,
-        "POST",
-        &format!("/items/{item}/claims"),
-        &idem(Uuid::new_v4()),
-        Some(serde_json::json!({ "qty": qty, "display_name": "小明", "email": email })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{b}");
-    (
-        b["guest_token"].as_str().unwrap().into(),
-        b["claim"]["id"].as_str().unwrap().parse().unwrap(),
-    )
+    let token = Uuid::new_v4().to_string();
+    let g: Uuid = sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, email) VALUES ($1, '小明', $2) RETURNING id")
+        .bind(wishly_api::session::hash_token(&token)).bind(email).fetch_one(pool).await.unwrap();
+    let claim = sqlx::query_scalar("INSERT INTO claims (item_id, guest_id, claimer_name, qty) VALUES ($1, $2, '小明', $3) RETURNING id")
+        .bind(item).bind(g).bind(qty).fetch_one(pool).await.unwrap();
+    sqlx::query("UPDATE wishlist_items SET qty_claimed = qty_claimed + $2 WHERE id = $1")
+        .bind(item)
+        .bind(qty)
+        .execute(pool)
+        .await
+        .unwrap();
+    (token, claim)
 }
 
 pub async fn quantity_wishlist(
@@ -368,7 +368,17 @@ pub async fn quantity_wishlist(
     (list, ids)
 }
 
-/// 建立指定數量的訪客捐助。
-pub async fn guest_claim(pool: &PgPool, item: Uuid, qty: i32) -> (String, Uuid) {
-    guest_claim_with_email(pool, item, qty, None).await
+/// 建立新會員並透過 API 捐助；回傳 (session token, claim id)。
+pub async fn user_claim(pool: &PgPool, item: Uuid, qty: i32) -> (String, Uuid) {
+    let u = user(pool, "小明").await;
+    let (s, _, b) = call(
+        pool,
+        "POST",
+        &format!("/items/{item}/claims"),
+        &[ck(&u.token), idem(Uuid::new_v4())].concat(),
+        Some(json!({ "qty": qty })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    (u.token, b["claim"]["id"].as_str().unwrap().parse().unwrap())
 }

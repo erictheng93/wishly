@@ -23,9 +23,9 @@ beforeEach(() => {
 })
 afterEach(() => { mounted?.unmount(); mounted = undefined; vi.unstubAllGlobals(); vi.resetAllMocks() })
 const NuxtLink = defineComponent({ setup: (_, { slots }) => () => h('a', {}, slots.default?.()) })
-function claim(mine: any = null, online = true, loggedInName?: string) {
+function claim(mine: any = null, online = true, loggedInName?: string, extra: Record<string, any> = {}) {
   mounted = mount(ClaimSheet, { item: { id: 'item', title: '禮物', qty_remaining: 3 }, mine, online, loggedInName,
-    onDone: done, onStale: stale }, { GuestDialog, NuxtLink }, { fmtPts, fmtTime })
+    onDone: done, onStale: stale, ...extra }, { GuestDialog, NuxtLink }, { fmtPts, fmtTime })
   return mounted.el
 }
 async function fund(online = true) {
@@ -41,50 +41,53 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
-it('new claim requires a nonblank nickname and does not send invalid input', async () => {
-  const el = claim()
-  await input(el, '#cn', '  ')
-  await submit(el)
-  expect(el.textContent).toContain('請填暱稱')
-  expect(api).not.toHaveBeenCalled()
-  expect(done).not.toHaveBeenCalled()
-})
-
-it('claim respects quantity bounds, locks fields in flight, and emits the persisted result', async () => {
+it('signed-in claim has no nickname/contact/email fields and sends only qty, note and visibility', async () => {
   const request = deferred(); api.mockReturnValue(request.promise)
-  const el = claim()
-  await input(el, '#cn', '  阿明  ')
+  const el = claim(null, true, '阿明')
+  expect(el.querySelector('#cn, #cc, #ce')).toBeNull()
+  expect(el.textContent).toContain('以 阿明 的身分捐助')
   const plus = el.querySelector<HTMLButtonElement>('button[aria-label="增加"]')!
   plus.click(); await nextTick(); plus.click(); await nextTick()
   expect(plus.disabled).toBe(true)
-  expect(el.querySelector<HTMLButtonElement>('button[aria-label="減少"]')!.disabled).toBe(false)
   await submit(el)
   expect(el.querySelector<HTMLButtonElement>('button.g-btn')!.disabled).toBe(true)
-  expect(el.querySelector<HTMLInputElement>('#cn')!.readOnly).toBe(true)
   expect(el.textContent).toContain('送出中')
   expect(api.mock.calls[0]).toEqual(['/items/item/claims', {
-    method: 'POST', headers: { 'Idempotency-Key': 'claim-key' }, retryAsNewGuest: true,
-    body: { qty: 3, display_name: '阿明', contact: undefined, email: undefined, note: undefined, visibility: undefined },
+    method: 'POST', headers: { 'Idempotency-Key': 'claim-key' }, keepToken: true,
+    body: { qty: 3, note: undefined, visibility: 'private' }, // 帶入帳號預設可見性
   }])
-  request.resolve({ id: 'claim', guest_token: 'new-guest' }); await flush()
-  expect(done).toHaveBeenCalledWith({ id: 'claim', guest_token: 'new-guest', persisted: true, lost: false, email: '', name: '阿明' })
-  expect(setToken).toHaveBeenCalledWith('new-guest')
-  expect(el.querySelector<HTMLButtonElement>('button.g-btn')!.disabled).toBe(false)
+  request.resolve({ id: 'claim' }); await flush()
+  expect(done).toHaveBeenCalledWith({ id: 'claim' })
+  expect(setToken).not.toHaveBeenCalled()
+})
+
+it('claim 401 asks the page to send the user to login instead of showing an error', async () => {
+  const login = vi.fn()
+  api.mockRejectedValue({ status: 401, code: 'UNAUTHORIZED', detail: '請先登入' })
+  const el = claim(null, true, '阿明', { onLogin: login })
+  await submit(el); await flush()
+  expect(login).toHaveBeenCalledOnce()
+  expect(el.querySelector('[role="alert"]')).toBeNull()
+})
+
+it('legacy guest editing can lower but never raise quantity above the current claim', () => {
+  const el = claim({ id: 'old', qty: 2 }, true)
+  expect(el.querySelector<HTMLButtonElement>('button[aria-label="增加"]')!.disabled).toBe(true)
+  expect(el.querySelector<HTMLButtonElement>('button[aria-label="減少"]')!.disabled).toBe(false)
 })
 
 it('claim server validation renders field error and unlocks submission', async () => {
-  api.mockRejectedValue({ code: 'VALIDATION_FAILED', data: { errors: [{ pointer: '/email', detail: 'Email 無效' }] } })
-  const el = claim()
-  await input(el, '#cn', '阿明'); await submit(el); await flush()
-  expect(el.textContent).toContain('Email 無效')
+  api.mockRejectedValue({ code: 'VALIDATION_FAILED', data: { errors: [{ pointer: '/note', detail: '留言太長' }] } })
+  const el = claim(null, true, '阿明')
+  await submit(el); await flush()
+  expect(el.textContent).toContain('留言太長')
   expect(el.querySelector<HTMLButtonElement>('button.g-btn')!.disabled).toBe(false)
   expect(done).not.toHaveBeenCalled()
 })
 
 it('claim inventory conflict lowers quantity to remaining and emits stale inventory', async () => {
   api.mockRejectedValue({ code: 'ITEM_FULLY_CLAIMED', data: { remaining: 1 } })
-  const el = claim()
-  await input(el, '#cn', '阿明')
+  const el = claim(null, true, '阿明')
   el.querySelector<HTMLButtonElement>('button[aria-label="增加"]')!.click(); await nextTick()
   await submit(el); await flush()
   expect(stale).toHaveBeenCalledWith(1)
@@ -97,7 +100,7 @@ it('editing claim sends only quantity and note to the existing claim', async () 
   const el = claim({ id: 'existing', qty: 2, note: '原留言' })
   await input(el, '#cm', '新留言'); await submit(el); await flush()
   expect(api.mock.calls[0]).toEqual(['/claims/existing', { method: 'PATCH', body: { qty: 2, note: '新留言' } }])
-  expect(done).toHaveBeenCalledWith(expect.objectContaining({ id: 'existing', lost: false }))
+  expect(done).toHaveBeenCalledWith({ id: 'existing' })
 })
 
 it.each(['0', '-1', '1.5', '1001', ''])('fund rejects invalid amount %s before sending', async amount => {

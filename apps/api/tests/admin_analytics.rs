@@ -43,7 +43,7 @@ async fn funnel_and_staff_excluded(pool: PgPool) {
     let _idle = user(&pool, "閒置").await;
     let wl = wishlist(&pool, a.id, ListOpts::default()).await;
     let it = item(&pool, wl.id, "杯子", 1).await;
-    guest_claim(&pool, it, 1).await;
+    legacy_guest_claim(&pool, it, 1, None).await;
     // staff 自己的清單不計入
     wishlist(&pool, s.id, ListOpts::default()).await;
 

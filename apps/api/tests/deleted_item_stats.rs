@@ -12,8 +12,8 @@ async fn deleted_delivered_item_is_excluded_from_dashboard_and_export(pool: PgPo
     let list = wishlist(&pool, owner.id, ListOpts::default()).await;
     let removed = item(&pool, list.id, "Delivered and removed", 2).await;
     let live = item(&pool, list.id, "Still available", 4).await;
-    let (_, delivered) = guest_claim(&pool, removed, 2).await;
-    guest_claim(&pool, live, 1).await;
+    let (_, delivered) = user_claim(&pool, removed, 2).await;
+    user_claim(&pool, live, 1).await;
     let (status, _, body) = call(
         &pool,
         "PATCH",
@@ -87,7 +87,7 @@ async fn deleted_delivered_item_is_excluded_from_dashboard_and_export(pool: PgPo
     assert_eq!(status, StatusCode::OK);
     assert_eq!(stats["claims_by_status"]["delivered"], 1);
     assert_eq!(stats["claims_by_status"]["reserved"], 1);
-    assert_eq!(stats["users"], 2);
+    assert_eq!(stats["users"], 4); // owner + admin + 兩位會員捐助者
     assert_eq!(stats["wishlists"], 1);
     assert_eq!(stats["active_wishlists"], 1);
     assert!(stats.get("qty_claimed").is_none());

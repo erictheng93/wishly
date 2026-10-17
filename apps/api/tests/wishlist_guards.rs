@@ -24,21 +24,9 @@ async fn list(pool: &PgPool, owner: Uuid, surprise: bool, off: i32) -> (Uuid, Uu
     (wid, it)
 }
 
-/// 訪客捐助；回傳 (guest_token, claim_id)
-async fn claim(pool: &PgPool, item: Uuid, email: Option<&str>) -> (String, Uuid) {
-    let (s, _, b) = call(
-        pool,
-        "POST",
-        &format!("/items/{item}/claims"),
-        &[("idempotency-key", Uuid::new_v4().to_string())],
-        Some(json!({ "qty": 1, "display_name": "小明", "email": email })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{b}");
-    (
-        b["guest_token"].as_str().unwrap().into(),
-        b["claim"]["id"].as_str().unwrap().parse().unwrap(),
-    )
+/// 會員捐助；回傳 (session_token, claim_id)
+async fn claim(pool: &PgPool, item: Uuid) -> (String, Uuid) {
+    common::user_claim(pool, item, 1).await
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -46,7 +34,7 @@ async fn surprise_lock_errors_do_not_reveal_claims(pool: PgPool) {
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (wid, claimed) = list(&pool, o, true, 30).await;
     let free: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items (wishlist_id, title, qty_needed) VALUES ($1,'x',3) RETURNING id").bind(wid).fetch_one(&pool).await.unwrap();
-    claim(&pool, claimed, None).await;
+    claim(&pool, claimed).await;
     for it in [claimed, free] {
         let (s, _, b) = call(
             &pool,
@@ -124,7 +112,7 @@ async fn surprise_lock_errors_do_not_reveal_claims(pool: PgPool) {
 async fn unlocked_keeps_specific_errors(pool: PgPool) {
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (_, it) = list(&pool, o, false, 30).await;
-    claim(&pool, it, None).await;
+    claim(&pool, it).await;
     let (_, _, b) = call(
         &pool,
         "PATCH",
@@ -134,8 +122,8 @@ async fn unlocked_keeps_specific_errors(pool: PgPool) {
     )
     .await;
     assert_eq!(b["code"], "VALIDATION_FAILED");
-    claim(&pool, it, None).await;
-    claim(&pool, it, None).await;
+    claim(&pool, it).await;
+    claim(&pool, it).await;
     let (_, _, b) = call(
         &pool,
         "PATCH",
@@ -360,8 +348,12 @@ async fn closes_at_is_optional_and_enforced(pool: PgPool) {
         &pool,
         "POST",
         &format!("/items/{item}/claims"),
-        &[("idempotency-key", Uuid::new_v4().to_string())],
-        Some(json!({ "qty": 1, "display_name": "小明" })),
+        &[
+            ck(&t),
+            vec![("idempotency-key", Uuid::new_v4().to_string())],
+        ]
+        .concat(),
+        Some(json!({ "qty": 1 })),
     )
     .await;
     assert_eq!(

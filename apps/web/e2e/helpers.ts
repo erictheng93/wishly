@@ -97,14 +97,21 @@ export async function uiLogin(page: Page, email: string, password: string) {
   await page.getByRole('button', { name: '登入', exact: true }).click()
 }
 
-// ---------- 訪客 ----------
-/** 以 API 作為新訪客捐助；回傳 guest token 與 claim */
-export async function guestClaim(itemId: string, qty = 1, name = `訪客${uid().slice(0, 4)}`) {
-  const api = await pwRequest.newContext({ baseURL: API + '/api/v1/' })
+// ---------- 認捐（需登入會員）----------
+/** 註冊會員（OTP 從 Mailpit 取）並把 session 帶進該頁的 browser context；之後這頁就是已登入狀態 */
+export async function signInPage(page: Page, opts: { name?: string; tag?: string } = {}): Promise<User> {
+  const u = await registerUser({ tag: 'member', ...opts })
+  await loginBrowser(page.context(), u)
+  return u
+}
+
+/** 以 API 作為會員認捐（沒傳 user 就臨時註冊一位）；回傳 claim 回應 */
+export async function memberClaim(itemId: string, qty = 1, user?: User) {
+  const u = user ?? await registerUser({ tag: 'claimer' })
   try {
-    const r = await must(await api.post(`items/${itemId}/claims`, { data: { qty, display_name: name }, headers: { 'Idempotency-Key': crypto.randomUUID() } }), '訪客捐助')
+    const r = await must(await u.api.post(`items/${itemId}/claims`, { data: { qty }, headers: { 'Idempotency-Key': crypto.randomUUID() } }), '會員認捐')
     return await r.json()
-  } finally { await api.dispose() }
+  } finally { if (!user) await u.api.dispose() }
 }
 
 /** 收集頁面的 console error 與失敗請求（4xx/5xx），給煙霧測試用 */
@@ -119,11 +126,10 @@ export function watchProblems(page: Page, ignore: RegExp[] = []) {
   return problems
 }
 
-/** 透過 UI 捐助品項（未登入訪客）。回傳後停在成功畫面 */
-export async function claimViaUi(page: Page, itemTitle: string, name: string, qty = 1) {
+/** 透過 UI 認捐品項（page 必須已登入，見 signInPage）。回傳後停在成功畫面 */
+export async function claimViaUi(page: Page, itemTitle: string, qty = 1) {
   const sheet = page.getByRole('dialog')
   await page.locator('li.g-card', { hasText: itemTitle }).getByRole('button', { name: '我要送' }).click()
-  await sheet.getByLabel('你的暱稱（必填）').fill(name)
   for (let i = 1; i < qty; i++) await sheet.getByRole('button', { name: '增加' }).click()
   await sheet.getByRole('button', { name: '確認捐助' }).click()
   await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
