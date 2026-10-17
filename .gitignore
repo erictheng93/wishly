@@ -14,3 +14,6 @@ apps/web/qa/out/
 apps/web/coverage/
 apps/web/npm-audit.json
 .claude/worktrees/
+
+# Playwright CLI 暫存（快照可能含畫面上的機密）
+.playwright-cli/

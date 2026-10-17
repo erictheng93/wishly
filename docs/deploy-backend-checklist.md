@@ -4,10 +4,12 @@
 
 ```
 使用者 → Cloudflare（WAF／CDN）→ Tunnel（cloudflared，出站連線）→ Traefik（Dokploy）→ wishly-api :8080 → PostgreSQL（同機）
-前端：Cloudflare Pages（app.<域名>）        圖片：Cloudflare R2（S3_PUBLIC_BASE，自訂網域）
+前端：Cloudflare Pages（apex 網域 wishly.tw）        圖片：Cloudflare R2（media.wishly.tw，自訂網域）
 ```
 
 本文件只列「上線前必須成立的條件」，每項附驗證方式。勾選請附日期與證據（指令輸出、截圖、commit），否則視為未完成。
+
+> **進度**：2026-10-17 已完成首次部署與端對端驗證，逐項證據見 [`deploy-verification-2026-10-17.md`](deploy-verification-2026-10-17.md)（§13 有對照本清單的狀態）；未完成項與優先級見 [`TODO.md`](TODO.md)。**最優先的缺口是資料庫備份與還原演練（P0）**，此清單 §2.1、§7.13 在完成前不得視為通過。
 
 > 依據：`apps/api/src/config.rs`、`apps/api/.env.example`、README〈環境變數〉〈部署〉、PRD D49、`docs/02` 部署與備份列。
 > 標示「**需實測**」的項目是關於 Dokploy／Traefik／Tunnel 的行為假設，本文件撰寫時未在實機驗證，不得當成事實。
@@ -29,7 +31,7 @@
 
 ## 1. 前置決策
 
-- [ ] 正式網域與子網域：`app.<域名>`（Pages）、`api.<域名>`（Tunnel）。`ws_session` 為 `SameSite=Lax` 且不帶 `Domain`，前端與 API 必須同一 registrable domain。
+- [x] 正式網域與子網域（2026-10-17 定案並上線）：`wishly.tw`（Pages，apex，無 `app.` 子網域）、`api.wishly.tw`（Tunnel）、`media.wishly.tw`（R2）。`ws_session` 為 `SameSite=Lax` 且不帶 `Domain`，前端與 API 必須同一 registrable domain。
 - [ ] **RPO／RTO 取捨（見 §2.1）**：PRD 目標 RPO ≤ 5 分鐘、RTO ≤ 1 小時。RPO ≤ 5 分鐘需要 WAL 歸檔；只用排程備份則 RPO 等於備份間隔。由產品負責人明確選擇並寫入 PRD。
 - [ ] 環境：staging 與 production 是否同一台 VPS（以不同 Dokploy 專案與資料庫隔離）還是兩台？同機的 staging 會與正式搶資源。
 - [ ] VPS 規格（CPU／RAM／磁碟）與單機容量上限的預期（SSE 連線數、尖峰認領 QPS）。
@@ -124,7 +126,7 @@
 - [ ] WAF／速率限制規則；**對外封鎖或限流 `/readyz`**（它查 DB）；`/healthz` 可開放。
 - [ ] Turnstile widget 建立，hostname 含前端網域。
 - [ ] Email Service：網域驗證（SPF／DKIM／DMARC）通過；實際寄出 OTP 到外部信箱，未進垃圾信。
-- [ ] 前端 Pages：`NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_TURNSTILE_SITE_KEY` 為**建置時**變數（`npm run deploy` 缺 Turnstile key 會中止）。部署會取代現有 `wishly-web`，先確認其內容（疑似 demo）可被取代。
+- [ ] 前端 Pages：`NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_TURNSTILE_SITE_KEY` 為**建置時**變數（`npm run deploy` 缺 Turnstile key 會中止）。（2026-10-17：`wishly-web` 已重建並部署正式版，`wishly.tw` 已綁定，見驗證紀錄 §6。）
 
 ## 5. 部署順序
 
