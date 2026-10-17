@@ -46,7 +46,9 @@ const groups = computed(() => {
     ['生日可見度', barRows(d.distribution.birthday_visibility, L.shareLevel)],
   ] as [string, BarRow[]][]
 })
-const months = computed(() => barRows(data.value?.birthday_month, Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i + 1).padStart(2, '0'), `${i + 1}`])), false))
+const months = computed(() => barRows(data.value?.birthday_month, Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i + 1).padStart(2, '0'), `${i + 1}`])), false)
+  // JS 物件會把 "10"–"12" 這類整數鍵排在 "01" 前面，須依鍵重新排序
+  .sort((a, b) => a.key.localeCompare(b.key)))
 const profile = computed(() => {
   const p = data.value?.profile
   return p ? [['有自我介紹', p.with_bio], ['有生日', p.with_birthday], ['有頭像', p.with_avatar]] as [string, number][] : []
