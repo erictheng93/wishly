@@ -192,8 +192,9 @@ pub fn client_ip(parts: &axum::http::request::Parts, cfg: &Config) -> String {
             .get("cf-connecting-ip")
             .and_then(|v| v.to_str().ok())
             .map(str::trim)
-            .filter(|v| !v.is_empty())
+            .and_then(|v| v.parse::<std::net::IpAddr>().ok())
         {
+            // 必須是合法 IP（正規化後回傳）：任意字串會成為限流 key、或寫壞 inet 欄位；非法值退回 socket 位址
             return ip.to_string();
         }
     }
