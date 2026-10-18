@@ -109,7 +109,7 @@
       "sent": "Report received. We will look into it soon."
     },
     "explore": {
-      "seoTitle": "Explore public lists | Wishly",
+      "seoTitle": "Explore public lists {'|'} Wishly",
       "seoDesc": "Browse everyone's public wishlists and relief lists. Sign in to pledge.",
       "heading": "Explore public lists",
       "typeGroup": "List type",
@@ -145,7 +145,7 @@
       "demoGift": "Gift",
       "demoWedding": "Wedding",
       "friend": "a friend",
-      "ogTitle": "Pick a gift for {name} | {title}",
+      "ogTitle": "Pick a gift for {name} {'|'} {title}",
       "ogDesc": "{pct}% complete, {left} items still waiting for you. Browsing needs no account; sign in to pledge.",
       "titleForbidden": "Permission required",
       "titleGone": "This list has been removed",

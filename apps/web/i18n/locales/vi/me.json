@@ -1,7 +1,7 @@
 {
   "me": {
     "home": {
-      "seoTitle": "Wishly | Danh sách ước nguyện và chia sẻ quà tặng",
+      "seoTitle": "Wishly {'|'} Danh sách ước nguyện và chia sẻ quà tặng",
       "seoDesc": "Tạo danh sách ước nguyện và chia sẻ bằng một liên kết. Dù là tặng quà, sinh nhật hay đám cưới, bạn bè chỉ cần mở liên kết để xem, đăng nhập là có thể đăng ký tặng quà, không trùng lặp, không bán lố.",
       "ogTitle": "Wishly",
       "ogDesc": "Liệt kê những gì bạn muốn, để người muốn tặng quà không phải đoán nữa.",
@@ -183,7 +183,7 @@
       "copyFail": "Không sao chép được. Vui lòng tự chọn địa chỉ.",
       "addTitle": "Thêm bạn",
       "toLabel": "Email hoặc tên tài khoản của họ",
-      "toPh": "name@example.com hoặc @handle",
+      "toPh": "name{'@'}example.com hoặc {'@'}handle",
       "send": "Gửi lời mời",
       "sending": "Đang gửi…",
       "inviteTitle": "Liên kết mời",
