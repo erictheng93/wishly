@@ -95,3 +95,4 @@ dialog.g-dialog:focus-visible{outline:0}
 }
 /* 橫放手機等短視窗：頂欄不固定 */
 @media (max-height:500px) and (orientation:landscape){ .g-top{position:static} }
+.g-demos{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--mute);margin-bottom:12px}.g-demos a{color:var(--link)}.g-demos a[aria-current=page]{color:var(--fg);font-weight:700;text-decoration:none}

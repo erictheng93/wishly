@@ -40,7 +40,7 @@ const faq = [
         <b class="l-logo">WISHLY</b>
         <nav>
           <NuxtLink to="/explore" class="l-nav-link">探索</NuxtLink>
-          <NuxtLink to="/s/demobirth0" class="l-nav-link">看範例</NuxtLink>
+          <NuxtLink to="/#scenes" class="l-nav-link">看範例</NuxtLink>
           <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>
         </nav>
       </div>
@@ -56,7 +56,7 @@ const faq = [
           <div class="l-cta">
             <NuxtLink :to="cta.to" class="g-btn">{{ cta.text }}</NuxtLink>
             <NuxtLink to="/explore" class="g-btn ghost">探索公開清單</NuxtLink>
-            <NuxtLink to="/s/demobirth0" class="g-btn ghost">看範例清單</NuxtLink>
+            <NuxtLink to="/#scenes" class="g-btn ghost">看範例清單</NuxtLink>
           </div>
         </div>
 
@@ -92,7 +92,7 @@ const faq = [
         </div>
       </section>
 
-      <section class="l-alt">
+      <section id="scenes" class="l-alt" style="scroll-margin-top:var(--head-h)">
         <div class="l-in">
           <h2>三種情境，都用同一份清單</h2>
           <div class="l-grid l-3">
