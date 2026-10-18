@@ -7,7 +7,7 @@ const audit = spawnSync('npm', ['audit', '--audit-level=high', '--json'], {
   cwd: fileURLToPath(new URL('../', import.meta.url)),
   encoding: 'utf8', maxBuffer: 10 * 1024 * 1024,
 })
-// Local backports do not satisfy issue #7's upstream-release and clean-audit requirements.
+// braces／node-forge 由 package.json overrides 換成修補 fork（見 patches/README.md）；不過濾 npm 的判定。
 // Preserve npm's report and failure signal, including registry errors.
 writeFileSync(new URL('../npm-audit.json', import.meta.url), audit.stdout ?? '')
 if (audit.stdout) process.stdout.write(audit.stdout)

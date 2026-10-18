@@ -73,11 +73,11 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 後端一般測試也會驗證真實 SMTP 寄送，請先啟動 `docker compose up -d db mailpit`。`scripts/cargo.sh` 已設定容器連到宿主的 SMTP 與 Mailpit API；直接跑 cargo 預設使用 localhost。
 
-CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。獨立 `web-audit` job 執行 `npm run audit:security`，每週一另行重查，保留原始 npm audit 的 exit code 與完整 JSON artifact；本地補丁不豁免 high／critical 警報。依 [issue #7](https://github.com/erictheng93/wishly/issues/7)，上游正式修補且原始 audit 清零前，維持非 required check。歷史範圍、更新基準流程及 mutation 證據記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）；現行回補政策以[本地安全補丁說明](apps/web/patches/README.md)為準。
+CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。`web-audit` job 執行 `npm run audit:security`（原始 `npm audit --audit-level=high`，不設例外，保留 exit code 與完整 JSON），每週一排程也會重查。歷史範圍、更新基準流程及 mutation 證據記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）；現行依賴修補政策以[安全 fork 說明](apps/web/patches/README.md)為準。
 
-刪除已覆蓋的程式碼也會改變覆蓋率的分子與分母；若比例低於基準減 0.5pp，API gate 會變紅。刻意調整測試範圍或程式碼時，請重新量測並同步更新 baseline，勿將此結果視為 flaky。上游 npm advisory 由 [issue #7](https://github.com/erictheng93/wishly/issues/7) 追蹤。
+刪除已覆蓋的程式碼也會改變覆蓋率的分子與分母；若比例低於基準減 0.5pp，API gate 會變紅。刻意調整測試範圍或程式碼時，請重新量測並同步更新 baseline，勿將此結果視為 flaky。
 
-前端安裝時會自動套用 `braces`／`node-forge` 的[本地安全補丁](apps/web/patches/README.md)，需安裝 Git 且不可略過 postinstall。回歸測試會驗證深層 glob 與惡意 RSA DigestAlgorithm 都被拒絕；版本號仍維持上游版本，因此原始 npm audit 仍會報警，手動 `npm run audit:security` 仍會報警，直到正式修補版發布。
+前端的 `braces`／`node-forge` 由 `package.json` 的 `overrides` 換成[已修補的 fork](apps/web/patches/README.md)（固定 commit SHA）。回歸測試 `tests/dependencySecurity.test.ts` 驗證深層 glob 與惡意 RSA DigestAlgorithm 都被拒絕。
 
 Mutation 可在 Mac／Linux 用 `scripts/mutate.sh --list` 選擇，例如 `scripts/mutate.sh cdn-account-delete`、`scripts/mutate.sh cdn-close-due`；需 Python 3、Rust 與可建立測試 DB 的 DATABASE_URL。runner 自動確認原版綠、停用單一行為後紅、還原後綠；CI 的 API job 會在 coverage 完成後執行 `scripts/mutate.sh all` 並上傳 receipts／patch／logs。輸出保存於 `apps/api/target/mutations/`，請勿與相同 SQLx test path 的一般測試併跑。`python3 scripts/test_mutate.py` 不需要 DB，可驗證 runner 的分類與中斷還原。
 

@@ -1,14 +1,10 @@
 import { generateKeyPairSync } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdtempSync, readFileSync, rmSync, appendFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
-// Exercise the actual transitive copies used by globby/fast-glob and listhen.
+// Exercise the actual transitive copies used by globby/fast-glob and listhen (package.json overrides → wishly forks).
 const braces = createRequire(require.resolve('micromatch'))('braces')
 const forge = createRequire(require.resolve('listhen'))('node-forge')
 
@@ -122,38 +118,4 @@ describe('GHSA-86w9-cpqp-85rv', () => {
     const parsed = forge.pki.certificateFromPem(forge.pki.certificateToPem(certificate))
     expect(parsed.verify(parsed)).toBe(true)
   })
-})
-
-it('applies backports on fresh source, supports reruns, and refuses source or version drift', () => {
-  const root = fileURLToPath(new URL('../', import.meta.url))
-  const directory = mkdtempSync(join(tmpdir(), 'wishly-dependency-patches-'))
-  const run = (...args: string[]) => spawnSync(process.execPath, args, { cwd: directory, encoding: 'utf8' })
-  try {
-    mkdirSync(join(directory, 'scripts'))
-    cpSync(join(root, 'scripts/patch-dependencies.mjs'), join(directory, 'scripts/patch-dependencies.mjs'))
-    cpSync(join(root, 'patches'), join(directory, 'patches'), { recursive: true })
-    for (const name of ['braces', 'node-forge']) {
-      cpSync(join(root, 'node_modules', name), join(directory, 'node_modules', name), { recursive: true })
-    }
-    const reversed = spawnSync('git', ['apply', '--no-index', '--reverse', 'patches/dependency-security.patch'], { cwd: directory, encoding: 'utf8' })
-    expect(reversed.status, reversed.stderr).toBe(0)
-    const unpatched = run('scripts/patch-dependencies.mjs', '--check')
-    expect(unpatched.status).not.toBe(0)
-    expect(unpatched.stderr).toContain('Security backport was not applied')
-    const first = run('scripts/patch-dependencies.mjs')
-    expect(first.status, first.stderr).toBe(0)
-    expect(run('scripts/patch-dependencies.mjs').status).toBe(0)
-    appendFileSync(join(directory, 'node_modules/node-forge/lib/rsa.js'), '\n// changed source\n')
-    const drift = run('scripts/patch-dependencies.mjs')
-    expect(drift.status).not.toBe(0)
-    expect(drift.stderr).toContain('Unexpected dependency source')
-    const packageFile = join(directory, 'node_modules/braces/package.json')
-    const pkg = JSON.parse(readFileSync(packageFile, 'utf8'))
-    writeFileSync(packageFile, JSON.stringify({ ...pkg, version: '3.0.4' }))
-    const upgrade = run('scripts/patch-dependencies.mjs')
-    expect(upgrade.status).not.toBe(0)
-    expect(upgrade.stderr).toContain('Review braces security backport before upgrading')
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
 })

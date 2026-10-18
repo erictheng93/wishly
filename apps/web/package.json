@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/patch-dependencies.mjs && nuxt prepare",
+    "postinstall": "nuxt prepare",
     "dev": "nuxt dev",
     "build": "nuxt build",
     "preview": "npm run build && wrangler pages dev dist",
@@ -44,5 +44,9 @@
     "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12",
     "wrangler": "^4"
+  },
+  "overrides": {
+    "braces": "git+https://github.com/erictheng93/braces.git#5991a5c00a4c00c68dadfea56f88fa2c5f9d699a",
+    "node-forge": "git+https://github.com/erictheng93/forge.git#bc338d653b0c3b7ca9b2e4a5d4146b9aa4f041d6"
   }
 }
