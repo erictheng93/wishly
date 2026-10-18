@@ -12,7 +12,7 @@ useSeoMeta({
 })
 
 const scenes = computed(() => (['gift', 'birthday', 'wedding'] as const).map(k => ({ k: t(`me.home.scenes.${k}.k`), slug: { gift: 'demogift00', birthday: 'demobirth0', wedding: 'demowedd00' }[k], t: t(`me.home.scenes.${k}.t`), d: t(`me.home.scenes.${k}.d`) })))
-const steps = computed(() => [0, 1, 2].map(i => ({ n: `0${i + 1}`, t: t(`me.home.steps.${i}.t`), d: t(`me.home.steps.${i}.d`) })))
+const steps = computed(() => [1, 2, 3].map(i => ({ n: `0${i}`, t: t(`me.home.steps.${i}.t`), d: t(`me.home.steps.${i}.d`) }))) // 語系檔的步驟 key 為 1–3
 const feats = computed(() => [0, 1, 2, 3].map(i => ({ t: t(`me.home.feats.${i}.t`), d: t(`me.home.feats.${i}.d`) })))
 const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: t(`me.home.faq.${i}.a`) })))
 </script>
@@ -25,6 +25,7 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
         <nav>
           <NuxtLink to="/explore" class="l-nav-link">{{ $t('me.home.explore') }}</NuxtLink>
           <NuxtLink to="/#scenes" class="l-nav-link">{{ $t('me.home.seeDemo') }}</NuxtLink>
+          <LocaleSwitch />
           <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>
         </nav>
       </div>
@@ -145,6 +146,8 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-nav nav{display:flex;align-items:center;gap:8px}
 .l-logo{color:var(--red-text);letter-spacing:.2em;font-size:16px}
 .l-nav-link{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.1em}
+/* 窄螢幕：頁首只留 Logo、語言切換與 CTA（探索 / 看範例在 Hero 按鈕已有），收緊字距與間距讓 CTA 不折行 */
+@media (max-width:479px){.l-nav-link{display:none}.l-logo{letter-spacing:.08em}.l-nav nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
 .l h2{font-size:24px;margin:0 0 24px;text-align:center}
 .l h3{font-size:17px;margin:8px 0}
 .l p{margin:0}
