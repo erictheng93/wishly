@@ -65,6 +65,7 @@ pub fn app(state: AppState) -> Router {
             state.clone(),
             read_only,
         ))
+        .layer(axum::middleware::from_fn(request_lang))
         .layer(cors())
         .layer(axum::middleware::map_response(problem_json))
         .layer(axum::middleware::map_response(security_headers))
@@ -166,6 +167,20 @@ fn cors() -> tower_http::cors::CorsLayer {
             HeaderName::from_static("idempotency-key"),
         ])
         .expose_headers([HeaderName::from_static("idempotency-replayed")])
+}
+
+/// 依 Accept-Language 設定本請求的語言（OTP 信等匿名寄信用；前端 useApi 會帶目前介面語言）
+async fn request_lang(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let lang = req
+        .headers()
+        .get(axum::http::header::ACCEPT_LANGUAGE)
+        .and_then(|v| v.to_str().ok())
+        .map(notify::Lang::parse)
+        .unwrap_or_default();
+    notify::REQUEST_LANG.scope(lang, next.run(req)).await
 }
 
 /// system_flags.read_only = true → 非安全方法回 503 READ_ONLY_MODE（退訂 POST 放行：保護性的使用者操作，且只寫退訂偏好；admin system-flags、登出、登入與兩步驟驗證除外：否則 staff 登出後無法登入來關閉唯讀）

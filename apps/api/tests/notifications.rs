@@ -44,3 +44,20 @@ async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
     assert!(body.contains("2 件新捐助"));
     assert_all_reconciled(&pool).await;
 }
+
+#[test]
+fn render_lang_en_vi() {
+    use wishly_api::notify::{render_lang, Lang};
+    let p = json!({"count": 2});
+    let (s, b) = render_lang(Lang::En, "claim.digest", "List", &p);
+    assert!(s.contains("2 new pledge") && b.contains("Sign in"));
+    let (s, _) = render_lang(Lang::Vi, "claim.digest", "List", &p);
+    assert!(s.contains("2 đóng góp mới"));
+    assert_eq!(Lang::parse("vi-VN,vi;q=0.9"), Lang::Vi);
+    assert_eq!(Lang::parse("en-US"), Lang::En);
+    assert_eq!(Lang::parse("fr"), Lang::Zh);
+    assert_eq!(
+        render_lang(Lang::Zh, "claim.digest", "清單", &p),
+        wishly_api::notify::render("claim.digest", "清單", &p)
+    );
+}
