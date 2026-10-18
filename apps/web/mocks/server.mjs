@@ -32,6 +32,11 @@ http.createServer(async (req, res) => {
   let m
   console.log(req.method, p)
 
+  if (p === '/public/wishlists') {
+    const page = +(u.searchParams.get('page') ?? 1), ty = u.searchParams.get('type')
+    const all = Array.from({ length: 30 }, (_, i) => ({ slug: i ? `demo${i}` : 'demo', title: `公開清單 ${i + 1}`, type: i % 3 ? 'registry' : 'relief', cover_image_url: null, event_date: null, owner: { display_name: '小愛', handle: 'xiaoai' }, item_count: 3, completion_pct: (i * 7) % 100 })).filter(w => !ty || w.type === ty)
+    return send(res, 200, { wishlists: all.slice((page - 1) * 24, page * 24), next_page: all.length > page * 24 ? page + 1 : null })
+  }
   if ((m = p.match(/^\/public\/wishlists\/([^/]+)$/))) {
     if (m[1] === 'boom') return err(res, 500, 'INTERNAL', '內部錯誤')
     if (m[1] === 'gone') return err(res, 410, 'WISHLIST_REMOVED', '已下架')

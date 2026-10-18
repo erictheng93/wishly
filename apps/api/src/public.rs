@@ -16,8 +16,57 @@ use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/public/wishlists", get(explore))
         .route("/public/wishlists/{slug}", get(wishlist))
         .route("/restricted/wishlists/{slug}", get(restricted))
+}
+
+const EXPLORE_PAGE: i64 = 24;
+
+#[derive(serde::Deserialize)]
+struct ExploreQ {
+    page: Option<i64>,
+    r#type: Option<String>,
+}
+
+type ExploreRow = (String, String, String, Option<String>, String, Option<NaiveDate>, String, Option<String>, i64, i64, i64);
+
+/// GET /public/wishlists?page=&type=：探索頁，列出所有人的公開清單（訪客可看；不讀 cookie，可被 CDN 快取）。
+/// 條件與 `servable` 一致再加：有品項、未結束、未驚喜鎖定、擁有者正常。
+/// ponytail: OFFSET 分頁（page 上限 100），清單到數萬筆再改 keyset；清單被收緊時探索頁最多殘留約一分鐘的快取卡片，點進去仍是 403/404。
+async fn explore(
+    State(st): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<ExploreQ>,
+) -> Result<Response, AppError> {
+    let page = q.page.unwrap_or(1).clamp(1, 100);
+    let ty = match q.r#type.as_deref() {
+        None | Some("") => None,
+        Some(t @ ("registry" | "relief")) => Some(t),
+        _ => return Err(AppError::invalid("/type", "ENUM", "type 必須是 registry / relief")),
+    };
+    let rows: Vec<ExploreRow> = sqlx::query_as(&format!(
+        "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
+                o.display_name, o.handle,
+                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
+                (SELECT COALESCE(sum({claimed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
+                (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+         FROM wishlists w JOIN users o ON o.id = w.owner_id
+         WHERE w.visibility = 'public' AND w.status = 'active' AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
+           AND o.deleted_at IS NULL AND o.blocked_at IS NULL
+           AND (w.closes_at IS NULL OR w.closes_at > now())
+           AND NOT (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')))
+           AND ($1::text IS NULL OR w.type::text = $1)
+           AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL))
+        .bind(ty).bind(EXPLORE_PAGE + 1).bind((page - 1) * EXPLORE_PAGE).fetch_all(&st.pool).await?;
+    let more = rows.len() as i64 > EXPLORE_PAGE;
+    let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, ev, on, oh, n, got, need)| json!({
+        "slug": slug, "title": title, "type": ty, "cover_image_url": image_url(ck.as_deref(), &cs), "event_date": ev,
+        "owner": { "display_name": on, "handle": oh }, "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })).collect();
+    Ok((
+        [(header::CACHE_CONTROL, "public, s-maxage=10, stale-while-revalidate=60")],
+        Json(json!({ "wishlists": wishlists, "next_page": more.then_some(page + 1) })),
+    ).into_response())
 }
 
 pub fn image_url(key: Option<&str>, status: &str) -> Option<String> {

@@ -39,6 +39,7 @@ const faq = [
       <div class="l-in">
         <b class="l-logo">WISHLY</b>
         <nav>
+          <NuxtLink to="/explore" class="l-nav-link">探索</NuxtLink>
           <NuxtLink to="/s/demo" class="l-nav-link">看範例</NuxtLink>
           <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>
         </nav>
@@ -54,6 +55,7 @@ const faq = [
           <p class="l-sub">一個連結分享整份心願清單。朋友打開連結就能瀏覽，登入會員後即可捐助，不重複、不超賣。</p>
           <div class="l-cta">
             <NuxtLink :to="cta.to" class="g-btn">{{ cta.text }}</NuxtLink>
+            <NuxtLink to="/explore" class="g-btn ghost">探索公開清單</NuxtLink>
             <NuxtLink to="/s/demo" class="g-btn ghost">看範例清單</NuxtLink>
           </div>
         </div>

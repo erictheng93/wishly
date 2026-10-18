@@ -160,6 +160,7 @@ npx playwright show-report                                      # 開啟上次�
 
 | 路徑 | 讀身分 | 回應 | CDN |
 |---|---|---|---|
+| `GET /api/v1/public/wishlists?page=&type=` | 不讀 cookie | 探索頁：所有人的公開清單（public、上線、有品項、未驚喜鎖定），每頁 24 筆 | 可快取（`public, s-maxage=10, stale-while-revalidate=60`） |
 | `GET /api/v1/public/wishlists/{slug}` | 不讀 cookie | public 的內容；其餘只回不含內容的 403 / 404 | 可快取（`public, s-maxage=10, stale-while-revalidate=60`） |
 | `GET /api/v1/restricted/wishlists/{slug}` | `ws_session` | 依可見性判斷 | 永不快取（`private, no-store`） |
 
