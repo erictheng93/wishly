@@ -213,6 +213,20 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    // 圖片 key 不綁上傳者：只刪「沒有其他人的清單 / 品項 / 頭像還在引用」的物件；頭像可能是舊外部 URL，只刪真正的 bucket key。
+    let media: Vec<String> = sqlx::query_scalar(
+        "SELECT k FROM (SELECT cover_image_key AS k FROM wishlists WHERE owner_id = $1
+                        UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id WHERE w.owner_id = $1
+                        UNION SELECT avatar_key FROM users WHERE id = $1) m
+          WHERE k IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM wishlists WHERE cover_image_key = k AND owner_id <> $1)
+            AND NOT EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id WHERE i.image_key = k AND w.owner_id <> $1)
+            AND NOT EXISTS (SELECT 1 FROM users WHERE avatar_key = k AND id <> $1 AND deleted_at IS NULL)")
+        .bind(id).fetch_all(&mut *tx).await?;
+    let media: Vec<String> = media
+        .into_iter()
+        .filter(|k| crate::uploads::valid_key(k) || crate::uploads::avatar_url(Some(k)).is_some())
+        .collect();
     let rows: Vec<(Uuid, String)> = sqlx::query_as("UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(closed_at, now()) WHERE owner_id = $1 AND status <> 'archived' RETURNING id, slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
     let (archived, slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().unzip();
@@ -255,6 +269,7 @@ async fn delete_me(
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.delete', 'users', $1)")
         .bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
+    crate::uploads::delete_objects(media); // COMMIT 後才刪：交易失敗不會留下指向已刪物件的資料
     crate::cdn::purge_wishlists(slugs); // 已封存為 private：邊緣快取的公開副本立即清掉
     let mut res = Json(json!({ "deleted": true, "anonymized_at": at })).into_response();
     res.headers_mut().insert(

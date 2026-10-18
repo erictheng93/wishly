@@ -283,6 +283,25 @@ async fn s3_req(
     })
 }
 
+/// 背景刪除 bucket 物件（不阻塞回應），失敗重試 3 次（1s、4s、16s）後只記 log。
+/// ponytail: 程序重啟會遺失尚未成功的刪除（物件殘留）；要保證送達再改成 DB 佇列。
+pub fn delete_objects(keys: Vec<String>) {
+    if keys.is_empty() {
+        return;
+    }
+    tokio::spawn(async move {
+        for key in keys {
+            for wait in [1u64, 4, 16, 0] {
+                match s3_req("DELETE", &key, None).await {
+                    Ok(r) if r.status().is_success() || r.status() == 404 => break,
+                    _ if wait == 0 => tracing::error!(%key, "R2 物件刪除失敗，已放棄"),
+                    _ => tokio::time::sleep(std::time::Duration::from_secs(wait)).await,
+                }
+            }
+        }
+    });
+}
+
 async fn ensure_bucket() {
     static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
     ONCE.get_or_init(|| async {
