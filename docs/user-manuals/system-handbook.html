@@ -144,7 +144,8 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>Google / LINE 登入與綁定</td><td><span class="tag live">已實作</span></td><td>可在設定頁綁定 / 解除，至少保留一種</td></tr>
 <tr><td>清單 CRUD、品項 CRUD、排序、圖片上傳</td><td><span class="tag live">已實作</span></td><td>類型 <code>personal</code>（個人心願）/ <code>registry</code>（禮物登記）</td></tr>
 <tr><td>登入後數量認捐（D50；原訪客免註冊）</td><td><span class="tag live">已實作</span></td><td>含修改、取消、狀態標記、逾期釋放、冪等重送；既有訪客認捐（舊資料）仍可管理但不可增量</td></tr>
-<tr><td>清單可見性 6 種</td><td><span class="tag live">已實作</span></td><td>public / link / friends / selected / password / private</td></tr>
+<tr><td>清單可見性 4 種</td><td><span class="tag live">已實作</span></td><td>public / friends（預設）/ selected（摯友）/ private</td></tr>
+<tr><td>公開清單探索頁 <code>/explore</code></td><td><span class="tag live">已實作</span></td><td>訪客可瀏覽所有人的公開清單；認捐仍須登入</td></tr>
 <tr><td>驚喜模式、自動結束時間</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>即時更新（SSE，失敗退輪詢）</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>好友、邀請連結、個人頁、指定名單</td><td><span class="tag live">已實作</span></td><td></td></tr>
@@ -307,7 +308,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>自動結束時間</td><td>選填，須在現在之後；到時清單自動變為「已結束」。留空＝不設期限</td></tr>
 <tr><td>驚喜模式</td><td>需設定活動日，見 <a href="#c-surprise">4.5</a></td></tr>
 <tr><td>顯示捐助者暱稱</td><td>預設關閉；開啟後其他訪客可在品項上看到捐助者暱稱</td></tr>
-<tr><td>誰可以看</td><td>見 <a href="#c-visibility">4.4</a>；預設「知道連結」</td></tr>
+<tr><td>誰可以看</td><td>見 <a href="#c-visibility">4.4</a>；預設「所有好友」</td></tr>
 </table>
 <p>按「建立並新增品項」後清單以<b>草稿</b>（<code>draft</code>）建立並進入編輯頁。草稿狀態朋友打開會看到「找不到」。</p>
 
@@ -340,14 +341,12 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <h3 id="c-visibility">4.4 清單可見性</h3>
 <table>
 <tr><th>選項</th><th>誰能開</th><th>注意</th></tr>
-<tr><td><code>public</code> 公開</td><td>任何人</td><td>會列在你的個人頁；可被 CDN 快取</td></tr>
-<tr><td><code>link</code> 知道連結（預設）</td><td>拿到連結的人</td><td>不列在個人頁；可被 CDN 快取</td></tr>
-<tr><td><code>friends</code> 僅好友</td><td>你的好友（需登入）</td><td>未登入顯示「請先登入」；非好友顯示無權限並可前往你的個人頁加好友</td></tr>
-<tr><td><code>selected</code> 指定好友</td><td>你勾選的好友（需登入）</td><td>名單只能從好友中選；含非好友的整批不寫入（<code>NOT_FRIEND</code>）</td></tr>
-<tr><td><code>password</code> 密碼保護</td><td>知道連結且知道密碼</td><td>密碼 8–64 字；改密碼後所有舊解鎖權杖立即失效；解鎖錯誤同清單＋IP 每 15 分鐘限 10 次</td></tr>
+<tr><td><code>public</code> 公開</td><td>任何人（含訪客）</td><td>會列在你的個人頁與探索頁 <code>/explore</code>；可被 CDN 快取</td></tr>
+<tr><td><code>friends</code> 所有好友（預設）</td><td>你的所有好友（需登入）</td><td>未登入顯示「請先登入」；非好友顯示無權限並可前往你的個人頁加好友</td></tr>
+<tr><td><code>selected</code> 摯友</td><td>你從好友中勾選的摯友（需登入）</td><td>名單只能從好友中選；含非好友的整批不寫入（<code>NOT_FRIEND</code>）</td></tr>
 <tr><td><code>private</code> 私人</td><td>只有你</td><td>其他人看到「找不到」</td></tr>
 </table>
-<div class="box note"><b class="t">給技術人員</b>受限內容（好友 / 指定 / 密碼）只走 <code>/api/v1/restricted/wishlists/{slug}</code>，永遠 <code>no-store</code>；可快取的 <code>/api/v1/public/wishlists/{slug}</code> 完全不讀 cookie，因此不會把受限內容放進 CDN。詳見 <a href="#cdn">11.3</a>。</div>
+<div class="box note"><b class="t">給技術人員</b>受限內容（好友 / 摯友）只走 <code>/api/v1/restricted/wishlists/{slug}</code>，永遠 <code>no-store</code>；可快取的 <code>/api/v1/public/wishlists/{slug}</code> 完全不讀 cookie，因此不會把受限內容放進 CDN。詳見 <a href="#cdn">11.3</a>。</div>
 <p>把清單從公開改成較嚴格的可見性、封存、下架或刪帳號時，後端會立即呼叫 Cloudflare 清除該清單公開網址的邊緣快取。</p>
 
 <h3 id="c-surprise">4.5 驚喜模式</h3>
@@ -672,7 +671,6 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>格式</td><td>JSON；欄位只增不刪，前端須容忍未知枚舉值與錯誤碼</td></tr>
 <tr><td>創建者認證</td><td>cookie <code>ws_session</code>；原生殼用 <code>Authorization: Bearer &lt;session_token&gt;</code></td></tr>
 <tr><td>訪客認證</td><td><code>X-Guest-Token</code>（優先）或 cookie <code>ws_guest</code></td></tr>
-<tr><td>密碼清單</td><td><code>X-List-Access</code>（SSE 用 <code>?access=</code>）；由 <code>POST /public/wishlists/{slug}/unlock</code> 取得</td></tr>
 <tr><td>冪等</td><td>建立型 POST（捐助、認捐、營運發點）必帶 <code>Idempotency-Key: &lt;UUID&gt;</code>；缺少回 <code>IDEMPOTENCY_KEY_REQUIRED</code>；重放回應帶 <code>Idempotency-Replayed</code></td></tr>
 <tr><td>並行編輯</td><td>PATCH 清單 / 品項可帶 <code>expected_updated_at</code>；不符回 <code>409 STALE_VERSION</code></td></tr>
 <tr><td>分頁</td><td>游標式：<code>?limit=1..100&amp;cursor=…</code>，回 <code>{ data: [...], next_cursor }</code></td></tr>
@@ -688,9 +686,9 @@ RETURNING qty_needed, qty_claimed;
 <h4>公開與訪客</h4>
 <table>
 <tr><th>方法</th><th>路徑</th><th>認證</th><th>說明</th></tr>
-<tr><td>GET</td><td><code>/public/wishlists/{slug}</code></td><td>—</td><td>公開清單（只回 public / link；可被 CDN 快取；不讀 cookie）</td></tr>
-<tr><td>GET</td><td><code>/restricted/wishlists/{slug}</code></td><td>U / 權杖</td><td>依可見性判斷；永遠 no-store</td></tr>
-<tr><td>POST</td><td><code>/public/wishlists/{slug}/unlock</code></td><td>—</td><td>密碼清單解鎖，回存取權杖</td></tr>
+<tr><td>GET</td><td><code>/public/wishlists/{slug}</code></td><td>—</td><td>公開清單（只回 public；可被 CDN 快取；不讀 cookie）</td></tr>
+<tr><td>GET</td><td><code>/public/wishlists?page=&amp;type=</code></td><td>—</td><td>探索頁：所有人的公開清單（public、active、有品項、未結束、未驚喜鎖定），每頁 24 筆，回 <code>next_page</code>；可被 CDN 快取；不讀 cookie</td></tr>
+<tr><td>GET</td><td><code>/restricted/wishlists/{slug}</code></td><td>U</td><td>依可見性判斷；永遠 no-store</td></tr>
 <tr><td>GET</td><td><code>/public/wishlists/{slug}/events</code></td><td>—</td><td>SSE 事件流（<code>item.updated</code>、<code>wishlist.updated</code>…）；每連線最長 30 分鐘、15 秒心跳、<code>retry: 5s</code></td></tr>
 <tr><td>POST</td><td><code>/public/wishlists/{slug}/reports</code></td><td>—</td><td>檢舉（Turnstile）</td></tr>
 <tr><td>POST</td><td><code>/items/{id}/claims</code></td><td>G/U</td><td>捐助（需 Idempotency-Key）</td></tr>
@@ -765,7 +763,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>400</td><td><code>OTP_INVALID</code>、<code>MFA_CODE_INVALID</code>、<code>NATIVE_CODE_INVALID</code></td><td>驗證碼錯誤、過期或已用（不區分原因）</td></tr>
 <tr><td>401</td><td><code>UNAUTHORIZED</code>、<code>INVALID_CREDENTIALS</code></td><td>未登入 / 失效；Email 或密碼錯誤（不區分無帳號與密碼錯）</td></tr>
 <tr><td>403</td><td><code>FORBIDDEN</code>、<code>STAFF_ONLY</code>、<code>MFA_REQUIRED</code>、<code>NATIVE_ONLY</code>、<code>ACCOUNT_BLOCKED</code></td><td>無權限；非 staff；須通過兩步驟驗證；僅原生殼；帳號停權</td></tr>
-<tr><td>403</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code>、<code>PASSWORD_REQUIRED</code></td><td>清單可見性不足；body 附 <code>visibility</code> 與 <code>owner</code>。<code>private</code> 一律 404</td></tr>
+<tr><td>403</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code></td><td>清單可見性不足；body 附 <code>visibility</code> 與 <code>owner</code>。<code>private</code> 一律 404</td></tr>
 <tr><td>404</td><td><code>NOT_FOUND</code></td><td>不存在、已刪除或無權查看</td></tr>
 <tr><td>409</td><td><code>ITEM_FULLY_CLAIMED</code></td><td>剩餘數量不足，附 <code>remaining</code></td></tr>
 <tr><td>409</td><td><code>CLAIM_ALREADY_EXISTS</code></td><td>已有有效捐助，請改用 PATCH</td></tr>
@@ -784,7 +782,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>409</td><td><code>ACCOUNT_HAS_POINTS</code>、<code>MFA_NOT_SET_UP</code></td><td>刪帳號前須處理認捐 / 餘額；尚未設定 TOTP</td></tr>
 <tr><td>410</td><td><code>WISHLIST_REMOVED</code></td><td>清單已被下架；body 不含原因</td></tr>
 <tr><td>422</td><td><code>VALIDATION_FAILED</code></td><td>欄位驗證失敗，<code>errors[]</code> 逐欄說明</td></tr>
-<tr><td>422</td><td><code>NOT_FRIEND</code>、<code>SELF_INVITE</code>、<code>WRONG_PASSWORD</code>、<code>INVALID_TOKEN</code></td><td>名單含非好友；接受自己的邀請；清單密碼錯誤；退訂連結無效</td></tr>
+<tr><td>422</td><td><code>NOT_FRIEND</code>、<code>SELF_INVITE</code>、<code>INVALID_TOKEN</code></td><td>名單含非好友；接受自己的邀請；退訂連結無效</td></tr>
 <tr><td>429</td><td><code>RATE_LIMITED</code></td><td>附 <code>Retry-After</code></td></tr>
 <tr><td>500 / 502</td><td><code>INTERNAL_ERROR</code>、<code>OAUTH_PROVIDER_ERROR</code>、<code>UPSTREAM_ERROR</code></td><td>未預期錯誤（細節只進 log）；第三方登入端點錯誤</td></tr>
 <tr><td>503</td><td><code>READ_ONLY_MODE</code></td><td>系統唯讀</td></tr>
@@ -797,7 +795,6 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>驗證碼寄送</td><td>每 Email 每小時 5 封、間隔 60 秒；有效 10 分鐘、最多 5 次嘗試</td></tr>
 <tr><td>捐助</td><td>每身分每小時 30 次；每身分每清單每小時 15 次</td></tr>
 <tr><td>認捐</td><td>每使用者每分鐘 30 次</td></tr>
-<tr><td>密碼清單解鎖</td><td>同 slug＋IP 每 15 分鐘 10 次</td></tr>
 <tr><td>檢舉</td><td>每 IP 每小時 10 次；同清單同 IP 每日 1 次</td></tr>
 <tr><td>好友邀請</td><td>每帳號每小時 30 次</td></tr>
 <tr><td>圖片 presign</td><td>每使用者每小時 60 次</td></tr>
@@ -839,7 +836,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td><code>DATABASE_URL</code></td><td>必填</td><td></td></tr>
 <tr><td><code>BIND</code></td><td>容器內 <code>0.0.0.0:8080</code></td><td>預設 <code>127.0.0.1:8080</code>；非回送位址啟動會印 WARN，前提是只有 Tunnel / 內網可達</td></tr>
 <tr><td><code>APP_URL</code> / <code>API_BASE_URL</code></td><td>必填</td><td>前端 / API 正式網址；CORS 允許 <code>APP_URL</code> 與明確設定的 <code>NATIVE_ORIGINS</code></td></tr>
-<tr><td><code>OTP_PEPPER</code>、<code>OAUTH_SECRET</code>、<code>UNSUB_SECRET</code></td><td>必填，各自獨立 ≥32 字元</td><td><code>openssl rand -hex 32</code>。更換 <code>UNSUB_SECRET</code> 會使既有退訂連結與密碼清單存取權杖失效</td></tr>
+<tr><td><code>OTP_PEPPER</code>、<code>OAUTH_SECRET</code>、<code>UNSUB_SECRET</code></td><td>必填，各自獨立 ≥32 字元</td><td><code>openssl rand -hex 32</code>。更換 <code>UNSUB_SECRET</code> 會使既有退訂連結失效</td></tr>
 <tr><td><code>CF_ACCOUNT_ID</code>、<code>CF_EMAIL_API_TOKEN</code>、<code>MAIL_FROM</code></td><td>必填</td><td>寄信；<code>MAIL_FROM</code> 網域須已驗證。dev 用 <code>SMTP_HOST</code> / <code>SMTP_PORT</code>（Mailpit）</td></tr>
 <tr><td><code>TRUSTED_PROXY</code></td><td>必填 <code>cloudflare</code></td><td>或 <code>none</code>；未設拒絕啟動</td></tr>
 <tr><td><code>CF_ZONE_ID</code>、<code>CF_CACHE_PURGE_TOKEN</code></td><td><code>cloudflare</code> 時必填</td><td>token 只給 Zone → Cache Purge；無自有 zone 的快速通道才可 <code>CDN_PURGE=off</code></td></tr>
@@ -881,8 +878,9 @@ npm run build:native   # Tauri 前端：NUXT_NATIVE=1，純 SPA、無 SSR、無 
 <h3 id="cdn">11.3 CDN 快取與受限清單</h3>
 <table>
 <tr><th>路徑</th><th>讀身分</th><th>回應</th><th>CDN</th></tr>
-<tr><td><code>GET /api/v1/public/wishlists/{slug}</code></td><td>不讀 cookie / 權杖</td><td>只回 public、link 內容；其餘回不含內容的 403 / 404</td><td>可快取（<code>public, s-maxage=10, stale-while-revalidate=60</code>）</td></tr>
-<tr><td><code>GET /api/v1/restricted/wishlists/{slug}</code></td><td><code>ws_session</code>、<code>X-List-Access</code></td><td>依可見性判斷</td><td>永不快取（<code>private, no-store</code>）</td></tr>
+<tr><td><code>GET /api/v1/public/wishlists/{slug}</code></td><td>不讀 cookie</td><td>只回 public 內容；其餘回不含內容的 403 / 404</td><td>可快取（<code>public, s-maxage=10, stale-while-revalidate=60</code>）</td></tr>
+<tr><td><code>GET /api/v1/public/wishlists?page=&amp;type=</code></td><td>不讀 cookie</td><td>探索頁：所有人的公開清單，每頁 24 筆</td><td>可快取（<code>public, s-maxage=10, stale-while-revalidate=60</code>）</td></tr>
+<tr><td><code>GET /api/v1/restricted/wishlists/{slug}</code></td><td><code>ws_session</code></td><td>依可見性判斷</td><td>永不快取（<code>private, no-store</code>）</td></tr>
 </table>
 <ul>
 <li>Cloudflare 後台：<code>/api/v1/public/*</code> 的 Edge TTL 用「Use cache-control header if present」，<b>不要</b>用「Cache Everything + 覆寫來源 TTL」；<code>/api/v1/restricted/*</code> 不套任何快取規則。</li>
@@ -956,7 +954,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <li><b>併發防護的回歸測試</b>：改動鎖序或併發相關 SQL（<code>FOR UPDATE</code> / <code>FOR SHARE</code>、<code>ON CONFLICT</code>）時，須在 <code>scripts/mutate.py</code> 補對應 mutant，並確認 <code>scripts/mutate.sh all</code> 全數 killed（還原後 SHA 一致）。輸出在 <code>apps/api/target/mutations/</code>，勿與相同 SQLx test path 的一般測試併跑。</li>
 <li><b>鎖序不可顛倒</b>：捐助 <code>wishlist_items → claims</code>；點數 <code>wishlists(FOR SHARE) → point_wallets(依 id) → wishlist_items → contributions</code>。</li>
 <li><b>餘額只經 <code>points::post</code></b>；帳本只增不改。</li>
-<li><b>受限內容不得進可快取路徑</b>：<code>GET /public/wishlists/{slug}</code> 不可讀 cookie / <code>X-List-Access</code>。清單不再可公開提供時呼叫 <code>cdn::purge_wishlists</code>。</li>
+<li><b>受限內容不得進可快取路徑</b>：<code>GET /public/wishlists/{slug}</code> 不可讀 cookie。清單不再可公開提供時呼叫 <code>cdn::purge_wishlists</code>。</li>
 <li>新增後端模組：只改 <code>lib.rs</code> 合併 <code>routes()</code>；錯誤統一走 <code>error.rs</code> 的 problem+json。</li>
 <li>新增創建者路由：加進 <code>routeRules</code>；直接 <code>$fetch</code> 的受保護請求要帶 <code>nativeHeaders()</code>。</li>
 <li>刪除已覆蓋的程式碼也會改變覆蓋率比例；刻意調整測試範圍時重新量測並更新 baseline（<code>apps/api/tests/coverage-baseline.json</code>），不要當成 flaky。</li>
@@ -984,7 +982,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <table>
 <tr><th>症狀</th><th>可能原因 / 解法</th></tr>
 <tr><td>朋友打開連結看到「找不到這份清單」</td><td>清單還是草稿（要發佈）、可見性是私人、已封存，或網址少複製字元</td></tr>
-<tr><td>朋友看到「請先登入」/「無權限」</td><td>可見性是 friends / selected：對方須登入且為好友 / 在名單內。改成 link 或 public 即可</td></tr>
+<tr><td>朋友看到「請先登入」/「無權限」</td><td>可見性是 friends / selected：對方須登入且為好友 / 在名單內。改成 public 即可（或請對方先成為你的好友）</td></tr>
 <tr><td>發佈失敗</td><td>看紅字列出的缺漏：至少 1 個品項、含眾籌要收件資訊、驚喜模式活動日要在今日之後</td></tr>
 <tr><td>儲存時顯示「已在其他地方被修改」</td><td>你在別的分頁 / 裝置改過，按「重新載入」</td></tr>
 <tr><td>無法調降數量 / 刪除品項</td><td>數量不得低於已捐助量；驚喜鎖定期間不能刪除或調降</td></tr>
@@ -1040,7 +1038,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <tr><th>名稱</th><th>值</th></tr>
 <tr><td><code>wishlist_type</code></td><td>personal、registry、relief（尚未開放建立）</td></tr>
 <tr><td><code>wishlist_status</code></td><td>draft、active、closed、archived</td></tr>
-<tr><td><code>visibility</code></td><td>public、link、friends、selected、password、private</td></tr>
+<tr><td><code>visibility</code></td><td>public、friends、selected、private（link、password 已於 0016 移除）</td></tr>
 <tr><td><code>moderation_status</code></td><td>ok、hidden</td></tr>
 <tr><td><code>funding_mode</code></td><td>quantity、crowdfund</td></tr>
 <tr><td><code>item_priority</code></td><td>high、medium、low</td></tr>
