@@ -154,3 +154,22 @@ test('指定好友清單：被指定的好友可開，其他好友被擋', async
   await expect(po.getByRole('heading', { name: '你沒有權限查看這份清單' })).toBeVisible()
   await closeAll([owner, allowed, other])
 })
+
+test('探索頁 /explore：訪客看得到公開清單，看不到僅好友清單', async ({ browser }) => {
+  const owner = await registerUser({ tag: 'xo' })
+  const pub = await listWith(owner, 'public'), fr = await listWith(owner, 'friends')
+  const anon = await pageFor(browser)
+  await anon.goto('/explore'); await hydrated(anon)
+  // 其他測試同時建公開清單，目標可能不在第一頁：一路「載入更多」直到出現（最多 10 頁）
+  const card = anon.getByRole('link', { name: pub.title })
+  for (let i = 0; i < 10 && !(await card.isVisible()); i++) {
+    const more = anon.getByRole('button', { name: '載入更多' })
+    if (!(await more.isVisible())) break
+    await more.click(); await anon.waitForTimeout(300)
+  }
+  await expect(card).toBeVisible()
+  await expect(anon.getByRole('link', { name: fr.title })).toHaveCount(0)
+  await card.click()
+  await expect(anon.getByRole('heading', { level: 1, name: pub.title })).toBeVisible()
+  await closeAll([owner])
+})
