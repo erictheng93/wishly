@@ -468,10 +468,10 @@ async fn confirm(
     let _permit = DECODE_SLOTS
         .acquire()
         .await
-        .map_err(|e| AppError::problem(500, "INTERNAL", e.to_string()))?;
+        .map_err(|_| AppError::problem(503, "BUSY", "圖片處理忙碌中，請稍後再試"))?;
     let stripped = tokio::task::spawn_blocking(move || strip_metadata(&bytes))
         .await
-        .map_err(|e| AppError::problem(500, "INTERNAL", e.to_string()))?;
+        .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"))?;
     match stripped {
         Ok((clean, ct)) if ext_of(ct) == Some(want_ext) => {
             s3_req("PUT", &r.object_key, Some((clean, ct))).await?;
