@@ -126,3 +126,71 @@ async fn unified_pct_owner_names_list_fields_and_image_base(pool: PgPool) {
     assert_eq!(wishly_api::wishlists::completion_pct(0, 0), 0);
     assert_all_reconciled(&pool).await;
 }
+
+// SSE 連線建立後失去存取權（取消好友、可見性改 private）：串流須關閉，不再推送標題/數量。
+// dashboard::BUS 為 process-wide，此檔僅此一個 SSE 測試（見 wishlist_events.rs 註解）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn sse_closes_when_viewer_loses_access(pool: PgPool) {
+    use axum::{body::Body, http::Request};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+    let owner = user(&pool, "o").await;
+    let fan = user(&pool, "f").await;
+    befriend(&pool, owner.id, fan.id).await;
+    let l = wishlist(
+        &pool,
+        owner.id,
+        ListOpts {
+            visibility: Some("friends"),
+            ..Default::default()
+        },
+    )
+    .await;
+    item(&pool, l.id, "禮物", 1).await;
+    let open = || async {
+        let req = Request::builder()
+            .uri(format!("/api/v1/public/wishlists/{}/events", l.slug))
+            .header("cookie", format!("ws_session={}", fan.token))
+            .body(Body::empty())
+            .unwrap();
+        let res = test_app(&pool).oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        res.into_body()
+    };
+    // 串流是否在失去存取權後結束，且期間沒有再推 wishlist.updated
+    async fn ends(mut body: Body) -> bool {
+        let mut got = String::new();
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_secs(5), body.frame()).await {
+                Err(_) => return false,
+                Ok(None) => return !got.contains("wishlist.updated"),
+                Ok(Some(f)) => {
+                    if let Some(d) = f.unwrap().data_ref() {
+                        got.push_str(&String::from_utf8_lossy(d));
+                    }
+                }
+            }
+        }
+    }
+    // 1) 取消好友後有任何事件 → 關閉
+    let body = open().await;
+    sqlx::query("DELETE FROM friendships")
+        .execute(&pool)
+        .await
+        .unwrap();
+    wishly_api::dashboard::notify(&pool, l.id).await.unwrap();
+    assert!(ends(body).await, "unfriend 後串流仍在推送");
+    // 2) 可見性改 private → 關閉
+    befriend(&pool, owner.id, fan.id).await;
+    let body = open().await;
+    sqlx::query("UPDATE wishlists SET visibility='private' WHERE id=$1")
+        .bind(l.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    wishly_api::dashboard::notify(&pool, l.id).await.unwrap();
+    assert!(ends(body).await, "改 private 後串流仍在推送");
+    tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
+        .await
+        .expect("SSE listener must release its connection when the pool closes");
+}
