@@ -1501,3 +1501,58 @@ async fn deleted_actor_cannot_create_claim_on_another_users_active_list(pool: Pg
     reconciled(&pool).await;
     common::assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn wallet_freeze_vs_reallocate_checks_status_under_lock(pool: PgPool) {
+    let _slot = RACE_SLOTS.acquire().await.unwrap();
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "owner").await;
+    let TestUser {
+        id: _,
+        token: staff,
+    } = common::staff(&pool, "staff").await;
+    let TestUser { id: donor, token } = common::user(&pool, "donor").await;
+    let wallet = grant(&pool, donor).await;
+    let wl = list(&pool, owner).await;
+    let src = funding(&pool, wl, 500).await;
+    let tgt = funding(&pool, wl, 500).await;
+    let app = app(AppState { pool: pool.clone() });
+    let cid = pledge(&app, src, &token, 200).await;
+    sqlx::query("UPDATE wishlist_items SET funding_status='expired',expired_at=now() WHERE id=$1")
+        .bind(src)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (gate, pid) = gate(&pool, "point_wallets", wallet).await;
+    let freeze = send(
+        &app,
+        (
+            "PATCH",
+            format!("/admin/wallets/{wallet}"),
+            common::ck(&staff),
+            Some(json!({"status":"frozen","reason":"race"})),
+        ),
+    );
+    blocked(&pool, pid, "SELECT status::text FROM point_wallets", 1).await;
+    let r = send(
+        &app,
+        (
+            "POST",
+            format!("/contributions/{cid}/reallocate"),
+            [common::ck(&token), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"target_item_id":tgt})),
+        ),
+    );
+    waiting(&pool, "FROM point_wallets w WHERE w.id", 1).await;
+    gate.commit().await.unwrap();
+    let f = finish(freeze).await;
+    let r = finish(r).await;
+    assert_eq!(f.0, StatusCode::OK, "{}", f.2);
+    assert_eq!(r.0, StatusCode::FORBIDDEN, "{}", r.2);
+    assert_eq!(r.2["code"], "WALLET_FROZEN");
+    assert_eq!(item_state(&pool, tgt).await, (0, "open".into()));
+    assert_eq!(item_state(&pool, src).await, (200, "expired".into()));
+    common::assert_all_reconciled(&pool).await;
+}

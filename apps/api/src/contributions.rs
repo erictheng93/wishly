@@ -479,6 +479,23 @@ async fn reallocate(
     let req: ReallocReq = parse(&body)?;
     let scope = format!("user:{}:POST /contributions/{{id}}/reallocate", user.id);
     let hash = idempotency::request_hash(&format!("POST /contributions/{id}/reallocate"), &body);
+    // 存取判斷（同 create，在交易外做以免佔住連線）：不再看得到清單者不可轉投
+    let acl: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+        "SELECT w.id, w.owner_id, w.visibility::text FROM contributions c JOIN wishlists w ON w.id = c.wishlist_id
+         WHERE c.id = $1 AND c.user_id = $2 AND w.deleted_at IS NULL")
+        .bind(id).bind(user.id).fetch_optional(&st.pool).await?;
+    if let Some((wid, owner_id, vis)) = &acl {
+        crate::access::check_wishlist(
+            &st.pool,
+            &crate::access::ListAccess {
+                wishlist_id: *wid,
+                owner_id: *owner_id,
+                visibility: vis,
+            },
+            Some(user.id),
+        )
+        .await?;
+    }
     let mut tx = st.pool.begin().await?;
     if let idempotency::Begin::Replay(s, b) =
         idempotency::begin(&mut tx, &scope, key, &hash).await?
@@ -487,12 +504,13 @@ async fn reallocate(
     }
     ratelimit::check(&mut *tx, &format!("pledge:{}", user.id), 30, 60).await?;
 
-    let c: Option<(Uuid, Uuid, Uuid)> =
-        sqlx::query_as("SELECT user_id, item_id, wishlist_id FROM contributions WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let (owner, src, wl) = c.ok_or(AppError::NotFound)?;
+    let c: Option<(Uuid, Uuid, Uuid, Uuid)> = sqlx::query_as(
+        "SELECT user_id, item_id, wishlist_id, wallet_id FROM contributions WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (owner, src, wl, wallet) = c.ok_or(AppError::NotFound)?;
     if owner != user.id {
         return Err(AppError::problem(
             403,
@@ -504,14 +522,24 @@ async fn reallocate(
     if tgt == src {
         return Err(not_allowed());
     }
-    let wl_active: Option<String> = sqlx::query_scalar(
-        "SELECT status::text FROM wishlists WHERE id = $1 AND deleted_at IS NULL FOR SHARE",
-    )
-    .bind(wl)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if wl_active.as_deref() != Some("active") {
+    // 清單共享鎖（條件同 create）→ 錢包 FOR UPDATE → 品項 → 認捐
+    let locked: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
+        .bind(wl).fetch_optional(&mut *tx).await?;
+    if locked.is_none() {
         return Err(not_allowed());
+    }
+    let wstatus: String =
+        sqlx::query_scalar("SELECT status::text FROM point_wallets w WHERE w.id = $1 FOR UPDATE")
+            .bind(wallet)
+            .fetch_one(&mut *tx)
+            .await?;
+    if wstatus == "frozen" {
+        return Err(AppError::problem(
+            403,
+            "WALLET_FROZEN",
+            "錢包已凍結，無法轉投，請聯絡客服",
+        ));
     }
     // 兩品項依 id 排序鎖定，再鎖認捐
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN ($1, $2) ORDER BY id FOR UPDATE")
