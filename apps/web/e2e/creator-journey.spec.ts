@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { newEmail, PASSWORD, signInPage, skipOtpCooldown, sql, uid, waitForOtp } from './helpers'
+import { newEmail, PASSWORD, resetOtpLimits, signInPage, skipOtpCooldown, sql, uid, waitForOtp } from './helpers'
 
 test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分享連結 → 登出/登入 → 忘記密碼', async ({ page, browser }) => {
   const email = newEmail('creator'), name = `阿美${uid().slice(0, 3)}`, title = `寶寶滿月 ${uid().slice(0, 4)}`
@@ -7,6 +7,7 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
   let shareUrl = ''
 
   await test.step('註冊：填資料 → Mailpit 取 OTP → 驗證', async () => {
+    resetOtpLimits()
     await page.goto('/register')
     await page.getByLabel('顯示名稱').fill(name)
     await page.getByLabel('Email').fill(email)
