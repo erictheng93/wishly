@@ -1069,7 +1069,7 @@ fn funding_locked() -> AppError {
     AppError::problem(
         409,
         "FUNDING_LOCKED",
-        "品項已達標或已過期，不能再修改目標點數或截止時間。",
+        "品項已達標或已過期，不能再修改商品資訊、目標點數或截止時間。",
     )
 }
 fn address_required() -> AppError {
@@ -1347,8 +1347,30 @@ async fn item_update(
     let old_qty = i.qty_needed;
     // 鎖定期間品項的 updated_at 被遮蔽（見 I::json），故不做品項版本檢查
     let exp = if locked { None } else { expected(m)? };
+    let product = |i: &I| {
+        (
+            i.title.clone(),
+            i.product_url.clone(),
+            i.image_key.clone(),
+            i.description.clone(),
+            i.brand.clone(),
+            i.spec.clone(),
+            i.unit_price_amount,
+            i.price_snapshot_amount,
+        )
+    };
+    let before = product(&i);
+    let frozen = i.funding_mode == "crowdfund" && i.funding_status.as_deref() != Some("open");
     apply_item(m, &mut i)?;
     apply_funding(&mut tx, m, &mut i, event, locked).await?;
+    // 契約：眾籌品項 funded 之後唯讀；後台採購單即時讀這些欄位，不可事後改商品。同值重送不算修改。
+    if frozen && product(&i) != before {
+        return Err(if locked {
+            surprise_locked_err()
+        } else {
+            funding_locked()
+        });
+    }
     // 驚喜鎖定：不論有無捐助，一律禁止調降（否則 QTY_BELOW_CLAIMED 會洩漏「有人捐助」）
     if locked && i.qty_needed < old_qty {
         return Err(surprise_locked_err());
