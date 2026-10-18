@@ -156,6 +156,7 @@ main{padding:0 16px 60px}
 <a class="sub" href="#w-profile">個人頁 /u/{handle}</a>
 <a class="sub" href="#w-vis">可見性選擇器</a>
 <a class="sub" href="#w-gate">受限清單門檻頁</a>
+<a class="sub" href="#w-explore">探索頁</a>
 <a class="sub" href="#w-social-set">個人頁與捐助設定</a>
 <a class="sub" href="#w-matrix">路由對照與覆蓋矩陣</a>
 <a href="#s6">6. 元件規格表</a>
@@ -182,6 +183,7 @@ main{padding:0 16px 60px}
 <tr><th>版本</th><td>v0.5</td></tr>
 <tr><th>日期</th><td>2026-10-12</td></tr>
 <tr><th>狀態</th><td>Draft</td></tr>
+<tr><th>D51 變更</th><td>清單可見性精簡為 public / friends（所有好友，預設）/ selected（摯友）/ private；移除知道連結與密碼保護（含 5.35 密碼門檻、3.10 密碼清單旅程）。新增訪客探索頁 /explore（5.36 與 3.10）。下文 v0.5 提及 link / password / 解鎖之處已被取代。</td></tr>
 <tr><th>v0.5 變更</th><td>對齊 10/11 已實作功能，補齊原文件缺漏的畫面與流程：Email＋密碼註冊 / 登入 / 忘記密碼（5.30）、好友（5.31）、好友邀請連結（5.32）、個人頁（5.33）、清單可見性選擇器（5.34）、受限清單門檻頁（5.35）、帳號設定的個人頁與捐助可見度、捐助可見度（5.36）；新增旅程 3.9 / 3.10、User Flow 4.12 至 4.16、路由對照與實作覆蓋矩陣（5.37）、E2E 必測情境（13.1）。5.2 登入頁改以實作為準（密碼為主，OTP 僅用於註冊與重設）。</td></tr>
 <tr><th>v0.4 變更</th><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。本文件對應：檢舉與下架畫面、/admin、/settings、個資告知與 Email 管理連結、圖片 EXIF 提示、發票選項、錢包凍結、已驗證組織徽章、第 12 至 14 節。</td></tr>
 <tr><th>v0.3 變更</th><td>效仿星巴克，新增自動儲值、電子禮物卡、回饋星星、企業禮券。核心原則不變：點數永遠不能提領成現金給受捐者（收卡者也不能變現），只能用在心願品項。</td></tr>
@@ -411,7 +413,7 @@ flowchart TD
 <div class="tw"><table>
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
-<tr><td>1 點開連結</td><td>LINE 點開 /s/{slug}，看到「請先登入」</td><td>「不是說瀏覽免登入嗎？」</td><td>疑惑</td><td>門檻頁（LOGIN_REQUIRED）</td><td>門檻頁說明「這份清單只開放給好友」並顯示建立者名稱；免登入瀏覽只適用 link / public / password 清單；認捐一律需登入（D50）</td></tr>
+<tr><td>1 點開連結</td><td>LINE 點開 /s/{slug}，看到「請先登入」</td><td>「不是說瀏覽免登入嗎？」</td><td>疑惑</td><td>門檻頁（LOGIN_REQUIRED）</td><td>門檻頁說明「這份清單只開放給好友」並顯示建立者名稱；免登入瀏覽只適用 public 清單；認捐一律需登入（D50、D51）</td></tr>
 <tr><td>2 登入</td><td>用 LINE / Google 或 Email 登入，帶 redirect 回清單</td><td>「登入完就能看吧」</td><td>耐心</td><td>/login?redirect=</td><td>LINE / Google 置頂；已有帳號者一步完成</td></tr>
 <tr><td>3 被擋（非好友）</td><td>看到「此清單僅限好友查看（擁有者：小愛）」</td><td>「我要怎麼加她？」</td><td>卡關</td><td>門檻頁（FRIENDS_ONLY）</td><td>「前往小愛的頁面加好友」直連 /u/{handle}；若小愛沒設 handle 則提示請她傳邀請連結</td></tr>
 <tr><td>4 加好友</td><td>在個人頁送出好友邀請，或點小愛先前傳的邀請連結直接成為好友</td><td>「等她接受」</td><td>等待</td><td>/u/{handle}、/invite/{token}</td><td>邀請連結一步到位（登入後即互為好友）；申請需對方接受，會提示「已送出邀請」</td></tr>
@@ -419,15 +421,15 @@ flowchart TD
 <tr><td>6 事後</td><td>到 /me/claims 標記已購買，必要時調整可見度</td><td>「幫她確認我有買」</td><td>輕鬆</td><td>/me/claims</td><td>登入者的捐助與帳號綁定，換裝置也找得到（不需管理連結）</td></tr>
 </tbody></table></div>
 
-<h3>3.10 密碼清單的訪客（阿嬤的朋友，免註冊瀏覽、認捐需登入）<span class="ph p0">P0</span></h3>
-<p class="small">目標：建立者想「有連結也不能亂看」，但不想要求親友註冊。她把清單設為密碼保護，並用口頭或群組私訊告知密碼。</p>
+<h3>3.10 探索公開清單的訪客（沒有連結的路人，免註冊瀏覽、認捐需登入）<span class="ph p0">P0</span></h3>
+<p class="small">目標：訪客沒有任何連結，想看看別人公開的清單。D51 取代原「密碼清單」旅程（密碼保護已移除）。</p>
 <div class="tw"><table>
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
-<tr><td>1 點開</td><td>點開連結，看到「這份清單需要密碼」與建立者名稱</td><td>「密碼是什麼？」</td><td>停頓</td><td>門檻頁（PASSWORD_REQUIRED）</td><td>顯示「由 小愛 建立。請向對方詢問密碼。」</td></tr>
-<tr><td>2 輸入</td><td>輸入密碼；錯誤顯示「密碼錯誤」</td><td>「大小寫嗎？」</td><td>略急</td><td>解鎖表單</td><td>密碼欄可顯示 / 隱藏；錯太多次顯示稍後再試（每 slug + IP 15 分鐘 10 次）</td></tr>
-<tr><td>3 瀏覽與捐助</td><td>解鎖後與一般清單相同；權杖存 sessionStorage，關閉分頁即失效</td><td>「跟平常一樣」</td><td>順暢</td><td>/s/{slug}</td><td>免登入瀏覽、認捐需登入（D50）；即時更新 SSE 帶權杖</td></tr>
-<tr><td>4 密碼被更換</td><td>建立者改了密碼，舊權杖失效，頁面回到輸入密碼</td><td>「又要輸入一次？」</td><td>小煩</td><td>門檻頁</td><td>既有捐助不受影響；在 /me/claims 仍可管理</td></tr>
+<tr><td>1 進入探索</td><td>從首頁或頂欄點「探索」，進入 /explore</td><td>「大家都在許什麼願？」</td><td>好奇</td><td>/explore</td><td>免登入；新到舊列出公開清單卡片（封面、標題、擁有者、完成度）</td></tr>
+<tr><td>2 篩選與瀏覽</td><td>切換類型、按「載入更多」</td><td>「想看救助類的」</td><td>順暢</td><td>類型篩選、載入更多</td><td>每頁 24 筆；沒有結果顯示空狀態</td></tr>
+<tr><td>3 點進清單</td><td>點卡片進入 /s/{slug}，或點擁有者進個人頁</td><td>「想幫忙」</td><td>期待</td><td>/s/{slug}、/u/{handle}</td><td>免登入瀏覽</td></tr>
+<tr><td>4 想認捐</td><td>按「我要送」被要求登入，登入或註冊後回到清單</td><td>「要先登入啊」</td><td>略停頓</td><td>/login?redirect=/s/{slug}</td><td>認捐、眾籌、加好友一律需登入（D50）；登入後回到原清單</td></tr>
 </tbody></table></div>
 
 <h2 id="s4">4. User Flow</h2>
@@ -733,21 +735,15 @@ flowchart TD
   F4 --> A
 </pre>
 
-<h3>4.13 開啟受限清單（好友 / 指定 / 密碼）<span class="ph p0">P0</span></h3>
+<h3>4.13 開啟受限清單（好友 / 摯友）<span class="ph p0">P0</span></h3>
 <pre class="mermaid">
 flowchart TD
   A["點開 /s/slug"] --> B["SSR GET /public/wishlists/slug 不帶憑證"]
-  B -->|"200 public 或 link"| C["顯示清單"]
+  B -->|"200 public"| C["顯示清單"]
   B -->|"404"| D["找不到 或 private"]
   B -->|"410"| D2["已下架"]
   B -->|"403 受限"| E["client 以憑證重抓 GET /restricted/wishlists/slug<br/>抓取期間顯示載入中 不閃門檻頁"]
   E -->|"200"| C
-  E -->|"403 PASSWORD_REQUIRED"| P["門檻頁 輸入密碼"]
-  P --> P1["POST /public/wishlists/slug/unlock"]
-  P1 -->|"422 WRONG_PASSWORD"| P2["密碼錯誤 可重試"]
-  P1 -->|"429"| P3["嘗試過多 請稍後再試"]
-  P1 -->|"200 access_token"| P4["存 sessionStorage 重抓"]
-  P4 --> E
   E -->|"403 LOGIN_REQUIRED"| L["門檻頁 請先登入"]
   L --> L1["/login?redirect=/s/slug 登入後回到清單"]
   L1 --> E
@@ -800,12 +796,10 @@ flowchart TD
 <h3>4.16 設定清單可見性（建立者）<span class="ph p0">P0</span></h3>
 <pre class="mermaid">
 flowchart TD
-  A["/lists/new 或 /lists/id/edit"] --> B["VisibilityPicker 六選一"]
-  B -->|"password"| C["輸入密碼 8 到 64 字<br/>編輯時留空 表示不變更"]
+  A["/lists/new 或 /lists/id/edit"] --> B["VisibilityPicker 四選一（預設 friends）"]
   B -->|"selected"| D["載入 GET /friends 勾選好友"]
   D -->|"沒有好友"| D1["提示先到 /friends 邀請朋友"]
-  B -->|"public link friends private"| E["儲存"]
-  C --> E
+  B -->|"public friends private"| E["儲存"]
   D --> E
   E --> F["POST 或 PATCH /wishlists 帶 visibility"]
   F --> G{"visibility 為 selected"}
@@ -1262,7 +1256,7 @@ flowchart TD
 </div>
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>SiteHeader、CategoryTabs、UrgencyGroup、NeedCard（= ItemCard relief 變體）、PledgeSheet（= ClaimSheet）、ReceiptSheet、SyncQueueBadge</td></tr>
-<tr><th>狀態</th><td><b>組織驗證</b>：<code>verification_status=verified</code> 的組織據點顯示「已驗證組織」徽章（文字 + 圖示）；未驗證組織的據點只能是 link 可見，不上地圖、不出現在據點列表，建立 public 據點時 API 回 403 <code>ORG_NOT_VERIFIED</code>，/org/{id} 顯示「驗證審核中」並說明限制。loading / empty（「這個據點目前沒有需求」）/ error / 已滿（已被認捐完，灰掉）/ site_status=paused（頂部橫幅「此據點暫停接收物資」，認捐停用）/ closed（唯讀）/ 離線（認捐停用，志工登記實收走佇列）。</td></tr>
+<tr><th>狀態</th><td><b>組織驗證</b>：<code>verification_status=verified</code> 的組織據點顯示「已驗證組織」徽章（文字 + 圖示）；未驗證組織的據點只能是 link 可見（D51：link 可見性已廢止，P2-D 未驗證據點的非公開層級待重新定義），不上地圖、不出現在據點列表，建立 public 據點時 API 回 403 <code>ORG_NOT_VERIFIED</code>，/org/{id} 顯示「驗證審核中」並說明限制。loading / empty（「這個據點目前沒有需求」）/ error / 已滿（已被認捐完，灰掉）/ site_status=paused（頂部橫幅「此據點暫停接收物資」，認捐停用）/ closed（唯讀）/ 離線（認捐停用，志工登記實收走佇列）。</td></tr>
 <tr><th>互動</th><td>需求依 <code>relief_urgency</code>（critical → low）分組，組內依 <code>relief_category</code> 排序。「我要認捐」沿用 ClaimSheet（數量 stepper，需登入，D50；不收集災民個資）。「登記實收」僅對 org_role 為 volunteer / coordinator / owner 顯示。離線佇列：IndexedDB 存放請求與其 Idempotency-Key，連線恢復（<code>online</code> 事件 / Background Sync）後重送；iOS Safari 無 Background Sync，改在 App 前景時 flush。</td></tr>
 <tr><th>API</th><td>GET <code>/public/wishlists/{slug}</code>（據點即 relief 型 wishlist，路由直接使用 slug；GET /public/relief/sites 每筆已回傳 slug）；POST <code>/items/{item_id}/claims</code>（認捐）；POST <code>/items/{item_id}/receipts</code>（實收）；PATCH <code>/sites/{id}</code>（coordinator / owner 調整狀態與緊急度）；SSE <code>/public/wishlists/{slug}/events</code></td></tr>
 </tbody></table></div></div></div>
@@ -2008,7 +2002,7 @@ flowchart TD
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>ProfileHeader（display_name、@handle、RelationAction）、WishlistRow（封面縮圖、可見性徽章、已結束徽章、類型、完成度）、DonationRow（品項 × 數量 或 點數、狀態徽章、送給誰、清單連結、日期）</td></tr>
 <tr><th>relation</th><td><code>self</code>：「編輯個人設定」→ /settings；<code>friend</code>：「好友」徽章；<code>outgoing</code>：「已送出邀請」；<code>incoming</code>：「接受好友邀請」；<code>none</code>：「送出好友邀請」；<code>anonymous</code>：「登入以加好友」（帶 redirect 回此頁）。</td></tr>
-<tr><th>可見度</th><td>清單：public 任何人；friends 需為好友；selected 需在名單；本人另可看到自己的 friends / selected（private、link、password 不列）。捐助：依每筆捐助與認捐的 visibility，匿名認捐只給本人。驚喜鎖定中與已下架的清單不出現。link 清單的捐助不附連結。</td></tr>
+<tr><th>可見度</th><td>清單：public 任何人；friends 需為好友；selected 需在名單；本人另可看到自己的 friends / selected（private 不列）。捐助：依每筆捐助與認捐的 visibility，匿名認捐只給本人。驚喜鎖定中與已下架的清單不出現。</td></tr>
 <tr><th>狀態</th><td>loading / ok / gone（404）/ error（重試）；頁面 <code>noindex</code>；empty：「目前沒有可看的清單。」「目前沒有可看的捐助紀錄。」。</td></tr>
 <tr><th>API</th><td>GET <code>/users/{handle}</code>（匿名可呼叫，帶 cookie 才有 relation）；POST <code>/friends/requests</code>；接受時先 GET <code>/friends</code> 找出申請 id 再 POST accept。</td></tr>
 </tbody></table></div></div>
@@ -2023,33 +2017,29 @@ flowchart TD
 <div class="ab">‹ 編輯清單</div>
 <div class="bd">
 <div class="lbl"><b>誰可以看這份清單</b></div>
-<div class="card" style="align-items:center"><div class="col"><b>◯ 公開</b><span class="lbl">任何人都能看；會列在你的個人頁。</span></div></div>
-<div class="card" style="align-items:center"><div class="col"><b>◉ 知道連結</b><span class="lbl">只有拿到連結的人能開，不會列在個人頁。</span></div></div>
-<div class="card" style="align-items:center"><div class="col"><b>◯ 僅好友</b><span class="lbl">只有你的好友能開，對方需要登入。</span></div></div>
-<div class="card" style="align-items:center"><div class="col"><b>◯ 指定好友</b><span class="lbl">只有你勾選的好友能開，對方需要登入。</span></div></div>
-<div class="card" style="align-items:center"><div class="col"><b>◯ 密碼保護</b><span class="lbl">拿到連結且知道密碼的人才能開。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 公開</b><span class="lbl">任何人都能看（含訪客），會列在探索頁與你的個人頁。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◉ 所有好友</b><span class="lbl">只有你的好友能開，對方需要登入。</span></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◯ 摯友</b><span class="lbl">只有你從好友中勾選的摯友能開，對方需要登入。</span></div></div>
 <div class="card" style="align-items:center"><div class="col"><b>◯ 私人</b><span class="lbl">只有你自己看得到，朋友打開會顯示找不到。</span></div></div>
-</div></div><div class="cap">選項（預設 link）</div></div>
+</div></div><div class="cap">選項（預設 friends）</div></div>
 <div><div class="phone" style="min-height:760px">
 <div class="st"><span>9:41</span><span></span></div>
 <div class="ab">‹ 編輯清單</div>
 <div class="bd">
 <div class="lbl"><b>誰可以看這份清單</b></div>
-<div class="card" style="align-items:center"><div class="col"><b>◉ 指定好友</b></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>◉ 摯友</b></div></div>
 <div class="lbl"><b>選擇可以看的好友（已選 1 位）</b></div>
 <div class="card"><div class="col"><b>☑ 阿明</b><span class="lbl">@aming</span></div></div>
 <div class="card"><div class="col"><b>☐ 小芸</b></div></div>
 <div class="lbl" style="margin-top:8px">— 或，沒有好友時 —</div>
 <div class="lbl">還沒有好友。先到「好友」邀請朋友，再回來勾選。</div>
-<div class="lbl" style="margin-top:8px"><b>密碼保護時</b></div>
-<div><div class="lbl"><b>清單密碼（8–64 字）</b></div><div class="inp">已設定密碼，留空則不變更</div></div>
-</div></div><div class="cap">指定好友 / 密碼欄位（兩種狀態合併示意）</div></div>
+</div></div><div class="cap">摯友勾選（含沒有好友的狀態）</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>VisibilityPicker（RadioCardGroup ×6、PasswordField、FriendCheckList）；new 與 edit 共用。</td></tr>
-<tr><th>狀態</th><td>selected：載入好友中 / 無好友提示 / 載入失敗；password：新建必填 8–64 字，編輯時已設定者可留空（<code>has_password</code>）；儲存時 <code>NOT_FRIEND</code> 顯示「名單只能選擇你的好友」。</td></tr>
-<tr><th>互動</th><td>切到 selected 才載入 /friends。改為 password 後既有訪客權杖在密碼更換時全部失效。從 public 收緊到其他可見性，後端立即清除邊緣快取，頁面上以一行說明告知「已分享的舊連結會立即受新設定約束」。edit 頁底部顯示目前可見性說明。</td></tr>
-<tr><th>API</th><td>POST <code>/wishlists</code>、PATCH <code>/wishlists/{id}</code>（visibility、access_password）；GET / PUT <code>/wishlists/{id}/allowed-users</code>；GET <code>/friends</code>。</td></tr>
+<tr><th>元件</th><td>VisibilityPicker（RadioCardGroup ×4、FriendCheckList）；new 與 edit 共用。</td></tr>
+<tr><th>狀態</th><td>selected：載入好友中 / 無好友提示 / 載入失敗；儲存時 <code>NOT_FRIEND</code> 顯示「名單只能選擇你的好友」。</td></tr>
+<tr><th>互動</th><td>切到 selected 才載入 /friends。從 public 收緊到其他可見性，後端立即清除邊緣快取，頁面上以一行說明告知「已分享的舊連結會立即受新設定約束」。edit 頁底部顯示目前可見性說明。</td></tr>
+<tr><th>API</th><td>POST <code>/wishlists</code>、PATCH <code>/wishlists/{id}</code>（visibility）；GET / PUT <code>/wishlists/{id}/allowed-users</code>；GET <code>/friends</code>。</td></tr>
 </tbody></table></div></div>
 </div>
 
@@ -2057,12 +2047,6 @@ flowchart TD
 <h3 id="w-gate">5.35 受限清單門檻頁 /s/{slug}（403）<span class="ph p0">P0</span></h3>
 <div class="wf">
 <div class="phones">
-<div><div class="phone">
-<div class="st"><span>9:41</span><span></span></div>
-<div class="ab">Wishly</div>
-<div class="bd">
-<div style="margin:auto;display:flex;flex-direction:column;gap:10px;width:100%"><div style="text-align:center"><b style="font-size:17px">這份清單需要密碼</b></div><span class="lbl" style="text-align:center">由 小愛 建立。請向對方詢問密碼。</span><div><div class="lbl"><b>密碼</b></div><div class="inp">••••••</div></div><div style="color:var(--red);font-size:12px">密碼錯誤（WRONG_PASSWORD 示範）</div><div class="btn pri">解鎖</div></div>
-</div></div><div class="cap">PASSWORD_REQUIRED</div></div>
 <div><div class="phone">
 <div class="st"><span>9:41</span><span></span></div>
 <div class="ab">Wishly</div>
@@ -2083,12 +2067,22 @@ flowchart TD
 </div></div><div class="cap">NOT_ALLOWED</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>AccessGate（依 <code>code</code> 切換）、UnlockForm、LoginCta、OwnerProfileLink</td></tr>
-<tr><th>狀態</th><td>載入：SSR 對受限清單回 403，client 帶憑證重抓期間顯示載入中，不閃現門檻頁（<code>checking</code>）。<code>PASSWORD_REQUIRED</code>：解鎖中 / <code>WRONG_PASSWORD</code> / <code>RATE_LIMITED</code>（每 slug + IP 15 分鐘 10 次）；成功後權杖存 sessionStorage（<code>ws_la_{slug}</code>）。權杖失效（密碼被換）時自動清除並回到輸入密碼。</td></tr>
+<tr><th>元件</th><td>AccessGate（依 <code>code</code> 切換）、LoginCta、OwnerProfileLink</td></tr>
+<tr><th>狀態</th><td>載入：SSR 對受限清單回 403，client 帶憑證重抓期間顯示載入中，不閃現門檻頁（<code>checking</code>）。D51 起無密碼門檻（<code>PASSWORD_REQUIRED</code> / 解鎖 / 權杖已移除），僅 <code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code> 三種。</td></tr>
 <tr><th>互動</th><td><code>LOGIN_REQUIRED</code> 的按鈕導向 /login?redirect=/s/{slug}，登入後自動重抓。門檻頁只顯示擁有者名稱，不洩漏標題、品項或封面。LINE 預覽（OG）對受限清單為通用文案。</td></tr>
-<tr><th>API</th><td>GET <code>/restricted/wishlists/{slug}</code>（ws_session + <code>X-List-Access</code>，no-store）；POST <code>/public/wishlists/{slug}/unlock</code>；SSE 以 <code>?access=</code> 帶權杖。</td></tr>
+<tr><th>API</th><td>GET <code>/restricted/wishlists/{slug}</code>（ws_session，no-store）。</td></tr>
 </tbody></table></div></div>
 </div>
+
+<!-- 5.36 EXPLORE -->
+<h3 id="w-explore">5.36 探索頁 /explore（D51）<span class="ph p0">P0</span></h3>
+<div class="spec"><div class="tw"><table><tbody>
+<tr><th>用途</th><td>訪客（免登入）瀏覽所有人的公開清單；沒有連結也能發現清單。</td></tr>
+<tr><th>元件</th><td>GuestTop（含「探索」入口）、TypeFilter（全部 / 禮物登記 / 救助）、ExploreCard（封面、標題、擁有者連結 /u/{handle}、完成度進度條、品項數）、LoadMore。</td></tr>
+<tr><th>狀態</th><td>loading / ok / empty（沒有公開清單）/ error（重試）；有 <code>next_page</code> 才顯示「載入更多」。SSR 輸出，標題與描述供 SEO。</td></tr>
+<tr><th>互動</th><td>點卡片進 /s/{slug}（免登入瀏覽，認捐需登入，D50）；切換類型重新從第 1 頁載入。首頁導覽列與 hero 另有「探索」入口。</td></tr>
+<tr><th>API</th><td>GET <code>/public/wishlists?page=&amp;type=</code>（不讀 cookie，可 CDN 快取，每頁 24 筆，回 <code>next_page</code>）。</td></tr>
+</tbody></table></div></div>
 
 <!-- 5.36 SOCIAL SETTINGS -->
 <h3 id="w-social-set">5.36 個人頁與捐助設定、捐助與認捐可見度 <span class="ph p0">P0</span></h3>
@@ -2164,6 +2158,7 @@ flowchart TD
 <thead><tr><th>原設計路徑（v0.4 以前）</th><th>實作路徑</th><th>前端檔案（apps/web/app/pages）</th><th>線框 / 狀態</th></tr></thead>
 <tbody>
 <tr><td>/</td><td>/</td><td>apps/web/app/pages/index.vue</td><td>✔</td></tr>
+<tr><td>（未畫）</td><td>/explore</td><td>explore.vue</td><td>✔ 5.36（D51）</td></tr>
 <tr><td>/login</td><td>/login</td><td>login.vue</td><td>✔ 5.30（v0.5 改為密碼為主）</td></tr>
 <tr><td>（未畫）</td><td>/register、/forgot-password</td><td>register.vue、forgot-password.vue</td><td>✔ 5.30</td></tr>
 <tr><td>/dashboard</td><td>/dashboard</td><td>dashboard/index.vue</td><td>✔</td></tr>
@@ -2440,7 +2435,7 @@ async function waitTopup(before) {
 <tr><td><code>og:image</code></td><td>1200×630 PNG，動態產生：<code>https://wishly.tw/og/{slug}.png</code>（見下）</td><td>—</td></tr>
 <tr><td><code>og:type</code> / <code>og:url</code> / <code>og:locale</code></td><td>website / canonical（不含 openExternalBrowser 等追蹤參數）/ zh_TW</td><td>—</td></tr>
 <tr><td><code>twitter:card</code></td><td>summary_large_image</td><td>—</td></tr>
-<tr><td><code>robots</code></td><td>visibility=link 時 <code>noindex, nofollow</code>（知道連結才可看，不給搜尋引擎）；relief public 據點頁可 index</td><td>—</td></tr>
+<tr><td><code>robots</code></td><td>受限清單（friends / selected，SSR 回 403）一律 <code>noindex</code>，不給搜尋引擎；relief public 據點頁可 index</td><td>—</td></tr>
 </tbody></table></div>
 <h3>動態 OG 圖建議</h3>
 <ul>
@@ -2733,7 +2728,7 @@ async function waitTopup(before) {
 <tr><td>事件白名單</td><td>攔截 PostHog 請求</td><td>事件名與屬性皆在 12 節白名單內，不含暱稱與聯絡方式</td></tr>
 <tr><td>密碼註冊與登入</td><td>全新 Email；Mailpit 取得 OTP</td><td>註冊 → 輸入 OTP → 進 /dashboard；登出後以密碼登入成功；錯誤密碼顯示「帳號或密碼錯誤」；重複 Email 驗證顯示「此 Email 已註冊」</td></tr>
 <tr><td>忘記密碼</td><td>已註冊帳號</td><td>寄出 OTP → 設新密碼 → 回 /login 顯示「密碼已重設」；舊密碼失效、其他裝置 session 被撤銷</td></tr>
-<tr><td>密碼清單</td><td>visibility=password</td><td>匿名開啟看到門檻頁（無標題與品項）；錯誤密碼 422；正確密碼後可捐助；建立者改密碼後舊權杖失效回到門檻頁</td></tr>
+<tr><td>探索頁</td><td>多位使用者各有 public / friends / selected / private 清單</td><td>匿名開 /explore 只看到 public 且有品項的清單；類型篩選與載入更多正常；點進清單可瀏覽但「我要送」要求登入</td></tr>
 <tr><td>好友清單</td><td>visibility=friends</td><td>未登入「請先登入」→ 登入後非好友「僅限好友」→ 成為好友後可看；解除好友後再次被擋</td></tr>
 <tr><td>指定清單</td><td>visibility=selected 名單含甲不含乙</td><td>甲可看、乙 NOT_ALLOWED；解除好友後甲被自動移出名單</td></tr>
 <tr><td>邀請連結</td><td>甲產生連結、乙開啟</td><td>未登入顯示「登入後成為好友」；登入後成為好友；自己開啟 SELF_INVITE；撤銷後 404；重新產生後舊連結失效</td></tr>

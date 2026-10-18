@@ -105,6 +105,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>版本</td><td>v0.5</td></tr>
 <tr><td>日期</td><td>2026-10-12</td></tr>
 <tr><td>狀態</td><td>Draft</td></tr>
+<tr><td>D51 變更（2026-10-18）</td><td>清單可見性精簡為 public / friends / selected / private，新清單預設 friends；移除 <code>link</code>（知道連結）與 <code>password</code>（密碼保護），連同 <code>POST /public/wishlists/{slug}/unlock</code>、<code>X-List-Access</code>、SSE <code>?access=</code>、<code>access_password</code> / <code>has_password</code>、錯誤碼 <code>PASSWORD_REQUIRED</code> / <code>WRONG_PASSWORD</code>（migration 0016，既有 link / password 清單收緊為 friends）。新增訪客探索 <code>GET /public/wishlists</code>（見 F21）。下文 v0.5 描述的 link / password 已被取代。</td></tr>
 <tr><td>v0.5 變更</td><td>對齊 10/11 已實作的功能（原文件停在 10/8，流程圖落後實作）：新增 F1-c Email＋密碼註冊 / 登入 / 忘記密碼（登入頁實際入口）、F20 好友與邀請連結、F21 清單可見性與存取（好友 / 指定 / 密碼 / CDN 受限路徑）、F22 個人頁與捐助可見度；更新角色矩陣、錯誤碼（LOGIN_REQUIRED、FRIENDS_ONLY、NOT_ALLOWED、PASSWORD_REQUIRED、WRONG_PASSWORD、INVALID_CREDENTIALS、EMAIL_EXISTS、HANDLE_TAKEN、NOT_FRIEND、SELF_INVITE）；修正 F1-a 的 OTP_INVALID 狀態碼為 400（與實作與 04 一致）。</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證（本文件新增 F15 到 F19、6.7 到 6.9，並更新 F2、F9、F10）。前端部署為 Cloudflare Pages（Pages Functions SSR），Workers 為備案。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值（F11）、電子禮物卡（F12）、回饋星星（F13）、企業禮券（F14）；點數改為分批（point lots）管理。</td></tr>
@@ -185,7 +186,7 @@ flowchart LR
 <table>
 <thead><tr><th>動作</th><th>guest</th><th>owner</th><th>org owner</th><th>coordinator</th><th>volunteer</th><th>staff</th><th>系統</th><th>備註</th></tr></thead>
 <tbody>
-<tr><td>瀏覽公開清單 / 訂閱 SSE</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>依 visibility：link 知道 slug 即可；private 僅 owner；public 為 relief</td></tr>
+<tr><td>瀏覽公開清單 / 訂閱 SSE</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>依 visibility：public 任何人（含探索頁 <code>GET /public/wishlists</code>）；friends / selected 需登入且符合條件；private 僅 owner（D51）</td></tr>
 <tr><td>建立 / 編輯 / 發佈 / 關閉 personal、registry 清單</td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>僅清單 owner_id 本人</td></tr>
 <tr><td>管理品項、上傳圖片</td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>relief 品項依 org 角色</td></tr>
 <tr><td>數量捐助</td><td class="c">●</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">—</td><td class="c">—</td><td>D50：新認捐須登入（<code>ws_session</code> / Bearer），guest 欄的 ● 僅指瀏覽，未登入 POST 回 401 且不寫入；技術上不禁止自己捐助自己的清單。眾籌認捐需登入，見下方錢包列</td></tr>
@@ -211,7 +212,7 @@ flowchart LR
 <tr><td>claim 逾期轉 expired、對帳、清理、通知寄送</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td>audit_logs 的 actor_type = system</td></tr>
 <tr><td>讀取 audit_logs</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td>v1 無對外 API，僅內部查詢</td></tr>
 <tr><td>瀏覽 friends / selected 清單 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">—</td><td>F21；需登入且為好友 / 在名單內；owner 本人免檢查；org 角色欄僅表示「已登入」，不因 org 身分放行</td></tr>
-<tr><td>解鎖並瀏覽 password 清單 <span class="badge p0">P0</span></td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F21；知道密碼即可，免登入；每 slug + IP 15 分鐘 10 次</td></tr>
+<tr><td><s>解鎖並瀏覽 password 清單</s>（已移除，D51） <span class="badge p0">P0</span></td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>D51 起移除密碼清單（migration 0016）</td></tr>
 <tr><td>設定清單可見性、存取密碼、指定名單 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>F21；僅清單 owner_id 本人；指定名單只能選自己的好友</td></tr>
 <tr><td>好友申請 / 接受 / 邀請連結 / 解除好友 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F20；需登入；訪客可開邀請預覽但接受需登入</td></tr>
 <tr><td>設定 handle 與捐助預設可見度、逐筆調整捐助與認捐可見度 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>F22；舊訪客捐助（D50 前資料）無帳號，不列入個人頁</td></tr>
@@ -253,20 +254,19 @@ flowchart TD
 
 
 <h4>4.1 社群與可見性主流程（v0.5 補充）<span class="badge p0">P0</span></h4>
-<p>主流程總覽只畫了「公開連結」路徑。實作後清單另有 6 種可見性與好友關係，訪客是否看得到清單、捐助是否列在個人頁，都由下圖決定。</p>
+<p>主流程總覽只畫了「公開連結」路徑。實作後清單另有 4 種可見性（D51 起；原 6 種的 link / password 已移除）與好友關係，訪客是否看得到清單、捐助是否列在個人頁，都由下圖決定。</p>
 <pre class="mermaid">
 flowchart TD
-  O["建立者設定可見性 F21<br/>public / link / friends / selected / password / private"] --> S["清單 /s/slug"]
+  O["建立者設定可見性 F21<br/>public / friends / selected / private<br/>預設 friends"] --> S["清單 /s/slug"]
   FR["好友關係 F20<br/>申請 或 邀請連結"] --> S
   V["訪客或登入者開啟 /s/slug"] --> C{"access.rs check_wishlist"}
-  C -->|"public / link"| OK["200 公開內容 可被 CDN 快取"]
+  C -->|"public"| OK["200 公開內容 可被 CDN 快取"]
+  EX["訪客探索 GET /public/wishlists<br/>只列 public"] --> V
   C -->|"private"| NF["404 NOT_FOUND"]
-  C -->|"password 且權杖有效"| OK2["200 受限內容 no-store"]
-  C -->|"password 無權杖"| PW["403 PASSWORD_REQUIRED<br/>輸入密碼 unlock"]
+  C -->|"friends 為好友 / selected 在名單"| OK2["200 受限內容 no-store"]
   C -->|"friends / selected 未登入"| LG["403 LOGIN_REQUIRED<br/>登入後回到清單"]
   C -->|"friends 非好友"| FO["403 FRIENDS_ONLY<br/>前往個人頁加好友"]
   C -->|"selected 不在名單"| NA["403 NOT_ALLOWED"]
-  PW -->|"POST unlock 成功"| OK2
   LG --> V
   OK --> CL["捐助 F4 或 認捐 F6b"]
   OK2 --> CL
@@ -466,7 +466,7 @@ sequenceDiagram
   A-->>V: 我的舊訪客捐助
 </pre>
 <table class="meta"><tbody>
-<tr><td>前置條件</td><td>清單 status ∈ {active, closed} 且 visibility = link（或 relief 的 public）。draft / private / archived 對外一律 <code>NOT_FOUND</code>，與「slug 不存在」不可區分。</td></tr>
+<tr><td>前置條件</td><td>清單 status ∈ {active, closed} 且 visibility = public（可被 CDN 快取；friends / selected 走 <code>/restricted</code>，D51 已移除 link）。draft / private / archived 對外一律 <code>NOT_FOUND</code>，與「slug 不存在」不可區分。</td></tr>
 <tr><td>快取策略</td><td>
 <ul>
 <li><code>GET /public/wishlists/{slug}</code>：<code>Cache-Control: public, s-maxage=10, stale-while-revalidate=30, stale-if-error=600</code>；relief 尖峰時由設定檔調為 s-maxage=30~60。回應<strong>不得</strong>含 <code>Set-Cookie</code>（否則 Cloudflare 不快取），也不得依 cookie 或 guest_token 變化內容（所有「我的」資料走 <code>/guest/me</code>）。</li>
@@ -1123,7 +1123,7 @@ sequenceDiagram
 <h4>F10-0 組織驗證（D43）</h4>
 <table class="meta"><tbody>
 <tr><td>規則</td><td><code>organizations.verification_status</code> ∈ pending（預設）| verified | rejected，附 <code>verified_at</code>、<code>verified_by</code>。驗證文件（立案證書、政府單位證明）經 <code>POST /uploads/presign</code>（purpose=org_document）上傳到 R2 <strong>私有 bucket</strong>，不經 CDN，只有該 org 成員與 staff 以短效簽名網址讀取。</td></tr>
-<tr><td>未驗證限制</td><td>未驗證組織的據點只能 <code>visibility=link</code>：不上地圖、不出現在 <code>GET /public/relief/sites</code> 與需求彙總；建立或改成 <code>visibility=public</code> 回 <code>ORG_NOT_VERIFIED</code> 403。通過驗證後，公開頁顯示「已驗證組織」徽章。驗證被撤銷（rejected）時，同交易把該組織所有 public 據點降為 link 並 purge CDN。</td></tr>
+<tr><td>未驗證限制</td><td>未驗證組織的據點只能 <code>visibility=link</code>（D51：link 可見性已廢止，P2-D 未驗證據點的非公開層級待重新定義）：不上地圖、不出現在 <code>GET /public/relief/sites</code> 與需求彙總；建立或改成 <code>visibility=public</code> 回 <code>ORG_NOT_VERIFIED</code> 403。通過驗證後，公開頁顯示「已驗證組織」徽章。驗證被撤銷（rejected）時，同交易把該組織所有 public 據點降為 link 並 purge CDN。</td></tr>
 <tr><td>API</td><td>staff：<code>GET /admin/orgs?verification_status=</code>、<code>PATCH /admin/orgs/{id}/verification</code>（body <code>{status, reason}</code>，STAFF_ONLY，寫 audit_logs）。</td></tr>
 <tr><td>錯誤碼</td><td><code>ORG_NOT_VERIFIED</code> 403；<code>STAFF_ONLY</code> 403。</td></tr>
 </tbody></table>
@@ -1649,47 +1649,44 @@ sequenceDiagram
   participant C as Cloudflare CDN
   participant A as Rust API
   participant D as PostgreSQL
-  Note over B,D: 公開路徑 (可被 CDN 快取, 不讀 cookie 與 X-List-Access)
+  Note over B,D: 公開路徑 (可被 CDN 快取, 不讀 cookie)
   B->>C: GET /public/wishlists/{slug}
   C->>A: (未命中)
-  alt visibility = public 或 link
+  alt visibility = public
     A-->>B: 200 public, s-maxage=10
   else 其他
     A-->>B: 403 附 visibility 與 owner (no-store)
   end
   Note over B,D: 受限路徑 (永遠 no-store)
-  B->>A: GET /restricted/wishlists/{slug} (ws_session, X-List-Access)
+  B->>A: GET /restricted/wishlists/{slug} (ws_session)
   A->>D: 讀 viewer 與 friendships / allowed_users
   alt 擁有者 或 通過檢查
     A-->>B: 200 private, no-store
   else 未通過
-    A-->>B: 403 LOGIN_REQUIRED / FRIENDS_ONLY / NOT_ALLOWED / PASSWORD_REQUIRED
-  end
-  Note over B,D: 密碼清單解鎖
-  B->>A: POST /public/wishlists/{slug}/unlock (password)
-  A->>A: 限流 每 slug + IP 10 / 15 分鐘
-  alt 密碼正確
-    A-->>B: 200 access_token = HMAC(wishlist_id + 目前密碼雜湊)
-    B->>B: sessionStorage 存權杖, 之後帶 X-List-Access (SSE 用 ?access=)
-  else 錯誤
-    A-->>B: 422 WRONG_PASSWORD
+    A-->>B: 403 LOGIN_REQUIRED / FRIENDS_ONLY / NOT_ALLOWED
   end
 </pre>
 <div class="tw"><table>
 <thead><tr><th>visibility</th><th>誰能看</th><th>被擋時</th><th>列在個人頁</th></tr></thead>
 <tbody>
 <tr><td><code>public</code></td><td>任何人</td><td>—</td><td>是（任何人）</td></tr>
-<tr><td><code>link</code>（預設）</td><td>知道連結的人</td><td>—</td><td>否</td></tr>
-<tr><td><code>friends</code></td><td>擁有者的好友（需登入）</td><td>未登入 403 <code>LOGIN_REQUIRED</code>；非好友 403 <code>FRIENDS_ONLY</code></td><td>僅好友與本人看得到</td></tr>
-<tr><td><code>selected</code></td><td><code>wishlist_allowed_users</code> 名單內的使用者（須為好友，需登入）</td><td>未登入 <code>LOGIN_REQUIRED</code>；不在名單 <code>NOT_ALLOWED</code></td><td>名單內使用者與本人</td></tr>
-<tr><td><code>password</code></td><td>知道連結＋存取密碼（8–64 字，argon2）</td><td>403 <code>PASSWORD_REQUIRED</code>；解鎖錯誤 422 <code>WRONG_PASSWORD</code></td><td>否</td></tr>
+<tr><td><code>friends</code>（預設）</td><td>擁有者的所有好友（需登入）</td><td>未登入 403 <code>LOGIN_REQUIRED</code>；非好友 403 <code>FRIENDS_ONLY</code></td><td>僅好友與本人看得到</td></tr>
+<tr><td><code>selected</code>（摯友）</td><td><code>wishlist_allowed_users</code> 名單內的使用者（從好友中勾選的摯友，需登入）</td><td>未登入 <code>LOGIN_REQUIRED</code>；不在名單 <code>NOT_ALLOWED</code></td><td>名單內使用者與本人</td></tr>
 <tr><td><code>private</code></td><td>僅擁有者</td><td>404 <code>NOT_FOUND</code>（不洩漏存在）</td><td>否</td></tr>
 </tbody></table></div>
 <table class="meta"><tbody>
-<tr><td>規則</td><td>存取權杖綁定「清單 id＋目前密碼雜湊」，<b>改密碼即全部失效</b>；擁有者本人免權杖。<code>/public/wishlists/{slug}</code> 為 CDN 可快取路徑，<b>絕不可讀 cookie 或 X-List-Access</b>；受限內容只走 <code>/restricted/wishlists/{slug}</code>。清單從可公開收緊為其他可見性時（PATCH visibility），必須呼叫 <code>cdn::purge_wishlists</code> 清除邊緣快取。前端 SSR 拿不到 cookie，受限清單 SSR 為 403，client 端 hydrate 後以憑證重抓，抓取期間不閃現門檻頁。403 回應帶 <code>visibility</code> 與 <code>owner</code>（id、display_name、handle）供門檻頁顯示「由誰建立」與「前往個人頁加好友」。</td></tr>
-<tr><td>建立者端</td><td><code>POST /wishlists</code>、<code>PATCH /wishlists/{id}</code> 帶 <code>visibility</code>、<code>access_password</code>（僅 password）；<code>PUT /wishlists/{id}/allowed-users</code> 設定指定名單（只能選自己的好友，否則 422 <code>NOT_FRIEND</code>）。<code>has_password</code> 表示已設定密碼（留空則不變更）。切離 selected 後名單保留於 DB 但不生效。</td></tr>
-<tr><td>相關限制</td><td>捐助、認捐、檢舉、SSE 皆先過 <code>check_wishlist</code>：看不到就不能捐助；密碼清單的 FundSheet 與 SSE 需帶權杖。個人頁與捐助紀錄的可見判斷與此處同源（F22）。</td></tr>
-<tr><td>錯誤碼</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code>、<code>PASSWORD_REQUIRED</code>（皆 403）；<code>WRONG_PASSWORD</code>、<code>NOT_FRIEND</code>、<code>VALIDATION_FAILED</code>（缺 password 欄位，422）；<code>RATE_LIMITED</code> 429；<code>NOT_FOUND</code> 404。</td></tr>
+<tr><td>規則</td><td>擁有者本人永遠可看。<code>/public/wishlists/{slug}</code> 為 CDN 可快取路徑，<b>絕不可讀 cookie</b>，只回 public；受限內容只走 <code>/restricted/wishlists/{slug}</code>。清單從可公開收緊為其他可見性時（PATCH visibility），必須呼叫 <code>cdn::purge_wishlists</code> 清除邊緣快取。前端 SSR 拿不到 cookie，受限清單 SSR 為 403，client 端 hydrate 後以憑證重抓，抓取期間不閃現門檻頁。403 回應帶 <code>visibility</code> 與 <code>owner</code>（id、display_name、handle）供門檻頁顯示「由誰建立」與「前往個人頁加好友」。</td></tr>
+<tr><td>建立者端</td><td><code>POST /wishlists</code>、<code>PATCH /wishlists/{id}</code> 帶 <code>visibility</code>（public / friends / selected / private，未帶預設 friends；傳 link / password 回 422，DB 以 CHECK 擋）；<code>PUT /wishlists/{id}/allowed-users</code> 設定指定名單（只能選自己的好友，否則 422 <code>NOT_FRIEND</code>）。切離 selected 後名單保留於 DB 但不生效。</td></tr>
+<tr><td>相關限制</td><td>捐助、認捐、檢舉、SSE 皆先過 <code>check_wishlist</code>：看不到就不能捐助。個人頁與捐助紀錄的可見判斷與此處同源（F22）。</td></tr>
+<tr><td>錯誤碼</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code>（皆 403）；<code>NOT_FRIEND</code>、<code>VALIDATION_FAILED</code>（422）；<code>NOT_FOUND</code> 404。</td></tr>
+</tbody></table>
+
+<h4>4.2 訪客探索（D51）</h4>
+<table class="meta"><tbody>
+<tr><td>端點</td><td><code>GET /public/wishlists?page=&amp;type=</code>（type 為 registry / relief，其他值 422；page 1–100）。免登入、不讀 cookie，與 <code>/public/wishlists/{slug}</code> 同樣 <code>public, s-maxage=10, stale-while-revalidate=60</code> 可被 CDN 快取。</td></tr>
+<tr><td>列入條件</td><td>visibility = public、status = active、未刪除、moderation ok、至少 1 個品項、未結束（closes_at 為空或未到）、未處於驚喜鎖定、擁有者未刪除且未封鎖。依建立時間新到舊，每頁 24 筆。</td></tr>
+<tr><td>回應</td><td><code>{ wishlists: [{ slug, title, type, cover_image_url, event_date, owner: { display_name, handle }, item_count, completion_pct }], next_page: number | null }</code></td></tr>
+<tr><td>訪客權限</td><td>訪客可瀏覽探索頁與清單，但不能認捐、眾籌或加好友，一律須登入（D50）。清單被收緊時探索頁最多殘留約 1 分鐘快取卡片，點進去仍依 check_wishlist 回 403 / 404。</td></tr>
 </tbody></table>
 
 <h3 id="f22">F22 個人頁與捐助可見度 <span class="badge p0">P0</span></h3>
@@ -1711,7 +1708,7 @@ flowchart TD
   F -->|"anonymous"| N["登入以加好友 redirect 回此頁"]
 </pre>
 <table class="meta"><tbody>
-<tr><td>規則</td><td><code>users.handle</code>：小寫英數與底線 3–30 字、唯一（<code>HANDLE_TAKEN</code> 409），可為空（無個人頁）。<b>舊訪客捐助（無帳號，D50 前資料）永遠不出現在任何個人頁</b>（<code>claims.visibility IS NULL</code>）。會員捐助時可在 ClaimSheet 指定 <code>visibility</code>（public / friends / private），未指定則由 DB trigger 套用帳號 <code>default_claim_visibility</code>（預設 private）；之後可於 /me/claims 逐筆 PATCH。點數認捐同樣保存逐筆 <code>visibility</code>，建立時可指定，未指定由 DB trigger 套帳號預設；既有資料回填遷移當下的帳號預設。之後可於 /me/wallet 逐筆 PATCH，改帳號預設不回溯既有捐助或認捐；轉投保留原筆可見度。匿名認捐在個人頁仍僅本人可見。驚喜鎖定中的清單、已下架 / 已刪除的清單，其捐助一律不顯示；link 清單的捐助不給 slug。捐助最多回 50 筆。</td></tr>
+<tr><td>規則</td><td><code>users.handle</code>：小寫英數與底線 3–30 字、唯一（<code>HANDLE_TAKEN</code> 409），可為空（無個人頁）。<b>舊訪客捐助（無帳號，D50 前資料）永遠不出現在任何個人頁</b>（<code>claims.visibility IS NULL</code>）。會員捐助時可在 ClaimSheet 指定 <code>visibility</code>（public / friends / private），未指定則由 DB trigger 套用帳號 <code>default_claim_visibility</code>（預設 private）；之後可於 /me/claims 逐筆 PATCH。點數認捐同樣保存逐筆 <code>visibility</code>，建立時可指定，未指定由 DB trigger 套帳號預設；既有資料回填遷移當下的帳號預設。之後可於 /me/wallet 逐筆 PATCH，改帳號預設不回溯既有捐助或認捐；轉投保留原筆可見度。匿名認捐在個人頁仍僅本人可見。驚喜鎖定中的清單、已下架 / 已刪除的清單，其捐助一律不顯示。捐助最多回 50 筆。</td></tr>
 <tr><td>API</td><td><code>GET /users/{handle}</code>（匿名可呼叫，帶 cookie 時回傳 relation）、<code>PATCH /me</code>（handle、default_claim_visibility）、<code>PATCH /claims/{id}</code>（visibility）、<code>POST /items/{id}/contributions</code>（visibility，選填）、<code>PATCH /contributions/{id}</code>（visibility，僅認捐者本人）</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>NOT_FOUND</code> 404（handle 不存在 / 帳號已刪除）；<code>HANDLE_TAKEN</code> 409；<code>VALIDATION_FAILED</code> 422（handle 格式）。個人頁一律 <code>noindex</code>。</td></tr>
 </tbody></table>
@@ -1940,8 +1937,8 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <tr><td><code>LOGIN_REQUIRED</code></td><td>403</td><td>friends / selected 清單，未登入（附 <code>visibility</code>、<code>owner</code>）</td></tr>
 <tr><td><code>FRIENDS_ONLY</code></td><td>403</td><td>friends 清單，登入者不是擁有者的好友</td></tr>
 <tr><td><code>NOT_ALLOWED</code></td><td>403</td><td>selected 清單，登入者不在指定名單</td></tr>
-<tr><td><code>PASSWORD_REQUIRED</code></td><td>403</td><td>password 清單，缺少或失效的 <code>X-List-Access</code> 權杖</td></tr>
-<tr><td><code>WRONG_PASSWORD</code></td><td>422</td><td>POST unlock 密碼錯誤</td></tr>
+<tr><td><s><code>PASSWORD_REQUIRED</code></s></td><td>403</td><td>已移除（D51，password 可見性廢止）</td></tr>
+<tr><td><s><code>WRONG_PASSWORD</code></s></td><td>422</td><td>已移除（D51，unlock 端點廢止）</td></tr>
 <tr><td><code>NOT_FRIEND</code></td><td>422</td><td>指定名單包含不是自己好友的使用者</td></tr>
 <tr><td><code>SELF_INVITE</code></td><td>422</td><td>接受自己產生的好友邀請連結</td></tr>
 <tr><td><code>INVALID_CREDENTIALS</code></td><td>401</td><td>Email 或密碼錯誤（不區分無帳號與密碼錯）</td></tr>
