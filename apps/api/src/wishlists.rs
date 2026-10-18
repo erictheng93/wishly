@@ -697,6 +697,7 @@ async fn update(
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;
     }
+    crate::dashboard::notify(&mut *tx, id).await?; // 即時連線立即重驗可見性 / 狀態
     tx.commit().await?;
     // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
     if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) {
@@ -744,6 +745,7 @@ async fn archive(
     let mut tx = st.pool.begin().await?;
     sqlx::query("UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) WHERE id=$1 AND status<>'archived'").bind(id).execute(&mut *tx).await?;
     release_pledged(&mut tx, &[id]).await?;
+    crate::dashboard::notify(&mut *tx, id).await?; // 即時連線收到後關閉
     tx.commit().await?;
     crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     Ok(StatusCode::NO_CONTENT)

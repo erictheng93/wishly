@@ -183,6 +183,8 @@ struct ItemSnap {
 }
 
 struct Snap {
+    owner_id: Uuid,
+    visibility: String,
     status: String,
     title: String,
     hidden: bool,
@@ -191,9 +193,9 @@ struct Snap {
 
 async fn snapshot(pool: &PgPool, wid: Uuid) -> Result<Option<Snap>, sqlx::Error> {
     SNAPSHOT_QUERIES.fetch_add(1, Ordering::Relaxed);
-    let w: Option<(String, String, String)> = sqlx::query_as(
-        "SELECT status::text, title, moderation_status::text FROM wishlists WHERE id = $1 AND deleted_at IS NULL").bind(wid).fetch_optional(pool).await?;
-    let Some((status, title, m)) = w else {
+    let w: Option<(String, String, String, Uuid, String)> = sqlx::query_as(
+        "SELECT status::text, title, moderation_status::text, owner_id, visibility::text FROM wishlists WHERE id = $1 AND deleted_at IS NULL").bind(wid).fetch_optional(pool).await?;
+    let Some((status, title, m, owner_id, visibility)) = w else {
         return Ok(None);
     };
     type SnapshotRow = (
@@ -211,6 +213,8 @@ async fn snapshot(pool: &PgPool, wid: Uuid) -> Result<Option<Snap>, sqlx::Error>
                     FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL", crate::points::DISPLAY_STATUS_SQL))
         .bind(wid).fetch_all(pool).await?;
     Ok(Some(Snap {
+        owner_id,
+        visibility,
         status,
         title,
         hidden: m == "hidden",
@@ -292,9 +296,15 @@ async fn events(
         tokio::pin!(deadline);
         let mut seq = 0u64;
         let mut nseq;
+        // 好友關係/指定名單變動不會 notify，定期重驗非公開清單的存取權
+        let mut recheck = tokio::time::interval(Duration::from_secs(60));
+        recheck.tick().await;
         loop {
+            let mut periodic = false;
             tokio::select! {
                 _ = &mut deadline => break,
+                // 定期重驗沿用最新共用快照：清單欄位變更都會 notify，好友/指定名單由 check_wishlist 即時查
+                _ = recheck.tick() => { periodic = true; nseq = NOTIFY_SEQ.load(Ordering::Relaxed); }
                 _ = tx.closed() => break,
                 r = rx.recv() => match r {
                     Ok((id, _)) if id != wid => continue,
@@ -303,9 +313,31 @@ async fn events(
                     Err(_) => nseq = NOTIFY_SEQ.load(Ordering::Relaxed), // Lagged：以最新序號重查
                 },
             }
-            let Ok(Some(s)) = snapshot_shared(&pool, wid, nseq).await else {
+            let Ok(snap) = snapshot_shared(&pool, wid, nseq).await else {
                 continue;
             };
+            // 清單已刪除、封存/下架為非 active/closed，或觀看者失去存取權：不再推送，直接關閉連線
+            let Some(s) = snap.filter(|s| matches!(s.status.as_str(), "active" | "closed")) else {
+                break;
+            };
+            if s.visibility != "public"
+                && crate::access::check_wishlist(
+                    &pool,
+                    &crate::access::ListAccess {
+                        wishlist_id: wid,
+                        owner_id: s.owner_id,
+                        visibility: &s.visibility,
+                    },
+                    viewer,
+                )
+                .await
+                .is_err()
+            {
+                break;
+            }
+            if periodic {
+                continue;
+            }
             let mut evs: Vec<(&str, Value)> = vec![];
             if !s.hidden {
                 for (id, cur) in &s.items {
