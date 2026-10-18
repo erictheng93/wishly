@@ -22,10 +22,10 @@ export function useAuth() {
     return fetchMe(true)
   }
   const login = (email: string, password: string) => session('/auth/login', { email, password })
-  const register = (email: string, password: string, display_name: string) => post('/auth/register', { email, password, display_name })
-  const verifyRegister = (email: string, code: string) => session('/auth/register/verify', { email, code })
-  const requestReset = (email: string) => post('/auth/password/reset/request', { email })
-  const confirmReset = (email: string, code: string, new_password: string) => post('/auth/password/reset/confirm', { email, code, new_password })
+  const register = (email: string, password: string, display_name: string, turnstile_token?: string) => post('/auth/register', { email, password, display_name, turnstile_token })
+  const verifyRegister = (email: string, code: string, challenge_id?: string) => session('/auth/register/verify', { email, code, challenge_id })
+  const requestReset = (email: string, turnstile_token?: string) => post('/auth/password/reset/request', { email, turnstile_token })
+  const confirmReset = (email: string, code: string, new_password: string, challenge_id?: string) => post('/auth/password/reset/confirm', { email, code, new_password, challenge_id })
   async function oauth(provider: 'google' | 'line', redirect = '/dashboard', link = false) {
     // 原生殼：系統瀏覽器完成後以 deep link 回 App。登入憑 verifier 兌換權杖；
     // 綁定因瀏覽器沒有 session，先以 Bearer 換一張綁 app_challenge 的一次性 ticket

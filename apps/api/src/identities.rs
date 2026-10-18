@@ -211,7 +211,16 @@ async fn verify_email(
 ) -> Result<Json<Value>, AppError> {
     let email = auth::norm_email(&b.email)?;
     let hash = session_hash(&headers)?;
-    auth::consume_otp_scoped(&st.pool, &email, &b.code, "link", Some(u.id), Some(&hash)).await?;
+    auth::consume_otp_scoped(
+        &st.pool,
+        &email,
+        &b.code,
+        "link",
+        Some(u.id),
+        Some(&hash),
+        None,
+    )
+    .await?;
     link(&st.pool, u.id, &hash, "email", &email, Some(&email)).await?;
     Ok(Json(auth::user_json(&st.pool, u.id).await?))
 }

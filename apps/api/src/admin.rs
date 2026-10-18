@@ -395,7 +395,7 @@ async fn recover_user(
         )
     })?;
     // 先取得 OTP 鎖，再鎖 user，與綁定驗證碼共用鎖順序；避免持交易另取 pool 連線。
-    let code =
+    let (_, code) =
         crate::auth::issue_otp_in_tx(&mut tx, &email, "reset", None, None, None, None).await?;
     let valid: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id=$1 AND email=$2 AND deleted_at IS NULL AND blocked_at IS NULL FOR SHARE")
         .bind(id).bind(&email).fetch_optional(&mut *tx).await?;
