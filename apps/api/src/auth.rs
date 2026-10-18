@@ -263,14 +263,14 @@ pub(crate) fn rate_limited(secs: i64) -> AppError {
     }
 }
 
-async fn send_mail(to: String, code: String, subject: &'static str) {
-    let r = crate::notify::send_mail(
-        &crate::config::get(),
-        &to,
-        subject,
-        &format!("您的驗證碼是 {code}，10 分鐘內有效。若非本人操作請忽略此信。"),
-    )
-    .await;
+async fn send_mail(to: String, code: String, subject: String, lang: crate::notify::Lang) {
+    use crate::notify::Lang::*;
+    let body = match lang {
+        Zh => format!("您的驗證碼是 {code}，10 分鐘內有效。若非本人操作請忽略此信。"),
+        En => format!("Your verification code is {code}. It is valid for 10 minutes. If this wasn't you, please ignore this email."),
+        Vi => format!("Mã xác minh của bạn là {code}, có hiệu lực trong 10 phút. Nếu không phải bạn yêu cầu, vui lòng bỏ qua email này."),
+    };
+    let r = crate::notify::send_mail(&crate::config::get(), &to, &subject, &body).await;
     if let Err(e) = r {
         tracing::error!(error = %e, "send otp mail failed");
     }
@@ -357,13 +357,28 @@ pub(crate) async fn issue_otp_in_tx(
 }
 
 pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
-    let subject = match purpose {
-        "register" => "Wishly 註冊驗證碼",
-        "reset" => "Wishly 重設密碼驗證碼",
-        "link" => "Wishly 綁定 Email 驗證碼",
-        _ => "Wishly 登入驗證碼",
+    use crate::notify::Lang::*;
+    let lang = crate::notify::request_lang();
+    let subject = match (purpose, lang) {
+        ("register", Zh) => "Wishly 註冊驗證碼",
+        ("reset", Zh) => "Wishly 重設密碼驗證碼",
+        ("link", Zh) => "Wishly 綁定 Email 驗證碼",
+        (_, Zh) => "Wishly 登入驗證碼",
+        ("register", En) => "Wishly sign-up verification code",
+        ("reset", En) => "Wishly password reset verification code",
+        ("link", En) => "Wishly email linking verification code",
+        (_, En) => "Wishly sign-in verification code",
+        ("register", Vi) => "Mã xác minh đăng ký Wishly",
+        ("reset", Vi) => "Mã xác minh đặt lại mật khẩu Wishly",
+        ("link", Vi) => "Mã xác minh liên kết Email Wishly",
+        (_, Vi) => "Mã xác minh đăng nhập Wishly",
     };
-    tokio::spawn(send_mail(email.to_string(), code, subject)); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
+    tokio::spawn(send_mail(
+        email.to_string(),
+        code,
+        subject.to_string(),
+        lang,
+    )); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
 }
 
 /// 匿名 OTP 請求的閘門（不論帳號是否存在都計數，不洩漏帳號）：
@@ -590,11 +605,13 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let (dn, email, avatar, staff, prefs, handle, dcv): (String, Option<String>, Option<String>, bool, Value, Option<String>, String) =
         sqlx::query_as("SELECT display_name, email, avatar_key, is_staff, notification_prefs, handle, default_claim_visibility::text FROM users WHERE id=$1 AND deleted_at IS NULL")
             .bind(id).fetch_optional(pool).await?.ok_or(AppError::Unauthorized)?;
-    let (bio, birthday, bv): (Option<String>, Option<String>, String) =
-        sqlx::query_as("SELECT bio, birthday, birthday_visibility::text FROM users WHERE id=$1")
-            .bind(id)
-            .fetch_one(pool)
-            .await?;
+    let (bio, birthday, bv, locale): (Option<String>, Option<String>, String, String) =
+        sqlx::query_as(
+            "SELECT bio, birthday, birthday_visibility::text, locale FROM users WHERE id=$1",
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await?;
     let (mfa_enabled, has_password): (bool, bool) = sqlx::query_as(
         "SELECT totp_enabled_at IS NOT NULL, EXISTS(SELECT 1 FROM auth_identities i WHERE i.user_id=$1 AND i.provider='email' AND i.password_hash IS NOT NULL)
          FROM users WHERE id=$1")
@@ -608,7 +625,7 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let avatar_url = crate::uploads::avatar_url(avatar.as_deref());
     Ok(
         json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
-               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
+               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "locale": locale, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
                "orgs": [] }),
     ) // orgs 為 P2-D，MVP 恆空
 }
@@ -637,6 +654,8 @@ struct PatchMe {
     #[serde(default, deserialize_with = "some_opt")]
     birthday: Option<Option<String>>,
     birthday_visibility: Option<String>,
+    /// 介面語言（信件語言）：zh-TW / en / vi
+    locale: Option<String>,
 }
 
 fn share_level(v: &str, ptr: &'static str) -> Result<(), AppError> {
@@ -756,6 +775,20 @@ async fn patch_me(
     if let Some(v) = &p.birthday_visibility {
         share_level(v, "/birthday_visibility")?;
         sqlx::query("UPDATE users SET birthday_visibility=$2::text::share_level WHERE id=$1")
+            .bind(u.id)
+            .bind(v)
+            .execute(&st.pool)
+            .await?;
+    }
+    if let Some(v) = &p.locale {
+        if !["zh-TW", "en", "vi"].contains(&v.as_str()) {
+            return Err(AppError::invalid(
+                "/locale",
+                "ENUM",
+                "只能是 zh-TW / en / vi",
+            ));
+        }
+        sqlx::query("UPDATE users SET locale=$2 WHERE id=$1")
             .bind(u.id)
             .bind(v)
             .execute(&st.pool)
