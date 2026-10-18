@@ -58,10 +58,28 @@ pub(crate) fn check_pw(p: &str) -> Result<(), AppError> {
         ))
     }
 }
-pub(crate) async fn hash_blocking(p: String) -> Result<String, AppError> {
-    tokio::task::spawn_blocking(move || hash_pw(&p))
+/// 全程序共用的 Argon2 併發上限（每次約 19 MiB），記憶體上界約 permits × 19 MiB。
+static ARGON_SEM: LazyLock<tokio::sync::Semaphore> = LazyLock::new(|| {
+    let n = std::thread::available_parallelism().map_or(4, |n| n.get() * 2);
+    tokio::sync::Semaphore::new(n.clamp(2, 16))
+});
+
+/// 所有 Argon2 雜湊 / 驗證都經此：取不到名額（等待 2 秒）回 503 BUSY。
+pub(crate) async fn argon_run<T: Send + 'static>(
+    f: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, AppError> {
+    let busy = || AppError::problem(503, "BUSY", "系統忙碌，請稍後再試");
+    let permit = tokio::time::timeout(std::time::Duration::from_secs(2), ARGON_SEM.acquire())
         .await
-        .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "系統錯誤"))?
+        .map_err(|_| busy())?
+        .map_err(|_| busy())?;
+    let r = tokio::task::spawn_blocking(f).await;
+    drop(permit);
+    r.map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "系統錯誤"))
+}
+
+pub(crate) async fn hash_blocking(p: String) -> Result<String, AppError> {
+    argon_run(move || hash_pw(&p)).await?
 }
 
 #[derive(Deserialize)]
@@ -159,6 +177,8 @@ async fn login(
     let email = r.email.trim().to_lowercase();
     let headers = parts.headers.clone();
     let ip = crate::config::client_ip(&parts, &crate::config::get());
+    // 原子的每 IP 嘗試數上限（先於 Argon2）：failure 列在驗證後才寫，併發請求否則全會通過下方計數
+    crate::ratelimit::check(&st.pool, &format!("login_ip:{ip}"), 30, 900).await?;
     let (by_pair, by_email, by_ip): (i64, i64, i64) = sqlx::query_as(
         "SELECT count(*) FILTER (WHERE email=$1 AND ip=$2), count(*) FILTER (WHERE email=$1), count(*) FILTER (WHERE ip=$2) FROM login_failures
          WHERE created_at > now() - interval '15 minutes' AND (email=$1 OR ip=$2)").bind(&email).bind(&ip).fetch_one(&st.pool).await?;
@@ -177,13 +197,12 @@ async fn login(
         None => (None, None),
     };
     let pw = r.password;
-    let ok = tokio::task::spawn_blocking(move || {
+    let ok = argon_run(move || {
         let real = hash.as_deref();
         let good = verify_pw(&pw, real.unwrap_or(&DUMMY_HASH)); // 無帳號 / 無密碼也跑一次
         good && real.is_some() && pw.chars().count() <= 128
     })
-    .await
-    .unwrap_or(false);
+    .await?;
     let Some(uid) = uid.filter(|_| ok) else {
         sqlx::query("INSERT INTO login_failures (email, ip) VALUES ($1,$2)")
             .bind(&email)
