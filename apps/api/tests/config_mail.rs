@@ -152,6 +152,32 @@ fn client_ip_trust() {
     let (p, c) = mk(true, true);
     assert_eq!(client_ip(&p, &c), "1.1.1.1");
     let _: HeaderMap = p.headers;
+    // CF-Connecting-IP 非合法 IP => 忽略，退回 socket 位址；合法 IPv4 / IPv6 => 取標頭值
+    let mk2 = |v: &str| {
+        let mut r = Request::builder()
+            .header("cf-connecting-ip", v)
+            .body(())
+            .unwrap();
+        r.extensions_mut()
+            .insert(ConnectInfo("9.9.9.9:1234".parse::<SocketAddr>().unwrap()));
+        let mut c = Config::dev();
+        c.trusted_proxy_cloudflare = true;
+        (r.into_parts().0, c)
+    };
+    for bad in [
+        "not-an-ip",
+        "1.1.1.1, 2.2.2.2",
+        "1.1.1.1:80",
+        "' OR 1=1",
+        "",
+    ] {
+        let (p, c) = mk2(bad);
+        assert_eq!(client_ip(&p, &c), "9.9.9.9", "{bad}");
+    }
+    let (p, c) = mk2(" 203.0.113.7 ");
+    assert_eq!(client_ip(&p, &c), "203.0.113.7");
+    let (p, c) = mk2("2001:db8::1");
+    assert_eq!(client_ip(&p, &c), "2001:db8::1");
 }
 
 #[tokio::test]
