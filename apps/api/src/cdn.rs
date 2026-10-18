@@ -1,6 +1,6 @@
 //! CDN 快取清除（Cloudflare purge by URL，所有方案皆可用）。
-//! GET /public/wishlists/{slug} 對 public / link 清單回 s-maxage=10 + stale-while-revalidate=60，邊緣可能留舊副本約一分鐘；
-//! 清單「不再能公開提供」時（收緊成 friends / selected / password / private、封存、下架、刪帳號）立刻清掉，
+//! GET /public/wishlists/{slug} 對 public 清單回 s-maxage=10 + stale-while-revalidate=60，邊緣可能留舊副本約一分鐘；
+//! 清單「不再能公開提供」時（收緊成 friends / selected / private、封存、下架、刪帳號）立刻清掉，
 //! 避免剛設成好友限定的清單仍被拿到連結的人看到。
 //! 未設 CF_ZONE_ID + CF_CACHE_PURGE_TOKEN（dev / test）時不做事；production 經 Cloudflare 時啟動即要求（config.rs）。
 use crate::config::Config;
@@ -8,7 +8,7 @@ use std::time::Duration;
 
 /// 公開（可快取）路徑是否會提供這份清單的內容（與 public.rs render 的匿名判斷一致）
 pub fn servable(visibility: &str, status: &str, moderation: &str) -> bool {
-    matches!(visibility, "public" | "link")
+    visibility == "public"
         && matches!(status, "active" | "closed")
         && moderation == "ok"
 }
@@ -74,15 +74,15 @@ pub fn purge_wishlists(slugs: Vec<String>) {
 mod tests {
     use super::servable;
     #[test]
-    fn servable_only_public_link_live_ok() {
-        assert!(servable("public", "active", "ok") && servable("link", "closed", "ok"));
-        for v in ["friends", "selected", "password", "private"] {
+    fn servable_only_public_live_ok() {
+        assert!(servable("public", "active", "ok") && servable("public", "closed", "ok"));
+        for v in ["friends", "selected", "link", "password", "private"] {
             assert!(!servable(v, "active", "ok"), "{v}");
         }
         assert!(
             !servable("public", "archived", "ok")
                 && !servable("public", "draft", "ok")
-                && !servable("link", "active", "hidden")
+                && !servable("public", "active", "hidden")
         );
     }
 }

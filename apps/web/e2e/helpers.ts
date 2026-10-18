@@ -66,7 +66,7 @@ export type List = { id: string; slug: string; title: string; items: { id: strin
 /** 建立清單 + 品項 + （預設）發佈 */
 export async function createList(user: User, o: ListOpts = {}): Promise<List> {
   const title = o.title ?? `E2E 清單 ${uid()}`
-  const body: any = { type: 'registry', title, visibility: 'link', surprise_mode: !!o.surprise, show_claimer_names: !!o.showNames }
+  const body: any = { type: 'registry', title, visibility: 'public', surprise_mode: !!o.surprise, show_claimer_names: !!o.showNames }
   if (o.surprise) body.event_date = new Date(Date.now() + 30 * 864e5 + 8 * 36e5).toISOString().slice(0, 10)
   const w = await (await must(await user.api.post('wishlists', { data: body }), '建立清單')).json()
   const items = []

@@ -15,7 +15,7 @@ const P = {
 const res = {}
 // 清單標題
 for (const [k, v] of Object.entries(P)) {
-  const r = await U.api.post('wishlists', { data: { type: 'registry', title: v, visibility: 'link' } })
+  const r = await U.api.post('wishlists', { data: { type: 'registry', title: v, visibility: 'public' } })
   res['title:' + k] = r.status(); R('list.title:' + k, r.status(), { body: (await r.text()).slice(0, 160) })
 }
 // 品項欄位

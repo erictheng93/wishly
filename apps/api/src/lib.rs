@@ -164,7 +164,6 @@ fn cors() -> tower_http::cors::CorsLayer {
             HeaderName::from_static("x-native-client"),
             HeaderName::from_static("x-guest-token"),
             HeaderName::from_static("idempotency-key"),
-            HeaderName::from_static("x-list-access"),
         ])
         .expose_headers([HeaderName::from_static("idempotency-replayed")])
 }

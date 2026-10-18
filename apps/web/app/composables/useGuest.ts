@@ -35,23 +35,16 @@ export function setGuestToken(t: string | null): boolean {
   return persisted
 }
 
-// 目前頁面的密碼清單權杖：分享頁解鎖後設定，之後所有 api() 自動帶 X-List-Access（ClaimSheet / ReportSheet 不用改）
-let activeAccess: string | null = null
-export const setActiveAccess = (t: string | null) => { activeAccess = t }
-export const getActiveAccess = () => activeAccess
-
 export const getPref = (k: string) => (import.meta.client ? safe(() => localStorage.getItem(k)) : null)
 export const setPref = (k: string, v: string) => safe(() => localStorage.setItem(k, v))
 
 export function useGuest() {
   const { public: { apiBase } } = useRuntimeConfig()
   // keepToken：401 時不清本機訪客 token。新增捐助需登入會員，其 401 只代表「沒登入」，不能讓舊訪客因此失去既有捐助的管理權
-  async function api<T = any>(path: string, opt: { method?: string, body?: any, headers?: Record<string, string>, keepToken?: boolean, access?: string } = {}): Promise<T> {
+  async function api<T = any>(path: string, opt: { method?: string, body?: any, headers?: Record<string, string>, keepToken?: boolean } = {}): Promise<T> {
     const headers: Record<string, string> = { ...nativeHeaders(), ...opt.headers } // 原生殼：登入會員以 Bearer 驗證
     const tk = getGuestToken()
     if (tk) headers['X-Guest-Token'] = tk
-    const acc = opt.access ?? activeAccess
-    if (acc) headers['X-List-Access'] = acc
     try {
       return await $fetch(`${apiBase}/api/v1${path}`, { method: (opt.method ?? 'GET') as any, body: opt.body, headers, credentials: 'include' }) as T
     } catch (e: any) {

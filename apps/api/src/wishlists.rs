@@ -163,7 +163,6 @@ struct W {
     event_date: Option<NaiveDate>,
     show_claimer_names: bool,
     surprise_mode: bool,
-    has_password: bool,
     surprise_locked: bool,
     claim_ttl_hours: Option<i32>,
     moderation_status: String,
@@ -175,7 +174,7 @@ struct W {
     has_shipping_address: bool,
 }
 const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
-  cover_image_key, cover_image_status::text AS cover_image_status, event_date, show_claimer_names, surprise_mode, (access_password_hash IS NOT NULL) AS has_password,
+  cover_image_key, cover_image_status::text AS cover_image_status, event_date, show_claimer_names, surprise_mode,
   (surprise_mode AND event_date IS NOT NULL AND now() < (event_date::timestamp AT TIME ZONE 'Asia/Taipei')) AS surprise_locked,
   claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, closes_at, created_at, updated_at,
   EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address";
@@ -188,7 +187,7 @@ impl W {
             "title": self.title, "description": self.description,
             "cover_image_url": self.cover_image_key.as_ref().filter(|_| self.cover_image_status == "ready").map(|k| img.public_url(k)),
             "cover_image_status": self.cover_image_status, "event_date": self.event_date,
-            "show_claimer_names": self.show_claimer_names, "surprise_mode": self.surprise_mode, "surprise_locked": self.surprise_locked, "has_password": self.has_password,
+            "show_claimer_names": self.show_claimer_names, "surprise_mode": self.surprise_mode, "surprise_locked": self.surprise_locked,
             "claim_ttl_hours": self.claim_ttl_hours, "moderation_status": self.moderation_status,
             "moderation_reason": self.moderation_reason, "moderated_at": self.moderated_at, "closes_at": self.closes_at,
             "has_shipping_address": self.has_shipping_address, "org_id": null, "location": null, "address": null, "site_status": null,
@@ -285,21 +284,7 @@ fn one_of<'a>(m: &'a Map<String, Value>, k: &str, allowed: &[&str]) -> R<Option<
         )),
     }
 }
-const VIS: &[&str] = &[
-    "public", "link", "friends", "selected", "password", "private",
-];
-/// access_password：8–64 字；None=未帶
-fn access_pw(m: &Map<String, Value>) -> R<Option<String>> {
-    match m.get("access_password") {
-        None | Some(Value::Null) => Ok(None),
-        Some(Value::String(s)) if (8..=64).contains(&s.chars().count()) => Ok(Some(s.clone())),
-        _ => Err(AppError::invalid(
-            "/access_password",
-            "RANGE",
-            "存取密碼長度須為 8 到 64 字",
-        )),
-    }
-}
+const VIS: &[&str] = &["public", "friends", "selected", "private"];
 fn date(m: &Map<String, Value>, k: &str) -> R<Option<Option<NaiveDate>>> {
     match m.get(k) {
         None => Ok(None),
@@ -380,19 +365,7 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     let desc = text(m, "description", 0, 2000)?.flatten();
     let cover = image_key(m, "cover_image_key", "covers/")?.flatten();
     let event = date(m, "event_date")?.flatten();
-    let vis = one_of(m, "visibility", VIS)?.unwrap_or("link");
-    let pw = access_pw(m)?;
-    if vis == "password" && pw.is_none() {
-        return Err(AppError::invalid(
-            "/access_password",
-            "REQUIRED",
-            "密碼清單必須設定存取密碼",
-        ));
-    }
-    let pw_hash = match pw.filter(|_| vis == "password") {
-        Some(p) => Some(crate::auth_ext::hash_blocking(p).await?),
-        None => None,
-    };
+    let vis = one_of(m, "visibility", VIS)?.unwrap_or("friends");
     let names = boolean(m, "show_claimer_names")?.unwrap_or(false);
     let surprise = boolean(m, "surprise_mode")?.unwrap_or(false);
     let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.flatten();
@@ -407,9 +380,9 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     }
     for _ in 0..5 {
         let r = sqlx::query_scalar::<_, Uuid>(
-            "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, access_password_hash, closes_at)
-             VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12,$13) RETURNING id")
-            .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(&pw_hash).bind(closes)
+            "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, closes_at)
+             VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12) RETURNING id")
+            .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(closes)
             .fetch_one(&st.pool).await;
         match r {
             Ok(id) => {
@@ -616,23 +589,6 @@ async fn update(
     if let Some(v) = one_of(m, "visibility", VIS)? {
         w.visibility = v.into();
     }
-    // 密碼雜湊：離開 password 清空；進入 password（原本無密碼）須帶密碼；帶了就更新
-    let new_pw = access_pw(m)?;
-    let pw_hash: Option<Option<String>> = if w.visibility != "password" {
-        Some(None)
-    } else {
-        match new_pw {
-            Some(p) => Some(Some(crate::auth_ext::hash_blocking(p).await?)),
-            None if !w.has_password => {
-                return Err(AppError::invalid(
-                    "/access_password",
-                    "REQUIRED",
-                    "密碼清單必須設定存取密碼",
-                ))
-            }
-            None => None,
-        }
-    };
     if let Some(v) = boolean(m, "show_claimer_names")? {
         w.show_claimer_names = v;
     }
@@ -729,13 +685,12 @@ async fn update(
     }
     let mut tx = st.pool.begin().await?;
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
-                 show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$15,
-                 closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $15 THEN NULL ELSE closes_reminded_at END,
-                 closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
-                 access_password_hash = CASE WHEN $13 THEN $14 ELSE access_password_hash END
+                 show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
+                 closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END,
+                 closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END
                  WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12)")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
-        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(pw_hash.is_some()).bind(pw_hash.flatten()).bind(w.closes_at).execute(&mut *tx).await?;
+        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
     }

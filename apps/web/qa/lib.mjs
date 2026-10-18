@@ -57,7 +57,7 @@ export async function registerUser({ name, tag = 'u', staff = false } = {}) {
 
 export async function createList(user, o = {}) {
   const title = o.title ?? `QA 清單 ${uid()}`
-  const body = { type: 'registry', title, visibility: 'link', surprise_mode: !!o.surprise, show_claimer_names: !!o.showNames, ...(o.extra ?? {}) }
+  const body = { type: 'registry', title, visibility: 'public', surprise_mode: !!o.surprise, show_claimer_names: !!o.showNames, ...(o.extra ?? {}) }
   if (o.surprise) body.event_date = new Date(Date.now() + 30 * 864e5 + 8 * 36e5).toISOString().slice(0, 10)
   let r = await user.api.post('wishlists', { data: body })
   if (!r.ok()) throw new Error('create ' + r.status() + await r.text())

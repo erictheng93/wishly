@@ -53,7 +53,7 @@ pub async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {
         .unwrap();
 }
 
-/// 未指定時採 active / link / ok；password fixture 的密碼為 "test password"。
+/// 未指定時採 active / public / ok。
 #[derive(Default)]
 pub struct ListOpts {
     pub status: Option<&'static str>,
@@ -69,26 +69,12 @@ pub struct TestList {
 }
 pub async fn wishlist(pool: &PgPool, owner: Uuid, o: ListOpts) -> TestList {
     let slug = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let password_hash = if o.visibility == Some("password") {
-        use argon2::{
-            password_hash::{rand_core::OsRng, SaltString},
-            Argon2, PasswordHasher,
-        };
-        Some(
-            Argon2::default()
-                .hash_password(b"test password", &SaltString::generate(&mut OsRng))
-                .unwrap()
-                .to_string(),
-        )
-    } else {
-        None
-    };
-    let id = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title,visibility,surprise_mode,event_date,closes_at,moderation_status,moderation_reason,access_password_hash)
+    let id = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title,visibility,surprise_mode,event_date,closes_at,moderation_status,moderation_reason)
         VALUES($1,'registry',$2::wishlist_status,$3,'清單',$4::visibility,$5,current_date+$6::int,now()+$7::interval,$8::moderation_status,
-        CASE WHEN $8='hidden' THEN 'test fixture' END,CASE WHEN $4='password' THEN $9 END) RETURNING id")
-        .bind(owner).bind(o.status.unwrap_or("active")).bind(&slug).bind(o.visibility.unwrap_or("link"))
+        CASE WHEN $8='hidden' THEN 'test fixture' END) RETURNING id")
+        .bind(owner).bind(o.status.unwrap_or("active")).bind(&slug).bind(o.visibility.unwrap_or("public"))
         .bind(o.surprise).bind(o.event_offset_days).bind(o.closes_in).bind(o.moderation_status.unwrap_or("ok"))
-        .bind(password_hash).fetch_one(pool).await.unwrap();
+        .fetch_one(pool).await.unwrap();
     TestList { id, slug }
 }
 pub async fn item(pool: &PgPool, wl: Uuid, title: &str, needed: i32) -> Uuid {

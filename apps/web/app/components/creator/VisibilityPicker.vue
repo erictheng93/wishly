@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// 可見性選擇 + 密碼 + 指定好友勾選（new / edit 共用）
-defineProps<{ hasPassword?: boolean }>()
+// 可見性選擇 + 摯友勾選（new / edit 共用）
 const visibility = defineModel<string>('visibility', { required: true })
-const password = defineModel<string>('password', { default: '' })
 const users = defineModel<string[]>('users', { default: () => [] })
 const { api } = useApi()
 const friends = ref<any[] | null>(null), fErr = ref('')
@@ -20,12 +18,8 @@ function toggle(id: string, on: boolean) { users.value = on ? [...users.value, i
       <span>{{ o.label }}<br><small class="c-mute">{{ o.desc }}</small></span>
     </label>
   </fieldset>
-  <label v-if="visibility === 'password'" class="c-field">
-    <span>清單密碼（8–64 字）</span>
-    <input v-model="password" type="password" minlength="8" maxlength="64" autocomplete="new-password" :required="!hasPassword" :placeholder="hasPassword ? '已設定密碼，留空則不變更' : ''">
-  </label>
   <div v-if="visibility === 'selected'" class="c-field">
-    <span>選擇可以看的好友（已選 {{ users.length }} 位）</span>
+    <span>選擇摯友（已選 {{ users.length }} 位）</span>
     <p v-if="fErr" class="c-err" role="alert">{{ fErr }}</p>
     <p v-else-if="!friends" class="c-mute" role="status">載入好友中…</p>
     <p v-else-if="!friends.length" class="c-mute">還沒有好友。先到 <NuxtLink to="/friends">好友</NuxtLink> 邀請朋友，再回來勾選。</p>

@@ -38,7 +38,7 @@ function seed() {
   const u = { id: uid(), display_name: 'demo', email: 'demo@example.com', avatar_url: null, is_staff: false, notification_prefs: { email_claims: true }, identities: [{ provider: 'email' }], orgs: [] }
   users.set(u.email, u)
   const mk = (title, extra = {}) => {
-    const w = { id: uid(), type: 'registry', status: 'active', visibility: 'link', slug: Math.random().toString(36).slice(2, 12), title, description: null, cover_image_url: null, cover_image_status: 'none', event_date: null, show_claimer_names: false, surprise_mode: false, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: u, created_at: now(), updated_at: now(), ...extra }
+    const w = { id: uid(), type: 'registry', status: 'active', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title, description: null, cover_image_url: null, cover_image_status: 'none', event_date: null, show_claimer_names: false, surprise_mode: false, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: u, created_at: now(), updated_at: now(), ...extra }
     lists.set(w.id, w)
     itemsBy.set(w.id, [])
     return w
@@ -169,7 +169,7 @@ http.createServer(async (req, res) => {
     if (!authed()) return
     if (!body.title?.trim()) return problem(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/title', code: 'REQUIRED', detail: '請輸入清單名稱' }] })
     if (body.surprise_mode && (!body.event_date || Date.parse(body.event_date) <= Date.now())) return problem(res, 422, 'VALIDATION_FAILED', '活動日需為未來日期', { errors: [{ pointer: '/event_date', code: 'RANGE', detail: '驚喜模式需設定未來的活動日' }] })
-    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'link', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
+    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
     lists.set(w.id, w); itemsBy.set(w.id, [])
     return send(res, 201, pub(w))
   }

@@ -18,8 +18,6 @@ export function apiErrMsg(e: { code?: string, status?: number, detail?: string }
   if (e.code === 'LOGIN_REQUIRED') return '請先登入才能查看這份清單'
   if (e.code === 'FRIENDS_ONLY') return '這份清單只開放給擁有者的好友'
   if (e.code === 'NOT_ALLOWED') return '擁有者沒有開放你查看這份清單'
-  if (e.code === 'PASSWORD_REQUIRED') return '這份清單需要密碼'
-  if (e.code === 'WRONG_PASSWORD') return '密碼不正確，請再試一次'
   if (e.code === 'NOT_FRIEND') return '只能選擇已成為好友的人'
   if (e.code === 'RATE_LIMITED' || s === 429) return '操作太頻繁，請稍後再試'
   if (s === 503) return '系統維護中，請稍後再試'

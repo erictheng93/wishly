@@ -102,38 +102,14 @@ test('僅好友清單：匿名請先登入、非好友被擋並可前往個人�
   await closeAll([owner, friend, stranger])
 })
 
-test('密碼清單：閘門 → 錯誤密碼 → 正確密碼解鎖（標題變清單名）→ 會員捐助', async ({ browser }) => {
-  const owner = await registerUser({ tag: 'po' }), member = await registerUser({ tag: 'pm' })
-  const list = await listWith(owner, 'password', { access_password: 'open-sesame-1' })
-  const p = await pageFor(browser, member)
-  await p.goto(`/s/${list.slug}`); await hydrated(p)
-  await expect(p.getByRole('heading', { name: '這份清單需要密碼' })).toBeVisible()
-  await expect(p).toHaveTitle(/需要權限才能查看/)
-
-  await p.getByLabel('清單密碼').fill('wrong-password')
-  await p.getByRole('button', { name: '解鎖' }).click()
-  await expect(p.getByRole('alert')).toBeVisible()
-  await expect(p.getByRole('heading', { name: '這份清單需要密碼' })).toBeVisible()
-
-  await p.getByLabel('清單密碼').fill('open-sesame-1')
-  await p.getByRole('button', { name: '解鎖' }).click()
-  await expect(p.getByRole('heading', { level: 1, name: list.title })).toBeVisible()
-  await expect(p).toHaveTitle(new RegExp(list.title))
-
-  await p.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
-  await p.getByRole('dialog').getByRole('button', { name: '確認捐助' }).click()
-  await expect(p.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
-  await closeAll([owner, member])
-})
-
 test('個人頁 /u/{handle}：公開 / 僅好友清單依身分可見；捐助依可見度與清單類型呈現', async ({ browser }) => {
   const owner = await withHandle('uo'), friend = await registerUser({ tag: 'uf' }), stranger = await registerUser({ tag: 'us' })
   await befriend(owner, friend)
   const pub = await listWith(owner, 'public'), fr = await listWith(owner, 'friends')
 
-  // 另一位送禮者（donor）：對 link 清單做公開 / 私人捐助，兩種品項
+  // 另一位送禮者（donor）：對公開清單做公開 / 私人捐助，兩種品項
   const donor = await withHandle('ud')
-  const two = await listWith(owner, 'link', {}, [{ title: '公開禮', qty: 1 }, { title: '私人禮', qty: 1 }])
+  const two = await listWith(owner, 'public', {}, [{ title: '公開禮', qty: 1 }, { title: '私人禮', qty: 1 }])
   await claimApi(donor, two.items[0].id, 'public')
   await claimApi(donor, two.items[1].id, 'private')
 
@@ -150,8 +126,8 @@ test('個人頁 /u/{handle}：公開 / 僅好友清單依身分可見；捐助�
   // 捐助紀錄在 donor 的個人頁
   await anon.goto(`/u/${donor.handle}`)
   const don = anon.locator('article', { hasText: '公開禮' })
-  await expect(don).toContainText(two.title) // link 清單只顯示標題
-  await expect(don.getByRole('link')).toHaveCount(0) // 連結清單不給連結
+  await expect(don).toContainText(two.title)
+  await expect(don.getByRole('link')).toHaveCount(1) // 公開清單給連結
   await expect(anon.getByText('私人禮')).toHaveCount(0)
   const ps = await pageFor(browser, stranger)
   await ps.goto(`/u/${donor.handle}`)

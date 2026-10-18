@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ApiError, useGuest, setGuestToken, getGuestToken, setActiveAccess } from '../app/composables/useGuest'
+import { ApiError, useGuest, setGuestToken, getGuestToken } from '../app/composables/useGuest'
 
 const fetch = vi.fn()
 beforeEach(() => {
-  localStorage.clear(); sessionStorage.clear(); setGuestToken(null); setActiveAccess(null)
+  localStorage.clear(); sessionStorage.clear(); setGuestToken(null)
   vi.stubGlobal('useRuntimeConfig', () => ({ public: { apiBase: 'https://api.example.test' } }))
   vi.stubGlobal('$fetch', fetch)
 })
@@ -28,12 +28,6 @@ it('cookie token beats sessionStorage and absence of JS token still sends cookie
   setGuestToken(null)
   await useGuest().api('/me/claims')
   expect(fetch.mock.calls[1]![1]).toMatchObject({ headers: {}, credentials: 'include' })
-})
-
-it('explicit list access overrides active access', async () => {
-  setActiveAccess('active')
-  await useGuest().api('/public/wishlists/list', { access: 'explicit' })
-  expect(fetch.mock.calls[0]![1].headers).toEqual({ 'X-List-Access': 'explicit' })
 })
 
 it('401 clears a stale guest token, but keepToken preserves it (claim POST 401 means not signed in)', async () => {

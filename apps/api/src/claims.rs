@@ -149,23 +149,20 @@ async fn create(
         return Err(AppError::invalid("/note", "RANGE", "備註至多 200 字"));
     }
 
-    // 存取判斷（看得到才能捐助）：好友/名單/密碼清單；品項不存在則交給後面的 diagnose 回 404
-    let wl: Option<(Uuid, Uuid, String, Option<String>)> = sqlx::query_as(
-        "SELECT w.id, w.owner_id, w.visibility::text, w.access_password_hash FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
+    // 存取判斷（看得到才能捐助）：好友/名單清單；品項不存在則交給後面的 diagnose 回 404
+    let wl: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+        "SELECT w.id, w.owner_id, w.visibility::text FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
          WHERE i.id = $1 AND i.deleted_at IS NULL AND w.deleted_at IS NULL").bind(item_id).fetch_optional(&st.pool).await?;
-    if let Some((wid, owner_id, vis, pw)) = &wl {
+    if let Some((wid, owner_id, vis)) = &wl {
         let viewer = Some(me.id);
-        let acc = headers.get("x-list-access").and_then(|v| v.to_str().ok());
         crate::access::check_wishlist(
             &st.pool,
             &crate::access::ListAccess {
                 wishlist_id: *wid,
                 owner_id: *owner_id,
                 visibility: vis,
-                pw_hash: pw.as_deref(),
             },
             viewer,
-            acc,
         )
         .await?;
     }

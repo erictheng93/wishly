@@ -31,7 +31,7 @@ node mocks/server.mjs                      # 訪客端契約 mock，:8080（slug
 - **捐助（`claims.rs`）**：核心是超賣防護。鎖序固定 `wishlist_items`（條件式 UPDATE / FOR UPDATE）→ `claims`，改動時不可顛倒。寫入需 `Idempotency-Key`（UUID），`idempotency.rs` 的占位與業務寫入在同一交易，失敗 rollback 不留痕；重放回應帶 `Idempotency-Replayed`。逾期捐助會釋放，另有 `ratelimit.rs`（DB 計數，背景清理）。
 - **心願眾籌（P2-A）**：`points.rs` 是唯一能改 `point_wallets.balance` 的地方（`post` 同交易寫 `point_ledger`，帳本只增不改）；`release` / `refund_partial` 內部先鎖錢包，所以要在動 `wishlist_items` 之前呼叫。鎖序 wishlists（FOR SHARE）→ point_wallets（依 id）→ wishlist_items → contributions。目前點數只靠後台人工發放，儲值規劃中（加 `topup` entry type 並呼叫 `post`）。收件資訊以 `sealed.rs` 加密，金鑰 `SHIPPING_ENC_KEY` 遺失就無法解密（見 README）。
 - **併發防護的回歸測試**：改動鎖序或併發相關 SQL（`FOR UPDATE` / `FOR SHARE`、`ON CONFLICT`）時，須在 `scripts/mutate.py` 補對應 mutant，並確認 `scripts/mutate.sh all` 全數 killed（還原後 SHA 一致）。
-- **清單可見性**：判斷集中在 `access.rs`（`check_wishlist`）。`GET /public/wishlists/{slug}` 會被 CDN 快取，**不可讀 cookie / `X-List-Access`**，只回 public / link 內容；受限內容走 `/restricted/wishlists/{slug}`（永遠 no-store）。清單不再可公開提供時呼叫 `cdn::purge_wishlists`。
+- **清單可見性**：只有 public / friends / selected / private 四種，新清單預設 friends（0016 移除 link、password）；`GET /public/wishlists` 是訪客可看的探索頁（只列 public、上線、有品項）。判斷集中在 `access.rs`（`check_wishlist`）。`GET /public/wishlists/{slug}` 會被 CDN 快取，**不可讀 cookie**，只回 public 內容；受限內容（friends＝所有好友、selected＝被選中的好友/摯友）走 `/restricted/wishlists/{slug}`（永遠 no-store）。清單不再可公開提供時呼叫 `cdn::purge_wishlists`。
 - 背景工作在 `main.rs` 啟動：`notify::spawn_worker`（寄信）、`ratelimit::spawn_cleanup`。錯誤統一為 RFC 9457 problem+json（`error.rs`，含 `code` 與 `errors[]`）。
 - 測試在 `apps/api/tests/*.rs`（依功能切片命名），皆用 `#[sqlx::test(migrations = "../../db/migrations")]`。
 - DB：PostgreSQL 16 + PostGIS，`db/migrations/000N_*.sql` 依序累加。

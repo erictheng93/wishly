@@ -17,7 +17,7 @@ beforeEach(() => {
     useAuth: () => ({ fetchMe: async () => ({ default_claim_visibility: 'private' }) }),
     getPref: () => null, setPref: vi.fn(), getGuestToken: () => currentToken,
     setGuestToken: (token: string) => { currentToken = token; setToken(token); return true },
-    getActiveAccess: () => 'list-access', fmtPts, fmtTime, contributionErr, quickAmounts,
+    fmtPts, fmtTime, contributionErr, quickAmounts,
     errMsg: (error: any) => error.detail,
   })) vi.stubGlobal(name, value)
 })
@@ -124,7 +124,7 @@ it('fund submits trimmed message and list access; busy state prevents another cl
   button.click()
   expect(api).toHaveBeenCalledTimes(1)
   expect(api.mock.calls[0]).toEqual(['/items/item/contributions', {
-    method: 'POST', headers: { 'Idempotency-Key': expect.any(String), 'X-List-Access': 'list-access' }, noRedirect: true,
+    method: 'POST', headers: { 'Idempotency-Key': expect.any(String) }, noRedirect: true,
     body: { points: 300, message: '生日快樂', is_anonymous: true, visibility: 'private' },
   }])
   request.resolve({ id: 'funded', points: 300 }); await flush()

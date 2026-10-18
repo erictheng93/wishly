@@ -1,9 +1,7 @@
 //! 清單與捐助的可見性判斷（0004_social）。所有對外讀取/捐助/SSE/檢舉都經 `check_wishlist`。
 use crate::{error::AppError, session::hash_token, AppState};
 use axum::http::request::Parts;
-use hmac::{Hmac, Mac};
 use serde_json::json;
-use sha2::Sha256;
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
@@ -37,51 +35,26 @@ pub async fn viewer(parts: &Parts, st: &AppState) -> Result<Option<Uuid>, AppErr
         .bind(hash_token(&tok)).fetch_optional(&st.pool).await?)
 }
 
-/// 密碼清單的存取權杖：HMAC(wishlist_id + 目前密碼雜湊)；改密碼即全部失效。
-/// 由 POST /public/wishlists/{slug}/unlock 簽發，客戶端以 `X-List-Access` header（SSE 用 `?access=`）帶回。
-pub fn access_token(wishlist_id: Uuid, pw_hash: &str) -> String {
-    let mut m = <Hmac<Sha256> as Mac>::new_from_slice(crate::config::get().unsub_secret.as_bytes())
-        .unwrap();
-    m.update(format!("list-access:{wishlist_id}:{pw_hash}").as_bytes());
-    hex::encode(m.finalize().into_bytes())
-}
-
-pub fn access_ok(wishlist_id: Uuid, pw_hash: Option<&str>, token: Option<&str>) -> bool {
-    match (pw_hash, token) {
-        (Some(h), Some(t)) => subtle_eq(access_token(wishlist_id, h).as_bytes(), t.as_bytes()),
-        _ => false,
-    }
-}
-
-fn subtle_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
-}
-
 /// 已在外層排除 draft/archived/刪除/下架；這裡只看 visibility。
-/// 錯誤：private → 404；friends/selected 未登入 → 403 LOGIN_REQUIRED；非好友/不在名單 → 403 FRIENDS_ONLY / NOT_ALLOWED；
-/// 密碼缺或錯 → 403 PASSWORD_REQUIRED。403 皆附 `visibility` 與 `owner`（{id, display_name, handle}）供前端顯示門檻頁。
+/// 錯誤：private → 404；friends/selected 未登入 → 403 LOGIN_REQUIRED；非好友/不在名單 → 403 FRIENDS_ONLY / NOT_ALLOWED。403 皆附 `visibility` 與 `owner`（{id, display_name, handle}）供前端顯示門檻頁。
 pub struct ListAccess<'a> {
     pub wishlist_id: Uuid,
     pub owner_id: Uuid,
     pub visibility: &'a str,
-    pub pw_hash: Option<&'a str>,
 }
 
 pub async fn check_wishlist(
     pool: &sqlx::PgPool,
     w: &ListAccess<'_>,
     viewer: Option<Uuid>,
-    access: Option<&str>,
 ) -> Result<(), AppError> {
     if viewer == Some(w.owner_id) {
         return Ok(());
     }
     let deny = |code, detail| deny(pool, w, code, detail);
     match w.visibility {
-        "public" | "link" => Ok(()),
+        "public" => Ok(()),
         "private" => Err(AppError::NotFound),
-        "password" if access_ok(w.wishlist_id, w.pw_hash, access) => Ok(()),
-        "password" => deny("PASSWORD_REQUIRED", "此清單需要存取密碼").await,
         "friends" | "selected" if viewer.is_none() => {
             deny("LOGIN_REQUIRED", "此清單僅限特定對象，請先登入").await
         }
@@ -134,14 +107,4 @@ pub async fn claim_visible(
         ("friends", Some(v)) => are_friends(pool, claimer, v).await?,
         _ => false,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn subtle_eq_works() {
-        assert!(super::subtle_eq(b"abc", b"abc"));
-        assert!(!super::subtle_eq(b"abc", b"abd"));
-        assert!(!super::subtle_eq(b"abc", b"ab"));
-    }
 }

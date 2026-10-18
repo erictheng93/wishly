@@ -1,11 +1,11 @@
-//! GET /public/wishlists/{slug}（契約第 5 章；訪客視角，可被 CDN 快取，只出 public / link 內容）
-//! GET /restricted/wishlists/{slug}（好友 / 指定 / 密碼 / 擁有者，依 ws_session 與 X-List-Access，永遠 no-store）
+//! GET /public/wishlists/{slug}（契約第 5 章；訪客視角，可被 CDN 快取，只出 public 內容）
+//! GET /restricted/wishlists/{slug}（好友 / 指定 / 擁有者，依 ws_session，永遠 no-store）
 use crate::{error::AppError, AppState};
 use axum::{
     extract::{Path, State},
     http::{header, request::Parts, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use chrono::{DateTime, NaiveDate, Utc};
@@ -17,40 +17,7 @@ use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/public/wishlists/{slug}", get(wishlist))
-        .route("/public/wishlists/{slug}/unlock", post(unlock))
         .route("/restricted/wishlists/{slug}", get(restricted))
-}
-
-/// POST /public/wishlists/{slug}/unlock：密碼清單換存取權杖（同 slug+IP 每 15 分鐘 10 次）
-async fn unlock(
-    State(st): State<AppState>,
-    Path(slug): Path<String>,
-    peer: crate::ratelimit::Peer,
-    Json(b): Json<Value>,
-) -> Result<Json<Value>, AppError> {
-    if !crate::validate::slug_ok(&slug) {
-        return Err(AppError::NotFound);
-    }
-    crate::ratelimit::check(&st.pool, &format!("unlock:{slug}:{}", peer.0), 10, 900).await?;
-    let w: Option<(Uuid, Option<String>)> = sqlx::query_as(
-        "SELECT id, access_password_hash FROM wishlists WHERE slug = $1 AND deleted_at IS NULL AND visibility::text = 'password' AND status IN ('active', 'closed')")
-        .bind(&slug).fetch_optional(&st.pool).await?;
-    let Some((id, Some(hash))) = w else {
-        return Err(AppError::NotFound);
-    };
-    let Some(pw) = b["password"].as_str().map(str::to_owned) else {
-        return Err(AppError::invalid("/password", "REQUIRED", "請輸入密碼"));
-    };
-    let h = hash.clone();
-    let ok = tokio::task::spawn_blocking(move || crate::auth_ext::verify_pw(&pw, &h))
-        .await
-        .unwrap_or(false);
-    if !ok {
-        return Err(AppError::problem(422, "WRONG_PASSWORD", "密碼錯誤"));
-    }
-    Ok(Json(
-        json!({ "access_token": crate::access::access_token(id, &hash) }),
-    ))
 }
 
 pub fn image_url(key: Option<&str>, status: &str) -> Option<String> {
@@ -76,7 +43,6 @@ struct W {
     surprise_mode: bool,
     owner_id: Uuid,
     owner_name: String,
-    pw_hash: Option<String>,
     locked: bool,
     updated_at: DateTime<Utc>,
 }
@@ -102,8 +68,8 @@ struct It {
     funding_deadline: Option<DateTime<Utc>>,
 }
 
-/// 可被 CDN 快取的路徑：**不讀 cookie、不讀 X-List-Access**，只會回 public / link 清單內容；
-/// 受限清單（friends / selected / password / private）在這裡一律以匿名身分判斷 → 只會得到不含清單內容的 403 / 404。
+/// 可被 CDN 快取的路徑：**不讀 cookie**，只會回 public 清單內容；
+/// 受限清單（friends / selected / private）在這裡一律以匿名身分判斷 → 只會得到不含清單內容的 403 / 404。
 /// 這樣即使 Cloudflare 被設成強制快取這個路徑，也只可能快取到公開資料或空的門檻回應。
 async fn wishlist(
     State(st): State<AppState>,
@@ -113,25 +79,21 @@ async fn wishlist(
     render(&st, &slug, None, &parts).await
 }
 
-/// 受限清單內容：依 ws_session 與 X-List-Access 判斷，任何清單都回 private, no-store（不走 CDN 快取）。
+/// 受限清單內容：依 ws_session 判斷，任何清單都回 private, no-store（不走 CDN 快取）。
 async fn restricted(
     State(st): State<AppState>,
     Path(slug): Path<String>,
     parts: Parts,
 ) -> Result<Response, AppError> {
     let viewer = crate::access::viewer(&parts, &st).await?;
-    let acc = parts
-        .headers
-        .get("x-list-access")
-        .and_then(|v| v.to_str().ok());
-    render(&st, &slug, Some((viewer, acc)), &parts).await
+    render(&st, &slug, Some(viewer), &parts).await
 }
 
-/// who = None：公開（可快取）路徑，匿名判斷；Some((登入者, 密碼權杖))：受限路徑。
+/// who = None：公開（可快取）路徑，匿名判斷；Some(登入者)：受限路徑。
 async fn render(
     st: &AppState,
     slug: &str,
-    who: Option<(Option<Uuid>, Option<&str>)>,
+    who: Option<Option<Uuid>>,
     parts: &Parts,
 ) -> Result<Response, AppError> {
     if !crate::validate::slug_ok(slug) {
@@ -141,7 +103,7 @@ async fn render(
         "SELECT w.id, w.slug::text AS slug, w.type::text AS type, w.status::text AS status, w.visibility::text AS visibility,
                 w.moderation_status::text AS moderation, w.title, w.description, w.cover_image_key,
                 w.cover_image_status::text AS cover_image_status, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
-                w.owner_id, u.display_name AS owner_name, w.access_password_hash AS pw_hash,
+                w.owner_id, u.display_name AS owner_name,
                 (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei'))) AS locked,
                 GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
          FROM wishlists w JOIN users u ON u.id = w.owner_id
@@ -150,25 +112,23 @@ async fn render(
     if w.status == "draft" || w.status == "archived" {
         return Err(AppError::NotFound);
     }
-    let (viewer, acc) = who.unwrap_or((None, None));
+    let viewer = who.flatten();
     crate::access::check_wishlist(
         &st.pool,
         &crate::access::ListAccess {
             wishlist_id: w.id,
             owner_id: w.owner_id,
             visibility: &w.visibility,
-            pw_hash: w.pw_hash.as_deref(),
         },
         viewer,
-        acc,
     )
     .await?;
     if w.moderation == "hidden" {
         return Err(AppError::WishlistRemoved);
     }
 
-    // 只有公開路徑上的 public / link 可被共用快取；受限路徑一律 no-store、不出 ETag（依觀看者而異）
-    let restricted = who.is_some() || !matches!(w.visibility.as_str(), "public" | "link");
+    // 只有公開路徑上的 public 可被共用快取；受限路徑一律 no-store、不出 ETag（依觀看者而異）
+    let restricted = who.is_some() || w.visibility != "public";
     let etag = format!(
         "\"w-{}-{}{}\"",
         w.slug,

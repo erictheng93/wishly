@@ -19,7 +19,7 @@ beforeEach(() => {
   FakeES.all = []
   vi.useFakeTimers()
   for (const [name, value] of Object.entries({ ref, watch, onMounted, onBeforeUnmount, EventSource: FakeES,
-    useApi: () => ({ base: '/api/v1' }), getListAccess: () => 'a+b' })) vi.stubGlobal(name, value)
+    useApi: () => ({ base: '/api/v1' }) })) vi.stubGlobal(name, value)
 })
 afterEach(() => { mounted?.unmount(); mounted = undefined; vi.useRealTimers(); vi.unstubAllGlobals() })
 function setup() {
@@ -31,7 +31,7 @@ function setup() {
 
 it('starts polling after exactly two consecutive reconnect errors and stops on recovery', () => {
   const { events, state } = setup(), es = FakeES.all[0]!
-  expect(es.url).toBe('/api/v1/public/wishlists/list/events?access=a%2Bb')
+  expect(es.url).toBe('/api/v1/public/wishlists/list/events')
   expect(es.options).toEqual({ withCredentials: true })
   es.onerror()
   vi.advanceTimersByTime(2000)

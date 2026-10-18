@@ -27,14 +27,12 @@ async fn profile_handle_case_and_unpublished_fields_are_private(pool: PgPool) {
         .unwrap();
     for (visibility, status, moderation) in [
         ("private", "active", "ok"),
-        ("link", "active", "ok"),
-        ("password", "active", "ok"),
         ("public", "draft", "ok"),
         ("public", "archived", "ok"),
         ("public", "active", "hidden"),
     ] {
         let id = wishlist(&pool, owner, ListOpts::default()).await.id;
-        sqlx::query("UPDATE wishlists SET title='Secret',description='Secret description',visibility=$2::visibility,status=$3::wishlist_status,moderation_status=$4::moderation_status,moderation_reason=CASE WHEN $4='hidden' THEN 'Secret reason' END,access_password_hash=CASE WHEN $2='password' THEN 'Secret hash' END WHERE id=$1")
+        sqlx::query("UPDATE wishlists SET title='Secret',description='Secret description',visibility=$2::visibility,status=$3::wishlist_status,moderation_status=$4::moderation_status,moderation_reason=CASE WHEN $4='hidden' THEN 'Secret reason' END WHERE id=$1")
             .bind(id).bind(visibility).bind(status).bind(moderation).execute(&pool).await.unwrap();
     }
     let deleted = wishlist(&pool, owner, ListOpts::default()).await.id;
@@ -63,7 +61,7 @@ async fn profile_handle_case_and_unpublished_fields_are_private(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap(),
-        8
+        6
     );
     common::assert_all_reconciled(&pool).await;
 }

@@ -160,8 +160,8 @@ npx playwright show-report                                      # 開啟上次�
 
 | 路徑 | 讀身分 | 回應 | CDN |
 |---|---|---|---|
-| `GET /api/v1/public/wishlists/{slug}` | 不讀 cookie / 權杖 | public、link 的內容；其餘只回不含內容的 403 / 404 | 可快取（`public, s-maxage=10, stale-while-revalidate=60`） |
-| `GET /api/v1/restricted/wishlists/{slug}` | `ws_session`、`X-List-Access` | 依可見性判斷 | 永不快取（`private, no-store`） |
+| `GET /api/v1/public/wishlists/{slug}` | 不讀 cookie | public 的內容；其餘只回不含內容的 403 / 404 | 可快取（`public, s-maxage=10, stale-while-revalidate=60`） |
+| `GET /api/v1/restricted/wishlists/{slug}` | `ws_session` | 依可見性判斷 | 永不快取（`private, no-store`） |
 
 - 所有非 `public` 的回應另帶 `Cloudflare-CDN-Cache-Control: no-store` 與 `CDN-Cache-Control: no-store`。
 - **Cloudflare 後台設定**：`/api/v1/public/*` 的 Edge TTL 用「Use cache-control header if present」，**不要**用「Cache Everything + 覆寫來源 TTL」；`/api/v1/restricted/*` 不要套任何快取規則。

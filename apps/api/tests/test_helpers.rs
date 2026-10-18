@@ -34,7 +34,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
         defaults,
         (
             "active".into(),
-            "link".into(),
+            "public".into(),
             false,
             true,
             true,
@@ -105,24 +105,6 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
             .unwrap();
         assert_all_reconciled(&pool).await;
     }
-    let protected = wishlist(
-        &pool,
-        owner.id,
-        ListOpts {
-            visibility: Some("password"),
-            ..Default::default()
-        },
-    )
-    .await;
-    let unlock = call(
-        &pool,
-        "POST",
-        &format!("/public/wishlists/{}/unlock", protected.slug),
-        &[],
-        Some(json!({"password":"test password"})),
-    )
-    .await;
-    assert_eq!(unlock.0, axum::http::StatusCode::OK, "{}", unlock.2);
     grant(&pool, operator.id, 100).await;
     let cf = crowdfund_item(&pool, wl.id, 1000).await;
     let result = pledge(&test_app(&pool), cf, &operator.token, 30).await;

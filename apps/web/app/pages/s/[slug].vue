@@ -18,34 +18,24 @@ const data = ref<any>(fetched.value)
 const st = ref<number | null>(error.value?.statusCode ?? null)
 const gate = ref<any>(null), checking = ref(st.value === 403)
 const restricted = ref(false)
-const pw = ref(''), pwBusy = ref(false), pwErr = ref('')
 const hold = (c: number | null) => c === 403 && !gate.value // SSR 的 403 不是最終結果，等 client 重抓
 watch([fetched, error], ([v, e]) => {
   if (v) { data.value = v; st.value = null } else if (e) { st.value = e.statusCode as number; if ([404, 410].includes(st.value!)) data.value = null; if (st.value === 403) loadClient() }
 })
 async function loadClient() {
   try {
-    const acc = getListAccess(slug)
-    // 受限清單 / 擁有者：帶憑證打不走 CDN 快取的路徑（公開路徑永遠只回 public / link 內容）
-    const r = await fetchListWithCreds(apiBase, slug, acc)
+    // 受限清單 / 擁有者：帶憑證打不走 CDN 快取的路徑（公開路徑永遠只回 public 內容）
+    const r = await fetchListWithCreds(apiBase, slug)
     data.value = r; st.value = null; gate.value = null; restricted.value = isRestricted(r.visibility)
-    setActiveAccess(acc); startLive()
+    startLive()
   } catch (e: any) {
     st.value = e?.statusCode ?? e?.response?.status ?? 0
-    if (st.value === 403) { gate.value = e.data ?? {}; restricted.value = true; data.value = null; if (gate.value.code === 'PASSWORD_REQUIRED') setListAccess(slug, null) }
+    if (st.value === 403) { gate.value = e.data ?? {}; restricted.value = true; data.value = null }
     else if ([404, 410].includes(st.value!)) data.value = null
   } finally { checking.value = false }
 }
-// 受限清單用帶憑證的 $fetch 更新；公開 / 連結清單維持 useFetch refresh（ETag）
+// 受限清單用帶憑證的 $fetch 更新；公開清單維持 useFetch refresh（ETag）
 const reload = () => restricted.value ? loadClient() : refresh()
-async function unlock() {
-  pwBusy.value = true; pwErr.value = ''
-  try {
-    const r = await api(`/public/wishlists/${slug}/unlock`, { method: 'POST', body: { password: pw.value } })
-    setListAccess(slug, r.access_token); pw.value = ''
-    await loadClient()
-  } catch (e: any) { pwErr.value = e.message } finally { pwBusy.value = false }
-}
 const gone = computed(() => st.value === 410)
 const notFound = computed(() => st.value === 404)
 const forbidden = computed(() => st.value === 403 && !!gate.value)
@@ -112,9 +102,8 @@ onMounted(async () => {
 })
 function startLive() {
   if (live || !data.value) return
-  const acc = getListAccess(slug)
   live = createLiveRefresh({
-    url: `${apiBase}/api/v1/public/wishlists/${slug}/events${acc ? `?access=${encodeURIComponent(acc)}` : ''}`,
+    url: `${apiBase}/api/v1/public/wishlists/${slug}/events`,
     withCredentials: restricted.value,
     refresh: reload, onMode: m => (mode.value = m),
     onEvent: (type, d) => {
@@ -128,7 +117,7 @@ function startLive() {
   })
   live.start()
 }
-onBeforeUnmount(() => { live?.stop(); setActiveAccess(null) })
+onBeforeUnmount(() => { live?.stop() })
 
 
 // --- 捐助 sheet / 成功 overlay ---
@@ -164,21 +153,10 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <div v-if="gone" class="g-center"><h1>此清單已被下架</h1><p class="g-mute">這份清單因違反服務條款已被移除，目前無法瀏覽或捐助。</p><NuxtLink to="/">回首頁</NuxtLink></div>
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">載入中…</div>
     <div v-else-if="forbidden" class="g-center">
-      <template v-if="gate.code === 'PASSWORD_REQUIRED'">
-        <h1>這份清單需要密碼</h1>
-        <p v-if="gate.owner" class="g-mute">由 {{ gate.owner.display_name }} 建立。請向對方詢問密碼。</p>
-        <form @submit.prevent="unlock">
-          <input v-model="pw" type="password" class="g-input" autocomplete="off" aria-label="清單密碼" placeholder="輸入密碼" required>
-          <p v-if="pwErr" class="g-field-err" role="alert">{{ pwErr }}</p>
-          <button class="g-btn block" :disabled="pwBusy || !pw">{{ pwBusy ? '驗證中…' : '解鎖' }}</button>
-        </form>
-      </template>
-      <template v-else>
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? '請先登入' : '你沒有權限查看這份清單' }}</h1>
         <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.code === 'FRIENDS_ONLY' && gate.owner">（擁有者：{{ gate.owner.display_name }}）</template></p>
         <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">登入後查看</NuxtLink>
         <NuxtLink v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.handle" class="g-btn" :to="`/u/${gate.owner.handle}`">前往 {{ gate.owner.display_name }} 的頁面加好友</NuxtLink>
-      </template>
       <p><NuxtLink to="/">回首頁</NuxtLink></p>
     </div>
     <div v-else-if="failed && !data" class="g-center"><h1>系統暫時無法載入，請稍後再試</h1><button class="g-btn" @click="reload()">重新載入</button></div>

@@ -78,7 +78,7 @@ async fn profile(
 
     let birthday = birthday.filter(|_| bv == "public" || is_self || (bv == "friends" && friend));
 
-    // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private/link/password 不列）
+    // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private 不列）
     // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）
     let lists: Vec<ProfileWishlist> = sqlx::query_as(&format!(
         "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
@@ -105,7 +105,7 @@ async fn profile(
 
     // 捐助 = 捐助 ∪ 點數認捐。可見性（$3=本人、$4=與捐助者為好友，與 access::claim_visible 同語意）：
     //   捐助看 c.visibility；認捐看 k.visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
-    // 清單條件兩者共用：對觀看者可存取（public/link；friends/selected 依觀看者或擁有者）、排除驚喜鎖定；link 清單不給 slug。
+    // 清單條件兩者共用：對觀看者可存取（public；friends/selected 依觀看者或擁有者）、排除驚喜鎖定。
     let rows: Vec<Donation> = sqlx::query_as(
         "WITH d AS (
            SELECT 'claim' AS kind, c.id, c.item_id, c.qty, NULL::bigint AS points, c.status::text AS status, c.created_at
@@ -118,14 +118,14 @@ async fn profile(
            WHERE k.user_id = $1 AND k.status IN ('pledged', 'captured')
              AND ($3 OR (NOT k.is_anonymous AND (k.visibility::text = 'public' OR (k.visibility::text = 'friends' AND $4)))))
          SELECT d.kind, i.title, d.qty, d.points, d.status, d.created_at,
-                CASE WHEN w.visibility::text = 'link' THEN NULL ELSE w.slug::text END, w.title, o.display_name, o.handle
+                w.slug::text, w.title, o.display_name, o.handle
          FROM d
          JOIN wishlist_items i ON i.id = d.item_id
          JOIN wishlists w ON w.id = i.wishlist_id
          JOIN users o ON o.id = w.owner_id
          WHERE w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND NOT (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')))
-           AND (w.visibility::text IN ('public', 'link')
+           AND (w.visibility::text = 'public'
                 OR w.owner_id = $2
                 OR (w.visibility::text = 'friends' AND $2::uuid IS NOT NULL
                     AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST($2::uuid, w.owner_id) AND f.user_b = GREATEST($2::uuid, w.owner_id)))

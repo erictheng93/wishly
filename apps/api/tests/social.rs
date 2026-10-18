@@ -608,7 +608,7 @@ async fn profile_lists_visibility(pool: PgPool) {
     let (_, ts, _) = handle_user(&pool, "Stranger", Some("stranger")).await;
     befriend(&pool, o, f).await;
     befriend(&pool, o, sel).await;
-    for v in ["public", "link", "friends", "selected", "private"] {
+    for v in ["public", "friends", "selected", "private"] {
         list(&pool, o, v, false).await;
     }
     let (w_sel, _) = list(&pool, o, "selected", false).await;
@@ -768,18 +768,13 @@ async fn profile_donations_visibility(pool: PgPool) {
     let (_, ts, _) = handle_user(&pool, "Stranger", Some("stranger")).await;
     befriend(&pool, d, f).await; // 捐助者的好友（非清單擁有者的好友）
     let (_, pub_item) = list(&pool, o, "public", false).await;
-    let (_, link_item) = list(&pool, o, "link", false).await;
     let (_, priv_item) = list(&pool, o, "private", false).await;
-    let (_, pw_item) = list(&pool, o, "public", false).await;
-    sqlx::query("UPDATE wishlists SET visibility='password', access_password_hash='x' WHERE id=(SELECT wishlist_id FROM wishlist_items WHERE id=$1)").bind(pw_item).execute(&pool).await.unwrap();
     let (_, locked_item) = list(&pool, o, "public", true).await;
     let (_, fr_item) = list(&pool, o, "friends", false).await;
     let (_, hidden_claim_item) = list(&pool, o, "public", false).await;
     for it in [
         pub_item,
-        link_item,
         priv_item,
-        pw_item,
         locked_item,
         fr_item,
     ] {
@@ -802,11 +797,8 @@ async fn profile_donations_visibility(pool: PgPool) {
         x.sort();
         x
     };
-    // 陌生人/匿名：public 清單與 link 清單（slug 為 null）；排除 private/password/驚喜鎖定/friends（非擁有者好友）/claim 私人
-    let expect = vec![
-        ("清單-link".to_string(), true),
-        ("清單-public".to_string(), false),
-    ];
+    // 陌生人/匿名：只有 public 清單；排除 private/驚喜鎖定/friends（非擁有者好友）/claim 私人
+    let expect = vec![("清單-public".to_string(), false)];
     let (_, _, v) = common::call(
         &pool,
         "GET",
@@ -835,7 +827,7 @@ async fn profile_donations_visibility(pool: PgPool) {
         None,
     )
     .await;
-    assert_eq!(v["donations"].as_array().unwrap().len(), 3);
+    assert_eq!(v["donations"].as_array().unwrap().len(), 2);
     // 捐助改 friends：陌生人看不到、捐助者好友看得到
     sqlx::query("UPDATE claims SET visibility='friends' WHERE item_id=$1")
         .bind(pub_item)
@@ -850,7 +842,7 @@ async fn profile_donations_visibility(pool: PgPool) {
         None,
     )
     .await;
-    assert_eq!(titles(&v), vec![("清單-link".to_string(), true)]);
+    assert!(titles(&v).is_empty(), "{v}");
     let (_, _, v) = common::call(
         &pool,
         "GET",
@@ -859,7 +851,7 @@ async fn profile_donations_visibility(pool: PgPool) {
         None,
     )
     .await;
-    assert_eq!(titles(&v).len(), 2);
+    assert_eq!(titles(&v).len(), 1);
     // 擁有者的好友可見 friends 清單的捐助
     let (_, tg, _) = handle_user(&pool, "G", Some("gee")).await;
     let gid: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE handle='gee'")
@@ -878,12 +870,12 @@ async fn profile_donations_visibility(pool: PgPool) {
     assert!(titles(&v).contains(&("清單-friends".to_string(), false)));
     // 已取消的捐助不列
     sqlx::query("UPDATE claims SET status='cancelled' WHERE item_id=$1")
-        .bind(link_item)
+        .bind(fr_item)
         .execute(&pool)
         .await
         .unwrap();
     sqlx::query("UPDATE wishlist_items SET qty_claimed=0 WHERE id=$1")
-        .bind(link_item)
+        .bind(fr_item)
         .execute(&pool)
         .await
         .unwrap();
@@ -895,7 +887,7 @@ async fn profile_donations_visibility(pool: PgPool) {
         None,
     )
     .await;
-    assert!(!titles(&v).iter().any(|t| t.0 == "清單-link"));
+    assert!(!titles(&v).iter().any(|t| t.0 == "清單-friends"));
     common::assert_all_reconciled(&pool).await;
 }
 
@@ -1120,7 +1112,7 @@ async fn public_page_masks_non_public_user_claims(pool: PgPool) {
     let (o, _, _) = handle_user(&pool, "O", None).await;
     let (d, _, _) = handle_user(&pool, "D", None).await;
     let (e, _, _) = handle_user(&pool, "E", None).await;
-    let (wid, it) = list(&pool, o, "link", false).await;
+    let (wid, it) = list(&pool, o, "public", false).await;
     sqlx::query("UPDATE wishlists SET show_claimer_names = true WHERE id = $1")
         .bind(wid)
         .execute(&pool)

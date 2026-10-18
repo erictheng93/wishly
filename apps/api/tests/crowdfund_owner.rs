@@ -11,7 +11,7 @@ use common::call;
 use common::{assert_all_reconciled, balance, ck, TestUser};
 /// 透過 API 建清單（registry）；extra 會合併進 body。回傳 (wishlist_id, slug)
 async fn mk_list(pool: &PgPool, tok: &str, extra: Value) -> (Uuid, String) {
-    let mut b = json!({ "type": "registry", "title": "寶寶清單", "show_claimer_names": true });
+    let mut b = json!({ "type": "registry", "title": "寶寶清單", "show_claimer_names": true, "visibility": "public" });
     b.as_object_mut()
         .unwrap()
         .extend(extra.as_object().unwrap().clone());

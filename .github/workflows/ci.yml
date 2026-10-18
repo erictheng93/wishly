@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     services:
       db:
-        image: postgis/postgis:16-3.4
+        image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
         env: { POSTGRES_USER: wishly, POSTGRES_PASSWORD: wishly, POSTGRES_DB: wishly }
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U wishly" --health-interval 2s --health-retries 30
       mailpit:
-        image: axllent/mailpit
+        image: axllent/mailpit:v1.31.6@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
         ports: ["1025:1025", "8025:8025"]
     env:
       DATABASE_URL: postgres://wishly:wishly@localhost:5432/wishly
@@ -25,26 +25,26 @@ jobs:
       SMTP_HOST: localhost
       MAILPIT_API_BASE: http://localhost:8025
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
         with: { components: rustfmt, clippy, llvm-tools-preview }
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with: { workspaces: apps/api }
       - run: cargo fmt --manifest-path apps/api/Cargo.toml --check
       - run: cargo clippy --manifest-path apps/api/Cargo.toml --all-targets -- -D warnings
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with: { tool: "cargo-llvm-cov@0.9.1,cargo-audit@0.22.2" }
       - run: sh scripts/audit-api.sh
       - run: python3 scripts/test_mutate.py
       - run: python3 scripts/test_coverage.py
       - run: sh scripts/coverage-api.sh
       - run: scripts/mutate.sh all
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: api-mutations
           path: apps/api/target/mutations/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: api-coverage
@@ -54,21 +54,21 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: docker build -f apps/api/Dockerfile -t wishly-api:ci .
   web:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: web-coverage
@@ -77,15 +77,15 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
         with: { components: rustfmt, clippy }
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with: { workspaces: apps/web/src-tauri }
       - run: cargo fmt --manifest-path apps/web/src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path apps/web/src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path apps/web/src-tauri/Cargo.toml --lib
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with: { tool: cargo-audit@0.22.2 }
       # 暫時接受既有 GTK3 依賴風險，待 Tauri #16170 整鏈升級後移除；不是漏洞修補。
       # RUSTSEC-2024-0429：glib 的 Linux VariantStrIter 問題；發布 Linux 原生殼前須重評估。
@@ -101,21 +101,21 @@ jobs:
     timeout-minutes: 30
     services:
       db:
-        image: postgis/postgis:16-3.4
+        image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
         env: { POSTGRES_USER: wishly, POSTGRES_PASSWORD: wishly, POSTGRES_DB: wishly }
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U wishly" --health-interval 2s --health-retries 30
       mailpit:
-        image: axllent/mailpit
+        image: axllent/mailpit:v1.31.6@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
         ports: ["1025:1025", "8025:8025"]
     defaults: { run: { working-directory: apps/web } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.99.0
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with: { workspaces: apps/api }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
       # e2e/support/psql.mjs 用 psql 重建 wishly_e2e 資料庫
@@ -123,7 +123,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # 啟動 API / Web 由 playwright.config.ts 的 webServer 負責（cargo build + 重置資料庫 + nuxt build）
       - run: npm run e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: playwright-report
@@ -139,11 +139,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: read, packages: write }
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: apps/api/Dockerfile
