@@ -59,3 +59,17 @@ it('logout clears identity and native token even if server logout fails', async 
   expect(token).toHaveBeenCalledWith(null)
   expect(navigate).toHaveBeenCalledWith('/login')
 })
+
+it('otp challenge id and turnstile token are sent to request / verify / confirm endpoints', async () => {
+  api.mockResolvedValue({ challenge_id: 'c1' })
+  const auth = useAuth()
+  await auth.register('a@b.c', 'password1', 'n', 'ts')
+  await auth.requestReset('a@b.c', 'ts')
+  await auth.confirmReset('a@b.c', '123456', 'newpassword', 'c1')
+  const bodies = api.mock.calls.map(c => c[1].body)
+  expect(bodies[0]).toMatchObject({ turnstile_token: 'ts' })
+  expect(bodies[1]).toEqual({ email: 'a@b.c', turnstile_token: 'ts' })
+  expect(bodies[2]).toMatchObject({ challenge_id: 'c1' })
+  await auth.verifyRegister('a@b.c', '123456', 'c1')
+  expect(api.mock.calls[3][1].body).toEqual({ email: 'a@b.c', code: '123456', challenge_id: 'c1' })
+})

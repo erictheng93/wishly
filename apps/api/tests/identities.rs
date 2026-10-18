@@ -56,18 +56,6 @@ async fn email_link_is_scoped_and_does_not_create_another_account(pool: PgPool) 
         .0,
         202
     );
-    assert_eq!(
-        common::call(
-            &pool,
-            "POST",
-            "/me/identities/email/request",
-            &common::ck(&token),
-            Some(request)
-        )
-        .await
-        .0,
-        429
-    );
     // 固定測試碼，不依賴寄信或暴力解碼。
     sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE email='link@example.com'")
         .bind(code_hash("123456", "dev-pepper"))

@@ -69,6 +69,7 @@ struct RegisterReq {
     email: String,
     password: String,
     display_name: String,
+    turnstile_token: Option<String>,
 }
 
 async fn register(
@@ -89,17 +90,23 @@ async fn register(
     }
     // 不論 email 是否已註冊都回 202（不洩漏帳號存在）；已有密碼者在 verify 時才拒絕
     let h = hash_blocking(r.password).await?;
-    issue_otp(&st.pool, &email, "register", Some(&h), Some(name)).await?;
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(json!({ "expires_in": 600, "resend_after": 60 })),
-    ))
+    crate::auth::otp_gate(
+        &st.pool,
+        "register",
+        &email,
+        &ip,
+        r.turnstile_token.as_deref(),
+    )
+    .await?;
+    let id = issue_otp(&st.pool, &email, "register", Some(&h), Some(name)).await?;
+    Ok(crate::auth::otp_accepted(id))
 }
 
 #[derive(Deserialize)]
 struct CodeReq {
     email: String,
     code: String,
+    challenge_id: Option<uuid::Uuid>,
 }
 
 async fn register_verify(
@@ -110,7 +117,7 @@ async fn register_verify(
 ) -> Result<Response, AppError> {
     crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
-    let (pw, name) = consume_otp(&st.pool, &email, &r.code, "register").await?;
+    let (pw, name) = consume_otp(&st.pool, &email, &r.code, "register", r.challenge_id).await?;
     let (Some(pw), Some(name)) = (pw, name) else {
         return Err(crate::auth::otp_invalid());
     };
@@ -195,6 +202,7 @@ async fn login(
 #[derive(Deserialize)]
 struct ResetReq {
     email: String,
+    turnstile_token: Option<String>,
 }
 
 async fn reset_request(
@@ -204,28 +212,30 @@ async fn reset_request(
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
+    crate::auth::otp_gate(&st.pool, "reset", &email, &ip, r.turnstile_token.as_deref()).await?;
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 AND deleted_at IS NULL)",
     )
     .bind(&email)
     .fetch_one(&st.pool)
     .await?;
+    // 帳號不存在或被限流時回隨機 id，回應形狀不變，維持不洩漏帳號
+    let mut id = uuid::Uuid::new_v4();
     if exists {
         match issue_otp(&st.pool, &email, "reset", None, None).await {
-            Ok(()) | Err(AppError::Problem { status: 429, .. }) => {} // 限流也回 202，維持不洩漏
+            Ok(real) => id = real,
+            Err(AppError::Problem { status: 429, .. }) => {}
             Err(e) => return Err(e),
         }
     }
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(json!({ "expires_in": 600, "resend_after": 60 })),
-    ))
+    Ok(crate::auth::otp_accepted(id))
 }
 
 #[derive(Deserialize)]
 struct ResetConfirm {
     email: String,
     code: String,
+    challenge_id: Option<uuid::Uuid>,
     new_password: String,
 }
 
@@ -237,7 +247,7 @@ async fn reset_confirm(
     crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     check_pw(&r.new_password)?;
-    consume_otp(&st.pool, &email, &r.code, "reset").await?;
+    consume_otp(&st.pool, &email, &r.code, "reset", r.challenge_id).await?;
     let uid: uuid::Uuid =
         sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL")
             .bind(&email)

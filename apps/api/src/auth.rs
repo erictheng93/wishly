@@ -236,6 +236,7 @@ pub(crate) async fn upsert_identity_in_tx(
 #[derive(Deserialize)]
 pub(crate) struct EmailReq {
     email: String,
+    turnstile_token: Option<String>,
 }
 
 pub(crate) fn norm_email(e: &str) -> Result<String, AppError> {
@@ -275,16 +276,16 @@ async fn send_mail(to: String, code: String, subject: &'static str) {
     }
 }
 
-// 限流以 (email, purpose) 計，避免匿名者用 login 用完額度而擋住本人的 reset / register / link；每 IP 限流在各 handler（ratelimit::check）。
-/// 限流 + 寫入挑戰 + 寄信。每 (email, 用途) 每小時 5 封、60 秒間隔。
-/// 60 秒間隔只看「尚未使用」的驗證碼：剛驗證成功（例如註冊完）立刻重設密碼是正常操作，不應被擋；沒有信箱存取權的人無法消耗驗證碼，所以不影響防濫用。
+// 硬上限以 (email, purpose) 計（每小時 20 封），避免匿名者用 login 用完額度而擋住本人的 reset / register / link。
+// 匿名端點另有「軟上限 + Turnstile」與「每請求者 60 秒間隔」（otp_gate），每 IP 限流在各 handler。
+/// 限流 + 寫入挑戰 + 寄信；回傳挑戰 id（驗證時綁定用）。
 pub(crate) async fn issue_otp(
     pool: &PgPool,
     email: &str,
     purpose: &str,
     pw_hash: Option<&str>,
     name: Option<&str>,
-) -> Result<(), AppError> {
+) -> Result<Uuid, AppError> {
     issue_otp_scoped(pool, email, purpose, pw_hash, name, None, None).await
 }
 
@@ -297,15 +298,16 @@ pub(crate) async fn issue_otp_scoped(
     name: Option<&str>,
     owner: Option<Uuid>,
     session_hash: Option<&[u8]>,
-) -> Result<(), AppError> {
+) -> Result<Uuid, AppError> {
     let mut tx = pool.begin().await?;
-    let code = issue_otp_in_tx(&mut tx, email, purpose, pw_hash, name, owner, session_hash).await?;
+    let (id, code) =
+        issue_otp_in_tx(&mut tx, email, purpose, pw_hash, name, owner, session_hash).await?;
     tx.commit().await?;
     send_otp(email, code, purpose);
-    Ok(())
+    Ok(id)
 }
 
-/// 共用交易：回傳驗證碼，呼叫者提交後才可寄信。鎖順序為 OTP → user。
+/// 共用交易：回傳 (挑戰 id, 驗證碼)，呼叫者提交後才可寄信。鎖順序為 OTP → user。
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn issue_otp_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -315,7 +317,7 @@ pub(crate) async fn issue_otp_in_tx(
     name: Option<&str>,
     owner: Option<Uuid>,
     session_hash: Option<&[u8]>,
-) -> Result<String, AppError> {
+) -> Result<(Uuid, String), AppError> {
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
         .bind(format!("otp:{email}"))
         .execute(&mut **tx)
@@ -332,21 +334,15 @@ pub(crate) async fn issue_otp_in_tx(
             return Err(AppError::Unauthorized);
         }
     }
-    let (cnt, last_age): (i64, Option<i64>) = sqlx::query_as(
-        "SELECT count(*), (min(extract(epoch FROM now() - created_at)) FILTER (WHERE consumed_at IS NULL))::bigint FROM otp_challenges
-         WHERE email = $1 AND purpose = $2 AND created_at > now() - interval '1 hour'").bind(email).bind(purpose).fetch_one(&mut **tx).await?;
-    if cnt >= 5 {
+    let cnt: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM otp_challenges WHERE email = $1 AND purpose = $2 AND created_at > now() - interval '1 hour'").bind(email).bind(purpose).fetch_one(&mut **tx).await?;
+    if cnt >= 20 {
         return Err(rate_limited(600));
     }
-    if let Some(age) = last_age {
-        if age < 60 {
-            return Err(rate_limited(60 - age));
-        }
-    }
     let code = format!("{:06}", rand::thread_rng().gen_range(0..1_000_000u32));
-    sqlx::query("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, pending_password_hash, pending_display_name, link_user_id, link_session_hash) VALUES ($1,$2, now() + make_interval(secs => $3),$4,$5,$6,$7,$8)")
-        .bind(email).bind(code_hash(&code, &pepper())).bind(OTP_TTL_SECS as f64).bind(purpose).bind(pw_hash).bind(name).bind(owner).bind(session_hash).execute(&mut **tx).await?;
-    Ok(code)
+    let id: Uuid = sqlx::query_scalar("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, pending_password_hash, pending_display_name, link_user_id, link_session_hash) VALUES ($1,$2, now() + make_interval(secs => $3),$4,$5,$6,$7,$8) RETURNING id")
+        .bind(email).bind(code_hash(&code, &pepper())).bind(OTP_TTL_SECS as f64).bind(purpose).bind(pw_hash).bind(name).bind(owner).bind(session_hash).fetch_one(&mut **tx).await?;
+    Ok((id, code))
 }
 
 pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
@@ -359,6 +355,40 @@ pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
     tokio::spawn(send_mail(email.to_string(), code, subject)); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
 }
 
+/// 匿名 OTP 請求的閘門（不論帳號是否存在都計數，不洩漏帳號）：
+/// 每 (用途, email) 每小時超過 3 次要 Turnstile（軟上限，擋不住本人）；每 (IP, email) 60 秒間隔。
+pub(crate) async fn otp_gate(
+    pool: &PgPool,
+    purpose: &str,
+    email: &str,
+    ip: &str,
+    turnstile_token: Option<&str>,
+) -> Result<(), AppError> {
+    if !crate::ratelimit::allow(pool, &format!("otp_soft:{purpose}:{email}"), 3, 3600).await? {
+        match crate::reports::verify_turnstile(&crate::config::get(), turnstile_token, ip).await {
+            Err(AppError::Problem { status: 403, .. }) => {
+                return Err(AppError::problem(
+                    403,
+                    "CAPTCHA_REQUIRED",
+                    "請先完成人機驗證後再試。",
+                ))
+            }
+            r => r?,
+        }
+    }
+    crate::ratelimit::check(pool, &format!("otp_gap:{purpose}:{ip}:{email}"), 1, 60).await
+}
+
+/// 202 回應本體；challenge_id 供驗證時綁定。
+pub(crate) fn otp_accepted(challenge_id: Uuid) -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::ACCEPTED,
+        Json(
+            json!({ "expires_in": OTP_TTL_SECS, "resend_after": 60, "challenge_id": challenge_id }),
+        ),
+    )
+}
+
 async fn otp_request(
     State(st): State<AppState>,
     Peer(ip): Peer,
@@ -366,17 +396,16 @@ async fn otp_request(
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
-    issue_otp(&st.pool, &email, "login", None, None).await?;
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(json!({ "expires_in": OTP_TTL_SECS, "resend_after": 60 })),
-    ))
+    otp_gate(&st.pool, "login", &email, &ip, r.turnstile_token.as_deref()).await?;
+    let id = issue_otp(&st.pool, &email, "login", None, None).await?;
+    Ok(otp_accepted(id))
 }
 
 #[derive(Deserialize)]
 pub(crate) struct VerifyReq {
     pub email: String,
     pub code: String,
+    pub challenge_id: Option<Uuid>,
 }
 
 pub(crate) fn otp_invalid() -> AppError {
@@ -389,8 +418,9 @@ pub(crate) async fn consume_otp(
     email: &str,
     code: &str,
     purpose: &str,
+    challenge: Option<Uuid>,
 ) -> Result<(Option<String>, Option<String>), AppError> {
-    consume_otp_scoped(pool, email, code, purpose, None, None).await
+    consume_otp_scoped(pool, email, code, purpose, None, None, challenge).await
 }
 
 pub(crate) async fn consume_otp_scoped(
@@ -400,6 +430,7 @@ pub(crate) async fn consume_otp_scoped(
     purpose: &str,
     owner: Option<Uuid>,
     session_hash: Option<&[u8]>,
+    challenge: Option<Uuid>,
 ) -> Result<(Option<String>, Option<String>), AppError> {
     let mut tx = pool.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
@@ -409,17 +440,21 @@ pub(crate) async fn consume_otp_scoped(
     if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
         return Err(AppError::invalid("/code", "FORMAT", "驗證碼為 6 位數字"));
     }
-    // 每 (email, 用途) 每小時最多 10 次驗證嘗試；不跨用途，login 亂猜不會擋掉有效的 reset / register / link 驗證碼
-    let tries: i64 = sqlx::query_scalar("SELECT coalesce(sum(attempts),0)::bigint FROM otp_challenges WHERE email=$1 AND purpose=$2 AND created_at > now() - interval '1 hour'")
-        .bind(email).bind(purpose).fetch_one(&mut *tx).await?;
-    if tries >= 10 {
-        return Err(rate_limited(600));
+    // 帶 challenge_id：只驗那一張、只套單張嘗試上限，他人亂猜 email 級額度也擋不了本人。
+    // 沒帶（舊客戶端、後台代寄的重設信）：每 (email, 用途) 每小時最多 10 次嘗試；不跨用途。
+    if challenge.is_none() {
+        let tries: i64 = sqlx::query_scalar("SELECT coalesce(sum(attempts),0)::bigint FROM otp_challenges WHERE email=$1 AND purpose=$2 AND created_at > now() - interval '1 hour'")
+            .bind(email).bind(purpose).fetch_one(&mut *tx).await?;
+        if tries >= 10 {
+            return Err(rate_limited(600));
+        }
     }
     type OtpChallengeRow = (Uuid, Vec<u8>, i16, Option<String>, Option<String>);
     let ch: Option<OtpChallengeRow> = sqlx::query_as(
         "SELECT id, code_hash, attempts, pending_password_hash, pending_display_name FROM otp_challenges
          WHERE email=$1 AND purpose=$2 AND link_user_id IS NOT DISTINCT FROM $3 AND link_session_hash IS NOT DISTINCT FROM $4 AND consumed_at IS NULL AND expires_at > now()
-         ORDER BY created_at DESC LIMIT 1").bind(email).bind(purpose).bind(owner).bind(session_hash).fetch_optional(&mut *tx).await?;
+         AND ($5::uuid IS NULL OR id = $5)
+         ORDER BY created_at DESC LIMIT 1").bind(email).bind(purpose).bind(owner).bind(session_hash).bind(challenge).fetch_optional(&mut *tx).await?;
     let (cid, hash, attempts, pw, name) = ch.ok_or_else(otp_invalid)?;
     if attempts >= OTP_MAX_ATTEMPTS {
         return Err(otp_invalid());
@@ -497,7 +532,7 @@ async fn otp_verify(
 ) -> Result<Response, AppError> {
     crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
-    consume_otp(&st.pool, &email, &r.code, "login").await?;
+    consume_otp(&st.pool, &email, &r.code, "login", r.challenge_id).await?;
     let name = email.split('@').next().unwrap_or("user");
     let (uid, is_new) =
         upsert_identity(&st.pool, "email", &email, Some(&email), name, None).await?;

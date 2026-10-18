@@ -606,6 +606,9 @@ async fn recovery_uses_one_connection_and_rolls_back_on_rate_limit(pool: PgPool)
         .connect_with((*pool.connect_options()).clone())
         .await
         .unwrap();
+    // 硬上限為每 (email, 用途) 每小時 20 封：先塞 19 封，第 20 封成功、第 21 封被擋
+    sqlx::query("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, created_at) SELECT $1, '\\x00', now() + interval '5 minutes', 'reset', now() - interval '2 minutes' FROM generate_series(1,19)")
+        .bind(&email).execute(&pool).await.unwrap();
     let path = format!("/admin/users/{id}/recovery");
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(2),
@@ -639,7 +642,7 @@ async fn recovery_uses_one_connection_and_rolls_back_on_rate_limit(pool: PgPool)
     .fetch_one(&single)
     .await
     .unwrap();
-    assert_eq!(n, 1);
+    assert_eq!(n, 20);
     let n: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM audit_logs WHERE entity_id=$1 AND action='user.recovery'",
     )

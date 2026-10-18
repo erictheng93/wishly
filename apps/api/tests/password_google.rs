@@ -42,6 +42,11 @@ async fn age_otps(pool: &PgPool) {
         .execute(pool)
         .await
         .unwrap();
+    // 每請求者 60 秒間隔存在 rate_limits，一併挪開
+    sqlx::query("DELETE FROM rate_limits WHERE key LIKE 'otp_gap:%'")
+        .execute(pool)
+        .await
+        .unwrap();
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -181,6 +186,7 @@ async fn password_register_login_reset(pool: PgPool) {
     assert_eq!(e1["code"], "INVALID_CREDENTIALS");
     // 已有密碼者再註冊 → 驗證時 409
     // 剛驗證成功（驗證碼已使用）不擋下一次請求；但新寄出、尚未使用的驗證碼 60 秒內不能再要
+    age_otps(&pool).await;
     assert_eq!(
         common::call_app(
             &app,
@@ -261,8 +267,8 @@ async fn password_register_login_reset(pool: PgPool) {
         )
         .await
         .0,
-        202
-    ); // 限流也 202
+        429
+    ); // 同 IP 60 秒內重送：與帳號是否存在無關，一律 429
     let code = recover_code(&pool, &email, "reset").await;
     assert_eq!(
         common::call_app(
