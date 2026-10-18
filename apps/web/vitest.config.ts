@@ -9,6 +9,7 @@ export default defineConfig({
   define: { 'import.meta.client': true, __NATIVE__: 'globalThis.__NATIVE__ === true' },
   test: {
     include: ['tests/**/*.test.ts'],
+    setupFiles: ['tests/setup.ts'],
     coverage: {
       provider: 'v8',
       include: ['app/composables/**/*.ts', 'app/utils/**/*.ts', 'app/components/**/*.vue'],

@@ -9,7 +9,7 @@ const id = useId()
     <label :for="id" class="c-lbl">{{ label }}</label>
     <div class="c-pw">
       <input :id="id" v-model="model" :type="show ? 'text' : 'password'" :autocomplete="autocomplete" :aria-describedby="hint ? id + '-h' : undefined" required>
-      <button type="button" class="c-btn plain small" :aria-pressed="show" @click="show = !show">{{ show ? '隱藏' : '顯示' }}</button>
+      <button type="button" class="c-btn plain small" :aria-pressed="show" @click="show = !show">{{ show ? $t('creator.password.hide') : $t('creator.password.show') }}</button>
     </div>
     <small v-if="hint" :id="id + '-h'" class="c-mute">{{ hint }}</small>
   </div>

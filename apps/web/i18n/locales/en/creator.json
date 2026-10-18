@@ -1,0 +1,172 @@
+{
+  "creator": {
+    "confirm": {
+      "cancel": "Cancel",
+      "busy": "Processing…",
+      "ok": "Confirm"
+    },
+    "image": {
+      "typeError": "Images must be JPG, PNG or WebP",
+      "tooBig": "Image must be under 5 MB",
+      "uploadFail": "Upload failed",
+      "cover": "Cover image (optional)",
+      "item": "Image (optional)",
+      "none": "No image",
+      "pick": "Choose image",
+      "uploading": "Uploading…",
+      "done": "Uploaded. The image will appear publicly once processing is done",
+      "retry": "Upload again",
+      "hint": "JPG, PNG or WebP, up to 5 MB. Hidden data such as location (EXIF) is removed after upload. Please do not upload photos containing personal information."
+    },
+    "itemSheet": {
+      "titleEdit": "Edit item",
+      "titleNew": "Add item",
+      "name": "Name (required)",
+      "namePh": "e.g. Baby bottle",
+      "brand": "Brand (optional)",
+      "spec": "Specs (optional)",
+      "url": "Product link (optional)",
+      "mode": "How to get it",
+      "modeQty": "Quantity pledges",
+      "modeCrowd": "Wish crowdfunding",
+      "modeLocked": "Someone has already pledged or contributed, so this can no longer be changed.",
+      "targetPoints": "Target points (required, 1 point = NT$1)",
+      "raisedSuffix": "({n} raised)",
+      "deadline": "Funding deadline (Taipei time, optional)",
+      "deadlineHint": "If left empty, 23:59 on the event date is used. Required when the list has no event date.",
+      "refPrice": "Reference price NT$ (optional)",
+      "crowdNote": "Once the goal is reached, the platform buys and ships it for you. Points are never paid out to you as cash. You need to fill in the list's shipping info first.",
+      "fundLocked": "The goal was reached or the deadline has passed, so the target and deadline can no longer be changed.",
+      "qty": "Quantity needed",
+      "claimedSuffix": "({n} pledged)",
+      "unitPrice": "Reference price NT$ (optional)",
+      "priority": "Priority",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "cancel": "Cancel",
+      "save": "Save item",
+      "saving": "Saving…",
+      "reload": "Reload",
+      "fillAddress": "Add shipping info",
+      "errName": "Please enter an item name",
+      "errTarget": "Please enter the target points (a positive whole number)",
+      "errStale": "This item was changed elsewhere. Please reload.",
+      "errAddr": "Crowdfunded items need shipping info first, so the platform knows where to send it once the goal is reached."
+    },
+    "otp": {
+      "group": "6-digit verification code",
+      "cell": "Digit {n}"
+    },
+    "password": {
+      "show": "Show",
+      "hide": "Hide"
+    },
+    "qr": {
+      "label": "Share link QR code",
+      "download": "Download QR"
+    },
+    "shipping": {
+      "intro": "When a wish crowdfund reaches its goal, the platform buys the item and ships it here. Only you and the staff placing the order can see this. Friends never can.",
+      "recipient": "Recipient",
+      "phone": "Phone",
+      "address": "Address",
+      "empty": "Not filled in yet. Lists with crowdfunded items must have this before they can be published.",
+      "recipientLabel": "Recipient (1–50 characters)",
+      "phoneLabel": "Phone (6–20 characters, may include + - and spaces)",
+      "addressLabel": "Address (5–200 characters)",
+      "privacy": "To protect your privacy, you need to re-enter everything when making changes.",
+      "saved": "Saved",
+      "saving": "Saving…",
+      "update": "Update shipping info",
+      "save": "Save shipping info"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "closed": "Ended",
+      "archived": "Archived",
+      "hidden": "Taken down",
+      "ok": "Normal",
+      "pending": "Processing image",
+      "ready": "Image ready",
+      "rejected": "Image rejected",
+      "reserved": "Pledged",
+      "purchased": "Purchased",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "open": "Pending",
+      "actioned": "Resolved",
+      "dismissed": "Dismissed"
+    },
+    "vis": {
+      "public": {
+        "label": "Public",
+        "desc": "Anyone can view it (including guests). It is listed on Explore and your profile."
+      },
+      "friends": {
+        "label": "All friends",
+        "desc": "Only your friends can open it, and they need to sign in."
+      },
+      "selected": {
+        "label": "Close friends",
+        "desc": "Only the close friends you pick from your friends can open it, and they need to sign in."
+      },
+      "private": {
+        "label": "Private",
+        "desc": "Only you can see it. Friends who open it will see \"not found\"."
+      },
+      "who": "Who can see this list",
+      "pickTitle": "Choose close friends ({n} selected)",
+      "loading": "Loading friends…",
+      "noFriendsPre": "No friends yet. Go to ",
+      "noFriendsPost": " to invite friends, then come back to pick."
+    },
+    "analytics": {
+      "funnel": {
+        "signed_up": "Signed up",
+        "created_list": "Created a list",
+        "published_list": "Published a list",
+        "received_claim": "Received a pledge"
+      },
+      "retention": {
+        "d1": "Next-day retention (day 1)",
+        "d7": "Days 7–13",
+        "d30": "Days 30–59"
+      },
+      "claimStatus": {
+        "reserved": "Pledged",
+        "purchased": "Purchased",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
+      },
+      "actor": {
+        "guest": "Guest",
+        "user": "Member"
+      },
+      "reason": {
+        "scam": "Suspected scam",
+        "inappropriate": "Inappropriate content",
+        "copyright": "Copyright infringement",
+        "personal_info": "Leaks personal information",
+        "other": "Other"
+      },
+      "wishlistType": {
+        "personal": "Personal wish",
+        "registry": "Gift registry",
+        "relief": "Relief"
+      },
+      "wishlistVisibility": {
+        "link": "Link",
+        "private": "Private",
+        "public": "Public"
+      },
+      "shareLevel": {
+        "public": "Public",
+        "friends": "Friends",
+        "private": "Private"
+      }
+    }
+  }
+}

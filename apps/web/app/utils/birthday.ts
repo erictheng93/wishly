@@ -8,4 +8,9 @@ export function toBirthday(m: string, d: string): string | null | undefined {
   return `${m}-${String(Math.min(+d, daysInMonth(m))).padStart(2, '0')}`
 }
 
-export const formatBirthday = (b: string) => `${+b.slice(0, 2)} 月 ${+b.slice(3)} 日`
+// 月日：zh-Hant 維持「5 月 1 日」，其他語系用 Intl（en「May 1」、vi「1 tháng 5」）
+export const formatBirthday = (b: string) => {
+  const lang = useNuxtApp().$i18n.locale.value
+  if (lang === 'en' || lang === 'vi') return new Date(2000, +b.slice(0, 2) - 1, +b.slice(3)).toLocaleDateString(lang, { month: 'long', day: 'numeric' })
+  return `${+b.slice(0, 2)} 月 ${+b.slice(3)} 日`
+}

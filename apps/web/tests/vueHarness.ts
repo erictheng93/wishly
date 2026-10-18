@@ -1,4 +1,5 @@
 import { createApp, h, nextTick, type Component } from 'vue'
+import { t } from './setup'
 
 // Mount real Vue components; only the API and Nuxt runtime are replaced in tests.
 export function mount(component: Component, props: Record<string, any> = {}, components: Record<string, Component> = {}, globals: Record<string, any> = {}) {
@@ -6,7 +7,7 @@ export function mount(component: Component, props: Record<string, any> = {}, com
   document.body.append(el)
   const app = createApp({ render: () => h(component, props) })
   for (const [name, value] of Object.entries(components)) app.component(name, value)
-  Object.assign(app.config.globalProperties, globals)
+  Object.assign(app.config.globalProperties, { $t: t }, globals)
   app.mount(el)
   return { el, unmount: () => { app.unmount(); el.remove() } }
 }

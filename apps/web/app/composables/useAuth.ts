@@ -5,6 +5,10 @@ export function useAuth() {
   async function fetchMe(force = false) {
     if (loaded.value && !force) return user.value
     try { user.value = await api('/me', { noRedirect: true }); useState<string>('auth-error', () => '').value = '' } catch { user.value = null }
+    // 以目前介面語言為準，讓後端寄信（通知、安全通知）用同一種語言
+    const cur = useNuxtApp().$i18n.locale.value
+    const want = cur === 'zh-Hant' ? 'zh-TW' : cur
+    if (user.value?.locale && user.value.locale !== want) api('/me', { method: 'PATCH', body: { locale: want }, noRedirect: true }).then((u) => { user.value = u }).catch(() => {})
     loaded.value = true
     return user.value
   }

@@ -1,0 +1,22 @@
+{
+  "common": {
+    "language": "Ngôn ngữ",
+    "explore": "Khám phá",
+    "myClaims": "Quà tôi đã nhận",
+    "back": "Quay lại",
+    "profile": "Trang cá nhân",
+    "friends": "Bạn bè",
+    "mainMenu": "Menu chính",
+    "myLists": "Danh sách của tôi",
+    "points": "Điểm",
+    "settings": "Cài đặt",
+    "admin": "Quản trị",
+    "theme": {
+      "auto": "Tự động",
+      "light": "Sáng",
+      "dark": "Tối",
+      "label": "Giao diện: {mode} (chạm để đổi)",
+      "title": "Giao diện: {mode}"
+    }
+  }
+}

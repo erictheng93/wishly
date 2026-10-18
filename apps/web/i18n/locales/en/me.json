@@ -1,0 +1,240 @@
+{
+  "me": {
+    "home": {
+      "seoTitle": "Wishly | Wishlists and gift sharing",
+      "seoDesc": "Build a wishlist and share it with one link. For gifts, birthdays and weddings: friends open the link to browse, then sign in to pledge a gift. No duplicates, no overselling.",
+      "ogTitle": "Wishly",
+      "ogDesc": "List what you want, so the people who want to give never have to guess.",
+      "myLists": "My lists",
+      "start": "Get started",
+      "explore": "Explore",
+      "seeDemo": "See examples",
+      "kicker": "Wishlists × Sharing",
+      "h1": "Wishly: wishlists, in sync",
+      "lead": "List what you want, so the people who want to give never have to guess.",
+      "sub": "Share your whole wishlist with one link. Friends open it to browse, then sign in to pledge a gift. No duplicates, no overselling.",
+      "ctaExplore": "Explore public lists",
+      "ctaDemo": "See an example list",
+      "demoAria": "Example wishlist: three items, one already pledged",
+      "demoTitle": "Annie's birthday wishes",
+      "demoCount": "3 items",
+      "demoThumb1": "Coffee",
+      "demoItem1": "Pour-over coffee set",
+      "demoTop": "Top wish",
+      "demoBy": "Pledged by Kai",
+      "demoThumb2": "Headphones",
+      "demoItem2": "Noise-cancelling headphones",
+      "demoRaised": "Raised $4,800",
+      "demoGoal": "/ $8,000",
+      "demoThumb3": "Book",
+      "demoItem3": "The Design of Everyday Things",
+      "demoGive": "I'll get it",
+      "scenesTitle": "Three occasions, one kind of list",
+      "scenes": {
+        "gift": {
+          "k": "Gifting",
+          "t": "Holidays and thank-you gifts",
+          "d": "The recipient makes the list and givers pick from it. No more guessing sizes, colors or tastes."
+        },
+        "birthday": {
+          "k": "Birthday",
+          "t": "One link gathers all the love",
+          "d": "Just paste it in the group chat. Everyone picks one item, or chips in together for a big gift."
+        },
+        "wedding": {
+          "k": "Wedding",
+          "t": "Set up the new home in one go",
+          "d": "List appliances, tableware and household goods. Once a guest pledges an item, it is locked right away."
+        }
+      },
+      "sceneMore": "See the {k} example →",
+      "stepsTitle": "Share your wishes in three steps",
+      "steps": {
+        "1": {
+          "t": "Create a wishlist",
+          "d": "Add the items you want with prices and links. Ten minutes is enough."
+        },
+        "2": {
+          "t": "Share the link",
+          "d": "Send it through LINE, Facebook or anywhere else. The preview image comes along automatically."
+        },
+        "3": {
+          "t": "Friends sign in to pledge",
+          "d": "Open the link to look around. Sign in to pledge an item, and nobody else can pick it afterwards."
+        }
+      },
+      "featsTitle": "Make your wishlist work harder",
+      "feats": {
+        "0": {
+          "t": "No overselling",
+          "d": "Each item can be pledged by only one person, even if two people tap at the same moment."
+        },
+        "1": {
+          "t": "Browse without an account",
+          "d": "Friends can view a list without an account, and sign in only when they want to pledge."
+        },
+        "2": {
+          "t": "Live updates",
+          "d": "Pledges and progress sync instantly. No need to refresh the page."
+        },
+        "3": {
+          "t": "Group funding",
+          "d": "Big items can be funded by several people, and the progress bar shows what is still missing."
+        }
+      },
+      "faqTitle": "FAQ",
+      "faq": {
+        "0": {
+          "q": "Do my friends need to sign up?",
+          "a": "Not to browse a list. To pledge an item they need to sign in first."
+        },
+        "1": {
+          "q": "Could two people give the same item?",
+          "a": "No. Once an item is pledged it is locked, and pledges that are not completed in time are released automatically."
+        },
+        "2": {
+          "q": "Can I show a list only to certain people?",
+          "a": "Yes. A list can be public, visible to all friends, visible to close friends only, or private to you."
+        }
+      },
+      "endTitle": "List your wishes now",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy"
+    },
+    "vis": {
+      "public": "Public",
+      "friends": "Friends only",
+      "private": "Private"
+    },
+    "whoSees": "Who can see",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "claims": {
+      "title": "My pledges",
+      "status": {
+        "reserved": "Pledged",
+        "purchased": "Purchased",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
+      },
+      "recoverFailed": "This management link is no longer valid (it can be used once and is valid for 30 days). Please go back to the list link your friend shared, or contact support.",
+      "loadFailed": "Failed to load",
+      "empty1": "You have not pledged anything yet. Once you get a friend's list link, sign in to pledge and manage your pledges here.",
+      "empty2": "Can't see your earlier guest pledges? They may have been made in a different browser or in LINE's built-in browser. If you left an email, use the \"Manage my pledges\" link in the confirmation email.",
+      "signedIn": " (signed in)",
+      "thisDevice": " (this device)",
+      "editNick": "Change nickname",
+      "nick": "Nickname",
+      "save": "Save",
+      "noImg": "Img",
+      "markPurchased": "Mark as purchased",
+      "markDelivered": "Mark as delivered",
+      "cancel": "Cancel",
+      "past": "Past records ({n})",
+      "wipe": "Delete my nickname and contact info",
+      "confirmCancelPurchased": "The list owner will be notified. Cancel this pledge?",
+      "confirmCancel": "Cancel this pledge?",
+      "confirmWipe": "Delete your nickname and contact info? Your pledges are kept as \"Deleted guest\", and this device will no longer be able to manage them."
+    },
+    "wallet": {
+      "title": "My points",
+      "pts": "{pts} pts",
+      "visUpdated": "Visibility updated",
+      "withdrawn": "Withdrew {pts} points",
+      "locked": "This pledge can no longer be withdrawn (the item has reached its goal or the withdrawal period has passed).",
+      "loadOthersFailed": "Failed to load the other items in this list. Please try again later.",
+      "reallocated": "Moved",
+      "reallocNotAllowed": "Can't move your points to this item (it may have reached its goal, closed, or the choice period has passed). Please try another.",
+      "available": "Available points (1 point = NT$1)",
+      "frozen": "Frozen",
+      "held": "{pts} points pledged (can be withdrawn until the goal is reached)",
+      "frozenWarn": "Your wallet is frozen and you can't contribute for now. Please contact support.",
+      "issuedByPlatform": "Points are currently issued by the platform.",
+      "topup": "Top up (coming soon)",
+      "myPledges": "My contributions",
+      "noPledges": "No contributions yet. Open a list a friend shared to join a group-funded wish.",
+      "noImg": "No image",
+      "quoted": "\"{msg}\"",
+      "anon": " (anonymous)",
+      "pledgedAt": "Pledged {time}",
+      "reachedAt": " · Goal reached {time}",
+      "refunded": "{pts} points of the difference refunded",
+      "anonNote": "Anonymous contributions are visible only to you on your profile.",
+      "expiredNote": "Funding has closed. Withdraw or move your points before {time}, or they will be refunded automatically.",
+      "realloc": "Move to another item",
+      "withdraw": "Withdraw",
+      "loadMore": "Load more",
+      "ledger": "Points ledger",
+      "noLedger": "No transactions yet",
+      "ledgerMeta": "{time} · Balance {bal}",
+      "wdTitle": "Withdraw contribution",
+      "wdText": "Withdraw {pts} points from \"{item}\"? The points go back to your wallet immediately.",
+      "wdOk": "Confirm withdrawal",
+      "reTitle": "Move to another item",
+      "reText": "Move {pts} points to another group-funded item in the same list (your wallet is not affected).",
+      "reOk": "Confirm move",
+      "noTargets": "This list has no other group-funded items open for funding right now.",
+      "moveTo": "Move to",
+      "targetOpt": "{title} ({pts} points to go)"
+    },
+    "friends": {
+      "sent": "If that person has an account, the invitation has been sent.",
+      "copyFail": "Couldn't copy. Please select the URL manually.",
+      "addTitle": "Add a friend",
+      "toLabel": "Their email or handle",
+      "toPh": "name@example.com or @handle",
+      "send": "Send invitation",
+      "sending": "Sending…",
+      "inviteTitle": "Invite link",
+      "inviteHint": "Give the link or QR code to a friend, and they become your friend after signing in. The link is valid for 7 days, and generating a new one invalidates the old one.",
+      "inviteUrl": "Invite URL",
+      "copy": "Copy URL",
+      "copied": "Copied",
+      "regen": "Regenerate",
+      "revoke": "Revoke",
+      "gen": "Create invite link",
+      "revokeExisting": "Revoke existing invite",
+      "incoming": "Invitations received",
+      "accept": "Accept",
+      "decline": "Decline",
+      "outgoing": "Invitations sent",
+      "cancelInvite": "Cancel invitation",
+      "mine": "My friends ({n})",
+      "none": "No friends yet. Invite someone using the options above.",
+      "unfriend": "Unfriend",
+      "unfriendTitle": "Unfriend {name}?",
+      "unfriendText": "They will no longer see your \"friends only\" lists, and your access to their \"selected people\" lists is removed too."
+    },
+    "profile": {
+      "vis": {
+        "public": "Public",
+        "friends": "Friends only",
+        "selected": "Selected friends",
+        "link": "Link"
+      },
+      "title": "{name}'s wishes",
+      "page": "Profile",
+      "gone": "User not found.",
+      "loadFailed": "Failed to load. Please try again later.",
+      "birthday": " · Birthday {date}",
+      "editSettings": "Edit profile settings",
+      "friend": "Friend",
+      "requestSent": "Invitation sent",
+      "acceptRequest": "Accept friend request",
+      "addFriend": "Send friend request",
+      "loginToAdd": "Sign in to add friend",
+      "lists": "Wishlists",
+      "noLists": "No lists to show right now.",
+      "closed": "Closed",
+      "registry": "Gift registry",
+      "personal": "Personal wishes",
+      "completion": "{pct}% complete ({n} items)",
+      "donations": "Pledge history",
+      "noDonations": "No pledge history to show right now.",
+      "pledgePts": " · {pts} pts",
+      "qty": " × {qty}",
+      "to": "For {name} · "
+    }
+  }
+}

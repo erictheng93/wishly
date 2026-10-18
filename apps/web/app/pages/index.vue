@@ -1,36 +1,20 @@
 <script setup lang="ts">
 const { user, fetchMe } = useAuth()
+const { t } = useI18n()
 onMounted(() => fetchMe())
-const cta = computed(() => user.value ? { to: '/dashboard', text: '我的清單' } : { to: '/login', text: '開始建立' })
+const cta = computed(() => user.value ? { to: '/dashboard', text: t('me.home.myLists') } : { to: '/login', text: t('me.home.start') })
 
 useSeoMeta({
-  title: 'Wishly 心願同步｜心願清單與心願分享',
-  description: '建立心願清單，用一個連結分享。送禮、生日、婚禮，朋友打開連結就能瀏覽，登入會員後即可捐助，不重複、不超賣。',
-  ogTitle: 'Wishly 心願同步',
-  ogDescription: '列出你想要的，讓想送的人不再猜。',
+  title: () => t('me.home.seoTitle'),
+  description: () => t('me.home.seoDesc'),
+  ogTitle: () => t('me.home.ogTitle'),
+  ogDescription: () => t('me.home.ogDesc'),
 })
 
-const scenes = [
-  { k: '送禮', slug: 'demogift00', t: '節日與回禮', d: '收禮的人列清單，送禮的人照著挑，不再猜尺寸、顏色和喜好。' },
-  { k: '生日', slug: 'demobirth0', t: '一個連結收齊心意', d: '貼進群組就好。大家各認一樣，也能湊錢一起買大禮。' },
-  { k: '婚禮', slug: 'demowedd00', t: '新家用品一次備齊', d: '家電、餐具、生活用品都列上去，賓客捐助後品項立刻鎖定。' },
-]
-const steps = [
-  { n: '01', t: '建立心願清單', d: '加入想要的品項、價格與連結，十分鐘就能完成。' },
-  { n: '02', t: '分享心願連結', d: '用 LINE、FB 或任何管道傳出去，預覽圖會自動帶上。' },
-  { n: '03', t: '朋友登入後捐助', d: '點開連結就能看，登入會員即可捐助品項，捐助後其他人不能再選。' },
-]
-const feats = [
-  { t: '防超賣', d: '同一個品項只會被一個人捐助，同時點擊也不會重複。' },
-  { t: '免帳號瀏覽', d: '朋友不用建帳號就能看清單，要認捐時再登入會員。' },
-  { t: '即時更新', d: '捐助與進度即時同步，頁面不用重新整理。' },
-  { t: '心願眾籌', d: '大件品項可以多人湊，進度條一眼看到還差多少。' },
-]
-const faq = [
-  { q: '朋友需要註冊嗎？', a: '瀏覽清單不需要。要捐助（認捐）品項時，需要先登入會員。' },
-  { q: '會不會有兩個人送到同一樣？', a: '不會。品項一旦被捐助就會鎖定，逾期未完成的捐助會自動釋放。' },
-  { q: '清單可以只給特定的人看嗎？', a: '可以。清單可設為公開、所有好友可見、僅摯友可見，或只有自己看得到。' },
-]
+const scenes = computed(() => (['gift', 'birthday', 'wedding'] as const).map(k => ({ k: t(`me.home.scenes.${k}.k`), slug: { gift: 'demogift00', birthday: 'demobirth0', wedding: 'demowedd00' }[k], t: t(`me.home.scenes.${k}.t`), d: t(`me.home.scenes.${k}.d`) })))
+const steps = computed(() => [0, 1, 2].map(i => ({ n: `0${i + 1}`, t: t(`me.home.steps.${i}.t`), d: t(`me.home.steps.${i}.d`) })))
+const feats = computed(() => [0, 1, 2, 3].map(i => ({ t: t(`me.home.feats.${i}.t`), d: t(`me.home.feats.${i}.d`) })))
+const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: t(`me.home.faq.${i}.a`) })))
 </script>
 
 <template>
@@ -39,8 +23,8 @@ const faq = [
       <div class="l-in">
         <b class="l-logo">WISHLY</b>
         <nav>
-          <NuxtLink to="/explore" class="l-nav-link">探索</NuxtLink>
-          <NuxtLink to="/#scenes" class="l-nav-link">看範例</NuxtLink>
+          <NuxtLink to="/explore" class="l-nav-link">{{ $t('me.home.explore') }}</NuxtLink>
+          <NuxtLink to="/#scenes" class="l-nav-link">{{ $t('me.home.seeDemo') }}</NuxtLink>
           <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>
         </nav>
       </div>
@@ -49,43 +33,43 @@ const faq = [
     <main>
       <section class="l-hero l-in">
         <div class="l-hero-copy">
-          <p class="l-kicker">心願清單 × 心願分享</p>
-          <h1>Wishly 心願同步</h1>
-          <p class="l-lead">列出你想要的，讓想送的人不再猜。</p>
-          <p class="l-sub">一個連結分享整份心願清單。朋友打開連結就能瀏覽，登入會員後即可捐助，不重複、不超賣。</p>
+          <p class="l-kicker">{{ $t('me.home.kicker') }}</p>
+          <h1>{{ $t('me.home.h1') }}</h1>
+          <p class="l-lead">{{ $t('me.home.lead') }}</p>
+          <p class="l-sub">{{ $t('me.home.sub') }}</p>
           <div class="l-cta">
             <NuxtLink :to="cta.to" class="g-btn">{{ cta.text }}</NuxtLink>
-            <NuxtLink to="/explore" class="g-btn ghost">探索公開清單</NuxtLink>
-            <NuxtLink to="/#scenes" class="g-btn ghost">看範例清單</NuxtLink>
+            <NuxtLink to="/explore" class="g-btn ghost">{{ $t('me.home.ctaExplore') }}</NuxtLink>
+            <NuxtLink to="/#scenes" class="g-btn ghost">{{ $t('me.home.ctaDemo') }}</NuxtLink>
           </div>
         </div>
 
         <!-- 假卡片：純示意，不取後端資料 -->
-        <div class="l-demo" role="img" aria-label="心願清單範例：三個品項，其中一項已被捐助">
-          <div class="g-top l-demo-top"><span>小安的生日心願</span><span class="g-mute">3 項</span></div>
+        <div class="l-demo" role="img" :aria-label="$t('me.home.demoAria')">
+          <div class="g-top l-demo-top"><span>{{ $t('me.home.demoTitle') }}</span><span class="g-mute">{{ $t('me.home.demoCount') }}</span></div>
           <ul>
             <li class="g-card g-item">
-              <span class="g-thumb">咖啡機</span>
+              <span class="g-thumb">{{ $t('me.home.demoThumb1') }}</span>
               <div class="g-body">
-                <div class="g-title">手沖咖啡組 <span class="g-badge high">最想要</span></div>
+                <div class="g-title">{{ $t('me.home.demoItem1') }} <span class="g-badge high">{{ $t('me.home.demoTop') }}</span></div>
                 <div class="g-bar"><i style="width:100%" /></div>
-                <span class="g-mute">已被 阿凱 捐助</span>
+                <span class="g-mute">{{ $t('me.home.demoBy') }}</span>
               </div>
             </li>
             <li class="g-card g-item">
-              <span class="g-thumb">耳機</span>
+              <span class="g-thumb">{{ $t('me.home.demoThumb2') }}</span>
               <div class="g-body">
-                <div class="g-title">降噪耳機</div>
+                <div class="g-title">{{ $t('me.home.demoItem2') }}</div>
                 <div class="g-bar"><i style="width:60%" /></div>
-                <span class="g-num">已湊 $4,800</span> <span class="g-mute">/ $8,000</span>
+                <span class="g-num">{{ $t('me.home.demoRaised') }}</span> <span class="g-mute">{{ $t('me.home.demoGoal') }}</span>
               </div>
             </li>
             <li class="g-card g-item">
-              <span class="g-thumb">書</span>
+              <span class="g-thumb">{{ $t('me.home.demoThumb3') }}</span>
               <div class="g-body">
-                <div class="g-title">設計的法則</div>
+                <div class="g-title">{{ $t('me.home.demoItem3') }}</div>
                 <div class="g-bar"><i style="width:0" /></div>
-                <span class="g-btn sm l-fake">我來送</span>
+                <span class="g-btn sm l-fake">{{ $t('me.home.demoGive') }}</span>
               </div>
             </li>
           </ul>
@@ -94,20 +78,20 @@ const faq = [
 
       <section id="scenes" class="l-alt" style="scroll-margin-top:var(--head-h)">
         <div class="l-in">
-          <h2>三種情境，都用同一份清單</h2>
+          <h2>{{ $t('me.home.scenesTitle') }}</h2>
           <div class="l-grid l-3">
             <article v-for="s in scenes" :key="s.k" class="l-scene">
               <span class="l-tag">{{ s.k }}</span>
               <h3>{{ s.t }}</h3>
               <p>{{ s.d }}</p>
-              <NuxtLink :to="`/s/${s.slug}`" class="l-more">看{{ s.k }}範例 →</NuxtLink>
+              <NuxtLink :to="`/s/${s.slug}`" class="l-more">{{ $t('me.home.sceneMore', { k: s.k }) }}</NuxtLink>
             </article>
           </div>
         </div>
       </section>
 
       <section class="l-in l-sec">
-        <h2>三步完成心願分享</h2>
+        <h2>{{ $t('me.home.stepsTitle') }}</h2>
         <ol class="l-grid l-3 l-steps">
           <li v-for="s in steps" :key="s.n">
             <span class="l-num">{{ s.n }}</span>
@@ -119,7 +103,7 @@ const faq = [
 
       <section class="l-alt">
         <div class="l-in">
-          <h2>讓心願清單更好用</h2>
+          <h2>{{ $t('me.home.featsTitle') }}</h2>
           <div class="l-grid l-4">
             <div v-for="f in feats" :key="f.t" class="g-card l-feat">
               <h3>{{ f.t }}</h3>
@@ -130,7 +114,7 @@ const faq = [
       </section>
 
       <section class="l-in l-sec l-faq">
-        <h2>常見問題</h2>
+        <h2>{{ $t('me.home.faqTitle') }}</h2>
         <details v-for="f in faq" :key="f.q">
           <summary>{{ f.q }}</summary>
           <p>{{ f.a }}</p>
@@ -139,7 +123,7 @@ const faq = [
 
       <section class="l-end">
         <div class="l-in">
-          <h2>現在就列出你的心願</h2>
+          <h2>{{ $t('me.home.endTitle') }}</h2>
           <NuxtLink :to="cta.to" class="g-btn l-end-btn">{{ cta.text }}</NuxtLink>
         </div>
       </section>
@@ -147,7 +131,7 @@ const faq = [
 
     <footer class="l-foot l-in">
       <span>© 2026 Eric Vrataski · Wishly</span>
-      <span><NuxtLink to="/terms">服務條款</NuxtLink>・<NuxtLink to="/privacy">隱私權政策</NuxtLink></span>
+      <span><NuxtLink to="/terms">{{ $t('me.home.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('me.home.privacy') }}</NuxtLink></span>
     </footer>
   </div>
 </template>

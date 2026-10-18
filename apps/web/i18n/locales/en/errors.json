@@ -1,0 +1,21 @@
+{
+  "errors": {
+    "reportRate": "Too many reports. Please try again later.",
+    "turnstile": "Human verification failed or expired. Please verify again before submitting.",
+    "network": "Connection unstable. Please try again.",
+    "removed": "This list has been taken down.",
+    "unauthorized": "Your session has expired. Refresh the page and try again; to recover an earlier pledge, use the link in your confirmation email.",
+    "handleTaken": "This handle is already taken. Try another one.",
+    "selfInvite": "This is your own invite link. Share it with a friend.",
+    "loginRequired": "Please sign in to view this list.",
+    "friendsOnly": "This list is only open to the owner's friends.",
+    "notAllowed": "The owner has not made this list available to you.",
+    "notFriend": "You can only choose people who are already your friends.",
+    "rate": "Too many requests. Please try again later.",
+    "maintenance": "The system is under maintenance. Please try again later.",
+    "claimGone": "This pledge no longer exists.",
+    "itemGone": "This item no longer exists. Please refresh the page.",
+    "server": "Something went wrong on our side. Please try again later.",
+    "generic": "Something went wrong. Please try again later."
+  }
+}

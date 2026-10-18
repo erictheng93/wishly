@@ -1,0 +1,118 @@
+{
+  "settings": {
+    "title": "Cài đặt tài khoản",
+    "profile": "Thông tin của tôi",
+    "noEmail": "Chưa liên kết Email",
+    "displayName": "Tên hiển thị",
+    "saved": "Đã lưu",
+    "save": "Lưu",
+    "login": {
+      "title": "Phương thức đăng nhập",
+      "hint": "Hãy giữ lại ít nhất một phương thức đăng nhập. Phương thức đã thuộc về tài khoản khác thì không thể liên kết trực tiếp.",
+      "linked": "Đã liên kết",
+      "unlinked": "Chưa liên kết",
+      "unlinkAria": "Hủy liên kết {label}",
+      "unlink": "Hủy liên kết",
+      "link": "Liên kết {label}",
+      "keepOne": "Hãy thêm một phương thức đăng nhập khác trước khi hủy liên kết phương thức hiện tại.",
+      "linkEmail": "Liên kết Email",
+      "codeSent": "Mã xác minh đã được gửi đến {email}",
+      "confirmEmail": "Xác nhận liên kết Email",
+      "verifying": "Đang xác minh…",
+      "resendIn": "Gửi lại sau {n} giây",
+      "resend": "Gửi lại",
+      "changeEmail": "Đổi Email",
+      "sending": "Đang gửi…",
+      "sendCode": "Gửi mã xác minh",
+      "setPw": "Đặt mật khẩu đăng nhập bằng Email",
+      "setPwNote": " (đặt bằng mã xác minh qua Email, sẽ đăng xuất khỏi mọi thiết bị)",
+      "noEmailWarn": "Chưa liên kết Email nên không thể nhận email thông báo hoặc đặt lại mật khẩu.",
+      "err": {
+        "oauth_failed": "Liên kết thất bại. Vui lòng thử lại và kiểm tra tài khoản đang đăng nhập.",
+        "oauth_unavailable": "Phương thức đăng nhập này chưa được mở.",
+        "identity_in_use": "Phương thức đăng nhập hoặc Email này đã thuộc về một tài khoản khác nên không thể liên kết trực tiếp. Vui lòng đăng nhập bằng tài khoản gốc.",
+        "provider_already_linked": "Phương thức đăng nhập này đã được liên kết. Hãy hủy liên kết trước khi đổi."
+      },
+      "linkedMsg": "Đã liên kết {label}",
+      "emailLinkedMsg": "Đã liên kết Email, bạn có thể nhận thông báo và đặt mật khẩu.",
+      "unlinkedMsg": "Đã hủy liên kết {label}",
+      "unlinkTitle": "Hủy liên kết {label}?",
+      "unlinkText": "Sau khi hủy liên kết, các thiết bị khác sẽ bị đăng xuất, thiết bị hiện tại vẫn đăng nhập. Sau đó bạn cần dùng phương thức đã liên kết khác để đăng nhập. Nếu không còn Email, bạn sẽ không nhận được thông báo hay đặt lại mật khẩu; nếu sau này xác minh lại cùng Email để đăng nhập, Email đó vẫn có thể tự động liên kết lại với tài khoản này.",
+      "unlinkOk": "Hủy liên kết"
+    },
+    "pw": {
+      "title": "Đổi mật khẩu",
+      "current": "Mật khẩu hiện tại",
+      "new": "Mật khẩu mới",
+      "hint": "8–128 ký tự. Các thiết bị khác sẽ bị đăng xuất sau khi đổi.",
+      "changing": "Đang đổi…",
+      "changed": "Đã đổi mật khẩu, các thiết bị khác đã bị đăng xuất.",
+      "forgot": "Quên mật khẩu hiện tại?"
+    },
+    "sess": {
+      "title": "Thiết bị đã đăng nhập",
+      "unknown": "Thiết bị không xác định",
+      "current": "Thiết bị này",
+      "lastUsed": "Dùng lần cuối {time}",
+      "signedInAt": " · Đăng nhập lúc {time}",
+      "logout": "Đăng xuất",
+      "logoutOthers": "Đăng xuất mọi thiết bị khác",
+      "loggedOutOne": "Đã đăng xuất thiết bị đó.",
+      "loggedOutN": "Đã đăng xuất {n} thiết bị khác."
+    },
+    "social": {
+      "title": "Trang cá nhân và quà tặng",
+      "handle": "Tên tài khoản (dùng trong địa chỉ trang cá nhân, có thể để trống)",
+      "handlePh": "Ví dụ: amy_wang",
+      "handleBadHint": "Chữ thường, số và dấu gạch dưới, 3–30 ký tự",
+      "handleBadErr": "Tên tài khoản chỉ được dùng chữ thường, số và dấu gạch dưới, 3–30 ký tự.",
+      "yourPage": "Trang cá nhân của bạn: ",
+      "copy": "Sao chép",
+      "copied": "Đã sao chép",
+      "copyFail": "Không sao chép được. Vui lòng tự chọn địa chỉ.",
+      "bio": "Giới thiệu bản thân (hiển thị trên trang cá nhân, có thể để trống)",
+      "birthday": "Sinh nhật (có thể để trống, chỉ lưu tháng và ngày)",
+      "monthAria": "Tháng",
+      "dayAria": "Ngày",
+      "monthOpt": "Tháng",
+      "dayOpt": "Ngày",
+      "monthN": "Tháng {n}",
+      "dayN": "Ngày {n}",
+      "birthdayErr": "Hãy chọn cả tháng và ngày cho sinh nhật, hoặc bỏ trống cả hai.",
+      "birthdayVis": "Ai xem được sinh nhật của bạn",
+      "onlyMe": "Chỉ mình tôi",
+      "claimVis": "Ai xem được lịch sử tặng quà theo mặc định"
+    },
+    "vis": {
+      "public": "Công khai",
+      "friends": "Chỉ bạn bè",
+      "private": "Riêng tư"
+    },
+    "notif": {
+      "title": "Thông báo",
+      "label": "Gửi Email khi có người đăng ký tặng",
+      "hint": "Lượt đầu tiên được báo ngay, sau đó gom thành một email mỗi ngày. Ở chế độ bất ngờ, email chỉ ghi \"có N lượt tặng mới\"."
+    },
+    "export": {
+      "title": "Xuất dữ liệu",
+      "hint": "Gồm thông tin cá nhân, danh sách và lịch sử tặng quà (JSON).",
+      "btn": "Xuất dữ liệu của tôi",
+      "busy": "Đang xuất…"
+    },
+    "logout": "Đăng xuất",
+    "del": {
+      "title": "Xóa tài khoản",
+      "text": "Chúng tôi sẽ xóa Email và tên của bạn, các danh sách sẽ được lưu trữ và gỡ khỏi chế độ công khai. Hành động này không thể hoàn tác.",
+      "btn": "Xóa tài khoản của tôi",
+      "confirmTitle": "Bạn chắc chắn muốn xóa tài khoản?",
+      "confirmText": "Email, tên và các phương thức đăng nhập của bạn sẽ bị xóa, danh sách sẽ được lưu trữ và gỡ khỏi chế độ công khai, bạn bè sẽ không mở được nữa.",
+      "ok": "Xóa vĩnh viễn",
+      "word": "XÓA",
+      "prompt": "Nhập \"{word}\" để xác nhận",
+      "hasPoints": "{detail} (bạn có thể rút lại lượt góp trong mục \"Điểm của tôi\")",
+      "hasBalance": "{detail} (số dư {balance} điểm, {pledged} lượt góp chưa hoàn tất, {orders} đơn chưa đóng). Vui lòng xử lý trước khi xóa."
+    },
+    "terms": "Điều khoản dịch vụ",
+    "privacy": "Chính sách quyền riêng tư"
+  }
+}

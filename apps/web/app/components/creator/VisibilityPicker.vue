@@ -12,17 +12,17 @@ function toggle(id: string, on: boolean) { users.value = on ? [...users.value, i
 </script>
 <template>
   <fieldset class="c-field c-vis">
-    <span>誰可以看這份清單</span>
+    <span>{{ $t('creator.vis.who') }}</span>
     <label v-for="o in VIS_OPTIONS" :key="o.v" class="c-switch">
       <input v-model="visibility" type="radio" name="visibility" :value="o.v">
       <span>{{ o.label }}<br><small class="c-mute">{{ o.desc }}</small></span>
     </label>
   </fieldset>
   <div v-if="visibility === 'selected'" class="c-field">
-    <span>選擇摯友（已選 {{ users.length }} 位）</span>
+    <span>{{ $t('creator.vis.pickTitle', { n: users.length }) }}</span>
     <p v-if="fErr" class="c-err" role="alert">{{ fErr }}</p>
-    <p v-else-if="!friends" class="c-mute" role="status">載入好友中…</p>
-    <p v-else-if="!friends.length" class="c-mute">還沒有好友。先到 <NuxtLink to="/friends">好友</NuxtLink> 邀請朋友，再回來勾選。</p>
+    <p v-else-if="!friends" class="c-mute" role="status">{{ $t('creator.vis.loading') }}</p>
+    <p v-else-if="!friends.length" class="c-mute">{{ $t('creator.vis.noFriendsPre') }}<NuxtLink to="/friends">{{ $t('common.friends') }}</NuxtLink>{{ $t('creator.vis.noFriendsPost') }}</p>
     <label v-for="f in friends" :key="f.id" class="c-switch">
       <input type="checkbox" :checked="users.includes(f.id)" @change="toggle(f.id, ($event.target as HTMLInputElement).checked)">
       <span>{{ f.display_name }}<small v-if="f.handle" class="c-mute">　@{{ f.handle }}</small></span>

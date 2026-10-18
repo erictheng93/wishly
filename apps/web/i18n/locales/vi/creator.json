@@ -1,0 +1,172 @@
+{
+  "creator": {
+    "confirm": {
+      "cancel": "Hủy",
+      "busy": "Đang xử lý…",
+      "ok": "Xác nhận"
+    },
+    "image": {
+      "typeError": "Ảnh chỉ nhận JPG, PNG hoặc WebP",
+      "tooBig": "Ảnh phải nhỏ hơn 5 MB",
+      "uploadFail": "Tải lên thất bại",
+      "cover": "Ảnh bìa (tùy chọn)",
+      "item": "Ảnh (tùy chọn)",
+      "none": "Không có ảnh",
+      "pick": "Chọn ảnh",
+      "uploading": "Đang tải lên…",
+      "done": "Đã tải lên. Ảnh sẽ hiển thị công khai sau khi xử lý xong",
+      "retry": "Tải lại",
+      "hint": "Chỉ nhận JPG, PNG, WebP, tối đa 5 MB. Dữ liệu ẩn như vị trí (EXIF) sẽ bị xóa sau khi tải lên. Vui lòng không tải lên ảnh chứa thông tin cá nhân."
+    },
+    "itemSheet": {
+      "titleEdit": "Sửa món quà",
+      "titleNew": "Thêm món quà",
+      "name": "Tên (bắt buộc)",
+      "namePh": "VD: Bình sữa",
+      "brand": "Thương hiệu (tùy chọn)",
+      "spec": "Quy cách (tùy chọn)",
+      "url": "Liên kết sản phẩm (tùy chọn)",
+      "mode": "Cách nhận",
+      "modeQty": "Đóng góp theo số lượng",
+      "modeCrowd": "Góp quỹ cho điều ước",
+      "modeLocked": "Đã có người đóng góp nên không thể đổi cách nhận.",
+      "targetPoints": "Điểm mục tiêu (bắt buộc, 1 điểm = NT$1)",
+      "raisedSuffix": "(đã góp {n})",
+      "deadline": "Hạn góp quỹ (giờ Đài Bắc, tùy chọn)",
+      "deadlineHint": "Nếu để trống sẽ dùng 23:59 ngày sự kiện. Bắt buộc nhập nếu danh sách không có ngày sự kiện.",
+      "refPrice": "Giá tham khảo NT$ (tùy chọn)",
+      "crowdNote": "Khi đạt mục tiêu, nền tảng sẽ mua và gửi quà cho bạn. Điểm không được quy đổi thành tiền mặt. Bạn cần điền thông tin nhận hàng của danh sách trước.",
+      "fundLocked": "Đã đạt mục tiêu hoặc đã hết hạn nên không thể sửa mục tiêu và thời hạn.",
+      "qty": "Số lượng cần",
+      "claimedSuffix": "(đã có {n} đóng góp)",
+      "unitPrice": "Giá tham khảo NT$ (tùy chọn)",
+      "priority": "Mức ưu tiên",
+      "high": "Cao",
+      "medium": "Vừa",
+      "low": "Thấp",
+      "cancel": "Hủy",
+      "save": "Lưu món quà",
+      "saving": "Đang lưu…",
+      "reload": "Tải lại",
+      "fillAddress": "Điền thông tin nhận hàng",
+      "errName": "Vui lòng nhập tên món quà",
+      "errTarget": "Vui lòng nhập điểm mục tiêu (số nguyên dương)",
+      "errStale": "Món quà này đã được sửa ở nơi khác. Vui lòng tải lại.",
+      "errAddr": "Món quà góp quỹ cần có thông tin nhận hàng trước, để nền tảng biết gửi đến đâu khi đạt mục tiêu."
+    },
+    "otp": {
+      "group": "Mã xác minh 6 chữ số",
+      "cell": "Chữ số thứ {n}"
+    },
+    "password": {
+      "show": "Hiện",
+      "hide": "Ẩn"
+    },
+    "qr": {
+      "label": "Mã QR của liên kết chia sẻ",
+      "download": "Tải mã QR"
+    },
+    "shipping": {
+      "intro": "Khi điều ước góp quỹ đạt mục tiêu, nền tảng sẽ mua và gửi quà đến đây. Chỉ bạn và nhân viên đặt hàng xem được, bạn bè sẽ không bao giờ thấy.",
+      "recipient": "Người nhận",
+      "phone": "Điện thoại",
+      "address": "Địa chỉ",
+      "empty": "Chưa điền. Danh sách có món góp quỹ phải điền thông tin này trước khi đăng.",
+      "recipientLabel": "Người nhận (1–50 ký tự)",
+      "phoneLabel": "Điện thoại (6–20 ký tự, có thể gồm + - và khoảng trắng)",
+      "addressLabel": "Địa chỉ (5–200 ký tự)",
+      "privacy": "Để bảo vệ quyền riêng tư, khi sửa bạn cần nhập lại toàn bộ nội dung.",
+      "saved": "Đã lưu",
+      "saving": "Đang lưu…",
+      "update": "Cập nhật thông tin nhận hàng",
+      "save": "Lưu thông tin nhận hàng"
+    },
+    "status": {
+      "draft": "Bản nháp",
+      "active": "Đang diễn ra",
+      "closed": "Đã kết thúc",
+      "archived": "Đã lưu trữ",
+      "hidden": "Đã gỡ",
+      "ok": "Bình thường",
+      "pending": "Đang xử lý ảnh",
+      "ready": "Ảnh đã sẵn sàng",
+      "rejected": "Ảnh không được duyệt",
+      "reserved": "Đã đóng góp",
+      "purchased": "Đã mua",
+      "delivered": "Đã giao",
+      "cancelled": "Đã hủy",
+      "open": "Chờ xử lý",
+      "actioned": "Đã xử lý",
+      "dismissed": "Đã bác bỏ"
+    },
+    "vis": {
+      "public": {
+        "label": "Công khai",
+        "desc": "Ai cũng xem được (kể cả khách). Danh sách sẽ hiện ở trang Khám phá và trang cá nhân của bạn."
+      },
+      "friends": {
+        "label": "Tất cả bạn bè",
+        "desc": "Chỉ bạn bè của bạn mở được và họ cần đăng nhập."
+      },
+      "selected": {
+        "label": "Bạn thân",
+        "desc": "Chỉ những bạn thân bạn chọn từ danh sách bạn bè mới mở được và họ cần đăng nhập."
+      },
+      "private": {
+        "label": "Riêng tư",
+        "desc": "Chỉ mình bạn xem được. Bạn bè mở ra sẽ thấy \"không tìm thấy\"."
+      },
+      "who": "Ai có thể xem danh sách này",
+      "pickTitle": "Chọn bạn thân (đã chọn {n})",
+      "loading": "Đang tải danh sách bạn bè…",
+      "noFriendsPre": "Chưa có bạn bè. Hãy vào ",
+      "noFriendsPost": " để mời bạn bè, rồi quay lại chọn."
+    },
+    "analytics": {
+      "funnel": {
+        "signed_up": "Đăng ký",
+        "created_list": "Tạo danh sách",
+        "published_list": "Đăng danh sách",
+        "received_claim": "Nhận được đóng góp"
+      },
+      "retention": {
+        "d1": "Giữ chân ngày kế tiếp (ngày 1)",
+        "d7": "Ngày 7–13",
+        "d30": "Ngày 30–59"
+      },
+      "claimStatus": {
+        "reserved": "Đã đóng góp",
+        "purchased": "Đã mua",
+        "delivered": "Đã giao",
+        "cancelled": "Đã hủy",
+        "expired": "Đã quá hạn"
+      },
+      "actor": {
+        "guest": "Khách",
+        "user": "Thành viên"
+      },
+      "reason": {
+        "scam": "Nghi lừa đảo",
+        "inappropriate": "Nội dung không phù hợp",
+        "copyright": "Vi phạm bản quyền",
+        "personal_info": "Lộ thông tin cá nhân",
+        "other": "Khác"
+      },
+      "wishlistType": {
+        "personal": "Điều ước cá nhân",
+        "registry": "Danh sách quà tặng",
+        "relief": "Cứu trợ"
+      },
+      "wishlistVisibility": {
+        "link": "Liên kết",
+        "private": "Riêng tư",
+        "public": "Công khai"
+      },
+      "shareLevel": {
+        "public": "Công khai",
+        "friends": "Bạn bè",
+        "private": "Riêng tư"
+      }
+    }
+  }
+}

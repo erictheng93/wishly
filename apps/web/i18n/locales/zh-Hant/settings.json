@@ -1,0 +1,118 @@
+{
+  "settings": {
+    "title": "帳號設定",
+    "profile": "我的資料",
+    "noEmail": "尚未綁定 Email",
+    "displayName": "顯示名稱",
+    "saved": "已儲存",
+    "save": "儲存",
+    "login": {
+      "title": "登入方式",
+      "hint": "至少保留一種登入方式。已屬於其他帳號的方式無法直接綁定。",
+      "linked": "已綁定",
+      "unlinked": "未綁定",
+      "unlinkAria": "解除 {label} 綁定",
+      "unlink": "解除綁定",
+      "link": "綁定 {label}",
+      "keepOne": "先新增另一種登入方式，才能解除目前的方式。",
+      "linkEmail": "綁定 Email",
+      "codeSent": "綁定驗證碼已寄到 {email}",
+      "confirmEmail": "確認綁定 Email",
+      "verifying": "驗證中…",
+      "resendIn": "{n} 秒後可重新寄送",
+      "resend": "重新寄送",
+      "changeEmail": "修改 Email",
+      "sending": "寄送中…",
+      "sendCode": "寄送綁定驗證碼",
+      "setPw": "設定 Email 登入密碼",
+      "setPwNote": "（以 Email 驗證碼設定，會登出所有裝置）",
+      "noEmailWarn": "尚未綁定 Email，無法收取通知信或使用密碼重設。",
+      "err": {
+        "oauth_failed": "綁定失敗，請重新操作並確認登入帳號",
+        "oauth_unavailable": "此登入方式尚未開放",
+        "identity_in_use": "此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。",
+        "provider_already_linked": "已綁定此登入方式，請先解除後再更換"
+      },
+      "linkedMsg": "已綁定 {label}",
+      "emailLinkedMsg": "已綁定 Email，可收取通知並設定密碼",
+      "unlinkedMsg": "已解除 {label} 綁定",
+      "unlinkTitle": "解除 {label} 綁定？",
+      "unlinkText": "解除後會登出其他裝置，目前裝置保持登入。之後須使用其他已綁定的方式登入。沒有剩餘 Email 時無法收通知或重設密碼；日後重新驗證相同 Email 登入，仍可能自動連結回此帳號。",
+      "unlinkOk": "解除綁定"
+    },
+    "pw": {
+      "title": "變更密碼",
+      "current": "目前密碼",
+      "new": "新密碼",
+      "hint": "8–128 字元。變更後會登出其他裝置。",
+      "changing": "變更中…",
+      "changed": "密碼已變更，其他裝置已登出",
+      "forgot": "忘記目前密碼？"
+    },
+    "sess": {
+      "title": "登入裝置",
+      "unknown": "未知裝置",
+      "current": "目前裝置",
+      "lastUsed": "最後使用 {time}",
+      "signedInAt": "・登入於 {time}",
+      "logout": "登出",
+      "logoutOthers": "登出其他所有裝置",
+      "loggedOutOne": "已登出該裝置",
+      "loggedOutN": "已登出 {n} 個其他裝置"
+    },
+    "social": {
+      "title": "個人頁與捐助",
+      "handle": "帳號代號（個人頁網址，可留空）",
+      "handlePh": "例如：amy_wang",
+      "handleBadHint": "小寫英文、數字、底線，3–30 字",
+      "handleBadErr": "代號只能用小寫英文、數字、底線，3–30 字",
+      "yourPage": "你的個人頁：",
+      "copy": "複製",
+      "copied": "已複製",
+      "copyFail": "無法複製，請手動選取網址",
+      "bio": "自我介紹（顯示在個人頁，可留空）",
+      "birthday": "生日（可留空，只記月日）",
+      "monthAria": "月",
+      "dayAria": "日",
+      "monthOpt": "月",
+      "dayOpt": "日",
+      "monthN": "{n} 月",
+      "dayN": "{n} 日",
+      "birthdayErr": "生日請同時選月和日，或都不選",
+      "birthdayVis": "生日誰看得到",
+      "onlyMe": "只有自己",
+      "claimVis": "捐助紀錄預設誰看得到"
+    },
+    "vis": {
+      "public": "公開",
+      "friends": "僅好友",
+      "private": "私人"
+    },
+    "notif": {
+      "title": "通知",
+      "label": "有人捐助時寄 Email",
+      "hint": "第一筆即時通知，之後每日彙整一封。驚喜模式下只寫「有 N 件新捐助」。"
+    },
+    "export": {
+      "title": "匯出資料",
+      "hint": "包含個人資料、清單與捐助紀錄（JSON）。",
+      "btn": "匯出我的資料",
+      "busy": "匯出中…"
+    },
+    "logout": "登出",
+    "del": {
+      "title": "刪除帳號",
+      "text": "我們會移除你的 Email 與名稱，你的清單會封存並從公開移除。此動作無法復原。",
+      "btn": "刪除我的帳號",
+      "confirmTitle": "確定要刪除帳號嗎？",
+      "confirmText": "你的 Email、名稱與登入方式會被移除，清單會封存並從公開移除，朋友無法再開啟。",
+      "ok": "永久刪除",
+      "word": "刪除",
+      "prompt": "請輸入「{word}」以確認",
+      "hasPoints": "{detail}（可到「我的點數」撤回認捐）",
+      "hasBalance": "{detail}（餘額 {balance} 點、未完成認捐 {pledged}、未結案訂單 {orders}）請先處理後再刪除。"
+    },
+    "terms": "服務條款",
+    "privacy": "隱私權政策"
+  }
+}

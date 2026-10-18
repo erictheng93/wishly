@@ -1,10 +1,12 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'staff' })
-useHead({ title: '稽核紀錄' })
+const { t, locale } = useI18n()
+useHead({ title: () => t('admin.audit.title') })
 const { api } = useApi()
 const filters = reactive({ actor_id: '', action: '', entity: '', entity_id: '', from: '', to: '' })
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), busy = ref(false), err = ref(''), done = ref(false)
-const fields: Record<string, string> = { actor_id: '操作者 UUID', action: '動作', entity: '對象類型', entity_id: '對象 UUID', from: '開始日期', to: '結束日期' }
+const fields = computed<Record<string, string>>(() => ({ actor_id: t('admin.audit.fields.actorId'), action: t('admin.audit.fields.action'), entity: t('admin.audit.fields.entity'), entity_id: t('admin.audit.fields.entityId'), from: t('admin.audit.fields.from'), to: t('admin.audit.fields.to') }))
+const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
 async function load(more = false) {
   if (busy.value) return
   busy.value = true; err.value = ''
@@ -19,23 +21,23 @@ onMounted(() => load())
 </script>
 <template>
   <main class="c-page c-admin">
-    <CreatorHeader title="稽核紀錄" back="/admin" />
+    <CreatorHeader :title="$t('admin.audit.title')" back="/admin" />
     <form @submit.prevent="load()">
       <div class="audit-filters">
-        <label v-for="(name, key) in fields" :key="key" class="c-field"><span>{{ name }}</span><input v-model="filters[key as keyof typeof filters]" :type="key === 'from' || key === 'to' ? 'date' : 'text'" :disabled="busy" :placeholder="key === 'action' ? '例如 user.update' : key === 'entity' ? '例如 users' : undefined"></label>
+        <label v-for="(name, key) in fields" :key="key" class="c-field"><span>{{ name }}</span><input v-model="filters[key as keyof typeof filters]" :type="key === 'from' || key === 'to' ? 'date' : 'text'" :disabled="busy" :placeholder="key === 'action' ? $t('admin.audit.exAction') : key === 'entity' ? $t('admin.audit.exEntity') : undefined"></label>
       </div>
-      <p class="c-mute">日期以台北時區計算，包含結束日；動作與對象類型須完整匹配。</p>
-      <button class="c-btn primary c-mb" :disabled="busy">{{ busy ? '查詢中…' : '查詢' }}</button>
+      <p class="c-mute">{{ $t('admin.audit.note') }}</p>
+      <button class="c-btn primary c-mb" :disabled="busy">{{ busy ? $t('admin.audit.querying') : $t('admin.audit.query') }}</button>
     </form>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <p v-if="done && !rows.length" class="c-mute">沒有符合的稽核紀錄</p>
+    <p v-if="done && !rows.length" class="c-mute">{{ $t('admin.audit.empty') }}</p>
     <article v-for="r in rows" :key="r.id" class="c-card audit-row">
-      <div class="c-row wrap"><strong class="c-grow">{{ r.action }}</strong><time class="c-mute">{{ new Date(r.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) }}</time></div>
-      <p>操作者：{{ r.actor_name || r.actor_type }}<span v-if="r.actor_id">（{{ r.actor_id }}）</span></p>
-      <p>對象：{{ r.entity }}<span v-if="r.entity_id">・{{ r.entity_id }}</span></p>
-      <details v-if="r.diff"><summary>操作內容</summary><pre>{{ JSON.stringify(r.diff, null, 2) }}</pre></details>
+      <div class="c-row wrap"><strong class="c-grow">{{ r.action }}</strong><time class="c-mute">{{ new Date(r.created_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }}</time></div>
+      <p>{{ $t('admin.audit.actor') }}{{ r.actor_name || r.actor_type }}<span v-if="r.actor_id">（{{ r.actor_id }}）</span></p>
+      <p>{{ $t('admin.audit.entity') }}{{ r.entity }}<span v-if="r.entity_id">・{{ r.entity_id }}</span></p>
+      <details v-if="r.diff"><summary>{{ $t('admin.audit.diff') }}</summary><pre>{{ JSON.stringify(r.diff, null, 2) }}</pre></details>
     </article>
-    <button v-if="cursor" class="c-btn block" :disabled="busy" @click="load(true)">載入更多稽核紀錄</button>
+    <button v-if="cursor" class="c-btn block" :disabled="busy" @click="load(true)">{{ $t('admin.audit.loadMore') }}</button>
   </main>
 </template>
 <style scoped>

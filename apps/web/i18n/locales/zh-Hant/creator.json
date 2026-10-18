@@ -1,0 +1,172 @@
+{
+  "creator": {
+    "confirm": {
+      "cancel": "取消",
+      "busy": "處理中…",
+      "ok": "確認"
+    },
+    "image": {
+      "typeError": "圖片限 JPG、PNG、WebP",
+      "tooBig": "圖片需在 5 MB 以內",
+      "uploadFail": "上傳失敗",
+      "cover": "封面圖片（選填）",
+      "item": "圖片（選填）",
+      "none": "無圖",
+      "pick": "選擇圖片",
+      "uploading": "上傳中…",
+      "done": "已上傳，圖片處理完成後才會公開顯示",
+      "retry": "重新上傳",
+      "hint": "限 JPG、PNG、WebP，5 MB 以內。上傳後會移除位置等隱藏資訊（EXIF），請勿上傳含個人資料的照片。"
+    },
+    "itemSheet": {
+      "titleEdit": "編輯品項",
+      "titleNew": "新增品項",
+      "name": "名稱（必填）",
+      "namePh": "例如：奶瓶",
+      "brand": "品牌（選填）",
+      "spec": "規格（選填）",
+      "url": "商品網址（選填）",
+      "mode": "取得方式",
+      "modeQty": "數量捐助",
+      "modeCrowd": "心願眾籌",
+      "modeLocked": "已有人捐助或贊助，無法切換取得方式。",
+      "targetPoints": "目標點數（必填，1 點 = NT$1）",
+      "raisedSuffix": "（已募 {n}）",
+      "deadline": "募集截止（台北時間，選填）",
+      "deadlineHint": "留空則使用活動日 23:59；清單沒有活動日時必須填寫。",
+      "refPrice": "商品參考價格 NT$（選填）",
+      "crowdNote": "達標後由平台代購寄出，點數不會轉成現金給你。需要先填寫清單的收件資訊。",
+      "fundLocked": "已達標或截止，目標與期限無法修改。",
+      "qty": "需要數量",
+      "claimedSuffix": "（已被捐助 {n}）",
+      "unitPrice": "參考價格 NT$（選填）",
+      "priority": "優先度",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "cancel": "取消",
+      "save": "儲存品項",
+      "saving": "儲存中…",
+      "reload": "重新載入",
+      "fillAddress": "填寫收件資訊",
+      "errName": "請輸入品項名稱",
+      "errTarget": "請輸入目標點數（正整數）",
+      "errStale": "這個品項已在其他地方被修改，請重新載入",
+      "errAddr": "眾籌品項需要先填寫收件資訊，達標後平台才知道要寄到哪裡。"
+    },
+    "otp": {
+      "group": "6 位數驗證碼",
+      "cell": "第 {n} 碼"
+    },
+    "password": {
+      "show": "顯示",
+      "hide": "隱藏"
+    },
+    "qr": {
+      "label": "分享連結 QR code",
+      "download": "下載 QR"
+    },
+    "shipping": {
+      "intro": "心願眾籌達標後，由平台代購並寄到這裡。只有你與負責下單的營運人員看得到，朋友永遠看不到。",
+      "recipient": "收件人",
+      "phone": "電話",
+      "address": "地址",
+      "empty": "尚未填寫。含眾籌品項的清單必須先填寫才能發佈。",
+      "recipientLabel": "收件人（1–50 字）",
+      "phoneLabel": "電話（6–20 碼，可含 + - 與空白）",
+      "addressLabel": "地址（5–200 字）",
+      "privacy": "為了保護隱私，修改時需重新輸入完整內容。",
+      "saved": "已儲存",
+      "saving": "儲存中…",
+      "update": "更新收件資訊",
+      "save": "儲存收件資訊"
+    },
+    "status": {
+      "draft": "草稿",
+      "active": "進行中",
+      "closed": "已結束",
+      "archived": "已封存",
+      "hidden": "已下架",
+      "ok": "正常",
+      "pending": "圖片處理中",
+      "ready": "圖片就緒",
+      "rejected": "圖片未通過",
+      "reserved": "已捐助",
+      "purchased": "已購買",
+      "delivered": "已送達",
+      "cancelled": "已取消",
+      "open": "待處理",
+      "actioned": "已處理",
+      "dismissed": "已駁回"
+    },
+    "vis": {
+      "public": {
+        "label": "公開",
+        "desc": "任何人都能看（含訪客），會列在探索頁與你的個人頁。"
+      },
+      "friends": {
+        "label": "所有好友",
+        "desc": "只有你的好友能開，對方需要登入。"
+      },
+      "selected": {
+        "label": "摯友",
+        "desc": "只有你從好友中勾選的摯友能開，對方需要登入。"
+      },
+      "private": {
+        "label": "私人",
+        "desc": "只有你自己看得到，朋友打開會顯示找不到。"
+      },
+      "who": "誰可以看這份清單",
+      "pickTitle": "選擇摯友（已選 {n} 位）",
+      "loading": "載入好友中…",
+      "noFriendsPre": "還沒有好友。先到 ",
+      "noFriendsPost": " 邀請朋友，再回來勾選。"
+    },
+    "analytics": {
+      "funnel": {
+        "signed_up": "註冊",
+        "created_list": "建立清單",
+        "published_list": "發布清單",
+        "received_claim": "收到捐助"
+      },
+      "retention": {
+        "d1": "次日留存（第 1 天）",
+        "d7": "第 7–13 天",
+        "d30": "第 30–59 天"
+      },
+      "claimStatus": {
+        "reserved": "已認領",
+        "purchased": "已購買",
+        "delivered": "已送達",
+        "cancelled": "已取消",
+        "expired": "已逾期"
+      },
+      "actor": {
+        "guest": "訪客",
+        "user": "會員"
+      },
+      "reason": {
+        "scam": "疑似詐騙",
+        "inappropriate": "不當內容",
+        "copyright": "侵害著作權",
+        "personal_info": "洩漏個人資料",
+        "other": "其他"
+      },
+      "wishlistType": {
+        "personal": "個人心願",
+        "registry": "禮物登記",
+        "relief": "救助"
+      },
+      "wishlistVisibility": {
+        "link": "連結",
+        "private": "私人",
+        "public": "公開"
+      },
+      "shareLevel": {
+        "public": "公開",
+        "friends": "好友",
+        "private": "私人"
+      }
+    }
+  }
+}

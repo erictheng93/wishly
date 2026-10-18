@@ -2,9 +2,10 @@
 import '~/assets/guest.css'
 // 公開分享頁：必須 SSR，LINE / FB 爬蟲才讀得到 OG（docs 03 §5.6）
 const route = useRoute()
+const { t, locale } = useI18n()
 const slug = route.params.slug as string
 // 範例清單（db/seed/demo.sql）：頂端提供互相切換，一般清單不顯示
-const demos = slug.startsWith('demo') ? [['demobirth0', '生日'], ['demogift00', '送禮'], ['demowedd00', '婚禮']] : []
+const demos = slug.startsWith('demo') ? [['demobirth0', t('guest.slug.demoBirthday')], ['demogift00', t('guest.slug.demoGift')], ['demowedd00', t('guest.slug.demoWedding')]] : []
 const { public: { apiBase } } = useRuntimeConfig()
 const { api } = useGuest()
 const listUrl = `${apiBase}/api/v1/public/wishlists/${slug}`
@@ -50,15 +51,15 @@ if (data.value) {
   const origin = useRequestURL().origin
   useSeoMeta({
     title: () => data.value?.title,
-    ogTitle: () => `幫${data.value?.owner?.display_name ?? '朋友'}挑禮物｜${data.value?.title}`,
+    ogTitle: () => t('guest.slug.ogTitle', { name: data.value?.owner?.display_name ?? t('guest.slug.friend'), title: data.value?.title }),
     description: () => data.value?.description ?? undefined,
-    ogDescription: () => `已完成 ${data.value?.completion?.completion_pct ?? 0}%，還有 ${left()} 項等你捐助。瀏覽不用註冊，登入會員後即可認捐。`,
+    ogDescription: () => t('guest.slug.ogDesc', { pct: data.value?.completion?.completion_pct ?? 0, left: left() }),
     // ponytail: 預設圖為靜態檔；動態 /og/{slug}.png（含清單名稱與完成度）之後再做
     ogImage: () => data.value?.cover_image_url ?? `${origin}/og-default.png`,
     ogImageWidth: 1200, ogImageHeight: 630,
-    ogType: 'website', ogUrl: () => `${origin}/s/${slug}`, ogLocale: 'zh_TW', twitterCard: 'summary_large_image',
+    ogType: 'website', ogUrl: () => `${origin}/s/${slug}`, ogLocale: () => ({ 'zh-Hant': 'zh_TW', en: 'en_US', vi: 'vi_VN' } as Record<string, string>)[String(locale.value)], twitterCard: 'summary_large_image',
   })
-} else useSeoMeta({ title: () => data.value?.title ?? (st.value === 403 ? '需要權限才能查看' : gone.value ? '此清單已被下架' : failed.value ? '暫時無法載入' : '找不到這份清單'), robots: 'noindex' }) // 受限清單 client 重抓成功後標題改成清單名
+} else useSeoMeta({ title: () => data.value?.title ?? (st.value === 403 ? t('guest.slug.titleForbidden') : gone.value ? t('guest.slug.titleGone') : failed.value ? t('guest.slug.titleFailed') : t('guest.slug.titleNotFound')), robots: 'noindex' }) // 受限清單 client 重抓成功後標題改成清單名
 
 useHead({ noscript: [{ innerHTML: '<style>.js-claim{display:none!important}.g-nojs{display:block!important}</style>' }] })
 const items = ref<any[]>(data.value?.items ?? [])
@@ -152,44 +153,44 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="gone" class="g-center"><h1>此清單已被下架</h1><p class="g-mute">這份清單因違反服務條款已被移除，目前無法瀏覽或捐助。</p><NuxtLink to="/">回首頁</NuxtLink></div>
-    <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">載入中…</div>
+    <div v-if="gone" class="g-center"><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
     <div v-else-if="forbidden" class="g-center">
-        <h1>{{ gate.code === 'LOGIN_REQUIRED' ? '請先登入' : '你沒有權限查看這份清單' }}</h1>
-        <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.code === 'FRIENDS_ONLY' && gate.owner">（擁有者：{{ gate.owner.display_name }}）</template></p>
-        <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">登入後查看</NuxtLink>
-        <NuxtLink v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.handle" class="g-btn" :to="`/u/${gate.owner.handle}`">前往 {{ gate.owner.display_name }} 的頁面加好友</NuxtLink>
-      <p><NuxtLink to="/">回首頁</NuxtLink></p>
+        <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
+        <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.code === 'FRIENDS_ONLY' && gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
+        <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.slug.loginToView') }}</NuxtLink>
+        <NuxtLink v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.handle" class="g-btn" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink>
+      <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
-    <div v-else-if="failed && !data" class="g-center"><h1>系統暫時無法載入，請稍後再試</h1><button class="g-btn" @click="reload()">重新載入</button></div>
-    <div v-else-if="!data" class="g-center"><h1>找不到這份清單</h1><NuxtLink to="/">回首頁</NuxtLink></div>
+    <div v-else-if="failed && !data" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
+    <div v-else-if="!data" class="g-center"><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
     <template v-else>
-      <div class="g-banner g-nojs">需要 JavaScript 才能捐助；你仍可查看清單內容</div>
-      <div v-if="!online" class="g-banner">目前離線，顯示的是上次載入的內容，捐助功能暫停。</div>
-      <div v-if="lineHint" class="g-banner">想把捐助保存起來？點右上角 ⋯ 選「用預設瀏覽器開啟」，之後比較不會找不到。 <button class="g-link" @click="dismissHint">知道了</button></div>
-      <div v-if="closed" class="g-banner">這份清單已結束</div>
-      <nav v-if="demos.length" class="g-demos" aria-label="其他範例">範例：<NuxtLink v-for="[k, t] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ t }}</NuxtLink></nav>
+      <div class="g-banner g-nojs">{{ $t('guest.slug.noJs') }}</div>
+      <div v-if="!online" class="g-banner">{{ $t('guest.slug.offline') }}</div>
+      <div v-if="lineHint" class="g-banner">{{ $t('guest.slug.lineHint') }}<button class="g-link" @click="dismissHint">{{ $t('guest.slug.gotIt') }}</button></div>
+      <div v-if="closed" class="g-banner">{{ $t('guest.slug.closed') }}</div>
+      <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
       <img v-if="data.cover_image_url" :src="data.cover_image_url" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
       <p class="g-mute">
-        <template v-if="data.event_date">日期 {{ data.event_date }}・</template><template v-if="data.closes_at && data.status === 'active'">{{ new Date(data.closes_at).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }) }} 結束・</template>由 {{ data.owner.display_name }} 建立
+        <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template>{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}
       </p>
       <p v-if="data.description">{{ data.description }}</p>
-      <div v-if="masked" class="g-banner">你正以建立者身分瀏覽，解鎖前不顯示各品項進度。</div>
+      <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
       <template v-else>
-        <div class="g-mute">完成度 {{ pct }}%・{{ data.completion.fulfilled_count }} / {{ data.completion.item_count }} 項</div>
+        <div class="g-mute">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
         <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
       </template>
-      <p v-if="!items.length" class="g-center g-mute">建立者還在準備清單，晚點再回來看看</p>
-      <p v-if="loginTo && items.length && !closed" class="g-mute">認捐需要登入會員。<NuxtLink :to="loginTo">登入</NuxtLink></p>
+      <p v-if="!items.length" class="g-center g-mute">{{ $t('guest.slug.empty') }}</p>
+      <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
           :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
-        <button class="g-link" @click="reporting = true">檢舉此清單</button>
-        ・<NuxtLink to="/terms">服務條款</NuxtLink>・<NuxtLink to="/privacy">隱私權政策</NuxtLink>
+        <button class="g-link" @click="reporting = true">{{ $t('guest.report.title') }}</button>
+        ・<NuxtLink to="/terms">{{ $t('guest.slug.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('guest.slug.privacy') }}</NuxtLink>
       </div>
     </template>
 
@@ -198,22 +199,22 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <GuestFundSheet v-if="fundItem" :key="fundItem.id" :item="fundItem" :slug="slug" :online="online" :logged-in-name="me?.display_name"
       @close="fundId = null" @done="onFunded" @stale="refresh()" />
     <GuestDialog v-if="funded" labelledby="funded-title" @close="funded = null"><div class="g-sheet center">
-      <h1 id="funded-title" class="ok">✓ 感謝你的贊助！</h1>
-      <p>你為「{{ funded.title }}」贊助了 {{ fmtPts(funded.contribution.points) }} 點</p>
-      <div v-if="funded.funded" class="g-banner ok">剛好達標了！平台會代購並寄出，進度會用 Email 通知你。</div>
-      <p v-if="funded.wallet" class="g-mute">錢包餘額剩 {{ fmtPts(funded.wallet.balance) }} 點</p>
-      <NuxtLink class="g-btn block" to="/me/wallet">查看我的點數與認捐</NuxtLink>
-      <button class="g-link" @click="funded = null">回到清單繼續看</button>
+      <h1 id="funded-title" class="ok">{{ $t('guest.slug.fundedTitle') }}</h1>
+      <p>{{ $t('guest.slug.fundedLine', { title: funded.title, pts: fmtPts(funded.contribution.points) }) }}</p>
+      <div v-if="funded.funded" class="g-banner ok">{{ $t('guest.slug.fundedGoal') }}</div>
+      <p v-if="funded.wallet" class="g-mute">{{ $t('guest.slug.walletLeft', { n: fmtPts(funded.wallet.balance) }) }}</p>
+      <NuxtLink class="g-btn block" to="/me/wallet">{{ $t('guest.slug.viewWallet') }}</NuxtLink>
+      <button class="g-link" @click="funded = null">{{ $t('guest.slug.backToList') }}</button>
     </div></GuestDialog>
-    <GuestReportSheet v-if="reporting" :slug="slug" @close="reporting = false" @sent="reporting = false; toast = '已收到檢舉，我們會盡快處理'" />
+    <GuestReportSheet v-if="reporting" :slug="slug" @close="reporting = false" @sent="reporting = false; toast = $t('guest.report.sent')" />
 
     <GuestDialog v-if="done" labelledby="done-title" @close="done = null"><div class="g-sheet center">
-      <h1 id="done-title" class="ok">✓ 捐助成功！</h1>
-      <p>你捐助了 {{ done.title }} × {{ done.claim.qty }}，謝謝你</p>
-      <div class="g-banner ok">可在「我的捐助」查看、標記已購買或取消。</div>
-      <div v-if="isLineBrowser()" class="g-banner">LINE 內建瀏覽器請保持登入狀態；點右上角 ⋯ →「用預設瀏覽器開啟」會更穩定。</div>
-      <NuxtLink class="g-btn block" to="/me/claims">查看我的捐助</NuxtLink>
-      <button class="g-link" @click="done = null">回到清單繼續看</button>
+      <h1 id="done-title" class="ok">{{ $t('guest.slug.doneTitle') }}</h1>
+      <p>{{ $t('guest.slug.doneLine', { title: done.title, qty: done.claim.qty }) }}</p>
+      <div class="g-banner ok">{{ $t('guest.slug.doneHint') }}</div>
+      <div v-if="isLineBrowser()" class="g-banner">{{ $t('guest.slug.lineBrowser') }}</div>
+      <NuxtLink class="g-btn block" to="/me/claims">{{ $t('guest.slug.viewMyClaims') }}</NuxtLink>
+      <button class="g-link" @click="done = null">{{ $t('guest.slug.backToList') }}</button>
     </div></GuestDialog>
     <div v-if="toast" class="g-banner g-toast" role="status" @click="toast = ''">{{ toast }}</div>
   </main>

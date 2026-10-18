@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
-useHead({ title: '建立清單' })
+const { t } = useI18n()
+useHead({ title: () => t('lists.new.pageTitle') })
 const { api } = useApi()
 const f = reactive({ type: 'registry', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends' })
 const allowed = ref<string[]>([])
@@ -10,9 +11,9 @@ const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)
 const nowLocal = toLocalInput(new Date().toISOString())
 async function submit() {
   err.value = dateErr.value = ''
-  if (f.surprise_mode && !f.event_date) { dateErr.value = '開啟驚喜模式需設定活動日'; return }
-  if (f.surprise_mode && f.event_date <= today) { dateErr.value = '活動日需為今日之後'; return }
-  if (f.closes_at && f.closes_at <= toLocalInput(new Date().toISOString())) { dateErr.value = '結束時間需在現在之後'; return }
+  if (f.surprise_mode && !f.event_date) { dateErr.value = t('lists.new.errSurprise'); return }
+  if (f.surprise_mode && f.event_date <= today) { dateErr.value = t('lists.new.errEventDate'); return }
+  if (f.closes_at && f.closes_at <= toLocalInput(new Date().toISOString())) { dateErr.value = t('lists.new.errClose'); return }
   busy.value = true
   try {
     const body: any = { type: f.type, title: f.title.trim(), description: f.description || null, event_date: f.event_date || null, closes_at: fromLocalInput(f.closes_at), visibility: f.visibility, surprise_mode: f.surprise_mode, show_claimer_names: f.show_claimer_names }
@@ -26,25 +27,25 @@ async function submit() {
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader title="建立清單" back="/dashboard" />
+    <CreatorHeader :title="$t('lists.new.pageTitle')" back="/dashboard" />
     <form @submit.prevent="submit">
-      <div class="c-field"><span>清單類型</span>
+      <div class="c-field"><span>{{ $t('lists.new.type') }}</span>
         <div class="c-seg">
-          <label><input v-model="f.type" type="radio" value="personal"><span>個人心願</span></label>
-          <label><input v-model="f.type" type="radio" value="registry"><span>禮物登記</span></label>
+          <label><input v-model="f.type" type="radio" value="personal"><span>{{ $t('lists.common.personal') }}</span></label>
+          <label><input v-model="f.type" type="radio" value="registry"><span>{{ $t('lists.common.registry') }}</span></label>
         </div>
       </div>
-      <label class="c-field"><span>清單名稱（{{ f.title.length }} / 100）</span><input v-model="f.title" maxlength="100" required placeholder="例如：小愛的待產清單"></label>
-      <label class="c-field"><span>說明（選填）</span><textarea v-model="f.description" rows="2" maxlength="300" /></label>
+      <label class="c-field"><span>{{ $t('lists.new.title', { n: f.title.length }) }}</span><input v-model="f.title" maxlength="100" required :placeholder="$t('lists.new.titlePh')"></label>
+      <label class="c-field"><span>{{ $t('lists.new.desc') }}</span><textarea v-model="f.description" rows="2" maxlength="300" /></label>
       <CreatorImageUploader v-model="cover" purpose="cover" @busy="upBusy = $event" />
-      <label class="c-field"><span>活動日（選填）</span><input v-model="f.event_date" type="date" :min="today"></label>
-      <label class="c-field"><span>自動結束時間（選填，留空＝不設期限）</span><input v-model="f.closes_at" type="datetime-local" :min="nowLocal"></label>
+      <label class="c-field"><span>{{ $t('lists.new.event') }}</span><input v-model="f.event_date" type="date" :min="today"></label>
+      <label class="c-field"><span>{{ $t('lists.new.closes') }}</span><input v-model="f.closes_at" type="datetime-local" :min="nowLocal"></label>
       <p v-if="dateErr" class="c-err" role="alert">{{ dateErr }}</p>
-      <label class="c-switch"><input v-model="f.surprise_mode" type="checkbox"><span>驚喜模式<br><small class="c-mute">活動日前，你只看得到完成度，看不到誰送了什麼。需設定活動日。</small></span></label>
-      <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>顯示捐助者暱稱給其他訪客<br><small class="c-mute">預設關閉</small></span></label>
+      <label class="c-switch"><input v-model="f.surprise_mode" type="checkbox"><span>{{ $t('lists.new.surprise') }}<br><small class="c-mute">{{ $t('lists.new.surpriseHint') }}</small></span></label>
+      <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>{{ $t('lists.new.showNames') }}<br><small class="c-mute">{{ $t('lists.new.showNamesHint') }}</small></span></label>
       <CreatorVisibilityPicker v-model:visibility="f.visibility" v-model:users="allowed" />
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-      <button class="c-btn primary block" :disabled="busy || upBusy || !f.title.trim()">{{ busy ? '建立中…' : '建立並新增品項' }}</button>
+      <button class="c-btn primary block" :disabled="busy || upBusy || !f.title.trim()">{{ busy ? $t('lists.new.creating') : $t('lists.new.submit') }}</button>
     </form>
   </main>
 </template>
