@@ -3,6 +3,8 @@ import '~/assets/guest.css'
 // 公開分享頁：必須 SSR，LINE / FB 爬蟲才讀得到 OG（docs 03 §5.6）
 const route = useRoute()
 const slug = route.params.slug as string
+// 範例清單（db/seed/demo.sql）：頂端提供互相切換，一般清單不顯示
+const demos = slug.startsWith('demo') ? [['demobirth0', '生日'], ['demogift00', '送禮'], ['demowedd00', '婚禮']] : []
 const { public: { apiBase } } = useRuntimeConfig()
 const { api } = useGuest()
 const listUrl = `${apiBase}/api/v1/public/wishlists/${slug}`
@@ -166,6 +168,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <div v-if="!online" class="g-banner">目前離線，顯示的是上次載入的內容，捐助功能暫停。</div>
       <div v-if="lineHint" class="g-banner">想把捐助保存起來？點右上角 ⋯ 選「用預設瀏覽器開啟」，之後比較不會找不到。 <button class="g-link" @click="dismissHint">知道了</button></div>
       <div v-if="closed" class="g-banner">這份清單已結束</div>
+      <nav v-if="demos.length" class="g-demos" aria-label="其他範例">範例：<NuxtLink v-for="[k, t] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ t }}</NuxtLink></nav>
       <img v-if="data.cover_image_url" :src="data.cover_image_url" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
       <p class="g-mute">
