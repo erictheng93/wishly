@@ -140,3 +140,28 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
     server.abort();
     common::assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn confirm_is_rate_limited_per_user(pool: PgPool) {
+    let TestUser { id, token } = user(&pool, "Alice").await;
+    let TestUser { token: other, .. } = user(&pool, "Bob").await;
+    for _ in 0..120 {
+        wishly_api::ratelimit::check(&pool, &format!("confirm:{id}"), 120, 3600)
+            .await
+            .unwrap();
+    }
+    let key = format!("items/{}.png", uuid::Uuid::new_v4());
+    let body = json!({"object_key": key});
+    let r = call(
+        &pool,
+        "POST",
+        "/uploads/confirm",
+        &ck(&token),
+        Some(body.clone()),
+    )
+    .await;
+    assert_eq!(r.0, StatusCode::TOO_MANY_REQUESTS);
+    // 其他使用者不受影響（會進到 S3 步驟，不是 429）
+    let r = call(&pool, "POST", "/uploads/confirm", &ck(&other), Some(body)).await;
+    assert_ne!(r.0, StatusCode::TOO_MANY_REQUESTS);
+}
