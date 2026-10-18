@@ -317,7 +317,7 @@ async fn edit_rules_after_pledges(pool: PgPool) {
         (StatusCode::OK, Some(401), Some(400)),
         "{b}"
     );
-    // 一般欄位仍可改，qty_needed 被強制為 1
+    // 募集中一般欄位仍可改，qty_needed 被強制為 1
     let (s, _, b) = call(
         &pool,
         "PATCH",
@@ -394,11 +394,29 @@ async fn edit_rules_after_pledges(pool: PgPool) {
         "PATCH",
         &path,
         &ck(&t),
-        Some(json!({ "target_points": 401, "title": "再改名" })),
+        Some(json!({ "target_points": 401, "title": "新名稱" })),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["funding_status"], "funded");
+    // 達標後商品欄位唯讀（採購單即時讀取）
+    for body in [
+        json!({ "title": "偷換" }),
+        json!({ "product_url": "https://evil.example/x" }),
+    ] {
+        let (s, _, b) = call(&pool, "PATCH", &path, &ck(&t), Some(body)).await;
+        assert_eq!(
+            (s.as_u16(), b["code"].as_str()),
+            (409, Some("FUNDING_LOCKED")),
+            "{b}"
+        );
+    }
+    let t_now: String = sqlx::query_scalar("SELECT title FROM wishlist_items WHERE id = $1")
+        .bind(item)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(t_now, "新名稱");
     assert_all_reconciled(&pool).await;
 }
 
@@ -960,6 +978,21 @@ async fn admin_order_placed_partial_refund_and_lifecycle(pool: PgPool) {
     pledge(&pool, item, b_, 6000, false).await;
     let oid = order_of(&pool, item).await;
     let url = format!("/admin/orders/{oid}");
+
+    // 已達標：商品欄位唯讀，後台採購單仍是原商品
+    let (st, _, b) = call(
+        &pool,
+        "PATCH",
+        &format!("/items/{item}"),
+        &ck(&t),
+        Some(json!({ "title": "偷換", "product_url": "https://evil.example/x" })),
+    )
+    .await;
+    assert_eq!(
+        (st.as_u16(), b["code"].as_str()),
+        (409, Some("FUNDING_LOCKED")),
+        "{b}"
+    );
 
     // 佇列：含解密後的收件資訊，且逐筆寫 audit
     let (st, h, l) = call(&pool, "GET", "/admin/orders?status=pending", &ck(&s), None).await;
