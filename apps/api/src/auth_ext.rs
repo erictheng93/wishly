@@ -177,12 +177,22 @@ async fn login(
     let email = r.email.trim().to_lowercase();
     let headers = parts.headers.clone();
     let ip = crate::config::client_ip(&parts, &crate::config::get());
-    // 原子的每 IP 嘗試數上限（先於 Argon2）：failure 列在驗證後才寫，併發請求否則全會通過下方計數
-    crate::ratelimit::check(&st.pool, &format!("login_ip:{ip}"), 30, 900).await?;
+    // 先記一筆失敗再計數（含自己）：同時送出的請求彼此看得到，鎖定不會被併發繞過；成功登入才清掉。
+    // 超過門檻被拒的嘗試刪掉自己那筆，不延長鎖定時間。
+    let fid: i64 =
+        sqlx::query_scalar("INSERT INTO login_failures (email, ip) VALUES ($1,$2) RETURNING id")
+            .bind(&email)
+            .bind(&ip)
+            .fetch_one(&st.pool)
+            .await?;
     let (by_pair, by_email, by_ip): (i64, i64, i64) = sqlx::query_as(
         "SELECT count(*) FILTER (WHERE email=$1 AND ip=$2), count(*) FILTER (WHERE email=$1), count(*) FILTER (WHERE ip=$2) FROM login_failures
          WHERE created_at > now() - interval '15 minutes' AND (email=$1 OR ip=$2)").bind(&email).bind(&ip).fetch_one(&st.pool).await?;
-    if by_pair >= 5 || by_email >= 20 || by_ip >= 30 {
+    if by_pair > 5 || by_email > 20 || by_ip > 30 {
+        sqlx::query("DELETE FROM login_failures WHERE id=$1")
+            .bind(fid)
+            .execute(&st.pool)
+            .await?;
         return Err(crate::auth::rate_limited(300));
     }
     let row: Option<(uuid::Uuid, Option<String>)> = sqlx::query_as(
@@ -197,19 +207,25 @@ async fn login(
         None => (None, None),
     };
     let pw = r.password;
-    let ok = argon_run(move || {
+    let verified = argon_run(move || {
         let real = hash.as_deref();
         let good = verify_pw(&pw, real.unwrap_or(&DUMMY_HASH)); // 無帳號 / 無密碼也跑一次
         good && real.is_some() && pw.chars().count() <= 128
     })
-    .await?;
+    .await;
+    let ok = match verified {
+        Ok(v) => v,
+        Err(e) => {
+            // 系統忙碌（BUSY）不算使用者的失敗嘗試
+            sqlx::query("DELETE FROM login_failures WHERE id=$1")
+                .bind(fid)
+                .execute(&st.pool)
+                .await?;
+            return Err(e);
+        }
+    };
     let Some(uid) = uid.filter(|_| ok) else {
-        sqlx::query("INSERT INTO login_failures (email, ip) VALUES ($1,$2)")
-            .bind(&email)
-            .bind(&ip)
-            .execute(&st.pool)
-            .await?;
-        return Err(bad_credentials());
+        return Err(bad_credentials()); // 驗證前已記下這筆失敗
     };
     sqlx::query("DELETE FROM login_failures WHERE email=$1")
         .bind(&email)
