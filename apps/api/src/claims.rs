@@ -381,6 +381,35 @@ async fn apply(
     p: PatchReq,
 ) -> Result<(ClaimRow, Value), AppError> {
     let actor = actor.ok_or(AppError::Unauthorized)?;
+    // 加量時的存取判斷比照 create 在交易外先做：check_wishlist 另取連線，放在交易內併發時會耗盡 pool
+    let access = match (&actor, p.qty) {
+        (Actor::User(u), Some(_)) => {
+            let w: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+                "SELECT w.id, w.owner_id, w.visibility::text FROM claims c
+                   JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
+                  WHERE c.id = $1",
+            )
+            .bind(id)
+            .fetch_optional(&st.pool)
+            .await?;
+            match w {
+                Some((wishlist_id, owner_id, vis)) => {
+                    crate::access::check_wishlist(
+                        &st.pool,
+                        &crate::access::ListAccess {
+                            wishlist_id,
+                            owner_id,
+                            visibility: &vis,
+                        },
+                        Some(*u),
+                    )
+                    .await
+                }
+                None => Ok(()),
+            }
+        }
+        _ => Ok(()),
+    };
     let mut tx = st.pool.begin().await?;
     // F5 交易邊界：先（不加鎖）取 item_id → 鎖 item → 鎖 claim
     let item_id: Uuid = sqlx::query_scalar("SELECT item_id FROM claims WHERE id = $1")
@@ -388,13 +417,12 @@ async fn apply(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(AppError::NotFound)?;
-    let (needed, claimed, wl_status, owner_id, locked, wl_id, vis, hidden, gone, past_due): (
+    let (needed, claimed, wl_status, owner_id, locked, vis, hidden, gone, past_due): (
         i32,
         i32,
         String,
         Uuid,
         bool,
-        Uuid,
         String,
         bool,
         bool,
@@ -402,7 +430,7 @@ async fn apply(
     ) = sqlx::query_as(
         "SELECT i.qty_needed, i.qty_claimed, w.status::text, w.owner_id,
                 (w.surprise_mode AND w.event_date IS NOT NULL AND now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')),
-                w.id, w.visibility::text, w.moderation_status::text = 'hidden',
+                w.visibility::text, w.moderation_status::text = 'hidden',
                 (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now())
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
          WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).fetch_one(&mut *tx).await?;
@@ -499,18 +527,7 @@ async fn apply(
                     "此清單已結束，不再接受捐助",
                 ));
             }
-            if let Actor::User(u) = actor {
-                crate::access::check_wishlist(
-                    &st.pool,
-                    &crate::access::ListAccess {
-                        wishlist_id: wl_id,
-                        owner_id,
-                        visibility: &vis,
-                    },
-                    Some(u),
-                )
-                .await?;
-            }
+            access?;
         }
         if delta != 0 {
             let r: Option<(i32,)> = sqlx::query_as("UPDATE wishlist_items SET qty_claimed = qty_claimed + $2 WHERE id = $1 AND qty_claimed + $2 <= qty_needed RETURNING qty_claimed")
