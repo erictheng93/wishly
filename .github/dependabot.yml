@@ -11,3 +11,7 @@ updates:
     schedule: { interval: weekly }
     groups:
       compose: { patterns: ["*"] }
+    ignore:
+      # PostgreSQL 大版本資料格式不相容（本機 volume 會起不來），且需與 CI / 正式環境的 16 一致；升級時手動處理
+      - dependency-name: postgis/postgis
+        update-types: ["version-update:semver-major"]
