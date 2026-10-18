@@ -1,0 +1,13 @@
+# 更新已固定 SHA／digest 的 actions 與本機開發映像（會一併改版本註解）
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      compose: { patterns: ["*"] }

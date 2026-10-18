@@ -44,8 +44,6 @@ describe('raw npm audit signal', () => {
       mkdirSync(join(directory, 'scripts'))
       mkdirSync(join(directory, 'bin'))
       copyFileSync(new URL('../scripts/audit-dependencies.mjs', import.meta.url), join(directory, 'scripts/audit-dependencies.mjs'))
-      // The previous exception runner also invoked these after accepting known advisories.
-      writeFileSync(join(directory, 'scripts/patch-dependencies.mjs'), '')
       writeFileSync(join(directory, 'bin/npm'), `#!/usr/bin/env node
 if (process.argv[2] === 'audit') {
   process.stdout.write(${JSON.stringify(output)});
