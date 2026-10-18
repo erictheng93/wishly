@@ -203,6 +203,17 @@ pub fn gt(token: &str) -> Hdr {
     vec![("x-guest-token", token.to_string())]
 }
 
+/// 最新一張 OTP 挑戰的 id（匿名端點發出的挑戰驗證時必須帶 challenge_id）。
+pub async fn latest_challenge(pool: &PgPool, email: &str, purpose: &str) -> String {
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM otp_challenges WHERE email=$1 AND purpose=$2 ORDER BY created_at DESC LIMIT 1")
+        .bind(email)
+        .bind(purpose)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .to_string()
+}
+
 pub async fn session(pool: &PgPool, id: Uuid) -> String {
     let token = Uuid::new_v4().to_string();
     sqlx::query("INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '1 day')")

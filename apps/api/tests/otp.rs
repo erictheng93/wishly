@@ -37,6 +37,7 @@ async fn otp_full_flow(pool: PgPool) {
     .await;
     assert_eq!(st, 202);
     assert_eq!(b["expires_in"], 600);
+    let cid = b["challenge_id"].clone();
     // 60 秒內重送 → 429
     let (st, h, b) = call_app(
         &app,
@@ -56,7 +57,7 @@ async fn otp_full_flow(pool: PgPool) {
         "POST",
         "/auth/otp/verify",
         &[],
-        Some(json!({ "email": email, "code": wrong })),
+        Some(json!({ "email": email, "code": wrong, "challenge_id": cid })),
     )
     .await;
     assert_eq!(
@@ -68,7 +69,7 @@ async fn otp_full_flow(pool: PgPool) {
         "POST",
         "/auth/otp/verify",
         &[],
-        Some(json!({ "email": email, "code": code })),
+        Some(json!({ "email": email, "code": code, "challenge_id": cid })),
     )
     .await;
     assert_eq!(st, 200, "{b}");
@@ -91,7 +92,7 @@ async fn otp_full_flow(pool: PgPool) {
         "POST",
         "/auth/otp/verify",
         &[],
-        Some(json!({ "email": email, "code": code })),
+        Some(json!({ "email": email, "code": code, "challenge_id": cid })),
     )
     .await;
     assert_eq!(st, 400);
@@ -150,7 +151,7 @@ async fn otp_full_flow(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    call_app(
+    let (_, _, b) = call_app(
         &app,
         "POST",
         "/auth/otp/request",
@@ -158,13 +159,14 @@ async fn otp_full_flow(pool: PgPool) {
         Some(json!({ "email": email })),
     )
     .await;
+    let cid = b["challenge_id"].clone();
     let code = recover_code(&pool, &lower).await;
     let (_, _, b) = call_app(
         &app,
         "POST",
         "/auth/otp/verify",
         &[],
-        Some(json!({ "email": email, "code": code })),
+        Some(json!({ "email": email, "code": code, "challenge_id": cid })),
     )
     .await;
     assert_eq!(b["is_new_user"], false);
@@ -175,7 +177,7 @@ async fn otp_full_flow(pool: PgPool) {
 async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
     let app = test_app(&pool);
     let email = format!("lock-{}@example.com", Uuid::new_v4());
-    call_app(
+    let (_, _, b) = call_app(
         &app,
         "POST",
         "/auth/otp/request",
@@ -183,6 +185,7 @@ async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
         Some(json!({ "email": email })),
     )
     .await;
+    let cid = b["challenge_id"].clone();
     let code = recover_code(&pool, &email).await;
     let wrong = if code == "000000" { "000001" } else { "000000" };
     for _ in 0..5 {
@@ -191,7 +194,7 @@ async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
             "POST",
             "/auth/otp/verify",
             &[],
-            Some(json!({ "email": email, "code": wrong })),
+            Some(json!({ "email": email, "code": wrong, "challenge_id": cid })),
         )
         .await;
     }
@@ -200,7 +203,7 @@ async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
         "POST",
         "/auth/otp/verify",
         &[],
-        Some(json!({ "email": email, "code": code })),
+        Some(json!({ "email": email, "code": code, "challenge_id": cid })),
     )
     .await;
     assert_eq!(
@@ -355,7 +358,7 @@ async fn attacker_cannot_lock_out_victim_with_challenge_id(pool: PgPool) {
     assert_all_reconciled(&pool).await;
 }
 
-/// challenge_id 屬於別的 email / 用途 → 拒絕；不帶 challenge_id 的舊流程仍可用（取最新一張）。
+/// challenge_id 屬於別的 email / 用途 → 拒絕；匿名發出的挑戰不帶 challenge_id 也驗不到。
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn challenge_id_is_bound_to_email_and_purpose(pool: PgPool) {
     let app = test_app(&pool);
@@ -396,12 +399,21 @@ async fn challenge_id_is_bound_to_email_and_purpose(pool: PgPool) {
         let (st, _) = from_ip(&app, "10.1.0.3", uri, body).await;
         assert_eq!(st, 400, "{uri}");
     }
-    // 舊客戶端不帶 challenge_id 仍可驗證
+    // 匿名端點發出的挑戰已綁定：不帶 challenge_id 驗證不到（他人無法不帶 id 燒掉本人那張）
     let (st, body) = from_ip(
         &app,
         "10.1.0.3",
         "/auth/otp/verify",
         json!({ "email": a, "code": "123456" }),
+    )
+    .await;
+    assert_eq!(st, 400, "{body}");
+    // 本人帶對的 id 仍可驗證（上面不帶 id 的嘗試沒有燒掉這張）
+    let (st, body) = from_ip(
+        &app,
+        "10.1.0.3",
+        "/auth/otp/verify",
+        json!({ "email": a, "code": "123456", "challenge_id": ida }),
     )
     .await;
     assert_eq!(st, 200, "{body}");
