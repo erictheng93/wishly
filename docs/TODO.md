@@ -36,7 +36,7 @@
 - [ ] `cloudflared` 容器確認 restart policy 為 always；Tunnel 掉線告警（Tunnel 是單點，掛掉全站不可達）。
 - [ ] 記錄並設定提醒：GHCR 讀取 PAT 的**到期日**；R2 S3 Token 若有到期日也一併記錄（到期會讓重新部署／上傳突然失敗）。
 - [ ] VPS 記憶體實測：`free -h`（DB、Dokploy、cloudflared、後端同機執行）。
-- [ ] **每月檢查一次 braces／node-forge 兩個公告是否有修補版**（issue #7；CI `web-audit` 因此刻意維持紅燈）：`gh api /advisories/GHSA-vfj7-8cjw-p6xm` 與 `/advisories/GHSA-86w9-cpqp-85rv` 看 `first_patched_version`，並 `npm view braces version`、`npm view node-forge version`。有修補版後依 `apps/web/patches/README.md` 更新 lockfile、重跑驗證、移除暫時補丁並關閉 #7。上次檢查：2026-10-17（兩者皆無修補版）。
+- [ ] **每月檢查一次 braces／node-forge 兩個公告是否有修補版**（CI `web-audit` 已移除；issue #7 已關閉，需要時重開）：`gh api /advisories/GHSA-vfj7-8cjw-p6xm` 與 `/advisories/GHSA-86w9-cpqp-85rv` 看 `first_patched_version`，並 `npm view braces version`、`npm view node-forge version`。有修補版後依 `apps/web/patches/README.md` 更新 lockfile、重跑驗證、移除暫時補丁並關閉 #7。上次檢查：2026-10-17（兩者皆無修補版）。
 
 ---
 
@@ -56,7 +56,6 @@
 - [ ] 寄信：用 Gmail 以外的信箱測 OTP；確認不進垃圾信。穩定後再決定 DMARC 是否維持 `p=reject`（觀察期先 `p=none`；注意 SPF 因 `cf-bounce` 子網域在嚴格對齊下不對齊，DMARC 靠 DKIM 通過）。
 
 CI／部署流程：
-- [ ] 查明 **`web-audit` 失敗**原因（`npm run audit:security` 退出碼 1，可能是新公告；run `39009130541`，附 `web-audit` artifact）。
 - [ ] 評估 `ubuntu-latest` 於 **2026-10-19** 遷至 Ubuntu 26 的影響（`api`／`e2e`／`image`）；必要時固定 `ubuntu-24.04`。
 - [ ] **自動部署**：CI `publish-image` 完成後呼叫 Dokploy webhook 以該次 SHA 部署，或關閉 Dokploy 的 `Autodeploy`（目前開啟但無作用）。
 - [ ] 回滾演練：把 `api` 的 Image 標籤改回前一個 SHA 並部署。
