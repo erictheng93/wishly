@@ -214,3 +214,57 @@ async fn otp_locks_after_5_wrong_attempts(pool: PgPool) {
     assert_eq!(st, 422);
     assert_all_reconciled(&pool).await;
 }
+
+/// 匿名者用 login 用途耗盡額度，不得擋掉本人的 reset 發信與 reset 驗證。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn login_spend_does_not_lock_reset(pool: PgPool) {
+    let app = test_app(&pool);
+    let u = user(&pool, "victim").await;
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
+        .bind(u.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    // 5 封 login 挑戰，各 2 次錯誤嘗試（共 10），皆已過 60 秒間隔
+    for _ in 0..5 {
+        sqlx::query("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, attempts, created_at) VALUES ($1, $2, now() + interval '5 minutes', 'login', 2, now() - interval '2 minutes')")
+            .bind(&email).bind(vec![0u8; 32]).execute(&pool).await.unwrap();
+    }
+    let body = json!({ "email": email });
+    let (st, ..) = call_app(
+        &app,
+        "POST",
+        "/auth/password/reset/request",
+        &[],
+        Some(body),
+    )
+    .await;
+    assert_eq!(st, 202);
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM otp_challenges WHERE email=$1 AND purpose='reset'",
+    )
+    .bind(&email)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1, "reset 發信不應被 login 額度吃掉");
+    sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE email=$2 AND purpose='reset'")
+        .bind(wishly_api::auth::code_hash(
+            "123456",
+            &wishly_api::config::get().otp_pepper,
+        ))
+        .bind(&email)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let body = json!({ "email": email, "code": "123456", "new_password": "NewPassw0rd!x" });
+    let (st, ..) = call_app(
+        &app,
+        "POST",
+        "/auth/password/reset/confirm",
+        &[],
+        Some(body),
+    )
+    .await;
+    assert_ne!(st, 429, "正確的 reset 碼不應被 login 嘗試數擋下");
+}
