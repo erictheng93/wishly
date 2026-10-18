@@ -1,7 +1,7 @@
 # 本機開發環境（D38）：PostGIS、MinIO（模擬 R2）、Mailpit（收 OTP 信）
 services:
   db:
-    image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
+    image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
     environment:
       POSTGRES_USER: wishly
       POSTGRES_PASSWORD: wishly
