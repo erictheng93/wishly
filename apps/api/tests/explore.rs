@@ -137,4 +137,26 @@ async fn demo_seed_hidden_from_explore(pool: PgPool) {
     .unwrap();
     assert_eq!(n, 3);
     assert!(titles(&pool, "").await.0.is_empty());
+    // 範例清單可瀏覽（closed），但真實使用者無法認捐
+    let (st, _, v) = call(&pool, "GET", "/public/wishlists/demobirth0", &[], None).await;
+    assert_eq!(
+        (st, v["status"].as_str()),
+        (StatusCode::OK, Some("closed")),
+        "{v}"
+    );
+    let item = v["items"][0]["id"].as_str().unwrap().to_string();
+    let u = user(&pool, "訪客").await;
+    let (st, _, b) = call(
+        &pool,
+        "POST",
+        &format!("/items/{item}/claims"),
+        &[ck(&u.token), idem(uuid::Uuid::new_v4())].concat(),
+        Some(serde_json::json!({ "qty": 1 })),
+    )
+    .await;
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("WISHLIST_CLOSED")),
+        "{b}"
+    );
 }

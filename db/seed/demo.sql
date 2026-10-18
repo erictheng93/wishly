@@ -1,5 +1,6 @@
 -- 範例清單：landing 的「看範例」連結（/s/demobirth0 等）走真實 API，取代僅 deploy:demo 才有的假資料。
--- 不是 migration（會污染測試與統計）；部署後手動執行一次：psql "$DATABASE_URL" -f db/seed/demo.sql（已存在則略過）。
+-- 不是 migration（會污染測試與統計）；部署後手動執行一次：psql "$DATABASE_URL" -f db/seed/demo.sql（可重複執行：已存在則只確保為 closed）。
+-- 清單一律 closed：可瀏覽、但不接受認捐，避免真實使用者對示範人物送出認捐。
 -- 擁有者為無 email 的示範帳號（無法登入）；品項只用數量制且 qty_claimed 一律 0（不造假認領），不寫點數。
 -- 探索頁排除 slug 'demo%'（見 public.rs），標題帶「【範例】」，避免被當成真人清單。
 -- slug 須符合 wishlists_slug_format（10 碼英數），所以不是 "demo"。
@@ -9,8 +10,8 @@ WITH o AS (
   WHERE NOT EXISTS (SELECT 1 FROM wishlists WHERE slug = 'demobirth0')
   RETURNING id, display_name
 ), w AS (
-  INSERT INTO wishlists (owner_id, type, status, visibility, slug, title, description, event_date)
-  SELECT o.id, 'registry', 'active', 'public', v.slug, v.title, v.descr, v.ev::date
+  INSERT INTO wishlists (owner_id, type, status, visibility, slug, title, description, event_date, closed_at)
+  SELECT o.id, 'registry', 'closed', 'public', v.slug, v.title, v.descr, v.ev::date, now()
   FROM o JOIN (VALUES
     ('小安', 'demobirth0', '【範例】小安的生日心願', '11 月 8 日生日，朋友們幫我認領一樣就好', '2026-11-08'),
     ('Mia', 'demogift00', '【範例】Mia 的聖誕心願', '不知道送什麼的話，看這裡就好，捐助後我會自己標記收到', '2026-12-25'),
@@ -35,3 +36,7 @@ FROM w JOIN (VALUES
   ('demowedd00', '掃地機器人', 'Roborock', NULL, 'high', 1, 0, 12000, 4),
   ('demowedd00', '玻璃保鮮盒', NULL, NULL, 'low', 3, 0, 600, 5)
 ) AS i(slug, title, brand, spec, pri, need, got, price, ord) ON i.slug = w.slug;
+
+-- 先前以 active 建立過的範例清單（重複執行時）一併改為 closed
+UPDATE wishlists SET status = 'closed', closed_at = COALESCE(closed_at, now())
+ WHERE slug IN ('demobirth0', 'demogift00', 'demowedd00') AND status = 'active';
