@@ -243,3 +243,80 @@ async fn member_with_stale_guest_token_still_manages_own_claims(pool: PgPool) {
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(qty_claimed(&pool, it).await, 4);
 }
+
+/// PATCH 加量等同新認捐：清單截止 / 下架 / 轉私人 / 被解除好友後都不可再加量；減量仍可。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn qty_increase_reapplies_create_gates(pool: PgPool) {
+    let cases = [
+        (
+            "deadline",
+            "UPDATE wishlists SET closes_at = now() - interval '1 hour' WHERE id = $1",
+        ),
+        (
+            "hidden",
+            "UPDATE wishlists SET moderation_status = 'hidden', moderation_reason = 'x' WHERE id = $1",
+        ),
+        (
+            "private",
+            "UPDATE wishlists SET visibility = 'private' WHERE id = $1",
+        ),
+        (
+            "unfriended",
+            "DELETE FROM friendships WHERE $1::uuid IS NOT NULL",
+        ),
+    ];
+    for (name, sql) in cases {
+        let owner = user(&pool, "owner").await;
+        let vis = if name == "unfriended" {
+            "friends"
+        } else {
+            "public"
+        };
+        let wl = wishlist(
+            &pool,
+            owner.id,
+            ListOpts {
+                visibility: Some(vis),
+                closes_in: Some("1 day"),
+                ..Default::default()
+            },
+        )
+        .await;
+        let it = item(&pool, wl.id, "奶瓶", 9).await;
+        let u = user(&pool, "u").await;
+        if name == "unfriended" {
+            befriend(&pool, owner.id, u.id).await;
+        }
+        let (s, _, b) = call(
+            &pool,
+            "POST",
+            &format!("/items/{it}/claims"),
+            &[ck(&u.token), idem(Uuid::new_v4())].concat(),
+            Some(json!({ "qty": 2 })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{name} {b}");
+        let cid = b["claim"]["id"].as_str().unwrap().to_string();
+        sqlx::query(sql).bind(wl.id).execute(&pool).await.unwrap();
+        let (s, _, b) = call(
+            &pool,
+            "PATCH",
+            &format!("/claims/{cid}"),
+            &ck(&u.token),
+            Some(json!({ "qty": 4 })),
+        )
+        .await;
+        assert!(s.is_client_error(), "{name} 加量應被拒 {s} {b}");
+        assert_eq!(qty_claimed(&pool, it).await, 2, "{name}");
+        let (s, _, b) = call(
+            &pool,
+            "PATCH",
+            &format!("/claims/{cid}"),
+            &ck(&u.token),
+            Some(json!({ "qty": 1 })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{name} 減量仍可 {b}");
+        assert_eq!(qty_claimed(&pool, it).await, 1, "{name}");
+    }
+}
