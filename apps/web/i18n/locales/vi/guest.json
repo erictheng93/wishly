@@ -109,7 +109,7 @@
       "sent": "Đã nhận báo cáo, chúng tôi sẽ xử lý sớm"
     },
     "explore": {
-      "seoTitle": "Khám phá danh sách công khai | Wishly",
+      "seoTitle": "Khám phá danh sách công khai {'|'} Wishly",
       "seoDesc": "Xem các danh sách quà ước và danh sách cứu trợ công khai, đăng nhập để nhận tặng.",
       "heading": "Khám phá danh sách công khai",
       "typeGroup": "Loại danh sách",
@@ -145,7 +145,7 @@
       "demoGift": "Tặng quà",
       "demoWedding": "Đám cưới",
       "friend": "bạn bè",
-      "ogTitle": "Chọn quà cho {name} | {title}",
+      "ogTitle": "Chọn quà cho {name} {'|'} {title}",
       "ogDesc": "Đã hoàn thành {pct}%, còn {left} món đang chờ bạn. Xem không cần đăng ký, đăng nhập để nhận tặng.",
       "titleForbidden": "Cần quyền để xem",
       "titleGone": "Danh sách này đã bị gỡ",

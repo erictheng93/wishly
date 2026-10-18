@@ -183,7 +183,7 @@
       "copyFail": "無法複製，請手動選取網址",
       "addTitle": "加好友",
       "toLabel": "對方的 Email 或帳號代號",
-      "toPh": "name@example.com 或 @handle",
+      "toPh": "name{'@'}example.com 或 {'@'}handle",
       "send": "送出邀請",
       "sending": "送出中…",
       "inviteTitle": "邀請連結",

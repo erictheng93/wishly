@@ -1,7 +1,7 @@
 {
   "me": {
     "home": {
-      "seoTitle": "Wishly | Wishlists and gift sharing",
+      "seoTitle": "Wishly {'|'} Wishlists and gift sharing",
       "seoDesc": "Build a wishlist and share it with one link. For gifts, birthdays and weddings: friends open the link to browse, then sign in to pledge a gift. No duplicates, no overselling.",
       "ogTitle": "Wishly",
       "ogDesc": "List what you want, so the people who want to give never have to guess.",
@@ -183,7 +183,7 @@
       "copyFail": "Couldn't copy. Please select the URL manually.",
       "addTitle": "Add a friend",
       "toLabel": "Their email or handle",
-      "toPh": "name@example.com or @handle",
+      "toPh": "name{'@'}example.com or {'@'}handle",
       "send": "Send invitation",
       "sending": "Sending…",
       "inviteTitle": "Invite link",
