@@ -341,11 +341,10 @@ async fn change_password(
         ));
     };
     let (cur, h) = (r.current_password, old.clone());
-    let ok = tokio::task::spawn_blocking(move || {
+    let ok = crate::auth_ext::argon_run(move || {
         cur.chars().count() <= 128 && crate::auth_ext::verify_pw(&cur, &h)
     })
-    .await
-    .unwrap_or(false);
+    .await?;
     if !ok {
         return Err(AppError::invalid(
             "/current_password",

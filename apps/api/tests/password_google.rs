@@ -931,3 +931,31 @@ async fn google_login_redirects_blocked_and_ambiguous_accounts(pool: PgPool) {
     assert_eq!(count, 0);
     common::assert_all_reconciled(&pool).await;
 }
+
+/// 併發失敗登入不能繞過每 IP 上限：failure 列在驗證後才寫，需靠 Argon2 前的原子計數擋下。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn concurrent_failed_logins_bounded_per_ip(pool: PgPool) {
+    let app = app(AppState { pool: pool.clone() });
+    let hs: Vec<_> = (0..45)
+        .map(|i| {
+            let app = app.clone();
+            tokio::spawn(async move {
+                let body =
+                    json!({ "email": format!("c{i}@example.com"), "password": "bad-password" });
+                common::call_app(&app, "POST", "/auth/login", &[], Some(body))
+                    .await
+                    .0
+            })
+        })
+        .collect();
+    let mut codes = vec![];
+    for h in hs {
+        codes.push(h.await.unwrap());
+    }
+    assert!(codes.contains(&StatusCode::TOO_MANY_REQUESTS), "{codes:?}");
+    let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM login_failures")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(n <= 30, "Argon2 驗證次數超過上限: {n}");
+}
