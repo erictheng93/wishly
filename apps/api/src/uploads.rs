@@ -346,6 +346,11 @@ fn ext_of(ct: &str) -> Option<&'static str> {
     }
 }
 
+/// confirm 每使用者每小時上限（大於 presign 的 60，容許重試）
+const CONFIRM_LIMIT: i32 = 120;
+/// 同時進行的圖片解碼數
+static DECODE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+
 async fn presign(
     State(st): State<AppState>,
     user: CurrentUser,
@@ -415,7 +420,11 @@ pub fn valid_key(k: &str) -> bool {
 }
 
 /// 前端 PUT 完成後呼叫：驗證、去中繼資料、寫入公開 key、刪除 incoming。（契約未列，補充端點）
-async fn confirm(user: CurrentUser, Json(r): Json<ConfirmReq>) -> Result<Json<Value>, AppError> {
+async fn confirm(
+    State(st): State<AppState>,
+    user: CurrentUser,
+    Json(r): Json<ConfirmReq>,
+) -> Result<Json<Value>, AppError> {
     if !valid_key(&r.object_key) {
         return Err(AppError::invalid(
             "/object_key",
@@ -423,6 +432,13 @@ async fn confirm(user: CurrentUser, Json(r): Json<ConfirmReq>) -> Result<Json<Va
             "object_key 格式不正確",
         ));
     }
+    crate::ratelimit::check(
+        &st.pool,
+        &format!("confirm:{}", user.id),
+        CONFIRM_LIMIT,
+        3600,
+    )
+    .await?;
     let inc = format!("incoming/{}/{}", user.id, r.object_key);
     let res = s3_req("GET", &inc, None).await?;
     if res.status().as_u16() == 404 {
@@ -448,7 +464,15 @@ async fn confirm(user: CurrentUser, Json(r): Json<ConfirmReq>) -> Result<Json<Va
         .await
         .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
     let want_ext = r.object_key.rsplit('.').next().unwrap_or("");
-    match strip_metadata(&bytes) {
+    // 解碼是 CPU 密集：丟 blocking 池並以全域信號量限制同時解碼數，避免耗盡 worker / 記憶體
+    let _permit = DECODE_SLOTS
+        .acquire()
+        .await
+        .map_err(|e| AppError::problem(500, "INTERNAL", e.to_string()))?;
+    let stripped = tokio::task::spawn_blocking(move || strip_metadata(&bytes))
+        .await
+        .map_err(|e| AppError::problem(500, "INTERNAL", e.to_string()))?;
+    match stripped {
         Ok((clean, ct)) if ext_of(ct) == Some(want_ext) => {
             s3_req("PUT", &r.object_key, Some((clean, ct))).await?;
             let _ = s3_req("DELETE", &inc, None).await;
