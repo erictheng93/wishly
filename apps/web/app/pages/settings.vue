@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
-useHead({ title: '帳號設定' })
+const { t, locale } = useI18n()
+useHead({ title: () => t('settings.title') })
 const { api } = useApi()
 const { user, fetchMe, logout, oauth } = useAuth()
 const route = useRoute()
@@ -22,23 +23,24 @@ const bDays = computed(() => daysInMonth(bMonth.value))
 const pad = (n: number) => String(n).padStart(2, '0')
 const exporting = ref(false)
 const showDel = ref(false), word = ref(''), delBusy = ref(false), delErr = ref('')
-const LINK_ERRORS: Record<string, string> = { oauth_failed: '綁定失敗，請重新操作並確認登入帳號', oauth_unavailable: '此登入方式尚未開放', identity_in_use: '此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。', provider_already_linked: '已綁定此登入方式，請先解除後再更換' }
+const LINK_ERROR_KEYS = ['oauth_failed', 'oauth_unavailable', 'identity_in_use', 'provider_already_linked']
+const linkError = (code: string) => (LINK_ERROR_KEYS.includes(code) ? t(`settings.login.err.${code}`) : '')
 // 網頁版整頁導向供應商再回來；原生殼等 deep link 回來後就地更新
 async function linkOAuth(p: (typeof providers)[number]) {
   if (identityBusy.value || p.provider === 'email') return
   identityBusy.value = true; identityErr.value = identityMsg.value = ''
   try {
     await oauth(p.provider, '/settings', true)
-    if (isNative()) identityMsg.value = `已綁定 ${p.label}`
+    if (isNative()) identityMsg.value = t('settings.login.linkedMsg', { label: p.label })
   } catch (e: any) {
-    if (e.message !== 'cancelled') identityErr.value = LINK_ERRORS[e.message] || errMsg(e)
+    if (e.message !== 'cancelled') identityErr.value = linkError(e.message) || errMsg(e)
   } finally { identityBusy.value = false }
 }
 onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
   bio.value = user.value?.bio ?? ''; [bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
-  identityErr.value = LINK_ERRORS[String(route.query.error)] ?? ''
+  identityErr.value = linkError(String(route.query.error))
   const label = providers.find(p => p.provider === route.query.linked)?.label
-  if (label) identityMsg.value = `已綁定 ${label}`
+  if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
   loadSessions()
 })
 
@@ -61,7 +63,7 @@ async function verifyLinkEmail() {
   try {
     user.value = await api('/me/identities/email/verify', { method: 'POST', body: { email: sentEmail.value, code: linkCode.value } })
     sentEmail.value = ''; linkCode.value = ''; cooldown.value = 0; clearInterval(linkTimer)
-    identityMsg.value = '已綁定 Email，可收取通知並設定密碼'
+    identityMsg.value = t('settings.login.emailLinkedMsg')
   } catch (e) { identityErr.value = errMsg(e); linkCode.value = ''; linkOtp.value?.focus() } finally { identityBusy.value = false }
 }
 function closeUnlink() { if (!identityBusy.value) removingProvider.value = '' }
@@ -70,7 +72,7 @@ async function unlinkIdentity() {
   identityBusy.value = true; identityErr.value = identityMsg.value = ''
   try {
     user.value = await api(`/me/identities/${removingProvider.value}`, { method: 'DELETE' })
-    identityMsg.value = `已解除 ${removingLabel.value} 綁定`
+    identityMsg.value = t('settings.login.unlinkedMsg', { label: removingLabel.value })
     removingProvider.value = ''; linkEmail.value = user.value.email ?? ''
   } catch (e) { identityErr.value = errMsg(e) } finally { identityBusy.value = false }
 }
@@ -80,11 +82,11 @@ const sessions = ref<any[]>([]), sessBusy = ref(false), sessErr = ref(''), sessM
 const OS: [RegExp, string][] = [[/iPhone|iPad/, 'iOS'], [/Android/, 'Android'], [/Mac OS/, 'macOS'], [/Windows/, 'Windows'], [/Linux/, 'Linux']]
 const BROWSER: [RegExp, string][] = [[/Edg\//, 'Edge'], [/Chrome\//, 'Chrome'], [/Firefox\//, 'Firefox'], [/Safari\//, 'Safari']]
 function device(ua?: string | null) {
-  if (!ua) return '未知裝置'
+  if (!ua) return t('settings.sess.unknown')
   const pick = (t: [RegExp, string][]) => t.find(([r]) => r.test(ua))?.[1]
   return [pick(BROWSER), pick(OS)].filter(Boolean).join('・') || ua.slice(0, 60)
 }
-const when = (t: string) => new Date(t).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })
+const when = (d: string) => new Date(d).toLocaleString(locale.value === 'zh-Hant' ? 'zh-TW' : locale.value, { dateStyle: 'medium', timeStyle: 'short' })
 async function loadSessions() {
   try { sessions.value = (await api('/me/sessions')).data } catch (e) { sessErr.value = errMsg(e) }
 }
@@ -92,8 +94,8 @@ async function revokeSession(id?: string) {
   if (sessBusy.value) return
   sessBusy.value = true; sessErr.value = sessMsg.value = ''
   try {
-    if (id) { await api(`/me/sessions/${id}`, { method: 'DELETE' }); sessMsg.value = '已登出該裝置' }
-    else { const r = await api('/me/sessions', { method: 'DELETE' }); sessMsg.value = `已登出 ${r.revoked} 個其他裝置` }
+    if (id) { await api(`/me/sessions/${id}`, { method: 'DELETE' }); sessMsg.value = t('settings.sess.loggedOutOne') }
+    else { const r = await api('/me/sessions', { method: 'DELETE' }); sessMsg.value = t('settings.sess.loggedOutN', { n: r.revoked }) }
     await loadSessions()
   } catch (e) { sessErr.value = errMsg(e) } finally { sessBusy.value = false }
 }
@@ -104,7 +106,7 @@ async function changePassword() {
   pwBusy.value = true; pwErr.value = pwMsg.value = ''
   try {
     await api('/me/password', { method: 'POST', body: { current_password: curPw.value, new_password: newPw.value } })
-    curPw.value = newPw.value = ''; pwMsg.value = '密碼已變更，其他裝置已登出'
+    curPw.value = newPw.value = ''; pwMsg.value = t('settings.pw.changed')
     await loadSessions()
   } catch (e) { pwErr.value = errMsg(e) } finally { pwBusy.value = false }
 }
@@ -117,23 +119,23 @@ async function toggle(ev: Event) {
 }
 async function saveName() {
   msg.value = err.value = ''
-  try { user.value = await api('/me', { method: 'PATCH', body: { display_name: name.value.trim() } }); msg.value = '已儲存' }
+  try { user.value = await api('/me', { method: 'PATCH', body: { display_name: name.value.trim() } }); msg.value = t('settings.saved') }
   catch (e) { err.value = errMsg(e) }
 }
 async function saveSocial() {
   hMsg.value = hErr.value = ''
-  if (hBad.value) { hErr.value = '代號只能用小寫英文、數字、底線，3–30 字'; return }
+  if (hBad.value) { hErr.value = t('settings.social.handleBadErr'); return }
   const birthday = toBirthday(bMonth.value, bDay.value)
-  if (birthday === undefined) { hErr.value = '生日請同時選月和日，或都不選'; return }
+  if (birthday === undefined) { hErr.value = t('settings.social.birthdayErr'); return }
   try {
     user.value = await api('/me', { method: 'PATCH', body: {
       handle: handle.value || null, default_claim_visibility: dcv.value,
       bio: bio.value.trim() || null, birthday, birthday_visibility: bVis.value } })
     ;[bMonth.value = '', bDay.value = ''] = user.value.birthday?.split('-') ?? [] // 日被夾到月底時同步顯示
-    hMsg.value = '已儲存'
+    hMsg.value = t('settings.saved')
   } catch (e: any) { hErr.value = apiErrMsg(e) }
 }
-async function copyUrl() { try { await copyText(profileUrl.value); copied.value = true } catch { hErr.value = '無法複製，請手動選取網址' } }
+async function copyUrl() { try { await copyText(profileUrl.value); copied.value = true } catch { hErr.value = t('settings.social.copyFail') } }
 async function exportData() {
   exporting.value = true; err.value = ''
   try {
@@ -150,121 +152,121 @@ async function remove() {
     user.value = null
     await navigateTo('/')
   } catch (e: any) {
-    delErr.value = e.code === 'ACCOUNT_HAS_POINTS' ? `${e.detail}（可到「我的點數」撤回認捐）` : e.code === 'ACCOUNT_HAS_BALANCE' ? `${e.detail}（餘額 ${e.body.balance ?? 0} 點、未完成認捐 ${e.body.pledged_count ?? 0}、未結案訂單 ${e.body.open_order_count ?? 0}）請先處理後再刪除。` : errMsg(e)
+    delErr.value = e.code === 'ACCOUNT_HAS_POINTS' ? t('settings.del.hasPoints', { detail: e.detail }) : e.code === 'ACCOUNT_HAS_BALANCE' ? t('settings.del.hasBalance', { detail: e.detail, balance: e.body.balance ?? 0, pledged: e.body.pledged_count ?? 0, orders: e.body.open_order_count ?? 0 }) : errMsg(e)
   } finally { delBusy.value = false }
 }
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader title="帳號設定" back="/dashboard" />
+    <CreatorHeader :title="$t('settings.title')" back="/dashboard" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <template v-if="user">
       <section class="c-card">
-        <h2 class="c-h2">我的資料</h2>
-        <p class="c-mute">{{ user.email || '尚未綁定 Email' }}</p>
+        <h2 class="c-h2">{{ $t('settings.profile') }}</h2>
+        <p class="c-mute">{{ user.email || $t('settings.noEmail') }}</p>
         <form @submit.prevent="saveName">
-          <label class="c-field"><span>顯示名稱</span><input v-model="name" maxlength="40" required></label>
+          <label class="c-field"><span>{{ $t('settings.displayName') }}</span><input v-model="name" maxlength="40" required></label>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
-          <button class="c-btn">儲存</button>
+          <button class="c-btn">{{ $t('settings.save') }}</button>
         </form>
       </section>
       <section class="c-card" aria-labelledby="login-methods-title">
-        <h2 id="login-methods-title" class="c-h2">登入方式</h2>
-        <p class="c-mute">至少保留一種登入方式。已屬於其他帳號的方式無法直接綁定。</p>
+        <h2 id="login-methods-title" class="c-h2">{{ $t('settings.login.title') }}</h2>
+        <p class="c-mute">{{ $t('settings.login.hint') }}</p>
         <ul class="identity-list">
           <li v-for="p in providers" :key="p.provider" class="c-row">
-            <span class="c-grow">{{ p.label }} <small class="c-mute">{{ linked.has(p.provider) ? '已綁定' : '未綁定' }}</small></span>
-            <button v-if="linked.has(p.provider)" type="button" class="c-btn" :aria-label="`解除 ${p.label} 綁定`" :disabled="identityBusy || linked.size <= 1" @click="removingProvider = p.provider; identityErr = ''">解除綁定</button>
-            <button v-else-if="p.provider !== 'email'" type="button" class="c-btn" :disabled="identityBusy" @click="linkOAuth(p)">綁定 {{ p.label }}</button>
+            <span class="c-grow">{{ p.label }} <small class="c-mute">{{ linked.has(p.provider) ? $t('settings.login.linked') : $t('settings.login.unlinked') }}</small></span>
+            <button v-if="linked.has(p.provider)" type="button" class="c-btn" :aria-label="$t('settings.login.unlinkAria', { label: p.label })" :disabled="identityBusy || linked.size <= 1" @click="removingProvider = p.provider; identityErr = ''">{{ $t('settings.login.unlink') }}</button>
+            <button v-else-if="p.provider !== 'email'" type="button" class="c-btn" :disabled="identityBusy" @click="linkOAuth(p)">{{ $t('settings.login.link', { label: p.label }) }}</button>
           </li>
         </ul>
-        <p v-if="linked.size <= 1" class="c-mute">先新增另一種登入方式，才能解除目前的方式。</p>
+        <p v-if="linked.size <= 1" class="c-mute">{{ $t('settings.login.keepOne') }}</p>
         <form v-if="!linked.has('email')" @submit.prevent="sentEmail ? verifyLinkEmail() : sendLinkEmail()">
-          <label class="c-field"><span>綁定 Email</span><input v-model="linkEmail" type="email" autocomplete="email" maxlength="254" :disabled="!!sentEmail || identityBusy" required></label>
+          <label class="c-field"><span>{{ $t('settings.login.linkEmail') }}</span><input v-model="linkEmail" type="email" autocomplete="email" maxlength="254" :disabled="!!sentEmail || identityBusy" required></label>
           <template v-if="sentEmail">
-            <p class="c-mute">綁定驗證碼已寄到 {{ sentEmail }}</p>
+            <p class="c-mute">{{ $t('settings.login.codeSent', { email: sentEmail }) }}</p>
             <CreatorOtpInput ref="linkOtp" v-model="linkCode" @complete="verifyLinkEmail" />
-            <button class="c-btn primary block c-mb" :disabled="identityBusy || linkCode.length !== 6">{{ identityBusy ? '驗證中…' : '確認綁定 Email' }}</button>
-            <button type="button" class="c-btn" :disabled="identityBusy || cooldown > 0" @click="sendLinkEmail">{{ cooldown > 0 ? `${cooldown} 秒後可重新寄送` : '重新寄送' }}</button>
-            <button type="button" class="c-btn" :disabled="identityBusy" @click="changeLinkEmail">修改 Email</button>
+            <button class="c-btn primary block c-mb" :disabled="identityBusy || linkCode.length !== 6">{{ identityBusy ? $t('settings.login.verifying') : $t('settings.login.confirmEmail') }}</button>
+            <button type="button" class="c-btn" :disabled="identityBusy || cooldown > 0" @click="sendLinkEmail">{{ cooldown > 0 ? $t('settings.login.resendIn', { n: cooldown }) : $t('settings.login.resend') }}</button>
+            <button type="button" class="c-btn" :disabled="identityBusy" @click="changeLinkEmail">{{ $t('settings.login.changeEmail') }}</button>
           </template>
-          <button v-else class="c-btn primary block" :disabled="identityBusy">{{ identityBusy ? '寄送中…' : '寄送綁定驗證碼' }}</button>
+          <button v-else class="c-btn primary block" :disabled="identityBusy">{{ identityBusy ? $t('settings.login.sending') : $t('settings.login.sendCode') }}</button>
         </form>
-        <p v-if="user.email && !user.has_password" class="c-mute"><NuxtLink to="/forgot-password">設定 Email 登入密碼</NuxtLink>（以 Email 驗證碼設定，會登出所有裝置）</p>
-        <p v-else class="c-mute">尚未綁定 Email，無法收取通知信或使用密碼重設。</p>
+        <p v-if="user.email && !user.has_password" class="c-mute"><NuxtLink to="/forgot-password">{{ $t('settings.login.setPw') }}</NuxtLink>{{ $t('settings.login.setPwNote') }}</p>
+        <p v-else class="c-mute">{{ $t('settings.login.noEmailWarn') }}</p>
         <p v-if="identityErr && !removingProvider" class="c-err" role="alert">{{ identityErr }}</p>
         <p v-if="identityMsg" class="c-ok" role="status">{{ identityMsg }}</p>
       </section>
       <section v-if="user.has_password" class="c-card">
-        <h2 class="c-h2">變更密碼</h2>
+        <h2 class="c-h2">{{ $t('settings.pw.title') }}</h2>
         <form @submit.prevent="changePassword">
-          <CreatorPasswordField v-model="curPw" label="目前密碼" autocomplete="current-password" />
-          <CreatorPasswordField v-model="newPw" label="新密碼" autocomplete="new-password" hint="8–128 字元。變更後會登出其他裝置。" />
+          <CreatorPasswordField v-model="curPw" :label="$t('settings.pw.current')" autocomplete="current-password" />
+          <CreatorPasswordField v-model="newPw" :label="$t('settings.pw.new')" autocomplete="new-password" :hint="$t('settings.pw.hint')" />
           <p v-if="pwErr" class="c-err" role="alert">{{ pwErr }}</p>
           <p v-if="pwMsg" class="c-ok" role="status">{{ pwMsg }}</p>
-          <button class="c-btn" :disabled="pwBusy">{{ pwBusy ? '變更中…' : '變更密碼' }}</button>
+          <button class="c-btn" :disabled="pwBusy">{{ pwBusy ? $t('settings.pw.changing') : $t('settings.pw.title') }}</button>
         </form>
-        <p class="c-mute"><NuxtLink to="/forgot-password">忘記目前密碼？</NuxtLink></p>
+        <p class="c-mute"><NuxtLink to="/forgot-password">{{ $t('settings.pw.forgot') }}</NuxtLink></p>
       </section>
       <section class="c-card" aria-labelledby="sessions-title">
-        <h2 id="sessions-title" class="c-h2">登入裝置</h2>
+        <h2 id="sessions-title" class="c-h2">{{ $t('settings.sess.title') }}</h2>
         <ul class="identity-list">
           <li v-for="s in sessions" :key="s.id" class="c-row">
-            <span class="c-grow">{{ device(s.user_agent) }} <small v-if="s.current" class="c-badge">目前裝置</small><br>
-              <small class="c-mute">最後使用 {{ when(s.last_seen_at) }}<template v-if="s.ip">・{{ s.ip }}</template>・登入於 {{ when(s.created_at) }}</small></span>
-            <button v-if="!s.current" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession(s.id)">登出</button>
+            <span class="c-grow">{{ device(s.user_agent) }} <small v-if="s.current" class="c-badge">{{ $t('settings.sess.current') }}</small><br>
+              <small class="c-mute">{{ $t('settings.sess.lastUsed', { time: when(s.last_seen_at) }) }}<template v-if="s.ip">・{{ s.ip }}</template>{{ $t('settings.sess.signedInAt', { time: when(s.created_at) }) }}</small></span>
+            <button v-if="!s.current" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession(s.id)">{{ $t('settings.sess.logout') }}</button>
           </li>
         </ul>
-        <button v-if="sessions.length > 1" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession()">登出其他所有裝置</button>
+        <button v-if="sessions.length > 1" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession()">{{ $t('settings.sess.logoutOthers') }}</button>
         <p v-if="sessErr" class="c-err" role="alert">{{ sessErr }}</p>
         <p v-if="sessMsg" class="c-ok" role="status">{{ sessMsg }}</p>
       </section>
       <section class="c-card">
-        <h2 class="c-h2">個人頁與捐助</h2>
+        <h2 class="c-h2">{{ $t('settings.social.title') }}</h2>
         <form @submit.prevent="saveSocial">
-          <label class="c-field"><span>帳號代號（個人頁網址，可留空）</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" placeholder="例如：amy_wang"></label>
-          <p v-if="hBad" class="c-err" role="alert">小寫英文、數字、底線，3–30 字</p>
-          <p v-if="profileUrl" class="c-mute">你的個人頁：<NuxtLink :to="`/u/${user.handle}`">{{ profileUrl }}</NuxtLink> <button type="button" class="c-btn" @click="copyUrl">{{ copied ? '已複製' : '複製' }}</button></p>
-          <label class="c-field"><span>自我介紹（顯示在個人頁，可留空）</span><textarea v-model="bio" maxlength="160" rows="3" /></label>
-          <div class="c-field" role="group" aria-labelledby="bday-label"><span id="bday-label">生日（可留空，只記月日）</span>
+          <label class="c-field"><span>{{ $t('settings.social.handle') }}</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" :placeholder="$t('settings.social.handlePh')"></label>
+          <p v-if="hBad" class="c-err" role="alert">{{ $t('settings.social.handleBadHint') }}</p>
+          <p v-if="profileUrl" class="c-mute">{{ $t('settings.social.yourPage') }}<NuxtLink :to="`/u/${user.handle}`">{{ profileUrl }}</NuxtLink> <button type="button" class="c-btn" @click="copyUrl">{{ copied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
+          <label class="c-field"><span>{{ $t('settings.social.bio') }}</span><textarea v-model="bio" maxlength="160" rows="3" /></label>
+          <div class="c-field" role="group" aria-labelledby="bday-label"><span id="bday-label">{{ $t('settings.social.birthday') }}</span>
             <div class="c-row">
-              <select v-model="bMonth" aria-label="月"><option value="">月</option><option v-for="m in 12" :key="m" :value="pad(m)">{{ m }} 月</option></select>
-              <select v-model="bDay" aria-label="日"><option value="">日</option><option v-for="d in bDays" :key="d" :value="pad(d)">{{ d }} 日</option></select>
+              <select v-model="bMonth" :aria-label="$t('settings.social.monthAria')"><option value="">{{ $t('settings.social.monthOpt') }}</option><option v-for="m in 12" :key="m" :value="pad(m)">{{ $t('settings.social.monthN', { n: m }) }}</option></select>
+              <select v-model="bDay" :aria-label="$t('settings.social.dayAria')"><option value="">{{ $t('settings.social.dayOpt') }}</option><option v-for="d in bDays" :key="d" :value="pad(d)">{{ $t('settings.social.dayN', { n: d }) }}</option></select>
             </div>
           </div>
-          <label class="c-field"><span>生日誰看得到</span>
-            <select v-model="bVis"><option value="public">公開</option><option value="friends">僅好友</option><option value="private">只有自己</option></select>
+          <label class="c-field"><span>{{ $t('settings.social.birthdayVis') }}</span>
+            <select v-model="bVis"><option value="public">{{ $t('settings.vis.public') }}</option><option value="friends">{{ $t('settings.vis.friends') }}</option><option value="private">{{ $t('settings.social.onlyMe') }}</option></select>
           </label>
-          <label class="c-field"><span>捐助紀錄預設誰看得到</span>
-            <select v-model="dcv"><option value="public">公開</option><option value="friends">僅好友</option><option value="private">私人</option></select>
+          <label class="c-field"><span>{{ $t('settings.social.claimVis') }}</span>
+            <select v-model="dcv"><option value="public">{{ $t('settings.vis.public') }}</option><option value="friends">{{ $t('settings.vis.friends') }}</option><option value="private">{{ $t('settings.vis.private') }}</option></select>
           </label>
           <p v-if="hErr" class="c-err" role="alert">{{ hErr }}</p>
           <p v-if="hMsg" class="c-ok" role="status">{{ hMsg }}</p>
-          <button class="c-btn" :disabled="hBad">儲存</button>
+          <button class="c-btn" :disabled="hBad">{{ $t('settings.save') }}</button>
         </form>
       </section>
       <section class="c-card">
-        <h2 class="c-h2">通知</h2>
-        <label class="c-switch"><input type="checkbox" :checked="!!user.email && user.notification_prefs?.email_claims" :disabled="!user.email" @change="toggle"><span>有人捐助時寄 Email<br><small class="c-mute">第一筆即時通知，之後每日彙整一封。驚喜模式下只寫「有 N 件新捐助」。</small></span></label>
+        <h2 class="c-h2">{{ $t('settings.notif.title') }}</h2>
+        <label class="c-switch"><input type="checkbox" :checked="!!user.email && user.notification_prefs?.email_claims" :disabled="!user.email" @change="toggle"><span>{{ $t('settings.notif.label') }}<br><small class="c-mute">{{ $t('settings.notif.hint') }}</small></span></label>
       </section>
       <section class="c-card">
-        <h2 class="c-h2">匯出資料</h2>
-        <p class="c-mute">包含個人資料、清單與捐助紀錄（JSON）。</p>
-        <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? '匯出中…' : '匯出我的資料' }}</button>
+        <h2 class="c-h2">{{ $t('settings.export.title') }}</h2>
+        <p class="c-mute">{{ $t('settings.export.hint') }}</p>
+        <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? $t('settings.export.busy') : $t('settings.export.btn') }}</button>
       </section>
       <section class="c-card">
-        <button class="c-btn block" @click="logout">登出</button>
+        <button class="c-btn block" @click="logout">{{ $t('settings.logout') }}</button>
       </section>
       <section class="c-card bad">
-        <h2 class="c-h2">刪除帳號</h2>
-        <p class="c-mute">我們會移除你的 Email 與名稱，你的清單會封存並從公開移除。此動作無法復原。</p>
-        <button class="c-btn danger" @click="showDel = true; word = ''; delErr = ''">刪除我的帳號</button>
+        <h2 class="c-h2">{{ $t('settings.del.title') }}</h2>
+        <p class="c-mute">{{ $t('settings.del.text') }}</p>
+        <button class="c-btn danger" @click="showDel = true; word = ''; delErr = ''">{{ $t('settings.del.btn') }}</button>
       </section>
-      <p class="c-mute"><NuxtLink to="/terms">服務條款</NuxtLink>・<NuxtLink to="/privacy">隱私權政策</NuxtLink></p>
+      <p class="c-mute"><NuxtLink to="/terms">{{ $t('settings.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('settings.privacy') }}</NuxtLink></p>
     </template>
-    <CreatorConfirm :open="!!removingProvider" :title="`解除 ${removingLabel} 綁定？`" text="解除後會登出其他裝置，目前裝置保持登入。之後須使用其他已綁定的方式登入。沒有剩餘 Email 時無法收通知或重設密碼；日後重新驗證相同 Email 登入，仍可能自動連結回此帳號。" ok="解除綁定" danger :busy="identityBusy" :error="identityErr" @close="!identityBusy && (removingProvider = '')" @ok="unlinkIdentity" />
-    <CreatorConfirm :open="showDel" title="確定要刪除帳號嗎？" text="你的 Email、名稱與登入方式會被移除，清單會封存並從公開移除，朋友無法再開啟。" ok="永久刪除" danger :busy="delBusy" :disabled="word !== '刪除'" :error="delErr" @close="showDel = false" @ok="remove">
-      <label class="c-field"><span>請輸入「刪除」以確認</span><input v-model="word" autocomplete="off"></label>
+    <CreatorConfirm :open="!!removingProvider" :title="$t('settings.login.unlinkTitle', { label: removingLabel })" :text="$t('settings.login.unlinkText')" :ok="$t('settings.login.unlinkOk')" danger :busy="identityBusy" :error="identityErr" @close="!identityBusy && (removingProvider = '')" @ok="unlinkIdentity" />
+    <CreatorConfirm :open="showDel" :title="$t('settings.del.confirmTitle')" :text="$t('settings.del.confirmText')" :ok="$t('settings.del.ok')" danger :busy="delBusy" :disabled="word !== $t('settings.del.word')" :error="delErr" @close="showDel = false" @ok="remove">
+      <label class="c-field"><span>{{ $t('settings.del.prompt', { word: $t('settings.del.word') }) }}</span><input v-model="word" autocomplete="off"></label>
     </CreatorConfirm>
   </main>
 </template>

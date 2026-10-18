@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Cloudflare Turnstile（explicit render）；v-model 為 token。未設 siteKey（本機）不顯示；後端無 secret 時本來就不會要求驗證。
 const token = defineModel<string>({ default: '' })
+const { t, locale } = useI18n()
 const err = ref('')
 const siteKey = useRuntimeConfig().public.turnstileSiteKey as string
 const box = ref<HTMLElement>()
@@ -18,16 +19,16 @@ function load(): Promise<any> {
 onMounted(async () => {
   if (!siteKey) return
   try {
-    const t = await load()
+    const ts = await load()
     if (!box.value) return
-    wid = t.render(box.value, {
-      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: 'zh-tw',
+    wid = ts.render(box.value, {
+      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: ({ 'zh-Hant': 'zh-tw', en: 'en', vi: 'vi' } as Record<string, string>)[String(locale.value)] ?? 'auto',
       callback: (v: string) => { token.value = v; err.value = '' },
-      'expired-callback': () => { token.value = ''; err.value = '驗證已過期，請重新驗證' },
-      'timeout-callback': () => { token.value = ''; err.value = '驗證逾時，請重新驗證' },
-      'error-callback': () => { token.value = ''; err.value = '人機驗證發生錯誤，請重新驗證或稍後再試' },
+      'expired-callback': () => { token.value = ''; err.value = t('guest.turnstile.expired') },
+      'timeout-callback': () => { token.value = ''; err.value = t('guest.turnstile.timeout') },
+      'error-callback': () => { token.value = ''; err.value = t('guest.turnstile.error') },
     })
-  } catch { err.value = '無法載入人機驗證，請檢查網路後重試' }
+  } catch { err.value = t('guest.turnstile.loadFailRetry') }
 })
 onBeforeUnmount(() => { if (wid !== undefined) (window as any).turnstile?.remove(wid); wid = undefined })
 </script>

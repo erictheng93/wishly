@@ -2,7 +2,20 @@
 // 原生殼（Tauri）建置：NUXT_NATIVE=1 nuxt generate → 純 SPA 靜態檔（無 SSR、無 service worker、不走 Cloudflare preset）
 const native = !!process.env.NUXT_NATIVE
 
+// 語系檔依功能區拆開（i18n/locales/<語系>/<區>.json，檔內最外層 key 即區名），各區獨立維護
+const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal']
+const loc = (code: string, language: string, name: string) => ({ code, language, name, files: AREAS.map(a => `${code}/${a}.json`) })
+
 export default defineNuxtConfig({
+  modules: ['@nuxtjs/i18n'],
+  // 不加網址前綴（routeRules、分享連結 /s/[slug] 都維持原樣）；語言存 cookie ws_locale，首次依瀏覽器語言
+  i18n: {
+    strategy: 'no_prefix',
+    defaultLocale: 'zh-Hant',
+    locales: [loc('zh-Hant', 'zh-Hant-TW', '繁體中文'), loc('en', 'en', 'English'), loc('vi', 'vi', 'Tiếng Việt')],
+    langDir: 'locales',
+    detectBrowserLanguage: { useCookie: true, cookieKey: 'ws_locale', fallbackLocale: 'zh-Hant', redirectOn: 'root' },
+  },
   compatibilityDate: '2026-10-01',
   ssr: !native,
   nitro: { preset: native ? 'static' : 'cloudflare_pages' },
@@ -25,7 +38,6 @@ export default defineNuxtConfig({
   // PWA：手寫 manifest + public/sw.js（不用 @vite-pwa/nuxt，避免模組預設快取策略碰到即時資料與 SSR 分享頁）
   app: {
     head: {
-      htmlAttrs: { lang: 'zh-Hant-TW' },
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'theme-color', content: '#c8102e', media: '(prefers-color-scheme: light)' },

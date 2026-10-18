@@ -1,0 +1,118 @@
+{
+  "settings": {
+    "title": "Account settings",
+    "profile": "My details",
+    "noEmail": "No email linked yet",
+    "displayName": "Display name",
+    "saved": "Saved",
+    "save": "Save",
+    "login": {
+      "title": "Sign-in methods",
+      "hint": "Keep at least one sign-in method. A method that belongs to another account can't be linked directly.",
+      "linked": "Linked",
+      "unlinked": "Not linked",
+      "unlinkAria": "Unlink {label}",
+      "unlink": "Unlink",
+      "link": "Link {label}",
+      "keepOne": "Add another sign-in method before unlinking the current one.",
+      "linkEmail": "Link email",
+      "codeSent": "A verification code was sent to {email}",
+      "confirmEmail": "Confirm email link",
+      "verifying": "Verifying…",
+      "resendIn": "Resend in {n}s",
+      "resend": "Resend",
+      "changeEmail": "Change email",
+      "sending": "Sending…",
+      "sendCode": "Send verification code",
+      "setPw": "Set an email sign-in password",
+      "setPwNote": " (set with an email code; signs out all devices)",
+      "noEmailWarn": "No email linked, so you can't receive notification emails or reset your password.",
+      "err": {
+        "oauth_failed": "Linking failed. Please try again and check which account you are signing in with.",
+        "oauth_unavailable": "This sign-in method is not available yet.",
+        "identity_in_use": "This sign-in method or email already belongs to another account and can't be linked directly. Please sign in with the original account.",
+        "provider_already_linked": "This sign-in method is already linked. Unlink it first to change it."
+      },
+      "linkedMsg": "{label} linked",
+      "emailLinkedMsg": "Email linked. You can now receive notifications and set a password.",
+      "unlinkedMsg": "{label} unlinked",
+      "unlinkTitle": "Unlink {label}?",
+      "unlinkText": "Unlinking signs out your other devices; this device stays signed in. You will need another linked method to sign in. Without an email you can't receive notifications or reset your password. Signing in again by verifying the same email may link it back to this account automatically.",
+      "unlinkOk": "Unlink"
+    },
+    "pw": {
+      "title": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "hint": "8–128 characters. Other devices are signed out after the change.",
+      "changing": "Changing…",
+      "changed": "Password changed. Other devices have been signed out.",
+      "forgot": "Forgot your current password?"
+    },
+    "sess": {
+      "title": "Signed-in devices",
+      "unknown": "Unknown device",
+      "current": "This device",
+      "lastUsed": "Last used {time}",
+      "signedInAt": " · Signed in {time}",
+      "logout": "Sign out",
+      "logoutOthers": "Sign out all other devices",
+      "loggedOutOne": "That device has been signed out.",
+      "loggedOutN": "Signed out {n} other devices."
+    },
+    "social": {
+      "title": "Profile and pledges",
+      "handle": "Handle (used in your profile URL, optional)",
+      "handlePh": "e.g. amy_wang",
+      "handleBadHint": "Lowercase letters, digits and underscores, 3–30 characters",
+      "handleBadErr": "A handle can only use lowercase letters, digits and underscores, 3–30 characters.",
+      "yourPage": "Your profile: ",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFail": "Couldn't copy. Please select the URL manually.",
+      "bio": "Bio (shown on your profile, optional)",
+      "birthday": "Birthday (optional, month and day only)",
+      "monthAria": "Month",
+      "dayAria": "Day",
+      "monthOpt": "Month",
+      "dayOpt": "Day",
+      "monthN": "{n}",
+      "dayN": "{n}",
+      "birthdayErr": "Pick both month and day for your birthday, or neither.",
+      "birthdayVis": "Who can see your birthday",
+      "onlyMe": "Only me",
+      "claimVis": "Who can see your pledges by default"
+    },
+    "vis": {
+      "public": "Public",
+      "friends": "Friends only",
+      "private": "Private"
+    },
+    "notif": {
+      "title": "Notifications",
+      "label": "Email me when someone pledges",
+      "hint": "The first pledge is notified right away, then a daily digest. In surprise mode the email only says \"N new pledges\"."
+    },
+    "export": {
+      "title": "Export data",
+      "hint": "Includes your profile, lists and pledge history (JSON).",
+      "btn": "Export my data",
+      "busy": "Exporting…"
+    },
+    "logout": "Sign out",
+    "del": {
+      "title": "Delete account",
+      "text": "We will remove your email and name, and your lists will be archived and taken off public view. This can't be undone.",
+      "btn": "Delete my account",
+      "confirmTitle": "Delete your account?",
+      "confirmText": "Your email, name and sign-in methods will be removed, and your lists will be archived and taken off public view, so friends can no longer open them.",
+      "ok": "Delete permanently",
+      "word": "DELETE",
+      "prompt": "Type \"{word}\" to confirm",
+      "hasPoints": "{detail} (you can withdraw contributions in \"My points\")",
+      "hasBalance": "{detail} (balance {balance} points, {pledged} open contributions, {orders} open orders). Please resolve these before deleting."
+    },
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy"
+  }
+}

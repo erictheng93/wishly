@@ -4,9 +4,10 @@ import '~/assets/guest.css'
 // 由父層 v-if 掛載即開啟；dirty 時 Esc / 點背景要二次確認，避免丟掉已輸入內容。
 const props = defineProps<{ labelledby: string, dirty?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
+const { t } = useI18n()
 const el = ref<HTMLDialogElement>()
 let opener: HTMLElement | null = null
-const leave = () => !props.dirty || confirm('放棄已輸入的內容？')
+const leave = () => !props.dirty || confirm(t('guest.discardConfirm'))
 onBeforeMount(() => { opener = document.activeElement as HTMLElement | null })
 onMounted(() => {
   el.value!.showModal()

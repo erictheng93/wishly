@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
-useHead({ title: '編輯清單' })
+const { t } = useI18n()
+useHead({ title: () => t('lists.edit.pageTitle') })
 const route = useRoute()
 const id = route.params.id as string
 const { api } = useApi()
@@ -40,11 +41,11 @@ const shareUrl = computed(() => {
 })
 function openItem(i: any = null) { editing.value = i; sheet.value = true }
 async function saved() { sheet.value = false; await load(true) }
-async function patchList(body: any, ok = '已儲存') {
+async function patchList(body: any, ok = t('lists.edit.saved')) {
   msg.value = ''; err.value = ''; stale.value = false
   try { w.value = await api(`/wishlists/${id}`, { method: 'PATCH', body: { ...body, expected_updated_at: w.value?.updated_at } }); msg.value = ok; return true }
   catch (e: any) {
-    if (e.code === 'STALE_VERSION') { stale.value = true; err.value = '這份清單已在其他地方被修改，請重新載入'; return false }
+    if (e.code === 'STALE_VERSION') { stale.value = true; err.value = t('lists.edit.errStale'); return false }
     err.value = errMsg(e)
     if (e.code === 'WISHLIST_NOT_PUBLISHABLE') {
       pubErrs.value = (e.errors || []).map((x: any) => x.detail)
@@ -63,14 +64,14 @@ async function saveMeta() {
 }
 async function publish() {
   pubBusy.value = true; pubErrs.value = []
-  if (await patchList({ status: 'active' }, '已發佈')) showShare.value = true
+  if (await patchList({ status: 'active' }, t('lists.edit.published'))) showShare.value = true
   pubBusy.value = false
 }
 async function remove(force = false) {
   delBusy.value = true; delErr.value = ''
   try { await api(`/items/${del.value.id}`, { method: 'DELETE', query: force ? { force: true } : {} }); del.value = null; await load(true) }
   catch (e: any) {
-    if (e.code === 'ITEM_HAS_CLAIMS' && !force) delErr.value = '此品項已有捐助。若仍要刪除，捐助將一併取消，請再按一次確認。'
+    if (e.code === 'ITEM_HAS_CLAIMS' && !force) delErr.value = t('lists.edit.errHasClaims')
     else delErr.value = errMsg(e)
     if (e.code === 'ITEM_HAS_CLAIMS') del.value.force = true
   } finally { delBusy.value = false }
@@ -88,94 +89,95 @@ async function copy() {
   catch { (document.getElementById('c-share-input') as HTMLInputElement)?.select() }
 }
 const lineHref = computed(() => `https://line.me/R/share?text=${encodeURIComponent(`${w.value?.title ?? ''} ${shareUrl.value}`)}`)
+const prio = (p: string) => ['high', 'medium', 'low'].includes(p) ? t(`lists.edit.pri.${p}`) : ''
 const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value.status))
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader :title="w?.title || '編輯清單'" back="/dashboard">
+    <CreatorHeader :title="w?.title || $t('lists.edit.pageTitle')" back="/dashboard">
       <CreatorStatusBadge v-if="w" :v="w.status" />
-      <NuxtLink :to="`/lists/${id}/progress`" class="c-btn">進度</NuxtLink>
+      <NuxtLink :to="`/lists/${id}/progress`" class="c-btn">{{ $t('lists.common.progress') }}</NuxtLink>
     </CreatorHeader>
-    <p v-if="loading" class="c-mute" role="status">載入中…</p>
-    <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ stale ? '重新載入' : '重試' }}</button></p>
+    <p v-if="loading" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
+    <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ stale ? $t('lists.common.reload') : $t('lists.common.retry') }}</button></p>
     <template v-if="w">
-      <div v-if="hidden" class="c-card bad c-err" role="alert">這份清單已被下架{{ w.moderation_reason ? `。原因：${w.moderation_reason}` : '' }}。分享已停用，若有誤判請聯絡客服申訴。</div>
-      <p v-if="closed" class="c-mute">清單已{{ w.status === 'closed' ? '結束' : '封存' }}，品項無法修改。</p>
+      <div v-if="hidden" class="c-card bad c-err" role="alert">{{ $t('lists.edit.hidden', { reason: w.moderation_reason ? $t('lists.common.reasonSuffix', { reason: w.moderation_reason }) : '' }) }}</div>
+      <p v-if="closed" class="c-mute">{{ $t('lists.edit.closedMsg', { state: w.status === 'closed' ? $t('lists.edit.stateClosed') : $t('lists.edit.stateArchived') }) }}</p>
       <ul v-if="pubErrs.length" class="c-err"><li v-for="x in pubErrs" :key="x">{{ x }}</li></ul>
 
       <div class="c-split"><div>
-      <p v-if="!items.length && !loading" class="c-center c-mute">還沒有品項，先新增第一個吧</p>
+      <p v-if="!items.length && !loading" class="c-center c-mute">{{ $t('lists.edit.noItems') }}</p>
       <div class="c-grid">
       <article v-for="(i, k) in items" :key="i.id" class="c-card">
         <div class="c-row">
           <img v-if="i.image_url" class="c-thumb" :src="i.image_url" alt="">
-          <div v-else class="c-thumb">{{ i.image_status === 'pending' ? '處理中' : '無圖' }}</div>
+          <div v-else class="c-thumb">{{ i.image_status === 'pending' ? $t('lists.edit.processing') : $t('creator.image.none') }}</div>
           <div class="c-grow">
             <strong>{{ i.title }}</strong>
-            <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">心願眾籌 {{ fmtPts(i.pledged_points) }} / {{ fmtPts(i.target_points) }} 點<template v-if="i.funding_deadline">・至 {{ fmtTime(i.funding_deadline) }}</template>・優先度{{ { high: '高', medium: '中', low: '低' }[i.priority as string] || '' }}</div>
-            <div v-else class="c-mute">需要 {{ i.qty_needed }}・數量捐助・優先度{{ { high: '高', medium: '中', low: '低' }[i.priority as string] || '' }}</div>
+            <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">{{ $t('lists.edit.crowdLine', { pledged: fmtPts(i.pledged_points), target: fmtPts(i.target_points) }) }}<template v-if="i.funding_deadline">{{ $t('lists.edit.until', { time: fmtTime(i.funding_deadline) }) }}</template>{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
+            <div v-else class="c-mute">{{ $t('lists.edit.qtyLine', { n: i.qty_needed }) }}{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
             <CreatorStatusBadge v-if="i.image_status === 'pending' || i.image_status === 'rejected'" :v="i.image_status" />
-            <div v-if="i.image_status === 'rejected'" class="c-err">圖片未通過，請換一張</div>
+            <div v-if="i.image_status === 'rejected'" class="c-err">{{ $t('lists.edit.imgRejected') }}</div>
           </div>
         </div>
         <div v-if="!closed" class="c-row wrap c-mt">
-          <button class="c-btn" :disabled="k === 0" aria-label="上移" @click="move(k, -1)">↑</button>
-          <button class="c-btn" :disabled="k === items.length - 1" aria-label="下移" @click="move(k, 1)">↓</button>
-          <button class="c-btn c-grow" @click="openItem(i)">編輯</button>
-          <button class="c-btn danger" @click="del = { ...i }; delErr = ''">刪除</button>
+          <button class="c-btn" :disabled="k === 0" :aria-label="$t('lists.edit.up')" @click="move(k, -1)">↑</button>
+          <button class="c-btn" :disabled="k === items.length - 1" :aria-label="$t('lists.edit.down')" @click="move(k, 1)">↓</button>
+          <button class="c-btn c-grow" @click="openItem(i)">{{ $t('lists.common.edit') }}</button>
+          <button class="c-btn danger" @click="del = { ...i }; delErr = ''">{{ $t('lists.edit.delete') }}</button>
         </div>
       </article>
       </div>
-      <button v-if="!closed" class="c-btn block c-mb16" @click="openItem()">＋ 新增品項</button>
+      <button v-if="!closed" class="c-btn block c-mb16" @click="openItem()">{{ $t('lists.edit.addItem') }}</button>
       </div>
       <aside>
 
       <details ref="addrEl" class="c-card" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
-        <summary>收件資訊（心願眾籌用）<span v-if="w.has_shipping_address" class="c-badge active">已填寫</span></summary>
+        <summary>{{ $t('lists.edit.shipSummary') }}<span v-if="w.has_shipping_address" class="c-badge active">{{ $t('lists.edit.filled') }}</span></summary>
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
 
       <details class="c-card">
-        <summary>清單設定</summary>
+        <summary>{{ $t('lists.edit.settings') }}</summary>
         <form class="c-mt12" @submit.prevent="saveMeta">
-          <label class="c-field"><span>清單名稱</span><input v-model="meta.title" maxlength="100" required></label>
-          <label class="c-field"><span>說明</span><textarea v-model="meta.description" rows="2" /></label>
-          <label class="c-field"><span>活動日</span><input v-model="meta.event_date" type="date"></label>
-          <label class="c-field"><span>自動結束時間（選填，留空＝不設期限）</span><input v-model="meta.closes_at" type="datetime-local"></label>
-          <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>顯示捐助者暱稱給其他訪客</span></label>
+          <label class="c-field"><span>{{ $t('lists.edit.name') }}</span><input v-model="meta.title" maxlength="100" required></label>
+          <label class="c-field"><span>{{ $t('lists.edit.desc') }}</span><textarea v-model="meta.description" rows="2" /></label>
+          <label class="c-field"><span>{{ $t('lists.edit.event') }}</span><input v-model="meta.event_date" type="date"></label>
+          <label class="c-field"><span>{{ $t('lists.edit.closes') }}</span><input v-model="meta.closes_at" type="datetime-local"></label>
+          <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
           <CreatorVisibilityPicker v-model:visibility="meta.visibility" v-model:users="allowed" />
-          <p class="c-mute">驚喜模式：{{ w.surprise_mode ? (w.surprise_locked ? '開啟中（鎖定至活動日，無法關閉）' : '開啟中（已解鎖）') : '未開啟' }}</p>
+          <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
-          <button class="c-btn block">儲存設定</button>
+          <button class="c-btn block">{{ $t('lists.edit.saveSettings') }}</button>
         </form>
         <div class="c-row c-mt">
-          <button v-if="w.status === 'active'" class="c-btn c-grow" @click="patchList({ status: 'closed' }, '清單已結束')">結束清單</button>
-          <button v-if="w.status === 'closed'" class="c-btn c-grow" @click="patchList({ status: 'active' }, '已重新開放')">重新開放</button>
+          <button v-if="w.status === 'active'" class="c-btn c-grow" @click="patchList({ status: 'closed' }, $t('lists.edit.ended'))">{{ $t('lists.edit.endList') }}</button>
+          <button v-if="w.status === 'closed'" class="c-btn c-grow" @click="patchList({ status: 'active' }, $t('lists.edit.reopened'))">{{ $t('lists.edit.reopen') }}</button>
         </div>
       </details>
       </aside></div>
 
       <div class="c-bottom"><div>
-        <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? '發佈中…' : '發佈並分享' }}</button>
-        <button v-else class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">分享</button>
+        <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? $t('lists.edit.publishing') : $t('lists.edit.publish') }}</button>
+        <button v-else class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
       </div></div>
     </template>
 
     <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
-    <CreatorConfirm :open="!!del" title="刪除品項" :text="`確定刪除「${del?.title}」？`" :ok="del?.force ? '連同捐助一併刪除' : '刪除'" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
-    <CreatorSheet :open="showShare" title="分享你的清單" @close="showShare = false">
-      <p v-if="w?.status === 'draft'" class="c-err">尚未發佈，朋友打開會看到不存在。</p>
+    <CreatorConfirm :open="!!del" :title="$t('lists.edit.delTitle')" :text="$t('lists.edit.delText', { title: del?.title })" :ok="del?.force ? $t('lists.edit.delForce') : $t('lists.edit.delOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
+    <CreatorSheet :open="showShare" :title="$t('lists.edit.shareTitle')" @close="showShare = false">
+      <p v-if="w?.status === 'draft'" class="c-err">{{ $t('lists.edit.draftWarn') }}</p>
       <p class="c-mute">{{ visDesc(w?.visibility) }}</p>
       <input id="c-share-input" class="c-input c-mb" :value="shareUrl" readonly @focus="($event.target as HTMLInputElement).select()">
-      <label class="c-switch"><input v-model="external" type="checkbox"><span>連結加上 openExternalBrowser=1（在 LINE 內改用預設瀏覽器開啟）</span></label>
+      <label class="c-switch"><input v-model="external" type="checkbox"><span>{{ $t('lists.edit.external') }}</span></label>
       <div class="c-row wrap">
-        <button class="c-btn c-grow" @click="copy">{{ copied ? '已複製 ✓' : '複製連結' }}</button>
-        <a class="c-btn c-grow" :href="lineHref" target="_blank" rel="noopener">用 LINE 傳</a>
-        <a class="c-btn c-grow" :href="`sms:?&body=${encodeURIComponent(shareUrl)}`">簡訊</a>
+        <button class="c-btn c-grow" @click="copy">{{ copied ? $t('lists.edit.copied') : $t('lists.edit.copy') }}</button>
+        <a class="c-btn c-grow" :href="lineHref" target="_blank" rel="noopener">{{ $t('lists.edit.line') }}</a>
+        <a class="c-btn c-grow" :href="`sms:?&body=${encodeURIComponent(shareUrl)}`">{{ $t('lists.edit.sms') }}</a>
         <a class="c-btn c-grow" :href="`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`" target="_blank" rel="noopener">Facebook</a>
       </div>
       <CreatorQr :text="shareUrl" :size="180" />
-      <button class="c-btn block c-mt" @click="showShare = false">關閉</button>
+      <button class="c-btn block c-mt" @click="showShare = false">{{ $t('lists.common.close') }}</button>
     </CreatorSheet>
   </main>
 </template>

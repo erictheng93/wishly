@@ -1,0 +1,21 @@
+{
+  "errors": {
+    "reportRate": "Báo cáo quá nhanh, vui lòng thử lại sau.",
+    "turnstile": "Xác minh không phải robot không thành công hoặc đã hết hạn, vui lòng xác minh lại trước khi gửi.",
+    "network": "Kết nối không ổn định, vui lòng thử lại.",
+    "removed": "Danh sách này đã bị gỡ.",
+    "unauthorized": "Phiên của bạn đã hết hạn. Hãy tải lại trang rồi thử lại; để tìm lại khoản đóng góp trước đó, hãy dùng liên kết trong email xác nhận.",
+    "handleTaken": "Tên định danh này đã được dùng, hãy thử tên khác.",
+    "selfInvite": "Đây là liên kết mời của chính bạn, hãy chia sẻ cho bạn bè.",
+    "loginRequired": "Vui lòng đăng nhập để xem danh sách này.",
+    "friendsOnly": "Danh sách này chỉ mở cho bạn bè của chủ sở hữu.",
+    "notAllowed": "Chủ sở hữu chưa cho phép bạn xem danh sách này.",
+    "notFriend": "Chỉ có thể chọn những người đã là bạn bè.",
+    "rate": "Thao tác quá nhanh, vui lòng thử lại sau.",
+    "maintenance": "Hệ thống đang bảo trì, vui lòng thử lại sau.",
+    "claimGone": "Khoản đóng góp này không còn tồn tại.",
+    "itemGone": "Món quà này không còn tồn tại, vui lòng tải lại trang.",
+    "server": "Hệ thống tạm thời gặp sự cố, vui lòng thử lại sau.",
+    "generic": "Đã xảy ra lỗi, vui lòng thử lại sau."
+  }
+}

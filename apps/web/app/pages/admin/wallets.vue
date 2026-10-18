@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'staff' })
-useHead({ title: '點數錢包' })
+const { t } = useI18n()
+useHead({ title: () => t('admin.wallets.title') })
 const { api } = useApi()
 const q = ref(''), rows = ref<ReturnType<typeof normWalletRow>[]>([]), done = ref(false)
 const err = ref(''), msg = ref(''), status = ref(''), cursor = ref<string | null>(null), busy = ref(false)
@@ -33,10 +34,10 @@ async function grant() {
   try {
     const r = await api('/admin/wallets/grants', { method: 'POST', headers: { 'Idempotency-Key': gKey.value }, body: { user_id: target.value.user_id, points: Number(g.points), reason: g.reason.trim() } })
     Object.assign(target.value, { balance: r.wallet.balance, status: r.wallet.status ?? target.value.status, wallet_id: r.wallet.id ?? target.value.wallet_id })
-    msg.value = `已${Number(g.points) > 0 ? '發放' : '扣除'} ${fmtPts(Math.abs(Number(g.points)))} 點，${target.value.display_name} 目前餘額 ${fmtPts(r.wallet.balance)} 點`
+    msg.value = t(Number(g.points) > 0 ? 'admin.wallets.grantDone' : 'admin.wallets.deductDone', { points: fmtPts(Math.abs(Number(g.points))), name: target.value.display_name, balance: fmtPts(r.wallet.balance) })
     gAsk.value = false; target.value = null
   } catch (e: any) {
-    gErr.value = e.code === 'INSUFFICIENT_POINTS' ? `扣點後會變成負數（目前餘額 ${fmtPts(e.body?.balance)} 點）` : errMsg(e)
+    gErr.value = e.code === 'INSUFFICIENT_POINTS' ? t('admin.wallets.insufficient', { balance: fmtPts(e.body?.balance) }) : errMsg(e)
     gAsk.value = false
     if (e.code !== 'NETWORK') gKey.value = crypto.randomUUID()
   } finally { gBusy.value = false }
@@ -50,45 +51,45 @@ async function setStatus() {
   try {
     const r = await api(`/admin/wallets/${fz.value.wallet_id}`, { method: 'PATCH', body: { status: to, reason: fzReason.value.trim() } })
     fz.value.status = r.status ?? r.wallet?.status ?? to
-    msg.value = `${fz.value.display_name} 的錢包已${to === 'frozen' ? '凍結' : '解凍'}`; fz.value = null
+    msg.value = t(to === 'frozen' ? 'admin.wallets.frozenDone' : 'admin.wallets.unfrozenDone', { name: fz.value.display_name }); fz.value = null
   } catch (e) { fzErr.value = errMsg(e) } finally { fzBusy.value = false }
 }
 </script>
 <template>
   <main class="c-page c-admin">
-    <CreatorHeader title="點數錢包" back="/admin" />
-    <form class="c-row c-mb" @submit.prevent="search()"><input v-model="q" class="c-grow c-input" placeholder="Email 或顯示名稱" aria-label="搜尋使用者" :disabled="busy"><button class="c-btn primary" :disabled="busy">{{ busy ? '搜尋中…' : '搜尋' }}</button></form>
-    <label class="c-field c-narrow"><span>錢包狀態</span><select v-model="status" :disabled="busy"><option value="">全部</option><option value="active">正常</option><option value="frozen">已凍結</option><option value="none">未建立錢包</option></select></label>
+    <CreatorHeader :title="$t('admin.wallets.title')" back="/admin" />
+    <form class="c-row c-mb" @submit.prevent="search()"><input v-model="q" class="c-grow c-input" :placeholder="$t('admin.wallets.placeholder')" :aria-label="$t('admin.wallets.searchLabel')" :disabled="busy"><button class="c-btn primary" :disabled="busy">{{ busy ? $t('admin.wallets.searching') : $t('admin.wallets.search') }}</button></form>
+    <label class="c-field c-narrow"><span>{{ $t('admin.wallets.status') }}</span><select v-model="status" :disabled="busy"><option value="">{{ $t('admin.wallets.all') }}</option><option value="active">{{ $t('admin.wallets.active') }}</option><option value="frozen">{{ $t('admin.wallets.frozen') }}</option><option value="none">{{ $t('admin.wallets.none') }}</option></select></label>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
-    <p v-if="done && !rows.length" class="c-center c-mute">沒有符合的使用者</p>
+    <p v-if="done && !rows.length" class="c-center c-mute">{{ $t('admin.wallets.empty') }}</p>
     <article v-for="r in rows" :key="r.user_id" class="c-card" :class="{ bad: r.status === 'frozen' }">
-      <div class="c-row"><strong class="c-grow">{{ r.display_name }}</strong><span v-if="r.status === 'frozen'" class="c-badge frozen">已凍結</span></div>
+      <div class="c-row"><strong class="c-grow">{{ r.display_name }}</strong><span v-if="r.status === 'frozen'" class="c-badge frozen">{{ $t('admin.wallets.frozen') }}</span></div>
       <div class="c-mute">{{ r.email }}</div>
-      <div>餘額 <b>{{ fmtPts(r.balance) }}</b> 點</div>
+      <div>{{ $t('admin.wallets.balance') }} <b>{{ fmtPts(r.balance) }}</b> {{ $t('admin.wallets.pts') }}</div>
       <div class="c-row wrap c-mt">
-        <button class="c-btn primary c-grow" @click="ask(r)">發點 / 扣點</button>
-        <button v-if="r.wallet_id" class="c-btn c-grow" :class="{ danger: r.status !== 'frozen' }" @click="fz = r; fzReason = ''; fzErr = ''">{{ r.status === 'frozen' ? '解凍' : '凍結' }}</button>
+        <button class="c-btn primary c-grow" @click="ask(r)">{{ $t('admin.wallets.grant') }}</button>
+        <button v-if="r.wallet_id" class="c-btn c-grow" :class="{ danger: r.status !== 'frozen' }" @click="fz = r; fzReason = ''; fzErr = ''">{{ r.status === 'frozen' ? $t('admin.wallets.unfreeze') : $t('admin.wallets.freeze') }}</button>
       </div>
     </article>
 
-    <button v-if="cursor" class="c-btn block" :disabled="busy" @click="search(true)">載入更多錢包</button>
-    <CreatorSheet :open="!!target" title="發點 / 扣點" @close="target = null">
-      <p>對象：<strong>{{ target?.display_name }}</strong>（{{ target?.email }}）　目前餘額 {{ fmtPts(target?.balance) }} 點</p>
+    <button v-if="cursor" class="c-btn block" :disabled="busy" @click="search(true)">{{ $t('admin.wallets.loadMore') }}</button>
+    <CreatorSheet :open="!!target" :title="$t('admin.wallets.grant')" @close="target = null">
+      <p>{{ $t('admin.wallets.target') }}<strong>{{ target?.display_name }}</strong>（{{ target?.email }}）　{{ $t('admin.wallets.currentBalance', { balance: fmtPts(target?.balance) }) }}</p>
       <form @submit.prevent="confirmGrant">
-        <label class="c-field"><span>點數（正數發放、負數扣除，單次 ±1,000,000 以內）</span><input v-model="g.points" type="number" inputmode="numeric" step="1" required></label>
-        <label class="c-field"><span>原因（必填，會寫入帳本與稽核紀錄）</span><input v-model="g.reason" maxlength="200" required></label>
+        <label class="c-field"><span>{{ $t('admin.wallets.pointsLabel') }}</span><input v-model="g.points" type="number" inputmode="numeric" step="1" required></label>
+        <label class="c-field"><span>{{ $t('admin.wallets.reasonLabel') }}</span><input v-model="g.reason" maxlength="200" required></label>
         <p v-if="gErr" class="c-err" role="alert">{{ gErr }}</p>
         <div class="c-row">
-          <button type="button" class="c-btn c-grow" @click="target = null">取消</button>
-          <button class="c-btn primary c-grow">下一步</button>
+          <button type="button" class="c-btn c-grow" @click="target = null">{{ $t('admin.wallets.cancel') }}</button>
+          <button class="c-btn primary c-grow">{{ $t('admin.wallets.next') }}</button>
         </div>
       </form>
     </CreatorSheet>
-    <CreatorConfirm :open="gAsk" :title="Number(g.points) > 0 ? '確認發點' : '確認扣點'" :text="`${Number(g.points) > 0 ? '發放' : '扣除'} ${fmtPts(Math.abs(Number(g.points)))} 點給 ${target?.display_name}，原因：${g.reason}`" :ok="Number(g.points) > 0 ? '確認發放' : '確認扣除'" :danger="Number(g.points) < 0" :busy="gBusy" @close="gAsk = false" @ok="grant" />
-    <CreatorConfirm :open="!!fz" :title="fz?.status === 'frozen' ? '解凍錢包' : '凍結錢包'" :text="`${fz?.display_name}（${fz?.email}）`" :ok="fz?.status === 'frozen' ? '解凍' : '凍結'" :danger="fz?.status !== 'frozen'" :busy="fzBusy" :disabled="!fzReason.trim()" :error="fzErr" @close="fz = null" @ok="setStatus">
-      <label class="c-field"><span>原因（必填）</span><input v-model="fzReason" maxlength="200"></label>
-      <p v-if="fz?.status !== 'frozen'" class="c-mute c-small">凍結後該使用者無法再贊助；既有認捐不受影響。</p>
+    <CreatorConfirm :open="gAsk" :title="Number(g.points) > 0 ? $t('admin.wallets.confirmGrant') : $t('admin.wallets.confirmDeduct')" :text="$t(Number(g.points) > 0 ? 'admin.wallets.grantText' : 'admin.wallets.deductText', { points: fmtPts(Math.abs(Number(g.points))), name: target?.display_name, reason: g.reason })" :ok="Number(g.points) > 0 ? $t('admin.wallets.okGrant') : $t('admin.wallets.okDeduct')" :danger="Number(g.points) < 0" :busy="gBusy" @close="gAsk = false" @ok="grant" />
+    <CreatorConfirm :open="!!fz" :title="fz?.status === 'frozen' ? $t('admin.wallets.unfreezeTitle') : $t('admin.wallets.freezeTitle')" :text="`${fz?.display_name}（${fz?.email}）`" :ok="fz?.status === 'frozen' ? $t('admin.wallets.unfreeze') : $t('admin.wallets.freeze')" :danger="fz?.status !== 'frozen'" :busy="fzBusy" :disabled="!fzReason.trim()" :error="fzErr" @close="fz = null" @ok="setStatus">
+      <label class="c-field"><span>{{ $t('admin.wallets.fzReason') }}</span><input v-model="fzReason" maxlength="200"></label>
+      <p v-if="fz?.status !== 'frozen'" class="c-mute c-small">{{ $t('admin.wallets.freezeNote') }}</p>
     </CreatorConfirm>
   </main>
 </template>

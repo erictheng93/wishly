@@ -1,5 +1,11 @@
 // P2-A 心願眾籌：純函式（文案對應、時間格式、錯誤歸因、表單轉換），可單元測試
-export const DISPLAY_STATUS: Record<string, string> = { open: '募集中', funded: '已達標', ordered: '已下單', shipped: '運送中', delivered: '已送達', expired: '已截止' }
+const T = (k: string, p?: Record<string, any>) => useNuxtApp().$i18n.t(k, p ?? {})
+/** 目前語系對應的 Intl locale（zh-Hant→zh-TW） */
+export const intlLocale = (): string => ({ 'zh-Hant': 'zh-TW', en: 'en', vi: 'vi' } as Record<string, string>)[String(useNuxtApp().$i18n.locale.value)] ?? 'zh-TW'
+// 文案對照表：值用 getter 延遲到讀取時才翻譯（語系依請求而定，不能在模組載入時求值）；仍是可列舉的一般物件，spread / v-for 可用
+const lazyMap = (prefix: string, keys: string[]): Record<string, string> =>
+  Object.defineProperties({}, Object.fromEntries(keys.map(k => [k, { enumerable: true, get: () => T(`${prefix}.${k}`) }])))
+export const DISPLAY_STATUS = lazyMap('guest.status', ['open', 'funded', 'ordered', 'shipped', 'delivered', 'expired'])
 export const displayStatusLabel = (s?: string | null) => (s && DISPLAY_STATUS[s]) || ''
 
 /** 優先用後端的 display_status；沒有時（例如 dashboard 只回 funding_status）用 funding_status + 採購單狀態推導 */
@@ -12,14 +18,15 @@ export function deriveDisplayStatus(item: { display_status?: string | null, fund
   return null
 }
 
-export const CONTRIBUTION_STATUS: Record<string, string> = { pledged: '已認捐', captured: '已達標扣用', released: '已退回', reallocated: '已轉投' }
-export const LEDGER_TYPE: Record<string, string> = { grant: '平台發放', pledge: '認捐', release: '退回', refund: '差額退回', adjustment: '調整' }
-export const ORDER_STATUS: Record<string, string> = { pending: '待下單', placed: '已下單', shipped: '運送中', delivered: '已送達', failed: '失敗', cancelled: '已取消' }
+export const CONTRIBUTION_STATUS = lazyMap('guest.contribStatus', ['pledged', 'captured', 'released', 'reallocated'])
+export const LEDGER_TYPE = lazyMap('guest.ledger', ['grant', 'pledge', 'release', 'refund', 'adjustment'])
+export const ORDER_STATUS = lazyMap('guest.order', ['pending', 'placed', 'shipped', 'delivered', 'failed', 'cancelled'])
 export const label = (m: Record<string, string>, k?: string | null) => (k && m[k]) || k || ''
 
-const tf = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-/** zh-TW、Asia/Taipei，例如 2026/10/08 13:10 */
-export const fmtTime = (iso?: string | null) => (iso ? tf.format(new Date(iso)).replace(/\s/g, ' ') : '') // ICU 可能用不換行空白分隔日期與時間
+const tfs: Record<string, Intl.DateTimeFormat> = {}
+const tf = (loc: string) => (tfs[loc] ??= new Intl.DateTimeFormat(loc, { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }))
+/** 依目前語系、Asia/Taipei，zh-TW 例如 2026/10/08 13:10 */
+export const fmtTime = (iso?: string | null) => (iso ? tf(intlLocale()).format(new Date(iso)).replace(/\s/g, ' ') : '') // ICU 可能用不換行空白分隔日期與時間
 export const fmtPts = (n?: number | null) => (n == null ? '–' : n.toLocaleString('en-US'))
 
 /** 公開頁 SSE item.updated 合併進卡片。眾籌品項用 pledged/target 重算進度，數量品項維持原算法 */
@@ -33,22 +40,22 @@ export function mergeItemEvent(i: any, d: any) {
 }
 
 /** 贊助失敗 → 文案；points 表示要把輸入框改成這個值 */
-export function contributionErr(code: string, body: any = {}, fallback = '贊助失敗，請稍後再試'): { msg: string, points?: number, wallet?: boolean } {
+export function contributionErr(code: string, body: any = {}, fallback = T('guest.contribErr.fallback')): { msg: string, points?: number, wallet?: boolean } {
   switch (code) {
-    case 'INSUFFICIENT_POINTS': return { msg: `點數不足（目前餘額 ${fmtPts(body.balance ?? 0)} 點）`, wallet: true }
+    case 'INSUFFICIENT_POINTS': return { msg: T('guest.contribErr.insufficient', { n: fmtPts(body.balance ?? 0) }), wallet: true }
     case 'CROWDFUND_TARGET_EXCEEDED': {
       const r = Number(body.remaining_points ?? 0)
-      return r > 0 ? { msg: `只差 ${fmtPts(r)} 點就達標了，已幫你調整金額，確認後再送出一次`, points: r } : { msg: '這個品項剛剛已經募集完成了，謝謝你的心意' }
+      return r > 0 ? { msg: T('guest.contribErr.almost', { n: fmtPts(r) }), points: r } : { msg: T('guest.contribErr.funded') }
     }
-    case 'ITEM_FUNDED': return { msg: '這個品項剛剛已經募集完成了，謝謝你的心意' }
-    case 'FUNDING_EXPIRED': return { msg: '這個品項的募集期限已過，無法再贊助' }
-    case 'WALLET_FROZEN': return { msg: '你的點數錢包已被凍結，暫時無法贊助，請聯絡客服' }
-    case 'WISHLIST_CLOSED': return { msg: '這份清單已結束，無法再贊助' }
-    case 'WISHLIST_REMOVED': return { msg: '這份清單已被下架' }
-    case 'FUNDING_MODE_MISMATCH': return { msg: '這個品項不是心願眾籌，請改用「我要送」' }
-    case 'IDEMPOTENCY_CONFLICT': return { msg: '請求重複，請關閉後重新操作' }
-    case 'RATE_LIMITED': return { msg: '操作太頻繁，請稍後再試' }
-    case 'NETWORK': return { msg: '網路不穩，再試一次' }
+    case 'ITEM_FUNDED': return { msg: T('guest.contribErr.funded') }
+    case 'FUNDING_EXPIRED': return { msg: T('guest.contribErr.expired') }
+    case 'WALLET_FROZEN': return { msg: T('guest.contribErr.frozen') }
+    case 'WISHLIST_CLOSED': return { msg: T('guest.contribErr.closed') }
+    case 'WISHLIST_REMOVED': return { msg: T('guest.contribErr.removed') }
+    case 'FUNDING_MODE_MISMATCH': return { msg: T('guest.contribErr.mismatch') }
+    case 'IDEMPOTENCY_CONFLICT': return { msg: T('guest.dupRequest') }
+    case 'RATE_LIMITED': return { msg: T('guest.contribErr.rate') }
+    case 'NETWORK': return { msg: T('guest.contribErr.network') }
     default: return { msg: fallback }
   }
 }
@@ -67,14 +74,14 @@ export interface OrderForm { merchant_order_id: string, amount: string | number,
 export function buildOrderPatch(to: string, f: OrderForm, target: number | null): { body?: any, error?: string } {
   if (to === 'placed') {
     const amount = Number(f.amount)
-    if (!f.merchant_order_id.trim()) return { error: '請填訂單編號' }
-    if (f.amount === '' || !Number.isInteger(amount) || amount <= 0) return { error: '請填實際金額（正整數）' }
-    if (target != null && amount > target) return { error: `實際金額不可超過目標 ${fmtPts(target)}，超過請改標為失敗` }
+    if (!f.merchant_order_id.trim()) return { error: T('guest.orderErr.orderNo') }
+    if (f.amount === '' || !Number.isInteger(amount) || amount <= 0) return { error: T('guest.orderErr.amount') }
+    if (target != null && amount > target) return { error: T('guest.orderErr.over', { n: fmtPts(target) }) }
     return { body: { status: to, merchant_order_id: f.merchant_order_id.trim(), amount } }
   }
   if (to === 'shipped') return { body: { status: to, ...(f.tracking_no.trim() ? { tracking_no: f.tracking_no.trim() } : {}) } }
   if (to === 'failed' || to === 'cancelled') {
-    if (!f.failure_reason.trim()) return { error: '請填原因' }
+    if (!f.failure_reason.trim()) return { error: T('guest.reasonRequired') }
     return { body: { status: to, failure_reason: f.failure_reason.trim() } }
   }
   return { body: { status: to } }
@@ -83,9 +90,9 @@ export function buildOrderPatch(to: string, f: OrderForm, target: number | null)
 // --- 後台錢包 ---
 export function grantError(points: string | number, reason: string): string {
   const n = Number(points)
-  if (points === '' || !Number.isInteger(n) || n === 0) return '點數需為非 0 的整數（扣點用負數）'
-  if (Math.abs(n) > 1_000_000) return '單次上限 1,000,000 點'
-  if (!reason.trim()) return '請填原因'
+  if (points === '' || !Number.isInteger(n) || n === 0) return T('guest.grantErr.points')
+  if (Math.abs(n) > 1_000_000) return T('guest.grantErr.max')
+  if (!reason.trim()) return T('guest.reasonRequired')
   return ''
 }
 /** /admin/wallets 列：同時容忍巢狀（user + wallet）與扁平兩種 shape */

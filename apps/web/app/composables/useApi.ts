@@ -4,9 +4,10 @@ export class CreatorApiError extends Error {
 }
 
 export function errMsg(e: any): string {
-  if (!(e instanceof CreatorApiError)) return '發生未知錯誤，請稍後再試'
-  if (e.code === 'READ_ONLY_MODE') return '系統維護中，稍後再試'
-  if (e.code === 'NETWORK') return '連線失敗，請檢查網路後再試'
+  const t = useNuxtApp().$i18n.t
+  if (!(e instanceof CreatorApiError)) return t('auth.api.unknown')
+  if (e.code === 'READ_ONLY_MODE') return t('auth.api.readOnly')
+  if (e.code === 'NETWORK') return t('auth.api.network')
   if (e.errors.length) return e.errors.map((x: any) => x.detail).join('；')
   return e.detail
 }
@@ -15,13 +16,14 @@ export function useApi() {
   const router = useRouter()
   const base = useRuntimeConfig().public.apiBase.replace(/\/$/, '') + '/api/v1'
   async function api<T = any>(path: string, opts: any = {}): Promise<T> {
+    const t = useNuxtApp().$i18n.t
     const { noRedirect, ...rest } = opts
     try {
-      return await $fetch(path, { baseURL: base, credentials: 'include', ...rest, headers: { ...nativeHeaders(), ...rest.headers } }) as T
+      return await $fetch(path, { baseURL: base, credentials: 'include', ...rest, headers: { 'Accept-Language': useNuxtApp().$i18n.locale.value === 'zh-Hant' ? 'zh-TW' : useNuxtApp().$i18n.locale.value, ...nativeHeaders(), ...rest.headers } }) as T
     } catch (e: any) {
       const status = e.statusCode || e.status || 0
       const d = e.data && typeof e.data === 'object' ? e.data : {}
-      const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || '連線失敗，請稍後再試', d.errors || [], d)
+      const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || t('auth.api.connFail'), d.errors || [], d)
       const blocked = err.code === 'ACCOUNT_BLOCKED'
       if (import.meta.client && (blocked || (err.code === 'UNAUTHORIZED' && !noRedirect))) {
         useState('auth-user').value = null

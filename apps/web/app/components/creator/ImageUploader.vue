@@ -3,6 +3,7 @@
 const props = defineProps<{ purpose: 'cover' | 'item'; modelValue?: string | null; currentUrl?: string | null }>()
 const emit = defineEmits<{ 'update:modelValue': [string | null]; busy: [boolean] }>()
 const { api } = useApi()
+const { t } = useI18n()
 const MAX = 5 * 1024 * 1024
 const preview = ref<string | null>(null)
 const state = ref<'idle' | 'uploading' | 'done' | 'fail'>('idle')
@@ -23,24 +24,24 @@ async function shrink(f: File): Promise<Blob> {
 }
 async function upload(f: File) {
   last.value = f; msg.value = ''
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) { state.value = 'fail'; msg.value = '圖片限 JPG、PNG、WebP'; return }
-  if (f.size > MAX * 4) { state.value = 'fail'; msg.value = '圖片需在 5 MB 以內'; return }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) { state.value = 'fail'; msg.value = t('creator.image.typeError'); return }
+  if (f.size > MAX * 4) { state.value = 'fail'; msg.value = t('creator.image.tooBig'); return }
   state.value = 'uploading'; emit('busy', true)
   try {
     const blob = await shrink(f)
-    if (blob.size > MAX) throw new Error('圖片需在 5 MB 以內')
+    if (blob.size > MAX) throw new Error(t('creator.image.tooBig'))
     const p = await api('/uploads/presign', { method: 'POST', body: { purpose: props.purpose, content_type: blob.type, content_length: blob.size } })
     const headers: Record<string, string> = {}
     for (const [k, v] of Object.entries(p.headers || {})) if (k.toLowerCase() !== 'content-length') headers[k] = v as string
     const r = await fetch(p.upload_url, { method: p.method || 'PUT', headers, body: blob })
-    if (!r.ok) throw new Error('上傳失敗')
+    if (!r.ok) throw new Error(t('creator.image.uploadFail'))
     await api('/uploads/confirm', { method: 'POST', body: { object_key: p.object_key } }) // 後端去 EXIF 並寫入公開 key
     if (preview.value) URL.revokeObjectURL(preview.value)
     preview.value = URL.createObjectURL(blob)
     emit('update:modelValue', p.object_key)
     state.value = 'done'
   } catch (e: any) {
-    state.value = 'fail'; msg.value = e instanceof CreatorApiError ? errMsg(e) : e.message || '上傳失敗'
+    state.value = 'fail'; msg.value = e instanceof CreatorApiError ? errMsg(e) : e.message || t('creator.image.uploadFail')
   } finally { emit('busy', false) }
 }
 function pick(ev: Event) {
@@ -50,20 +51,20 @@ function pick(ev: Event) {
 </script>
 <template>
   <div class="c-field">
-    <span>{{ purpose === 'cover' ? '封面圖片（選填）' : '圖片（選填）' }}</span>
+    <span>{{ purpose === 'cover' ? $t('creator.image.cover') : $t('creator.image.item') }}</span>
     <div class="c-row">
       <img v-if="preview || currentUrl" class="c-thumb" :src="preview || currentUrl!" alt="">
-      <div v-else class="c-thumb">無圖</div>
+      <div v-else class="c-thumb">{{ $t('creator.image.none') }}</div>
       <div class="c-grow">
         <label class="c-btn c-file" :aria-disabled="state === 'uploading'">
-          選擇圖片
+          {{ $t('creator.image.pick') }}
           <input type="file" accept="image/jpeg,image/png,image/webp" :disabled="state === 'uploading'" @change="pick">
         </label>
-        <div v-if="state === 'uploading'" class="c-mute" role="status">上傳中…</div>
-        <div v-else-if="state === 'done'" class="c-ok">已上傳，圖片處理完成後才會公開顯示</div>
-        <div v-else-if="state === 'fail'" class="c-err" role="alert">{{ msg }} <button v-if="last" type="button" class="c-btn" @click="upload(last)">重新上傳</button></div>
+        <div v-if="state === 'uploading'" class="c-mute" role="status">{{ $t('creator.image.uploading') }}</div>
+        <div v-else-if="state === 'done'" class="c-ok">{{ $t('creator.image.done') }}</div>
+        <div v-else-if="state === 'fail'" class="c-err" role="alert">{{ msg }} <button v-if="last" type="button" class="c-btn" @click="upload(last)">{{ $t('creator.image.retry') }}</button></div>
       </div>
     </div>
-    <p class="c-mute">限 JPG、PNG、WebP，5 MB 以內。上傳後會移除位置等隱藏資訊（EXIF），請勿上傳含個人資料的照片。</p>
+    <p class="c-mute">{{ $t('creator.image.hint') }}</p>
   </div>
 </template>

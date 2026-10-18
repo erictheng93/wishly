@@ -8,8 +8,8 @@ defineEmits<{ close: []; ok: [] }>()
     <p v-if="error" class="c-err" role="alert">{{ error }}</p>
     <slot />
     <div class="c-row">
-      <button type="button" class="c-btn c-grow" @click="$emit('close')">取消</button>
-      <button type="button" class="c-btn c-grow" :class="danger ? 'danger' : 'primary'" :disabled="busy || disabled" @click="$emit('ok')">{{ busy ? '處理中…' : ok || '確認' }}</button>
+      <button type="button" class="c-btn c-grow" @click="$emit('close')">{{ $t('creator.confirm.cancel') }}</button>
+      <button type="button" class="c-btn c-grow" :class="danger ? 'danger' : 'primary'" :disabled="busy || disabled" @click="$emit('ok')">{{ busy ? $t('creator.confirm.busy') : ok || $t('creator.confirm.ok') }}</button>
     </div>
   </CreatorSheet>
 </template>

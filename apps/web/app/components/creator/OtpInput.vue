@@ -25,7 +25,7 @@ function onKey(i: number, ev: KeyboardEvent) {
 defineExpose({ focus: () => cells.value[0]?.focus() })
 </script>
 <template>
-  <div class="c-otp" role="group" aria-label="6 位數驗證碼">
-    <input v-for="i in 6" :key="i" :ref="(el) => (cells[i - 1] = el as HTMLInputElement)" :value="digit(i - 1)" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :aria-label="`第 ${i} 碼`" @input="onInput(i - 1, $event)" @keydown="onKey(i - 1, $event)">
+  <div class="c-otp" role="group" :aria-label="$t('creator.otp.group')">
+    <input v-for="i in 6" :key="i" :ref="(el) => (cells[i - 1] = el as HTMLInputElement)" :value="digit(i - 1)" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :aria-label="$t('creator.otp.cell', { n: i })" @input="onInput(i - 1, $event)" @keydown="onKey(i - 1, $event)">
   </div>
 </template>

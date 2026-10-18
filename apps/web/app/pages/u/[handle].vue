@@ -5,9 +5,11 @@ const { api, base } = useApi()
 const { user, fetchMe } = useAuth()
 const p = ref<any>(null), state = ref<'loading' | 'ok' | 'gone' | 'error'>('loading')
 const busy = ref(false), err = ref('')
-const vis: Record<string, string> = { public: '公開', friends: '僅好友', selected: '指定好友', link: '連結' }
-const status: Record<string, string> = { reserved: '已捐助', purchased: '已購買', delivered: '已送達', ...CONTRIBUTION_STATUS }
-useHead(() => ({ title: p.value ? `${p.value.user.display_name} 的心願` : '個人頁', meta: [{ name: 'robots', content: 'noindex' }] }))
+const { t, locale } = useI18n()
+const visLabel = (v: string) => (['public', 'friends', 'selected', 'link'].includes(v) ? t(`me.profile.vis.${v}`) : v)
+const statusLabel = (s: string) => CONTRIBUTION_STATUS[s] ?? (['reserved', 'purchased', 'delivered'].includes(s) ? t(`me.claims.status.${s}`) : s)
+const dateLocale = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
+useHead(() => ({ title: p.value ? t('me.profile.title', { name: p.value.user.display_name }) : t('me.profile.page'), meta: [{ name: 'robots', content: 'noindex' }] }))
 
 // 匿名也要能看：不走 useApi 的 401 轉址，直接帶 cookie 呼叫
 async function load() {
@@ -30,53 +32,53 @@ const accept = () => run(async () => {
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader :title="p ? p.user.display_name : '個人頁'" back="/friends" />
-    <p v-if="state === 'loading'" class="c-mute" role="status">載入中…</p>
-    <div v-else-if="state === 'gone'" class="c-center"><p>找不到這位使用者。</p></div>
-    <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">讀取失敗，請稍後再試</p><button class="c-btn" @click="load">重試</button></div>
+    <CreatorHeader :title="p ? p.user.display_name : $t('me.profile.page')" back="/friends" />
+    <p v-if="state === 'loading'" class="c-mute" role="status">{{ $t('me.loading') }}</p>
+    <div v-else-if="state === 'gone'" class="c-center"><p>{{ $t('me.profile.gone') }}</p></div>
+    <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></div>
     <template v-else>
       <section class="c-card">
         <h2 class="c-h2">{{ p.user.display_name }}</h2>
-        <p class="c-mute">@{{ p.user.handle }}<template v-if="p.user.birthday">・生日 {{ formatBirthday(p.user.birthday) }}</template></p>
+        <p class="c-mute">@{{ p.user.handle }}<template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
         <p v-if="p.user.bio" style="white-space:pre-line">{{ p.user.bio }}</p>
         <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-        <NuxtLink v-if="p.relation === 'self'" to="/settings" class="c-btn">編輯個人設定</NuxtLink>
-        <span v-else-if="p.relation === 'friend'" class="c-badge active">好友</span>
-        <span v-else-if="p.relation === 'outgoing'" class="c-badge">已送出邀請</span>
-        <button v-else-if="p.relation === 'incoming'" class="c-btn primary" :disabled="busy" @click="accept">接受好友邀請</button>
-        <button v-else-if="p.relation === 'none'" class="c-btn primary" :disabled="busy" @click="add">送出好友邀請</button>
-        <NuxtLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="c-btn primary">登入以加好友</NuxtLink>
+        <NuxtLink v-if="p.relation === 'self'" to="/settings" class="c-btn">{{ $t('me.profile.editSettings') }}</NuxtLink>
+        <span v-else-if="p.relation === 'friend'" class="c-badge active">{{ $t('me.profile.friend') }}</span>
+        <span v-else-if="p.relation === 'outgoing'" class="c-badge">{{ $t('me.profile.requestSent') }}</span>
+        <button v-else-if="p.relation === 'incoming'" class="c-btn primary" :disabled="busy" @click="accept">{{ $t('me.profile.acceptRequest') }}</button>
+        <button v-else-if="p.relation === 'none'" class="c-btn primary" :disabled="busy" @click="add">{{ $t('me.profile.addFriend') }}</button>
+        <NuxtLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="c-btn primary">{{ $t('me.profile.loginToAdd') }}</NuxtLink>
       </section>
 
       <section>
-        <h2 class="c-h2">心願清單</h2>
-        <p v-if="!p.wishlists.length" class="c-mute">目前沒有可看的清單。</p>
+        <h2 class="c-h2">{{ $t('me.profile.lists') }}</h2>
+        <p v-if="!p.wishlists.length" class="c-mute">{{ $t('me.profile.noLists') }}</p>
         <article v-for="w in p.wishlists" :key="w.slug" class="c-card">
           <div class="c-row">
             <img v-if="w.cover_image_url" class="c-thumb" :src="w.cover_image_url" alt="">
             <div class="c-grow">
               <NuxtLink :to="`/s/${w.slug}`"><strong>{{ w.title }}</strong></NuxtLink>
               <div class="c-row wrap">
-                <span class="c-badge">{{ vis[w.visibility] ?? w.visibility }}</span>
-                <span v-if="w.status === 'closed'" class="c-badge">已結束</span>
-                <span class="c-mute">{{ w.type === 'registry' ? '禮物登記' : '個人心願' }}</span>
+                <span class="c-badge">{{ visLabel(w.visibility) }}</span>
+                <span v-if="w.status === 'closed'" class="c-badge">{{ $t('me.profile.closed') }}</span>
+                <span class="c-mute">{{ w.type === 'registry' ? $t('me.profile.registry') : $t('me.profile.personal') }}</span>
               </div>
-              <div class="c-mute">完成度 {{ w.completion_pct ?? 0 }}%（{{ w.item_count }} 件）</div>
+              <div class="c-mute">{{ $t('me.profile.completion', { pct: w.completion_pct ?? 0, n: w.item_count }) }}</div>
             </div>
           </div>
         </article>
       </section>
 
       <section>
-        <h2 class="c-h2">捐助紀錄</h2>
-        <p v-if="!p.donations.length" class="c-mute">目前沒有可看的捐助紀錄。</p>
+        <h2 class="c-h2">{{ $t('me.profile.donations') }}</h2>
+        <p v-if="!p.donations.length" class="c-mute">{{ $t('me.profile.noDonations') }}</p>
         <article v-for="(d, i) in p.donations" :key="i" class="c-card">
-          <strong>{{ d.item_title }}{{ d.kind === 'pledge' ? `・${d.points} 點` : ` × ${d.qty}` }}</strong>
-          <span class="c-badge">{{ status[d.status] ?? d.status }}</span>
+          <strong>{{ d.item_title }}{{ d.kind === 'pledge' ? $t('me.profile.pledgePts', { pts: d.points }) : $t('me.profile.qty', { qty: d.qty }) }}</strong>
+          <span class="c-badge">{{ statusLabel(d.status) }}</span>
           <div class="c-mute">
-            送給 {{ d.wishlist.owner.display_name }}・
+            {{ $t('me.profile.to', { name: d.wishlist.owner.display_name }) }}
             <NuxtLink v-if="d.wishlist.slug" :to="`/s/${d.wishlist.slug}`">{{ d.wishlist.title }}</NuxtLink><template v-else>{{ d.wishlist.title }}</template>
-            ・{{ new Date(d.created_at).toLocaleDateString('zh-TW') }}
+            ・{{ new Date(d.created_at).toLocaleDateString(dateLocale) }}
           </div>
         </article>
       </section>

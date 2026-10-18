@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
-useHead({ title: '我的清單' })
+const { t } = useI18n()
+useHead({ title: () => t('lists.dashboard.title') })
 const { api } = useApi()
 const { user } = useAuth()
 const list = ref<any[]>([])
@@ -25,16 +26,16 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader title="我的清單">
-      <NuxtLink v-if="user?.is_staff" to="/admin" class="c-btn c-nav-dup">後台</NuxtLink>
-      <NuxtLink to="/me/wallet" class="c-btn c-nav-dup">點數</NuxtLink>
-      <NuxtLink to="/settings" class="c-btn c-nav-dup" aria-label="設定">設定</NuxtLink>
+    <CreatorHeader :title="$t('lists.dashboard.title')">
+      <NuxtLink v-if="user?.is_staff" to="/admin" class="c-btn c-nav-dup">{{ $t('common.admin') }}</NuxtLink>
+      <NuxtLink to="/me/wallet" class="c-btn c-nav-dup">{{ $t('common.points') }}</NuxtLink>
+      <NuxtLink to="/settings" class="c-btn c-nav-dup" :aria-label="$t('common.settings')">{{ $t('common.settings') }}</NuxtLink>
     </CreatorHeader>
-    <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">重試</button></p>
-    <p v-else-if="loading && !list.length" class="c-mute" role="status">載入中…</p>
+    <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('lists.common.retry') }}</button></p>
+    <p v-else-if="loading && !list.length" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
     <div v-else-if="!visible.length" class="c-center">
-      <p class="c-mute">還沒有清單，建立第一份吧</p>
-      <NuxtLink to="/lists/new" class="c-btn primary">＋ 建立清單</NuxtLink>
+      <p class="c-mute">{{ $t('lists.dashboard.empty') }}</p>
+      <NuxtLink to="/lists/new" class="c-btn primary">{{ $t('lists.dashboard.create') }}</NuxtLink>
     </div>
     <div class="c-grid">
     <article v-for="w in visible" :key="w.id" class="c-card" :class="{ bad: w.moderation_status === 'hidden' }">
@@ -44,23 +45,23 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
           <NuxtLink :to="`/lists/${w.id}/edit`"><strong>{{ w.title }}</strong></NuxtLink>
           <div class="c-row wrap">
             <CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" />
-            <span class="c-mute">{{ w.type === 'registry' ? '禮物登記' : '個人心願' }}</span>
+            <span class="c-mute">{{ w.type === 'registry' ? $t('lists.common.registry') : $t('lists.common.personal') }}</span>
           </div>
-          <div class="c-mute">完成度 {{ w.completion?.completion_pct ?? 0 }}%（{{ w.completion?.fulfilled_count ?? 0 }} / {{ w.completion?.item_count ?? 0 }}）</div>
+          <div class="c-mute">{{ $t('lists.dashboard.completion', { pct: w.completion?.completion_pct ?? 0, done: w.completion?.fulfilled_count ?? 0, total: w.completion?.item_count ?? 0 }) }}</div>
         </div>
       </div>
       <div v-if="w.moderation_status === 'hidden'" class="c-err" role="alert">
-        這份清單已被下架{{ w.moderation_reason ? `。原因：${w.moderation_reason}` : '' }}。公開頁目前無法瀏覽，分享已停用。若有誤判請聯絡客服申訴。
+        {{ $t('lists.dashboard.hidden', { reason: w.moderation_reason ? $t('lists.common.reasonSuffix', { reason: w.moderation_reason }) : '' }) }}
       </div>
       <div class="c-row c-mt">
-        <NuxtLink :to="`/lists/${w.id}/edit`" class="c-btn c-grow">編輯</NuxtLink>
-        <NuxtLink :to="`/lists/${w.id}/progress`" class="c-btn c-grow">進度</NuxtLink>
-        <button class="c-btn danger" @click="del = w; delErr = ''">封存</button>
+        <NuxtLink :to="`/lists/${w.id}/edit`" class="c-btn c-grow">{{ $t('lists.common.edit') }}</NuxtLink>
+        <NuxtLink :to="`/lists/${w.id}/progress`" class="c-btn c-grow">{{ $t('lists.common.progress') }}</NuxtLink>
+        <button class="c-btn danger" @click="del = w; delErr = ''">{{ $t('lists.dashboard.archive') }}</button>
       </div>
     </article>
     </div>
-    <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">載入更多</button>
-    <NuxtLink v-if="visible.length" to="/lists/new" class="c-btn primary c-fab">＋ 新建</NuxtLink>
-    <CreatorConfirm :open="!!del" title="封存清單" :text="`封存「${del?.title}」後，公開頁會立即失效，朋友無法再開啟（既有捐助仍保留）。`" ok="確認封存" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
+    <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">{{ $t('lists.dashboard.loadMore') }}</button>
+    <NuxtLink v-if="visible.length" to="/lists/new" class="c-btn primary c-fab">{{ $t('lists.dashboard.newFab') }}</NuxtLink>
+    <CreatorConfirm :open="!!del" :title="$t('lists.dashboard.archiveTitle')" :text="$t('lists.dashboard.archiveText', { title: del?.title })" :ok="$t('lists.dashboard.archiveOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
   </main>
 </template>

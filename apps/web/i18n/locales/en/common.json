@@ -1,0 +1,22 @@
+{
+  "common": {
+    "language": "Language",
+    "explore": "Explore",
+    "myClaims": "My pledges",
+    "back": "Back",
+    "profile": "Profile",
+    "friends": "Friends",
+    "mainMenu": "Main menu",
+    "myLists": "My lists",
+    "points": "Points",
+    "settings": "Settings",
+    "admin": "Admin",
+    "theme": {
+      "auto": "Auto",
+      "light": "Light",
+      "dark": "Dark",
+      "label": "Theme: {mode} (tap to switch)",
+      "title": "Theme: {mode}"
+    }
+  }
+}

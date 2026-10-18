@@ -1,5 +1,6 @@
 <script setup lang="ts">
-useHead({ title: '忘記密碼' })
+const i18n = useI18n()
+useHead({ title: () => i18n.t('auth.forgot.title') })
 const { requestReset, confirmReset } = useAuth()
 const step = ref<'email' | 'reset'>('email')
 const email = ref(''), password = ref(''), code = ref('')
@@ -19,43 +20,43 @@ async function send() {
     challengeId.value = r.challenge_id || ''; needCaptcha.value = false; tsToken.value = ''
     step.value = 'reset'; tick(r.resend_after || 60)
   } catch (e: any) {
-    if (e.code === 'CAPTCHA_REQUIRED') { needCaptcha.value = true; tsToken.value = ''; capKey.value++; err.value = '請先完成人機驗證' }
-    else err.value = e.status === 429 ? '請求過於頻繁，請稍後再試' : errMsg(e)
+    if (e.code === 'CAPTCHA_REQUIRED') { needCaptcha.value = true; tsToken.value = ''; capKey.value++; err.value = i18n.t('auth.forgot.captcha') }
+    else err.value = e.status === 429 ? i18n.t('auth.forgot.rate') : errMsg(e)
   } finally { busy.value = false }
 }
 async function confirm() {
   err.value = ''
-  if (code.value.length < 6) { err.value = '請輸入 6 位數驗證碼'; return }
-  if (password.value.length < 8) { err.value = '新密碼至少需 8 個字元'; return }
+  if (code.value.length < 6) { err.value = i18n.t('auth.forgot.codeLen'); return }
+  if (password.value.length < 8) { err.value = i18n.t('auth.forgot.pwShort'); return }
   busy.value = true
   try {
     await confirmReset(email.value.trim(), code.value, password.value, challengeId.value || undefined)
     await navigateTo({ path: '/login', query: { reset: '1' } })
   } catch (e: any) {
-    err.value = e.code === 'OTP_INVALID' ? '驗證碼不正確或已過期，請再試一次' : e.status === 429 ? '嘗試次數過多，請稍後再試' : errMsg(e)
+    err.value = e.code === 'OTP_INVALID' ? i18n.t('auth.forgot.otpInvalid') : e.status === 429 ? i18n.t('auth.forgot.tooMany') : errMsg(e)
   } finally { busy.value = false }
 }
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader title="忘記密碼" back="/login" />
+    <CreatorHeader :title="$t('auth.forgot.title')" back="/login" />
     <form v-if="step === 'email'" @submit.prevent="send">
       <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
       <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-      <button class="c-btn primary block" :disabled="busy">{{ busy ? '寄送中…' : '寄送驗證碼' }}</button>
+      <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.forgot.sending') : $t('auth.forgot.sendCode') }}</button>
     </form>
     <form v-else @submit.prevent="confirm">
-      <p class="c-ok" role="status">若帳號存在，已寄出驗證碼</p>
-      <span class="c-lbl">驗證碼</span>
+      <p class="c-ok" role="status">{{ $t('auth.forgot.sentNote') }}</p>
+      <span class="c-lbl">{{ $t('auth.forgot.code') }}</span>
       <CreatorOtpInput ref="otp" v-model="code" />
-      <CreatorPasswordField v-model="password" label="新密碼" autocomplete="new-password" hint="至少 8 個字元，最多 128 個字元" />
+      <CreatorPasswordField v-model="password" :label="$t('auth.forgot.newPassword')" autocomplete="new-password" :hint="$t('auth.forgot.pwHint')" />
       <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-      <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? '重設中…' : '重設密碼' }}</button>
+      <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? $t('auth.forgot.resetting') : $t('auth.forgot.reset') }}</button>
       <p class="c-center c-mute">
-        <button v-if="wait <= 0" type="button" class="c-btn" :disabled="busy" @click="send">重新寄送</button>
-        <span v-else>{{ wait }} 秒後可重新寄送</span>
+        <button v-if="wait <= 0" type="button" class="c-btn" :disabled="busy" @click="send">{{ $t('auth.forgot.resend') }}</button>
+        <span v-else>{{ $t('auth.forgot.resendIn', { n: wait }) }}</span>
       </p>
     </form>
   </main>

@@ -49,4 +49,4 @@ export function createLiveRefresh(o: LiveOpts) {
   return { start, stop }
 }
 
-export const liveLabel = (m: LiveMode) => m === 'live' ? '即時更新中' : m === 'polling' ? '定時更新' : '連線中…'
+export const liveLabel = (m: LiveMode) => useNuxtApp().$i18n.t(`guest.live.${m}`)

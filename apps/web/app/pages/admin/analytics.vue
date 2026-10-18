@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'staff' })
-useHead({ title: '數據分析' })
+const { t } = useI18n()
+useHead({ title: () => t('admin.analytics.title') })
 const { api } = useApi()
 const RANGES = [7, 30, 90, 365]
 const days = ref(30)
@@ -17,11 +18,11 @@ onMounted(load)
 const TILES = computed(() => {
   const d = data.value
   return d ? [
-    ['使用者', d.totals.users], ['訪客', d.totals.guests], ['清單', d.totals.wishlists], ['好友關係', d.totals.friendships],
-    ['今天活躍', d.active.d1], ['近 7 天活躍', d.active.d7], ['近 30 天活躍', d.active.d30],
+    [t('admin.analytics.tile.users'), d.totals.users], [t('admin.analytics.tile.guests'), d.totals.guests], [t('admin.analytics.tile.wishlists'), d.totals.wishlists], [t('admin.analytics.tile.friendships'), d.totals.friendships],
+    [t('admin.analytics.tile.d1'), d.active.d1], [t('admin.analytics.tile.d7'), d.active.d7], [t('admin.analytics.tile.d30'), d.active.d30],
   ] as [string, number][] : []
 })
-const METRICS = [['active_users', '活躍使用者'], ['signups', '註冊'], ['wishlists', '新清單'], ['claims', '捐助'], ['new_guests', '新訪客']] as const
+const METRICS = computed(() => [['active_users', t('admin.analytics.metric.activeUsers')], ['signups', t('admin.analytics.metric.signups')], ['wishlists', t('admin.analytics.metric.wishlists')], ['claims', t('admin.analytics.metric.claims')], ['new_guests', t('admin.analytics.metric.newGuests')]] as [string, string][])
 const W = 200, H = 48
 // 折線座標；單日區間（理論上不會）避免除以 0
 function chart(key: string) {
@@ -32,18 +33,18 @@ function chart(key: string) {
   const pts = rows.map((r, i) => `${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`).join(' ')
   return { pts, area: rows.length ? `0,${H} ${pts} ${W},${H}` : '', max, sum: rows.reduce((s, r) => s + r[key], 0), avg: mean(rows.map(r => r[key])), step: W / Math.max(1, rows.length) }
 }
-const charts = computed(() => METRICS.map(([k, name]) => ({ k, name, ...chart(k) })))
+const charts = computed(() => METRICS.value.map(([k, name]) => ({ k, name, ...chart(k) })))
 const funnel = computed(() => funnelSteps(data.value?.funnel))
 const retention = computed(() => retentionRows(data.value?.retention))
 const groups = computed(() => {
   const d = data.value
   if (!d) return []
   return [
-    ['捐助狀態', barRows(d.claims.by_status, L.claimStatus)], ['捐助者類型', barRows(d.claims.by_actor, L.actor)],
-    ['檢舉原因', barRows(d.trust.reports_by_reason, L.reason)],
-    ['登入來源', barRows(d.distribution.provider, L.provider)], ['語系', barRows(d.distribution.locale)],
-    ['清單類型', barRows(d.distribution.wishlist_type, L.wishlistType)], ['清單可見度', barRows(d.distribution.wishlist_visibility, L.wishlistVisibility)],
-    ['生日可見度', barRows(d.distribution.birthday_visibility, L.shareLevel)],
+    [t('admin.analytics.group.claimStatus'), barRows(d.claims.by_status, L.claimStatus)], [t('admin.analytics.group.claimActor'), barRows(d.claims.by_actor, L.actor)],
+    [t('admin.analytics.group.reportReason'), barRows(d.trust.reports_by_reason, L.reason)],
+    [t('admin.analytics.group.provider'), barRows(d.distribution.provider, L.provider)], [t('admin.analytics.group.locale'), barRows(d.distribution.locale)],
+    [t('admin.analytics.group.wishlistType'), barRows(d.distribution.wishlist_type, L.wishlistType)], [t('admin.analytics.group.wishlistVisibility'), barRows(d.distribution.wishlist_visibility, L.wishlistVisibility)],
+    [t('admin.analytics.group.birthdayVisibility'), barRows(d.distribution.birthday_visibility, L.shareLevel)],
   ] as [string, BarRow[]][]
 })
 const months = computed(() => barRows(data.value?.birthday_month, Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i + 1).padStart(2, '0'), `${i + 1}`])), false)
@@ -51,36 +52,36 @@ const months = computed(() => barRows(data.value?.birthday_month, Object.fromEnt
   .sort((a, b) => a.key.localeCompare(b.key)))
 const profile = computed(() => {
   const p = data.value?.profile
-  return p ? [['有自我介紹', p.with_bio], ['有生日', p.with_birthday], ['有頭像', p.with_avatar]] as [string, number][] : []
+  return p ? [[t('admin.analytics.hasBio'), p.with_bio], [t('admin.analytics.hasBirthday'), p.with_birthday], [t('admin.analytics.hasAvatar'), p.with_avatar]] as [string, number][] : []
 })
 </script>
 <template>
   <main class="c-page c-admin">
-    <CreatorHeader title="數據分析" back="/admin" />
+    <CreatorHeader :title="$t('admin.analytics.title')" back="/admin" />
     <div class="c-row wrap c-mb">
-      <div class="c-row c-grow" role="group" aria-label="統計區間">
-        <button v-for="n in RANGES" :key="n" class="c-btn c-grow" :class="{ on: days === n }" :aria-pressed="days === n" :disabled="busy" @click="days = n">{{ n }} 天</button>
+      <div class="c-row c-grow" role="group" :aria-label="$t('admin.analytics.rangeLabel')">
+        <button v-for="n in RANGES" :key="n" class="c-btn c-grow" :class="{ on: days === n }" :aria-pressed="days === n" :disabled="busy" @click="days = n">{{ $t('admin.analytics.days', { n }) }}</button>
       </div>
-      <button class="c-btn" :disabled="busy" @click="load">{{ busy ? '更新中…' : '重新整理' }}</button>
+      <button class="c-btn" :disabled="busy" @click="load">{{ busy ? $t('admin.analytics.refreshing') : $t('admin.analytics.refresh') }}</button>
     </div>
-    <p class="c-mute">人數少於 5 的分組以 &lt;5 顯示，避免反推個人。日期以台北時區計算；排除 staff 與已刪除帳號。</p>
+    <p class="c-mute">{{ $t('admin.analytics.privacy') }}</p>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <p v-if="!data && busy" class="c-mute">載入中…</p>
+    <p v-if="!data && busy" class="c-mute">{{ $t('admin.analytics.loading') }}</p>
 
     <template v-if="data">
-      <p class="c-mute">區間：{{ data.range.from }} ～ {{ data.range.to }}（{{ data.range.days }} 天）</p>
-      <section class="c-card" aria-label="總覽">
+      <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+      <section class="c-card" :aria-label="$t('admin.analytics.overview')">
         <dl class="an-tiles">
           <div v-for="t in TILES" :key="t[0]"><dt>{{ t[0] }}</dt><dd>{{ fmtCount(t[1]) }}</dd></div>
         </dl>
       </section>
 
-      <section class="c-card" aria-label="每日趨勢">
-        <h2 class="c-h2">每日趨勢</h2>
+      <section class="c-card" :aria-label="$t('admin.analytics.dailyTrend')">
+        <h2 class="c-h2">{{ $t('admin.analytics.dailyTrend') }}</h2>
         <div class="an-multi">
           <figure v-for="c in charts" :key="c.k" class="an-fig">
-            <figcaption><strong>{{ c.name }}</strong><span class="c-mute">{{ c.k === 'active_users' ? `平均 ${c.avg}` : `合計 ${fmtCount(c.sum)}` }}・單日最高 {{ c.max === 1 && !c.sum ? 0 : c.max }}</span></figcaption>
-            <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="an-svg" role="img" :aria-label="`${c.name}每日趨勢，${c.k === 'active_users' ? '平均 ' + c.avg : '合計 ' + c.sum}`">
+            <figcaption><strong>{{ c.name }}</strong><span class="c-mute">{{ c.k === 'active_users' ? $t('admin.analytics.avg', { n: c.avg }) : $t('admin.analytics.sum', { n: fmtCount(c.sum) }) }}・{{ $t('admin.analytics.peak', { n: c.max === 1 && !c.sum ? 0 : c.max }) }}</span></figcaption>
+            <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="an-svg" role="img" :aria-label="$t('admin.analytics.chartAria', { name: c.name, value: c.k === 'active_users' ? $t('admin.analytics.avg', { n: c.avg }) : $t('admin.analytics.sum', { n: c.sum }) })">
               <line x1="0" :x2="W" :y1="H - 1" :y2="H - 1" class="an-axis" />
               <polygon :points="c.area" class="an-area" />
               <polyline :points="c.pts" class="an-line" vector-effect="non-scaling-stroke" />
@@ -91,9 +92,9 @@ const profile = computed(() => {
         </div>
       </section>
 
-      <section class="c-card" aria-label="轉換漏斗">
-        <h2 class="c-h2">轉換漏斗</h2>
-        <p class="c-mute">對象：區間內註冊的使用者；百分比為相對上一步。</p>
+      <section class="c-card" :aria-label="$t('admin.analytics.funnel')">
+        <h2 class="c-h2">{{ $t('admin.analytics.funnel') }}</h2>
+        <p class="c-mute">{{ $t('admin.analytics.funnelNote') }}</p>
         <div v-for="s in funnel" :key="s.key" class="an-row">
           <span class="an-l">{{ s.label }}</span>
           <span class="an-track"><span class="an-bar" :style="{ width: s.w + '%' }" /></span>
@@ -101,10 +102,10 @@ const profile = computed(() => {
         </div>
       </section>
 
-      <section class="c-card" aria-label="留存">
-        <h2 class="c-h2">留存</h2>
-        <p class="c-mute">對象為區間內註冊、且觀察期已結束的使用者。</p>
-        <p v-if="retention.every(x => !x.cohort)" class="c-mute">區間內尚無已滿觀察期的新使用者</p>
+      <section class="c-card" :aria-label="$t('admin.analytics.retention')">
+        <h2 class="c-h2">{{ $t('admin.analytics.retention') }}</h2>
+        <p class="c-mute">{{ $t('admin.analytics.retentionNote') }}</p>
+        <p v-if="retention.every(x => !x.cohort)" class="c-mute">{{ $t('admin.analytics.retentionEmpty') }}</p>
         <div v-for="x in retention" :key="x.key" class="an-row">
           <span class="an-l">{{ x.label }}</span>
           <span class="an-track"><span class="an-bar" :style="{ width: x.w + '%' }" /></span>
@@ -112,15 +113,15 @@ const profile = computed(() => {
         </div>
       </section>
 
-      <section class="c-card" aria-label="捐助與信任">
-        <h2 class="c-h2">捐助與信任</h2>
+      <section class="c-card" :aria-label="$t('admin.analytics.claimsTrust')">
+        <h2 class="c-h2">{{ $t('admin.analytics.claimsTrust') }}</h2>
         <dl class="an-tiles">
-          <div><dt>檢舉（區間）</dt><dd>{{ fmtCount(data.trust.reports) }}</dd></div>
-          <div><dt>登入失敗（區間）</dt><dd>{{ fmtCount(data.trust.login_failures) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.reports') }}</dt><dd>{{ fmtCount(data.trust.reports) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.loginFailures') }}</dt><dd>{{ fmtCount(data.trust.login_failures) }}</dd></div>
         </dl>
         <template v-for="g in groups.slice(0, 3)" :key="g[0]">
           <h3 class="an-h3">{{ g[0] }}</h3>
-          <p v-if="!g[1].length" class="c-mute">沒有資料</p>
+          <p v-if="!g[1].length" class="c-mute">{{ $t('admin.analytics.noData') }}</p>
           <div v-for="r in g[1]" :key="r.key" class="an-row">
             <span class="an-l">{{ r.label }}</span>
             <span class="an-track"><span class="an-bar" :class="{ sup: r.v == null }" :style="r.v == null ? undefined : { width: r.w + '%' }" /></span>
@@ -129,18 +130,18 @@ const profile = computed(() => {
         </template>
       </section>
 
-      <section class="c-card" aria-label="個人資料完整度">
-        <h2 class="c-h2">個人資料完整度</h2>
-        <p class="c-mute">分母：有效使用者 {{ fmtCount(data.profile.users) }} 人</p>
+      <section class="c-card" :aria-label="$t('admin.analytics.profile')">
+        <h2 class="c-h2">{{ $t('admin.analytics.profile') }}</h2>
+        <p class="c-mute">{{ $t('admin.analytics.denominator', { n: fmtCount(data.profile.users) }) }}</p>
         <div v-for="p in profile" :key="p[0]" class="an-row">
           <span class="an-l">{{ p[0] }}</span>
           <span class="an-track"><span class="an-bar" :style="{ width: (data.profile.users ? p[1] / data.profile.users * 100 : 0) + '%' }" /></span>
           <span class="an-v">{{ pct(p[1], data.profile.users) }}<small class="c-mute"> {{ fmtCount(p[1]) }}</small></span>
         </div>
-        <dl class="an-tiles c-mt"><div><dt>30 天內生日</dt><dd>{{ fmtCount(data.profile.upcoming_birthdays_30d) }}</dd></div></dl>
-        <h3 class="an-h3">生日月份</h3>
-        <div class="an-cols" role="img" aria-label="生日月份分布">
-          <div v-for="m in months" :key="m.key" class="an-col" :title="`${m.label} 月：${fmtCount(m.v)}`">
+        <dl class="an-tiles c-mt"><div><dt>{{ $t('admin.analytics.upcoming') }}</dt><dd>{{ fmtCount(data.profile.upcoming_birthdays_30d) }}</dd></div></dl>
+        <h3 class="an-h3">{{ $t('admin.analytics.birthdayMonth') }}</h3>
+        <div class="an-cols" role="img" :aria-label="$t('admin.analytics.monthAria')">
+          <div v-for="m in months" :key="m.key" class="an-col" :title="$t('admin.analytics.monthTitle', { month: m.label, n: fmtCount(m.v) })">
             <span class="an-cv">{{ fmtCount(m.v) }}</span>
             <span class="an-ctrack"><span class="an-cbar" :class="{ sup: m.v == null }" :style="{ height: (m.v == null ? 0 : m.w) + '%' }" /></span>
             <span class="an-cl c-mute">{{ m.label }}</span>
@@ -148,11 +149,11 @@ const profile = computed(() => {
         </div>
       </section>
 
-      <section class="c-card" aria-label="分布">
-        <h2 class="c-h2">分布</h2>
+      <section class="c-card" :aria-label="$t('admin.analytics.distribution')">
+        <h2 class="c-h2">{{ $t('admin.analytics.distribution') }}</h2>
         <template v-for="g in groups.slice(3)" :key="g[0]">
           <h3 class="an-h3">{{ g[0] }}</h3>
-          <p v-if="!g[1].length" class="c-mute">沒有資料</p>
+          <p v-if="!g[1].length" class="c-mute">{{ $t('admin.analytics.noData') }}</p>
           <div v-for="r in g[1]" :key="r.key" class="an-row">
             <span class="an-l">{{ r.label }}</span>
             <span class="an-track"><span class="an-bar" :class="{ sup: r.v == null }" :style="r.v == null ? undefined : { width: r.w + '%' }" /></span>
@@ -161,8 +162,8 @@ const profile = computed(() => {
         </template>
       </section>
 
-      <details class="c-card"><summary>每日資料表</summary>
-        <table class="an-table"><thead><tr><th>日期</th><th v-for="m in METRICS" :key="m[0]">{{ m[1] }}</th></tr></thead>
+      <details class="c-card"><summary>{{ $t('admin.analytics.dailyTable') }}</summary>
+        <table class="an-table"><thead><tr><th>{{ $t('admin.analytics.date') }}</th><th v-for="m in METRICS" :key="m[0]">{{ m[1] }}</th></tr></thead>
           <tbody><tr v-for="r in data.daily" :key="r.date"><td>{{ r.date }}</td><td v-for="m in METRICS" :key="m[0]">{{ r[m[0]] }}</td></tr></tbody></table>
       </details>
     </template>

@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-useSeoMeta({ title: '服務條款' })
+const { t } = useI18n()
+useSeoMeta({ title: () => t('legal.terms.title') })
 </script>
 <template>
   <GuestTop />
   <main class="g-wrap g-doc">
-    <h1>服務條款</h1>
-    <p class="g-mute">版本：草案（正式條款上線前請由法務確認）</p>
-    <h2>1. 服務內容</h2>
-    <p>Wishly 提供建立願望清單、分享連結與讓親友捐助品項的平台。捐助者與建立者之間的實際購買、運送與交付由雙方自行處理，平台不經手商品與款項。</p>
-    <h2>2. 使用規範</h2>
-    <ul><li>不得張貼詐騙、不當、侵權或洩漏他人個資的內容。</li><li>不得以自動化方式大量捐助或干擾服務。</li><li>發現違規內容可使用清單頁底的「檢舉此清單」，經人工審核後可能下架。</li></ul>
-    <h2>3. 捐助</h2>
-    <p>瀏覽分享連結不需註冊，捐助（認捐）需登入會員。同一人對同一品項僅有一筆有效捐助，可隨時修改數量或取消；已送達的捐助不可取消。</p>
-    <h2>4. 責任限制</h2>
-    <p>服務依現況提供，我們不保證不中斷。因清單內容、第三方商品連結或雙方交易所生爭議，平台不負賠償責任，但會配合處理違規內容。</p>
-    <h2>5. 條款變更</h2>
-    <p>條款修改後公告於本頁，繼續使用即視為同意。</p>
+    <h1>{{ $t('legal.terms.title') }}</h1>
+    <p class="g-mute">{{ $t('legal.terms.draft') }}</p>
+    <h2>{{ $t('legal.terms.s1h') }}</h2>
+    <p>{{ $t('legal.terms.s1p') }}</p>
+    <h2>{{ $t('legal.terms.s2h') }}</h2>
+    <ul><li>{{ $t('legal.terms.s2l1') }}</li><li>{{ $t('legal.terms.s2l2') }}</li><li>{{ $t('legal.terms.s2l3') }}</li></ul>
+    <h2>{{ $t('legal.terms.s3h') }}</h2>
+    <p>{{ $t('legal.terms.s3p') }}</p>
+    <h2>{{ $t('legal.terms.s4h') }}</h2>
+    <p>{{ $t('legal.terms.s4p') }}</p>
+    <h2>{{ $t('legal.terms.s5h') }}</h2>
+    <p>{{ $t('legal.terms.s5p') }}</p>
   </main>
 </template>

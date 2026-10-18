@@ -1,11 +1,9 @@
 import { nativeHeaders } from './native'
 // 清單可見性：選項文案（同時作為分享時「誰能打開」的提示）
-export const VIS_OPTIONS = [
-  { v: 'public', label: '公開', desc: '任何人都能看（含訪客），會列在探索頁與你的個人頁。' },
-  { v: 'friends', label: '所有好友', desc: '只有你的好友能開，對方需要登入。' },
-  { v: 'selected', label: '摯友', desc: '只有你從好友中勾選的摯友能開，對方需要登入。' },
-  { v: 'private', label: '私人', desc: '只有你自己看得到，朋友打開會顯示找不到。' },
-] as const
+const t = (k: string) => useNuxtApp().$i18n.t(k)
+// label / desc 用 getter：語系是每個請求（SSR）或使用者切換後才決定，不能在模組載入時固定
+const opt = <V extends string>(v: V) => ({ v, get label() { return t(`creator.vis.${v}.label`) }, get desc() { return t(`creator.vis.${v}.desc`) } })
+export const VIS_OPTIONS = [opt('public'), opt('friends'), opt('selected'), opt('private')] as const
 export type Visibility = typeof VIS_OPTIONS[number]['v']
 export const visDesc = (v: string) => VIS_OPTIONS.find(o => o.v === v)?.desc ?? ''
 

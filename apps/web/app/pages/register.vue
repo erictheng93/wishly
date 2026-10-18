@@ -1,11 +1,13 @@
 <script setup lang="ts">
-useHead({ title: '建立帳號' })
+const i18n = useI18n()
+useHead({ title: () => i18n.t('auth.register.title') })
 const route = useRoute()
 const { register, verifyRegister, oauth } = useAuth()
 const redirect = safeRedirect(route.query.redirect)
 const step = ref<'form' | 'otp'>('form')
 const email = ref(''), password = ref(''), name = ref(''), code = ref('')
 const otp = ref<{ focus: () => void }>()
+const exists = ref(false)
 const busy = ref(false), err = ref(''), wait = ref(0)
 const challengeId = ref(''), needCaptcha = ref(false), tsToken = ref(''), capKey = ref(0)
 // 請求過於頻繁時後端要求人機驗證：完成後自動重送
@@ -15,8 +17,8 @@ function tick(n: number) { wait.value = n; clearInterval(t); t = setInterval(() 
 onBeforeUnmount(() => clearInterval(t))
 
 async function send() {
-  err.value = ''
-  if (password.value.length < 8) { err.value = '密碼至少需 8 個字元'; return }
+  err.value = ''; exists.value = false
+  if (password.value.length < 8) { err.value = i18n.t('auth.register.pwShort'); return }
   busy.value = true
   try {
     const r = await register(email.value.trim(), password.value, name.value.trim(), tsToken.value || undefined)
@@ -24,8 +26,8 @@ async function send() {
     step.value = 'otp'; code.value = ''; tick(r.resend_after || 60)
     nextTick(() => otp.value?.focus())
   } catch (e: any) {
-    if (e.code === 'CAPTCHA_REQUIRED') { needCaptcha.value = true; tsToken.value = ''; capKey.value++; err.value = '請先完成人機驗證' }
-    else err.value = e.status === 429 ? '請求過於頻繁，請稍後再試' : errMsg(e)
+    if (e.code === 'CAPTCHA_REQUIRED') { needCaptcha.value = true; tsToken.value = ''; capKey.value++; err.value = i18n.t('auth.register.captcha') }
+    else err.value = e.status === 429 ? i18n.t('auth.register.rate') : errMsg(e)
   } finally { busy.value = false }
 }
 async function verify() {
@@ -35,40 +37,40 @@ async function verify() {
     await verifyRegister(email.value.trim(), code.value, challengeId.value || undefined)
     await navigateTo(redirect)
   } catch (e: any) {
-    if (e.code === 'EMAIL_EXISTS') err.value = '此 Email 已註冊，請直接登入或使用忘記密碼'
-    else { err.value = e.code === 'OTP_INVALID' ? '驗證碼不正確或已過期，請再試一次' : e.status === 429 ? '嘗試次數過多，請稍後再試' : errMsg(e); code.value = ''; otp.value?.focus() }
+    if (e.code === 'EMAIL_EXISTS') { err.value = i18n.t('auth.register.exists'); exists.value = true }
+    else { err.value = e.code === 'OTP_INVALID' ? i18n.t('auth.register.otpInvalid') : e.status === 429 ? i18n.t('auth.register.tooMany') : errMsg(e); code.value = ''; otp.value?.focus() }
   } finally { busy.value = false }
 }
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader title="建立帳號" back="/login" />
+    <CreatorHeader :title="$t('auth.register.title')" back="/login" />
     <form v-if="step === 'form'" @submit.prevent="send">
-      <label class="c-field"><span>顯示名稱</span><input v-model="name" type="text" autocomplete="nickname" maxlength="50" required></label>
+      <label class="c-field"><span>{{ $t('auth.register.displayName') }}</span><input v-model="name" type="text" autocomplete="nickname" maxlength="50" required></label>
       <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
-      <CreatorPasswordField v-model="password" label="密碼" autocomplete="new-password" hint="至少 8 個字元，最多 128 個字元" />
+      <CreatorPasswordField v-model="password" :label="$t('auth.register.password')" autocomplete="new-password" :hint="$t('auth.register.pwHint')" />
       <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-      <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? '寄送中…' : '寄送驗證碼' }}</button>
-      <p class="c-center c-mute">已有帳號？<NuxtLink :to="{ path: '/login', query: route.query.redirect ? { redirect } : {} }">登入</NuxtLink></p>
+      <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? $t('auth.register.sending') : $t('auth.register.sendCode') }}</button>
+      <p class="c-center c-mute">{{ $t('auth.register.haveAccount') }}<NuxtLink :to="{ path: '/login', query: route.query.redirect ? { redirect } : {} }">{{ $t('auth.register.login') }}</NuxtLink></p>
     </form>
     <template v-if="step === 'form' && !isNative()">
-      <p class="c-center c-mute">或</p>
-      <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">使用 Google 繼續</button>
-      <button type="button" class="c-btn block c-mb" @click="oauth('line', redirect)">使用 LINE 繼續</button>
+      <p class="c-center c-mute">{{ $t('auth.register.or') }}</p>
+      <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">{{ $t('auth.register.google') }}</button>
+      <button type="button" class="c-btn block c-mb" @click="oauth('line', redirect)">{{ $t('auth.register.line') }}</button>
     </template>
     <template v-if="step === 'otp'">
-      <p>驗證碼已寄到 {{ email }}</p>
+      <p>{{ $t('auth.register.codeSent', { email }) }}</p>
       <CreatorOtpInput ref="otp" v-model="code" @complete="verify" />
       <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
       <p v-if="err" class="c-err c-center" role="alert">{{ err }}</p>
-      <NuxtLink v-if="err.includes('已註冊')" class="c-btn block c-mb" to="/login">前往登入</NuxtLink>
-      <button class="c-btn primary block c-mb" :disabled="busy || code.length < 6" @click="verify">{{ busy ? '驗證中…' : '完成註冊' }}</button>
+      <NuxtLink v-if="exists" class="c-btn block c-mb" to="/login">{{ $t('auth.register.goLogin') }}</NuxtLink>
+      <button class="c-btn primary block c-mb" :disabled="busy || code.length < 6" @click="verify">{{ busy ? $t('auth.register.verifying') : $t('auth.register.finish') }}</button>
       <p class="c-center c-mute">
-        <button v-if="wait <= 0" class="c-btn" :disabled="busy" @click="send">重新寄送</button>
-        <span v-else>{{ wait }} 秒後可重新寄送</span>
+        <button v-if="wait <= 0" class="c-btn" :disabled="busy" @click="send">{{ $t('auth.register.resend') }}</button>
+        <span v-else>{{ $t('auth.register.resendIn', { n: wait }) }}</span>
       </p>
-      <button class="c-btn block" @click="step = 'form'; err = ''">修改資料</button>
+      <button class="c-btn block" @click="step = 'form'; err = ''">{{ $t('auth.register.edit') }}</button>
     </template>
   </main>
 </template>

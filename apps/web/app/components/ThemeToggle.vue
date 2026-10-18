@@ -1,10 +1,11 @@
 <script setup lang="ts">
 const { mode, sync, toggle } = useTheme()
 onMounted(sync)
-const view = computed(() => ({ auto: ['◐', '自動'], light: ['☀', '淺色'], dark: ['☾', '深色'] })[mode.value])
+const { t } = useI18n()
+const view = computed(() => ({ auto: ['◐', t('common.theme.auto')], light: ['☀', t('common.theme.light')], dark: ['☾', t('common.theme.dark')] })[mode.value])
 </script>
 <template>
-  <button type="button" class="theme-toggle" :aria-label="`主題：${view[1]}（點擊切換）`" :title="`主題：${view[1]}`" @click="toggle">
+  <button type="button" class="theme-toggle" :aria-label="$t('common.theme.label', { mode: view[1] })" :title="$t('common.theme.title', { mode: view[1] })" @click="toggle">
     {{ view[0] }}
   </button>
 </template>

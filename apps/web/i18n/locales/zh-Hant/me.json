@@ -1,0 +1,240 @@
+{
+  "me": {
+    "home": {
+      "seoTitle": "Wishly 心願同步｜心願清單與心願分享",
+      "seoDesc": "建立心願清單，用一個連結分享。送禮、生日、婚禮，朋友打開連結就能瀏覽，登入會員後即可捐助，不重複、不超賣。",
+      "ogTitle": "Wishly 心願同步",
+      "ogDesc": "列出你想要的，讓想送的人不再猜。",
+      "myLists": "我的清單",
+      "start": "開始建立",
+      "explore": "探索",
+      "seeDemo": "看範例",
+      "kicker": "心願清單 × 心願分享",
+      "h1": "Wishly 心願同步",
+      "lead": "列出你想要的，讓想送的人不再猜。",
+      "sub": "一個連結分享整份心願清單。朋友打開連結就能瀏覽，登入會員後即可捐助，不重複、不超賣。",
+      "ctaExplore": "探索公開清單",
+      "ctaDemo": "看範例清單",
+      "demoAria": "心願清單範例：三個品項，其中一項已被捐助",
+      "demoTitle": "小安的生日心願",
+      "demoCount": "3 項",
+      "demoThumb1": "咖啡機",
+      "demoItem1": "手沖咖啡組",
+      "demoTop": "最想要",
+      "demoBy": "已被 阿凱 捐助",
+      "demoThumb2": "耳機",
+      "demoItem2": "降噪耳機",
+      "demoRaised": "已湊 $4,800",
+      "demoGoal": "/ $8,000",
+      "demoThumb3": "書",
+      "demoItem3": "設計的法則",
+      "demoGive": "我來送",
+      "scenesTitle": "三種情境，都用同一份清單",
+      "scenes": {
+        "gift": {
+          "k": "送禮",
+          "t": "節日與回禮",
+          "d": "收禮的人列清單，送禮的人照著挑，不再猜尺寸、顏色和喜好。"
+        },
+        "birthday": {
+          "k": "生日",
+          "t": "一個連結收齊心意",
+          "d": "貼進群組就好。大家各認一樣，也能湊錢一起買大禮。"
+        },
+        "wedding": {
+          "k": "婚禮",
+          "t": "新家用品一次備齊",
+          "d": "家電、餐具、生活用品都列上去，賓客捐助後品項立刻鎖定。"
+        }
+      },
+      "sceneMore": "看{k}範例 →",
+      "stepsTitle": "三步完成心願分享",
+      "steps": {
+        "1": {
+          "t": "建立心願清單",
+          "d": "加入想要的品項、價格與連結，十分鐘就能完成。"
+        },
+        "2": {
+          "t": "分享心願連結",
+          "d": "用 LINE、FB 或任何管道傳出去，預覽圖會自動帶上。"
+        },
+        "3": {
+          "t": "朋友登入後捐助",
+          "d": "點開連結就能看，登入會員即可捐助品項，捐助後其他人不能再選。"
+        }
+      },
+      "featsTitle": "讓心願清單更好用",
+      "feats": {
+        "0": {
+          "t": "防超賣",
+          "d": "同一個品項只會被一個人捐助，同時點擊也不會重複。"
+        },
+        "1": {
+          "t": "免帳號瀏覽",
+          "d": "朋友不用建帳號就能看清單，要認捐時再登入會員。"
+        },
+        "2": {
+          "t": "即時更新",
+          "d": "捐助與進度即時同步，頁面不用重新整理。"
+        },
+        "3": {
+          "t": "心願眾籌",
+          "d": "大件品項可以多人湊，進度條一眼看到還差多少。"
+        }
+      },
+      "faqTitle": "常見問題",
+      "faq": {
+        "0": {
+          "q": "朋友需要註冊嗎？",
+          "a": "瀏覽清單不需要。要捐助（認捐）品項時，需要先登入會員。"
+        },
+        "1": {
+          "q": "會不會有兩個人送到同一樣？",
+          "a": "不會。品項一旦被捐助就會鎖定，逾期未完成的捐助會自動釋放。"
+        },
+        "2": {
+          "q": "清單可以只給特定的人看嗎？",
+          "a": "可以。清單可設為公開、所有好友可見、僅摯友可見，或只有自己看得到。"
+        }
+      },
+      "endTitle": "現在就列出你的心願",
+      "terms": "服務條款",
+      "privacy": "隱私權政策"
+    },
+    "vis": {
+      "public": "公開",
+      "friends": "僅好友",
+      "private": "私人"
+    },
+    "whoSees": "誰看得到",
+    "loading": "載入中…",
+    "retry": "重試",
+    "claims": {
+      "title": "我的捐助",
+      "status": {
+        "reserved": "已捐助",
+        "purchased": "已購買",
+        "delivered": "已送達",
+        "cancelled": "已取消",
+        "expired": "已逾期"
+      },
+      "recoverFailed": "這個管理連結已失效（只能使用一次，且 30 天內有效）。請回到朋友分享的清單連結，或聯絡客服。",
+      "loadFailed": "讀取失敗",
+      "empty1": "你還沒有捐助任何東西。收到朋友的清單連結後，登入會員即可認捐，並在這裡管理。",
+      "empty2": "看不到之前以訪客身分的捐助？可能是在不同瀏覽器或 LINE 內建瀏覽器。留過 Email 的捐助，可從確認信的「管理我的捐助」連結回來。",
+      "signedIn": "（已登入）",
+      "thisDevice": "（此裝置）",
+      "editNick": "改暱稱",
+      "nick": "暱稱",
+      "save": "儲存",
+      "noImg": "圖",
+      "markPurchased": "標記已購買",
+      "markDelivered": "標記已送達",
+      "cancel": "取消",
+      "past": "過去的紀錄（{n}）",
+      "wipe": "刪除我的暱稱與聯絡方式",
+      "confirmCancelPurchased": "建立者會收到通知，確定要取消捐助？",
+      "confirmCancel": "確定要取消這筆捐助？",
+      "confirmWipe": "確定刪除你的暱稱與聯絡方式？捐助紀錄會保留為「已刪除的訪客」，且此裝置之後無法再管理。"
+    },
+    "wallet": {
+      "title": "我的點數",
+      "pts": "{pts} 點",
+      "visUpdated": "可見度已更新",
+      "withdrawn": "已撤回 {pts} 點",
+      "locked": "這筆認捐已無法撤回（品項已達標或超過撤回期限）",
+      "loadOthersFailed": "讀取同清單的其他品項失敗，請稍後再試",
+      "reallocated": "已轉投",
+      "reallocNotAllowed": "無法轉投到這個品項（可能已達標、已截止或超過選擇期限），請換一個再試",
+      "available": "可用點數（1 點 = NT$1）",
+      "frozen": "已凍結",
+      "held": "認捐中 {pts} 點（已認捐，達標前可撤回）",
+      "frozenWarn": "錢包已被凍結，暫時無法贊助，請聯絡客服。",
+      "issuedByPlatform": "目前點數由平台發放。",
+      "topup": "儲值（即將推出）",
+      "myPledges": "我的認捐",
+      "noPledges": "還沒有認捐紀錄。打開朋友分享的清單，就能參與心願眾籌。",
+      "noImg": "無圖",
+      "quoted": "「{msg}」",
+      "anon": "（匿名）",
+      "pledgedAt": "認捐 {time}",
+      "reachedAt": "・達標 {time}",
+      "refunded": "已退回差額 {pts} 點",
+      "anonNote": "匿名認捐在個人頁僅本人可見。",
+      "expiredNote": "募集已截止，請在 {time} 前撤回或轉投，逾期會自動退回。",
+      "realloc": "轉投其他品項",
+      "withdraw": "撤回",
+      "loadMore": "載入更多",
+      "ledger": "點數帳本",
+      "noLedger": "還沒有異動紀錄",
+      "ledgerMeta": "{time}・餘額 {bal}",
+      "wdTitle": "撤回認捐",
+      "wdText": "撤回「{item}」的 {pts} 點？點數會立即退回你的錢包。",
+      "wdOk": "確認撤回",
+      "reTitle": "轉投其他品項",
+      "reText": "把 {pts} 點轉投到同一份清單的其他眾籌品項（不會異動錢包）。",
+      "reOk": "確認轉投",
+      "noTargets": "這份清單目前沒有其他募集中的眾籌品項。",
+      "moveTo": "轉投到",
+      "targetOpt": "{title}（還差 {pts} 點）"
+    },
+    "friends": {
+      "sent": "若對方有帳號，已送出邀請",
+      "copyFail": "無法複製，請手動選取網址",
+      "addTitle": "加好友",
+      "toLabel": "對方的 Email 或帳號代號",
+      "toPh": "name@example.com 或 @handle",
+      "send": "送出邀請",
+      "sending": "送出中…",
+      "inviteTitle": "邀請連結",
+      "inviteHint": "把連結或 QR 給朋友，對方登入後即可成為好友。連結 7 天有效，重新產生會讓舊連結失效。",
+      "inviteUrl": "邀請網址",
+      "copy": "複製網址",
+      "copied": "已複製",
+      "regen": "重新產生",
+      "revoke": "撤銷",
+      "gen": "產生邀請連結",
+      "revokeExisting": "撤銷既有邀請",
+      "incoming": "收到的邀請",
+      "accept": "接受",
+      "decline": "婉拒",
+      "outgoing": "已送出的邀請",
+      "cancelInvite": "取消邀請",
+      "mine": "我的好友（{n}）",
+      "none": "還沒有好友，用上面的方式邀請朋友吧。",
+      "unfriend": "解除好友",
+      "unfriendTitle": "解除與 {name} 的好友關係？",
+      "unfriendText": "對方將無法再看到你「僅好友」的清單，你在對方「指定名單」中的權限也會一併移除。"
+    },
+    "profile": {
+      "vis": {
+        "public": "公開",
+        "friends": "僅好友",
+        "selected": "指定好友",
+        "link": "連結"
+      },
+      "title": "{name} 的心願",
+      "page": "個人頁",
+      "gone": "找不到這位使用者。",
+      "loadFailed": "讀取失敗，請稍後再試",
+      "birthday": "・生日 {date}",
+      "editSettings": "編輯個人設定",
+      "friend": "好友",
+      "requestSent": "已送出邀請",
+      "acceptRequest": "接受好友邀請",
+      "addFriend": "送出好友邀請",
+      "loginToAdd": "登入以加好友",
+      "lists": "心願清單",
+      "noLists": "目前沒有可看的清單。",
+      "closed": "已結束",
+      "registry": "禮物登記",
+      "personal": "個人心願",
+      "completion": "完成度 {pct}%（{n} 件）",
+      "donations": "捐助紀錄",
+      "noDonations": "目前沒有可看的捐助紀錄。",
+      "pledgePts": "・{pts} 點",
+      "qty": " × {qty}",
+      "to": "送給 {name}・"
+    }
+  }
+}
