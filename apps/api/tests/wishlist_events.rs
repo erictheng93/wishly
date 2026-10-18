@@ -53,6 +53,7 @@ async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
         "{got}"
     );
     assert!(!got.contains("秘密客"));
+    sse_fanout_and_caps(&pool, wid, &slug).await;
     // 下架 → 新連線 410
     sqlx::query(
         "UPDATE wishlists SET moderation_status='hidden', moderation_reason='x' WHERE id=$1",
@@ -74,4 +75,51 @@ async fn sse_pushes_item_update_and_410_when_hidden(pool: PgPool) {
     tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
         .await
         .expect("SSE listener must release its connection when the pool closes");
+}
+
+async fn open_sse(pool: &PgPool, slug: &str) -> axum::response::Response {
+    let req = Request::builder()
+        .uri(format!("/api/v1/public/wishlists/{slug}/events"))
+        .body(Body::empty())
+        .unwrap();
+    test_app(pool).oneshot(req).await.unwrap()
+}
+
+/// 多訂閱者 + 一次 notify：snapshot 只查一次（不隨訂閱者數成長）；超過單 IP 上限被拒。
+async fn sse_fanout_and_caps(pool: &PgPool, wid: uuid::Uuid, slug: &str) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let mut bodies = vec![];
+    for _ in 0..5 {
+        let res = open_sse(pool, slug).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        bodies.push(res.into_body());
+    }
+    let before = wishly_api::dashboard::SNAPSHOT_QUERIES.load(Relaxed);
+    wishly_api::dashboard::notify(pool, wid).await.unwrap();
+    for b in bodies.iter_mut() {
+        let mut got = String::new();
+        while !got.contains("wishlist.updated") {
+            let f = tokio::time::timeout(std::time::Duration::from_secs(5), b.frame())
+                .await
+                .expect("sse timeout")
+                .unwrap()
+                .unwrap();
+            got.push_str(&String::from_utf8_lossy(f.data_ref().unwrap()));
+        }
+    }
+    let used = wishly_api::dashboard::SNAPSHOT_QUERIES.load(Relaxed) - before;
+    assert_eq!(used, 1, "snapshot 查詢數不應隨訂閱者數成長");
+    // 單 IP 上限（含上面已開的連線與先前測試段落的 1 條）
+    let mut rejected = None;
+    for _ in 0..20 {
+        let res = open_sse(pool, slug).await;
+        if res.status() != StatusCode::OK {
+            rejected = Some(res.status());
+            break;
+        }
+        bodies.push(res.into_body());
+    }
+    assert_eq!(rejected, Some(StatusCode::TOO_MANY_REQUESTS));
+    drop(bodies);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await; // 等背景 task 歸還名額
 }

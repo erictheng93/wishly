@@ -17,8 +17,16 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use std::{collections::HashMap, convert::Infallible, time::Duration};
-use tokio::sync::{broadcast, mpsc, OnceCell};
+use std::{
+    collections::HashMap,
+    convert::Infallible,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
+};
+use tokio::sync::{broadcast, mpsc, OnceCell, Semaphore, SemaphorePermit};
 use uuid::Uuid;
 
 const CHANNEL: &str = "wishlist_events";
@@ -42,9 +50,89 @@ pub async fn notify<'e, E: sqlx::PgExecutor<'e>>(
 
 // ---------- SSE ----------
 
-static BUS: OnceCell<broadcast::Sender<Uuid>> = OnceCell::const_new();
+/// 匿名 SSE 連線上限：全域與每個來源 IP（超過就拒絕，避免耗盡 DB pool / 記憶體）。
+const MAX_SSE_TOTAL: usize = 2000;
+const MAX_SSE_PER_IP: u32 = 16;
+static SSE_TOTAL: Semaphore = Semaphore::const_new(MAX_SSE_TOTAL);
+static SSE_PER_IP: Mutex<Option<HashMap<String, u32>>> = Mutex::new(None);
 
-async fn bus(pool: &PgPool) -> Result<&'static broadcast::Sender<Uuid>, sqlx::Error> {
+/// 持有期間佔用一個全域名額與該 IP 一個計數；drop 時歸還。
+struct SseSlot {
+    _permit: SemaphorePermit<'static>,
+    ip: String,
+}
+
+impl SseSlot {
+    fn acquire(ip: String) -> Result<Self, AppError> {
+        let permit = SSE_TOTAL
+            .try_acquire()
+            .map_err(|_| AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試"))?;
+        let mut m = SSE_PER_IP.lock().unwrap();
+        let n = m
+            .get_or_insert_with(HashMap::new)
+            .entry(ip.clone())
+            .or_insert(0);
+        if *n >= MAX_SSE_PER_IP {
+            return Err(AppError::problem(429, "RATE_LIMITED", "即時更新連線過多"));
+        }
+        *n += 1;
+        Ok(SseSlot {
+            _permit: permit,
+            ip,
+        })
+    }
+}
+
+impl Drop for SseSlot {
+    fn drop(&mut self) {
+        let mut g = SSE_PER_IP.lock().unwrap();
+        if let Some(m) = g.as_mut() {
+            if let Some(n) = m.get_mut(&self.ip) {
+                *n -= 1;
+                if *n == 0 {
+                    m.remove(&self.ip);
+                }
+            }
+        }
+    }
+}
+
+/// 每次 pg_notify 收到時配一個遞增序號；同一 (清單, 序號) 的 snapshot 只查一次，由所有訂閱者共用。
+static NOTIFY_SEQ: AtomicU64 = AtomicU64::new(0);
+type SnapCell = Arc<OnceCell<Option<Arc<Snap>>>>;
+static MEMO: Mutex<Option<HashMap<Uuid, (u64, SnapCell)>>> = Mutex::new(None);
+/// snapshot() 實際打到 DB 的次數（測試用，驗證 DB 工作量不隨訂閱者數成長）。
+pub static SNAPSHOT_QUERIES: AtomicU64 = AtomicU64::new(0);
+
+async fn snapshot_shared(
+    pool: &PgPool,
+    wid: Uuid,
+    seq: u64,
+) -> Result<Option<Arc<Snap>>, sqlx::Error> {
+    let cell = {
+        let mut g = MEMO.lock().unwrap();
+        let m = g.get_or_insert_with(HashMap::new);
+        if m.len() > 1024 {
+            m.clear(); // ponytail: 粗暴清空，下次重建；有量再改 LRU
+        }
+        match m.get(&wid) {
+            Some((q, c)) if *q == seq => c.clone(),
+            Some((q, _)) if *q > seq => Arc::default(), // 落後的訂閱者：自己查，不覆蓋較新的
+            _ => {
+                let c = SnapCell::default();
+                m.insert(wid, (seq, c.clone()));
+                c
+            }
+        }
+    };
+    cell.get_or_try_init(|| async { Ok(snapshot(pool, wid).await?.map(Arc::new)) })
+        .await
+        .cloned()
+}
+
+static BUS: OnceCell<broadcast::Sender<(Uuid, u64)>> = OnceCell::const_new();
+
+async fn bus(pool: &PgPool) -> Result<&'static broadcast::Sender<(Uuid, u64)>, sqlx::Error> {
     BUS.get_or_try_init(|| async {
         // 回應 SSE 之前完成 LISTEN，避免首個捐助通知在 listener 啟動前遺失。
         let mut listener = sqlx::postgres::PgListener::connect_with(pool).await?;
@@ -55,7 +143,7 @@ async fn bus(pool: &PgPool) -> Result<&'static broadcast::Sender<Uuid>, sqlx::Er
             loop {
                 while let Ok(n) = listener.recv().await {
                     if let Ok(id) = n.payload().parse() {
-                        let _ = t.send(id);
+                        let _ = t.send((id, NOTIFY_SEQ.fetch_add(1, Ordering::Relaxed) + 1));
                     }
                 }
                 // PgListener::recv 原生支援 pool 關閉事件；關閉後不可再重連。
@@ -102,6 +190,7 @@ struct Snap {
 }
 
 async fn snapshot(pool: &PgPool, wid: Uuid) -> Result<Option<Snap>, sqlx::Error> {
+    SNAPSHOT_QUERIES.fetch_add(1, Ordering::Relaxed);
     let w: Option<(String, String, String)> = sqlx::query_as(
         "SELECT status::text, title, moderation_status::text FROM wishlists WHERE id = $1 AND deleted_at IS NULL").bind(wid).fetch_optional(pool).await?;
     let Some((status, title, m)) = w else {
@@ -167,10 +256,14 @@ async fn events(
     Path(slug): Path<String>,
     parts: Parts,
 ) -> Result<Response, AppError> {
+    let slot = SseSlot::acquire(crate::config::client_ip(&parts, &crate::config::get()))?;
     let w: Option<(Uuid, String, Uuid, String)> = sqlx::query_as(
         "SELECT id, moderation_status::text, owner_id, visibility::text FROM wishlists
-          WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')")
-        .bind(&slug).fetch_optional(&st.pool).await?;
+          WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')",
+    )
+    .bind(&slug)
+    .fetch_optional(&st.pool)
+    .await?;
     let (wid, m, owner_id, vis) = w.ok_or(AppError::NotFound)?;
     let viewer = crate::access::viewer(&parts, &st).await?;
     crate::access::check_wishlist(
@@ -194,20 +287,23 @@ async fn events(
     let (tx, out) = mpsc::channel::<Result<Event, Infallible>>(16);
     let pool = st.pool.clone();
     tokio::spawn(async move {
+        let _slot = slot; // 連線結束才歸還名額
         let deadline = tokio::time::sleep(Duration::from_secs(30 * 60)); // 每條連線最長 30 分鐘
         tokio::pin!(deadline);
         let mut seq = 0u64;
+        let mut nseq;
         loop {
             tokio::select! {
                 _ = &mut deadline => break,
                 _ = tx.closed() => break,
                 r = rx.recv() => match r {
-                    Ok(id) if id != wid => continue,
+                    Ok((id, _)) if id != wid => continue,
+                    Ok((_, n)) => nseq = n,
                     Err(broadcast::error::RecvError::Closed) => break,
-                    _ => {}
+                    Err(_) => nseq = NOTIFY_SEQ.load(Ordering::Relaxed), // Lagged：以最新序號重查
                 },
             }
-            let Ok(Some(s)) = snapshot(&pool, wid).await else {
+            let Ok(Some(s)) = snapshot_shared(&pool, wid, nseq).await else {
                 continue;
             };
             let mut evs: Vec<(&str, Value)> = vec![];
@@ -234,7 +330,7 @@ async fn events(
             evs.push(("wishlist.updated", json!({ "status": s.status, "title": s.title,
                 "completion": { "item_count": s.items.len(), "fulfilled_count": fulfilled, "completion_pct": crate::wishlists::completion_pct(s.items.values().map(|i| units(i).0).sum(), s.items.values().map(|i| units(i).1).sum()) },
                 "updated_at": chrono::Utc::now() })));
-            seen = s.items;
+            seen = s.items.clone();
             for (name, data) in evs {
                 seq += 1;
                 let ev = Event::default()
