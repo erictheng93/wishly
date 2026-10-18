@@ -286,7 +286,7 @@ pub(crate) async fn issue_otp(
     pw_hash: Option<&str>,
     name: Option<&str>,
 ) -> Result<Uuid, AppError> {
-    issue_otp_scoped(pool, email, purpose, pw_hash, name, None, None).await
+    issue_otp_scoped(pool, email, purpose, pw_hash, name, None, None, true).await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -298,10 +298,20 @@ pub(crate) async fn issue_otp_scoped(
     name: Option<&str>,
     owner: Option<Uuid>,
     session_hash: Option<&[u8]>,
+    bound: bool,
 ) -> Result<Uuid, AppError> {
     let mut tx = pool.begin().await?;
-    let (id, code) =
-        issue_otp_in_tx(&mut tx, email, purpose, pw_hash, name, owner, session_hash).await?;
+    let (id, code) = issue_otp_in_tx(
+        &mut tx,
+        email,
+        purpose,
+        pw_hash,
+        name,
+        owner,
+        session_hash,
+        bound,
+    )
+    .await?;
     tx.commit().await?;
     send_otp(email, code, purpose);
     Ok(id)
@@ -317,6 +327,7 @@ pub(crate) async fn issue_otp_in_tx(
     name: Option<&str>,
     owner: Option<Uuid>,
     session_hash: Option<&[u8]>,
+    bound: bool,
 ) -> Result<(Uuid, String), AppError> {
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
         .bind(format!("otp:{email}"))
@@ -340,8 +351,8 @@ pub(crate) async fn issue_otp_in_tx(
         return Err(rate_limited(600));
     }
     let code = format!("{:06}", rand::thread_rng().gen_range(0..1_000_000u32));
-    let id: Uuid = sqlx::query_scalar("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, pending_password_hash, pending_display_name, link_user_id, link_session_hash) VALUES ($1,$2, now() + make_interval(secs => $3),$4,$5,$6,$7,$8) RETURNING id")
-        .bind(email).bind(code_hash(&code, &pepper())).bind(OTP_TTL_SECS as f64).bind(purpose).bind(pw_hash).bind(name).bind(owner).bind(session_hash).fetch_one(&mut **tx).await?;
+    let id: Uuid = sqlx::query_scalar("INSERT INTO otp_challenges (email, code_hash, expires_at, purpose, pending_password_hash, pending_display_name, link_user_id, link_session_hash, bound) VALUES ($1,$2, now() + make_interval(secs => $3),$4,$5,$6,$7,$8,$9) RETURNING id")
+        .bind(email).bind(code_hash(&code, &pepper())).bind(OTP_TTL_SECS as f64).bind(purpose).bind(pw_hash).bind(name).bind(owner).bind(session_hash).bind(bound).fetch_one(&mut **tx).await?;
     Ok((id, code))
 }
 
@@ -441,7 +452,8 @@ pub(crate) async fn consume_otp_scoped(
         return Err(AppError::invalid("/code", "FORMAT", "驗證碼為 6 位數字"));
     }
     // 帶 challenge_id：只驗那一張、只套單張嘗試上限，他人亂猜 email 級額度也擋不了本人。
-    // 沒帶（舊客戶端、後台代寄的重設信）：每 (email, 用途) 每小時最多 10 次嘗試；不跨用途。
+    // 沒帶（後台代寄的重設信、登入中綁定 Email）：只能驗未綁定的挑戰，每 (email, 用途) 每小時最多 10 次嘗試；不跨用途。
+    // 匿名端點發出的挑戰一律綁定 id，他人不帶 id 亂猜碰不到本人那張。
     if challenge.is_none() {
         let tries: i64 = sqlx::query_scalar("SELECT coalesce(sum(attempts),0)::bigint FROM otp_challenges WHERE email=$1 AND purpose=$2 AND created_at > now() - interval '1 hour'")
             .bind(email).bind(purpose).fetch_one(&mut *tx).await?;
@@ -453,7 +465,7 @@ pub(crate) async fn consume_otp_scoped(
     let ch: Option<OtpChallengeRow> = sqlx::query_as(
         "SELECT id, code_hash, attempts, pending_password_hash, pending_display_name FROM otp_challenges
          WHERE email=$1 AND purpose=$2 AND link_user_id IS NOT DISTINCT FROM $3 AND link_session_hash IS NOT DISTINCT FROM $4 AND consumed_at IS NULL AND expires_at > now()
-         AND ($5::uuid IS NULL OR id = $5)
+         AND (id = $5 OR ($5::uuid IS NULL AND NOT bound))
          ORDER BY created_at DESC LIMIT 1").bind(email).bind(purpose).bind(owner).bind(session_hash).bind(challenge).fetch_optional(&mut *tx).await?;
     let (cid, hash, attempts, pw, name) = ch.ok_or_else(otp_invalid)?;
     if attempts >= OTP_MAX_ATTEMPTS {

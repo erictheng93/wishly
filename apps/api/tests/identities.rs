@@ -418,6 +418,7 @@ async fn registration_identity_and_password_are_atomic(pool: PgPool) {
         .execute(&mut *unlink)
         .await
         .unwrap();
+    let cid = common::latest_challenge(&pool, "register-race@example.com", "register").await;
     let register = tokio::spawn({
         let pool = pool.clone();
         async move {
@@ -426,7 +427,9 @@ async fn registration_identity_and_password_are_atomic(pool: PgPool) {
                 "POST",
                 "/auth/register/verify",
                 &[],
-                Some(json!({"email":"register-race@example.com","code":"123456"})),
+                Some(
+                    json!({"email":"register-race@example.com","code":"123456","challenge_id":cid}),
+                ),
             )
             .await
         }

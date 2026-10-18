@@ -195,6 +195,7 @@ async fn request_email(
         None,
         Some(u.id),
         Some(&session_hash(&headers)?),
+        false,
     )
     .await?;
     Ok((

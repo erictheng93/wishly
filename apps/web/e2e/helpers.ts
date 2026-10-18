@@ -40,8 +40,8 @@ export function makeStaff(email: string) {
   const n = sql(`UPDATE users SET is_staff = true WHERE email = '${q(email)}' RETURNING 1`)
   if (n.split('\n')[0] !== '1') throw new Error(`找不到使用者 ${email}`)
 }
-/** OTP 共用「每 email 60 秒間隔」限流；需要在同一個 email 連續取第二封信時把舊紀錄往前推 */
-export const skipOtpCooldown = (email: string) => sql(`UPDATE otp_challenges SET created_at = created_at - interval '5 minutes' WHERE email = '${q(email)}'`)
+/** OTP「每 (請求者 IP, email) 60 秒間隔」記在 rate_limits；需要在同一個 email 連續取第二封信時把它清掉 */
+export const skipOtpCooldown = (email: string) => sql(`DELETE FROM rate_limits WHERE key LIKE 'otp_gap:%:${q(email)}'`)
 
 // ---------- API（創建者）----------
 export const apiCtx = (): Promise<APIRequestContext> => pwRequest.newContext({ baseURL: API + '/api/v1/', extraHTTPHeaders: { Origin: 'http://localhost:3012' } })
@@ -55,9 +55,10 @@ export type User = { email: string; password: string; name: string; api: APIRequ
 export async function registerUser(opts: { name?: string; tag?: string } = {}): Promise<User> {
   const email = newEmail(opts.tag), name = opts.name ?? `創建者${uid().slice(0, 4)}`
   const api = await apiCtx()
-  await must(await api.post('auth/register', { data: { email, password: PASSWORD, display_name: name } }), '註冊')
+  const r = await must(await api.post('auth/register', { data: { email, password: PASSWORD, display_name: name } }), '註冊')
+  const { challenge_id } = await r.json()
   const code = await waitForOtp(email)
-  await must(await api.post('auth/register/verify', { data: { email, code } }), '驗證註冊')
+  await must(await api.post('auth/register/verify', { data: { email, code, challenge_id } }), '驗證註冊')
   return { email, password: PASSWORD, name, api }
 }
 

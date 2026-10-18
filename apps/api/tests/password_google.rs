@@ -105,6 +105,7 @@ async fn password_register_login_reset(pool: PgPool) {
     );
     // login 用途的 OTP 不能拿來驗註冊
     let code = recover_code(&pool, &email, "register").await;
+    let cid = common::latest_challenge(&pool, &email, "register").await;
     let wrong = if code == "000000" { "000001" } else { "000000" };
     assert_eq!(
         common::call_app(
@@ -112,7 +113,7 @@ async fn password_register_login_reset(pool: PgPool) {
             "POST",
             "/auth/register/verify",
             &[],
-            Some(json!({ "email": email, "code": wrong }))
+            Some(json!({ "email": email, "code": wrong, "challenge_id": cid }))
         )
         .await
         .0,
@@ -123,7 +124,7 @@ async fn password_register_login_reset(pool: PgPool) {
         "POST",
         "/auth/register/verify",
         &[],
-        Some(json!({ "email": email, "code": code })),
+        Some(json!({ "email": email, "code": code, "challenge_id": cid })),
     )
     .await;
     assert_eq!(st, 200, "{b}");
@@ -213,13 +214,14 @@ async fn password_register_login_reset(pool: PgPool) {
     );
     age_otps(&pool).await;
     let code = recover_code(&pool, &email, "register").await;
+    let cid = common::latest_challenge(&pool, &email, "register").await;
     assert_eq!(
         common::call_app(
             &app,
             "POST",
             "/auth/register/verify",
             &[],
-            Some(json!({ "email": email, "code": code }))
+            Some(json!({ "email": email, "code": code, "challenge_id": cid }))
         )
         .await
         .0,
@@ -270,13 +272,16 @@ async fn password_register_login_reset(pool: PgPool) {
         429
     ); // 同 IP 60 秒內重送：與帳號是否存在無關，一律 429
     let code = recover_code(&pool, &email, "reset").await;
+    let cid = common::latest_challenge(&pool, &email, "reset").await;
     assert_eq!(
         common::call_app(
             &app,
             "POST",
             "/auth/password/reset/confirm",
             &[],
-            Some(json!({ "email": email, "code": code, "new_password": "tiny" }))
+            Some(
+                json!({ "email": email, "code": code, "new_password": "tiny", "challenge_id": cid })
+            )
         )
         .await
         .0,
@@ -287,7 +292,7 @@ async fn password_register_login_reset(pool: PgPool) {
         "POST",
         "/auth/password/reset/confirm",
         &[],
-        Some(json!({ "email": email, "code": code, "new_password": "brand-new-pass" })),
+        Some(json!({ "email": email, "code": code, "new_password": "brand-new-pass", "challenge_id": cid })),
     )
     .await;
     assert_eq!(st, 204);
@@ -361,13 +366,14 @@ async fn otp_account_sets_password_via_reset(pool: PgPool) {
     )
     .await;
     let code = recover_code(&pool, &email, "login").await;
+    let cid = common::latest_challenge(&pool, &email, "login").await;
     assert_eq!(
         common::call_app(
             &app,
             "POST",
             "/auth/otp/verify",
             &[],
-            Some(json!({ "email": email, "code": code }))
+            Some(json!({ "email": email, "code": code, "challenge_id": cid }))
         )
         .await
         .0,
@@ -395,13 +401,14 @@ async fn otp_account_sets_password_via_reset(pool: PgPool) {
     )
     .await;
     let code = recover_code(&pool, &email, "reset").await;
+    let cid = common::latest_challenge(&pool, &email, "reset").await;
     assert_eq!(
         common::call_app(
             &app,
             "POST",
             "/auth/password/reset/confirm",
             &[],
-            Some(json!({ "email": email, "code": code, "new_password": "whatever-123" }))
+            Some(json!({ "email": email, "code": code, "new_password": "whatever-123", "challenge_id": cid }))
         )
         .await
         .0,
