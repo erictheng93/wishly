@@ -36,7 +36,11 @@ export function useAuth() {
         const { ticket } = await api(`/auth/oauth/${provider}/link-ticket`, { method: 'POST', body: { app_challenge: c }, noRedirect: true })
         return `${start}&link=true&app_challenge=${c}&ticket=${encodeURIComponent(ticket)}`
       })
-      return link ? fetchMe(true) : session('/auth/native/exchange', { code: r.code, verifier: r.verifier })
+      if (link) {
+        await api('/auth/native/link-confirm', { method: 'POST', body: { code: r.linkCode, verifier: r.verifier }, noRedirect: true })
+        return fetchMe(true)
+      }
+      return session('/auth/native/exchange', { code: r.code, verifier: r.verifier })
     }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }

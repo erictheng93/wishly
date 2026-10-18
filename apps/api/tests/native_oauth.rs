@@ -372,13 +372,123 @@ async fn native_link_ticket_flow(pool: PgPool) {
     )
     .await;
     assert_eq!(st, 302);
+    // callback 只發待確認碼，還沒寫入任何身分（瀏覽器端可能是別人）
+    let loc = h.get(header::LOCATION).unwrap().to_str().unwrap();
+    let lc = loc
+        .strip_prefix("wishly://auth?link_code=")
+        .expect(loc)
+        .to_string();
+    let count = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM auth_identities WHERE provider='line' AND provider_uid='U-link-9'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    assert_eq!(count().await, 0, "CSRF：callback 不可直接綁定");
+    let confirm = |code: String, verifier: String, hdr: Vec<(&'static str, String)>| {
+        let app = app.clone();
+        async move {
+            call_app(
+                &app,
+                "POST",
+                "/auth/native/link-confirm",
+                &hdr,
+                Some(json!({ "code": code, "verifier": verifier })),
+            )
+            .await
+        }
+    };
+    let nat = || -> Vec<(&'static str, String)> {
+        vec![
+            ("origin", TAURI.to_string()),
+            ("x-native-client", "1".to_string()),
+        ]
+    };
+    // 沒有 Bearer 不能確認；link_result 碼不能當登入碼；別人的 session 也不行
+    assert_eq!(confirm(lc.clone(), "v".repeat(43), nat()).await.0, 401);
+    let (st, _, _) = call_app(
+        &app,
+        "POST",
+        "/auth/native/exchange",
+        &nat(),
+        Some(json!({ "code": lc, "verifier": "v".repeat(43) })),
+    )
+    .await;
+    assert_eq!(st, 400);
+    let other_user = user(&pool, "別人").await;
+    let other_tok = session(&pool, other_user.id).await;
+    let mut h_other = nat();
+    h_other.push(("authorization", format!("Bearer {other_tok}")));
+    assert_eq!(confirm(lc, "v".repeat(43), h_other).await.0, 400);
+    assert_eq!(count().await, 0);
+    // 重新走一次：verifier 錯 → 400 且碼作廢；對的 verifier + 同 session → 200，且不可重放
+    let cb = |state: String, oc: String| {
+        let app = app.clone();
+        async move {
+            let (_, h, _) = call_app(
+                &app,
+                "GET",
+                &format!("/auth/oauth/line/callback?code=c&state={state}"),
+                &[("cookie", oc)],
+                None,
+            )
+            .await;
+            h.get(header::LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .strip_prefix("wishly://auth?link_code=")
+                .unwrap()
+                .to_string()
+        }
+    };
+    let new_link_code = || async {
+        let t = get_ticket().await;
+        let (_, h, _) = call_app(&app, "GET", &format!("{url}&ticket={t}"), &[], None).await;
+        let state = h
+            .get(header::LOCATION)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split("state=")
+            .nth(1)
+            .unwrap()
+            .split('&')
+            .next()
+            .unwrap()
+            .to_string();
+        let oc = h
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_string();
+        cb(state, oc).await
+    };
+    let mut h_me = nat();
+    h_me.push(bearer.clone());
+    let lc2 = new_link_code().await;
     assert_eq!(
-        h.get(header::LOCATION).unwrap(),
-        "wishly://auth?linked=line"
+        confirm(lc2.clone(), "x".repeat(43), h_me.clone()).await.0,
+        400
     );
+    assert_eq!(
+        confirm(lc2, "v".repeat(43), h_me.clone()).await.0,
+        400,
+        "碼已作廢"
+    );
+    let lc3 = new_link_code().await;
+    let (st, _, b) = confirm(lc3.clone(), "v".repeat(43), h_me.clone()).await;
+    assert_eq!(st, 200, "{b}");
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_identities WHERE user_id=$1 AND provider='line' AND provider_uid='U-link-9'")
         .bind(me.id).fetch_one(&pool).await.unwrap();
     assert_eq!(n, 1);
+    assert_eq!(confirm(lc3, "v".repeat(43), h_me).await.0, 400, "不可重放");
 
     // ticket 發出後 session 被登出 → 綁定在 callback 失敗並以 deep link 回報
     let me2 = user(&pool, "登出者").await;
