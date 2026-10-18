@@ -72,7 +72,7 @@ async fn explore(
          WHERE w.visibility = 'public' AND w.status = 'active' AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
            AND o.deleted_at IS NULL AND o.blocked_at IS NULL
            AND (w.closes_at IS NULL OR w.closes_at > now())
-           AND w.slug::text NOT LIKE 'demo%'   -- 0018 範例清單不上探索頁
+           AND w.slug::text NOT LIKE 'demo%'   -- 範例清單（db/seed/demo.sql）不上探索頁
            AND NOT (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')))
            AND ($1::text IS NULL OR w.type::text = $1)
            AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
