@@ -32,6 +32,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/oauth/{provider}/start", get(oauth_start))
         .route("/auth/oauth/{provider}/callback", get(oauth_callback))
         .route("/auth/native/exchange", post(native_exchange))
+        .route("/auth/native/link-confirm", post(native_link_confirm))
         .route("/auth/oauth/{provider}/link-ticket", post(link_ticket))
         .route("/auth/logout", post(logout))
         .merge(crate::auth_ext::routes())
@@ -1144,6 +1145,26 @@ async fn oauth_callback(
         }
     };
     let (sub, email, name, picture) = identity;
+    // 原生殼綁定：瀏覽器不一定是發 ticket 的那台裝置，這裡不寫 auth_identities，
+    // 只存待確認結果，由 App 憑 verifier + 同 session 呼叫 link-confirm 才綁定。
+    if let (Some(id), Some(challenge)) = (s.link_user, &s.app_challenge) {
+        let code = rand_b64(32);
+        sqlx::query("INSERT INTO native_auth_codes (code_hash, user_id, challenge, expires_at, purpose, session_hash, provider, provider_uid, email, picture) VALUES ($1,$2,$3, now() + interval '60 seconds','link_result',$4,$5,$6,$7,$8)")
+            .bind(hash_token(&code)).bind(id).bind(challenge).bind(session_hash.as_deref())
+            .bind(&provider).bind(&sub).bind(email.as_deref()).bind(picture.as_deref())
+            .execute(&st.pool).await?;
+        return Ok((
+            StatusCode::FOUND,
+            AppendHeaders([
+                (
+                    header::LOCATION,
+                    format!("{}?link_code={code}", native_redirect()),
+                ),
+                (header::SET_COOKIE, clear),
+            ]),
+        )
+            .into_response());
+    }
     if let Some(id) = s.link_user {
         match crate::identities::link(
             &st.pool,
@@ -1162,11 +1183,7 @@ async fn oauth_callback(
                     AppendHeaders([
                         (
                             header::LOCATION,
-                            if s.app_challenge.is_some() {
-                                format!("{}?linked={provider}", native_redirect())
-                            } else {
-                                format!("{}/settings?linked={provider}", app_url())
-                            },
+                            format!("{}/settings?linked={provider}", app_url()),
                         ),
                         (header::SET_COOKIE, clear),
                     ]),
@@ -1300,6 +1317,57 @@ async fn native_exchange(
         return Err(invalid());
     }
     session_response(&st.pool, &headers, &ip, "native", uid, false).await
+}
+
+/// 原生殼綁定的最後一步：link_code + PKCE verifier + 發起 ticket 的同一個 Bearer session，才寫入 auth_identities。
+/// 碼先刪除再驗證（單次）；purpose 分開，link_result 碼無法當登入碼兌換，反之亦然。
+async fn native_link_confirm(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    u: CurrentUser,
+    Json(r): Json<ExchangeReq>,
+) -> Result<Json<Value>, AppError> {
+    if !native_client(&headers) {
+        return Err(AppError::problem(403, "NATIVE_ONLY", "僅限原生客戶端"));
+    }
+    let invalid =
+        || AppError::problem(400, "NATIVE_CODE_INVALID", "綁定碼無效或已過期，請重新操作");
+    #[allow(clippy::type_complexity)]
+    let (uid, challenge, hash, provider, puid, email, picture): (
+        Uuid,
+        String,
+        Option<Vec<u8>>,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+    ) = sqlx::query_as(
+        "DELETE FROM native_auth_codes WHERE code_hash=$1 AND purpose='link_result' AND expires_at > now() RETURNING user_id, challenge, session_hash, provider, provider_uid, email, picture",
+    )
+    .bind(hash_token(&r.code))
+    .fetch_optional(&st.pool)
+    .await?
+    .ok_or_else(invalid)?;
+    let expect = B64.encode(Sha256::digest(r.verifier.as_bytes()));
+    let cur = crate::session::session_token(&headers).map(|t| hash_token(&t));
+    if uid != u.id
+        || !crate::config::ct_eq(expect.as_bytes(), challenge.as_bytes())
+        || hash.is_none()
+        || hash != cur
+    {
+        return Err(invalid());
+    }
+    crate::identities::link(
+        &st.pool,
+        uid,
+        hash.as_deref().unwrap_or_default(),
+        &provider,
+        &puid,
+        email.as_deref(),
+    )
+    .await?;
+    crate::uploads::import_avatar(&st.pool, uid, &provider, picture.as_deref()).await;
+    Ok(Json(json!({ "linked": provider })))
 }
 
 #[cfg(test)]
