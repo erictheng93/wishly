@@ -12,8 +12,12 @@ use sqlx::PgPool;
 use tokio::sync::mpsc;
 use wishly_api::{config::Config, uploads::MAX_BYTES};
 
+// config 是行程全域單例（先到先贏）：兩個測試並行時，confirm 的 S3 請求會打進對方的 mock，故序列化。
+static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: PgPool) {
+    let _serial = SERIAL.lock().await;
     let (seen, mut received) = mpsc::unbounded_channel();
     let mock = Router::new()
         .route("/media", put(|| async { StatusCode::OK }))
@@ -143,6 +147,7 @@ async fn presign_whitelists_size_type_purpose_and_binds_incoming_to_user(pool: P
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn confirm_is_rate_limited_per_user(pool: PgPool) {
+    let _serial = SERIAL.lock().await;
     let TestUser { id, token } = user(&pool, "Alice").await;
     let TestUser { token: other, .. } = user(&pool, "Bob").await;
     for _ in 0..120 {
