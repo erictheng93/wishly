@@ -551,7 +551,7 @@ async fn analytics(
          r AS (SELECT today - ($1 - 1) AS d0, today FROM b),
          -- 區間起點（含）的 timestamptz
          lo AS (SELECT d0::timestamp AT TIME ZONE 'Asia/Taipei' AS t FROM r),
-         cu AS (SELECT * FROM users WHERE deleted_at IS NULL AND NOT is_staff),
+         cu AS (SELECT * FROM users WHERE deleted_at IS NULL AND NOT is_staff AND NOT EXISTS (SELECT 1 FROM wishlists d WHERE d.owner_id = users.id AND d.slug::text LIKE 'demo%')),
          wl AS (SELECT w.* FROM wishlists w JOIN cu ON cu.id = w.owner_id WHERE w.deleted_at IS NULL),
          cohort AS (SELECT id, created_at FROM cu WHERE created_at >= (SELECT t FROM lo)),
          -- 留存 cohort：台北註冊日落在區間內

@@ -11,9 +11,9 @@ useSeoMeta({
 })
 
 const scenes = [
-  { k: '送禮', slug: 'gift', t: '節日與回禮', d: '收禮的人列清單，送禮的人照著挑，不再猜尺寸、顏色和喜好。' },
-  { k: '生日', slug: 'birthday', t: '一個連結收齊心意', d: '貼進群組就好。大家各認一樣，也能湊錢一起買大禮。' },
-  { k: '婚禮', slug: 'wedding', t: '新家用品一次備齊', d: '家電、餐具、生活用品都列上去，賓客捐助後品項立刻鎖定。' },
+  { k: '送禮', slug: 'demogift00', t: '節日與回禮', d: '收禮的人列清單，送禮的人照著挑，不再猜尺寸、顏色和喜好。' },
+  { k: '生日', slug: 'demobirth0', t: '一個連結收齊心意', d: '貼進群組就好。大家各認一樣，也能湊錢一起買大禮。' },
+  { k: '婚禮', slug: 'demowedd00', t: '新家用品一次備齊', d: '家電、餐具、生活用品都列上去，賓客捐助後品項立刻鎖定。' },
 ]
 const steps = [
   { n: '01', t: '建立心願清單', d: '加入想要的品項、價格與連結，十分鐘就能完成。' },
@@ -40,7 +40,7 @@ const faq = [
         <b class="l-logo">WISHLY</b>
         <nav>
           <NuxtLink to="/explore" class="l-nav-link">探索</NuxtLink>
-          <NuxtLink to="/s/demo" class="l-nav-link">看範例</NuxtLink>
+          <NuxtLink to="/s/demobirth0" class="l-nav-link">看範例</NuxtLink>
           <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>
         </nav>
       </div>
@@ -56,7 +56,7 @@ const faq = [
           <div class="l-cta">
             <NuxtLink :to="cta.to" class="g-btn">{{ cta.text }}</NuxtLink>
             <NuxtLink to="/explore" class="g-btn ghost">探索公開清單</NuxtLink>
-            <NuxtLink to="/s/demo" class="g-btn ghost">看範例清單</NuxtLink>
+            <NuxtLink to="/s/demobirth0" class="g-btn ghost">看範例清單</NuxtLink>
           </div>
         </div>
 

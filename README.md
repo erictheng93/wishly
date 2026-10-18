@@ -149,6 +149,9 @@ npx playwright show-report                                      # 開啟上次�
 | `npm run build:native`（Tauri 前端） | `NUXT_NATIVE=1`、`NUXT_PUBLIC_SITE_URL`（分享連結網域，預設 `https://wishly.tw`）、`NUXT_PUBLIC_API_BASE` | 純 SPA 靜態檔 `.output/public`（無 SSR、無 service worker、隱藏第三方登入）；Tauri 的 `frontendDist` 指向它。尚未包 Tauri 專案 |
 | `npm run deploy:demo`（示範） | `NUXT_DEMO=1`、`NUXT_PUBLIC_API_BASE=` | 僅 `/s/demo` 有同源假資料，其餘分享連結失敗；**不要給真實使用者** |
 
+- 範例清單（landing「看範例」，`/s/demobirth0`、`/s/demogift00`、`/s/demowedd00`）是真實 API 的 public 清單：部署後在正式 DB 執行一次 `psql "$DATABASE_URL" -f db/seed/demo.sql`（可重複執行）。它們不出現在探索頁與後台分析。
+
+
 - 正式 API 網域不同時，建置前設 `NUXT_PUBLIC_API_BASE=https://...`，或改 `nuxt.config.ts` 預設值。
 - `wrangler.jsonc` 刻意不放 `vars`，避免執行期變數蓋掉建置設定。
 - 本機驗證：`npm run build` 後 `npx wrangler pages dev dist`（示範用 `npm run build:demo`）。

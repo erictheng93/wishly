@@ -58,3 +58,13 @@ async fn explore_paginates(pool: PgPool) {
     let (p2, v) = titles(&pool, "?page=2").await;
     assert_eq!((p2.len(), v["next_page"].is_null()), (1, true));
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn demo_seed_hidden_from_explore(pool: PgPool) {
+    for _ in 0..2 {   // 第二次驗證可重複執行
+        sqlx::raw_sql(include_str!("../../../db/seed/demo.sql")).execute(&pool).await.unwrap();
+    }
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlists WHERE slug LIKE 'demo%' AND visibility = 'public'").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 3);
+    assert!(titles(&pool, "").await.0.is_empty());
+}
