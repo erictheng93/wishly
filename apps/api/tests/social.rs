@@ -772,12 +772,7 @@ async fn profile_donations_visibility(pool: PgPool) {
     let (_, locked_item) = list(&pool, o, "public", true).await;
     let (_, fr_item) = list(&pool, o, "friends", false).await;
     let (_, hidden_claim_item) = list(&pool, o, "public", false).await;
-    for it in [
-        pub_item,
-        priv_item,
-        locked_item,
-        fr_item,
-    ] {
+    for it in [pub_item, priv_item, locked_item, fr_item] {
         user_claim(&pool, it, d, "public").await;
     }
     user_claim(&pool, hidden_claim_item, d, "private").await;

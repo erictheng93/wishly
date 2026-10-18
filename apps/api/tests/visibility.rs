@@ -231,32 +231,55 @@ async fn owner_visibility_rules(pool: PgPool) {
     // 已移除的 link / password 與未知值一律 422
     for v in ["link", "password", "nope"] {
         assert_eq!(
-            create(json!({ "type": "personal", "title": "x", "visibility": v })).await.0,
+            create(json!({ "type": "personal", "title": "x", "visibility": v }))
+                .await
+                .0,
             StatusCode::UNPROCESSABLE_ENTITY,
             "{v}"
         );
     }
     // 未指定 → 預設僅好友
     let (s, _, w) = create(json!({ "type": "personal", "title": "x" })).await;
-    assert_eq!((s, w["visibility"].as_str()), (StatusCode::CREATED, Some("friends")));
+    assert_eq!(
+        (s, w["visibility"].as_str()),
+        (StatusCode::CREATED, Some("friends"))
+    );
     let id = w["id"].as_str().unwrap();
     for v in ["link", "password"] {
         assert_eq!(
-            call(&pool, "PATCH", &format!("/wishlists/{id}"), &o, Some(json!({ "visibility": v }))).await.0,
+            call(
+                &pool,
+                "PATCH",
+                &format!("/wishlists/{id}"),
+                &o,
+                Some(json!({ "visibility": v }))
+            )
+            .await
+            .0,
             StatusCode::UNPROCESSABLE_ENTITY,
             "{v}"
         );
     }
     assert_eq!(
-        call(&pool, "PATCH", &format!("/wishlists/{id}"), &o, Some(json!({ "visibility": "public" }))).await.0,
+        call(
+            &pool,
+            "PATCH",
+            &format!("/wishlists/{id}"),
+            &o,
+            Some(json!({ "visibility": "public" }))
+        )
+        .await
+        .0,
         StatusCode::OK
     );
     // DB 層也擋（舊 enum 值仍存在，靠 CHECK）
-    assert!(sqlx::query("UPDATE wishlists SET visibility='link' WHERE id=$1::uuid")
-        .bind(id)
-        .execute(&pool)
-        .await
-        .is_err());
+    assert!(
+        sqlx::query("UPDATE wishlists SET visibility='link' WHERE id=$1::uuid")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .is_err()
+    );
     assert_all_reconciled(&pool).await;
 }
 

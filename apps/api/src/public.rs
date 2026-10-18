@@ -29,7 +29,19 @@ struct ExploreQ {
     r#type: Option<String>,
 }
 
-type ExploreRow = (String, String, String, Option<String>, String, Option<NaiveDate>, String, Option<String>, i64, i64, i64);
+type ExploreRow = (
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    Option<NaiveDate>,
+    String,
+    Option<String>,
+    i64,
+    i64,
+    i64,
+);
 
 /// GET /public/wishlists?page=&type=：探索頁，列出所有人的公開清單（訪客可看；不讀 cookie，可被 CDN 快取）。
 /// 條件與 `servable` 一致再加：有品項、未結束、未驚喜鎖定、擁有者正常。
@@ -42,7 +54,13 @@ async fn explore(
     let ty = match q.r#type.as_deref() {
         None | Some("") => None,
         Some(t @ ("registry" | "relief")) => Some(t),
-        _ => return Err(AppError::invalid("/type", "ENUM", "type 必須是 registry / relief")),
+        _ => {
+            return Err(AppError::invalid(
+                "/type",
+                "ENUM",
+                "type 必須是 registry / relief",
+            ))
+        }
     };
     let rows: Vec<ExploreRow> = sqlx::query_as(&format!(
         "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
@@ -65,9 +83,13 @@ async fn explore(
         "slug": slug, "title": title, "type": ty, "cover_image_url": image_url(ck.as_deref(), &cs), "event_date": ev,
         "owner": { "display_name": on, "handle": oh }, "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })).collect();
     Ok((
-        [(header::CACHE_CONTROL, "public, s-maxage=10, stale-while-revalidate=60")],
+        [(
+            header::CACHE_CONTROL,
+            "public, s-maxage=10, stale-while-revalidate=60",
+        )],
         Json(json!({ "wishlists": wishlists, "next_page": more.then_some(page + 1) })),
-    ).into_response())
+    )
+        .into_response())
 }
 
 pub fn image_url(key: Option<&str>, status: &str) -> Option<String> {

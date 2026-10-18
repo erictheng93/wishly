@@ -8,7 +8,12 @@ async fn titles(pool: &PgPool, q: &str) -> (Vec<String>, serde_json::Value) {
     let (s, h, v) = call(pool, "GET", &format!("/public/wishlists{q}"), &[], None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert!(h["cache-control"].to_str().unwrap().starts_with("public"));
-    let t = v["wishlists"].as_array().unwrap().iter().map(|w| w["title"].as_str().unwrap().to_string()).collect();
+    let t = v["wishlists"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["title"].as_str().unwrap().to_string())
+        .collect();
     (t, v)
 }
 
@@ -17,20 +22,72 @@ async fn explore_lists_only_servable_public_lists(pool: PgPool) {
     let o = user(&pool, "主人").await;
     let cases: [(&str, ListOpts, bool); 7] = [
         ("公開", ListOpts::default(), true),
-        ("好友", ListOpts { visibility: Some("friends"), ..Default::default() }, false),
-        ("摯友", ListOpts { visibility: Some("selected"), ..Default::default() }, false),
-        ("私人", ListOpts { visibility: Some("private"), ..Default::default() }, false),
-        ("草稿", ListOpts { status: Some("draft"), ..Default::default() }, false),
-        ("下架", ListOpts { moderation_status: Some("hidden"), ..Default::default() }, false),
-        ("驚喜", ListOpts { surprise: true, event_offset_days: Some(30), ..Default::default() }, false),
+        (
+            "好友",
+            ListOpts {
+                visibility: Some("friends"),
+                ..Default::default()
+            },
+            false,
+        ),
+        (
+            "摯友",
+            ListOpts {
+                visibility: Some("selected"),
+                ..Default::default()
+            },
+            false,
+        ),
+        (
+            "私人",
+            ListOpts {
+                visibility: Some("private"),
+                ..Default::default()
+            },
+            false,
+        ),
+        (
+            "草稿",
+            ListOpts {
+                status: Some("draft"),
+                ..Default::default()
+            },
+            false,
+        ),
+        (
+            "下架",
+            ListOpts {
+                moderation_status: Some("hidden"),
+                ..Default::default()
+            },
+            false,
+        ),
+        (
+            "驚喜",
+            ListOpts {
+                surprise: true,
+                event_offset_days: Some(30),
+                ..Default::default()
+            },
+            false,
+        ),
     ];
     for (title, opts, _) in cases {
         let l = wishlist(&pool, o.id, opts).await;
-        sqlx::query("UPDATE wishlists SET title=$2 WHERE id=$1").bind(l.id).bind(title).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE wishlists SET title=$2 WHERE id=$1")
+            .bind(l.id)
+            .bind(title)
+            .execute(&pool)
+            .await
+            .unwrap();
         item(&pool, l.id, "奶瓶", 1).await;
     }
     let empty = wishlist(&pool, o.id, ListOpts::default()).await; // 沒有品項
-    sqlx::query("UPDATE wishlists SET title='空清單' WHERE id=$1").bind(empty.id).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE wishlists SET title='空清單' WHERE id=$1")
+        .bind(empty.id)
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let (t, v) = titles(&pool, "").await;
     assert_eq!(t, vec!["公開"], "{v}");
@@ -42,7 +99,11 @@ async fn explore_lists_only_servable_public_lists(pool: PgPool) {
     let (s, _, _) = call(&pool, "GET", "/public/wishlists?type=nope", &[], None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     // 擁有者被封鎖 → 不列
-    sqlx::query("UPDATE users SET blocked_at = now() WHERE id=$1").bind(o.id).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE users SET blocked_at = now() WHERE id=$1")
+        .bind(o.id)
+        .execute(&pool)
+        .await
+        .unwrap();
     assert!(titles(&pool, "").await.0.is_empty());
 }
 
@@ -61,10 +122,19 @@ async fn explore_paginates(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn demo_seed_hidden_from_explore(pool: PgPool) {
-    for _ in 0..2 {   // 第二次驗證可重複執行
-        sqlx::raw_sql(include_str!("../../../db/seed/demo.sql")).execute(&pool).await.unwrap();
+    for _ in 0..2 {
+        // 第二次驗證可重複執行
+        sqlx::raw_sql(include_str!("../../../db/seed/demo.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
     }
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlists WHERE slug LIKE 'demo%' AND visibility = 'public'").fetch_one(&pool).await.unwrap();
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM wishlists WHERE slug LIKE 'demo%' AND visibility = 'public'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(n, 3);
     assert!(titles(&pool, "").await.0.is_empty());
 }

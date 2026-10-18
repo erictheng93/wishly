@@ -114,8 +114,11 @@ async fn create(
     }
     let w: Option<(Uuid, String, Uuid, String)> = sqlx::query_as(
         "SELECT id, moderation_status::text, owner_id, visibility::text FROM wishlists
-         WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')")
-        .bind(&slug).fetch_optional(&st.pool).await?;
+         WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')",
+    )
+    .bind(&slug)
+    .fetch_optional(&st.pool)
+    .await?;
     let (wid, m, owner_id, vis) = w.ok_or(AppError::NotFound)?;
     let viewer = crate::access::viewer(&parts, &st).await?;
     crate::access::check_wishlist(

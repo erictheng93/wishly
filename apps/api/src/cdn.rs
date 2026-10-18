@@ -8,9 +8,7 @@ use std::time::Duration;
 
 /// 公開（可快取）路徑是否會提供這份清單的內容（與 public.rs render 的匿名判斷一致）
 pub fn servable(visibility: &str, status: &str, moderation: &str) -> bool {
-    visibility == "public"
-        && matches!(status, "active" | "closed")
-        && moderation == "ok"
+    visibility == "public" && matches!(status, "active" | "closed") && moderation == "ok"
 }
 
 fn public_url(cfg: &Config, slug: &str) -> String {
