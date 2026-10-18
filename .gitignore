@@ -3,6 +3,7 @@ node_modules/
 .nuxt/
 .output/
 .wrangler/
+.cloudflare/
 .env
 .DS_Store
 dist/
