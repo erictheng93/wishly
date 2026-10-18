@@ -1344,3 +1344,84 @@ async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool
         .fetch_one(&pool).await.unwrap();
     assert_eq!(fresh, "private");
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reallocate_rejected_when_wallet_frozen_or_list_not_pledgeable(pool: PgPool) {
+    let app = test_app(&pool);
+    let TestUser {
+        id: owner,
+        token: _,
+    } = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    grant(&pool, a, 1000).await;
+    common::befriend(&pool, owner, a).await;
+    let wl = list_with_shipping(&pool, owner).await;
+    sqlx::query("UPDATE wishlists SET visibility = 'friends' WHERE id = $1")
+        .bind(wl)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let src = cf_item(&pool, wl, 500).await;
+    let dst = cf_item(&pool, wl, 200).await;
+    let (_, _, r) = pledge(&app, src, &ta, 200).await;
+    let cid = r["contribution"]["id"].as_str().unwrap().to_string();
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() WHERE id = $1",
+    )
+    .bind(src)
+    .execute(&pool)
+    .await
+    .unwrap();
+    // (情境, 破壞 SQL, 還原 SQL)；$1 = 甲（frozen / unfriended）或擁有者
+    let cases: [(&str, &str, &str); 5] = [
+        ("frozen", "UPDATE point_wallets SET status = 'frozen' WHERE user_id = $1", "UPDATE point_wallets SET status = 'active' WHERE user_id = $1"),
+        ("hidden", "UPDATE wishlists SET moderation_status = 'hidden', moderation_reason = 'x' WHERE owner_id = $1", "UPDATE wishlists SET moderation_status = 'ok', moderation_reason = NULL WHERE owner_id = $1"),
+        ("private", "UPDATE wishlists SET visibility = 'private' WHERE owner_id = $1", "UPDATE wishlists SET visibility = 'friends' WHERE owner_id = $1"),
+        ("closed", "UPDATE wishlists SET closes_at = now() - interval '1 hour' WHERE owner_id = $1", "UPDATE wishlists SET closes_at = NULL WHERE owner_id = $1"),
+        ("unfriended", "DELETE FROM friendships WHERE user_a = $1 OR user_b = $1", "SELECT 1 WHERE $1::uuid IS NOT NULL"),
+    ];
+    for (name, bad, undo) in cases {
+        let who = if name == "frozen" || name == "unfriended" {
+            a
+        } else {
+            owner
+        };
+        sqlx::query(bad).bind(who).execute(&pool).await.unwrap();
+        let r = common::call_app(
+            &app,
+            "POST",
+            &format!("/contributions/{cid}/reallocate"),
+            &[common::ck(&ta), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({ "target_item_id": dst })),
+        )
+        .await;
+        assert!(r.0.is_client_error(), "{name}: {} {}", r.0, r.2);
+        if name == "frozen" {
+            assert_eq!(r.2["code"], "WALLET_FROZEN");
+        }
+        sqlx::query(undo).bind(who).execute(&pool).await.unwrap();
+    }
+    let (captured, orders): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM contributions WHERE status = 'captured'), (SELECT count(*) FROM purchase_orders)",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((captured, orders), (0, 0));
+    let st: String =
+        sqlx::query_scalar("SELECT status::text FROM contributions WHERE id = $1::uuid")
+            .bind(&cid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(st, "pledged");
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT pledged_points FROM wishlist_items WHERE id = $1")
+            .bind(dst)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    common::assert_all_reconciled(&pool).await;
+}
