@@ -73,8 +73,10 @@ struct RegisterReq {
 
 async fn register(
     State(st): State<AppState>,
+    crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<RegisterReq>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
+    crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
     check_pw(&r.password)?;
     let name = r.display_name.trim();
@@ -106,6 +108,7 @@ async fn register_verify(
     headers: HeaderMap,
     Json(r): Json<CodeReq>,
 ) -> Result<Response, AppError> {
+    crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     let (pw, name) = consume_otp(&st.pool, &email, &r.code, "register").await?;
     let (Some(pw), Some(name)) = (pw, name) else {
@@ -196,8 +199,10 @@ struct ResetReq {
 
 async fn reset_request(
     State(st): State<AppState>,
+    crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<ResetReq>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
+    crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 AND deleted_at IS NULL)",
@@ -229,6 +234,7 @@ async fn reset_confirm(
     crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<ResetConfirm>,
 ) -> Result<StatusCode, AppError> {
+    crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     check_pw(&r.new_password)?;
     consume_otp(&st.pool, &email, &r.code, "reset").await?;

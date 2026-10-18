@@ -274,8 +274,8 @@ async fn send_mail(to: String, code: String, subject: &'static str) {
     }
 }
 
-// ponytail: 只做每 email 限流（查 otp_challenges）；每 IP 20/小時需前置層（Cloudflare）或 in-memory/Redis，之後再加。
-/// 限流 + 寫入挑戰 + 寄信。login / register / reset 共用同一組限流（每 email 每小時 5 封、60 秒間隔）。
+// 限流以 (email, purpose) 計，避免匿名者用 login 用完額度而擋住本人的 reset / register / link；每 IP 限流在各 handler（ratelimit::check）。
+/// 限流 + 寫入挑戰 + 寄信。每 (email, 用途) 每小時 5 封、60 秒間隔。
 /// 60 秒間隔只看「尚未使用」的驗證碼：剛驗證成功（例如註冊完）立刻重設密碼是正常操作，不應被擋；沒有信箱存取權的人無法消耗驗證碼，所以不影響防濫用。
 pub(crate) async fn issue_otp(
     pool: &PgPool,
@@ -333,7 +333,7 @@ pub(crate) async fn issue_otp_in_tx(
     }
     let (cnt, last_age): (i64, Option<i64>) = sqlx::query_as(
         "SELECT count(*), (min(extract(epoch FROM now() - created_at)) FILTER (WHERE consumed_at IS NULL))::bigint FROM otp_challenges
-         WHERE email = $1 AND created_at > now() - interval '1 hour'").bind(email).fetch_one(&mut **tx).await?;
+         WHERE email = $1 AND purpose = $2 AND created_at > now() - interval '1 hour'").bind(email).bind(purpose).fetch_one(&mut **tx).await?;
     if cnt >= 5 {
         return Err(rate_limited(600));
     }
@@ -360,8 +360,10 @@ pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
 
 async fn otp_request(
     State(st): State<AppState>,
+    Peer(ip): Peer,
     Json(r): Json<EmailReq>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
+    crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
     issue_otp(&st.pool, &email, "login", None, None).await?;
     Ok((
@@ -406,9 +408,9 @@ pub(crate) async fn consume_otp_scoped(
     if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
         return Err(AppError::invalid("/code", "FORMAT", "驗證碼為 6 位數字"));
     }
-    // 每 email 每小時最多 10 次驗證嘗試
-    let tries: i64 = sqlx::query_scalar("SELECT coalesce(sum(attempts),0)::bigint FROM otp_challenges WHERE email=$1 AND created_at > now() - interval '1 hour'")
-        .bind(email).fetch_one(&mut *tx).await?;
+    // 每 (email, 用途) 每小時最多 10 次驗證嘗試；不跨用途，login 亂猜不會擋掉有效的 reset / register / link 驗證碼
+    let tries: i64 = sqlx::query_scalar("SELECT coalesce(sum(attempts),0)::bigint FROM otp_challenges WHERE email=$1 AND purpose=$2 AND created_at > now() - interval '1 hour'")
+        .bind(email).bind(purpose).fetch_one(&mut *tx).await?;
     if tries >= 10 {
         return Err(rate_limited(600));
     }
@@ -492,6 +494,7 @@ async fn otp_verify(
     headers: HeaderMap,
     Json(r): Json<VerifyReq>,
 ) -> Result<Response, AppError> {
+    crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     consume_otp(&st.pool, &email, &r.code, "login").await?;
     let name = email.split('@').next().unwrap_or("user");
