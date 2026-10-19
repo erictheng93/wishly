@@ -151,7 +151,7 @@
       "held": "Đang góp {pts} điểm (có thể rút lại trước khi đạt mục tiêu)",
       "frozenWarn": "Ví của bạn đã bị đóng băng, tạm thời không thể đóng góp. Vui lòng liên hệ hỗ trợ.",
       "issuedByPlatform": "Hiện tại điểm do nền tảng cấp.",
-      "topup": "Nạp điểm (sắp ra mắt)",
+      "topup": "Nạp điểm",
       "myPledges": "Các lượt góp của tôi",
       "noPledges": "Chưa có lượt góp nào. Hãy mở danh sách bạn bè chia sẻ để tham gia góp quỹ cho điều ước.",
       "noImg": "Không có ảnh",
@@ -235,6 +235,104 @@
       "pledgePts": " · {pts} điểm",
       "qty": " × {qty}",
       "to": "Tặng {name} · "
+    },
+    "topup": {
+      "title": "Nạp điểm",
+      "balance": "Số dư hiện tại: {pts} điểm",
+      "amount": "Số tiền (NT$)",
+      "customAmount": "Số tiền tùy chọn",
+      "amountHint": "100 đến 50,000",
+      "methodLegend": "Phương thức thanh toán",
+      "method": {
+        "card": "Thẻ tín dụng",
+        "cvs_code": "Mã cửa hàng tiện lợi",
+        "cvs_barcode": "Mã vạch cửa hàng tiện lợi",
+        "atm": "Tài khoản ảo ATM"
+      },
+      "methodDesc": {
+        "card": "Thanh toán trực tuyến, cộng điểm ngay.",
+        "cvs_code": "Nhập mã tại máy ở cửa hàng để in phiếu rồi thanh toán. Cộng điểm sau khi thanh toán.",
+        "cvs_barcode": "In hoặc xuất trình mã vạch và thanh toán tại quầy.",
+        "atm": "Nhận số tài khoản riêng rồi chuyển khoản qua ATM hoặc ngân hàng trực tuyến."
+      },
+      "deadlineCard": "Vui lòng thanh toán trong 30 phút.",
+      "deadlineOther": "Hạn thanh toán 3 ngày.",
+      "invoiceLegend": "Hóa đơn điện tử",
+      "carrierType": "Loại lưu trữ hóa đơn",
+      "carrier": {
+        "member": "Lưu theo tài khoản (mặc định)",
+        "mobile_barcode": "Mã vạch điện thoại",
+        "citizen_cert": "Chứng thư công dân",
+        "donate": "Tặng hóa đơn",
+        "b2b": "Mã số thuế công ty"
+      },
+      "field": {
+        "mobile": "Mã vạch điện thoại",
+        "cert": "Mã vạch chứng thư công dân",
+        "donate": "Mã tặng",
+        "taxId": "Mã số thuế",
+        "buyerName": "Tên công ty (không bắt buộc)"
+      },
+      "summary": "Xác nhận",
+      "summaryLine": "Nạp NT$ {amount}, nhận {pts} điểm (1 điểm = NT$ 1)",
+      "summaryEmpty": "Nhập số tiền để xem tóm tắt.",
+      "note1": "Điểm không thể rút cho người nhận quà và không thể chuyển nhượng.",
+      "note2": "Tiền nạp là khoản thu trước và được xử lý theo quy định hoàn tiền.",
+      "submit": "Tiếp tục thanh toán",
+      "submitting": "Đang xử lý, vui lòng chờ...",
+      "err": {
+        "amountInt": "Vui lòng nhập số nguyên",
+        "amountRange": "Số tiền phải từ 100 đến 50,000",
+        "mobile": "Mã vạch điện thoại gồm / và 7 ký tự chữ hoa hoặc số (ví dụ /ABC1234)",
+        "cert": "Mã vạch chứng thư gồm 2 chữ hoa và 14 chữ số",
+        "donate": "Mã tặng gồm 3 đến 7 chữ số",
+        "taxId": "Mã số thuế gồm 8 chữ số",
+        "disabled": "Chức năng nạp điểm chưa mở",
+        "cap": "Điểm sau khi nạp sẽ vượt giới hạn {cap} điểm (tính cả đơn chờ thanh toán). Vui lòng giảm số tiền.",
+        "limit": "Tài khoản mới nạp tối đa NT$ {limit} mỗi ngày. Hôm nay bạn còn nạp được NT$ {remaining}.",
+        "rate": "Thao tác quá nhanh. Vui lòng thử lại sau khoảng {min} phút.",
+        "rateNoMin": "Thao tác quá nhanh. Vui lòng thử lại sau.",
+        "validation": "Có trường không hợp lệ. Vui lòng kiểm tra các trường được đánh dấu.",
+        "network": "Kết nối thất bại. Vui lòng kiểm tra mạng và thử lại.",
+        "server": "Hệ thống tạm thời không xử lý được. Vui lòng thử lại sau.",
+        "generic": "Nạp điểm thất bại. Vui lòng thử lại sau."
+      },
+      "history": "Lịch sử nạp điểm",
+      "empty": "Chưa có lần nạp nào.",
+      "refresh": "Làm mới",
+      "stalled": "Chưa cập nhật? Nhấn Làm mới để xem trạng thái mới nhất.",
+      "createdAt": "Tạo lúc {time}",
+      "paidAt": "Thanh toán lúc {time}",
+      "status": {
+        "pending": "Chờ thanh toán",
+        "paid": "Đã cộng điểm",
+        "failed": "Thất bại",
+        "expired": "Hết hạn",
+        "refunded": "Đã hoàn tiền",
+        "disputed": "Đang tranh chấp",
+        "charged_back": "Bị hoàn ngược"
+      },
+      "fetching": "Đang lấy thông tin thanh toán... (vài giây)",
+      "pay": {
+        "paymentNo": "Mã thanh toán",
+        "barcode1": "Mã vạch phần 1",
+        "barcode2": "Mã vạch phần 2",
+        "barcode3": "Mã vạch phần 3",
+        "bankCode": "Mã ngân hàng",
+        "account": "Tài khoản ảo"
+      },
+      "copy": "Sao chép",
+      "copied": "Đã sao chép",
+      "copyFail": "Sao chép thất bại. Vui lòng chọn văn bản thủ công.",
+      "expireAt": "Hạn thanh toán {time}",
+      "leftDH": "Còn {d} ngày {h} giờ",
+      "leftHM": "Còn {h} giờ {m} phút",
+      "leftM": "Còn {m} phút",
+      "expired": "Đã hết hạn",
+      "cardPending": "Chưa hoàn tất thanh toán. Vui lòng hoàn tất trước {time}.",
+      "success": "Nạp điểm thành công. Đã cộng {pts} điểm; số dư hiện tại {bal} điểm.",
+      "nativeText": "Không thể mở trang thanh toán trong ứng dụng. Vui lòng nạp điểm trên phiên bản web.",
+      "nativeLink": "Nạp điểm trên web"
     }
   }
 }

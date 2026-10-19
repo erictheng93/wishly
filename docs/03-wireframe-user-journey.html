@@ -1404,6 +1404,14 @@ flowchart TD
 <tr><th>API</th><td>POST <code>/wallet/topups</code>（<code>Idempotency-Key</code>；body: amount, method（card | line_pay | apple_pay）, invoice（巢狀物件）；provider 由後端依 method 決定，前端不傳；回傳金流前端參數）；GET <code>/config/public</code>（<code>topup_presets</code>、<code>topup_min_amount</code>、<code>topup_max_amount</code>）；GET <code>/wallet</code>；入帳由後端 POST <code>/webhooks/payments/{provider}</code> 處理（前端不呼叫）</td></tr>
 </tbody></table></div></div></div>
 
+<div class="note w"><b>實作現況（D54，綠界階段）：獨立頁 <code>/me/topup</code>（me/topup.vue），取代上圖的 TopupSheet。</b>由錢包頁「儲值」進入，需登入。
+<ul>
+<li><b>欄位</b>：金額（快選 500 / 1,000 / 2,000 / 5,000 + 自訂 100 至 50,000，前端先驗整數與範圍）；付款方式（信用卡 30 分鐘內完成；超商代碼、超商條碼、ATM 虛擬帳號 3 天內繳費）；電子發票載具（預設會員載具；手機條碼 <code>/</code> + 7 碼大寫英數、自然人憑證 2 碼大寫 + 14 碼數字、捐贈碼 3 至 7 碼數字、公司統編 8 碼 + 選填抬頭），格式錯誤逐欄顯示。送出前摘要：「儲值 NT$ X，入帳 X 點（1 點 = NT$ 1）」，並提示點數不可提領給受捐者、不可轉讓，儲值款項屬預收款、依退款規則辦理。</li>
+<li><b>送出</b>：<code>POST /wallet/topups</code> 回 201 後，以隱藏 <code>&lt;form method="post" action=payment.url&gt;</code> 把 <code>payment.fields</code> 全部以 hidden input 送出，整頁導向綠界付款頁（不用 fetch）。按鈕送出後停用；Idempotency-Key 在「同一份表單內容」下沿用（網路失敗重試不重複建單），內容改變才換新。原生殼（Tauri）無法導向第三方付款頁，改顯示「請至網頁版完成儲值」與連結。</li>
+<li><b>錯誤文案</b>：409 <code>WALLET_CAP_EXCEEDED</code> 顯示上限 50,000 點（含待付款）；409 <code>TOPUP_LIMIT_EXCEEDED</code> 顯示每日上限與今日剩餘額度；429 <code>RATE_LIMITED</code> 顯示約幾分鐘後再試（依 Retry-After）；503 <code>TOPUP_DISABLED</code> 顯示「儲值功能尚未開放」並隱藏表單；422 的 <code>errors[].pointer</code> 對應到欄位。</li>
+<li><b>儲值紀錄</b>（同頁下方，<code>GET /wallet/topups</code>，新到舊）：狀態徽章（待付款 / 已入帳 / 失敗 / 已逾期 / 已退款 / 爭議中 / 已拒付）、金額、方式、時間。pending 的超商代碼顯示繳費代碼（可一鍵複製）、超商條碼顯示三段條碼（等寬字體）、ATM 顯示銀行代碼與虛擬帳號，並標示繳費期限與剩餘時間。</li>
+<li><b>取號中 / 到期 / 返回</b>：綠界的取號通知通常在建單後數秒內寫入，<code>payment_info</code> 為 null 時顯示「取號中…」，每 3 秒輪詢，最多 10 次，之後改由「重新整理」手動更新。付款完成或按「返回」會回到 <code>/me/topup</code>：頁面自動重新整理，對剛建立的 pending 單輪詢，轉為已入帳時顯示「儲值成功，已入帳 X 點，目前餘額 Y 點」（入帳仍以後端 webhook 為準）。逾期未付的單顯示「已逾期」，需重新建單。</li>
+</ul></div>
 <!-- 5.17 REALLOCATE -->
 <h3 id="w-realloc">5.17 未達標選擇 ReallocateSheet <span class="ph p2">P2-A</span></h3>
 <div class="wf">
@@ -2169,6 +2177,7 @@ flowchart TD
 <tr><td>/me/claims</td><td>/me/claims</td><td>me/claims.vue</td><td>✔</td></tr>
 <tr><td>/me/settings</td><td><b>/settings</b></td><td>settings.vue</td><td>✔ 5.28 / 5.36</td></tr>
 <tr><td>/wallet</td><td><b>/me/wallet</b></td><td>me/wallet.vue</td><td>✔ P2-A</td></tr>
+<tr><td>TopupSheet（5.16）</td><td><b>/me/topup</b></td><td>me/topup.vue</td><td>✔ P2-A 綠界</td></tr>
 <tr><td>（未畫）</td><td>/friends</td><td>friends.vue</td><td>✔ 5.31</td></tr>
 <tr><td>（未畫）</td><td>/invite/{token}</td><td>invite/[token].vue</td><td>✔ 5.32</td></tr>
 <tr><td>（未畫）</td><td>/u/{handle}</td><td>u/[handle].vue</td><td>✔ 5.33</td></tr>

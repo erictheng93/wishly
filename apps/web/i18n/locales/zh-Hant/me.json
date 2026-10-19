@@ -151,7 +151,7 @@
       "held": "認捐中 {pts} 點（已認捐，達標前可撤回）",
       "frozenWarn": "錢包已被凍結，暫時無法贊助，請聯絡客服。",
       "issuedByPlatform": "目前點數由平台發放。",
-      "topup": "儲值（即將推出）",
+      "topup": "儲值",
       "myPledges": "我的認捐",
       "noPledges": "還沒有認捐紀錄。打開朋友分享的清單，就能參與心願眾籌。",
       "noImg": "無圖",
@@ -235,6 +235,104 @@
       "pledgePts": "・{pts} 點",
       "qty": " × {qty}",
       "to": "送給 {name}・"
+    },
+    "topup": {
+      "title": "儲值",
+      "balance": "目前餘額 {pts} 點",
+      "amount": "儲值金額（NT$）",
+      "customAmount": "自訂金額",
+      "amountHint": "100 至 50,000",
+      "methodLegend": "付款方式",
+      "method": {
+        "card": "信用卡",
+        "cvs_code": "超商代碼",
+        "cvs_barcode": "超商條碼",
+        "atm": "ATM 虛擬帳號"
+      },
+      "methodDesc": {
+        "card": "線上刷卡，即時入帳。",
+        "cvs_code": "到超商機台輸入代碼列印繳費單，付款後入帳。",
+        "cvs_barcode": "列印或出示條碼，到超商櫃檯繳費。",
+        "atm": "取得專屬帳號後，用 ATM 或網路銀行轉帳。"
+      },
+      "deadlineCard": "請於 30 分鐘內完成付款。",
+      "deadlineOther": "繳費期限 3 天。",
+      "invoiceLegend": "電子發票",
+      "carrierType": "發票載具",
+      "carrier": {
+        "member": "會員載具（預設）",
+        "mobile_barcode": "手機條碼",
+        "citizen_cert": "自然人憑證",
+        "donate": "捐贈發票",
+        "b2b": "公司統編"
+      },
+      "field": {
+        "mobile": "手機條碼",
+        "cert": "自然人憑證條碼",
+        "donate": "捐贈碼",
+        "taxId": "統一編號",
+        "buyerName": "公司抬頭（選填）"
+      },
+      "summary": "確認內容",
+      "summaryLine": "儲值 NT$ {amount}，入帳 {pts} 點（1 點 = NT$ 1）",
+      "summaryEmpty": "輸入金額後顯示摘要。",
+      "note1": "點數不可提領給受捐者，也不可轉讓。",
+      "note2": "儲值款項屬預收款，依退款規則辦理。",
+      "submit": "前往付款",
+      "submitting": "處理中，請稍候…",
+      "err": {
+        "amountInt": "請輸入整數金額",
+        "amountRange": "金額須介於 100 至 50,000",
+        "mobile": "手機條碼為 / 加 7 碼大寫英數字（例：/ABC1234）",
+        "cert": "自然人憑證條碼為 2 碼大寫英文加 14 碼數字",
+        "donate": "捐贈碼為 3 至 7 碼數字",
+        "taxId": "統一編號為 8 碼數字",
+        "disabled": "儲值功能尚未開放",
+        "cap": "儲值後的點數會超過上限 {cap} 點（含待付款的儲值單），請調降金額。",
+        "limit": "新帳號每日儲值上限 NT$ {limit}，今天還能儲值 NT$ {remaining}。",
+        "rate": "操作太頻繁，請約 {min} 分鐘後再試。",
+        "rateNoMin": "操作太頻繁，請稍後再試。",
+        "validation": "內容有誤，請檢查標示的欄位。",
+        "network": "連線失敗，請檢查網路後重試。",
+        "server": "系統暫時無法處理，請稍後再試。",
+        "generic": "儲值失敗，請稍後再試。"
+      },
+      "history": "儲值紀錄",
+      "empty": "還沒有儲值紀錄。",
+      "refresh": "重新整理",
+      "stalled": "尚未更新？請按「重新整理」查看最新狀態。",
+      "createdAt": "建立 {time}",
+      "paidAt": "付款 {time}",
+      "status": {
+        "pending": "待付款",
+        "paid": "已入帳",
+        "failed": "失敗",
+        "expired": "已逾期",
+        "refunded": "已退款",
+        "disputed": "爭議中",
+        "charged_back": "已拒付"
+      },
+      "fetching": "取號中…（約需數秒）",
+      "pay": {
+        "paymentNo": "繳費代碼",
+        "barcode1": "條碼第 1 段",
+        "barcode2": "條碼第 2 段",
+        "barcode3": "條碼第 3 段",
+        "bankCode": "銀行代碼",
+        "account": "虛擬帳號"
+      },
+      "copy": "複製",
+      "copied": "已複製",
+      "copyFail": "複製失敗，請手動選取。",
+      "expireAt": "繳費期限 {time}",
+      "leftDH": "剩 {d} 天 {h} 小時",
+      "leftHM": "剩 {h} 小時 {m} 分",
+      "leftM": "剩 {m} 分",
+      "expired": "已逾期",
+      "cardPending": "尚未完成付款，請於 {time} 前完成。",
+      "success": "儲值成功，已入帳 {pts} 點，目前餘額 {bal} 點。",
+      "nativeText": "App 內無法開啟付款頁，請至網頁版完成儲值。",
+      "nativeLink": "前往網頁版儲值"
     }
   }
 }
