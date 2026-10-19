@@ -1538,6 +1538,7 @@ sequenceDiagram
 </pre>
 <table class="meta"><tbody>
 <tr><td>預防（D41）</td><td>所有信用卡付款強制 3DS。新帳號風控：註冊 30 天內，每日儲值與禮物卡購買合計上限 NT$3,000，<strong>涵蓋手動儲值、自動儲值（F11）與禮物卡購買，不含營運建立的企業禮券（F14）</strong>；超限<strong>直接拒絕</strong>，回 <code>TOPUP_LIMIT_EXCEEDED</code> 409（附 <code>limit_amount</code>、<code>remaining_amount</code>）。異常（短時間多卡、多帳號同裝置）進人工審核佇列，審核屬風控標記，<strong>不影響 <code>TOPUP_LIMIT_EXCEEDED</code> 的判定</strong>；審核期間該筆的禮物卡設 <code>gift_cards.claimable_at</code>（最多延遲 24 小時才可兌換）。</td></tr>
+<tr><td>營運入口（D57）</td><td>綠界沒有可驗證的爭議通知格式，爭議 / 拒付由營運依銀行或綠界特店後台通知處理：staff 以 <code>GET /admin/topups?status=</code> 找到儲值單，再 <code>POST /admin/topups/{id}/dispute</code> 登錄 <code>open</code>（凍結）→ <code>won</code>（恢復）或 <code>lost</code>（扣回並記欠款），每次寫 audit_logs；下表與流程圖中的「webhook 報爭議」目前由此入口取代，供應商 webhook 待取得官方格式再接。使用者在 /wallet 看到錢包凍結提示。</td></tr>
 <tr><td>拒付處理</td><td>
 <ol>
 <li>webhook 報爭議 → <code>topups.status = disputed</code>，<code>point_wallets.status = frozen</code>。</li>
