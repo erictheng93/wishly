@@ -1256,7 +1256,7 @@ flowchart TD
 </div>
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>SiteHeader、CategoryTabs、UrgencyGroup、NeedCard（= ItemCard relief 變體）、PledgeSheet（= ClaimSheet）、ReceiptSheet、SyncQueueBadge</td></tr>
-<tr><th>狀態</th><td><b>組織驗證</b>：<code>verification_status=verified</code> 的組織據點顯示「已驗證組織」徽章（文字 + 圖示）；未驗證組織的據點只能是 link 可見（D51：link 可見性已廢止，P2-D 未驗證據點的非公開層級待重新定義），不上地圖、不出現在據點列表，建立 public 據點時 API 回 403 <code>ORG_NOT_VERIFIED</code>，/org/{id} 顯示「驗證審核中」並說明限制。loading / empty（「這個據點目前沒有需求」）/ error / 已滿（已被認捐完，灰掉）/ site_status=paused（頂部橫幅「此據點暫停接收物資」，認捐停用）/ closed（唯讀）/ 離線（認捐停用，志工登記實收走佇列）。</td></tr>
+<tr><th>狀態</th><td><b>組織驗證</b>：<code>verification_status=verified</code> 的組織據點顯示「已驗證組織」徽章（文字 + 圖示）；未驗證組織的據點只能維持 draft（D52：link 已廢止，未驗證組織的據點維持 draft，驗證通過後才能發布），不上地圖、不出現在據點列表，建立 public 據點時 API 回 403 <code>ORG_NOT_VERIFIED</code>，/org/{id} 顯示「驗證審核中」並說明限制。loading / empty（「這個據點目前沒有需求」）/ error / 已滿（已被認捐完，灰掉）/ site_status=paused（頂部橫幅「此據點暫停接收物資」，認捐停用）/ closed（唯讀）/ 離線（認捐停用，志工登記實收走佇列）。</td></tr>
 <tr><th>互動</th><td>需求依 <code>relief_urgency</code>（critical → low）分組，組內依 <code>relief_category</code> 排序。「我要認捐」沿用 ClaimSheet（數量 stepper，需登入，D50；不收集災民個資）。「登記實收」僅對 org_role 為 volunteer / coordinator / owner 顯示。離線佇列：IndexedDB 存放請求與其 Idempotency-Key，連線恢復（<code>online</code> 事件 / Background Sync）後重送；iOS Safari 無 Background Sync，改在 App 前景時 flush。</td></tr>
 <tr><th>API</th><td>GET <code>/public/wishlists/{slug}</code>（據點即 relief 型 wishlist，路由直接使用 slug；GET /public/relief/sites 每筆已回傳 slug）；POST <code>/items/{item_id}/claims</code>（認捐）；POST <code>/items/{item_id}/receipts</code>（實收）；PATCH <code>/sites/{id}</code>（coordinator / owner 調整狀態與緊急度）；SSE <code>/public/wishlists/{slug}/events</code></td></tr>
 </tbody></table></div></div></div>
@@ -2335,7 +2335,7 @@ sequenceDiagram
 <tr><td><code>GIFT_CARD_NOT_YET_CLAIMABLE</code> <span class="ph p2">P2-B</span></td><td>409</td><td>讀取 <code>claimable_at</code>，兌換按鈕停用並顯示「預計 X 時間起可兌換」</td></tr>
 <tr><td><code>TOPUP_LIMIT_EXCEEDED</code> <span class="ph p2">P2-A</span></td><td>409</td><td>讀取 <code>limit_amount</code>、<code>remaining_amount</code>，顯示今日剩餘額度並把金額上限壓到剩餘額度</td></tr>
 <tr><td><code>WALLET_FROZEN</code> <span class="ph p2">P2-A</span></td><td>403</td><td>顯示錢包凍結說明並停用儲值 / 投點 / 兌換 / 退款，提供聯絡客服（5.15）</td></tr>
-<tr><td><code>ORG_NOT_VERIFIED</code> <span class="ph p2">P2-D</span></td><td>403</td><td>建立 public 據點被拒：說明未驗證組織的據點只能以連結分享，並引導完成驗證</td></tr>
+<tr><td><code>ORG_NOT_VERIFIED</code> <span class="ph p2">P2-D</span></td><td>403</td><td>建立 public 據點被拒：說明未驗證組織的據點會先保留為草稿，並引導完成驗證</td></tr>
 <tr><td><code>STAFF_ONLY</code> <span class="ph p0">MVP</span></td><td>403</td><td>顯示「僅限營運人員」，不顯示後台入口</td></tr>
 <tr><td><code>WISHLIST_NOT_PUBLISHABLE</code></td><td>409</td><td>發佈失敗，列出缺少條件（例如無品項；P2 眾籌品項缺收件地址時另回 <code>SHIPPING_ADDRESS_REQUIRED</code>）</td></tr>
 <tr><td><code>SITE_NOT_ACTIVE</code> <span class="ph p2">P2</span></td><td>409</td><td>據點暫停或關閉，停用認捐</td></tr>
@@ -2526,7 +2526,7 @@ async function waitTopup(before) {
 <tr><td>圖片處理中</td><td>圖片處理中，完成後會自動顯示。</td></tr>
 <tr><td>圖片未通過</td><td>這張圖片無法使用，請換一張。</td></tr>
 <tr><td>403 WALLET_FROZEN</td><td>你的錢包目前已凍結，暫時無法使用。請聯絡客服了解原因。</td></tr>
-<tr><td>403 ORG_NOT_VERIFIED</td><td>組織尚未通過驗證，據點只能以連結分享，不會顯示在地圖上。</td></tr>
+<tr><td>403 ORG_NOT_VERIFIED</td><td>組織尚未通過驗證，據點會先保留為草稿，通過驗證後才能發布，也不會顯示在地圖上。</td></tr>
 <tr><td>已驗證組織</td><td>已驗證組織：此組織已通過身分審核。</td></tr>
 <tr><td>3D 驗證提示</td><td>信用卡付款需要經過銀行的 3D 驗證，請依畫面指示完成。</td></tr>
 <tr><td>429</td><td>操作太頻繁了，請 30 秒後再試。</td></tr>

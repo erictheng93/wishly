@@ -1123,7 +1123,7 @@ sequenceDiagram
 <h4>F10-0 組織驗證（D43）</h4>
 <table class="meta"><tbody>
 <tr><td>規則</td><td><code>organizations.verification_status</code> ∈ pending（預設）| verified | rejected，附 <code>verified_at</code>、<code>verified_by</code>。驗證文件（立案證書、政府單位證明）經 <code>POST /uploads/presign</code>（purpose=org_document）上傳到 R2 <strong>私有 bucket</strong>，不經 CDN，只有該 org 成員與 staff 以短效簽名網址讀取。</td></tr>
-<tr><td>未驗證限制</td><td>未驗證組織的據點只能 <code>visibility=link</code>（D51：link 可見性已廢止，P2-D 未驗證據點的非公開層級待重新定義）：不上地圖、不出現在 <code>GET /public/relief/sites</code> 與需求彙總；建立或改成 <code>visibility=public</code> 回 <code>ORG_NOT_VERIFIED</code> 403。通過驗證後，公開頁顯示「已驗證組織」徽章。驗證被撤銷（rejected）時，同交易把該組織所有 public 據點降為 link 並 purge CDN。</td></tr>
+<tr><td>未驗證限制</td><td>未驗證組織的據點只能維持 <code>status=draft</code>（D52：link 已廢止，未驗證組織的據點維持 draft，驗證通過後才能發布）：不上地圖、不出現在 <code>GET /public/relief/sites</code> 與需求彙總；建立或改成 <code>visibility=public</code> 回 <code>ORG_NOT_VERIFIED</code> 403。通過驗證後，公開頁顯示「已驗證組織」徽章。驗證被撤銷（rejected）時，同交易把該組織所有 public 據點降為 draft 並 purge CDN。</td></tr>
 <tr><td>API</td><td>staff：<code>GET /admin/orgs?verification_status=</code>、<code>PATCH /admin/orgs/{id}/verification</code>（body <code>{status, reason}</code>，STAFF_ONLY，寫 audit_logs）。</td></tr>
 <tr><td>錯誤碼</td><td><code>ORG_NOT_VERIFIED</code> 403；<code>STAFF_ONLY</code> 403。</td></tr>
 </tbody></table>

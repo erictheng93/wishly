@@ -74,6 +74,8 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>狀態</td><td>Draft</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏：行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。部署平台為 Cloudflare Pages（使用者基於成本決定，D48）。</td></tr>
 <tr><td>後端部署定案（2026-10-15，D49）</td><td>後端與 PostgreSQL 同機部署於 Linode（Akamai）VPS 東京節點，以 Dokploy 管理，經 Cloudflare Tunnel 對外；物件儲存使用 Cloudflare R2；取代原 GCP Cloud Run / Cloud SQL / Cloud Scheduler 規劃。背景工作維持後端行程內排程。影響：備份（RPO / RTO 須自行達成並演練）、SSE 鏈路（Cloudflare → Tunnel → Traefik → API，Spike S3 的受測鏈路隨之改變）、金鑰與資料庫同機的威脅模型。見 <code>docs/deploy-backend-checklist.md</code>。</td></tr>
+<tr><td>儲值骨架先於金流商接入（2026-10-19，D53）</td><td>先落地與金流商無關的部分：migration 0020（<code>topups</code> 表、ledger <code>topup</code> 類型、防重複入帳唯一索引）、<code>POST /topups</code> 建單（面額 500 / 1000 / 2000 / 5000，單一錢包含待付款上限 NT$50,000）、<code>POST /webhooks/topup/{provider}</code>（HMAC 驗簽、鎖訂單列、核對金額、經 <code>points::post</code> 冪等入帳）。未設 <code>TOPUP_WEBHOOK_SECRET</code> 時端點回 503（功能關閉）。這是 04 章完整儲值設計（point_lots、發票、拒付、自動儲值）的<b>精簡子集</b>，欄位與路徑與其有差異，接入金流商時再收斂；付款方式以台灣超商代碼 / 條碼 / ATM 為先（<code>card | cvs_code | cvs_barcode | atm</code>），金流商候選為綠界或藍新。尚待會計師 / 律師確認：預收款信託或履約保證、發票開立時點、未使用餘額退款。</td></tr>
+<tr><td>未驗證組織據點維持草稿（2026-10-19，D52）</td><td>產品負責人同意：因 link 可見性已廢止（D51），P2-D 未驗證組織的據點不再有「連結可見」層級，改為維持 <code>draft</code>；組織通過驗證後才能發布為 public（或其他可見性）。驗證被撤銷時，既有 public 據點降為 draft。理由：救助網站涉及募款與信任，審核前內容不外露；不新增可見性層級，只把「發布」綁在驗證狀態。尚未實作（P2-D）。</td></tr>
 <tr><td>可見性精簡與訪客探索（2026-10-18，D51）</td><td>產品負責人決定：清單可見性只保留 <code>public</code>（公開）、<code>friends</code>（有限度公開：所有好友）、<code>selected</code>（有限度公開：被選中的好友，即「摯友」）、<code>private</code>（僅自己）；新清單預設 <code>friends</code>。移除 <code>link</code>（知道連結）與 <code>password</code>（密碼保護），連同密碼解鎖流程（<code>POST /public/wishlists/{slug}/unlock</code>、<code>X-List-Access</code>）；既有 link / password 清單於 migration 0016 收緊為 friends。新增訪客可瀏覽的探索頁（<code>GET /public/wishlists</code>、<code>/explore</code>），只列公開清單；訪客仍不能認捐、眾籌或加好友（D50）。下文凡提及 link / password 之處以本決策為準。</td></tr>
 <tr><td>訪客僅能瀏覽，認捐需登入（2026-10-18，D50）</td><td>產品負責人決定：未登入者（含持有舊 <code>ws_guest</code> / <code>X-Guest-Token</code> 的訪客）只能瀏覽 public 清單（D51 起；原含 link / password），新增認捐（<code>POST /items/{id}/claims</code>）須為已登入會員，未登入回 401 <code>UNAUTHORIZED</code> 且不寫入任何資料。理由（負責人原話）：「認捐需要消耗點數，未登入無法紀錄點數。」補充：目前數量認捐本身並未扣點數（只有眾籌扣點），此決策先讓認捐綁定會員身分，為之後點數化鋪路。既有訪客認捐（舊資料）保留管理權（查看、取消、減量、改備註 / 可見性），不可增加數量；不再建立新的 guests 列。取代原「免註冊捐助」承諾（G1、US-04、US-05、FR-06、FR-07 與相關段落已據此改寫）。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值、電子禮物卡、回饋星星、企業禮券；點數改為分批（point lots）管理；8.7 法規依 D30 更新；P2 細分為 P2-A / B / C / D。</td></tr>
@@ -494,7 +496,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 </ul></div>
 <div class="story"><span class="id">US-44 救災組織驗證（P2-D）</span>　身為救災組織，我想取得已驗證徽章。
 <ul>
-<li><b>Given</b> 我的組織 <code>verification_status=pending</code>，<b>When</b> 我嘗試建立 <code>public</code> 據點，<b>Then</b> 回 403 <code>ORG_NOT_VERIFIED</code>；據點只能是 link 可見（D51：link 可見性已廢止，P2-D 未驗證據點的非公開層級待重新定義），不上地圖、不出現在 <code>GET /public/relief/sites</code>。</li>
+<li><b>Given</b> 我的組織 <code>verification_status=pending</code>，<b>When</b> 我嘗試建立 <code>public</code> 據點，<b>Then</b> 回 403 <code>ORG_NOT_VERIFIED</code>；據點只能維持 draft（D52：link 已廢止，未驗證組織的據點維持 draft，驗證通過後才能發布），不上地圖、不出現在 <code>GET /public/relief/sites</code>。</li>
 <li><b>Given</b> 我上傳立案證書或政府單位證明（R2 私有 bucket），<b>When</b> staff 於 <code>PATCH /admin/orgs/{id}/verification</code> 核准，<b>Then</b> 狀態為 <code>verified</code>，公開頁顯示「已驗證組織」徽章。</li>
 </ul></div>
 
