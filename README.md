@@ -125,7 +125,7 @@ npx playwright show-report                                      # 開啟上次�
   - `TURNSTILE_SECRET`：production 必填；檢舉的 `turnstile_token` 會送 siteverify 驗證，失敗回 403 `FORBIDDEN`。dev/test 不設則略過驗證（接受任何 token，含前端的 `dev-bypass`）。`TURNSTILE_VERIFY_URL` 僅測試時覆寫。
   - `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE`：production 全部必填，缺漏啟動即 panic 並指出缺哪個；dev 預設本機 MinIO。`S3_REGION` 選填。production 使用 Cloudflare R2：`S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`、`S3_REGION=auto`（程式以 path-style 簽名）、`S3_PUBLIC_BASE` 為綁定 bucket 的自訂網域；API Token 只給該 bucket 的 Object Read & Write。`incoming/` 前綴放尚未去 EXIF 的原圖，**不得對外公開**，見 `docs/deploy-backend-checklist.md` §2.2。
   - `CF_ZONE_ID`、`CF_CACHE_PURGE_TOKEN`：`TRUSTED_PROXY=cloudflare` 的 production **必填**（token 只需 Zone → Cache Purge 權限）。清單改成好友 / 指定 / 密碼 / 私人、封存、下架、刪帳號時，後端立即清除該清單公開網址的邊緣快取。沒有自己 zone 的快速通道才可明確設 `CDN_PURGE=off` 略過。見下方〈CDN 快取與受限清單〉。
-  - `TOPUP_WEBHOOK_SECRET`：儲值 webhook 的簽章金鑰（≥32 字元），**選填**；未設時儲值端點（`POST /topups`、`POST /webhooks/topup/{provider}`）回 503，功能關閉。金流商尚未接入。
+  - `ECPAY_MERCHANT_ID`、`ECPAY_HASH_KEY`、`ECPAY_HASH_IV`：綠界金流憑證，**選填**；三個都設才啟用儲值，否則 `POST /wallet/topups` 與 `POST /webhooks/payments/{provider}` 回 503 `TOPUP_DISABLED`。dev/test 預設用綠界公開測試參數（以綠界文件為準）。`ECPAY_ENDPOINT`（預設 stage `https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5`，正式為 `https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5`）；`ECPAY_RETURN_URL` 為我方 webhook 的對外完整網址（dev 預設 `http://localhost:8080/api/v1/webhooks/payments/ecpay`，production 未設時取 `API_BASE_URL` + `/api/v1/webhooks/payments/ecpay`），須在綠界後台可達。
   - `SHIPPING_ENC_KEY`：收件資訊加密金鑰，**production 必填**，必須是 base64 編碼的 32 bytes，否則拒絕啟動。dev / test 不設時使用固定的開發金鑰。詳見下方〈收件資訊加密金鑰〉。
 
 ### 收件資訊加密金鑰（`SHIPPING_ENC_KEY`）

@@ -33,7 +33,7 @@ CASES = {
     "idempotency-pledge-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_pledge_requests_overlap_and_debit_once"),
     "delete-item-for-update": (API + "wishlists.rs", "item_delete", "SELECT id FROM wishlist_items WHERE id=$1 FOR UPDATE", "SELECT id FROM wishlist_items WHERE id=$1", "concurrency", "force_delete_vs_claim_update_uses_item_then_claim_lock_order"),
     "reallocation-source-first": (API + "contributions.rs", "reallocate", "ORDER BY id FOR UPDATE", "ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END FOR UPDATE", "concurrency", "opposite_reallocations_lock_lowest_item_first_without_deadlock"),
-    "topup-for-update": (API + "topup.rs", "webhook", "WHERE merchant_trade_no = $1 AND provider = $2 FOR UPDATE", "WHERE merchant_trade_no = $1 AND provider = $2", "topup", "concurrent_duplicate_notices_credit_once"),
+    "topup-for-update": (API + "topup.rs", "webhook", "WHERE merchant_trade_no = $1 AND provider = 'ecpay' FOR UPDATE", "WHERE merchant_trade_no = $1 AND provider = 'ecpay'", "topup", "concurrent_duplicate_notices_credit_once"),
     "activity-on-conflict": (API + "session.rs", None, "ON CONFLICT DO NOTHING", "", "activity_days", "stale_session_with_existing_row_still_advances_last_seen"),
     "activity-not-exists": (API + "session.rs", None, " OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)", "", "activity_days", "fresh_session_but_missing_today_row_reinserts"),
 }
