@@ -151,7 +151,7 @@
       "held": "{pts} points pledged (can be withdrawn until the goal is reached)",
       "frozenWarn": "Your wallet is frozen and you can't contribute for now. Please contact support.",
       "issuedByPlatform": "Points are currently issued by the platform.",
-      "topup": "Top up (coming soon)",
+      "topup": "Top up",
       "myPledges": "My contributions",
       "noPledges": "No contributions yet. Open a list a friend shared to join a group-funded wish.",
       "noImg": "No image",
@@ -235,6 +235,104 @@
       "pledgePts": " · {pts} pts",
       "qty": " × {qty}",
       "to": "For {name} · "
+    },
+    "topup": {
+      "title": "Top up",
+      "balance": "Current balance: {pts} points",
+      "amount": "Amount (NT$)",
+      "customAmount": "Custom amount",
+      "amountHint": "100 to 50,000",
+      "methodLegend": "Payment method",
+      "method": {
+        "card": "Credit card",
+        "cvs_code": "Convenience store code",
+        "cvs_barcode": "Convenience store barcode",
+        "atm": "ATM virtual account"
+      },
+      "methodDesc": {
+        "card": "Pay online; credited right away.",
+        "cvs_code": "Enter the code at a store kiosk to print a slip, then pay. Credited after payment.",
+        "cvs_barcode": "Print or show the barcode and pay at the store counter.",
+        "atm": "Get a dedicated account number, then transfer by ATM or online banking."
+      },
+      "deadlineCard": "Complete payment within 30 minutes.",
+      "deadlineOther": "Pay within 3 days.",
+      "invoiceLegend": "E-invoice",
+      "carrierType": "Invoice carrier",
+      "carrier": {
+        "member": "Member carrier (default)",
+        "mobile_barcode": "Mobile barcode",
+        "citizen_cert": "Citizen Digital Certificate",
+        "donate": "Donate invoice",
+        "b2b": "Company tax ID"
+      },
+      "field": {
+        "mobile": "Mobile barcode",
+        "cert": "Citizen certificate barcode",
+        "donate": "Donation code",
+        "taxId": "Tax ID number",
+        "buyerName": "Company name (optional)"
+      },
+      "summary": "Review",
+      "summaryLine": "Top up NT$ {amount}, credited as {pts} points (1 point = NT$ 1)",
+      "summaryEmpty": "Enter an amount to see the summary.",
+      "note1": "Points cannot be withdrawn by recipients or transferred.",
+      "note2": "Top-up funds are prepayments and follow the refund rules.",
+      "submit": "Continue to payment",
+      "submitting": "Working, please wait...",
+      "err": {
+        "amountInt": "Enter a whole number",
+        "amountRange": "Amount must be between 100 and 50,000",
+        "mobile": "Mobile barcode is / followed by 7 uppercase letters or digits (e.g. /ABC1234)",
+        "cert": "Certificate barcode is 2 uppercase letters followed by 14 digits",
+        "donate": "Donation code is 3 to 7 digits",
+        "taxId": "Tax ID is 8 digits",
+        "disabled": "Top-up is not available yet",
+        "cap": "Your points would exceed the {cap}-point limit (pending top-ups included). Please lower the amount.",
+        "limit": "New accounts can top up up to NT$ {limit} per day. You can still add NT$ {remaining} today.",
+        "rate": "Too many attempts. Please try again in about {min} minutes.",
+        "rateNoMin": "Too many attempts. Please try again later.",
+        "validation": "Some fields are invalid. Please check the highlighted ones.",
+        "network": "Connection failed. Check your network and retry.",
+        "server": "The system is temporarily unavailable. Please try again later.",
+        "generic": "Top-up failed. Please try again later."
+      },
+      "history": "Top-up history",
+      "empty": "No top-ups yet.",
+      "refresh": "Refresh",
+      "stalled": "Not updated yet? Press Refresh to see the latest status.",
+      "createdAt": "Created {time}",
+      "paidAt": "Paid {time}",
+      "status": {
+        "pending": "Awaiting payment",
+        "paid": "Credited",
+        "failed": "Failed",
+        "expired": "Expired",
+        "refunded": "Refunded",
+        "disputed": "Disputed",
+        "charged_back": "Charged back"
+      },
+      "fetching": "Getting payment details... (a few seconds)",
+      "pay": {
+        "paymentNo": "Payment code",
+        "barcode1": "Barcode part 1",
+        "barcode2": "Barcode part 2",
+        "barcode3": "Barcode part 3",
+        "bankCode": "Bank code",
+        "account": "Virtual account"
+      },
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFail": "Copy failed. Please select the text manually.",
+      "expireAt": "Pay by {time}",
+      "leftDH": "{d} d {h} h left",
+      "leftHM": "{h} h {m} min left",
+      "leftM": "{m} min left",
+      "expired": "Expired",
+      "cardPending": "Payment not completed yet. Please finish before {time}.",
+      "success": "Top-up successful. {pts} points credited; balance is now {bal} points.",
+      "nativeText": "The payment page can't open inside the app. Please complete the top-up on the web version.",
+      "nativeLink": "Top up on the web"
     }
   }
 }

@@ -88,7 +88,7 @@ cd apps/web && npm run typecheck && npm run test:coverage && npm run build   # C
 
 ### 端對端測試（Playwright）
 
-`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（認捐一律以註冊會員身分進行，OTP 從 Mailpit 取，helper 為 `signInPage` / `memberClaim`；登入會員認捐、未登入「登入後認捐」導引與登入後導回、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試等）。
+`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（認捐一律以註冊會員身分進行，OTP 從 Mailpit 取，helper 為 `signInPage` / `memberClaim`；登入會員認捐、未登入「登入後認捐」導引與登入後導回、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試、儲值頁 `/me/topup`〔`topup.spec.ts`：登入走真後端，wallet / topups 以 `page.route` 模擬，攔截導向綠界的表單 POST 驗證，不連外〕等）。
 
 前置條件：
 - `docker compose up -d db mailpit`（Postgres 在 5432、Mailpit 在 8025；OTP 信從 Mailpit HTTP API 讀取）。

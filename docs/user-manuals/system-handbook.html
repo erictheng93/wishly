@@ -154,7 +154,8 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>Email 通知 outbox、一鍵退訂</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>帳號刪除、資料匯出</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>Tauri 原生殼（Bearer 權杖）</td><td><span class="tag live">已實作</span></td><td>後端與前端建置模式已備；未見上架紀錄</td></tr>
-<tr><td>儲值（金流）、自動儲值</td><td><span class="tag plan">規劃中</span></td><td>錢包頁的「儲值」按鈕停用</td></tr>
+<tr><td>儲值（綠界金流）</td><td><span class="tag live">已實作</span></td><td>前端 <code>/me/topup</code>；後端 <code>ECPAY_*</code> 未設定時顯示「儲值功能尚未開放」</td></tr>
+<tr><td>自動儲值</td><td><span class="tag plan">規劃中</span></td><td>後端有設定端點，尚無前端頁面</td></tr>
 <tr><td>電子禮物卡、回饋星星、企業禮券</td><td><span class="tag plan">規劃中</span></td><td>P2-B / P2-C，無對應 migration</td></tr>
 <tr><td>目錄商品自動下單</td><td><span class="tag plan">規劃中</span></td><td>目前僅人工代購（<code>concierge</code>）流程由營運操作採購單</td></tr>
 <tr><td>救災 <code>relief</code> 據點與組織</td><td><span class="tag plan">規劃中</span></td><td>API 建立 <code>relief</code> 回 422</td></tr>
@@ -453,7 +454,17 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <li>確認後點數從錢包扣出，狀態為 <b>pledged</b>（認捐中）。餘額不足會顯示還缺多少。</li>
 <li>達標的那一刻，所有 pledged 轉為 <b>captured</b>，平台建立採購單；你會收到 Email 通知，之後依序收到出貨、送達通知。</li>
 </ol>
-<div class="box note"><b class="t">點數目前由平台發放</b>錢包頁的「儲值」尚未開放。點數 1 點 = NT$1，只能用在心願品項，<b>不會轉成現金給建立者</b>。</div>
+<div class="box note"><b class="t">點數 1 點 = NT$1</b>點數只能用在心願品項，<b>不會轉成現金給建立者</b>，也不可轉讓。儲值款項屬預收款，依退款規則辦理。</div>
+<h4>如何儲值（<code>/me/topup</code>）</h4>
+<p>在「我的點數」頁按「儲值」。若顯示「儲值功能尚未開放」，代表營運尚未啟用金流，點數仍由平台發放。原生 App 內無法開啟付款頁，請改用網頁版。</p>
+<ol class="steps">
+<li>選金額：快選 500 / 1,000 / 2,000 / 5,000，或自訂 100 到 50,000 的整數。錢包（含待付款的儲值單）合計不可超過 50,000 點；新帳號另有每日上限，超過時會顯示今日還能儲多少。</li>
+<li>選付款方式：<b>信用卡</b>（30 分鐘內完成）；<b>超商代碼</b>、<b>超商條碼</b>、<b>ATM 虛擬帳號</b>（皆 3 天內繳費）。</li>
+<li>選發票載具：預設會員載具；也可填手機條碼（<code>/</code> 加 7 碼大寫英數）、自然人憑證（2 碼大寫英文加 14 碼數字）、捐贈碼（3 到 7 碼數字）或公司統編（8 碼）。格式錯誤會在該欄位提示。</li>
+<li>確認摘要後按「前往付款」，頁面會跳到綠界付款頁；信用卡在該頁輸入卡號（卡號不經過本站）。</li>
+<li><b>超商代碼</b>：回到「儲值紀錄」查看繳費代碼（可按「複製」），到超商機台輸入代碼列印繳費單，在期限內到櫃檯付款。<b>超商條碼</b>：紀錄中會顯示三段條碼，列印或出示給店員掃描繳費。<b>ATM</b>：紀錄中顯示銀行代碼與虛擬帳號，用 ATM 或網路銀行轉帳。剛建單時可能先顯示「取號中…」，數秒後自動出現；若一直沒出現，按「重新整理」。</li>
+<li>付款完成後點數會在數秒到數分鐘內入帳（超商與 ATM 依繳費時間），入帳時頁面會顯示成功與新餘額。逾期未付的單會顯示「已逾期」，請重新建立。</li>
+</ol>
 <h4>我的點數（<code>/me/wallet</code>）</h4>
 <ul>
 <li><b>可用點數</b>、<b>認捐中</b>點數；錢包被凍結時顯示「已凍結」，不能新增贊助，但退點仍會入帳。</li>
