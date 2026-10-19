@@ -84,6 +84,11 @@ async function reallocate() {
         <p v-if="wallet.status === 'frozen'" class="c-err" role="alert">{{ $t('me.wallet.frozenWarn') }}</p>
         <p class="c-mute c-small">{{ $t('me.wallet.issuedByPlatform') }}</p>
         <NuxtLink to="/me/topup" class="c-btn primary">{{ $t('me.wallet.topup') }}</NuxtLink>
+        <div class="c-mt">
+          <NuxtLink v-if="Number(wallet.cash_refundable_balance) > 0 && wallet.status !== 'frozen'" to="/me/refund" class="c-btn primary" data-testid="refund-entry">{{ $t('me.wallet.refund') }}</NuxtLink>
+          <p v-else class="c-mute c-small c-m0" data-testid="refund-none">{{ $t(wallet.status === 'frozen' ? 'me.wallet.refundFrozen' : 'me.wallet.refundNone') }}</p>
+          <p v-if="Number(wallet.cash_refundable_balance) > 0" class="c-mute c-small c-m0">{{ $t('me.wallet.refundable', { pts: fmtPts(wallet.cash_refundable_balance) }) }}</p>
+        </div>
       </section>
 
       <h2 class="c-h2">{{ $t('me.wallet.myPledges') }}</h2>
