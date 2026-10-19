@@ -202,24 +202,21 @@ pub async fn assert_points_reconciled(pool: &PgPool) {
         .fetch_all(pool).await.unwrap();
     assert!(drift.is_empty(), "item.pledged_points 漂移: {drift:?}");
     // 批次：Σ lots.remaining = balance；批次 remaining = 該批次 ledger 加總（舊資料批次的 ledger 沒有 lot_id，只對帳錢包層級）
-    let lot_bad: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM point_wallets w WHERE balance <> COALESCE((SELECT sum(remaining_points) FROM point_lots l WHERE l.wallet_id=w.id),0)")
+    let lot_sum_off: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM point_wallets w WHERE balance <> COALESCE((SELECT sum(remaining_points) FROM point_lots l WHERE l.wallet_id=w.id),0)")
         .fetch_all(pool).await.unwrap();
     assert!(
-        lot_bad.is_empty(),
-        "錢包 balance 與批次 remaining 加總不一致: {lot_bad:?}"
+        lot_sum_off.is_empty(),
+        "錢包 balance 與批次 remaining 加總不一致: {lot_sum_off:?}"
     );
-    let lot_drift: Vec<Uuid> = sqlx::query_scalar("SELECT l.id FROM point_lots l WHERE NOT (l.source = 'adjustment' AND l.source_ref_id = l.wallet_id) AND l.remaining_points <> COALESCE((SELECT sum(delta) FROM point_ledger g WHERE g.lot_id = l.id),0)")
+    let lot_ledger_off: Vec<Uuid> = sqlx::query_scalar("SELECT l.id FROM point_lots l WHERE NOT (l.source = 'adjustment' AND l.source_ref_id = l.wallet_id) AND l.remaining_points <> COALESCE((SELECT sum(delta) FROM point_ledger g WHERE g.lot_id = l.id),0)")
         .fetch_all(pool).await.unwrap();
     assert!(
-        lot_drift.is_empty(),
-        "批次 remaining 與 ledger 加總不一致: {lot_drift:?}"
+        lot_ledger_off.is_empty(),
+        "批次 remaining 與 ledger 加總不一致: {lot_ledger_off:?}"
     );
-    let alloc_drift: Vec<Uuid> = sqlx::query_scalar("SELECT c.id FROM contributions c WHERE c.status IN ('pledged','captured') AND EXISTS (SELECT 1 FROM contribution_lot_allocations a WHERE a.contribution_id = c.id) AND c.points - c.refunded_points <> (SELECT sum(a.points - a.refunded_points) FROM contribution_lot_allocations a WHERE a.contribution_id = c.id)")
+    let alloc_off: Vec<Uuid> = sqlx::query_scalar("SELECT c.id FROM contributions c WHERE c.status IN ('pledged','captured') AND EXISTS (SELECT 1 FROM contribution_lot_allocations a WHERE a.contribution_id = c.id) AND c.points - c.refunded_points <> (SELECT sum(a.points - a.refunded_points) FROM contribution_lot_allocations a WHERE a.contribution_id = c.id)")
         .fetch_all(pool).await.unwrap();
-    assert!(
-        alloc_drift.is_empty(),
-        "認捐與批次分配不一致: {alloc_drift:?}"
-    );
+    assert!(alloc_off.is_empty(), "認捐與批次分配不一致: {alloc_off:?}");
 }
 pub async fn assert_all_reconciled(pool: &PgPool) {
     assert_points_reconciled(pool).await;
