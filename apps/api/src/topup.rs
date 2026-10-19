@@ -48,6 +48,10 @@ pub fn routes() -> Router<AppState> {
         .route("/wallet/topups/{id}", get(detail))
         .route("/webhooks/payments/{provider}", post(webhook))
         .route("/webhooks/payments/{provider}/info", post(webhook_info))
+        .route(
+            "/webhooks/payments/{provider}/dispute",
+            post(webhook_dispute),
+        )
 }
 
 fn ecpay() -> Result<Ecpay, AppError> {
@@ -627,6 +631,18 @@ async fn credit(pool: &PgPool, id: Uuid, txn: &str) -> Result<(), AppError> {
     .await?;
     tx.commit().await?;
     Ok(())
+}
+
+// ---- POST /webhooks/payments/{provider}/dispute（接口位置，D57）----
+
+/// 綠界尚未提供可驗證的爭議通知格式（拒付多半走銀行 / 特店後台）；取得官方格式後在此驗簽並呼叫
+/// `wallet_ops::dispute_open / charge_back / dispute_won`。目前拒付由營運入口 `POST /admin/topups/{id}/dispute` 處理。
+async fn webhook_dispute() -> Result<Response, AppError> {
+    Err(AppError::problem(
+        501,
+        "DISPUTE_WEBHOOK_NOT_AVAILABLE",
+        "尚未提供可驗證的爭議通知格式，請由營運後台處理",
+    ))
 }
 
 // ---- POST /webhooks/payments/{provider}/info（PaymentInfoURL 取號通知）----

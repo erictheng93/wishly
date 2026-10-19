@@ -176,7 +176,11 @@
       "reOk": "確認轉投",
       "noTargets": "這份清單目前沒有其他募集中的眾籌品項。",
       "moveTo": "轉投到",
-      "targetOpt": "{title}（還差 {pts} 點）"
+      "targetOpt": "{title}（還差 {pts} 點）",
+      "refund": "申請現金退款",
+      "refundable": "可退現金 {pts} 點",
+      "refundNone": "目前沒有可退現金的點數。只有儲值購買的點數可退現金，禮物卡與贊助取得的點數不可退。",
+      "refundFrozen": "錢包已凍結，暫時無法申請現金退款。"
     },
     "friends": {
       "sent": "若對方有帳號，已送出邀請",
@@ -333,6 +337,53 @@
       "success": "儲值成功，已入帳 {pts} 點，目前餘額 {bal} 點。",
       "nativeText": "App 內無法開啟付款頁，請至網頁版完成儲值。",
       "nativeLink": "前往網頁版儲值"
+    },
+    "frozenBanner": "錢包已凍結：暫時無法贊助或申請現金退款，請聯絡客服。",
+    "refund": {
+      "title": "申請現金退款",
+      "refundable": "可退現金餘額（點）",
+      "onlyTopup": "只有儲值購買的點數可以退現金；禮物卡與贊助取得的點數不可退。",
+      "none": "目前沒有可退現金的點數。只有儲值購買的點數可以退現金，禮物卡與贊助取得的點數不可退。",
+      "pending": "審核中：你有 {n} 筆退款申請正在處理。",
+      "amount": "退款點數",
+      "amountHint": "1 至 {max}",
+      "all": "全部",
+      "summary": "確認內容",
+      "summaryLine": "將先從錢包扣除 {pts} 點，審核通過後退款 NT$ {amount}。",
+      "summaryEmpty": "輸入點數後顯示摘要。",
+      "note1": "申請後點數會先扣除；審核通過後退款。",
+      "note2": "若申請被拒絕，點數會退回你的錢包。",
+      "submit": "送出申請",
+      "submitting": "送出中…",
+      "success": "已送出申請，扣除 {pts} 點，目前餘額 {bal} 點。審核通過後將退款。",
+      "history": "我的申請",
+      "empty": "還沒有退款申請。",
+      "pts": "{pts} 點",
+      "createdAt": "申請 {time}",
+      "completedAt": "完成 {time}",
+      "rejectReason": "拒絕原因：{reason}",
+      "rejectedNote": "點數已退回你的錢包。",
+      "inReview": "審核中，通過後會退款。",
+      "status": {
+        "requested": "待審核",
+        "processing": "處理中",
+        "completed": "已退款",
+        "rejected": "已拒絕"
+      },
+      "err": {
+        "amountInt": "請輸入整數點數",
+        "amountRange": "點數須介於 1 至 50,000",
+        "amountOver": "不可超過可退現金餘額",
+        "frozen": "帳戶已凍結，暫時無法申請現金退款，請聯絡客服。",
+        "notRefundable": "可退現金的點數只有 {pts} 點（禮物卡與贊助點數不可退現金），請調降點數。",
+        "insufficient": "點數餘額不足（目前 {bal} 點）。",
+        "rate": "申請太頻繁，請約 {min} 分鐘後再試。",
+        "rateNoMin": "申請太頻繁，請稍後再試。",
+        "validation": "內容有誤，請檢查點數。",
+        "network": "連線失敗，請檢查網路後重試。",
+        "server": "系統暫時無法處理，請稍後再試。",
+        "generic": "申請失敗，請稍後再試。"
+      }
     }
   }
 }

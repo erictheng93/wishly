@@ -59,7 +59,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 ## 營運後台
 
-`/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄。
+`/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄；`/admin/cash-refunds` 為現金退款審核、`/admin/wallet-debts` 為拒付欠款結案、`/admin/topups` 為儲值單的拒付爭議處理（標記爭議 / 勝訴 / 敗訴扣回）。使用者端現金退款在 `/me/refund`（由 `/me/wallet` 進入，只有儲值購買的點數可退）。
 
 - 第一位 staff 需由資料庫設定 `users.is_staff = true`；之後可在後台設為／取消 staff。最後一位有效 staff 不可被停權、降權或自行刪帳號。
 - 停權、staff 變更與營運解除綁定會撤銷現有登入；解鎖後需重新登入。停權保留清單、捐助與帳務紀錄，不會自動下架清單。
@@ -88,7 +88,7 @@ cd apps/web && npm run typecheck && npm run test:coverage && npm run build   # C
 
 ### 端對端測試（Playwright）
 
-`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（認捐一律以註冊會員身分進行，OTP 從 Mailpit 取，helper 為 `signInPage` / `memberClaim`；登入會員認捐、未登入「登入後認捐」導引與登入後導回、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試、儲值頁 `/me/topup`〔`topup.spec.ts`：登入走真後端，wallet / topups 以 `page.route` 模擬，攔截導向綠界的表單 POST 驗證，不連外〕等）。
+`apps/web/e2e/` 以真實的 API + Web + Postgres + Mailpit 跑瀏覽器流程（認捐一律以註冊會員身分進行，OTP 從 Mailpit 取，helper 為 `signInPage` / `memberClaim`；登入會員認捐、未登入「登入後認捐」導引與登入後導回、防超賣、心願眾籌（發點、贊助 / 撤回、達標、捐款者名單、採購與差額退回、轉投）、創建者註冊 / 登入 / 發佈、即時更新、驚喜模式、檢舉下架、LINE 內建瀏覽器、版面煙霧測試、儲值頁 `/me/topup`〔`topup.spec.ts`：登入走真後端，wallet / topups 以 `page.route` 模擬，攔截導向綠界的表單 POST 驗證，不連外〕、現金退款 `/me/refund`〔`refund.spec.ts`〕與營運三頁〔`admin-wallet-ops.spec.ts`：登入與 staff 權限走真後端，錢包 / 後台端點以 `page.route` 模擬，共用 `e2e/support/mockApi.ts`〕等）。
 
 前置條件：
 - `docker compose up -d db mailpit`（Postgres 在 5432、Mailpit 在 8025；OTP 信從 Mailpit HTTP API 讀取）。

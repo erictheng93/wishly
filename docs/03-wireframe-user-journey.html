@@ -1412,6 +1412,15 @@ flowchart TD
 <li><b>儲值紀錄</b>（同頁下方，<code>GET /wallet/topups</code>，新到舊）：狀態徽章（待付款 / 已入帳 / 失敗 / 已逾期 / 已退款 / 爭議中 / 已拒付）、金額、方式、時間。pending 的超商代碼顯示繳費代碼（可一鍵複製）、超商條碼顯示三段條碼（等寬字體）、ATM 顯示銀行代碼與虛擬帳號，並標示繳費期限與剩餘時間。</li>
 <li><b>取號中 / 到期 / 返回</b>：綠界的取號通知通常在建單後數秒內寫入，<code>payment_info</code> 為 null 時顯示「取號中…」，每 3 秒輪詢，最多 10 次，之後改由「重新整理」手動更新。付款完成或按「返回」會回到 <code>/me/topup</code>：頁面自動重新整理，對剛建立的 pending 單輪詢，轉為已入帳時顯示「儲值成功，已入帳 X 點，目前餘額 Y 點」（入帳仍以後端 webhook 為準）。逾期未付的單顯示「已逾期」，需重新建單。</li>
 </ul></div>
+<div class="note w"><b>實作現況（D55，現金退款）：獨立頁 <code>/me/refund</code>（me/refund.vue）。</b>由錢包頁（<code>/me/wallet</code>）的「申請現金退款」進入，需登入。只有<b>儲值購買的點數</b>可退現金（<code>GET /wallet</code> 的 <code>cash_refundable_balance</code>）；禮物卡與贊助取得的點數不可退。
+<ul>
+<li><b>入口</b>：<code>cash_refundable_balance &gt; 0</code> 且錢包未凍結時，錢包頁顯示主要按鈕「申請現金退款」與「可退現金 X 點」；否則不顯示按鈕，改顯示說明「目前沒有可退現金的點數。只有儲值購買的點數可退現金，禮物卡與贊助取得的點數不可退」（凍結時顯示「錢包已凍結，暫時無法申請現金退款」）。</li>
+<li><b>欄位</b>：可退現金餘額（大字）、退款點數（整數，1 至可退餘額且不超過 50,000，「全部」快捷帶入）。確認摘要：「將先從錢包扣除 X 點，審核通過後退款 NT$ X」，並說明審核被拒絕時點數會退回錢包。沒有可退餘額時整個表單換成上述說明。</li>
+<li><b>送出</b>：<code>POST /wallet/cash-refunds</code>（body <code>{ amount }</code>，<code>Idempotency-Key</code> 必填）。按鈕送出後停用防重複點擊；Idempotency-Key 在「同一份表單內容」下沿用（失敗重試不重複建單），內容改變才換新，成功後重置。201 後顯示「已送出申請，扣除 X 點，目前餘額 Y 點」，並重讀餘額、把新申請加到清單最上方。</li>
+<li><b>錯誤文案</b>：409 <code>NOT_CASH_REFUNDABLE</code> 顯示「可退現金的點數只有 {refundable_points} 點（禮物卡與贊助點數不可退現金）」並重讀餘額；409 <code>INSUFFICIENT_POINTS</code> 顯示目前餘額；403 <code>WALLET_FROZEN</code> 顯示「帳戶已凍結，暫時無法申請現金退款，請聯絡客服」並隱藏表單；422 <code>VALIDATION_FAILED</code> 顯示「內容有誤，請檢查點數」；429 <code>RATE_LIMITED</code> 顯示約幾分鐘後再試（依 Retry-After，每人每小時 10 次）；網路 / 5xx 顯示可重試訊息。</li>
+<li><b>我的申請</b>（同頁下方，<code>GET /wallet/cash-refunds</code>，新到舊）：狀態徽章（待審核 requested / 處理中 processing / 已退款 completed / 已拒絕 rejected）、點數、申請與完成時間；被拒絕時顯示拒絕原因與「點數已退回你的錢包」。有 requested 或 processing 的申請時，頁首顯示「審核中：你有 N 筆退款申請正在處理」。</li>
+<li><b>凍結提示</b>：錢包 <code>status = frozen</code>（拒付爭議或風控）時，<code>/me/wallet</code>、<code>/me/topup</code>、<code>/me/refund</code> 都顯示凍結提示；後端未回 <code>status</code> 視為正常。</li>
+</ul></div>
 <!-- 5.17 REALLOCATE -->
 <h3 id="w-realloc">5.17 未達標選擇 ReallocateSheet <span class="ph p2">P2-A</span></h3>
 <div class="wf">
@@ -1543,6 +1552,12 @@ flowchart TD
 
 
 
+<div class="note w"><b>實作現況（D55，錢包營運三頁）：</b>掛在 /admin 殼內（<code>middleware: staff</code>，非 staff 一律呈現為「找不到頁面」；後台首頁按鈕列新增「現金退款」「拒付欠款」「儲值與爭議」三個入口）。列表皆為「篩選 + 卡片 + 載入更多」，所有寫入先開二次確認對話框（取消不送出），處理成功後就地更新該列並顯示結果訊息；錯誤顯示在對話框內可重試。
+<ul>
+<li><b>現金退款 <code>/admin/cash-refunds</code></b>（admin/cash-refunds.vue）：依狀態篩選（預設待審核，可選全部 / 處理中 / 已退款 / 已拒絕）；每列顯示使用者、Email、退款點數、申請 / 完成時間、拒絕原因。狀態機 requested →「開始處理」→ processing →「標記已退款」→ completed；requested / processing 皆可「拒絕並退點」。拒絕必填理由（空白擋下並顯示「請填寫拒絕原因」，送出 <code>reject_reason</code>，使用者看得到），點數依原批次退回使用者錢包；已退款 / 已拒絕不再有動作。「標記已退款」的確認文字為「確認已完成對 X 的 NT$ N 退款？此動作無法復原」。API：GET <code>/admin/cash-refunds?status=&amp;cursor=&amp;limit=</code>；PATCH <code>/admin/cash-refunds/{id}</code>（body <code>{ status, reject_reason? }</code>）。他人已處理（409 <code>INVALID_STATE_TRANSITION</code>）時關閉對話框、重讀列表並顯示「這筆申請的狀態已被其他人變更」。</li>
+<li><b>拒付欠款 <code>/admin/wallet-debts</code></b>（admin/wallet-debts.vue）：依狀態篩選（預設未結清 open，可選已追回 settled / 已核銷 written_off）；每列顯示使用者、欠款點數、對應儲值單、建立 / 結案時間、結案備註。open 可「標記已追回」或「核銷」（平台吸收損失並列帳），備註必填（寫入稽核紀錄）。API：GET <code>/admin/wallet-debts?status=</code>；PATCH <code>/admin/wallet-debts/{id}</code>（body <code>{ status: settled | written_off, note }</code>）；已結案再改回 409，處理方式同上。</li>
+<li><b>儲值與爭議 <code>/admin/topups</code></b>（admin/topups.vue）：依狀態篩選（預設爭議中 disputed，可切已入帳 / 已拒付 / 全部）；每列顯示金額、方式、狀態、使用者與 Email、金流與交易序號、時間，以及「錢包已凍結」標示。paid 單可「標記爭議」（錢包凍結）；disputed 單可「爭議勝訴」（恢復已入帳；沒有其他爭議時解凍）或「拒付敗訴（扣回）」（扣回該筆儲值批次剩餘點數，已被花掉的部分記為欠款，錢包保持凍結）。備註選填。請求為 POST <code>/admin/topups/{id}/dispute</code>（<code>Idempotency-Key</code> 於開啟確認時產生，後端已回應的錯誤後換新；body <code>{ action: open | won | lost, note? }</code>）。結果訊息：敗訴顯示「扣回 N 點，記為欠款 M 點」；<code>applied = false</code>（已處理過的重送）顯示「狀態已變更，沒有做任何動作」，不謊報成功。</li>
+</ul></div>
 <!-- 5.21 GIFT -->
 <h3 id="w-gift">5.21 購買禮物卡 /gift <span class="ph p2">P2-B</span></h3>
 <div class="wf">
@@ -2184,6 +2199,10 @@ flowchart TD
 <tr><td>/admin</td><td>/admin</td><td>admin/index.vue</td><td>✔ 5.27</td></tr>
 <tr><td>/admin/orders</td><td>/admin/orders</td><td>admin/orders.vue</td><td>✔ P2-A</td></tr>
 <tr><td>（5.20 內含）</td><td>/admin/wallets</td><td>admin/wallets.vue</td><td>✔ P2-A（發點 / 扣點 / 搜尋）</td></tr>
+<tr><td>（5.16 實作現況）</td><td><b>/me/refund</b></td><td>me/refund.vue</td><td>✔ P2-A 現金退款</td></tr>
+<tr><td>/admin/cash-refunds</td><td>/admin/cash-refunds</td><td>admin/cash-refunds.vue</td><td>✔ P2-A（5.20 實作現況）</td></tr>
+<tr><td>（5.20 實作現況）</td><td>/admin/wallet-debts</td><td>admin/wallet-debts.vue</td><td>✔ P2-A 拒付欠款結案</td></tr>
+<tr><td>（5.20 實作現況）</td><td>/admin/topups</td><td>admin/topups.vue</td><td>✔ P2-A 儲值爭議（標記爭議 / 勝訴 / 敗訴）</td></tr>
 <tr><td>/terms、/privacy</td><td>/terms、/privacy</td><td>terms.vue、privacy.vue</td><td>✔ 5.29</td></tr>
 <tr><td>（Email 退訂）</td><td>/unsubscribe、/unsubscribed</td><td>unsubscribe.vue、unsubscribed.vue</td><td>✔ 5.28</td></tr>
 <tr><td>/gift、/g/{code}、/rewards</td><td>—</td><td>—</td><td>尚未實作（P2-B）</td></tr>

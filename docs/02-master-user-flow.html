@@ -942,6 +942,11 @@ sequenceDiagram
 <tr><td>交易邊界</td><td>單一交易：鎖 wallet → 條件式扣點 → ledger → cash_refund_requests → audit。呼叫金流商退款 API 在交易之外，由 staff 觸發後再開短交易更新狀態。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>NOT_CASH_REFUNDABLE</code> 409；<code>INSUFFICIENT_POINTS</code> 409；<code>VALIDATION_FAILED</code> 422；<code>UNAUTHORIZED</code> 401；<code>IDEMPOTENCY_KEY_REQUIRED</code> 400；<code>STAFF_ONLY</code> 403（後台）；<code>RATE_LIMITED</code> 429。</td></tr>
 <tr><td>冪等性</td><td>POST 必帶 Idempotency-Key（金額操作）；後台狀態更新以目標狀態為準。</td></tr>
+<tr><td>前端 / 營運步驟（D55）</td><td>
+<ol>
+<li>使用者：<code>/me/wallet</code> 在可退現金餘額（<code>cash_refundable_balance</code>）大於 0 時顯示「申請現金退款」→ <code>/me/refund</code> 輸入點數（1 至可退餘額）→ 確認摘要（點數先扣、審核通過後退款、被拒絕則退回）→ 送出；清單顯示待審核 / 處理中 / 已退款 / 已拒絕與拒絕原因。沒有可退點數時只顯示說明，不顯示表單。錢包凍結時隱藏表單並提示聯絡客服（<code>WALLET_FROZEN</code>）。</li>
+<li>營運：<code>/admin/cash-refunds</code> 預設看待審核 → 「開始處理」（requested → processing）→ 在金流商後台完成原路退款 → 「標記已退款」（processing → completed）；無法退款時「拒絕並退點」（必填理由，點數退回原批次，使用者看得到理由）。每一步都有二次確認；他人已處理時顯示 409 說明並重讀列表。</li>
+</ol></td></tr>
 </tbody></table>
 
 <h3 id="f7">F7 建立者完成度儀表板 <span class="badge p0">P0</span></h3>
@@ -1538,6 +1543,7 @@ sequenceDiagram
 </pre>
 <table class="meta"><tbody>
 <tr><td>預防（D41）</td><td>所有信用卡付款強制 3DS。新帳號風控：註冊 30 天內，每日儲值與禮物卡購買合計上限 NT$3,000，<strong>涵蓋手動儲值、自動儲值（F11）與禮物卡購買，不含營運建立的企業禮券（F14）</strong>；超限<strong>直接拒絕</strong>，回 <code>TOPUP_LIMIT_EXCEEDED</code> 409（附 <code>limit_amount</code>、<code>remaining_amount</code>）。異常（短時間多卡、多帳號同裝置）進人工審核佇列，審核屬風控標記，<strong>不影響 <code>TOPUP_LIMIT_EXCEEDED</code> 的判定</strong>；審核期間該筆的禮物卡設 <code>gift_cards.claimable_at</code>（最多延遲 24 小時才可兌換）。</td></tr>
+<tr><td>營運入口（D57）</td><td>綠界沒有可驗證的爭議通知格式，爭議 / 拒付由營運依銀行或綠界特店後台通知處理：staff 以 <code>GET /admin/topups?status=</code> 找到儲值單，再 <code>POST /admin/topups/{id}/dispute</code> 登錄 <code>open</code>（凍結）→ <code>won</code>（恢復）或 <code>lost</code>（扣回並記欠款），每次寫 audit_logs；下表與流程圖中的「webhook 報爭議」目前由此入口取代，供應商 webhook 待取得官方格式再接。使用者在 /wallet 看到錢包凍結提示。</td></tr>
 <tr><td>拒付處理</td><td>
 <ol>
 <li>webhook 報爭議 → <code>topups.status = disputed</code>，<code>point_wallets.status = frozen</code>。</li>
@@ -1551,6 +1557,12 @@ sequenceDiagram
 <tr><td>交易邊界</td><td>爭議處理單一交易：鎖序 <code>topups → wishlists（讀）→ point_wallets → point_lots → wishlist_items → contributions</code>；含大量 released 時分批，以 ledger UNIQUE 重跑安全。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>WALLET_FROZEN</code> 403；<code>TOPUP_LIMIT_EXCEEDED</code> 409（新帳號額度）；<code>PAYMENT_FAILED</code> 402（3DS 失敗）；<code>STAFF_ONLY</code> 403。</td></tr>
 <tr><td>冪等性</td><td>webhook 以 <code>(provider_txn_id, event_type)</code> 去重；狀態轉換為條件式（只從 paid 轉 disputed），重送不會重複扣回。</td></tr>
+<tr><td>營運步驟（D55，後台頁）</td><td>
+<ol>
+<li><code>/admin/topups</code>（儲值與爭議）：預設列出爭議中；金流商通知爭議時，對 paid 單按「標記爭議」（錢包凍結）；金流商判決後按「爭議勝訴」（回 paid，無其他爭議時解凍）或「拒付敗訴（扣回）」（扣回批次剩餘點數、不足記欠款、錢包保持凍結）。每個動作都有二次確認，結果訊息顯示扣回點數與欠款；<code>applied = false</code> 表示已處理過，不重複動作。</li>
+<li><code>/admin/wallet-debts</code>（拒付欠款）：敗訴後產生的 open 欠款，追回後按「標記已追回」，或決定吸收損失按「核銷」，備註必填並寫入稽核紀錄。</li>
+<li>錢包解凍 / 手動凍結仍在 <code>/admin/wallets</code>（原因必填）。</li>
+</ol></td></tr>
 </tbody></table>
 
 <h3 id="f19">F19 電子發票 <span class="badge p2">P2</span> <span class="muted">P2-A</span></h3>

@@ -602,3 +602,503 @@ async fn auto_topup_settings_crud_and_limits(pool: PgPool) {
         (Some(false), true)
     );
 }
+
+// ---------- 營運拒付入口（D57）----------
+
+async fn dispute(pool: &PgPool, token: &str, topup: Uuid, key: Uuid, body: Value) -> common::Resp {
+    call(
+        pool,
+        "POST",
+        &format!("/admin/topups/{topup}/dispute"),
+        &[ck(token), idem(key)].concat(),
+        Some(body),
+    )
+    .await
+}
+
+async fn topup_status(pool: &PgPool, id: Uuid) -> String {
+    sqlx::query_scalar("SELECT status::text FROM topups WHERE id = $1")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn wallet_status(pool: &PgPool, user: Uuid) -> String {
+    sqlx::query_scalar("SELECT status::text FROM point_wallets WHERE user_id = $1")
+        .bind(user)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn audit_count(pool: &PgPool, action: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE actor_type = 'staff' AND action = $1")
+        .bind(action)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn staff_dispute_open_won_lost_flow_is_idempotent_and_audited(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let owner = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let topup = topup_credit(&pool, a, 100).await;
+    let wl = common::wishlist(&pool, owner.id, Default::default())
+        .await
+        .id;
+    let item = crowdfund_item(&pool, wl, 1000).await;
+    assert_eq!(
+        pledge(&test_app(&pool), item, &ta, 30).await.0,
+        StatusCode::CREATED
+    );
+
+    // open：凍結；同 key 重放帶 Idempotency-Replayed；不同 key 重送 applied=false 且不重複 audit
+    let k = Uuid::new_v4();
+    let open = json!({ "action": "open", "note": "銀行通知" });
+    let (s, _, b) = dispute(&pool, &staff.token, topup, k, open.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(
+        (b["status"].as_str(), b["applied"].as_bool()),
+        (Some("disputed"), Some(true))
+    );
+    assert_eq!(wallet_status(&pool, a).await, "frozen");
+    let (s, h, b2) = dispute(&pool, &staff.token, topup, k, open).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b2, b);
+    assert_eq!(
+        h.get("idempotency-replayed").map(|v| v.as_bytes()),
+        Some(&b"true"[..])
+    );
+    let again = json!({ "action": "open" });
+    let (s, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), again).await;
+    assert_eq!(
+        (s, b["status"].as_str(), b["applied"].as_bool()),
+        (StatusCode::OK, Some("disputed"), Some(false))
+    );
+    assert_eq!(audit_count(&pool, "topup.dispute_open").await, 1);
+    // GET /wallet 讓前端顯示凍結提示
+    let (_, _, w) = call(&pool, "GET", "/wallet", &ck(&ta), None).await;
+    assert_eq!(w["wallet"]["status"], "frozen");
+
+    // won：恢復
+    let won = json!({ "action": "won" });
+    let (s, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), won.clone()).await;
+    assert_eq!(
+        (s, b["status"].as_str(), b["applied"].as_bool()),
+        (StatusCode::OK, Some("paid"), Some(true))
+    );
+    assert_eq!(wallet_status(&pool, a).await, "active");
+    let (_, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), won).await;
+    assert_eq!(b["applied"].as_bool(), Some(false));
+    assert_eq!(audit_count(&pool, "topup.dispute_won").await, 1);
+
+    // 再 open → lost：扣回批次剩餘 70，已認捐的 30 記欠款
+    dispute(
+        &pool,
+        &staff.token,
+        topup,
+        Uuid::new_v4(),
+        json!({ "action": "open" }),
+    )
+    .await;
+    let lost = json!({ "action": "lost", "note": "敗訴" });
+    let (s, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), lost).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(
+        (
+            b["status"].as_str(),
+            b["applied"].as_bool(),
+            b["recovered"].as_i64(),
+            b["debt"].as_i64()
+        ),
+        (Some("charged_back"), Some(true), Some(70), Some(30))
+    );
+    assert_eq!(wallet_status(&pool, a).await, "frozen");
+    assert_eq!(common::balance(&pool, a).await, 0);
+    let lost2 = json!({ "action": "lost" });
+    let (s, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), lost2).await;
+    assert_eq!(
+        (s, b["applied"].as_bool(), b.get("debt").is_none()),
+        (StatusCode::OK, Some(false), true)
+    );
+    let debts: i64 = sqlx::query_scalar("SELECT count(*) FROM wallet_debts WHERE amount = 30")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(debts, 1);
+    // 終態不可再爭議 / 勝訴
+    for action in ["open", "won"] {
+        let body = json!({ "action": action });
+        let (s, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), body).await;
+        assert_eq!(
+            (s, b["code"].as_str()),
+            (StatusCode::CONFLICT, Some("INVALID_STATE_TRANSITION")),
+            "charged_back 後 {action}"
+        );
+    }
+
+    // audit_logs：staff 操作各一筆，diff 含 note 與結果
+    assert_eq!(audit_count(&pool, "topup.dispute_lost").await, 1);
+    let diff: Value =
+        sqlx::query_scalar("SELECT diff FROM audit_logs WHERE action = 'topup.dispute_lost'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (
+            diff["note"].as_str(),
+            diff["recovered"].as_i64(),
+            diff["debt"].as_i64()
+        ),
+        (Some("敗訴"), Some(70), Some(30))
+    );
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn staff_dispute_rejects_bad_state_input_and_non_staff(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let paid = topup_credit(&pool, a, 100).await;
+    let wallet: Uuid = sqlx::query_scalar("SELECT id FROM point_wallets WHERE user_id = $1")
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let pending = Uuid::new_v4();
+    sqlx::query("INSERT INTO topups (id, wallet_id, merchant_trade_no, provider, method, amount, expires_at) VALUES ($1, $2, $3, 'ecpay', 'card', 100, now())")
+        .bind(pending).bind(wallet).bind(pending.to_string()).execute(&pool).await.unwrap();
+
+    for action in ["open", "won", "lost"] {
+        let body = json!({ "action": action });
+        let (s, _, b) = dispute(&pool, &staff.token, pending, Uuid::new_v4(), body).await;
+        assert_eq!(
+            (s, b["code"].as_str()),
+            (StatusCode::CONFLICT, Some("INVALID_STATE_TRANSITION")),
+            "pending 不可 {action}"
+        );
+    }
+    assert_eq!(topup_status(&pool, pending).await, "pending");
+    assert_eq!(wallet_status(&pool, a).await, "active");
+
+    let nf = Uuid::new_v4();
+    let (s, ..) = dispute(
+        &pool,
+        &staff.token,
+        nf,
+        Uuid::new_v4(),
+        json!({ "action": "open" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    // 輸入驗證
+    for body in [
+        json!({ "action": "x" }),
+        json!({}),
+        json!({ "action": "open", "note": "字".repeat(501) }),
+    ] {
+        let (s, ..) = dispute(&pool, &staff.token, paid, Uuid::new_v4(), body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let path = format!("/admin/topups/{paid}/dispute");
+    let body = json!({ "action": "open" });
+    let (s, _, b) = call(&pool, "POST", &path, &ck(&staff.token), Some(body.clone())).await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("IDEMPOTENCY_KEY_REQUIRED"))
+    );
+    // 同 key 不同內容
+    let k = Uuid::new_v4();
+    assert_eq!(
+        dispute(&pool, &staff.token, paid, k, body.clone()).await.0,
+        StatusCode::OK
+    );
+    let other = json!({ "action": "lost" });
+    let (s, _, b) = dispute(&pool, &staff.token, paid, k, other).await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("IDEMPOTENCY_CONFLICT"))
+    );
+    // 權限
+    let (s, _, b) = dispute(&pool, &ta, paid, Uuid::new_v4(), body.clone()).await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("STAFF_ONLY"))
+    );
+    let (s, ..) = call(&pool, "POST", &path, &idem(Uuid::new_v4()), Some(body)).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        call(&pool, "GET", "/admin/topups", &ck(&ta), None).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(&pool, "GET", "/admin/topups", &[], None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn paid_topup_can_be_charged_back_directly(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let TestUser { id: a, .. } = common::user(&pool, "甲").await;
+    let topup = topup_credit(&pool, a, 100).await;
+    let body = json!({ "action": "lost" });
+    let (s, _, b) = dispute(&pool, &staff.token, topup, Uuid::new_v4(), body).await;
+    assert_eq!(
+        (s, b["recovered"].as_i64(), b["debt"].as_i64()),
+        (StatusCode::OK, Some(100), Some(0))
+    );
+    assert_eq!(wallet_status(&pool, a).await, "frozen");
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn admin_topup_list_filters_and_paginates(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let mut ids = vec![];
+    for name in ["甲", "乙", "丙"] {
+        let u = common::user(&pool, name).await;
+        ids.push(topup_credit(&pool, u.id, 100).await);
+    }
+    let mut tx = pool.begin().await.unwrap();
+    wallet_ops::dispute_open(&mut tx, ids[1]).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let get = |q: String| {
+        let (pool, t) = (pool.clone(), staff.token.clone());
+        async move { call(&pool, "GET", &format!("/admin/topups{q}"), &ck(&t), None).await }
+    };
+    let (s, h, b) = get("?status=disputed".into()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h.get("cache-control").unwrap(), "private, no-store");
+    let d = &b["data"];
+    assert_eq!(d.as_array().unwrap().len(), 1);
+    assert_eq!(
+        (
+            d[0]["id"].as_str(),
+            d[0]["status"].as_str(),
+            d[0]["amount"].as_i64(),
+            d[0]["method"].as_str(),
+            d[0]["provider"].as_str(),
+            d[0]["user"]["display_name"].as_str(),
+            d[0]["wallet"]["status"].as_str()
+        ),
+        (
+            Some(ids[1].to_string().as_str()),
+            Some("disputed"),
+            Some(100),
+            Some("card"),
+            Some("ecpay"),
+            Some("乙"),
+            Some("frozen")
+        )
+    );
+    assert!(d[0]["user"]["email"].is_string() && d[0].get("paid_at").is_some());
+    assert!(b["next_cursor"].is_null());
+
+    // 分頁：limit=2 → 兩頁共 3 筆、不重複；limit 越界被夾住
+    let (_, _, p1) = get("?limit=2".into()).await;
+    assert_eq!(p1["data"].as_array().unwrap().len(), 2);
+    let cur = p1["next_cursor"].as_str().unwrap().to_string();
+    let (_, _, p2) = get(format!("?limit=2&cursor={cur}")).await;
+    assert_eq!(p2["data"].as_array().unwrap().len(), 1);
+    assert!(p2["next_cursor"].is_null());
+    let mut seen: Vec<&str> = p1["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(p2["data"].as_array().unwrap())
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    seen.sort();
+    seen.dedup();
+    assert_eq!(seen.len(), 3);
+    let len = |v: Value| v["data"].as_array().unwrap().len();
+    assert_eq!(len(get("?limit=0".into()).await.2), 1);
+    assert_eq!(len(get("?limit=9999".into()).await.2), 3);
+    assert_eq!(len(get("?status=paid".into()).await.2), 2);
+    assert_eq!(
+        get("?status=bogus".into()).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn my_cash_refund_list_is_own_newest_first_and_hides_internals(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let TestUser {
+        id: b_id,
+        token: tb,
+    } = common::user(&pool, "乙").await;
+    topup_credit(&pool, a, 100).await;
+    topup_credit(&pool, b_id, 100).await;
+    let (_, _, r1) = refund(&pool, &ta, 10, Uuid::new_v4()).await;
+    let (_, _, r2) = refund(&pool, &ta, 20, Uuid::new_v4()).await;
+    refund(&pool, &tb, 30, Uuid::new_v4()).await;
+    let id1 = r1["request"]["id"].as_str().unwrap().to_string();
+    let reject = json!({ "status": "rejected", "reject_reason": "帳戶有誤" });
+    assert_eq!(
+        process(&pool, &staff.token, &id1, reject).await.0,
+        StatusCode::OK
+    );
+
+    let (s, h, b) = call(&pool, "GET", "/wallet/cash-refunds", &ck(&ta), None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h.get("cache-control").unwrap(), "private, no-store");
+    let rs = b["requests"].as_array().unwrap();
+    assert_eq!(rs.len(), 2, "看不到他人的申請");
+    assert_eq!(rs[0]["id"], r2["request"]["id"], "最新在前");
+    assert_eq!(
+        (
+            rs[0]["amount"].as_i64(),
+            rs[0]["status"].as_str(),
+            rs[0]["completed_at"].is_null(),
+            rs[0]["reject_reason"].is_null()
+        ),
+        (Some(20), Some("requested"), true, true)
+    );
+    assert_eq!(
+        (
+            rs[1]["status"].as_str(),
+            rs[1]["reject_reason"].as_str(),
+            rs[1]["completed_at"].is_string()
+        ),
+        (Some("rejected"), Some("帳戶有誤"), true)
+    );
+    let mut keys: Vec<&String> = rs[0].as_object().unwrap().keys().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        [
+            "amount",
+            "completed_at",
+            "created_at",
+            "id",
+            "reject_reason",
+            "status"
+        ]
+    );
+    // limit 邊界
+    let n = |q: &'static str| {
+        let (pool, t) = (pool.clone(), ta.clone());
+        async move {
+            let uri = format!("/wallet/cash-refunds{q}");
+            call(&pool, "GET", &uri, &ck(&t), None).await.2["requests"]
+                .as_array()
+                .unwrap()
+                .len()
+        }
+    };
+    assert_eq!(
+        (
+            n("?limit=1").await,
+            n("?limit=0").await,
+            n("?limit=999").await
+        ),
+        (1, 1, 2)
+    );
+    assert_eq!(
+        call(&pool, "GET", "/wallet/cash-refunds", &[], None)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    // 沒有申請的使用者拿到空陣列
+    let c = common::user(&pool, "丙").await;
+    let (s, _, b) = call(&pool, "GET", "/wallet/cash-refunds", &ck(&c.token), None).await;
+    assert_eq!(
+        (s, b["requests"].as_array().map(Vec::len)),
+        (StatusCode::OK, Some(0))
+    );
+}
+
+/// 決定性併發：持鎖交易模擬「另一個正在處理 lost 的營運」；請求必須卡在 topups 列鎖上，
+/// 等它提交後讀到 charged_back → applied=false，只扣回一次、欠款一筆。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn concurrent_lost_waits_on_topup_row_lock_and_charges_back_once(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let owner = common::user(&pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let topup = topup_credit(&pool, a, 100).await;
+    let wl = common::wishlist(&pool, owner.id, Default::default())
+        .await
+        .id;
+    let item = crowdfund_item(&pool, wl, 1000).await;
+    assert_eq!(
+        pledge(&test_app(&pool), item, &ta, 30).await.0,
+        StatusCode::CREATED
+    );
+
+    let mut holder = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *holder)
+        .await
+        .unwrap();
+    // 持鎖者先處理 lost（FOR UPDATE 在 charge_back 內取得並持有到 commit）
+    let out = wallet_ops::charge_back(&mut holder, topup).await.unwrap();
+    assert_eq!(
+        out,
+        ChargedBack::Applied {
+            recovered: 70,
+            debt: 30
+        }
+    );
+
+    let (p, t) = (pool.clone(), staff.token.clone());
+    let req = tokio::spawn(async move {
+        dispute(&p, &t, topup, Uuid::new_v4(), json!({ "action": "lost" })).await
+    });
+    let blocked = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        common::wait_for_blocked(&pool, pid, 1),
+    )
+    .await;
+    assert!(
+        blocked.is_ok(),
+        "lost request did not block on the topups row lock"
+    );
+    holder.commit().await.unwrap();
+
+    let (status, _, b) = req.await.unwrap();
+    // 只比狀態碼與欄位：失敗時 body 可能帶 INTERNAL_ERROR，mutate.py 會誤判為基礎設施錯誤
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "blocked lost request failed after concurrent charge_back"
+    );
+    assert_eq!(
+        b["applied"].as_bool(),
+        Some(false),
+        "charge_back applied twice"
+    );
+    let debts: i64 = sqlx::query_scalar("SELECT count(*) FROM wallet_debts")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!((debts, common::balance(&pool, a).await), (1, 0));
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn dispute_webhook_is_a_documented_501_placeholder(pool: PgPool) {
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        "/webhooks/payments/ecpay/dispute",
+        &[],
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (
+            StatusCode::NOT_IMPLEMENTED,
+            Some("DISPUTE_WEBHOOK_NOT_AVAILABLE")
+        )
+    );
+}

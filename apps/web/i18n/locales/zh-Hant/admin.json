@@ -25,7 +25,10 @@
         "orders": "採購單佇列",
         "wallets": "點數錢包",
         "audit": "稽核紀錄",
-        "analytics": "數據分析"
+        "analytics": "數據分析",
+        "cashRefunds": "現金退款",
+        "walletDebts": "拒付欠款",
+        "topups": "儲值與爭議"
       },
       "tabsLabel": "後台功能",
       "tabs": {
@@ -315,6 +318,121 @@
       "distribution": "分布",
       "dailyTable": "每日資料表",
       "date": "日期"
+    },
+    "cashRefunds": {
+      "title": "現金退款審核",
+      "statusLabel": "狀態",
+      "all": "全部",
+      "retry": "重試",
+      "loading": "載入中…",
+      "empty": "沒有符合的申請",
+      "loadMore": "載入更多",
+      "status": {
+        "requested": "待審核",
+        "processing": "處理中",
+        "completed": "已退款",
+        "rejected": "已拒絕"
+      },
+      "amount": "退款點數",
+      "pts": "{pts} 點",
+      "createdAt": "申請時間",
+      "completedAt": "完成時間",
+      "rejectReason": "拒絕原因",
+      "action": {
+        "processing": "開始處理",
+        "completed": "標記已退款",
+        "rejected": "拒絕並退點"
+      },
+      "confirm": {
+        "processing": "將 {name} 的 {amount} 點退款申請標為處理中？",
+        "completed": "確認已完成對 {name} 的 NT$ {amount} 退款？此動作無法復原。",
+        "rejected": "拒絕 {name} 的 {amount} 點退款申請？點數會依原批次退回他的錢包。"
+      },
+      "reasonLabel": "拒絕原因（必填，會顯示給使用者）",
+      "rejectNote": "被拒絕的申請不能再恢復，使用者需重新申請。",
+      "reasonRequired": "請填寫拒絕原因",
+      "done": {
+        "processing": "已將 {name} 的 {amount} 點申請標為處理中",
+        "completed": "已標記 {name} 的 NT$ {amount} 退款完成",
+        "rejected": "已拒絕 {name} 的申請，{amount} 點已退回其錢包"
+      },
+      "stale": "這筆申請的狀態已被其他人變更，已重新載入列表。"
+    },
+    "walletDebts": {
+      "title": "拒付欠款",
+      "intro": "信用卡拒付後，已被花掉而無法扣回的點數會記為欠款。",
+      "statusLabel": "狀態",
+      "retry": "重試",
+      "loading": "載入中…",
+      "empty": "沒有符合的欠款",
+      "loadMore": "載入更多",
+      "status": {
+        "open": "未結清",
+        "settled": "已追回",
+        "written_off": "已核銷"
+      },
+      "amount": "欠款",
+      "pts": "{pts} 點",
+      "topup": "儲值單",
+      "createdAt": "建立時間",
+      "resolvedAt": "結案時間",
+      "note": "結案備註",
+      "action": {
+        "settled": "標記已追回",
+        "written_off": "核銷"
+      },
+      "confirm": {
+        "settled": "確認已向 {name} 追回 {amount} 點的欠款？",
+        "written_off": "核銷 {name} 的 {amount} 點欠款？平台吸收損失並列帳。"
+      },
+      "noteLabel": "備註（必填，寫入稽核紀錄）",
+      "noteRequired": "請填寫備註",
+      "done": {
+        "settled": "已將 {name} 的 {amount} 點欠款標為已追回",
+        "written_off": "已核銷 {name} 的 {amount} 點欠款"
+      },
+      "stale": "這筆欠款已被結案，已重新載入列表。"
+    },
+    "topups": {
+      "title": "儲值與拒付爭議",
+      "intro": "信用卡拒付時，標記爭議會凍結錢包；勝訴恢復、敗訴會扣回該筆儲值批次剩餘點數，不足部分記為欠款。",
+      "statusLabel": "狀態",
+      "all": "全部",
+      "retry": "重試",
+      "loading": "載入中…",
+      "empty": "沒有符合的儲值單",
+      "loadMore": "載入更多",
+      "status": {
+        "disputed": "爭議中",
+        "paid": "已入帳",
+        "charged_back": "已拒付",
+        "pending": "待付款",
+        "failed": "失敗",
+        "expired": "已逾期",
+        "refunded": "已退款"
+      },
+      "walletFrozen": "錢包已凍結",
+      "provider": "金流",
+      "createdAt": "建立時間",
+      "paidAt": "付款時間",
+      "action": {
+        "open": "標記爭議",
+        "won": "爭議勝訴",
+        "lost": "拒付敗訴（扣回）"
+      },
+      "confirm": {
+        "open": "將 {name} 的 NT$ {amount} 儲值單標為爭議中？錢包會被凍結。",
+        "won": "{name} 的 NT$ {amount} 爭議勝訴？儲值單恢復為已入帳，沒有其他爭議時錢包會解凍。",
+        "lost": "{name} 的 NT$ {amount} 拒付敗訴？會扣回該筆儲值批次剩餘的點數，已花掉的部分記為欠款，錢包保持凍結。"
+      },
+      "noteLabel": "備註（選填）",
+      "done": {
+        "open": "已將 {name} 的 NT$ {amount} 標為爭議中，錢包已凍結",
+        "won": "已將 {name} 的 NT$ {amount} 判為爭議勝訴；錢包是否解凍請見「點數錢包」",
+        "lost": "已處理 {name} 的 NT$ {amount} 拒付：扣回 {recovered} 點，記為欠款 {debt} 點"
+      },
+      "notApplied": "這筆儲值單的狀態已變更，沒有做任何動作（{name}，NT$ {amount}）。",
+      "stale": "這筆儲值單的狀態不允許此操作，已重新載入列表。"
     }
   }
 }

@@ -176,7 +176,11 @@
       "reOk": "Confirm move",
       "noTargets": "This list has no other group-funded items open for funding right now.",
       "moveTo": "Move to",
-      "targetOpt": "{title} ({pts} points to go)"
+      "targetOpt": "{title} ({pts} points to go)",
+      "refund": "Request a cash refund",
+      "refundable": "{pts} points refundable as cash",
+      "refundNone": "No points are refundable as cash right now. Only points bought by top-up can be refunded; gift card and contribution points can't.",
+      "refundFrozen": "Your wallet is frozen. Cash refunds are unavailable for now."
     },
     "friends": {
       "sent": "If that person has an account, the invitation has been sent.",
@@ -333,6 +337,53 @@
       "success": "Top-up successful. {pts} points credited; balance is now {bal} points.",
       "nativeText": "The payment page can't open inside the app. Please complete the top-up on the web version.",
       "nativeLink": "Top up on the web"
+    },
+    "frozenBanner": "Your wallet is frozen: you can't contribute or request a cash refund for now. Please contact support.",
+    "refund": {
+      "title": "Cash refund",
+      "refundable": "Refundable cash balance (points)",
+      "onlyTopup": "Only points bought by top-up can be refunded as cash. Gift card and contribution points can't.",
+      "none": "No points are refundable as cash right now. Only points bought by top-up can be refunded; gift card and contribution points can't.",
+      "pending": "Under review: {n} refund request(s) being processed.",
+      "amount": "Points to refund",
+      "amountHint": "1 to {max}",
+      "all": "All",
+      "summary": "Summary",
+      "summaryLine": "{pts} points will be deducted from your wallet first. After approval, NT$ {amount} is refunded.",
+      "summaryEmpty": "Enter points to see a summary.",
+      "note1": "Points are deducted when you submit; the refund is paid after review.",
+      "note2": "If the request is rejected, the points go back to your wallet.",
+      "submit": "Submit request",
+      "submitting": "Submitting…",
+      "success": "Request submitted. {pts} points deducted; balance is now {bal} points. The refund is paid after approval.",
+      "history": "My requests",
+      "empty": "No refund requests yet.",
+      "pts": "{pts} points",
+      "createdAt": "Requested {time}",
+      "completedAt": "Completed {time}",
+      "rejectReason": "Reason: {reason}",
+      "rejectedNote": "The points were returned to your wallet.",
+      "inReview": "Under review. The refund is paid once approved.",
+      "status": {
+        "requested": "Pending review",
+        "processing": "Processing",
+        "completed": "Refunded",
+        "rejected": "Rejected"
+      },
+      "err": {
+        "amountInt": "Enter a whole number of points",
+        "amountRange": "Points must be between 1 and 50,000",
+        "amountOver": "Can't exceed your refundable cash balance",
+        "frozen": "Your wallet is frozen, so cash refunds are unavailable for now. Please contact support.",
+        "notRefundable": "Only {pts} points are refundable as cash (gift card and contribution points can't be refunded). Please lower the amount.",
+        "insufficient": "Not enough points (you have {bal}).",
+        "rate": "Too many requests. Please try again in about {min} minute(s).",
+        "rateNoMin": "Too many requests. Please try again later.",
+        "validation": "Something is wrong with the points entered.",
+        "network": "Connection failed. Check your network and try again.",
+        "server": "We can't process this right now. Please try again later.",
+        "generic": "The request failed. Please try again later."
+      }
     }
   }
 }

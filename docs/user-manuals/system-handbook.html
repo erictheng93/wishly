@@ -155,6 +155,8 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>帳號刪除、資料匯出</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>Tauri 原生殼（Bearer 權杖）</td><td><span class="tag live">已實作</span></td><td>後端與前端建置模式已備；未見上架紀錄</td></tr>
 <tr><td>儲值（綠界金流）</td><td><span class="tag live">已實作</span></td><td>前端 <code>/me/topup</code>；後端 <code>ECPAY_*</code> 未設定時顯示「儲值功能尚未開放」</td></tr>
+<tr><td>現金退款（使用者申請、營運審核）</td><td><span class="tag live">已實作</span></td><td>前端 <code>/me/refund</code>、<code>/admin/cash-refunds</code>；只有儲值購買的點數可退</td></tr>
+<tr><td>拒付爭議與欠款處理</td><td><span class="tag live">已實作</span></td><td>前端 <code>/admin/topups</code>、<code>/admin/wallet-debts</code>（標記爭議、勝訴、敗訴扣回、欠款結案）</td></tr>
 <tr><td>自動儲值</td><td><span class="tag plan">規劃中</span></td><td>後端有設定端點，尚無前端頁面</td></tr>
 <tr><td>電子禮物卡、回饋星星、企業禮券</td><td><span class="tag plan">規劃中</span></td><td>P2-B / P2-C，無對應 migration</td></tr>
 <tr><td>目錄商品自動下單</td><td><span class="tag plan">規劃中</span></td><td>目前僅人工代購（<code>concierge</code>）流程由營運操作採購單</td></tr>
@@ -465,9 +467,19 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <li><b>超商代碼</b>：回到「儲值紀錄」查看繳費代碼（可按「複製」），到超商機台輸入代碼列印繳費單，在期限內到櫃檯付款。<b>超商條碼</b>：紀錄中會顯示三段條碼，列印或出示給店員掃描繳費。<b>ATM</b>：紀錄中顯示銀行代碼與虛擬帳號，用 ATM 或網路銀行轉帳。剛建單時可能先顯示「取號中…」，數秒後自動出現；若一直沒出現，按「重新整理」。</li>
 <li>付款完成後點數會在數秒到數分鐘內入帳（超商與 ATM 依繳費時間），入帳時頁面會顯示成功與新餘額。逾期未付的單會顯示「已逾期」，請重新建立。</li>
 </ol>
+<h4>如何申請現金退款（<code>/me/refund</code>）</h4>
+<p>只有<b>儲值購買的點數</b>可以退回現金；禮物卡與贊助取得的點數不可退。在「我的點數」頁，當「可退現金」大於 0 時會出現「申請現金退款」按鈕；沒有可退點數時，頁面只會說明原因，不顯示表單。</p>
+<ol class="steps">
+<li>按「申請現金退款」，頁面上方顯示目前可退現金餘額（點）。</li>
+<li>輸入要退的點數（整數，至少 1、不超過可退餘額，單次上限 50,000），或按「全部」帶入可退餘額。</li>
+<li>確認摘要：點數會<b>先從錢包扣除</b>，審核通過後退款；若申請被拒絕，點數會退回錢包。</li>
+<li>按「送出申請」。送出中按鈕會停用，網路失敗後重試不會重複建立申請。成功後會顯示扣除的點數與新餘額，申請出現在下方「我的申請」。</li>
+<li>狀態：<b>待審核</b>、<b>處理中</b>、<b>已退款</b>、<b>已拒絕</b>（會顯示拒絕原因，點數已退回錢包）。有待審核或處理中的申請時，頁首會顯示「審核中」。</li>
+</ol>
+<p>可能看到的提示：「可退現金的點數只有 N 點」（金額超過可退點數，請調降）；「點數餘額不足」；「申請太頻繁」（每人每小時最多 10 次，請稍後再試）；「帳戶已凍結，暫時無法申請現金退款，請聯絡客服」（錢包凍結時整個表單隱藏）。</p>
 <h4>我的點數（<code>/me/wallet</code>）</h4>
 <ul>
-<li><b>可用點數</b>、<b>認捐中</b>點數；錢包被凍結時顯示「已凍結」，不能新增贊助，但退點仍會入帳。</li>
+<li><b>可用點數</b>、<b>認捐中</b>點數；錢包被凍結時顯示「已凍結」與提示（錢包、儲值、退款頁都會顯示），不能新增贊助或申請現金退款，但退點仍會入帳。</li>
 <li><b>撤回</b>：品項達標前（仍為 pledged）隨時可撤回，點數立即回到錢包。已達標（captured）則回 <code>CONTRIBUTION_LOCKED</code>。</li>
 <li><b>轉投</b>：只在<b>來源品項已截止未達標（<code>expired</code>）且仍在 7 天選擇期內</b>時可用；目標須是同一份（使用中）清單另一個募集中、尚未截止的眾籌品項，且須能承接<b>整筆</b>點數（不超過其剩餘額）。不異動錢包；原認捐標為 <code>reallocated</code> 並建立一筆新認捐。</li>
 <li><b>截止未達標</b>：品項變為 <code>expired</code>，有 <b>7 天選擇期</b>讓你撤回或轉投；逾期未處理則自動退回錢包。</li>
@@ -541,6 +553,38 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 
 <h3>6.8 稽核紀錄（<code>/admin/audit</code>）</h3>
 <p>可用操作者 UUID、動作、對象類型（須完整匹配）、對象 UUID、起訖日期查詢；日期以<b>台北時區</b>計算且包含結束日。每筆可展開「操作內容」(diff)。</p>
+
+<h3 id="s-refunds">6.9 現金退款審核（<code>/admin/cash-refunds</code>）</h3>
+<p>使用者申請時點數已先扣除（只扣可退現金的儲值批次）。後台首頁按「現金退款」進入；預設只看<b>待審核</b>，可改選全部 / 處理中 / 已退款 / 已拒絕。每列顯示使用者、Email、退款點數、申請與完成時間、拒絕原因。</p>
+<ol class="steps">
+<li>待審核的申請按「<b>開始處理</b>」（requested → processing），確認對話框按同名按鈕送出。</li>
+<li>到金流商後台完成原路退款（本系統不代為呼叫金流商）。</li>
+<li>回到列按「<b>標記已退款</b>」（processing → completed）。此動作無法復原，確認文字會寫明使用者與金額。</li>
+<li>無法退款時，待審核或處理中的申請都可按「<b>拒絕並退點</b>」：<b>拒絕原因必填</b>（空白會被擋下；原因會顯示給使用者），點數依原批次退回使用者錢包。已退款 / 已拒絕的列沒有動作按鈕。</li>
+</ol>
+<p>他人已先處理時回 <code>INVALID_STATE_TRANSITION</code>：頁面會關閉對話框、重新載入列表並顯示說明。所有處理都寫入稽核（<code>cash_refund.process</code>）。</p>
+
+<h3 id="s-debts">6.10 拒付欠款（<code>/admin/wallet-debts</code>）</h3>
+<p>信用卡拒付敗訴後，該筆儲值已被花掉而扣不回的點數會記為欠款。預設列出<b>未結清</b>，可切換已追回 / 已核銷。每列顯示使用者、欠款點數、對應儲值單、建立與結案時間、結案備註。</p>
+<ul>
+<li>「<b>標記已追回</b>」：已向使用者追回欠款。</li>
+<li>「<b>核銷</b>」：金額小於追討成本等原因，由平台吸收損失並列帳。</li>
+<li>兩者都需二次確認，<b>備註必填</b>並寫入稽核（<code>wallet_debt.resolve</code>）；已結案的欠款不能再改（<code>INVALID_STATE_TRANSITION</code>）。仍有未結清欠款的帳號無法刪除帳號。</li>
+</ul>
+
+<h3 id="s-disputes">6.11 儲值與拒付爭議（<code>/admin/topups</code>）</h3>
+<p>後台首頁按「儲值與爭議」進入；預設列出<b>爭議中</b>，可切換已入帳 / 已拒付 / 全部。每列顯示金額、方式、狀態、使用者、金流與交易序號、時間；錢包已凍結的會標示「錢包已凍結」。</p>
+<table><thead><tr><th>目前狀態</th><th>可用動作</th><th>結果</th></tr></thead><tbody>
+<tr><td>已入帳（paid）</td><td>標記爭議</td><td>儲值單變爭議中，使用者錢包被凍結</td></tr>
+<tr><td>爭議中（disputed）</td><td>爭議勝訴</td><td>回已入帳；沒有其他爭議中的儲值時錢包解凍</td></tr>
+<tr><td>爭議中（disputed）</td><td>拒付敗訴（扣回）</td><td>變已拒付；扣回該筆儲值批次剩餘點數，已被花掉的部分記為欠款（見 6.10），錢包保持凍結</td></tr>
+<tr><td>已拒付 / 其他</td><td>無</td><td>—</td></tr>
+</tbody></table>
+<ul>
+<li>每個動作都有二次確認，備註選填。請求帶 <code>Idempotency-Key</code>，重送不會重複扣回。</li>
+<li>結果訊息：敗訴顯示「扣回 N 點，記為欠款 M 點」；若顯示「狀態已變更，沒有做任何動作」，代表該筆已被處理過（<code>applied = false</code>），並未再次變更。</li>
+<li>勝訴後是否解凍以「點數錢包」頁的實際狀態為準；需要手動解凍 / 凍結時用 6.6。</li>
+</ul>
 
 <!-- ========================================================= 7 -->
 <h2 id="rules">7. 業務規則與狀態機</h2>
