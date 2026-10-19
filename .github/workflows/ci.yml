@@ -142,8 +142,8 @@ jobs:
             apps/web/test-results/
           retention-days: 7
   publish-image:
-    # main 的測試全綠後才推 GHCR（映像公開；標籤為 commit SHA，Dokploy 以 SHA 部署與回滾）。
-    # 首次推送後需到 GitHub 的 package 設定把 wishly-api 改為 Public（預設是私有）。
+    # main 的測試全綠後才推 GHCR（映像維持 Private；標籤為 commit SHA，Dokploy 以 SHA 部署與回滾）。
+    # Dokploy 拉映像需用 GitHub PAT 登入 GHCR（見 docs/deploy-runbook.md）。
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [api, image, web, e2e]
     runs-on: ubuntu-latest
