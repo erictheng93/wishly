@@ -725,6 +725,67 @@ async fn concurrent_duplicate_notices_credit_once(pool: PgPool) {
     assert_points_reconciled(&pool).await;
 }
 
+/// 決定性版本（不靠時序）：持有訂單列鎖的交易模擬「另一個已在入帳的 webhook」，被擋住的 webhook
+/// 等它提交後必須重讀為 paid 而冪等；若 credit 沒鎖訂單列，這裡會重複入帳（point_lots_source_uk 違反 → 500）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn webhook_blocked_on_row_lock_does_not_credit_twice(pool: PgPool) {
+    let u = aged_user(&pool, "儲值者").await;
+    let (_, _, v) = order(&pool, &u.token, 1000, "card").await;
+    let id_s = v["topup"]["id"].as_str().unwrap();
+    let id: Uuid = id_s.parse().unwrap();
+    let no = trade_no(&pool, id_s).await;
+
+    let mut holder = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *holder)
+        .await
+        .unwrap();
+    let wallet: Uuid = sqlx::query_scalar("SELECT wallet_id FROM topups WHERE id = $1 FOR UPDATE")
+        .bind(id)
+        .fetch_one(&mut *holder)
+        .await
+        .unwrap();
+    let (p, n) = (pool.clone(), no.clone());
+    let webhook = tokio::spawn(async move { notify(&p, &n, 1000).await });
+    wait_for_blocked(&pool, pid, 1).await;
+
+    // 持鎖者完成入帳（與 webhook 的 credit 相同的寫法）
+    sqlx::query(
+        "UPDATE topups SET status = 'paid', paid_at = now(), provider_txn_id = $2 WHERE id = $1",
+    )
+    .bind(id)
+    .bind(format!("2610{}", &no[1..]))
+    .execute(&mut *holder)
+    .await
+    .unwrap();
+    wishly_api::points::post(
+        &mut holder,
+        wallet,
+        1000,
+        wishly_api::points::Entry {
+            kind: "topup",
+            ref_type: "topup",
+            ref_id: Some(id),
+            note: None,
+            actor: None,
+        },
+    )
+    .await
+    .unwrap();
+    holder.commit().await.unwrap();
+
+    let (status, _, text) = webhook.await.unwrap();
+    // 只比狀態碼：失敗時 body 會帶 INTERNAL_ERROR，mutate.py 會把它誤判為基礎設施錯誤
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "webhook credited twice or failed after concurrent credit"
+    );
+    assert_eq!(text, "1|OK");
+    assert_eq!(balance(&pool, u.id).await, 1000);
+    assert_points_reconciled(&pool).await;
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn late_payment_after_expiry_still_credits(pool: PgPool) {
     let u = aged_user(&pool, "儲值者").await;
