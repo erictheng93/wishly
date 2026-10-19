@@ -31,6 +31,8 @@ pub struct Config {
     pub s3: crate::uploads::S3,
     /// 收件地址 AEAD 金鑰（SHIPPING_ENC_KEY，base64 32 bytes），見 sealed.rs
     pub shipping_key: [u8; 32],
+    /// 儲值 webhook 簽章金鑰（topup.rs）；None = 儲值功能關閉（端點回 503）
+    pub topup_webhook_secret: Option<String>,
 }
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -104,6 +106,7 @@ impl Config {
                     use sha2::Digest;
                     sha2::Sha256::digest(b"dev-shipping-key").into()
                 }),
+            topup_webhook_secret: Some("dev-topup-webhook-secret-0123456789".into()),
         }
     }
 
@@ -128,6 +131,8 @@ impl Config {
             Some(s) if s.len() < 32 => Err(format!("{k} 至少 32 字元")),
             Some(s) => Ok(s),
         };
+        // 選填：未設則儲值關閉（不影響啟動）
+        c.topup_webhook_secret = var("TOPUP_WEBHOOK_SECRET").filter(|s| s.len() >= 32);
         c.otp_pepper = must("OTP_PEPPER")?;
         c.oauth_secret = must("OAUTH_SECRET")?;
         c.unsub_secret = must("UNSUB_SECRET")?;

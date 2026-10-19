@@ -1,9 +1,8 @@
 //! 點數記帳核心（P2-A，無批次 / 無金流）：所有 balance 異動都經 `post`，balance 與 point_ledger 同交易同步。
 //! 鎖序（docs/04 D22-12）：wishlists（FOR SHARE）→ point_wallets（FOR UPDATE，多個時依 id 排序）→ wishlist_items → contributions。
 //! 因此 `release` / `refund_partial` 會先鎖錢包，呼叫端必須在「動 wishlist_items 之前」呼叫它們。
-//! 點數來源：目前只有營運人工發放（grant / adjustment）。儲值（topup，規劃中）上線時：ledger_entry_type 加 'topup'、
-//! 新增 topups 表，金流 webhook 驗簽後同樣呼叫 `post`；認捐 / 退點路徑不需改動。若要區分可退現金的點數，
-//! 屆時再引入 point_lots，並只改 `post` / `release` / `refund_partial` 三處。
+//! 點數來源：營運人工發放（grant / adjustment）與儲值（topup，見 topup.rs：webhook 驗簽後呼叫 `post`，
+//! 認捐 / 退點路徑不需改動）。若要區分可退現金的點數，再引入 point_lots，並只改 `post` / `release` / `refund_partial` 三處。
 use crate::error::AppError;
 use serde_json::json;
 use sqlx::{Postgres, Transaction};
@@ -22,8 +21,8 @@ pub const DISPLAY_STATUS_SQL: &str = "CASE
     ELSE 'funded' END";
 
 pub struct Entry<'a> {
-    pub kind: &'a str, // ledger_entry_type：grant | pledge | release | refund | adjustment
-    pub ref_type: &'a str, // contribution | manual
+    pub kind: &'a str, // ledger_entry_type：grant | pledge | release | refund | adjustment | topup
+    pub ref_type: &'a str, // contribution | manual | topup
     pub ref_id: Option<Uuid>,
     pub note: Option<&'a str>,
     pub actor: Option<Uuid>, // 營運人員（grant / adjustment）

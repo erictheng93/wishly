@@ -24,6 +24,7 @@ pub mod reports;
 pub mod sealed;
 pub mod security;
 pub mod session;
+pub mod topup;
 pub mod uploads;
 pub mod validate;
 pub mod wallet;
@@ -58,6 +59,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(uploads::routes())
                 .merge(auth::routes())
                 .merge(security::routes())
+                .merge(topup::routes())
                 .merge(friends::routes())
                 .merge(profiles::routes()),
         )
