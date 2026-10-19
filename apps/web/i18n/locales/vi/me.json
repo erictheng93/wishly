@@ -176,7 +176,11 @@
       "reOk": "Xác nhận chuyển",
       "noTargets": "Danh sách này hiện không có món góp quỹ nào khác đang mở.",
       "moveTo": "Chuyển sang",
-      "targetOpt": "{title} (còn thiếu {pts} điểm)"
+      "targetOpt": "{title} (còn thiếu {pts} điểm)",
+      "refund": "Yêu cầu hoàn tiền mặt",
+      "refundable": "{pts} điểm có thể hoàn tiền mặt",
+      "refundNone": "Hiện không có điểm nào có thể hoàn tiền mặt. Chỉ điểm mua bằng nạp tiền mới được hoàn; điểm từ thẻ quà tặng và điểm đóng góp thì không.",
+      "refundFrozen": "Ví của bạn đã bị đóng băng, tạm thời không thể yêu cầu hoàn tiền mặt."
     },
     "friends": {
       "sent": "Nếu người đó có tài khoản, lời mời đã được gửi.",
@@ -333,6 +337,53 @@
       "success": "Nạp điểm thành công. Đã cộng {pts} điểm; số dư hiện tại {bal} điểm.",
       "nativeText": "Không thể mở trang thanh toán trong ứng dụng. Vui lòng nạp điểm trên phiên bản web.",
       "nativeLink": "Nạp điểm trên web"
+    },
+    "frozenBanner": "Ví của bạn đã bị đóng băng: tạm thời không thể đóng góp hoặc yêu cầu hoàn tiền mặt. Vui lòng liên hệ hỗ trợ.",
+    "refund": {
+      "title": "Hoàn tiền mặt",
+      "refundable": "Số dư có thể hoàn tiền mặt (điểm)",
+      "onlyTopup": "Chỉ điểm mua bằng nạp tiền mới được hoàn tiền mặt. Điểm từ thẻ quà tặng và điểm đóng góp thì không.",
+      "none": "Hiện không có điểm nào có thể hoàn tiền mặt. Chỉ điểm mua bằng nạp tiền mới được hoàn; điểm từ thẻ quà tặng và điểm đóng góp thì không.",
+      "pending": "Đang xét duyệt: bạn có {n} yêu cầu hoàn tiền đang được xử lý.",
+      "amount": "Số điểm muốn hoàn",
+      "amountHint": "Từ 1 đến {max}",
+      "all": "Tất cả",
+      "summary": "Xác nhận nội dung",
+      "summaryLine": "Hệ thống sẽ trừ trước {pts} điểm khỏi ví. Sau khi được duyệt, bạn sẽ được hoàn NT$ {amount}.",
+      "summaryEmpty": "Nhập số điểm để xem tóm tắt.",
+      "note1": "Điểm bị trừ ngay khi gửi yêu cầu; tiền được hoàn sau khi xét duyệt.",
+      "note2": "Nếu yêu cầu bị từ chối, điểm sẽ được trả lại ví của bạn.",
+      "submit": "Gửi yêu cầu",
+      "submitting": "Đang gửi…",
+      "success": "Đã gửi yêu cầu. Đã trừ {pts} điểm, số dư hiện tại {bal} điểm. Tiền sẽ được hoàn sau khi được duyệt.",
+      "history": "Yêu cầu của tôi",
+      "empty": "Chưa có yêu cầu hoàn tiền nào.",
+      "pts": "{pts} điểm",
+      "createdAt": "Gửi lúc {time}",
+      "completedAt": "Hoàn tất {time}",
+      "rejectReason": "Lý do từ chối: {reason}",
+      "rejectedNote": "Điểm đã được trả lại ví của bạn.",
+      "inReview": "Đang xét duyệt. Tiền sẽ được hoàn sau khi được duyệt.",
+      "status": {
+        "requested": "Chờ duyệt",
+        "processing": "Đang xử lý",
+        "completed": "Đã hoàn tiền",
+        "rejected": "Đã từ chối"
+      },
+      "err": {
+        "amountInt": "Vui lòng nhập số điểm nguyên",
+        "amountRange": "Số điểm phải từ 1 đến 50,000",
+        "amountOver": "Không được vượt quá số dư có thể hoàn tiền mặt",
+        "frozen": "Ví đã bị đóng băng, tạm thời không thể yêu cầu hoàn tiền mặt. Vui lòng liên hệ hỗ trợ.",
+        "notRefundable": "Chỉ có {pts} điểm có thể hoàn tiền mặt (điểm từ thẻ quà tặng và điểm đóng góp không được hoàn). Vui lòng giảm số điểm.",
+        "insufficient": "Không đủ điểm (hiện có {bal} điểm).",
+        "rate": "Thao tác quá nhiều. Vui lòng thử lại sau khoảng {min} phút.",
+        "rateNoMin": "Thao tác quá nhiều. Vui lòng thử lại sau.",
+        "validation": "Số điểm nhập chưa hợp lệ.",
+        "network": "Kết nối thất bại. Hãy kiểm tra mạng rồi thử lại.",
+        "server": "Hệ thống tạm thời không xử lý được. Vui lòng thử lại sau.",
+        "generic": "Gửi yêu cầu thất bại. Vui lòng thử lại sau."
+      }
     }
   }
 }

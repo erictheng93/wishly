@@ -1,5 +1,7 @@
 // 訪客端契約 mock（docs 04 §5）。node mocks/server.mjs  → http://localhost:8080
 // slug: demo=正常 / closed=已結束 / gone=410 / boom=500 / sseoff=清單正常但 events 回 500（測輪詢備援）/ 其他=404。恢復權杖 "good" 有效。
+// 登入態：帶 ws_session cookie 即視為會員；cookie 值為 staff（ws_session=staff）則為營運人員，可開 /admin/cash-refunds、/admin/wallet-debts、/admin/topups（假資料，id 為 stale 的列一律 409）。
+// 現金退款 /me/refund 需先儲值並在模擬綠界付款後才有可退餘額；MOCK_FROZEN=1 node mocks/server.mjs 可模擬錢包凍結。
 import http from 'node:http'
 import { randomBytes } from 'node:crypto'
 
@@ -13,8 +15,33 @@ const items = [
     contributors: [{ display_name: '阿明', points: 3000 }, { display_name: '匿名朋友', points: 1300 }, { display_name: '小華', points: 2000 }] },
 ]
 const view = i => { const r = i.qty_needed - i.qty_claimed; return { funding_mode: 'quantity', ...i, qty_remaining: r, is_fully_claimed: r <= 0, progress_percent: i.target_points ? Math.floor(i.pledged_points / i.target_points * 100) : Math.round(i.qty_claimed / i.qty_needed * 100) } }
-const mockUser = { name: '登入會員' }, guests = new Map(), claims = new Map(), idem = new Map(), sse = new Set(), topups = []
+const mockUser = { name: '登入會員' }, guests = new Map(), claims = new Map(), idem = new Map(), sse = new Set(), topups = [], refunds = []
 let n = 0
+const walletFrozen = process.env.MOCK_FROZEN === '1' // MOCK_FROZEN=1 node mocks/server.mjs → 錢包凍結（橫幅與 WALLET_FROZEN）
+// 後台假資料（重啟即重置）。id 為 'stale' 的列一律回 409 INVALID_STATE_TRANSITION（模擬別人已處理）
+const iso = ms => new Date(Date.now() + ms).toISOString()
+const usr = (i, name) => ({ id: 'u' + i, display_name: name, email: `${name}@example.com` })
+const adminRefunds = [
+  { id: 'cr-a', amount: 2000, status: 'requested', user: usr(2, '小明'), lot_allocations: [], reject_reason: null, processed_by: null, created_at: iso(-3 * 36e5), completed_at: null },
+  { id: 'cr-b', amount: 800, status: 'processing', user: usr(3, '小華'), lot_allocations: [], reject_reason: null, processed_by: 'staff1', created_at: iso(-30 * 36e5), completed_at: null },
+  { id: 'cr-c', amount: 500, status: 'requested', user: usr(4, '阿美'), lot_allocations: [], reject_reason: null, processed_by: null, created_at: iso(-36e5), completed_at: null },
+  { id: 'stale', amount: 100, status: 'requested', user: usr(5, '過期單'), lot_allocations: [], reject_reason: null, processed_by: null, created_at: iso(-2 * 36e5), completed_at: null },
+  { id: 'cr-d', amount: 1200, status: 'completed', user: usr(6, '已完成'), lot_allocations: [], reject_reason: null, processed_by: 'staff1', created_at: iso(-90 * 36e5), completed_at: iso(-60 * 36e5) },
+  { id: 'cr-e', amount: 300, status: 'rejected', user: usr(7, '被拒絕'), lot_allocations: [], reject_reason: '退款帳戶資料不符', processed_by: 'staff1', created_at: iso(-80 * 36e5), completed_at: iso(-70 * 36e5) },
+]
+const debts = [
+  { id: 'd-a', amount: 1500, status: 'open', topup_id: 'tp-x1', user: usr(8, '欠款甲'), note: null, resolved_at: null, created_at: iso(-48 * 36e5) },
+  { id: 'd-b', amount: 400, status: 'open', topup_id: 'tp-x2', user: usr(9, '欠款乙'), note: null, resolved_at: null, created_at: iso(-24 * 36e5) },
+  { id: 'stale', amount: 50, status: 'open', topup_id: 'tp-x3', user: usr(10, '已被結案'), note: null, resolved_at: null, created_at: iso(-12 * 36e5) },
+  { id: 'd-c', amount: 700, status: 'settled', topup_id: 'tp-x4', user: usr(11, '已追回'), note: '已匯款', resolved_at: iso(-6 * 36e5), created_at: iso(-96 * 36e5) },
+]
+const adminTopups = [
+  { id: 'tpd-a', amount: 3000, method: 'card', status: 'disputed', provider: 'ecpay', provider_txn_id: 'T0001', created_at: iso(-72 * 36e5), paid_at: iso(-71 * 36e5), user: usr(12, '爭議甲'), wallet: { id: 'w12', status: 'frozen' } },
+  { id: 'tpd-b', amount: 1000, method: 'card', status: 'disputed', provider: 'ecpay', provider_txn_id: 'T0002', created_at: iso(-60 * 36e5), paid_at: iso(-59 * 36e5), user: usr(13, '爭議乙'), wallet: { id: 'w13', status: 'frozen' } },
+  { id: 'tpd-c', amount: 2000, method: 'card', status: 'paid', provider: 'ecpay', provider_txn_id: 'T0003', created_at: iso(-30 * 36e5), paid_at: iso(-29 * 36e5), user: usr(14, '已入帳丙'), wallet: { id: 'w14', status: 'active' } },
+  { id: 'stale', amount: 500, method: 'card', status: 'paid', provider: 'ecpay', provider_txn_id: 'T0004', created_at: iso(-20 * 36e5), paid_at: iso(-19 * 36e5), user: usr(15, '過期丁'), wallet: { id: 'w15', status: 'active' } },
+  { id: 'tpd-d', amount: 800, method: 'card', status: 'charged_back', provider: 'ecpay', provider_txn_id: 'T0005', created_at: iso(-200 * 36e5), paid_at: iso(-199 * 36e5), user: usr(16, '已拒付戊'), wallet: { id: 'w16', status: 'frozen' } },
+]
 
 const send = (res, st, body, type = 'application/json') => { res.writeHead(st, { 'content-type': type }); res.end(body === undefined ? '' : JSON.stringify(body)) }
 const err = (res, st, code, detail, extra = {}) => send(res, st, { type: 'about:blank', title: code, status: st, code, detail, ...extra }, 'application/problem+json')
@@ -91,13 +118,74 @@ http.createServer(async (req, res) => {
   }
   // 儲值（/me/topup）：帶 ws_session cookie 或 Authorization 視為已登入。特殊金額觸發錯誤：666=503、777=每日額度、888=錢包上限、999=429
   const authed = /(^|;\s*)ws_session=/.test(req.headers.cookie ?? '') || !!req.headers.authorization
-  if (p === '/me' && authed) return send(res, 200, { id: 'u1', display_name: mockUser.name, email: 'mock@example.com', handle: 'mock', is_staff: false, locale: 'zh-TW' })
+  const staff = /(^|;\s*)ws_session=staff\b/.test(req.headers.cookie ?? '') // 後台頁：cookie ws_session=staff 視為營運人員
+  if (p === '/me' && authed) return send(res, 200, { id: 'u1', display_name: mockUser.name, email: 'mock@example.com', handle: 'mock', is_staff: staff, locale: 'zh-TW' })
+  if (p.startsWith('/admin/')) {
+    if (!authed) return err(res, 401, 'UNAUTHORIZED', '未登入')
+    if (!staff) return err(res, 403, 'STAFF_ONLY', '僅限營運人員')
+    const paged = (rows, q) => { const lim = +(q.get('limit') ?? 20), start = q.get('cursor') ? rows.findIndex(r => r.id === q.get('cursor')) + 1 : 0, pg = rows.slice(start, start + lim); return { data: pg, next_cursor: start + lim < rows.length ? pg.at(-1).id : null } }
+    const invalid = (pointer, detail) => err(res, 422, 'VALIDATION_FAILED', detail, { errors: [{ pointer, code: 'INVALID', detail }] })
+    const stale = () => err(res, 409, 'INVALID_STATE_TRANSITION', '此狀態無法這樣變更')
+    if (p === '/admin/cash-refunds' && req.method === 'GET') { const st = u.searchParams.get('status'); return send(res, 200, paged(adminRefunds.filter(r => !st || r.status === st), u.searchParams)) }
+    if ((m = p.match(/^\/admin\/cash-refunds\/([^/]+)$/)) && req.method === 'PATCH') {
+      const r = adminRefunds.find(x => x.id === m[1]); if (!r) return err(res, 404, 'NOT_FOUND', '找不到')
+      if (!['processing', 'completed', 'rejected'].includes(body.status)) return invalid('/status', 'status 必須是 processing | completed | rejected')
+      if (body.status === 'rejected' && !String(body.reject_reason ?? '').trim()) return invalid('/reject_reason', 'reject_reason 必填')
+      const ok = r.id !== 'stale' && (body.status === 'processing' ? r.status === 'requested' : body.status === 'completed' ? r.status === 'processing' : ['requested', 'processing'].includes(r.status))
+      if (!ok) return stale()
+      r.status = body.status; if (body.status !== 'processing') r.completed_at = new Date().toISOString(); if (body.status === 'rejected') r.reject_reason = body.reject_reason
+      return send(res, 200, { id: r.id, amount: r.amount, status: r.status, reject_reason: r.reject_reason, processed_by: 'staff1', completed_at: r.completed_at })
+    }
+    if (p === '/admin/wallet-debts' && req.method === 'GET') { const st = u.searchParams.get('status') ?? 'open'; return send(res, 200, paged(debts.filter(d => d.status === st), u.searchParams)) }
+    if ((m = p.match(/^\/admin\/wallet-debts\/([^/]+)$/)) && req.method === 'PATCH') {
+      const d = debts.find(x => x.id === m[1]); if (!d) return err(res, 404, 'NOT_FOUND', '找不到')
+      if (!['settled', 'written_off'].includes(body.status)) return invalid('/status', 'status 必須是 settled | written_off')
+      if (!String(body.note ?? '').trim()) return invalid('/note', 'note 必填')
+      if (d.status !== 'open' || d.id === 'stale') return stale()
+      Object.assign(d, { status: body.status, note: body.note, resolved_at: new Date().toISOString() })
+      return send(res, 200, { id: d.id, status: d.status, note: d.note, resolved_at: d.resolved_at })
+    }
+    if (p === '/admin/topups' && req.method === 'GET') { const st = u.searchParams.get('status'); return send(res, 200, paged(adminTopups.filter(x => !st || x.status === st), u.searchParams)) }
+    if ((m = p.match(/^\/admin\/topups\/([^/]+)\/dispute$/)) && req.method === 'POST') {
+      const key = req.headers['idempotency-key']; if (!key) return err(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', '缺少 Idempotency-Key')
+      if (idem.has(key)) { res.setHeader('idempotency-replayed', 'true'); return send(res, 200, idem.get(key)) }
+      const x = adminTopups.find(t => t.id === m[1]); if (!x) return err(res, 404, 'NOT_FOUND', '找不到')
+      if (!['open', 'won', 'lost'].includes(body.action)) return invalid('/action', 'action 必須是 open | won | lost')
+      const from = body.action === 'open' ? ['paid'] : body.action === 'won' ? ['disputed'] : ['paid', 'disputed']
+      if (x.id === 'stale' || !from.includes(x.status)) return stale()
+      let out
+      if (body.action === 'open') { x.status = 'disputed'; x.wallet.status = 'frozen'; out = { topup_id: x.id, status: x.status, applied: true } }
+      else if (body.action === 'won') { x.status = 'paid'; x.wallet.status = 'active'; out = { topup_id: x.id, status: x.status, applied: true } }
+      else {
+        x.status = 'charged_back'; x.wallet.status = 'frozen'; const recovered = Math.min(x.amount, 600)
+        out = { topup_id: x.id, status: x.status, applied: true, recovered, debt: x.amount - recovered }
+        if (x.amount > recovered) debts.unshift({ id: 'd' + ++n, amount: x.amount - recovered, status: 'open', topup_id: x.id, user: x.user, note: null, resolved_at: null, created_at: new Date().toISOString() })
+      }
+      idem.set(key, out); return send(res, 200, out)
+    }
+  }
   if (p === '/mock-ecpay') { // 模擬綠界付款頁：收到表單 POST 後把該單標為已付款
     const t = topups.find(x => x.merchant_trade_no === body.MerchantTradeNo); if (t) t.paid_flag = true
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(`<h1>模擬綠界</h1><p>${t ? '已付款' : '找不到訂單'}</p><a href="http://localhost:3000/me/topup">返回</a>`)
   }
   if (p.startsWith('/wallet') && !authed) return err(res, 401, 'UNAUTHORIZED', '未登入')
-  if (p === '/wallet' && req.method === 'GET') return send(res, 200, { wallet: { balance: topups.filter(x => x.status === 'paid').reduce((a, x) => a + x.amount, 0), held_points: 0, status: 'active', cash_refundable_balance: 0 }, data: [], next_cursor: null })
+  if (p === '/wallet' && req.method === 'GET') { const bal = walletBalance(); return send(res, 200, { wallet: { balance: bal, held_points: 0, status: walletFrozen ? 'frozen' : 'active', cash_refundable_balance: bal }, data: [], next_cursor: null }) }
+  // 現金退款（/me/refund）：可退餘額 = 已入帳儲值 - 未被拒絕的申請（要先到 /me/topup 儲值並付款）。
+  // 特殊金額觸發錯誤：555=429、666=403 WALLET_FROZEN、777=409 NOT_CASH_REFUNDABLE（refundable_points 300）、888=409 INSUFFICIENT_POINTS、999=422
+  if (p === '/wallet/cash-refunds' && req.method === 'GET') return send(res, 200, { requests: [...refunds].reverse().slice(0, +(u.searchParams.get('limit') ?? 20)).map(refundOut) })
+  if (p === '/wallet/cash-refunds' && req.method === 'POST') {
+    const key = req.headers['idempotency-key']; if (!key) return err(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', '缺少 Idempotency-Key')
+    if (idem.has(key)) { res.setHeader('idempotency-replayed', 'true'); return send(res, 201, idem.get(key)) }
+    if (!Number.isInteger(body.amount) || body.amount < 1 || body.amount > 50000 || body.amount === 999) return err(res, 422, 'VALIDATION_FAILED', 'amount 必須介於 1 與 50000', { errors: [{ pointer: '/amount', code: 'RANGE', detail: 'amount 必須介於 1 與 50000' }] })
+    if (body.amount === 555) { res.setHeader('retry-after', '1800'); return err(res, 429, 'RATE_LIMITED', '每小時最多 10 次') }
+    if (body.amount === 666 || walletFrozen) return err(res, 403, 'WALLET_FROZEN', '錢包已凍結，無法申請現金退款，請聯絡客服')
+    if (body.amount === 888) return err(res, 409, 'INSUFFICIENT_POINTS', '點數餘額不足（目前 50 點）', { balance: 50 })
+    if (body.amount === 777 || body.amount > walletBalance()) return err(res, 409, 'NOT_CASH_REFUNDABLE', '可退現金的點數只有 300 點（禮物卡與贊助點數不可退現金）', { refundable_points: body.amount === 777 ? 300 : walletBalance(), balance: walletBalance() })
+    const r = { id: 'cr' + ++n, amount: body.amount, status: 'requested', created_at: new Date().toISOString(), completed_at: null, reject_reason: null }
+    refunds.push(r)
+    const out = { request: refundOut(r), wallet: { balance: walletBalance() } }
+    idem.set(key, out); return send(res, 201, out)
+  }
   if (p === '/wallet/contributions') return send(res, 200, { data: [], next_cursor: null })
   if (p === '/wallet/topups' && req.method === 'GET') return send(res, 200, { topups: [...topups].reverse().slice(0, +(u.searchParams.get('limit') ?? 20)).map(topupOut) })
   if ((m = p.match(/^\/wallet\/topups\/([^/]+)$/)) && req.method === 'GET') { const t = topups.find(x => x.id === m[1]); return t ? send(res, 200, { topup: topupOut(t) }) : err(res, 404, 'NOT_FOUND', '找不到') }
@@ -118,6 +206,8 @@ http.createServer(async (req, res) => {
   err(res, 404, 'NOT_FOUND', 'no route ' + p)
 }).listen(8080, () => console.log('mock on :8080'))
 // 儲值單：超商 / ATM 的取號資訊建單後約 6 秒才有（模擬綠界取號通知延遲）；/mock-ecpay 收到表單 POST 即標為已付款
+const walletBalance = () => topups.filter(x => x.status === 'paid').reduce((a, x) => a + x.amount, 0) - refunds.filter(r => r.status !== 'rejected').reduce((a, r) => a + r.amount, 0)
+const refundOut = r => ({ id: r.id, amount: r.amount, status: r.status, created_at: r.created_at, completed_at: r.completed_at, reject_reason: r.reject_reason })
 function topupOut(t) {
   if (t.status === 'pending' && t.paid_flag) { t.status = 'paid'; t.paid_at = new Date().toISOString() }
   const exp = t.expires_at, ready = Date.now() >= t.ready_at

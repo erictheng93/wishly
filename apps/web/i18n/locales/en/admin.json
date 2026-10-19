@@ -25,7 +25,10 @@
         "orders": "Order queue",
         "wallets": "Point wallets",
         "audit": "Audit log",
-        "analytics": "Analytics"
+        "analytics": "Analytics",
+        "cashRefunds": "Cash refunds",
+        "walletDebts": "Chargeback debts",
+        "topups": "Top-ups and disputes"
       },
       "tabsLabel": "Console sections",
       "tabs": {
@@ -315,6 +318,121 @@
       "distribution": "Distribution",
       "dailyTable": "Daily data table",
       "date": "Date"
+    },
+    "cashRefunds": {
+      "title": "Cash refund review",
+      "statusLabel": "Status",
+      "all": "All",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "empty": "No matching requests",
+      "loadMore": "Load more",
+      "status": {
+        "requested": "Pending review",
+        "processing": "Processing",
+        "completed": "Refunded",
+        "rejected": "Rejected"
+      },
+      "amount": "Points",
+      "pts": "{pts} points",
+      "createdAt": "Requested at",
+      "completedAt": "Completed at",
+      "rejectReason": "Reject reason",
+      "action": {
+        "processing": "Start processing",
+        "completed": "Mark refunded",
+        "rejected": "Reject and return points"
+      },
+      "confirm": {
+        "processing": "Mark {name}'s {amount}-point request as processing?",
+        "completed": "Confirm that the NT$ {amount} refund to {name} is done? This can't be undone.",
+        "rejected": "Reject {name}'s {amount}-point request? The points go back to their original lots in the user's wallet."
+      },
+      "reasonLabel": "Reject reason (required, shown to the user)",
+      "rejectNote": "A rejected request can't be restored; the user must submit a new one.",
+      "reasonRequired": "Enter a reject reason",
+      "done": {
+        "processing": "Marked {name}'s {amount}-point request as processing",
+        "completed": "Marked {name}'s NT$ {amount} refund as done",
+        "rejected": "Rejected {name}'s request; {amount} points returned to their wallet"
+      },
+      "stale": "This request was changed by someone else. The list was reloaded."
+    },
+    "walletDebts": {
+      "title": "Chargeback debts",
+      "intro": "After a card chargeback, points that were already spent and can't be recovered are recorded as debt.",
+      "statusLabel": "Status",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "empty": "No matching debts",
+      "loadMore": "Load more",
+      "status": {
+        "open": "Open",
+        "settled": "Recovered",
+        "written_off": "Written off"
+      },
+      "amount": "Debt",
+      "pts": "{pts} points",
+      "topup": "Top-up",
+      "createdAt": "Created at",
+      "resolvedAt": "Resolved at",
+      "note": "Resolution note",
+      "action": {
+        "settled": "Mark recovered",
+        "written_off": "Write off"
+      },
+      "confirm": {
+        "settled": "Confirm that {name}'s {amount}-point debt was recovered?",
+        "written_off": "Write off {name}'s {amount}-point debt? The platform absorbs the loss and books it."
+      },
+      "noteLabel": "Note (required, saved to the audit log)",
+      "noteRequired": "Enter a note",
+      "done": {
+        "settled": "Marked {name}'s {amount}-point debt as recovered",
+        "written_off": "Wrote off {name}'s {amount}-point debt"
+      },
+      "stale": "This debt was already closed. The list was reloaded."
+    },
+    "topups": {
+      "title": "Top-ups and chargeback disputes",
+      "intro": "On a card chargeback, marking a dispute freezes the wallet. Winning restores it; losing claws back what is left of that top-up lot and records the rest as debt.",
+      "statusLabel": "Status",
+      "all": "All",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "empty": "No matching top-ups",
+      "loadMore": "Load more",
+      "status": {
+        "disputed": "Disputed",
+        "paid": "Paid",
+        "charged_back": "Charged back",
+        "pending": "Pending",
+        "failed": "Failed",
+        "expired": "Expired",
+        "refunded": "Refunded"
+      },
+      "walletFrozen": "Wallet frozen",
+      "provider": "Provider",
+      "createdAt": "Created at",
+      "paidAt": "Paid at",
+      "action": {
+        "open": "Mark disputed",
+        "won": "Dispute won",
+        "lost": "Chargeback lost (claw back)"
+      },
+      "confirm": {
+        "open": "Mark {name}'s NT$ {amount} top-up as disputed? The wallet will be frozen.",
+        "won": "Dispute won for {name}'s NT$ {amount} top-up? It returns to paid, and the wallet is unfrozen if no other dispute is open.",
+        "lost": "Chargeback lost for {name}'s NT$ {amount} top-up? The remaining points of that top-up lot are clawed back, the spent part is recorded as debt, and the wallet stays frozen."
+      },
+      "noteLabel": "Note (optional)",
+      "done": {
+        "open": "Marked {name}'s NT$ {amount} top-up as disputed; wallet frozen",
+        "won": "Marked {name}'s NT$ {amount} dispute as won; check the Wallets page for the wallet state",
+        "lost": "Processed {name}'s NT$ {amount} chargeback: {recovered} points clawed back, {debt} points recorded as debt"
+      },
+      "notApplied": "This top-up had already changed state, so nothing was done ({name}, NT$ {amount}).",
+      "stale": "This top-up's state doesn't allow that action. The list was reloaded."
     }
   }
 }

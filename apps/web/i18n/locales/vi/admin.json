@@ -25,7 +25,10 @@
         "orders": "Hàng đợi đơn mua",
         "wallets": "Ví điểm",
         "audit": "Nhật ký kiểm toán",
-        "analytics": "Phân tích dữ liệu"
+        "analytics": "Phân tích dữ liệu",
+        "cashRefunds": "Hoàn tiền mặt",
+        "walletDebts": "Nợ do chargeback",
+        "topups": "Nạp điểm và tranh chấp"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
@@ -315,6 +318,121 @@
       "distribution": "Phân bố",
       "dailyTable": "Bảng dữ liệu theo ngày",
       "date": "Ngày"
+    },
+    "cashRefunds": {
+      "title": "Duyệt hoàn tiền mặt",
+      "statusLabel": "Trạng thái",
+      "all": "Tất cả",
+      "retry": "Thử lại",
+      "loading": "Đang tải…",
+      "empty": "Không có yêu cầu phù hợp",
+      "loadMore": "Tải thêm",
+      "status": {
+        "requested": "Chờ duyệt",
+        "processing": "Đang xử lý",
+        "completed": "Đã hoàn tiền",
+        "rejected": "Đã từ chối"
+      },
+      "amount": "Số điểm",
+      "pts": "{pts} điểm",
+      "createdAt": "Thời gian gửi",
+      "completedAt": "Thời gian hoàn tất",
+      "rejectReason": "Lý do từ chối",
+      "action": {
+        "processing": "Bắt đầu xử lý",
+        "completed": "Đánh dấu đã hoàn tiền",
+        "rejected": "Từ chối và trả điểm"
+      },
+      "confirm": {
+        "processing": "Đánh dấu yêu cầu {amount} điểm của {name} là đang xử lý?",
+        "completed": "Xác nhận đã hoàn NT$ {amount} cho {name}? Thao tác này không thể hoàn tác.",
+        "rejected": "Từ chối yêu cầu {amount} điểm của {name}? Điểm sẽ được trả về các lô gốc trong ví của họ."
+      },
+      "reasonLabel": "Lý do từ chối (bắt buộc, hiển thị cho người dùng)",
+      "rejectNote": "Yêu cầu bị từ chối không thể khôi phục; người dùng phải gửi yêu cầu mới.",
+      "reasonRequired": "Vui lòng nhập lý do từ chối",
+      "done": {
+        "processing": "Đã đánh dấu yêu cầu {amount} điểm của {name} là đang xử lý",
+        "completed": "Đã đánh dấu hoàn NT$ {amount} cho {name} là xong",
+        "rejected": "Đã từ chối yêu cầu của {name}; {amount} điểm đã được trả lại ví"
+      },
+      "stale": "Yêu cầu này đã được người khác thay đổi. Danh sách đã được tải lại."
+    },
+    "walletDebts": {
+      "title": "Nợ do chargeback",
+      "intro": "Sau khi thẻ bị chargeback, số điểm đã tiêu và không thể thu hồi được ghi nhận là nợ.",
+      "statusLabel": "Trạng thái",
+      "retry": "Thử lại",
+      "loading": "Đang tải…",
+      "empty": "Không có khoản nợ phù hợp",
+      "loadMore": "Tải thêm",
+      "status": {
+        "open": "Chưa tất toán",
+        "settled": "Đã thu hồi",
+        "written_off": "Đã xóa nợ"
+      },
+      "amount": "Khoản nợ",
+      "pts": "{pts} điểm",
+      "topup": "Đơn nạp",
+      "createdAt": "Thời gian tạo",
+      "resolvedAt": "Thời gian tất toán",
+      "note": "Ghi chú tất toán",
+      "action": {
+        "settled": "Đánh dấu đã thu hồi",
+        "written_off": "Xóa nợ"
+      },
+      "confirm": {
+        "settled": "Xác nhận đã thu hồi khoản nợ {amount} điểm của {name}?",
+        "written_off": "Xóa khoản nợ {amount} điểm của {name}? Nền tảng chịu khoản lỗ và hạch toán."
+      },
+      "noteLabel": "Ghi chú (bắt buộc, lưu vào nhật ký kiểm toán)",
+      "noteRequired": "Vui lòng nhập ghi chú",
+      "done": {
+        "settled": "Đã đánh dấu khoản nợ {amount} điểm của {name} là đã thu hồi",
+        "written_off": "Đã xóa khoản nợ {amount} điểm của {name}"
+      },
+      "stale": "Khoản nợ này đã được tất toán. Danh sách đã được tải lại."
+    },
+    "topups": {
+      "title": "Nạp điểm và tranh chấp chargeback",
+      "intro": "Khi thẻ bị chargeback, đánh dấu tranh chấp sẽ đóng băng ví. Thắng thì khôi phục; thua thì thu hồi số điểm còn lại của lô nạp đó và ghi phần còn thiếu là nợ.",
+      "statusLabel": "Trạng thái",
+      "all": "Tất cả",
+      "retry": "Thử lại",
+      "loading": "Đang tải…",
+      "empty": "Không có đơn nạp phù hợp",
+      "loadMore": "Tải thêm",
+      "status": {
+        "disputed": "Đang tranh chấp",
+        "paid": "Đã ghi nhận",
+        "charged_back": "Đã chargeback",
+        "pending": "Chờ thanh toán",
+        "failed": "Thất bại",
+        "expired": "Đã quá hạn",
+        "refunded": "Đã hoàn tiền"
+      },
+      "walletFrozen": "Ví đã đóng băng",
+      "provider": "Cổng thanh toán",
+      "createdAt": "Thời gian tạo",
+      "paidAt": "Thời gian thanh toán",
+      "action": {
+        "open": "Đánh dấu tranh chấp",
+        "won": "Thắng tranh chấp",
+        "lost": "Thua chargeback (thu hồi)"
+      },
+      "confirm": {
+        "open": "Đánh dấu đơn nạp NT$ {amount} của {name} là đang tranh chấp? Ví sẽ bị đóng băng.",
+        "won": "Thắng tranh chấp đơn nạp NT$ {amount} của {name}? Đơn trở lại trạng thái đã ghi nhận, và ví được mở khóa nếu không còn tranh chấp nào khác.",
+        "lost": "Thua chargeback đơn nạp NT$ {amount} của {name}? Số điểm còn lại của lô nạp đó sẽ bị thu hồi, phần đã tiêu được ghi là nợ, và ví vẫn bị đóng băng."
+      },
+      "noteLabel": "Ghi chú (không bắt buộc)",
+      "done": {
+        "open": "Đã đánh dấu đơn nạp NT$ {amount} của {name} là đang tranh chấp; ví đã đóng băng",
+        "won": "Đã ghi nhận thắng tranh chấp đơn nạp NT$ {amount} của {name}; xem trang Ví điểm để biết trạng thái ví",
+        "lost": "Đã xử lý chargeback đơn nạp NT$ {amount} của {name}: thu hồi {recovered} điểm, ghi nợ {debt} điểm"
+      },
+      "notApplied": "Đơn nạp này đã đổi trạng thái nên không có thao tác nào được thực hiện ({name}, NT$ {amount}).",
+      "stale": "Trạng thái đơn nạp này không cho phép thao tác đó. Danh sách đã được tải lại."
     }
   }
 }
