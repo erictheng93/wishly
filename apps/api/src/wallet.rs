@@ -64,7 +64,7 @@ async fn wallet(
     if let Some((wid, ..)) = &w {
         let mut rows: Vec<(i64, Value)> = sqlx::query_as(
             "SELECT seq, jsonb_build_object('id', id, 'delta', delta, 'balance_after', balance_after, 'entry_type', entry_type,
-                      'ref_type', ref_type, 'ref_id', ref_id, 'note', note, 'created_at', created_at)
+                      'ref_type', ref_type, 'ref_id', ref_id, 'lot_id', lot_id, 'note', note, 'created_at', created_at)
                FROM point_ledger WHERE wallet_id = $1 AND ($2::bigint IS NULL OR seq < $2) ORDER BY seq DESC LIMIT $3")
             .bind(wid).bind(cursor).bind(lim + 1).fetch_all(&st.pool).await?;
         if rows.len() as i64 > lim {
@@ -73,10 +73,21 @@ async fn wallet(
         }
         data = rows.into_iter().map(|r| r.1).collect();
     }
+    // 批次摘要（D55）：可退現金的餘額 = cash_refundable 批次的 remaining 加總
+    let (refundable, lots): (i64, Value) = match &w {
+        Some((wid, ..)) => sqlx::query_as(
+            "SELECT COALESCE(sum(remaining_points) FILTER (WHERE cash_refundable), 0)::bigint,
+                    COALESCE(jsonb_agg(jsonb_build_object('source', source, 'remaining_points', remaining_points,
+                      'cash_refundable', cash_refundable, 'expires_at', expires_at) ORDER BY created_at, id), '[]'::jsonb)
+               FROM point_lots WHERE wallet_id = $1 AND remaining_points > 0")
+            .bind(wid).fetch_one(&st.pool).await?,
+        None => (0, json!([])),
+    };
     let (id, balance, status) =
         w.map_or((None, 0, "active".to_string()), |(i, b, s)| (Some(i), b, s));
     Ok(no_store(
-        json!({ "wallet": { "id": id, "balance": balance, "held_points": held, "status": status }, "data": data, "next_cursor": next }),
+        json!({ "wallet": { "id": id, "balance": balance, "held_points": held, "status": status,
+                            "cash_refundable_balance": refundable, "lots": lots }, "data": data, "next_cursor": next }),
     ))
 }
 

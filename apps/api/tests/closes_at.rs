@@ -276,14 +276,7 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
     let item: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, qty_needed, funding_mode, target_points, funding_status, funding_deadline, fulfillment_type)
          VALUES ($1, '推車', 1, 'crowdfund', 500, 'open', now() + interval '7 days', 'concierge') RETURNING id").bind(wid).fetch_one(&pool).await.unwrap();
-    let wal: Uuid = sqlx::query_scalar(
-        "INSERT INTO point_wallets (user_id, balance) VALUES ($1, 100) RETURNING id",
-    )
-    .bind(donor)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    sqlx::query("INSERT INTO point_ledger (wallet_id, delta, balance_after, entry_type, ref_type, note) VALUES ($1, 100, 100, 'grant', 'manual', 't')").bind(wal).execute(&pool).await.unwrap();
+    common::grant(&pool, donor, 100).await;
 
     let mut hdr = ck(&tok).to_vec();
     hdr.push(("idempotency-key", Uuid::new_v4().to_string()));
@@ -296,8 +289,8 @@ async fn expired_list_rejects_pledges_before_sweep(pool: PgPool) {
     )
     .await;
     assert!(s.is_client_error(), "{s} {b}");
-    let (bal, pledged): (i64, i64) = sqlx::query_as("SELECT (SELECT balance FROM point_wallets WHERE id = $1), (SELECT pledged_points FROM wishlist_items WHERE id = $2)")
-        .bind(wal).bind(item).fetch_one(&pool).await.unwrap();
+    let (bal, pledged): (i64, i64) = sqlx::query_as("SELECT (SELECT balance FROM point_wallets WHERE user_id = $1), (SELECT pledged_points FROM wishlist_items WHERE id = $2)")
+        .bind(donor).bind(item).fetch_one(&pool).await.unwrap();
     assert_eq!((bal, pledged), (100, 0), "被擋的認捐不扣點");
     // 對照組：期限改到未來，同一筆認捐即成功（確認上面是被 closes_at 擋，而非 fixture 缺漏）
     sqlx::query("UPDATE wishlists SET closes_at = now() + interval '1 hour' WHERE id = $1")

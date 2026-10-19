@@ -1,8 +1,8 @@
 //! 點數記帳核心（P2-A，無批次 / 無金流）：所有 balance 異動都經 `post`，balance 與 point_ledger 同交易同步。
 //! 鎖序（docs/04 D22-12）：wishlists（FOR SHARE）→ point_wallets（FOR UPDATE，多個時依 id 排序）→ wishlist_items → contributions。
 //! 因此 `release` / `refund_partial` 會先鎖錢包，呼叫端必須在「動 wishlist_items 之前」呼叫它們。
-//! 點數來源：營運人工發放（grant / adjustment）與儲值（topup，見 topup.rs：webhook 驗簽後呼叫 `post`，
-//! 認捐 / 退點路徑不需改動）。若要區分可退現金的點數，再引入 point_lots，並只改 `post` / `release` / `refund_partial` 三處。
+//! 點數來源：營運人工發放（grant / adjustment）與儲值（topup，見 topup.rs：webhook 驗簽後呼叫 `post`）。
+//! 點數批次（point_lots，D55）：`post` 依 kind 建批次 / 依順序扣批次 / 退回原批次，balance 仍是快取（Σ lots.remaining = balance）。
 use crate::error::AppError;
 use serde_json::json;
 use sqlx::{Postgres, Transaction};
@@ -21,7 +21,7 @@ pub const DISPLAY_STATUS_SQL: &str = "CASE
     ELSE 'funded' END";
 
 pub struct Entry<'a> {
-    pub kind: &'a str, // ledger_entry_type：grant | pledge | release | refund | adjustment | topup
+    pub kind: &'a str, // ledger_entry_type：grant | pledge | release | refund | adjustment | topup | cash_refund
     pub ref_type: &'a str, // contribution | manual | topup
     pub ref_id: Option<Uuid>,
     pub note: Option<&'a str>,
@@ -63,8 +63,13 @@ pub async fn lock_wallets(tx: &mut Tx<'_>, ids: &[Uuid]) -> Result<(), AppError>
     Ok(())
 }
 
-/// balance += delta 並寫一筆 ledger，回傳 balance_after。扣到負數 → 409 INSUFFICIENT_POINTS（附 balance）。
-/// 不檢查 frozen：凍結只擋使用者主動認捐（由呼叫端檢查），退點仍要能入帳。
+/// balance += delta 並依批次寫 ledger（每個受影響批次一列，帶 lot_id），回傳 balance_after。
+/// 扣到負數 → 409 INSUFFICIENT_POINTS（附 balance）。不檢查 frozen：凍結只擋使用者主動認捐（由呼叫端檢查），退點仍要能入帳。
+/// 批次規則（D23 / D55；呼叫端須已持有錢包列鎖——下面第一句 UPDATE 就會取得，所以 lots 不另鎖）：
+/// - 正向 topup：建 source=topup 批次（可退現金，(source, source_ref_id) 唯一防重複入帳）；
+/// - 正向 release / refund：依該認捐的 allocations 逆序退回原批次（topup → adjustment → gift_card → reward_bonus）；
+/// - 其他正向（grant 等）：建 source=adjustment 批次（不可退現金）；
+/// - 負向（pledge / 負數 adjustment）：reward_bonus（最早到期）→ gift_card → adjustment → topup，pledge 另寫 allocations。
 pub async fn post(
     tx: &mut Tx<'_>,
     wallet_id: Uuid,
@@ -79,18 +84,130 @@ pub async fn post(
         .bind(wallet_id).bind(delta).fetch_optional(&mut **tx).await?;
     let Some(after) = after else {
         let b = balance(tx, wallet_id).await?;
-        return Err(AppError::Extra {
-            status: 409,
-            code: "INSUFFICIENT_POINTS",
-            detail: format!("點數餘額不足（目前 {b} 點）"),
-            extra: json!({ "balance": b }),
-        });
+        return Err(insufficient(b));
     };
-    sqlx::query("INSERT INTO point_ledger (wallet_id, delta, balance_after, entry_type, ref_type, ref_id, note, actor_id)
-                 VALUES ($1, $2, $3, $4::ledger_entry_type, $5, $6, $7, $8)")
-        .bind(wallet_id).bind(delta).bind(after).bind(e.kind).bind(e.ref_type).bind(e.ref_id).bind(e.note).bind(e.actor)
-        .execute(&mut **tx).await?;
+    match (delta > 0, e.kind) {
+        (true, "release" | "refund") => {
+            return_to_allocations(tx, wallet_id, delta, after, &e).await?
+        }
+        (true, kind) => {
+            let (source, refundable) = if kind == "topup" {
+                ("topup", true)
+            } else {
+                ("adjustment", false)
+            };
+            let lot: Uuid = sqlx::query_scalar(
+                "INSERT INTO point_lots (wallet_id, source, source_ref_id, original_points, remaining_points, cash_refundable)
+                 VALUES ($1, $2::point_lot_source, $3, $4, $4, $5) RETURNING id")
+                .bind(wallet_id).bind(source).bind(e.ref_id).bind(delta).bind(refundable).fetch_one(&mut **tx).await?;
+            ledger(tx, wallet_id, lot, delta, after, &e).await?;
+        }
+        (false, _) => debit(tx, wallet_id, -delta, after, &e).await?,
+    }
     Ok(after)
+}
+
+fn insufficient(balance: i64) -> AppError {
+    AppError::Extra {
+        status: 409,
+        code: "INSUFFICIENT_POINTS",
+        detail: format!("點數餘額不足（目前 {balance} 點）"),
+        extra: json!({ "balance": balance }),
+    }
+}
+
+async fn ledger(
+    tx: &mut Tx<'_>,
+    wallet_id: Uuid,
+    lot_id: Uuid,
+    delta: i64,
+    balance_after: i64,
+    e: &Entry<'_>,
+) -> Result<(), AppError> {
+    sqlx::query("INSERT INTO point_ledger (wallet_id, lot_id, delta, balance_after, entry_type, ref_type, ref_id, note, actor_id)
+                 VALUES ($1, $2, $3, $4, $5::ledger_entry_type, $6, $7, $8, $9)")
+        .bind(wallet_id).bind(lot_id).bind(delta).bind(balance_after).bind(e.kind).bind(e.ref_type).bind(e.ref_id).bind(e.note).bind(e.actor)
+        .execute(&mut **tx).await?;
+    Ok(())
+}
+
+/// 依扣點順序從批次扣 `need` 點；`after` 是整筆扣完後的 balance，每列 balance_after 逐筆還原。
+async fn debit(
+    tx: &mut Tx<'_>,
+    wallet_id: Uuid,
+    need: i64,
+    after: i64,
+    e: &Entry<'_>,
+) -> Result<(), AppError> {
+    let lots: Vec<(Uuid, i64)> = sqlx::query_as(
+        "SELECT id, remaining_points FROM point_lots
+          WHERE wallet_id = $1 AND remaining_points > 0 AND (expires_at IS NULL OR expires_at > now())
+          ORDER BY CASE source WHEN 'reward_bonus' THEN 0 WHEN 'gift_card' THEN 1 WHEN 'adjustment' THEN 2 ELSE 3 END,
+                   expires_at NULLS LAST, created_at, id")
+        .bind(wallet_id).fetch_all(&mut **tx).await?;
+    let (mut left, mut running) = (need, after + need);
+    for (lot, rem) in lots {
+        if left == 0 {
+            break;
+        }
+        let take = rem.min(left);
+        sqlx::query("UPDATE point_lots SET remaining_points = remaining_points - $2 WHERE id = $1")
+            .bind(lot)
+            .bind(take)
+            .execute(&mut **tx)
+            .await?;
+        running -= take;
+        ledger(tx, wallet_id, lot, -take, running, e).await?;
+        if e.kind == "pledge" {
+            sqlx::query("INSERT INTO contribution_lot_allocations (contribution_id, lot_id, points) VALUES ($1, $2, $3)")
+                .bind(e.ref_id).bind(lot).bind(take).execute(&mut **tx).await?;
+        }
+        left -= take;
+    }
+    if left > 0 {
+        return Err(insufficient(after + need)); // 批次可用點數不足（例如已到期）；整筆 rollback
+    }
+    Ok(())
+}
+
+/// 把 `delta` 點依認捐的 allocations 逆序退回原批次（只退尚未退回的部分）。
+async fn return_to_allocations(
+    tx: &mut Tx<'_>,
+    wallet_id: Uuid,
+    delta: i64,
+    after: i64,
+    e: &Entry<'_>,
+) -> Result<(), AppError> {
+    let allocs: Vec<(Uuid, i64)> = sqlx::query_as(
+        "SELECT a.lot_id, a.points - a.refunded_points FROM contribution_lot_allocations a JOIN point_lots l ON l.id = a.lot_id
+          WHERE a.contribution_id = $1 AND a.points > a.refunded_points
+          ORDER BY CASE l.source WHEN 'topup' THEN 0 WHEN 'adjustment' THEN 1 WHEN 'gift_card' THEN 2 ELSE 3 END, l.created_at DESC, l.id DESC")
+        .bind(e.ref_id).fetch_all(&mut **tx).await?;
+    let (mut left, mut running) = (delta, after - delta);
+    for (lot, avail) in allocs {
+        if left == 0 {
+            break;
+        }
+        let take = avail.min(left);
+        sqlx::query("UPDATE contribution_lot_allocations SET refunded_points = refunded_points + $3 WHERE contribution_id = $1 AND lot_id = $2")
+            .bind(e.ref_id).bind(lot).bind(take).execute(&mut **tx).await?;
+        sqlx::query("UPDATE point_lots SET remaining_points = remaining_points + $2 WHERE id = $1")
+            .bind(lot)
+            .bind(take)
+            .execute(&mut **tx)
+            .await?;
+        running += take;
+        ledger(tx, wallet_id, lot, take, running, e).await?;
+        left -= take;
+    }
+    if left > 0 {
+        return Err(AppError::problem(
+            500,
+            "INTERNAL_ERROR",
+            "認捐的點數批次分配不足以退回",
+        ));
+    }
+    Ok(())
 }
 
 async fn balance(tx: &mut Tx<'_>, wallet_id: Uuid) -> Result<i64, AppError> {

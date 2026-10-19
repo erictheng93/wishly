@@ -134,6 +134,66 @@ pub async fn pledge(app: &Router, item: Uuid, token: &str, points: i64) -> Resp 
     )
     .await
 }
+/// 以 SQL 建一筆已入帳的 topups 列，再走 `points::post`（kind=topup）入帳——與 webhook 相同的入帳路徑；回傳 topups.id。
+pub async fn topup_credit(pool: &PgPool, user: Uuid, n: i64) -> Uuid {
+    let mut tx = pool.begin().await.unwrap();
+    let wallet = wishly_api::points::ensure_wallet(&mut tx, user)
+        .await
+        .unwrap();
+    let id = Uuid::new_v4();
+    sqlx::query("INSERT INTO topups (id, wallet_id, merchant_trade_no, provider, method, amount, status, provider_txn_id, paid_at, expires_at)
+                 VALUES ($1, $2, $3, 'ecpay', 'card', $4, 'paid', $3, now(), now())")
+        .bind(id).bind(wallet).bind(id.to_string()).bind(n).execute(&mut *tx).await.unwrap();
+    wishly_api::points::post(
+        &mut tx,
+        wallet,
+        n,
+        wishly_api::points::Entry {
+            kind: "topup",
+            ref_type: "topup",
+            ref_id: Some(id),
+            note: None,
+            actor: None,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    id
+}
+/// 直接植入 gift_card / reward_bonus 批次（目前無對應功能）：批次 + balance + ledger 一次補齊，維持對帳。
+pub async fn seed_lot(
+    pool: &PgPool,
+    user: Uuid,
+    source: &str,
+    n: i64,
+    expires_in: Option<&str>,
+) -> Uuid {
+    let mut tx = pool.begin().await.unwrap();
+    let wallet = wishly_api::points::ensure_wallet(&mut tx, user)
+        .await
+        .unwrap();
+    let lot: Uuid = sqlx::query_scalar("INSERT INTO point_lots (wallet_id, source, source_ref_id, original_points, remaining_points, cash_refundable, expires_at)
+                 VALUES ($1, $2::point_lot_source, gen_random_uuid(), $3, $3, false, now() + $4::interval) RETURNING id")
+        .bind(wallet).bind(source).bind(n).bind(expires_in).fetch_one(&mut *tx).await.unwrap();
+    let after: i64 = sqlx::query_scalar(
+        "UPDATE point_wallets SET balance = balance + $2 WHERE id = $1 RETURNING balance",
+    )
+    .bind(wallet)
+    .bind(n)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO point_ledger (wallet_id, lot_id, delta, balance_after, entry_type, ref_type) VALUES ($1, $2, $3, $4, 'grant', 'manual')")
+        .bind(wallet).bind(lot).bind(n).bind(after).execute(&mut *tx).await.unwrap();
+    tx.commit().await.unwrap();
+    lot
+}
+/// 各批次 (source, remaining) 依建立順序（測試用快照）
+pub async fn lots(pool: &PgPool, user: Uuid) -> Vec<(String, i64)> {
+    sqlx::query_as("SELECT l.source::text, l.remaining_points FROM point_lots l JOIN point_wallets w ON w.id = l.wallet_id WHERE w.user_id = $1 ORDER BY l.created_at, l.id")
+        .bind(user).fetch_all(pool).await.unwrap()
+}
 pub async fn assert_points_reconciled(pool: &PgPool) {
     let bad: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM point_wallets w WHERE balance <> COALESCE((SELECT sum(delta) FROM point_ledger l WHERE l.wallet_id=w.id),0)")
         .fetch_all(pool).await.unwrap();
@@ -141,6 +201,25 @@ pub async fn assert_points_reconciled(pool: &PgPool) {
     let drift: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM wishlist_items i WHERE funding_mode='crowdfund' AND pledged_points <> COALESCE((SELECT sum(points) FROM contributions c WHERE c.item_id=i.id AND c.status IN ('pledged','captured')),0)")
         .fetch_all(pool).await.unwrap();
     assert!(drift.is_empty(), "item.pledged_points 漂移: {drift:?}");
+    // 批次：Σ lots.remaining = balance；批次 remaining = 該批次 ledger 加總（舊資料批次的 ledger 沒有 lot_id，只對帳錢包層級）
+    let lot_bad: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM point_wallets w WHERE balance <> COALESCE((SELECT sum(remaining_points) FROM point_lots l WHERE l.wallet_id=w.id),0)")
+        .fetch_all(pool).await.unwrap();
+    assert!(
+        lot_bad.is_empty(),
+        "錢包 balance 與批次 remaining 加總不一致: {lot_bad:?}"
+    );
+    let lot_drift: Vec<Uuid> = sqlx::query_scalar("SELECT l.id FROM point_lots l WHERE NOT (l.source = 'adjustment' AND l.source_ref_id = l.wallet_id) AND l.remaining_points <> COALESCE((SELECT sum(delta) FROM point_ledger g WHERE g.lot_id = l.id),0)")
+        .fetch_all(pool).await.unwrap();
+    assert!(
+        lot_drift.is_empty(),
+        "批次 remaining 與 ledger 加總不一致: {lot_drift:?}"
+    );
+    let alloc_drift: Vec<Uuid> = sqlx::query_scalar("SELECT c.id FROM contributions c WHERE c.status IN ('pledged','captured') AND EXISTS (SELECT 1 FROM contribution_lot_allocations a WHERE a.contribution_id = c.id) AND c.points - c.refunded_points <> (SELECT sum(a.points - a.refunded_points) FROM contribution_lot_allocations a WHERE a.contribution_id = c.id)")
+        .fetch_all(pool).await.unwrap();
+    assert!(
+        alloc_drift.is_empty(),
+        "認捐與批次分配不一致: {alloc_drift:?}"
+    );
 }
 pub async fn assert_all_reconciled(pool: &PgPool) {
     assert_points_reconciled(pool).await;

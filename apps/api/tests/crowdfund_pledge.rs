@@ -910,6 +910,11 @@ async fn wallet_endpoint_held_points_and_pagination(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
+    sqlx::query("UPDATE contribution_lot_allocations SET refunded_points = 10 WHERE contribution_id IN (SELECT id FROM contributions WHERE item_id = $1)")
+        .bind(done)
+        .execute(&pool)
+        .await
+        .unwrap();
     let (_, _, b) = common::call_app(&app, "GET", "/wallet", &common::ck(&ta), None).await;
     assert_eq!(b["wallet"]["held_points"], 210);
 
@@ -1286,7 +1291,12 @@ async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool
         .execute(&pool)
         .await
         .unwrap();
-        grant(&pool, donor, 100).await;
+        // pre-0022 schema 沒有 point_lots，不能用 grant helper
+        sqlx::query("INSERT INTO point_wallets (user_id, balance) VALUES ($1, 100)")
+            .bind(donor)
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points)
             SELECT $1, $2, user_id, id, 'x', 10 FROM point_wallets WHERE user_id = $3")
             .bind(item).bind(wl).bind(donor).execute(&pool).await.unwrap();

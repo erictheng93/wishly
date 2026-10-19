@@ -575,6 +575,14 @@ async fn reallocate(
         "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility)
          SELECT $2, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility FROM contributions WHERE id = $1 RETURNING id")
         .bind(id).bind(tgt).fetch_one(&mut *tx).await?;
+    // 扣點批次分配跟著轉投後的新認捐走（之後撤回 / 退點才退得回原批次）
+    sqlx::query(
+        "UPDATE contribution_lot_allocations SET contribution_id = $2 WHERE contribution_id = $1",
+    )
+    .bind(id)
+    .bind(new_id)
+    .execute(&mut *tx)
+    .await?;
     let funded = fs == "funded";
     if funded {
         on_funded(&mut tx, tgt, wl).await?;
