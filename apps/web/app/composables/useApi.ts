@@ -23,7 +23,7 @@ export function useApi() {
     } catch (e: any) {
       const status = e.statusCode || e.status || 0
       const d = e.data && typeof e.data === 'object' ? e.data : {}
-      const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || t('auth.api.connFail'), d.errors || [], d)
+      const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || t('auth.api.connFail'), d.errors || [], { ...d, retry_after: Number(e.response?.headers?.get?.('retry-after')) || undefined })
       const blocked = err.code === 'ACCOUNT_BLOCKED'
       if (import.meta.client && (blocked || (err.code === 'UNAUTHORIZED' && !noRedirect))) {
         useState('auth-user').value = null

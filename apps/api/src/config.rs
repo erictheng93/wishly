@@ -44,6 +44,35 @@ pub struct Ecpay {
     pub endpoint: String,
     /// 我方 webhook 的對外完整網址（綠界 ReturnURL）
     pub return_url: String,
+    /// 取號通知網址（綠界 PaymentInfoURL，超商代碼 / 條碼 / ATM 取號成功時通知）
+    pub payment_info_url: String,
+    /// 訂單查詢 API（QueryTradeInfo/V5），入帳前 server-to-server 二次確認
+    pub query_url: String,
+    pub query_timeout_secs: u64,
+}
+
+impl Ecpay {
+    /// 未明確設定的網址由 API 對外網址與 AioCheckOut 網址推導。
+    fn from_env(merchant_id: String, hash_key: String, hash_iv: String, api_base: &str) -> Ecpay {
+        let api_base = api_base.trim_end_matches('/');
+        let endpoint = var("ECPAY_ENDPOINT").unwrap_or_else(|| ECPAY_STAGE.into());
+        Ecpay {
+            merchant_id,
+            hash_key,
+            hash_iv,
+            return_url: var("ECPAY_RETURN_URL")
+                .unwrap_or_else(|| format!("{api_base}/api/v1/webhooks/payments/ecpay")),
+            payment_info_url: var("ECPAY_PAYMENT_INFO_URL")
+                .unwrap_or_else(|| format!("{api_base}/api/v1/webhooks/payments/ecpay/info")),
+            // stage / 正式的 QueryTradeInfo 與 AioCheckOut 同網域（以綠界官方文件為準）：未設時由 endpoint 推導
+            query_url: var("ECPAY_QUERY_URL")
+                .unwrap_or_else(|| endpoint.replace("/AioCheckOut/", "/QueryTradeInfo/")),
+            query_timeout_secs: var("ECPAY_QUERY_TIMEOUT_SECS")
+                .and_then(|t| t.parse().ok())
+                .unwrap_or(8),
+            endpoint,
+        }
+    }
 }
 
 const ECPAY_STAGE: &str = "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5";
@@ -120,16 +149,12 @@ impl Config {
                     sha2::Sha256::digest(b"dev-shipping-key").into()
                 }),
             // 綠界公開測試參數（stage 環境），以綠界文件為準；僅 dev/test 使用。
-            ecpay: Some(Ecpay {
-                merchant_id: v("ECPAY_MERCHANT_ID", "3002607"),
-                hash_key: v("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
-                hash_iv: v("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
-                endpoint: v("ECPAY_ENDPOINT", ECPAY_STAGE),
-                return_url: v(
-                    "ECPAY_RETURN_URL",
-                    "http://localhost:8080/api/v1/webhooks/payments/ecpay",
-                ),
-            }),
+            ecpay: Some(Ecpay::from_env(
+                v("ECPAY_MERCHANT_ID", "3002607"),
+                v("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
+                v("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
+                &v("API_BASE_URL", "http://localhost:8080"),
+            )),
         }
     }
 
@@ -160,20 +185,12 @@ impl Config {
             var("ECPAY_HASH_KEY"),
             var("ECPAY_HASH_IV"),
         ) {
-            (Some(merchant_id), Some(hash_key), Some(hash_iv)) => Some(Ecpay {
+            (Some(merchant_id), Some(hash_key), Some(hash_iv)) => Some(Ecpay::from_env(
                 merchant_id,
                 hash_key,
                 hash_iv,
-                endpoint: var("ECPAY_ENDPOINT").unwrap_or_else(|| ECPAY_STAGE.into()),
-                return_url: var("ECPAY_RETURN_URL").unwrap_or_else(|| {
-                    format!(
-                        "{}/api/v1/webhooks/payments/ecpay",
-                        var("API_BASE_URL")
-                            .unwrap_or_default()
-                            .trim_end_matches('/')
-                    )
-                }),
-            }),
+                &var("API_BASE_URL").unwrap_or_default(),
+            )),
             _ => None,
         };
         c.otp_pepper = must("OTP_PEPPER")?;

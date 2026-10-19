@@ -170,7 +170,11 @@ fn cors() -> tower_http::cors::CorsLayer {
             HeaderName::from_static("x-guest-token"),
             HeaderName::from_static("idempotency-key"),
         ])
-        .expose_headers([HeaderName::from_static("idempotency-replayed")])
+        // 跨網域前端要讀得到：重放標記與 429 / 503 的等待秒數
+        .expose_headers([
+            HeaderName::from_static("idempotency-replayed"),
+            header::RETRY_AFTER,
+        ])
 }
 
 /// 依 Accept-Language 設定本請求的語言（OTP 信等匿名寄信用；前端 useApi 會帶目前介面語言）

@@ -83,7 +83,7 @@ async function reallocate() {
         <p class="c-mute">{{ $t('me.wallet.held', { pts: fmtPts(wallet.held_points) }) }}</p>
         <p v-if="wallet.status === 'frozen'" class="c-err" role="alert">{{ $t('me.wallet.frozenWarn') }}</p>
         <p class="c-mute c-small">{{ $t('me.wallet.issuedByPlatform') }}</p>
-        <button class="c-btn" disabled>{{ $t('me.wallet.topup') }}</button>
+        <NuxtLink to="/me/topup" class="c-btn primary">{{ $t('me.wallet.topup') }}</NuxtLink>
       </section>
 
       <h2 class="c-h2">{{ $t('me.wallet.myPledges') }}</h2>

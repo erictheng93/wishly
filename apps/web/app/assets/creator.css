@@ -82,7 +82,8 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-mute a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}
 /* P2-A 眾籌 / 錢包 / 採購單 */
 .c-badge.funded,.c-badge.fulfilled,.c-badge.ordered,.c-badge.placed,.c-badge.shipped,.c-badge.captured{color:var(--ok);border-color:var(--ok)}
-.c-badge.failed,.c-badge.expired,.c-badge.frozen{color:var(--bad);border-color:var(--bad)}
+.c-badge.failed,.c-badge.expired,.c-badge.frozen,.c-badge.refunded,.c-badge.disputed,.c-badge.charged_back{color:var(--bad);border-color:var(--bad)}
+.c-badge.paid{color:var(--ok);border-color:var(--ok)}
 .c-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0;font-size:14px}
 .c-dl dt{color:var(--mute)}.c-dl dd{margin:0}
 .c-sub{border-top:1px dashed var(--line);margin-top:12px;padding-top:8px}

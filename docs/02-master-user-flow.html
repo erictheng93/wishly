@@ -719,6 +719,7 @@ sequenceDiagram
   A-->>B: 新餘額 + 最近 ledger
 </pre>
 <table class="meta"><tbody>
+<tr><td>前端步驟（綠界，<code>/me/topup</code>）</td><td>1) 錢包頁按「儲值」進入 <code>/me/topup</code>，選金額、付款方式（信用卡 / 超商代碼 / 超商條碼 / ATM）與發票載具，前端先驗格式。2) 送出 <code>POST /wallet/topups</code>（同一份內容沿用同一個 Idempotency-Key）。3) 回 201 後以隱藏表單 POST <code>payment.fields</code> 到 <code>payment.url</code>，導向綠界付款頁；原生殼改請使用者至網頁版。4) 超商 / ATM 的繳費代碼由綠界取號通知寫入，頁面顯示「取號中…」並每 3 秒輪詢 <code>GET /wallet/topups</code>（最多 10 次，之後手動重新整理），取得後顯示代碼 / 條碼 / 虛擬帳號與繳費期限。5) 付款完成或按「返回」回到 <code>/me/topup</code>，自動重新整理並輪詢該筆單，入帳後顯示成功訊息與新餘額；入帳仍以 webhook 為準。</td></tr>
 <tr><td>前置條件</td><td>已登入；<code>amount</code> 為整數，單筆範圍取自設定（<code>topup_min_amount</code> 100 ~ <code>topup_max_amount</code> 50000，同 <code>GET /config/public</code>），每使用者每日上限另由設定控制，需法遵確認。</td></tr>
 <tr><td>步驟</td><td>1) 依 method 選定 provider，建立 pending 的 topups（記錄 provider），<code>provider_txn_id</code>（UNIQUE）即我方送給金流商的交易編號。2) 前端依回傳參數完成付款。3) 金流商 webhook 回呼；<strong>金額與狀態只信任伺服器端的 topups 列與驗簽後的回呼</strong>，不信任前端回報。4) 成功後同一交易完成 topups → paid、錢包加點、寫 ledger。5) 同交易建立 pending 的 <code>invoices</code> 與 outbox（見 F19，開立時點待會計師確認），COMMIT 後由 job 開立發票與通知。</td></tr>
 <tr><td>API</td><td><code>GET /wallet</code>、<code>POST /wallet/topups</code>（body <code>{amount, method}</code>，method ∈ card | line_pay | apple_pay；<strong>provider（tappay | ecpay）由後端依 method 與設定決定，前端不傳</strong>）、<code>POST /webhooks/payments/{provider}</code>（provider = tappay | ecpay；無 ws_session，以簽章認證）</td></tr>
