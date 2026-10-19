@@ -432,6 +432,7 @@ async fn wallet_cap_counts_balance_and_pending(pool: PgPool) {
         (StatusCode::CONFLICT, Some("WALLET_CAP_EXCEEDED")),
         "{v}"
     );
+    assert_eq!(v["limit_amount"], 50_000);
     assert_eq!(
         order(&pool, &u.token, 3000, "card").await.0,
         StatusCode::CREATED
@@ -1296,4 +1297,26 @@ async fn topup_queries_are_owner_only_newest_first_with_limit(pool: PgPool) {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+/// 跨網域前端（Pages）要能讀到 429 的 Retry-After，CORS 必須公開該標頭
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cors_exposes_retry_after(pool: PgPool) {
+    let origin = wishly_api::config::get().app_url;
+    let (_, h, _) = call(
+        &pool,
+        "GET",
+        "/public/wishlists",
+        &[("origin", origin)],
+        None,
+    )
+    .await;
+    let exposed = h["access-control-expose-headers"]
+        .to_str()
+        .unwrap()
+        .to_lowercase();
+    assert!(
+        exposed.contains("retry-after") && exposed.contains("idempotency-replayed"),
+        "{exposed}"
+    );
 }

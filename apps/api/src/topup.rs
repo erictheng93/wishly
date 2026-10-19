@@ -334,11 +334,12 @@ async fn create(
     .fetch_one(&mut *tx)
     .await?;
     if held + amount > WALLET_CAP {
-        return Err(AppError::problem(
-            409,
-            "WALLET_CAP_EXCEEDED",
-            format!("儲值後餘額將超過上限 {WALLET_CAP} 點"),
-        ));
+        return Err(AppError::Extra {
+            status: 409,
+            code: "WALLET_CAP_EXCEEDED",
+            detail: format!("儲值後餘額將超過上限 {WALLET_CAP} 點"),
+            extra: json!({ "limit_amount": WALLET_CAP }),
+        });
     }
     // 4.14 新帳號每日上限（gift_card_orders 尚未存在，僅計儲值單）；0 rows = 非新帳號
     let remaining: Option<i64> = sqlx::query_scalar(
