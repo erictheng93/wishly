@@ -2,7 +2,8 @@
 //! 1 點 = NT$1。目前只實作 provider=ecpay（綠界 AioCheckOut，form_post）；tappay 與 line_pay / apple_pay 尚未實作。
 //! 建單：Idempotency-Key 必填，占位與寫入同一交易；入帳只在 webhook，且只走 `points::post`（kind=topup）。
 //! 憑證（ECPAY_*）未設齊時兩個端點都回 503 TOPUP_DISABLED。
-//! 未做：綠界 QueryTradeInfo 二次確認、PaymentInfoURL（超商代碼 / ATM 取號通知）、拒付 / 爭議、自動儲值。
+//! webhook 入帳前以 QueryTradeInfo 二次確認（D56）：外部 HTTP 在資料庫交易之外，入帳才開交易 FOR UPDATE 重讀訂單；
+//! 取號通知（PaymentInfoURL）寫入 `topups.payment_info`。`GET /wallet/topups[/{id}]` 供前端顯示繳費資訊。
 use crate::{
     config::{self, Ecpay},
     error::AppError,
@@ -13,13 +14,15 @@ use crate::{
 };
 use axum::{
     body::Bytes,
-    extract::{rejection::FormRejection, Form, Path, State},
+    extract::{rejection::FormRejection, Form, Path, Query, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
-use chrono::{DateTime, Duration, FixedOffset, Utc};
+use chrono::{
+    DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, SecondsFormat, TimeZone, Utc,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -41,8 +44,10 @@ const OFFLINE_TTL_DAYS: i64 = 3;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/wallet/topups", post(create))
+        .route("/wallet/topups", post(create).get(list))
+        .route("/wallet/topups/{id}", get(detail))
         .route("/webhooks/payments/{provider}", post(webhook))
+        .route("/webhooks/payments/{provider}/info", post(webhook_info))
 }
 
 fn ecpay() -> Result<Ecpay, AppError> {
@@ -138,7 +143,11 @@ fn payment_form(
         ("ItemName".into(), format!("Wishly 點數 {amount} 點")),
         ("ReturnURL".into(), cfg.return_url.clone()),
         ("EncryptType".into(), "1".into()),
-        ("ClientBackURL".into(), config::get().app_url),
+        ("PaymentInfoURL".into(), cfg.payment_info_url.clone()),
+        (
+            "ClientBackURL".into(),
+            format!("{}/me/topup", config::get().app_url),
+        ),
     ];
     let (choose, expire) = match method {
         "card" => ("Credit", None),
@@ -413,45 +422,58 @@ fn ok_text() -> Response {
         .into_response()
 }
 
-/// 驗簽 → 鎖訂單 → 核對金額 → 入帳（冪等）。成功一律回純文字 `1|OK`，否則綠界會重送。
-/// 唯讀模式由全域 read_only middleware 回 503（供應商稍後重送）。
+fn provider_gate(provider: &str) -> Result<Ecpay, AppError> {
+    match provider {
+        "ecpay" => ecpay(),
+        "tappay" => Err(AppError::problem(
+            501,
+            "PROVIDER_NOT_IMPLEMENTED",
+            "tappay 尚未實作",
+        )),
+        _ => Err(AppError::NotFound),
+    }
+}
+
+/// 解析表單並以常數時間驗 CheckMacValue。
+fn verified_form(
+    form: Result<Form<Vec<(String, String)>>, FormRejection>,
+    cfg: &Ecpay,
+) -> Result<Vec<(String, String)>, AppError> {
+    let Form(params) =
+        form.map_err(|_| AppError::problem(400, "BAD_REQUEST", "請求內容必須是表單"))?;
+    let given = param(&params, "CheckMacValue")
+        .unwrap_or_default()
+        .to_uppercase();
+    if !bool::from(given.as_bytes().ct_eq(check_mac(&params, cfg).as_bytes())) {
+        return Err(AppError::problem(401, "UNAUTHORIZED", "簽章錯誤"));
+    }
+    Ok(params)
+}
+
+fn param<'a>(params: &'a [(String, String)], k: &str) -> Option<&'a str> {
+    params.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str())
+}
+
+/// 驗簽 → 讀訂單（無鎖）→ 核對通知金額 → QueryTradeInfo 二次確認（交易外）→ 開交易 FOR UPDATE 重讀後入帳（冪等）。
+/// 成功一律回純文字 `1|OK`，否則綠界會重送。唯讀模式由全域 read_only middleware 回 503（供應商稍後重送）。
 async fn webhook(
     State(st): State<AppState>,
     Path(provider): Path<String>,
     form: Result<Form<Vec<(String, String)>>, FormRejection>,
 ) -> Result<Response, AppError> {
-    match provider.as_str() {
-        "ecpay" => {}
-        "tappay" => {
-            return Err(AppError::problem(
-                501,
-                "PROVIDER_NOT_IMPLEMENTED",
-                "tappay 尚未實作",
-            ))
-        }
-        _ => return Err(AppError::NotFound),
-    }
-    let cfg = ecpay()?;
-    let Form(params) =
-        form.map_err(|_| AppError::problem(400, "BAD_REQUEST", "請求內容必須是表單"))?;
-    let get = |k: &str| params.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
-    let given = get("CheckMacValue").unwrap_or_default().to_uppercase();
-    if !bool::from(given.as_bytes().ct_eq(check_mac(&params, &cfg).as_bytes())) {
-        return Err(AppError::problem(401, "UNAUTHORIZED", "簽章錯誤"));
-    }
+    let cfg = provider_gate(&provider)?;
+    let params = verified_form(form, &cfg)?;
+    let get = |k: &str| param(&params, k);
     let trade_no = get("MerchantTradeNo").unwrap_or_default();
     let bad = || AppError::problem(400, "BAD_REQUEST", "通知欄位不完整");
-    let provider_txn = get("TradeNo").filter(|t| !t.is_empty());
 
-    let mut tx = st.pool.begin().await?;
-    let row: Option<(Uuid, Uuid, i64, String)> = sqlx::query_as(
-        "SELECT id, wallet_id, amount, status::text FROM topups
-          WHERE merchant_trade_no = $1 AND provider = 'ecpay' FOR UPDATE",
+    let row: Option<(Uuid, i64, String)> = sqlx::query_as(
+        "SELECT id, amount, status::text FROM topups WHERE merchant_trade_no = $1 AND provider = 'ecpay'",
     )
     .bind(trade_no)
-    .fetch_optional(&mut *tx)
+    .fetch_optional(&st.pool)
     .await?;
-    let Some((id, wallet, amount, status)) = row else {
+    let Some((id, amount, status)) = row else {
         return Err(AppError::problem(404, "NOT_FOUND", "查無儲值訂單"));
     };
     // 已入帳、或已進入退款 / 爭議流程：重送一律冪等
@@ -459,29 +481,129 @@ async fn webhook(
         return Ok(ok_text());
     }
     if get("RtnCode") != Some("1") {
+        // 條件式 UPDATE 本身即原子：與入帳競爭時，已 paid 的列不會被改回 failed
         sqlx::query("UPDATE topups SET status = 'failed', failure_reason = $2, updated_at = now() WHERE id = $1 AND status = 'pending'")
             .bind(id)
             .bind(get("RtnMsg"))
-            .execute(&mut *tx)
+            .execute(&st.pool)
             .await?;
-        tx.commit().await?;
         return Ok(ok_text());
     }
-    let txn = provider_txn.ok_or_else(bad)?;
+    let txn = get("TradeNo").filter(|t| !t.is_empty()).ok_or_else(bad)?;
     // 金額不符一律不入帳、寫 audit_logs 並告警；已逾期但實際付款成功仍入帳，錢已收
     if get("TradeAmt").and_then(|a| a.parse::<i64>().ok()) != Some(amount) {
-        sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', 'topup.amount_mismatch', 'topups', $1, $2)")
-            .bind(id)
-            .bind(json!({ "expected": amount, "notified": get("TradeAmt"), "trade_no": txn }))
-            .execute(&mut *tx)
-            .await?;
-        tx.commit().await?;
+        audit(
+            &st.pool,
+            "topup.amount_mismatch",
+            id,
+            json!({ "expected": amount, "notified": get("TradeAmt"), "trade_no": txn }),
+        )
+        .await?;
         tracing::error!(topup = %id, "topup 通知金額與訂單不符，未入帳");
         return Err(AppError::problem(
             422,
             "AMOUNT_MISMATCH",
             "通知金額與訂單不符",
         ));
+    }
+    // 外部 HTTP 絕不在持有 topups 列鎖的交易內執行（會佔住連線與鎖）
+    confirm(&st.pool, &cfg, id, trade_no, amount, txn).await?;
+    credit(&st.pool, id, txn).await?;
+    Ok(ok_text())
+}
+
+async fn audit(pool: &PgPool, action: &str, id: Uuid, diff: Value) -> Result<(), AppError> {
+    sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', $1, 'topups', $2, $3)")
+        .bind(action)
+        .bind(id)
+        .bind(diff)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// 綠界 QueryTradeInfo/V5（POST form），回應為 URL-encoded 字串。逾時 / 網路錯誤 / 非 2xx 一律 503，讓綠界稍後重送。
+async fn query_trade(cfg: &Ecpay, trade_no: &str) -> Result<Vec<(String, String)>, AppError> {
+    let unavailable = |why: &str| {
+        tracing::error!(trade_no, why, "綠界 QueryTradeInfo 失敗");
+        AppError::problem(
+            503,
+            "PAYMENT_QUERY_FAILED",
+            "無法向金流商確認交易，請稍後重送",
+        )
+    };
+    let mut f: Vec<(String, String)> = vec![
+        ("MerchantID".into(), cfg.merchant_id.clone()),
+        ("MerchantTradeNo".into(), trade_no.into()),
+        ("TimeStamp".into(), Utc::now().timestamp().to_string()),
+    ];
+    let mac = check_mac(&f, cfg);
+    f.push(("CheckMacValue".into(), mac));
+    let res = reqwest::Client::new()
+        .post(&cfg.query_url)
+        .form(&f)
+        .timeout(std::time::Duration::from_secs(cfg.query_timeout_secs))
+        .send()
+        .await
+        .map_err(|e| unavailable(&e.to_string()))?;
+    if !res.status().is_success() {
+        return Err(unavailable(res.status().as_str()));
+    }
+    let text = res.text().await.map_err(|e| unavailable(&e.to_string()))?;
+    serde_urlencoded::from_str(&text).map_err(|e| unavailable(&e.to_string()))
+}
+
+/// 入帳前二次確認：回應簽章正確，且 TradeStatus=1（已付款）、金額、MerchantTradeNo、TradeNo 皆與訂單一致。
+/// 任一不符 → 不入帳、寫 audit_logs（topup.query_mismatch）並告警，回 422 讓綠界重送。
+async fn confirm(
+    pool: &PgPool,
+    cfg: &Ecpay,
+    id: Uuid,
+    trade_no: &str,
+    amount: i64,
+    txn: &str,
+) -> Result<(), AppError> {
+    let q = query_trade(cfg, trade_no).await?;
+    let get = |k: &str| param(&q, k);
+    let given = get("CheckMacValue").unwrap_or_default().to_uppercase();
+    let sig_ok = bool::from(given.as_bytes().ct_eq(check_mac(&q, cfg).as_bytes()));
+    let paid = get("TradeStatus") == Some("1")
+        && get("TradeAmt").and_then(|a| a.parse::<i64>().ok()) == Some(amount)
+        && get("MerchantTradeNo") == Some(trade_no)
+        && get("TradeNo") == Some(txn);
+    if !sig_ok || !paid {
+        audit(
+            pool,
+            "topup.query_mismatch",
+            id,
+            json!({
+                "expected": amount, "trade_no": txn, "signature_ok": sig_ok,
+                "queried": { "status": get("TradeStatus"), "amount": get("TradeAmt"),
+                             "merchant_trade_no": get("MerchantTradeNo"), "trade_no": get("TradeNo") },
+            }),
+        )
+        .await?;
+        tracing::error!(topup = %id, signature_ok = sig_ok, "topup 二次確認與通知不符，未入帳");
+        return Err(AppError::problem(
+            422,
+            "PAYMENT_QUERY_MISMATCH",
+            "金流商查詢結果與通知不符",
+        ));
+    }
+    Ok(())
+}
+
+/// 入帳交易：FOR UPDATE 重讀訂單（確認期間可能已被並行通知入帳或其他流程改變狀態），已入帳則冪等略過。
+async fn credit(pool: &PgPool, id: Uuid, txn: &str) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    let (wallet, amount, status): (Uuid, i64, String) = sqlx::query_as(
+        "SELECT wallet_id, amount, status::text FROM topups WHERE id = $1 FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !matches!(status.as_str(), "pending" | "expired" | "failed") {
+        return Ok(());
     }
     points::lock_wallets(&mut tx, &[wallet]).await?;
     sqlx::query("UPDATE topups SET status = 'paid', paid_at = now(), provider_txn_id = $2, failure_reason = NULL, updated_at = now() WHERE id = $1")
@@ -503,5 +625,157 @@ async fn webhook(
     )
     .await?;
     tx.commit().await?;
+    Ok(())
+}
+
+// ---- POST /webhooks/payments/{provider}/info（PaymentInfoURL 取號通知）----
+
+/// 綠界 ExpireDate：CVS / BARCODE 為 `yyyy/MM/dd HH:mm:ss`，ATM 為 `yyyy/MM/dd`（以官方文件為準），皆為台灣時間；日期型取當日 23:59:59。
+fn parse_expire(s: &str) -> Option<DateTime<Utc>> {
+    let tw = FixedOffset::east_opt(8 * 3600)?;
+    let naive = NaiveDateTime::parse_from_str(s.trim(), "%Y/%m/%d %H:%M:%S")
+        .ok()
+        .or_else(|| {
+            NaiveDate::parse_from_str(s.trim(), "%Y/%m/%d")
+                .ok()?
+                .and_hms_opt(23, 59, 59)
+        })?;
+    Some(tw.from_local_datetime(&naive).single()?.with_timezone(&Utc))
+}
+
+/// 取號成功通知：驗簽 → 核對金額 → 寫入 payment_info（僅 pending；重送覆寫為相同內容無害）→ `1|OK`。
+/// RtnCode 依付款方式不同（ATM=2、CVS / BARCODE=10100073，以官方文件為準），故不比對特定碼：
+/// 只排除 `1`（那是付款通知），其餘以「該付款方式必要的取號欄位是否齊全」判斷，欄位不齊時記 warn 並回 OK（重送也不會補齊）。
+async fn webhook_info(
+    State(st): State<AppState>,
+    Path(provider): Path<String>,
+    form: Result<Form<Vec<(String, String)>>, FormRejection>,
+) -> Result<Response, AppError> {
+    let cfg = provider_gate(&provider)?;
+    let params = verified_form(form, &cfg)?;
+    let get = |k: &str| param(&params, k).filter(|v| !v.is_empty());
+    let trade_no = get("MerchantTradeNo").unwrap_or_default();
+    let row: Option<(Uuid, i64, String, String, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT id, amount, method::text, status::text, expires_at FROM topups WHERE merchant_trade_no = $1 AND provider = 'ecpay'",
+    )
+    .bind(trade_no)
+    .fetch_optional(&st.pool)
+    .await?;
+    let Some((id, amount, method, status, expires_at)) = row else {
+        return Err(AppError::problem(404, "NOT_FOUND", "查無儲值訂單"));
+    };
+    if status != "pending" || get("RtnCode") == Some("1") {
+        return Ok(ok_text());
+    }
+    if get("TradeAmt").and_then(|a| a.parse::<i64>().ok()) != Some(amount) {
+        audit(
+            &st.pool,
+            "topup.info_amount_mismatch",
+            id,
+            json!({ "expected": amount, "notified": get("TradeAmt") }),
+        )
+        .await?;
+        tracing::error!(topup = %id, "topup 取號通知金額與訂單不符");
+        return Err(AppError::problem(
+            422,
+            "AMOUNT_MISMATCH",
+            "通知金額與訂單不符",
+        ));
+    }
+    let expire_at = get("ExpireDate")
+        .and_then(parse_expire)
+        .unwrap_or(expires_at)
+        .to_rfc3339_opts(SecondsFormat::Secs, true);
+    let info = match method.as_str() {
+        "cvs_code" => get("PaymentNo")
+            .map(|n| json!({ "type": method, "payment_no": n, "expire_at": expire_at })),
+        "cvs_barcode" => match (get("Barcode1"), get("Barcode2"), get("Barcode3")) {
+            (Some(a), Some(b), Some(c)) => Some(
+                json!({ "type": method, "barcode1": a, "barcode2": b, "barcode3": c, "expire_at": expire_at }),
+            ),
+            _ => None,
+        },
+        "atm" => match (get("BankCode"), get("vAccount")) {
+            (Some(bank), Some(acct)) => Some(
+                json!({ "type": method, "bank_code": bank, "account": acct, "expire_at": expire_at }),
+            ),
+            _ => None,
+        },
+        _ => None,
+    };
+    let Some(info) = info else {
+        tracing::warn!(topup = %id, method, "取號通知缺少必要欄位或付款方式不適用，略過");
+        return Ok(ok_text());
+    };
+    sqlx::query("UPDATE topups SET payment_info = $2, updated_at = now() WHERE id = $1 AND status = 'pending'")
+        .bind(id)
+        .bind(info)
+        .execute(&st.pool)
+        .await?;
     Ok(ok_text())
+}
+
+// ---- GET /wallet/topups、GET /wallet/topups/{id} ----
+
+type TopupRow = (
+    Uuid,
+    i64,
+    String,
+    String,
+    DateTime<Utc>,
+    Option<DateTime<Utc>>,
+    DateTime<Utc>,
+    Option<Value>,
+);
+const TOPUP_COLS: &str = "t.id, t.amount, t.method::text, t.status::text, t.created_at, t.paid_at, t.expires_at, t.payment_info";
+
+fn topup_json(r: TopupRow) -> Value {
+    json!({ "id": r.0, "amount": r.1, "method": r.2, "status": r.3, "created_at": r.4,
+            "paid_at": r.5, "expires_at": r.6, "payment_info": r.7 })
+}
+
+fn no_store(body: Value) -> Response {
+    ([(header::CACHE_CONTROL, "private, no-store")], Json(body)).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct ListQuery {
+    limit: Option<i64>,
+}
+
+/// 本人的儲值單，最新在前；limit 預設 20、上限 50。
+async fn list(
+    State(st): State<AppState>,
+    user: CurrentUser,
+    Query(q): Query<ListQuery>,
+) -> Result<Response, AppError> {
+    let rows: Vec<TopupRow> = sqlx::query_as(&format!(
+        "SELECT {TOPUP_COLS} FROM topups t JOIN point_wallets w ON w.id = t.wallet_id
+          WHERE w.user_id = $1 ORDER BY t.created_at DESC, t.id DESC LIMIT $2"
+    ))
+    .bind(user.id)
+    .bind(q.limit.unwrap_or(20).clamp(1, 50))
+    .fetch_all(&st.pool)
+    .await?;
+    Ok(no_store(
+        json!({ "topups": rows.into_iter().map(topup_json).collect::<Vec<_>>() }),
+    ))
+}
+
+/// 非本人或不存在一律 404，不洩漏存在性。
+async fn detail(
+    State(st): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Response, AppError> {
+    let row: Option<TopupRow> = sqlx::query_as(&format!(
+        "SELECT {TOPUP_COLS} FROM topups t JOIN point_wallets w ON w.id = t.wallet_id
+          WHERE t.id = $1 AND w.user_id = $2"
+    ))
+    .bind(id)
+    .bind(user.id)
+    .fetch_optional(&st.pool)
+    .await?;
+    let row = row.ok_or(AppError::NotFound)?;
+    Ok(no_store(json!({ "topup": topup_json(row) })))
 }
