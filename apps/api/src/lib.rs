@@ -28,6 +28,7 @@ pub mod topup;
 pub mod uploads;
 pub mod validate;
 pub mod wallet;
+pub mod wallet_ops;
 pub mod wishlists;
 
 use axum::{response::IntoResponse, Router};
@@ -50,6 +51,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(claims::routes())
                 .merge(contributions::routes())
                 .merge(wallet::routes())
+                .merge(wallet_ops::routes())
                 .merge(dashboard::routes())
                 .merge(reports::routes())
                 .merge(admin::routes())

@@ -116,7 +116,7 @@ fn insufficient(balance: i64) -> AppError {
     }
 }
 
-async fn ledger(
+pub(crate) async fn ledger(
     tx: &mut Tx<'_>,
     wallet_id: Uuid,
     lot_id: Uuid,
@@ -208,6 +208,100 @@ async fn return_to_allocations(
         ));
     }
     Ok(())
+}
+
+/// 現金退款申請扣點（4.3h）：只從 cash_refundable 批次先進先出扣；呼叫端須已持有錢包列鎖並檢查未凍結。
+/// 餘額不足 → 409 INSUFFICIENT_POINTS；balance 足夠但可退現金的點數不足 → 409 NOT_CASH_REFUNDABLE（附 refundable_points，不扣任何批次）。
+/// 回傳扣自各批次的 [(lot_id, points)]，呼叫端存入 cash_refund_requests.lot_allocations。
+pub async fn cash_refund_debit(
+    tx: &mut Tx<'_>,
+    wallet_id: Uuid,
+    amount: i64,
+    request_id: Uuid,
+) -> Result<Vec<(Uuid, i64)>, AppError> {
+    let bal = balance(tx, wallet_id).await?;
+    if bal < amount {
+        return Err(insufficient(bal));
+    }
+    let lots: Vec<(Uuid, i64)> = sqlx::query_as(
+        "SELECT id, remaining_points FROM point_lots
+          WHERE wallet_id = $1 AND cash_refundable AND remaining_points > 0 ORDER BY created_at, id")
+        .bind(wallet_id).fetch_all(&mut **tx).await?;
+    let refundable: i64 = lots.iter().map(|l| l.1).sum();
+    if refundable < amount {
+        return Err(AppError::Extra {
+            status: 409,
+            code: "NOT_CASH_REFUNDABLE",
+            detail: format!("可退現金的點數只有 {refundable} 點（禮物卡與贊助點數不可退現金）"),
+            extra: json!({ "refundable_points": refundable, "balance": bal }),
+        });
+    }
+    sqlx::query("UPDATE point_wallets SET balance = balance - $2 WHERE id = $1")
+        .bind(wallet_id)
+        .bind(amount)
+        .execute(&mut **tx)
+        .await?;
+    let e = Entry {
+        kind: "cash_refund",
+        ref_type: "cash_refund_request",
+        ref_id: Some(request_id),
+        note: None,
+        actor: None,
+    };
+    let (mut left, mut running, mut out) = (amount, bal, vec![]);
+    for (lot, rem) in lots {
+        if left == 0 {
+            break;
+        }
+        let take = rem.min(left);
+        sqlx::query("UPDATE point_lots SET remaining_points = remaining_points - $2 WHERE id = $1")
+            .bind(lot)
+            .bind(take)
+            .execute(&mut **tx)
+            .await?;
+        running -= take;
+        ledger(tx, wallet_id, lot, -take, running, &e).await?;
+        out.push((lot, take));
+        left -= take;
+    }
+    Ok(out)
+}
+
+/// 現金退款被拒絕：依申請時記錄的 lot_allocations 退回原批次，ledger 記 adjustment（4.3i）。
+/// 呼叫端須已持有錢包列鎖，並以申請狀態守衛確保只退一次。
+pub async fn cash_refund_restore(
+    tx: &mut Tx<'_>,
+    wallet_id: Uuid,
+    request_id: Uuid,
+    allocations: &[(Uuid, i64)],
+    staff: Uuid,
+) -> Result<i64, AppError> {
+    let total: i64 = allocations.iter().map(|a| a.1).sum();
+    let after: i64 = sqlx::query_scalar(
+        "UPDATE point_wallets SET balance = balance + $2 WHERE id = $1 RETURNING balance",
+    )
+    .bind(wallet_id)
+    .bind(total)
+    .fetch_one(&mut **tx)
+    .await?;
+    let e = Entry {
+        kind: "adjustment",
+        ref_type: "cash_refund_request",
+        ref_id: Some(request_id),
+        note: Some("現金退款申請被拒絕，點數退回原批次"),
+        actor: Some(staff),
+    };
+    let mut running = after - total;
+    for (lot, pts) in allocations {
+        sqlx::query("UPDATE point_lots SET remaining_points = remaining_points + $2 WHERE id = $1")
+            .bind(lot)
+            .bind(pts)
+            .execute(&mut **tx)
+            .await?;
+        running += pts;
+        ledger(tx, wallet_id, *lot, *pts, running, &e).await?;
+    }
+    Ok(after)
 }
 
 async fn balance(tx: &mut Tx<'_>, wallet_id: Uuid) -> Result<i64, AppError> {
