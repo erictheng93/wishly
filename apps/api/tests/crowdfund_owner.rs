@@ -73,12 +73,12 @@ async fn pledge(pool: &PgPool, item: Uuid, user: Uuid, n: i64, anon: bool) -> Uu
         .unwrap();
     points::lock_wallets(&mut tx, &[w]).await.unwrap();
     let cid = Uuid::new_v4();
-    points::post(&mut tx, w, -n, points::Entry::contribution("pledge", cid))
-        .await
-        .unwrap();
     sqlx::query("INSERT INTO contributions (id, item_id, wishlist_id, user_id, wallet_id, donor_name, points, is_anonymous, message)
                  SELECT $1, $2, $3, $4, $5, u.display_name, $6, $7, '加油' FROM users u WHERE u.id = $4")
         .bind(cid).bind(item).bind(wid).bind(user).bind(w).bind(n).bind(anon).execute(&mut *tx).await.unwrap();
+    points::post(&mut tx, w, -n, points::Entry::contribution("pledge", cid))
+        .await
+        .unwrap();
     let (pledged, target): (i64, i64) = sqlx::query_as("UPDATE wishlist_items SET pledged_points = pledged_points + $2 WHERE id = $1 RETURNING pledged_points, target_points")
         .bind(item).bind(n).fetch_one(&mut *tx).await.unwrap();
     if pledged == target {

@@ -82,6 +82,12 @@ async fn wallet_and_ledger_enforce_nonnegative_balance_and_append_only(pool: PgP
     .await
     .unwrap();
     let ledger: Uuid = sqlx::query_scalar("INSERT INTO point_ledger(wallet_id,delta,balance_after,entry_type,note) VALUES ($1,100,100,'grant','Initial') RETURNING id").bind(wallet).fetch_one(&pool).await.unwrap();
+    // 舊資料錢包：餘額由「舊資料批次」支撐（source_ref_id = wallet id，ledger 無 lot_id）
+    sqlx::query("INSERT INTO point_lots(wallet_id,source,source_ref_id,original_points,remaining_points,cash_refundable) VALUES ($1,'adjustment',$1,100,100,false)")
+        .bind(wallet)
+        .execute(&pool)
+        .await
+        .unwrap();
     rejected(
         sqlx::query("UPDATE point_wallets SET balance=-1 WHERE id=$1")
             .bind(wallet)

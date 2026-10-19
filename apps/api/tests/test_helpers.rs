@@ -110,11 +110,16 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
     let result = pledge(&test_app(&pool), cf, &operator.token, 30).await;
     assert_eq!(result.0, axum::http::StatusCode::CREATED, "{}", result.2);
     assert_eq!(balance(&pool, operator.id).await, 70);
-    sqlx::query("UPDATE point_wallets SET balance=71 WHERE user_id=$1")
-        .bind(operator.id)
-        .execute(&pool)
-        .await
-        .unwrap();
+    // 以多一列無批次的 ledger 製造「balance 與 ledger 加總不一致」（批次加總仍等於 balance）；帳本只增不改，之後再補一列沖回
+    let stray = |delta: i64, after: i64| {
+        let pool = pool.clone();
+        let user = operator.id;
+        async move {
+            sqlx::query("INSERT INTO point_ledger (wallet_id, delta, balance_after, entry_type, ref_type) SELECT id, $2, $3, 'adjustment', 'manual' FROM point_wallets WHERE user_id = $1")
+                .bind(user).bind(delta).bind(after).execute(&pool).await.unwrap();
+        }
+    };
+    stray(1, 71).await;
     let check = pool.clone();
     assert!(
         tokio::spawn(async move { assert_points_reconciled(&check).await })
@@ -122,11 +127,7 @@ async fn fixtures_preserve_options_quantities_and_reconcile_domain_state(pool: P
             .expect_err("wallet reconciliation accepted a drifted balance")
             .is_panic()
     );
-    sqlx::query("UPDATE point_wallets SET balance=70 WHERE user_id=$1")
-        .bind(operator.id)
-        .execute(&pool)
-        .await
-        .unwrap();
+    stray(-1, 70).await;
     sqlx::query("UPDATE wishlist_items SET pledged_points=31 WHERE id=$1")
         .bind(cf)
         .execute(&pool)
