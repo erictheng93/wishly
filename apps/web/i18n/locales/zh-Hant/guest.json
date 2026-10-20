@@ -242,6 +242,69 @@
     "grantErr": {
       "points": "點數需為非 0 的整數（扣點用負數）",
       "max": "單次上限 1,000,000 點"
+    },
+    "inspire": {
+      "seoTitle": "選物靈感 {'|'} Wishly",
+      "seoDesc": "Wishly 精選送禮靈感，依對象、場合與預算挑選，一鍵加到你的願望清單。",
+      "heading": "選物靈感",
+      "recipient": "對象",
+      "occasion": "場合",
+      "budget": "預算",
+      "all": "不限",
+      "b": {
+        "lt1000": "NT$1,000 以下",
+        "1000-3000": "NT$1,000–3,000",
+        "gt3000": "NT$3,000 以上"
+      },
+      "empty": "沒有符合條件的商品，換個條件試試",
+      "add": "加到我的願望清單",
+      "view": "看商品",
+      "pickTitle": "加到哪一份清單？",
+      "loading": "載入清單中…",
+      "noLists": "你還沒有可加入的清單",
+      "create": "建立清單",
+      "loadErr": "清單載入失敗，請稍後再試",
+      "who": "誰想要這個",
+      "whoTitle": "誰想要這個",
+      "scope": {
+        "all": "全部",
+        "public": "公開",
+        "friends": "朋友",
+        "selected": "摯友"
+      },
+      "loginHint": "登入後可看到朋友與摯友的心願",
+      "whoEmpty": "目前沒有人把這個加進心願",
+      "whoErr": "載入失敗，請稍後再試",
+      "retry": "重試",
+      "left": "還差 {n} 份",
+      "done": "已送齊",
+      "gift": "去送這個",
+      "r": {
+        "partner": "伴侶",
+        "elder": "長輩",
+        "baby": "寶寶",
+        "friend": "朋友"
+      },
+      "o": {
+        "birthday": "生日",
+        "full_month": "彌月",
+        "housewarming": "喬遷",
+        "holiday": "節慶"
+      },
+      "soonTitle": "精選商品即將上架",
+      "soonBody": "我們正在挑選值得送的好物，敬請期待。"
+    },
+    "brands": {
+      "seoTitle": "品牌館 {'|'} Wishly",
+      "seoDesc": "Wishly 品牌館：瀏覽合作品牌與其精選商品，一鍵加到你的願望清單。",
+      "heading": "品牌館",
+      "soonTitle": "品牌館即將開幕",
+      "soonBody": "合作品牌陸續進駐中，敬請期待。",
+      "brandTitle": "{name} {'|'} Wishly 品牌館",
+      "notFound": "找不到這個品牌",
+      "back": "回品牌館",
+      "website": "品牌官網",
+      "noProducts": "這個品牌的商品即將上架"
     }
   }
 }

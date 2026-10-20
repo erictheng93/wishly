@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ open: boolean; wishlistId: string; item: any | null }>()
+const props = defineProps<{ open: boolean; wishlistId: string; item: any | null; prefill?: Record<string, any> }>()
 const emit = defineEmits<{ close: []; saved: []; reload: []; address: [] }>()
 const { api } = useApi()
 const { t: tr } = useI18n()
@@ -14,7 +14,8 @@ const crowd = computed(() => f.funding_mode === 'crowdfund')
 watch(() => props.open, (v) => {
   if (!v) return
   const i = props.item
-  Object.assign(f, { title: i?.title ?? '', brand: i?.brand ?? '', spec: i?.spec ?? '', product_url: i?.product_url ?? '', qty_needed: i?.qty_needed ?? 1, unit_price_amount: i?.unit_price_amount ?? '', priority: i?.priority ?? 'medium',
+  const p = i ? {} : props.prefill ?? {} // 預填只用於新增
+  Object.assign(f, { title: i?.title ?? p.title ?? '', brand: i?.brand ?? p.brand ?? '', spec: i?.spec ?? p.spec ?? '', product_url: i?.product_url ?? p.product_url ?? '', qty_needed: i?.qty_needed ?? 1, unit_price_amount: i?.unit_price_amount ?? p.unit_price_amount ?? '', priority: i?.priority ?? 'medium',
     funding_mode: i?.funding_mode === 'crowdfund' ? 'crowdfund' : 'quantity', target_points: i?.target_points ?? '', funding_deadline: toTaipeiInput(i?.funding_deadline), price_snapshot_amount: i?.price_snapshot_amount ?? i?.unit_price_amount ?? '' })
   imageKey.value = null; err.value = ''; stale.value = false; needAddr.value = false; version.value = i?.updated_at ?? null
 })
@@ -36,6 +37,7 @@ async function save() {
   }
   if (!props.item || f.funding_mode !== (props.item.funding_mode ?? 'quantity')) body.funding_mode = f.funding_mode
   if (imageKey.value) body.image_key = imageKey.value
+  if (!props.item && props.prefill?.catalog_ref) body.catalog_ref = props.prefill.catalog_ref // 僅新增
   busy.value = true
   try {
     if (props.item) {

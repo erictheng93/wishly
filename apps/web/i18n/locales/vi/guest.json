@@ -242,6 +242,69 @@
     "grantErr": {
       "points": "Số điểm phải là số nguyên khác 0 (dùng số âm để trừ)",
       "max": "Tối đa 1.000.000 điểm mỗi lần"
+    },
+    "inspire": {
+      "seoTitle": "Gợi ý quà tặng {'|'} Wishly",
+      "seoDesc": "Quà tặng tuyển chọn theo người nhận, dịp và ngân sách. Thêm vào danh sách ước nguyện chỉ với một chạm.",
+      "heading": "Gợi ý quà tặng",
+      "recipient": "Người nhận",
+      "occasion": "Dịp",
+      "budget": "Ngân sách",
+      "all": "Tất cả",
+      "b": {
+        "lt1000": "Dưới NT$1.000",
+        "1000-3000": "NT$1.000–3.000",
+        "gt3000": "Từ NT$3.000"
+      },
+      "empty": "Không có sản phẩm phù hợp. Hãy thử bộ lọc khác.",
+      "add": "Thêm vào danh sách của tôi",
+      "view": "Xem sản phẩm",
+      "pickTitle": "Thêm vào danh sách nào?",
+      "loading": "Đang tải danh sách…",
+      "noLists": "Bạn chưa có danh sách nào để thêm",
+      "create": "Tạo danh sách",
+      "loadErr": "Không tải được danh sách. Vui lòng thử lại.",
+      "who": "Ai muốn món này",
+      "whoTitle": "Ai muốn món này",
+      "scope": {
+        "all": "Tất cả",
+        "public": "Công khai",
+        "friends": "Bạn bè",
+        "selected": "Bạn thân"
+      },
+      "loginHint": "Đăng nhập để xem điều ước của bạn bè và bạn thân.",
+      "whoEmpty": "Chưa có ai ước món này",
+      "whoErr": "Tải thất bại, vui lòng thử lại sau.",
+      "retry": "Thử lại",
+      "left": "Còn thiếu {n}",
+      "done": "Đã đủ quà",
+      "gift": "Tặng món này",
+      "r": {
+        "partner": "Người yêu",
+        "elder": "Người lớn tuổi",
+        "baby": "Em bé",
+        "friend": "Bạn bè"
+      },
+      "o": {
+        "birthday": "Sinh nhật",
+        "full_month": "Đầy tháng",
+        "housewarming": "Tân gia",
+        "holiday": "Lễ hội"
+      },
+      "soonTitle": "Sản phẩm tuyển chọn sắp ra mắt",
+      "soonBody": "Chúng tôi đang chọn những món quà đáng tặng. Hãy quay lại sớm nhé."
+    },
+    "brands": {
+      "seoTitle": "Thương hiệu {'|'} Wishly",
+      "seoDesc": "Gian hàng thương hiệu Wishly: xem thương hiệu đối tác và sản phẩm tuyển chọn, thêm vào danh sách ước nguyện chỉ một chạm.",
+      "heading": "Thương hiệu",
+      "soonTitle": "Gian hàng thương hiệu sắp khai trương",
+      "soonBody": "Các thương hiệu đối tác đang dần tham gia. Hãy quay lại sớm nhé.",
+      "brandTitle": "{name} {'|'} Thương hiệu Wishly",
+      "notFound": "Không tìm thấy thương hiệu này",
+      "back": "Về gian hàng thương hiệu",
+      "website": "Trang web thương hiệu",
+      "noProducts": "Sản phẩm của thương hiệu này sắp ra mắt"
     }
   }
 }

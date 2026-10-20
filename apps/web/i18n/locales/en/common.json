@@ -18,6 +18,8 @@
       "dark": "Dark",
       "label": "Theme: {mode} (tap to switch)",
       "title": "Theme: {mode}"
-    }
+    },
+    "inspire": "Inspiration",
+    "brands": "Brands"
   }
 }

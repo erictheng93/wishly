@@ -8,7 +8,7 @@ const { api } = useApi()
 const w = ref<any>(null)
 const items = ref<any[]>([])
 const loading = ref(true), err = ref(''), msg = ref(''), stale = ref(false)
-const sheet = ref(false), editing = ref<any>(null)
+const sheet = ref(false), editing = ref<any>(null), prefill = ref<ItemPrefill>({})
 const del = ref<any>(null), delBusy = ref(false), delErr = ref('')
 const pubBusy = ref(false), pubErrs = ref<string[]>([])
 const external = ref(false), copied = ref(false), showShare = ref(false)
@@ -30,7 +30,13 @@ async function load(quiet = false) {
   clearTimeout(poll)
   if (items.value.some(i => i.image_status === 'pending')) poll = setTimeout(() => load(true), 4000) // 圖片處理中輪詢
 }
-onMounted(() => load())
+onMounted(async () => {
+  await load()
+  // 靈感頁連結帶 ?add=1 開啟新增；開完即清掉 query，重整/返回不再重開
+  if (!route.query.add || !w.value) return // 載入失敗時保留 query，重整可再試
+  if (route.query.add === '1' && !closed.value) openItem(null, sanitizeItemPrefill(route.query))
+  navigateTo({ path: route.path, query: {} }, { replace: true })
+})
 onBeforeUnmount(() => clearTimeout(poll))
 
 const hidden = computed(() => w.value?.moderation_status === 'hidden')
@@ -39,7 +45,7 @@ const shareUrl = computed(() => {
   const u = w.value.share_url || `${siteOrigin()}/s/${w.value.slug}`
   return external.value ? u + '?openExternalBrowser=1' : u
 })
-function openItem(i: any = null) { editing.value = i; sheet.value = true }
+function openItem(i: any = null, p: ItemPrefill = {}) { editing.value = i; prefill.value = p; sheet.value = true }
 async function saved() { sheet.value = false; await load(true) }
 async function patchList(body: any, ok = t('lists.edit.saved')) {
   msg.value = ''; err.value = ''; stale.value = false
@@ -163,7 +169,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       </div></div>
     </template>
 
-    <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
+    <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
     <CreatorConfirm :open="!!del" :title="$t('lists.edit.delTitle')" :text="$t('lists.edit.delText', { title: del?.title })" :ok="del?.force ? $t('lists.edit.delForce') : $t('lists.edit.delOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
     <CreatorSheet :open="showShare" :title="$t('lists.edit.shareTitle')" @close="showShare = false">
       <p v-if="w?.status === 'draft'" class="c-err">{{ $t('lists.edit.draftWarn') }}</p>

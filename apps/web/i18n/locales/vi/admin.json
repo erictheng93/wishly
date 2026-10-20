@@ -28,7 +28,8 @@
         "analytics": "Phân tích dữ liệu",
         "cashRefunds": "Hoàn tiền mặt",
         "walletDebts": "Nợ do chargeback",
-        "topups": "Nạp điểm và tranh chấp"
+        "topups": "Nạp điểm và tranh chấp",
+        "catalog": "Thương hiệu & sản phẩm"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
@@ -433,6 +434,46 @@
       },
       "notApplied": "Đơn nạp này đã đổi trạng thái nên không có thao tác nào được thực hiện ({name}, NT$ {amount}).",
       "stale": "Trạng thái đơn nạp này không cho phép thao tác đó. Danh sách đã được tải lại."
+    },
+    "catalog": {
+      "title": "Thương hiệu & sản phẩm tuyển chọn",
+      "tabsLabel": "Thương hiệu hoặc sản phẩm",
+      "tab": {
+        "brands": "Thương hiệu",
+        "products": "Sản phẩm"
+      },
+      "newBrand": "Thêm thương hiệu",
+      "newProduct": "Thêm sản phẩm",
+      "loading": "Đang tải…",
+      "emptyBrands": "Chưa có thương hiệu",
+      "emptyProducts": "Chưa có sản phẩm",
+      "on": "Đang bán",
+      "off": "Đã ẩn",
+      "edit": "Sửa",
+      "loadMore": "Tải thêm",
+      "saved": "Đã lưu",
+      "curated": "Wishly tuyển chọn",
+      "allBrands": "Tất cả thương hiệu",
+      "brand": "Thương hiệu",
+      "logoStatus": "Trạng thái logo: {s}",
+      "imageStatus": "Trạng thái ảnh: {s}",
+      "brandForm": "Thương hiệu",
+      "productForm": "Sản phẩm",
+      "slug": "Slug (không đổi được sau khi tạo)",
+      "name": "Tên",
+      "description": "Mô tả",
+      "website": "URL trang web",
+      "ref": "Mã sản phẩm (ref, không đổi được sau khi tạo)",
+      "productTitle": "Tên sản phẩm",
+      "spec": "Quy cách",
+      "note": "Ghi chú",
+      "price": "Giá (NT$)",
+      "productUrl": "Liên kết sản phẩm",
+      "sort": "Thứ tự (nhỏ trước)",
+      "active": "Đang hoạt động",
+      "cancel": "Hủy",
+      "save": "Lưu",
+      "saving": "Đang lưu…"
     }
   }
 }

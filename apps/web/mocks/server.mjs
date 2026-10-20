@@ -43,6 +43,16 @@ const adminTopups = [
   { id: 'tpd-d', amount: 800, method: 'card', status: 'charged_back', provider: 'ecpay', provider_txn_id: 'T0005', created_at: iso(-200 * 36e5), paid_at: iso(-199 * 36e5), user: usr(16, '已拒付戊'), wallet: { id: 'w16', status: 'frozen' } },
 ]
 
+const brandList = [
+  { slug: 'pigeon', name: 'Pigeon 貝親', description: '日本母嬰用品品牌，奶瓶與清潔系列。', logo_url: null, website_url: 'https://example.com' },
+  { slug: 'muji', name: '無印良品', description: '簡約生活選物。', logo_url: null, website_url: 'https://example.com' },
+]
+const catalog = Array.from({ length: 30 }, (_, i) => ({
+  ref: 'mock-' + i, title: `精選好物 ${i + 1}`, spec: i % 2 ? '米白 / M' : null, note: '編輯推薦，送禮不踩雷。', price_amount: [480, 1200, 3600][i % 3], image_url: null, product_url: 'https://example.com/p' + i,
+  recipients: [['baby', 'friend', 'partner', 'elder'][i % 4]], occasions: [['birthday', 'full_month', 'housewarming', 'holiday'][i % 4]],
+  brand: i % 3 === 2 ? null : { slug: brandList[i % 2].slug, name: brandList[i % 2].name },
+}))
+
 const send = (res, st, body, type = 'application/json') => { res.writeHead(st, { 'content-type': type }); res.end(body === undefined ? '' : JSON.stringify(body)) }
 const err = (res, st, code, detail, extra = {}) => send(res, st, { type: 'about:blank', title: code, status: st, code, detail, ...extra }, 'application/problem+json')
 const claimOut = c => ({ id: c.id, item_id: c.item_id, qty: c.qty, status: c.status, claimer_name: c.name, note: c.note, expires_at: null, created_at: c.at, updated_at: c.at, purchased_at: null, delivered_at: null, cancelled_at: null })
@@ -59,6 +69,18 @@ http.createServer(async (req, res) => {
   let m
   console.log(req.method, p)
 
+  // 商品目錄 / 品牌館（公開）：?brand= 的 slug 不存在的品牌回 404；MOCK_EMPTY_CATALOG=1 看空狀態
+  if (p === '/public/catalog/products') {
+    const q = u.searchParams, page = +(q.get('page') ?? 1)
+    const band = x => ({ lt1000: x < 1000, '1000-3000': x >= 1000 && x <= 3000, gt3000: x > 3000 })
+    const all = process.env.MOCK_EMPTY_CATALOG ? [] : catalog.filter(x => (!q.get('brand') || x.brand?.slug === q.get('brand')) && (!q.get('recipient') || x.recipients.includes(q.get('recipient'))) && (!q.get('occasion') || x.occasions.includes(q.get('occasion'))) && (!q.get('budget') || band(x.price_amount)[q.get('budget')]))
+    return send(res, 200, { products: all.slice((page - 1) * 24, page * 24), next_page: all.length > page * 24 ? page + 1 : null })
+  }
+  if (p === '/public/brands') return send(res, 200, { brands: process.env.MOCK_EMPTY_CATALOG ? [] : brandList.map(({ website_url, ...b }) => b) })
+  if ((m = p.match(/^\/public\/brands\/([^/]+)$/))) {
+    const b = brandList.find(x => x.slug === m[1])
+    return b ? send(res, 200, { brand: b }) : err(res, 404, 'NOT_FOUND', '找不到')
+  }
   if (p === '/public/wishlists') {
     const page = +(u.searchParams.get('page') ?? 1), ty = u.searchParams.get('type')
     const all = Array.from({ length: 30 }, (_, i) => ({ slug: i ? `demo${i}` : 'demo', title: `公開清單 ${i + 1}`, type: i % 3 ? 'registry' : 'relief', cover_image_url: null, event_date: null, owner: { display_name: '小愛', handle: 'xiaoai' }, item_count: 3, completion_pct: (i * 7) % 100 })).filter(w => !ty || w.type === ty)

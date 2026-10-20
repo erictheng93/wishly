@@ -3,6 +3,7 @@ pub mod account;
 pub mod admin;
 pub mod auth;
 pub mod auth_ext;
+pub mod catalog;
 pub mod cdn;
 pub mod claims;
 pub mod config;
@@ -14,6 +15,7 @@ pub mod guest;
 pub mod health;
 pub mod idempotency;
 pub mod identities;
+pub mod inspire;
 pub mod notify;
 pub mod orders;
 pub mod points;
@@ -63,6 +65,8 @@ pub fn app(state: AppState) -> Router {
                 .merge(security::routes())
                 .merge(topup::routes())
                 .merge(friends::routes())
+                .merge(inspire::routes())
+                .merge(catalog::routes())
                 .merge(profiles::routes()),
         )
         .layer(axum::middleware::from_fn_with_state(
