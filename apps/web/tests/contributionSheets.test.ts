@@ -41,7 +41,7 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
-it('signed-in claim has no nickname/contact/email fields and sends only qty, note and visibility', async () => {
+it('signed-in claim has no nickname/contact/email fields and sends only qty, note, visibility and anonymity', async () => {
   const request = deferred(); api.mockReturnValue(request.promise)
   const el = claim(null, true, '阿明')
   expect(el.querySelector('#cn, #cc, #ce')).toBeNull()
@@ -49,12 +49,13 @@ it('signed-in claim has no nickname/contact/email fields and sends only qty, not
   const plus = el.querySelector<HTMLButtonElement>('button[aria-label="增加"]')!
   plus.click(); await nextTick(); plus.click(); await nextTick()
   expect(plus.disabled).toBe(true)
+  el.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); await nextTick()
   await submit(el)
   expect(el.querySelector<HTMLButtonElement>('button.g-btn')!.disabled).toBe(true)
   expect(el.textContent).toContain('送出中')
   expect(api.mock.calls[0]).toEqual(['/items/item/claims', {
     method: 'POST', headers: { 'Idempotency-Key': 'claim-key' }, keepToken: true,
-    body: { qty: 3, note: undefined, visibility: 'private' }, // 帶入帳號預設可見性
+    body: { qty: 3, note: undefined, visibility: 'private', is_anonymous: true }, // 帶入帳號預設可見性
   }])
   request.resolve({ id: 'claim' }); await flush()
   expect(done).toHaveBeenCalledWith({ id: 'claim' })

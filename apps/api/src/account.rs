@@ -129,7 +129,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
         "SELECT jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title, 'type', w.type::text, 'status', w.status::text,
            'event_date', w.event_date, 'surprise_mode', w.surprise_mode, 'created_at', w.created_at,
            'items', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', i.id, 'title', i.title, 'qty_needed', i.qty_needed,
-               'qty_claimed', CASE WHEN w.surprise_mode AND w.event_date IS NOT NULL AND now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei') THEN NULL ELSE i.qty_claimed END)
+               'qty_claimed', CASE WHEN surprise_locked(w.surprise_mode, w.event_date) THEN NULL ELSE i.qty_claimed END)
                ORDER BY i.sort_order, i.id), '[]'::jsonb) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL))
          FROM wishlists w WHERE w.owner_id = $1 AND w.deleted_at IS NULL ORDER BY w.id").bind(u.id).fetch_all(&st.pool).await?;
     let claims: Vec<Value> = sqlx::query_scalar(

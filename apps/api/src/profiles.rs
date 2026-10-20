@@ -104,14 +104,14 @@ async fn profile(
         .collect();
 
     // 捐助 = 捐助 ∪ 點數認捐。可見性（$3=本人、$4=與捐助者為好友，與 access::claim_visible 同語意）：
-    //   捐助看 c.visibility；認捐看 k.visibility，且匿名認捐只給本人看（不能從個人頁反推匿名者）。
+    //   捐助看 c.visibility、認捐看 k.visibility，且兩者的匿名紀錄都只給本人看（不能從個人頁反推匿名者）。
     // 清單條件兩者共用：對觀看者可存取（public；friends/selected 依觀看者或擁有者）、排除驚喜鎖定。
     let rows: Vec<Donation> = sqlx::query_as(
         "WITH d AS (
            SELECT 'claim' AS kind, c.id, c.item_id, c.qty, NULL::bigint AS points, c.status::text AS status, c.created_at
            FROM claims c
            WHERE c.user_id = $1 AND c.status IN ('reserved', 'purchased', 'delivered')
-             AND (c.visibility::text = 'public' OR $3 OR (c.visibility::text = 'friends' AND $4))
+             AND ($3 OR (NOT c.is_anonymous AND (c.visibility::text = 'public' OR (c.visibility::text = 'friends' AND $4))))
            UNION ALL
            SELECT 'pledge', k.id, k.item_id, NULL, k.points, k.status::text, k.created_at
            FROM contributions k
@@ -124,7 +124,7 @@ async fn profile(
          JOIN wishlists w ON w.id = i.wishlist_id
          JOIN users o ON o.id = w.owner_id
          WHERE w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
-           AND NOT (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')))
+           AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND (w.visibility::text = 'public'
                 OR w.owner_id = $2
                 OR (w.visibility::text = 'friends' AND $2::uuid IS NOT NULL

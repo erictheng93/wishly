@@ -16,11 +16,12 @@ const editing = !!props.mine
 const max = ref(props.loggedInName ? props.item.qty_remaining + (props.mine?.qty ?? 0) : (props.mine?.qty ?? 0))
 const qty = ref(Math.min(props.mine?.qty ?? 1, max.value))
 const note = ref(props.mine?.note ?? '')
+const anon = ref(false)
 const busy = ref(false)
 const msg = ref('')
 const errs = ref<Record<string, string>>({})
 const note0 = note.value
-const dirty = computed(() => note.value !== note0)
+const dirty = computed(() => note.value !== note0 || anon.value)
 
 async function submit() {
   errs.value = {}; msg.value = ''
@@ -32,7 +33,7 @@ async function submit() {
     } else {
       r = await api(`/items/${props.item.id}/claims`, {
         method: 'POST', headers: { 'Idempotency-Key': key }, keepToken: true,
-        body: { qty: qty.value, note: note.value || undefined, visibility: vis.value },
+        body: { qty: qty.value, note: note.value || undefined, visibility: vis.value, is_anonymous: anon.value },
       })
     }
     emit('done', r)
@@ -73,6 +74,7 @@ async function submit() {
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
       <template v-if="!editing">
         <p class="g-mute">{{ $t('guest.claim.asUser', { name: loggedInName }) }}</p>
+        <label class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.claim.anon') }}</label>
         <template v-if="vis">
           <label for="cv">{{ $t('guest.claim.visLabel') }}</label>
           <select id="cv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option></select>

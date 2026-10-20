@@ -27,9 +27,8 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .fetch_one(&pool)
         .await
         .unwrap();
-    wishly_api::notify::enqueue_claim(&pool, wishlist)
-        .await
-        .unwrap();
+    sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1, 'email', 'event.reminder', jsonb_build_object('wishlist_id', $2::uuid))")
+        .bind(owner).bind(wishlist).execute(&pool).await.unwrap();
     assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 1);
     assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 0);
     let state: (String, i16, bool, Option<String>) = sqlx::query_as("SELECT status::text,attempts,sent_at IS NOT NULL,last_error FROM notifications WHERE user_id=$1").bind(owner).fetch_one(&pool).await.unwrap();
@@ -81,7 +80,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
     assert_eq!(message["To"][0]["Address"], email);
     assert_eq!(
         message["Subject"],
-        "【Wishly】《SMTP integration wishlist》有 1 件新捐助"
+        "【Wishly】《SMTP integration wishlist》活動日快到了"
     );
     let base = std::env::var("MAILPIT_API_BASE").unwrap_or_else(|_| "http://localhost:8025".into());
     let body: Value = client
@@ -99,7 +98,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .await
         .unwrap();
     let text = body["Text"].as_str().unwrap();
-    assert!(text.contains("有 1 件新捐助"));
+    assert!(text.contains("活動日即將到來"));
     assert!(text.contains("/api/v1/unsubscribe?token="));
     assert!(!text.contains("Secret Gift") && !text.contains("Secret Owner"));
     let payload: Value = sqlx::query_scalar("SELECT payload FROM notifications WHERE user_id=$1")
@@ -107,6 +106,6 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(payload, json!({"wishlist_id":wishlist,"count":1}));
+    assert_eq!(payload, json!({"wishlist_id":wishlist}));
     common::assert_all_reconciled(&pool).await;
 }

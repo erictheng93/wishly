@@ -29,7 +29,7 @@ pub fn routes() -> Router<AppState> {
 
 /// claims 以別名 `c` 查詢
 pub const CLAIM_COLS: &str = "c.id, c.item_id, c.qty, c.status::text AS status, c.claimer_name, c.note, c.expires_at,
-    c.created_at, c.updated_at, c.purchased_at, c.delivered_at, c.cancelled_at, c.visibility::text AS visibility";
+    c.created_at, c.updated_at, c.purchased_at, c.delivered_at, c.cancelled_at, c.visibility::text AS visibility, c.is_anonymous";
 
 #[derive(FromRow, Serialize)]
 pub struct ClaimRow {
@@ -47,6 +47,7 @@ pub struct ClaimRow {
     pub cancelled_at: Option<DateTime<Utc>>,
     /// 登入者捐助的公開層級（public/friends/private）；舊訪客捐助為 null
     pub visibility: Option<String>,
+    pub is_anonymous: bool,
 }
 
 /// trim + 字元驗證；空（含只有零寬字元）→ None
@@ -117,6 +118,7 @@ struct CreateReq {
     qty: i32,
     note: Option<String>,
     visibility: Option<String>,
+    is_anonymous: Option<bool>,
 }
 
 pub(crate) fn share_level(v: &Option<String>) -> Result<(), AppError> {
@@ -232,11 +234,12 @@ async fn create(
     };
 
     let ins = sqlx::query_as::<_, ClaimRow>(&format!(
-        "INSERT INTO claims AS c (item_id, user_id, claimer_name, qty, note, expires_at, visibility)
-         VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + $6::int * interval '1 hour' END, $7::text::share_level)
+        "INSERT INTO claims AS c (item_id, user_id, claimer_name, qty, note, expires_at, visibility, is_anonymous)
+         VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + $6::int * interval '1 hour' END, $7::text::share_level, $8)
          RETURNING {CLAIM_COLS}"))
         .bind(item_id).bind(me.id).bind(&name).bind(req.qty).bind(&req.note).bind(ttl)
         .bind(req.visibility.as_deref()) // NULL 時由 trigger 套帳號預設
+        .bind(req.is_anonymous.unwrap_or(false))
         .fetch_one(&mut *tx).await;
     let claim = match ins {
         Ok(c) => c,
@@ -266,7 +269,6 @@ async fn create(
     let resp = json!({ "claim": claim, "item": item_json(item_id, needed, claimed) });
     idempotency::finish(&mut tx, &scope, key, 201, &resp).await?;
     let wid = wishlist_of(&mut tx, item_id).await?;
-    crate::notify::enqueue_claim(&mut *tx, wid).await?;
     crate::dashboard::notify(&mut *tx, wid).await?;
     tx.commit().await?;
     Ok(json_resp(201, &resp, false))
@@ -429,7 +431,7 @@ async fn apply(
         bool,
     ) = sqlx::query_as(
         "SELECT i.qty_needed, i.qty_claimed, w.status::text, w.owner_id,
-                (w.surprise_mode AND w.event_date IS NOT NULL AND now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')),
+                surprise_locked(w.surprise_mode, w.event_date),
                 w.visibility::text, w.moderation_status::text = 'hidden',
                 (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now())
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id

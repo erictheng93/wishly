@@ -1,6 +1,6 @@
-//! Email 通知 outbox：捐助模組呼叫 `enqueue_claim`（寫 notifications，docs/04 4.10），
+//! Email 通知 outbox（寫 notifications，docs/04 4.10），
 //! 背景 worker `spawn_worker` 輪詢到期通知，經 SMTP（預設 Mailpit localhost:1025）寄出。
-//! 內容刻意不含品項與捐助者，只寫「有 N 件新捐助」，所以驚喜模式下天然不洩漏。
+//! 不通知受捐者「有新捐助」（0026 移除 claim.created / claim.digest）：會轟炸收件匣，也破壞驚喜。
 use crate::config::Config;
 use lettre::{
     message::header::ContentType, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -9,31 +9,6 @@ use serde_json::Value;
 use sqlx::PgPool;
 use std::time::Duration;
 use uuid::Uuid;
-
-/// 捐助成功的同一交易內呼叫：第一筆即時 claim.created；之後合併為每日台北 09:00 的 claim.digest（count 累加）。
-/// 建立者關閉 email_claims 或已刪除則不寫。
-pub async fn enqueue_claim<'e, E: sqlx::PgExecutor<'e>>(
-    ex: E,
-    wishlist_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO notifications (user_id, channel, kind, payload, scheduled_at)
-         SELECT u.id, 'email',
-                CASE WHEN f.first THEN 'claim.created' ELSE 'claim.digest' END,
-                jsonb_build_object('wishlist_id', w.id, 'count', 1),
-                CASE WHEN f.first THEN now() ELSE
-                  ((date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') + interval '9 hours'
-                    + CASE WHEN (now() AT TIME ZONE 'Asia/Taipei')::time >= time '09:00' THEN interval '1 day' ELSE interval '0' END)
-                   AT TIME ZONE 'Asia/Taipei') END
-           FROM wishlists w JOIN users u ON u.id = w.owner_id,
-                LATERAL (SELECT NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = u.id AND n.kind = 'claim.created'
-                                              AND n.payload->>'wishlist_id' = w.id::text) AS first) f
-          WHERE w.id = $1 AND u.deleted_at IS NULL AND COALESCE((u.notification_prefs->>'email_claims')::boolean, true)
-         ON CONFLICT (user_id, kind, (payload->>'wishlist_id')) WHERE kind = 'claim.digest' AND status = 'pending'
-         DO UPDATE SET payload = jsonb_set(notifications.payload, '{count}', to_jsonb((notifications.payload->>'count')::int + 1))")
-        .bind(wishlist_id).execute(ex).await?;
-    Ok(())
-}
 
 /// 眾籌（P2-A）：通知某品項的捐贈者（status in `statuses` 的認捐，每人一封）。
 /// kind：crowdfund.funded / order.shipped / order.delivered / order.failed / funding.expired。
@@ -317,7 +292,6 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         );
     }
-    let n = payload.get("count").and_then(Value::as_i64).unwrap_or(1);
     let base = app;
     let manage = match payload.get("recovery_token").and_then(Value::as_str) {
         Some(t) => format!("{base}/me/claims#r={t}"),
@@ -376,22 +350,6 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("清單《{title}》的建立者移除了「{item}」（或封存了清單），你捐出的點數已退回錢包。\n查看我的點數：{wallet}\n"),
                 format!("The owner of list \"{title}\" removed \"{item}\" (or archived the list), and the points you contributed have been refunded to your wallet.\nView my points: {wallet}\n"),
                 format!("Chủ danh sách \"{title}\" đã gỡ \"{item}\" (hoặc lưu trữ danh sách), điểm bạn đã đóng góp đã được hoàn vào ví.\nXem điểm của tôi: {wallet}\n"),
-            ),
-        ),
-        "claim.digest" => (
-            l.pick(format!("【Wishly】《{title}》今日有 {n} 件新捐助"), format!("[Wishly] \"{title}\" has {n} new pledge(s) today"), format!("[Wishly] \"{title}\" hôm nay có {n} đóng góp mới")),
-            l.pick(
-                format!("你的清單《{title}》今日彙整：有 {n} 件新捐助。\n登入查看：{base}/dashboard\n"),
-                format!("Today's summary for your list \"{title}\": {n} new pledge(s).\nSign in to view: {base}/dashboard\n"),
-                format!("Tổng hợp hôm nay của danh sách \"{title}\": có {n} đóng góp mới.\nĐăng nhập để xem: {base}/dashboard\n"),
-            ),
-        ),
-        "claim.created" => (
-            l.pick(format!("【Wishly】《{title}》有 {n} 件新捐助"), format!("[Wishly] \"{title}\" has {n} new pledge(s)"), format!("[Wishly] \"{title}\" có {n} đóng góp mới")),
-            l.pick(
-                format!("你的清單《{title}》有 {n} 件新捐助。\n登入查看：{base}/dashboard\n"),
-                format!("Your list \"{title}\" has {n} new pledge(s).\nSign in to view: {base}/dashboard\n"),
-                format!("Danh sách \"{title}\" của bạn có {n} đóng góp mới.\nĐăng nhập để xem: {base}/dashboard\n"),
             ),
         ),
         "claim.confirmation" => (

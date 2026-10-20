@@ -2134,7 +2134,10 @@ UPDATE claims SET claimer_name = '已刪除的訪客' WHERE guest_id = $1;
 UPDATE notifications SET status = 'cancelled' WHERE guest_id = $1 AND status = 'pending';
 -- 之後帶該 token 的請求 → 401（應用層檢查 guests.deleted_at IS NOT NULL）
 
--- 4.10 MVP Email 通知（D39）：捐助成功交易內寫入 notifications（outbox）
+-- 4.10 MVP Email 通知（D39）：【已停用，D58】不再通知受捐者「有新捐助」（轟炸收件匣、破壞驚喜），以下為歷史設計
+--   D58 同時新增 claims.is_anonymous（比照 contributions，公開頁顯示「匿名」、受捐者頁顯示「匿名朋友」），
+--   驚喜鎖定判斷集中為 SQL 函式 surprise_locked(surprise_mode, event_date)，event_date 為 NULL 視為鎖定（migration 0026）
+--   捐助成功交易內寫入 notifications（outbox）
 --   第一筆即時（claim.created）；之後每日彙整一封（claim.digest，累加 count）；驚喜模式內容只寫「有 N 件新捐助」
 --   $1 = wishlist_id  $2 = 下一個台北 09:00 的 timestamptz
 INSERT INTO notifications (user_id, channel, kind, payload, scheduled_at)
@@ -2735,7 +2738,8 @@ data: {"status":"active","title":"小米與阿嘉的寶寶迎接清單","complet
 Authorization: Bearer &lt;session_token&gt;（原生殼；網頁用 ws_session cookie）</code></pre><h5>Request body</h5><pre><code>{
   "qty": 3,
   "note": "週末前寄到",
-  "visibility": "friends"
+  "visibility": "friends",
+  "is_anonymous": false
 }</code></pre><h5>Response 201</h5><pre><code>Location: /api/v1/claims/0192f3b2-4d21-7e4c-a1b2-3c4d5e6f7a01</code></pre><pre><code>{
   "claim": {
     "id": "0192f3b2-4d21-7e4c-a1b2-3c4d5e6f7a01",
@@ -2750,7 +2754,8 @@ Authorization: Bearer &lt;session_token&gt;（原生殼；網頁用 ws_session c
     "purchased_at": null,
     "delivered_at": null,
     "cancelled_at": null,
-    "visibility": "friends"
+    "visibility": "friends",
+    "is_anonymous": false
   },
   "item": { "id": "0192f3a1-0a11-7c3b-8e5f-2b3c4d5e6f01", "qty_needed": 10, "qty_claimed": 7, "qty_remaining": 3 }
 }</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-IDEMPOTENCY_KEY_REQUIRED"><code>IDEMPOTENCY_KEY_REQUIRED</code></a> <a href="#err-IDEMPOTENCY_CONFLICT"><code>IDEMPOTENCY_CONFLICT</code></a> <a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-VALIDATION_FAILED"><code>VALIDATION_FAILED</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a> <a href="#err-LOGIN_REQUIRED"><code>LOGIN_REQUIRED</code></a> <a href="#err-FRIENDS_ONLY"><code>FRIENDS_ONLY</code></a> <a href="#err-NOT_ALLOWED"><code>NOT_ALLOWED</code></a> <a href="#err-CLAIM_ALREADY_EXISTS"><code>CLAIM_ALREADY_EXISTS</code></a> <a href="#err-ITEM_FULLY_CLAIMED"><code>ITEM_FULLY_CLAIMED</code></a> <a href="#err-WISHLIST_CLOSED"><code>WISHLIST_CLOSED</code></a> <a href="#err-SITE_NOT_ACTIVE"><code>SITE_NOT_ACTIVE</code></a> <a href="#err-FUNDING_MODE_MISMATCH"><code>FUNDING_MODE_MISMATCH</code></a> <a href="#err-RATE_LIMITED"><code>RATE_LIMITED</code></a></div><div class="note"><strong>D50（2026-10-18）：訪客僅能瀏覽，認捐需登入。</strong>負責人理由：「認捐需要消耗點數，未登入無法紀錄點數。」（目前數量認捐本身並未扣點，此決策先讓認捐綁定會員身分。）未登入（含持舊 <code>ws_guest</code> / <code>X-Guest-Token</code> 者）回 401 <code>UNAUTHORIZED</code>（problem+json），不寫入任何資料；前端導向 <code>/login?redirect=</code>。已移除請求欄位 <code>display_name</code>、<code>contact</code>、<code>email</code>（顯示名稱採帳號暱稱，<code>claimer_name</code> 由帳號帶入），回應不再含 <code>guest_token</code>，也不再建立 guest 或寄訪客確認信。若 qty 超過剩餘量回 ITEM_FULLY_CLAIMED，body 內附 <code>remaining</code>（見錯誤範例）。捐助時 user_id 寫入 claims。<s>選填 email（D39）訪客確認信與恢復權杖</s>：已由 D50 取代，僅保留給舊訪客資料（<code>POST /guest/recover</code> 見 Account 章節）。捐助成功同時依建立者的通知設定寫入通知（第一筆即時、之後每日彙整，驚喜模式只寫件數，見 4.10）。<strong>同一人對同一品項只能有一筆有效捐助</strong>（D6）：重複 POST 回 409 <code>CLAIM_ALREADY_EXISTS</code>（body 附 <code>claim_id</code>），改數量請用 PATCH /claims/{claim_id}；DB 以 partial unique index 保證。relief 據點 site_status 非 active 回 <code>SITE_NOT_ACTIVE</code>。<br><strong>v0.5：</strong>(1) 「看得到才能捐助」——先套用與公開頁相同的可見性檢查（觀看者 = 登入者；未登入先回 401），無權回 403 <code>LOGIN_REQUIRED</code> / <code>FRIENDS_ONLY</code> / <code>NOT_ALLOWED</code>（friends / selected 清單訪客不能捐助，須登入）；private 清單非擁有者 404，捐助交易本身也拒絕 private。(2) 選填 <code>visibility</code>（public | friends | private），未帶則由 trigger 套帳號 <code>default_claim_visibility</code>（D50 後新認捐皆為會員，不再有 <code>visibility: null</code>；null 僅見於舊訪客資料）。非法值 422。回應的 claim 新增 <code>visibility</code>。若清單設有 claim_ttl_hours，回應的 claim 會有 <code>expires_at</code>（purchased 後清除）。</div></div><div class="ep" id="ep-patch-claims-claim-id"><h4><span class="badge m-PATCH">PATCH</span><code class="path">/api/v1/claims/{claim_id}</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session / Bearer（捐助者本人）；legacy：X-Guest-Token / ws_guest（D50 前的舊訪客，不可增量）；status=delivered 另允許清單 owner、org owner / coordinator（D5）</div><p>修改自己的捐助：改數量、備註或推進狀態。</p><h5>Request body</h5><pre><code>{ "qty": 2, "note": "改成 2 個", "status": "purchased", "visibility": "public" }</code></pre><h5>Response 200</h5><pre><code>{

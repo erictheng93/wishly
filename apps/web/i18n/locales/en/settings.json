@@ -88,11 +88,6 @@
       "friends": "Friends only",
       "private": "Private"
     },
-    "notif": {
-      "title": "Notifications",
-      "label": "Email me when someone pledges",
-      "hint": "The first pledge is notified right away, then a daily digest. In surprise mode the email only says \"N new pledges\"."
-    },
     "export": {
       "title": "Export data",
       "hint": "Includes your profile, lists and pledge history (JSON).",

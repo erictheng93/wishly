@@ -80,6 +80,25 @@ async fn public_page_happy_and_masking(pool: PgPool) {
     );
     assert!(b.to_string().find("contact").is_none());
 
+    // 匿名認領：即使 visibility=public，公開頁也只顯示「匿名」
+    let hua = common::user(&pool, "小華").await;
+    let (st, _, c) = call(
+        &app,
+        "POST",
+        &format!("/items/{}/claims", bottle),
+        &[common::ck(&hua.token), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty": 1, "visibility": "public", "is_anonymous": true})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    assert_eq!(c["claim"]["is_anonymous"], true);
+    let (_, _, b) = call(&app, "GET", "/public/wishlists/Ab3dE5gH7k", &[], None).await;
+    assert_eq!(
+        b["items"][0]["claimers"],
+        json!([{"display_name": "小明", "qty": 5}, {"display_name": "匿名", "qty": 1}])
+    );
+    assert!(!b.to_string().contains("小華"));
+
     // 驚喜鎖定（未來 event_date）→ 即使 show_claimer_names 也不輸出
     sqlx::query(
         "UPDATE wishlists SET surprise_mode = true, event_date = current_date + 30 WHERE id = $1",
@@ -92,7 +111,10 @@ async fn public_page_happy_and_masking(pool: PgPool) {
     assert_eq!(b["surprise_mode"], true);
     assert_eq!(b["claimers_visible"], false);
     assert!(b["items"][0].get("claimers").is_none());
-    assert_eq!(b["items"][0]["qty_claimed"], 5);
+    assert_eq!(b["items"][0]["qty_claimed"], 6);
+    // 鎖定條件只有一份定義（0026）：沒有活動日一律視為鎖定
+    let locked: bool = sqlx::query_scalar("SELECT surprise_locked(true, NULL)").fetch_one(&pool).await.unwrap();
+    assert!(locked);
     assert_all_reconciled(&pool).await;
 }
 
