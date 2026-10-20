@@ -230,7 +230,10 @@
       "closesToday": "Đóng hôm nay",
       "birthdays": "Sinh nhật sắp tới",
       "bdIn": "{n} ngày nữa",
-      "bdToday": "Sinh nhật hôm nay"
+      "bdToday": "Sinh nhật hôm nay",
+      "feedNoFriends": "Bạn chưa có bạn bè nào. Hãy kết bạn để xem điều ước mới, sinh nhật của họ và những món quà bạn đã tặng.",
+      "feedInvite": "Mời bạn bè",
+      "bdNone": "Không có sinh nhật bạn bè nào trong 30 ngày tới."
     },
     "profile": {
       "vis": {

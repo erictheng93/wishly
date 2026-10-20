@@ -72,8 +72,9 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
             <button class="c-btn" @click="dropReq(r)">{{ $t('me.friends.decline') }}</button>
           </div>
         </section>
-        <section v-if="feed?.birthdays.length" class="c-card">
+        <section v-if="feed" class="c-card" :class="{ 'fr-no-friends': !data.friends.length }">
           <h2 class="c-h2">{{ $t('me.friends.birthdays') }}</h2>
+          <p v-if="!feed.birthdays.length" class="c-mute c-m0">{{ $t('me.friends.bdNone') }}</p>
           <div v-for="b in feed.birthdays" :key="b.id" class="c-row c-mb">
             <span class="fr-date">{{ +b.birthday.slice(0, 2) }}/{{ +b.birthday.slice(3) }}</span>
             <span class="c-grow">
@@ -89,6 +90,10 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
         <h2 id="fr-feed-h" class="c-h2">{{ $t('me.friends.feedTitle') }}</h2>
         <p v-if="feedErr" class="c-err" role="alert">{{ feedErr }}</p>
         <p v-else-if="!feed" class="c-mute" role="status">{{ $t('me.loading') }}</p>
+        <div v-else-if="!data.friends.length" class="c-mask">
+          <p class="c-m0">{{ $t('me.friends.feedNoFriends') }}</p>
+          <a href="#fr-invite" class="c-btn primary c-mt12">{{ $t('me.friends.feedInvite') }}</a>
+        </div>
         <p v-else-if="!feed.events.length" class="c-mask">{{ $t('me.friends.feedEmpty') }}</p>
         <article v-for="(e, i) in feed?.events" :key="i" class="c-card">
           <div class="c-row fr-who">
@@ -136,7 +141,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
           </form>
         </section>
 
-        <section class="c-card">
+        <section id="fr-invite" class="c-card">
           <h2 class="c-h2">{{ $t('me.friends.inviteTitle') }}</h2>
           <p class="c-mute">{{ $t('me.friends.inviteHint') }}</p>
           <template v-if="invite">
@@ -189,7 +194,10 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 .fr-date{flex:none;display:grid;place-items:center;min-width:52px;height:40px;border:1px solid var(--red);color:var(--red-text);font-weight:800;font-variant-numeric:tabular-nums}
 .c-card a.fr-item{display:flex;gap:12px;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--line);border-left:4px solid var(--red)}
 .fr-item strong,.fr-item .c-mute{display:block}
+.fr-side .c-card{scroll-margin-top:calc(var(--head-h) + 12px)}
 .fr-hot{color:var(--red-text);border-color:var(--red)}
+/* 手機沒有好友時藏起空的生日卡，讓「邀請朋友」成為第一眼看到的東西 */
+@media (max-width:1099px){.fr-no-friends{display:none}}
 @media (min-width:1100px){
   .fr{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"feed top" "feed side";grid-template-rows:auto 1fr;gap:0 24px;align-items:start}
   .fr-feed{grid-area:feed}.fr-top{grid-area:top}.fr-side{grid-area:side}

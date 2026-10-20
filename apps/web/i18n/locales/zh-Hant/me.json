@@ -230,7 +230,10 @@
       "closesToday": "今天截止",
       "birthdays": "近期生日",
       "bdIn": "{n} 天後",
-      "bdToday": "今天生日"
+      "bdToday": "今天生日",
+      "feedNoFriends": "目前還沒有好友。加入好友後，這裡會顯示他們的新願望、生日和你送出的禮物。",
+      "feedInvite": "邀請朋友",
+      "bdNone": "30 天內沒有好友生日。"
     },
     "profile": {
       "vis": {

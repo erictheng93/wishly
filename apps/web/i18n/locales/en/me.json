@@ -230,7 +230,10 @@
       "closesToday": "Closes today",
       "birthdays": "Upcoming birthdays",
       "bdIn": "in {n} days",
-      "bdToday": "Birthday today"
+      "bdToday": "Birthday today",
+      "feedNoFriends": "You don't have any friends here yet. Add friends to see their new wishes, birthdays and the gifts you've sent.",
+      "feedInvite": "Invite friends",
+      "bdNone": "No friend birthdays in the next 30 days."
     },
     "profile": {
       "vis": {
