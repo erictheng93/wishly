@@ -113,7 +113,10 @@ async fn public_page_happy_and_masking(pool: PgPool) {
     assert!(b["items"][0].get("claimers").is_none());
     assert_eq!(b["items"][0]["qty_claimed"], 6);
     // 鎖定條件只有一份定義（0026）：沒有活動日一律視為鎖定
-    let locked: bool = sqlx::query_scalar("SELECT surprise_locked(true, NULL)").fetch_one(&pool).await.unwrap();
+    let locked: bool = sqlx::query_scalar("SELECT surprise_locked(true, NULL)")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert!(locked);
     assert_all_reconciled(&pool).await;
 }
