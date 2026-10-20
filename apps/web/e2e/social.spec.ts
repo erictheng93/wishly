@@ -36,6 +36,8 @@ test('好友：邀請連結 + QR → 未登入開連結帶 redirect → 登入�
 
   await test.step('A 產生邀請連結，看得到 QR', async () => {
     await pa.goto('/friends'); await hydrated(pa)
+    await expect(pa.getByText('目前還沒有好友。')).toBeVisible() // 沒好友也顯示動態框架與引導
+    await expect(pa.getByText('30 天內沒有好友生日。')).toBeVisible()
     await pa.getByRole('button', { name: '產生邀請連結' }).click()
     await expect(pa.locator('main svg').first()).toBeVisible()
   })
