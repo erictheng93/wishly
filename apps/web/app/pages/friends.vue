@@ -72,7 +72,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
             <button class="c-btn" @click="dropReq(r)">{{ $t('me.friends.decline') }}</button>
           </div>
         </section>
-        <section v-if="feed" class="c-card">
+        <section v-if="feed" class="c-card" :class="{ 'fr-no-friends': !data.friends.length }">
           <h2 class="c-h2">{{ $t('me.friends.birthdays') }}</h2>
           <p v-if="!feed.birthdays.length" class="c-mute c-m0">{{ $t('me.friends.bdNone') }}</p>
           <div v-for="b in feed.birthdays" :key="b.id" class="c-row c-mb">
@@ -196,6 +196,8 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 .fr-item strong,.fr-item .c-mute{display:block}
 .fr-side .c-card{scroll-margin-top:calc(var(--head-h) + 12px)}
 .fr-hot{color:var(--red-text);border-color:var(--red)}
+/* 手機沒有好友時藏起空的生日卡，讓「邀請朋友」成為第一眼看到的東西 */
+@media (max-width:1099px){.fr-no-friends{display:none}}
 @media (min-width:1100px){
   .fr{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"feed top" "feed side";grid-template-rows:auto 1fr;gap:0 24px;align-items:start}
   .fr-feed{grid-area:feed}.fr-top{grid-area:top}.fr-side{grid-area:side}
