@@ -2136,6 +2136,7 @@ UPDATE notifications SET status = 'cancelled' WHERE guest_id = $1 AND status = '
 
 -- 4.10 MVP Email 通知（D39）：【已停用，D58】不再通知受捐者「有新捐助」（轟炸收件匣、破壞驚喜），以下為歷史設計
 --   D58 同時新增 claims.is_anonymous（比照 contributions，公開頁顯示「匿名」、受捐者頁顯示「匿名朋友」），
+--   會員信不再附退訂連結（剩下的都是點數 / 訂單 / 自己清單的服務通知，email_claims 已無作用）；訪客信照舊附
 --   驚喜鎖定判斷集中為 SQL 函式 surprise_locked(surprise_mode, event_date)，event_date 為 NULL 視為鎖定（migration 0026）
 --   捐助成功交易內寫入 notifications（outbox）
 --   第一筆即時（claim.created）；之後每日彙整一封（claim.digest，累加 count）；驚喜模式內容只寫「有 N 件新捐助」

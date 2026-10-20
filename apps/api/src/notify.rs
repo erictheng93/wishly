@@ -151,16 +151,12 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
             }
         }
         let api = cfg.api_base_url.clone();
-        let sub = match (uid, gid) {
-            (Some(u), _) => Some(('u', u)),
-            (_, Some(g)) => Some(('g', g)),
-            _ => None,
-        };
-        if let Some((k, i)) = sub.filter(|_| !security) {
+        // 只有訪客信附退訂。會員信都是點數、訂單、自己清單的服務通知；唯一可退訂的「有新捐助」已移除（D58），附了也停不掉
+        if let (None, Some(g)) = (uid, gid) {
             payload["unsubscribe_url"] = format!(
                 "{}/api/v1/unsubscribe?token={}",
                 api.trim_end_matches('/'),
-                crate::account::unsub_token(k, i)
+                crate::account::unsub_token('g', g)
             )
             .into();
         }

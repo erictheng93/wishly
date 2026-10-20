@@ -99,7 +99,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .unwrap();
     let text = body["Text"].as_str().unwrap();
     assert!(text.contains("活動日即將到來"));
-    assert!(text.contains("/api/v1/unsubscribe?token="));
+    assert!(!text.contains("unsubscribe"), "會員信不附退訂連結（D58）");
     assert!(!text.contains("Secret Gift") && !text.contains("Secret Owner"));
     let payload: Value = sqlx::query_scalar("SELECT payload FROM notifications WHERE user_id=$1")
         .bind(owner)
