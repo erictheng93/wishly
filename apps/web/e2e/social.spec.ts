@@ -173,3 +173,16 @@ test('探索頁 /explore：訪客看得到公開清單，看不到僅好友清�
   await expect(anon.getByRole('heading', { level: 1, name: pub.title })).toBeVisible()
   await closeAll([owner])
 })
+
+test('好友動態：好友新增願望出現在 /friends，點「去送禮」到分享頁', async ({ browser }) => {
+  const owner = await withHandle('fo'), friend = await withHandle('ff')
+  await befriend(owner, friend)
+  const list = await listWith(owner, 'friends')
+  const p = await pageFor(browser, friend)
+  await p.goto('/friends'); await hydrated(p)
+  const card = p.locator('article', { hasText: owner.name })
+  await expect(card).toContainText('奶瓶')
+  await card.getByRole('link', { name: '去送禮' }).click()
+  await expect(p).toHaveURL(new RegExp(`/s/${list.slug}$`))
+  await closeAll([owner, friend])
+})

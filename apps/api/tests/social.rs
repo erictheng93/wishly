@@ -1503,3 +1503,71 @@ async fn me_bio_birthday_and_profile_visibility(pool: PgPool) {
     assert!(v["bio"].is_null() && v["birthday"].is_null());
     let _ = tb;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn friend_feed_respects_visibility_and_birthdays(pool: PgPool) {
+    let (me, tme, _) = handle_user(&pool, "Me", Some("meme")).await;
+    let (f, _, _) = handle_user(&pool, "F", Some("ffff")).await;
+    let (x, _, _) = handle_user(&pool, "X", Some("xxxx")).await;
+    befriend(&pool, me, f).await;
+    for v in ["friends", "private", "selected"] {
+        list(&pool, f, v, false).await;
+    }
+    list(&pool, x, "friends", false).await; // 非好友
+    let (_, allowed_item) = list(&pool, f, "selected", false).await;
+    sqlx::query("UPDATE wishlists SET title='清單-選中' WHERE id = (SELECT wishlist_id FROM wishlist_items WHERE id=$1)")
+        .bind(allowed_item).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) SELECT wishlist_id, $2 FROM wishlist_items WHERE id=$1")
+        .bind(allowed_item).bind(me).execute(&pool).await.unwrap();
+    // 我送的禮物已送達
+    let delivered = user_claim(&pool, allowed_item, me, "friends").await;
+    sqlx::query("UPDATE claims SET status='delivered', delivered_at=now() WHERE id=$1")
+        .bind(delivered)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // 生日：F 好友可見、3 天後；X 不是好友
+    sqlx::query("UPDATE users SET birthday=to_char((now() AT TIME ZONE 'Asia/Taipei')::date + 3, 'MM-DD'), birthday_visibility='friends' WHERE id = ANY($1)")
+        .bind(vec![f, x]).execute(&pool).await.unwrap();
+
+    let (st, _, body) = common::call(&pool, "GET", "/friends/feed", &common::ck(&tme), None).await;
+    assert_eq!(st, StatusCode::OK);
+    let mut titles: Vec<&str> = body["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["kind"] == "items_added")
+        .map(|e| e["wishlist"]["title"].as_str().unwrap())
+        .collect();
+    titles.sort();
+    assert_eq!(titles, ["清單-friends", "清單-選中"]);
+    let gift = body["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["kind"] == "delivered")
+        .unwrap();
+    assert_eq!(gift["item"]["title"], "奶瓶");
+    assert_eq!(gift["owner"]["handle"], "ffff");
+    let b = body["birthdays"].as_array().unwrap();
+    assert_eq!(b.len(), 1);
+    assert_eq!(
+        (b[0]["handle"].as_str(), b[0]["days"].as_i64()),
+        (Some("ffff"), Some(3))
+    );
+
+    // 生日改成不公開就不出現；未登入 401
+    sqlx::query("UPDATE users SET birthday_visibility='private' WHERE id=$1")
+        .bind(f)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, _, body) = common::call(&pool, "GET", "/friends/feed", &common::ck(&tme), None).await;
+    assert!(body["birthdays"].as_array().unwrap().is_empty());
+    assert_eq!(
+        common::call(&pool, "GET", "/friends/feed", &[], None)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+}

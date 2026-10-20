@@ -208,7 +208,23 @@
       "none": "Chưa có bạn bè nào, hãy mời bạn theo cách ở trên nhé.",
       "unfriend": "Hủy kết bạn",
       "unfriendTitle": "Hủy kết bạn với {name}?",
-      "unfriendText": "Họ sẽ không còn xem được các danh sách \"chỉ bạn bè\" của bạn, và quyền của bạn trong các danh sách \"chỉ định\" của họ cũng bị gỡ bỏ."
+      "unfriendText": "Họ sẽ không còn xem được các danh sách \"chỉ bạn bè\" của bạn, và quyền của bạn trong các danh sách \"chỉ định\" của họ cũng bị gỡ bỏ.",
+      "feedTitle": "Hoạt động của bạn bè",
+      "feedEmpty": "Bạn bè chưa có điều ước mới trong 30 ngày qua.",
+      "added": "đã thêm {n} điều ước vào",
+      "newList": "đã tạo danh sách mới",
+      "delivered": "đã nhận quà của bạn",
+      "open": "Chưa ai nhận",
+      "taken": "Đã có người nhận",
+      "give": "Tặng quà",
+      "viewList": "Xem danh sách",
+      "more": "Còn {n} điều ước mới khác",
+      "progress": "{n} món · hoàn thành {pct}%",
+      "closesIn": "Đóng sau {n} ngày",
+      "closesToday": "Đóng hôm nay",
+      "birthdays": "Sinh nhật sắp tới",
+      "bdIn": "{n} ngày nữa",
+      "bdToday": "Sinh nhật hôm nay"
     },
     "profile": {
       "vis": {
