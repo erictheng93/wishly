@@ -21,7 +21,9 @@ for (const [name, vp] of Object.entries(SIZES)) {
       expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(60)
       expect(await noOverflow()).toBe(true)
       expect(await page.locator('.c-rail').isVisible()).toBe(vp.width >= 1280)
-      expect(await page.getByRole('link', { name: '好友' }).first().isVisible()).toBe(true) // header 或側欄其一
+      expect((await page.locator('.c-head').boundingBox())!.height).toBeLessThan(70) // header 不換行
+      if (vp.width < 1280) await page.getByRole('button', { name: '帳號選單' }).click() // 好友在帳號選單，≥1280 在側欄
+      expect(await page.getByRole('link', { name: '好友' }).first().isVisible()).toBe(true)
     })
     await test.step('edit：標題寬度、雙欄、無溢出', async () => {
       await page.goto(`/lists/${list.id}/edit`)
