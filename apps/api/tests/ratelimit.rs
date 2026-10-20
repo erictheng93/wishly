@@ -168,13 +168,14 @@ async fn cleanup_removes_old_rows(pool: PgPool) {
     sqlx::query("INSERT INTO idempotency_keys (key, scope, request_hash, created_at) VALUES ($1, 's', 'h', now() - interval '25 hours'), ($2, 's', 'h', now())")
         .bind(Uuid::new_v4()).bind(Uuid::new_v4()).execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('old', now() - interval '3 days', 1), ('new', now(), 1)").execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO login_failures (email, ip, created_at) VALUES ('a@x.com', '1.1.1.1', now() - interval '2 days'), ('a@x.com', '1.1.1.1', now())").execute(&pool).await.unwrap();
     ratelimit::cleanup(&pool).await.unwrap();
-    let (i, r): (i64, i64) = sqlx::query_as(
-        "SELECT (SELECT count(*) FROM idempotency_keys), (SELECT count(*) FROM rate_limits)",
+    let (i, r, f): (i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM idempotency_keys), (SELECT count(*) FROM rate_limits), (SELECT count(*) FROM login_failures)",
     )
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!((i, r), (1, 1));
+    assert_eq!((i, r, f), (1, 1, 1));
     common::assert_all_reconciled(&pool).await;
 }

@@ -391,18 +391,24 @@ pub(crate) async fn otp_gate(
     turnstile_token: Option<&str>,
 ) -> Result<(), AppError> {
     if !crate::ratelimit::allow(pool, &format!("otp_soft:{purpose}:{email}"), 3, 3600).await? {
-        match crate::reports::verify_turnstile(&crate::config::get(), turnstile_token, ip).await {
-            Err(AppError::Problem { status: 403, .. }) => {
-                return Err(AppError::problem(
-                    403,
-                    "CAPTCHA_REQUIRED",
-                    "請先完成人機驗證後再試。",
-                ))
-            }
-            r => r?,
-        }
+        require_captcha(turnstile_token, ip).await?;
     }
     crate::ratelimit::check(pool, &format!("otp_gap:{purpose}:{ip}:{email}"), 1, 60).await
+}
+
+/// Turnstile 驗證；缺 / 錯 token 回 403 CAPTCHA_REQUIRED（前端據此顯示人機驗證）。
+pub(crate) async fn require_captcha(
+    turnstile_token: Option<&str>,
+    ip: &str,
+) -> Result<(), AppError> {
+    match crate::reports::verify_turnstile(&crate::config::get(), turnstile_token, ip).await {
+        Err(AppError::Problem { status: 403, .. }) => Err(AppError::problem(
+            403,
+            "CAPTCHA_REQUIRED",
+            "請先完成人機驗證後再試。",
+        )),
+        r => r,
+    }
 }
 
 /// 202 回應本體；challenge_id 供驗證時綁定。
