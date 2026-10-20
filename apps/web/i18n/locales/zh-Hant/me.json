@@ -208,7 +208,23 @@
       "none": "還沒有好友，用上面的方式邀請朋友吧。",
       "unfriend": "解除好友",
       "unfriendTitle": "解除與 {name} 的好友關係？",
-      "unfriendText": "對方將無法再看到你「僅好友」的清單，你在對方「指定名單」中的權限也會一併移除。"
+      "unfriendText": "對方將無法再看到你「僅好友」的清單，你在對方「指定名單」中的權限也會一併移除。",
+      "feedTitle": "好友動態",
+      "feedEmpty": "最近 30 天好友還沒有新願望。",
+      "added": "新增了 {n} 個願望到",
+      "newList": "開了新清單",
+      "delivered": "收到了你送的禮物",
+      "open": "還沒人認捐",
+      "taken": "已有人認捐",
+      "give": "去送禮",
+      "viewList": "看清單",
+      "more": "另外還有 {n} 項新願望",
+      "progress": "共 {n} 項 · 完成 {pct}%",
+      "closesIn": "{n} 天後截止",
+      "closesToday": "今天截止",
+      "birthdays": "近期生日",
+      "bdIn": "{n} 天後",
+      "bdToday": "今天生日"
     },
     "profile": {
       "vis": {

@@ -72,6 +72,15 @@ CI／部署流程：
 - [ ] 帳號權限最小化：帳號與其他專案共用（`makanmasak.com`、`prophetica.net`、多個 R2 bucket、一個 All-buckets 的 R2 Admin Token）；日後新增 Cloudflare 資源時注意 Domain／bucket 預設值會指到別的專案。
 - [ ] Dokploy 設定備份（專案、環境變數、Tunnel token 的存放位置）。
 - [ ] Dokploy Settings → Registry 目前沒被使用（Docker Provider 用自己的帳密欄），可移除以免誤導。
+- [ ] `GET /friends/feed`（好友動態，`friends.rs::feed`）尚未寫進 `docs/04` API 契約。
+
+## 好友動態後續（2026-10-20 方案 A 已上 `/friends`，提案稿已刪）
+
+- [ ] 眾籌「快達標」卡（例：達 80% 且未截止），需在 feed 加 crowdfund 品項的進度事件。
+- [ ] 共同好友數、「好友 N 年」（`friendships.created_at` 已有）、常看好友捷徑。
+- [ ] 「提醒他建清單」：生日近但沒有可見清單的好友，送通知（需防騷擾限流）。
+- [ ] 已知限制：動態以品項 `created_at` 計，草稿放超過 30 天才發佈的清單不會出現；考慮加 `wishlists.published_at`。
+- [ ] 另一方向（提案 B 倒數看板）：以日期為主角，大數字倒數＋60 天時間軸（生日、`event_date`、`closes_at` 混排），可做成 `/friends` 的另一個分頁。
 
 ---
 

@@ -208,7 +208,23 @@
       "none": "No friends yet. Invite someone using the options above.",
       "unfriend": "Unfriend",
       "unfriendTitle": "Unfriend {name}?",
-      "unfriendText": "They will no longer see your \"friends only\" lists, and your access to their \"selected people\" lists is removed too."
+      "unfriendText": "They will no longer see your \"friends only\" lists, and your access to their \"selected people\" lists is removed too.",
+      "feedTitle": "Friends' activity",
+      "feedEmpty": "No new wishes from friends in the last 30 days.",
+      "added": "added {n} wish(es) to",
+      "newList": "started a new list",
+      "delivered": "received your gift",
+      "open": "Not claimed yet",
+      "taken": "Already claimed",
+      "give": "Give a gift",
+      "viewList": "View list",
+      "more": "{n} more new wish(es)",
+      "progress": "{n} items · {pct}% done",
+      "closesIn": "Closes in {n} days",
+      "closesToday": "Closes today",
+      "birthdays": "Upcoming birthdays",
+      "bdIn": "in {n} days",
+      "bdToday": "Birthday today"
     },
     "profile": {
       "vis": {
