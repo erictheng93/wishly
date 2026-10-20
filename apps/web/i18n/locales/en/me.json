@@ -48,6 +48,12 @@
         }
       },
       "sceneMore": "See the {k} example →",
+      "originTitle": "Why I built this",
+      "origin": [
+        "The person who needs something can’t bring themselves to ask, and the person who wants to give has no idea what’s missing. So everyone buys the same baby bottle and nobody buys the formula.",
+        "Gifting and donating share one problem: supply and demand are out of sync.",
+        "That’s why I built Wishly: list what you want, share one link, and let people claim items without ever over-claiming, so the one who needs and the one who gives finally line up."
+      ],
       "stepsTitle": "Share your wishes in three steps",
       "steps": {
         "1": {

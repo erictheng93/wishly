@@ -77,6 +77,11 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
         </div>
       </section>
 
+      <section class="l-in l-sec l-origin">
+        <h2>{{ $t('me.home.originTitle') }}</h2>
+        <p v-for="i in 3" :key="i">{{ $t(`me.home.origin.${i - 1}`) }}</p>
+      </section>
+
       <section id="scenes" class="l-alt" style="scroll-margin-top:var(--head-h)">
         <div class="l-in">
           <h2>{{ $t('me.home.scenesTitle') }}</h2>
@@ -175,7 +180,9 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-steps li{border-top:1px solid var(--line);padding-top:12px}
 .l-num{font-size:28px;font-weight:800;color:var(--red-text);letter-spacing:.05em}
 .l-feat{margin:0}
-.l-faq{max-width:760px}
+.l-faq,.l-origin{max-width:760px}
+.l-origin p+p{margin-top:12px}
+.l-origin p{font-size:16px;line-height:1.8}
 .l-faq details{border-bottom:1px solid var(--line)}
 .l-faq summary{font-weight:700;min-height:52px}
 .l-faq details p{color:var(--mute);padding-bottom:16px}

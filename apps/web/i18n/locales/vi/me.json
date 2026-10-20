@@ -48,6 +48,12 @@
         }
       },
       "sceneMore": "Xem ví dụ {k} →",
+      "originTitle": "Vì sao có Wishly",
+      "origin": [
+        "Người cần thì ngại mở lời, người muốn tặng thì không biết thiếu gì, nên ai cũng mua bình sữa còn không ai mua sữa bột.",
+        "Tặng quà và quyên góp có chung một vấn đề: cung và cầu không khớp thông tin.",
+        "Vì vậy tôi làm Wishly: liệt kê điều bạn cần, chia sẻ một liên kết, mọi người nhận phần mình mà không bao giờ nhận vượt số lượng."
+      ],
       "stepsTitle": "Chia sẻ ước nguyện trong ba bước",
       "steps": {
         "1": {
