@@ -79,7 +79,7 @@ CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆�
 
 前端的 `braces`／`node-forge` 由 `package.json` 的 `overrides` 換成[已修補的 fork](apps/web/patches/README.md)（固定 commit SHA）。回歸測試 `tests/dependencySecurity.test.ts` 驗證深層 glob 與惡意 RSA DigestAlgorithm 都被拒絕。
 
-Mutation 可在 Mac／Linux 用 `scripts/mutate.sh --list` 選擇，例如 `scripts/mutate.sh cdn-account-delete`、`scripts/mutate.sh cdn-close-due`；需 Python 3、Rust 與可建立測試 DB 的 DATABASE_URL。runner 自動確認原版綠、停用單一行為後紅、還原後綠；CI 的 API job 會在 coverage 完成後執行 `scripts/mutate.sh all` 並上傳 receipts／patch／logs。輸出保存於 `apps/api/target/mutations/`，請勿與相同 SQLx test path 的一般測試併跑。`python3 scripts/test_mutate.py` 不需要 DB，可驗證 runner 的分類與中斷還原。
+Mutation 可在 Mac／Linux 用 `scripts/mutate.sh --list` 選擇，例如 `scripts/mutate.sh cdn-account-delete`、`scripts/mutate.sh cdn-close-due`；需 Python 3、Rust 與可建立測試 DB 的 DATABASE_URL。runner 自動確認原版綠、停用單一行為後紅、還原後綠；CI 的獨立 `mutate` job 執行 `scripts/mutate.sh all` 並上傳 receipts／patch／logs（不擋 `publish-image`）。輸出保存於 `apps/api/target/mutations/`，請勿與相同 SQLx test path 的一般測試併跑。`python3 scripts/test_mutate.py` 不需要 DB，可驗證 runner 的分類與中斷還原。
 
 ```sh
 cargo test --manifest-path apps/api/Cargo.toml    # 每個測試使用獨立資料庫（sqlx::test）

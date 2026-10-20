@@ -35,20 +35,44 @@ jobs:
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with: { tool: "cargo-llvm-cov@0.9.1,cargo-audit@0.22.2" }
       - run: sh scripts/audit-api.sh
-      - run: python3 scripts/test_mutate.py
       - run: python3 scripts/test_coverage.py
       - run: sh scripts/coverage-api.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: api-coverage
+          path: apps/api/target/coverage.json
+  mutate:
+    # 突變測試（約 18 分鐘）量測的是測試強度，不擋 publish-image；失敗仍會讓 run 標紅。
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.5@sha256:94146ac37bc61e2322f88016056c5920729cb8c64c8542ed590af8fc2abdac07
+        env: { POSTGRES_USER: wishly, POSTGRES_PASSWORD: wishly, POSTGRES_DB: wishly }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U wishly" --health-interval 2s --health-retries 30
+      mailpit:
+        image: axllent/mailpit:v1.31.6@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
+        ports: ["1025:1025", "8025:8025"]
+    env:
+      DATABASE_URL: postgres://wishly:wishly@localhost:5432/wishly
+      APP_ENV: dev
+      SMTP_HOST: localhost
+      MAILPIT_API_BASE: http://localhost:8025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with: { workspaces: apps/api }
+      - run: python3 scripts/test_mutate.py
       - run: scripts/mutate.sh all
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: api-mutations
           path: apps/api/target/mutations/
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: api-coverage
-          path: apps/api/target/coverage.json
   image:
     # 只驗證 Dockerfile 能建置（不 push）；build context 必須是 repo 根目錄。
     if: github.event_name != 'schedule'
