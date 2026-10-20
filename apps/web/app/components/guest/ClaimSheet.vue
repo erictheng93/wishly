@@ -74,7 +74,6 @@ async function submit() {
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
       <template v-if="!editing">
         <p class="g-mute">{{ $t('guest.claim.asUser', { name: loggedInName }) }}</p>
-        <label class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.claim.anon') }}</label>
         <template v-if="vis">
           <label for="cv">{{ $t('guest.claim.visLabel') }}</label>
           <select id="cv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option></select>
@@ -83,6 +82,8 @@ async function submit() {
       <label for="cm">{{ $t('guest.noteLabel') }}</label>
       <input id="cm" v-model="note" maxlength="200" :readonly="busy">
       <div v-if="errs.note" class="g-field-err">{{ errs.note }}</div>
+      <!-- 放在留言欄之後：GuestDialog 會把初始焦點給第一個 input -->
+      <label v-if="!editing" class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.claim.anon') }}</label>
       <p class="g-mute">{{ $t('guest.claim.notice') }}<NuxtLink to="/privacy#collect" target="_blank">{{ $t('guest.claim.privacyLink') }}</NuxtLink><span class="g-nowrap">{{ $t('guest.claim.noCheck') }}</span></p>
       <button class="g-btn" :disabled="busy || !online">{{ !online ? $t('guest.claim.offline') : busy ? $t('guest.sending') : editing ? $t('guest.claim.save') : $t('guest.claim.confirm') }}</button>
       <button type="button" class="g-link" @click="emit('close')">{{ $t('guest.cancel') }}</button>
