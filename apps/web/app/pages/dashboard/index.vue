@@ -3,7 +3,6 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('lists.dashboard.title') })
 const { api } = useApi()
-const { user } = useAuth()
 const list = ref<any[]>([])
 const cursor = ref<string | null>(null)
 const loading = ref(true), err = ref('')
@@ -26,11 +25,7 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader :title="$t('lists.dashboard.title')">
-      <NuxtLink v-if="user?.is_staff" to="/admin" class="c-btn c-nav-dup">{{ $t('common.admin') }}</NuxtLink>
-      <NuxtLink to="/me/wallet" class="c-btn c-nav-dup">{{ $t('common.points') }}</NuxtLink>
-      <NuxtLink to="/settings" class="c-btn c-nav-dup" :aria-label="$t('common.settings')">{{ $t('common.settings') }}</NuxtLink>
-    </CreatorHeader>
+    <CreatorHeader :title="$t('lists.dashboard.title')" />
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('lists.common.retry') }}</button></p>
     <p v-else-if="loading && !list.length" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
     <div v-else-if="!visible.length" class="c-center">
