@@ -643,8 +643,7 @@ RETURNING qty_needed, qty_claimed;
 <h3>7.5 通知</h3>
 <table>
 <tr><th>種類（kind）</th><th>對象</th><th>時機</th></tr>
-<tr><td><code>claim.created</code></td><td>建立者</td><td>每份清單<b>第一筆</b>捐助，立即</td></tr>
-<tr><td><code>claim.digest</code></td><td>建立者</td><td>之後的捐助合併，每日台北 09:00 一封（count 累加）</td></tr>
+<tr><td><s><code>claim.created</code> / <code>claim.digest</code></s></td><td>建立者</td><td>已停用（D58）：有人捐助時不再寄信給建立者</td></tr>
 <tr><td><code>claim.confirmation</code></td><td>訪客（legacy）</td><td>D50 前捐助時填了 Email（D50 起不再產生）；含「管理我的捐助」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
 <tr><td><code>claim.item_removed</code></td><td>訪客</td><td>你捐助的品項被建立者刪除</td></tr>
 <tr><td><code>wishlist.closing</code></td><td>建立者</td><td>自動結束前 24 小時（一次）</td></tr>

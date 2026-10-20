@@ -175,7 +175,7 @@ struct W {
 }
 const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
   cover_image_key, cover_image_status::text AS cover_image_status, event_date, show_claimer_names, surprise_mode,
-  (surprise_mode AND event_date IS NOT NULL AND now() < (event_date::timestamp AT TIME ZONE 'Asia/Taipei')) AS surprise_locked,
+  surprise_locked(surprise_mode, event_date) AS surprise_locked,
   claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, closes_at, created_at, updated_at,
   EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address";
 
@@ -813,7 +813,7 @@ async fn dashboard(
             DateTime<Utc>,
         );
         let rows: Vec<ClaimDashboardRow> = sqlx::query_as(
-            "SELECT c.id, c.item_id, c.claimer_name, c.qty, c.status::text, c.note, c.created_at FROM claims c JOIN wishlist_items i ON i.id=c.item_id
+            "SELECT c.id, c.item_id, CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.claimer_name END, c.qty, c.status::text, c.note, c.created_at FROM claims c JOIN wishlist_items i ON i.id=c.item_id
              WHERE i.wishlist_id=$1 ORDER BY c.id").bind(id).fetch_all(&st.pool).await?;
         Value::Array(
             rows.into_iter()

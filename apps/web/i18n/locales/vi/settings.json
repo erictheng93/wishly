@@ -88,11 +88,6 @@
       "friends": "Chỉ bạn bè",
       "private": "Riêng tư"
     },
-    "notif": {
-      "title": "Thông báo",
-      "label": "Gửi Email khi có người đăng ký tặng",
-      "hint": "Lượt đầu tiên được báo ngay, sau đó gom thành một email mỗi ngày. Ở chế độ bất ngờ, email chỉ ghi \"có N lượt tặng mới\"."
-    },
     "export": {
       "title": "Xuất dữ liệu",
       "hint": "Gồm thông tin cá nhân, danh sách và lịch sử tặng quà (JSON).",

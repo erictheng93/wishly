@@ -26,6 +26,7 @@
       "required": "Please complete the verification first"
     },
     "claim": {
+      "anon": "Pledge anonymously (the recipient and share page only see \"Anonymous\")",
       "soldOutN": "Sorry, only {n} left.",
       "soldOut": "Someone else just pledged the rest.",
       "exists": "You have already pledged this item. Switched to edit.",

@@ -73,7 +73,7 @@ async fn explore(
            AND o.deleted_at IS NULL AND o.blocked_at IS NULL
            AND (w.closes_at IS NULL OR w.closes_at > now())
            AND w.slug::text NOT LIKE 'demo%'   -- 範例清單（db/seed/demo.sql）不上探索頁
-           AND NOT (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei')))
+           AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND ($1::text IS NULL OR w.type::text = $1)
            AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL))
@@ -176,7 +176,7 @@ async fn render(
                 w.moderation_status::text AS moderation, w.title, w.description, w.cover_image_key,
                 w.cover_image_status::text AS cover_image_status, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
                 w.owner_id, u.display_name AS owner_name,
-                (w.surprise_mode AND (w.event_date IS NULL OR now() < (w.event_date::timestamp AT TIME ZONE 'Asia/Taipei'))) AS locked,
+                surprise_locked(w.surprise_mode, w.event_date) AS locked,
                 GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
          FROM wishlists w JOIN users u ON u.id = w.owner_id
          WHERE w.slug = $1 AND w.deleted_at IS NULL")
@@ -239,8 +239,8 @@ async fn render(
     let mut claimers: HashMap<Uuid, Vec<Value>> = HashMap::new();
     if visible {
         let rows: Vec<(Uuid, String, i64)> = sqlx::query_as(
-            // 登入者的捐助非 public → 對外顯示「匿名」（此回應可被共用快取，不做逐觀看者的好友判斷）
-            "SELECT c.item_id, CASE WHEN c.visibility IS NULL OR c.visibility = 'public' THEN c.claimer_name ELSE '匿名' END AS n, sum(c.qty)::bigint
+            // 匿名或登入者的捐助非 public → 對外顯示「匿名」（此回應可被共用快取，不做逐觀看者的好友判斷）
+            "SELECT c.item_id, CASE WHEN NOT c.is_anonymous AND (c.visibility IS NULL OR c.visibility = 'public') THEN c.claimer_name ELSE '匿名' END AS n, sum(c.qty)::bigint
              FROM claims c JOIN wishlist_items i ON i.id = c.item_id
              WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('reserved','purchased','delivered')
              GROUP BY c.item_id, n ORDER BY min(c.created_at)")

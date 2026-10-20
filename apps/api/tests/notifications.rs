@@ -1,63 +1,18 @@
-mod common;
 use serde_json::json;
-use sqlx::PgPool;
-
-/// 回傳 (user_id, session token)
-use common::*;
-
-#[sqlx::test(migrations = "../../db/migrations")]
-async fn enqueue_claim_first_immediate_then_digest(pool: PgPool) {
-    let TestUser {
-        id: owner,
-        token: _,
-    } = user(&pool, "o").await;
-    let (wid, _, _) = claimed_wishlist(&pool, owner, true, 30, 2, 1).await;
-    let mut tx = pool.begin().await.unwrap();
-    for _ in 0..3 {
-        wishly_api::notify::enqueue_claim(&mut *tx, wid)
-            .await
-            .unwrap();
-    }
-    let rows: Vec<(String, i32, bool)> = sqlx::query_as(
-        "SELECT kind, (payload->>'count')::int, CASE WHEN kind='claim.created' THEN scheduled_at=now() ELSE scheduled_at=((date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') + interval '9 hours' + CASE WHEN (now() AT TIME ZONE 'Asia/Taipei')::time >= time '09:00' THEN interval '1 day' ELSE interval '0' END) AT TIME ZONE 'Asia/Taipei') END FROM notifications WHERE user_id = $1 ORDER BY kind").bind(owner).fetch_all(&mut *tx).await.unwrap();
-    assert_eq!(
-        rows,
-        vec![
-            ("claim.created".to_string(), 1, true),
-            ("claim.digest".to_string(), 2, true)
-        ]
-    );
-    tx.commit().await.unwrap();
-    // 關閉通知則不寫
-    sqlx::query("UPDATE users SET notification_prefs = '{\"email_claims\": false}' WHERE id = $1")
-        .bind(owner)
-        .execute(&pool)
-        .await
-        .unwrap();
-    wishly_api::notify::enqueue_claim(&pool, wid).await.unwrap();
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(n, 2);
-    let (_, body) = wishly_api::notify::render("claim.digest", "清單", &json!({"count": 2}));
-    assert!(body.contains("2 件新捐助"));
-    assert_all_reconciled(&pool).await;
-}
 
 #[test]
 fn render_lang_en_vi() {
     use wishly_api::notify::{render_lang, Lang};
-    let p = json!({"count": 2});
-    let (s, b) = render_lang(Lang::En, "claim.digest", "List", &p);
-    assert!(s.contains("2 new pledge") && b.contains("Sign in"));
-    let (s, _) = render_lang(Lang::Vi, "claim.digest", "List", &p);
-    assert!(s.contains("2 đóng góp mới"));
+    let p = json!({});
+    let (s, b) = render_lang(Lang::En, "event.reminder", "List", &p);
+    assert!(s.contains("is coming up") && b.contains("/dashboard"));
+    let (s, _) = render_lang(Lang::Vi, "event.reminder", "List", &p);
+    assert!(s.contains("Sắp đến ngày sự kiện"));
     assert_eq!(Lang::parse("vi-VN,vi;q=0.9"), Lang::Vi);
     assert_eq!(Lang::parse("en-US"), Lang::En);
     assert_eq!(Lang::parse("fr"), Lang::Zh);
     assert_eq!(
-        render_lang(Lang::Zh, "claim.digest", "清單", &p),
-        wishly_api::notify::render("claim.digest", "清單", &p)
+        render_lang(Lang::Zh, "event.reminder", "清單", &p),
+        wishly_api::notify::render("event.reminder", "清單", &p)
     );
 }

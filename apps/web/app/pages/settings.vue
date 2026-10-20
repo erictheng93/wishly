@@ -111,12 +111,6 @@ async function changePassword() {
   } catch (e) { pwErr.value = errMsg(e) } finally { pwBusy.value = false }
 }
 
-async function toggle(ev: Event) {
-  const v = (ev.target as HTMLInputElement).checked, old = !v
-  user.value.notification_prefs = { ...user.value.notification_prefs, email_claims: v } // 樂觀更新
-  try { await api('/me', { method: 'PATCH', body: { notification_prefs: { email_claims: v } } }) }
-  catch (e) { user.value.notification_prefs = { ...user.value.notification_prefs, email_claims: old }; err.value = errMsg(e) }
-}
 async function saveName() {
   msg.value = err.value = ''
   try { user.value = await api('/me', { method: 'PATCH', body: { display_name: name.value.trim() } }); msg.value = t('settings.saved') }
@@ -244,10 +238,6 @@ async function remove() {
           <p v-if="hMsg" class="c-ok" role="status">{{ hMsg }}</p>
           <button class="c-btn" :disabled="hBad">{{ $t('settings.save') }}</button>
         </form>
-      </section>
-      <section class="c-card">
-        <h2 class="c-h2">{{ $t('settings.notif.title') }}</h2>
-        <label class="c-switch"><input type="checkbox" :checked="!!user.email && user.notification_prefs?.email_claims" :disabled="!user.email" @change="toggle"><span>{{ $t('settings.notif.label') }}<br><small class="c-mute">{{ $t('settings.notif.hint') }}</small></span></label>
       </section>
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.export.title') }}</h2>

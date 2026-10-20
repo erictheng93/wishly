@@ -26,6 +26,7 @@
       "required": "Vui lòng hoàn tất xác minh trước"
     },
     "claim": {
+      "anon": "Nhận tặng ẩn danh (người nhận và trang chia sẻ chỉ thấy \"Ẩn danh\")",
       "soldOutN": "Rất tiếc, chỉ còn {n} món.",
       "soldOut": "Vừa có người khác nhận hết rồi.",
       "exists": "Bạn đã nhận tặng món này rồi, đã chuyển sang chỉnh sửa",
