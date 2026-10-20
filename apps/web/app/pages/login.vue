@@ -7,6 +7,8 @@ const redirect = safeRedirect(route.query.redirect)
 const email = ref(''), password = ref('')
 const busy = ref(false)
 const err = ref('')
+// 失敗多次後後端要求人機驗證；不自動重送（新 token 一到就送會拿舊的錯密碼連續失敗）
+const needCaptcha = ref(false), tsToken = ref(''), capKey = ref(0)
 const authError = useState<string>('auth-error', () => '')
 const oauthErrors = (): Record<string, string> => ({
   oauth_failed: t('auth.login.oauthFailed'),
@@ -29,10 +31,13 @@ onMounted(async () => {
 async function submit() {
   err.value = ''; busy.value = true
   try {
-    await login(email.value.trim(), password.value)
+    await login(email.value.trim(), password.value, tsToken.value || undefined)
+    needCaptcha.value = false
     await navigateTo(redirect)
   } catch (e: any) {
-    err.value = e.code === 'INVALID_CREDENTIALS' ? t('auth.login.badCredentials') : e.status === 429 ? t('auth.login.tooMany') : errMsg(e)
+    // token 只能用一次：每次失敗後都重新出一張
+    if (needCaptcha.value || e.code === 'CAPTCHA_REQUIRED') { needCaptcha.value = true; tsToken.value = ''; capKey.value++ }
+    err.value = e.code === 'CAPTCHA_REQUIRED' ? t('auth.login.captcha') : e.code === 'INVALID_CREDENTIALS' ? t('auth.login.badCredentials') : e.status === 429 ? t('auth.login.tooMany') : errMsg(e)
   } finally { busy.value = false }
 }
 
@@ -53,6 +58,7 @@ async function social(provider: 'google' | 'line') {
     <form @submit.prevent="submit">
       <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
       <CreatorPasswordField v-model="password" :label="$t('auth.login.password')" autocomplete="current-password" />
+      <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
       <p v-if="err || loginError" class="c-err" role="alert">{{ err || loginError }}</p>
       <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
     </form>

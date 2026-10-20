@@ -25,7 +25,7 @@ export function useAuth() {
     if (r?.session_token) setNativeToken(r.session_token)
     return fetchMe(true)
   }
-  const login = (email: string, password: string) => session('/auth/login', { email, password })
+  const login = (email: string, password: string, turnstile_token?: string) => session('/auth/login', { email, password, turnstile_token })
   const register = (email: string, password: string, display_name: string, turnstile_token?: string) => post('/auth/register', { email, password, display_name, turnstile_token })
   const verifyRegister = (email: string, code: string, challenge_id?: string) => session('/auth/register/verify', { email, code, challenge_id })
   const requestReset = (email: string, turnstile_token?: string) => post('/auth/password/reset/request', { email, turnstile_token })

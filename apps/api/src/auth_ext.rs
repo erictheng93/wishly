@@ -163,12 +163,15 @@ fn bad_credentials() -> AppError {
 struct LoginReq {
     email: String,
     password: String,
+    turnstile_token: Option<String>,
 }
 
 // IP 見 config::client_ip（TRUSTED_PROXY）。15 分鐘內失敗：同 (email, IP) 5 次即鎖（主要）；
 // 同 email 跨 IP 合計 20 次即鎖（防分散式暴力的上限）；同 IP 30 次即鎖。
 // 取捨：攻擊者單一 IP 只能鎖自己那組 (email, IP)，無法鎖死受害者在別的 IP 的登入；
 // 要鎖死他人需 20 次分散失敗（成本較高），且受害者重設密碼 / 成功登入即清除該 email 的紀錄。
+// 撞庫（每帳號只試一兩次、輪換 IP）碰不到上述門檻：同 IP 或同 email 已失敗 3 次、
+// 或全站 15 分鐘內登入嘗試超過 300 次，就要先過 Turnstile（在 argon2 之前，省 CPU）。
 async fn login(
     State(st): State<AppState>,
     parts: axum::http::request::Parts,
@@ -194,6 +197,17 @@ async fn login(
             .execute(&st.pool)
             .await?;
         return Err(crate::auth::rate_limited(300));
+    }
+    let busy_site = !crate::ratelimit::allow(&st.pool, "login_global", 300, 900).await?;
+    if by_ip > 3 || by_email > 3 || busy_site {
+        if let Err(e) = crate::auth::require_captcha(r.turnstile_token.as_deref(), &ip).await {
+            // 沒過人機驗證不算密碼失敗，不累計鎖定
+            sqlx::query("DELETE FROM login_failures WHERE id=$1")
+                .bind(fid)
+                .execute(&st.pool)
+                .await?;
+            return Err(e);
+        }
     }
     let row: Option<(uuid::Uuid, Option<String>)> = sqlx::query_as(
         "SELECT i.user_id, i.password_hash FROM auth_identities i JOIN users u ON u.id=i.user_id
