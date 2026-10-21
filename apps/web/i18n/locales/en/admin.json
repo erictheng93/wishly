@@ -28,7 +28,8 @@
         "analytics": "Analytics",
         "cashRefunds": "Cash refunds",
         "walletDebts": "Chargeback debts",
-        "topups": "Top-ups and disputes"
+        "topups": "Top-ups and disputes",
+        "catalog": "Brands & products"
       },
       "tabsLabel": "Console sections",
       "tabs": {
@@ -433,6 +434,46 @@
       },
       "notApplied": "This top-up had already changed state, so nothing was done ({name}, NT$ {amount}).",
       "stale": "This top-up's state doesn't allow that action. The list was reloaded."
+    },
+    "catalog": {
+      "title": "Brands & curated products",
+      "tabsLabel": "Brands or products",
+      "tab": {
+        "brands": "Brands",
+        "products": "Products"
+      },
+      "newBrand": "New brand",
+      "newProduct": "New product",
+      "loading": "Loading…",
+      "emptyBrands": "No brands yet",
+      "emptyProducts": "No products yet",
+      "on": "Live",
+      "off": "Hidden",
+      "edit": "Edit",
+      "loadMore": "Load more",
+      "saved": "Saved",
+      "curated": "Wishly curated",
+      "allBrands": "All brands",
+      "brand": "Brand",
+      "logoStatus": "Logo status: {s}",
+      "imageStatus": "Image status: {s}",
+      "brandForm": "Brand",
+      "productForm": "Product",
+      "slug": "Slug (cannot change after creation)",
+      "name": "Name",
+      "description": "Description",
+      "website": "Website URL",
+      "ref": "Product ref (cannot change after creation)",
+      "productTitle": "Product name",
+      "spec": "Spec",
+      "note": "Note",
+      "price": "Price (NT$)",
+      "productUrl": "Product link",
+      "sort": "Sort order (lower first)",
+      "active": "Active",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…"
     }
   }
 }

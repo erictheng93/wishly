@@ -151,6 +151,7 @@ npx playwright show-report                                      # 開啟上次�
 | `npm run deploy:demo`（示範） | `NUXT_DEMO=1`、`NUXT_PUBLIC_API_BASE=` | 僅 `/s/demo` 有同源假資料，其餘分享連結失敗；**不要給真實使用者** |
 
 - 範例清單（landing「看範例」，`/s/demobirth0`、`/s/demogift00`、`/s/demowedd00`）是真實 API 的 public 清單：部署後在正式 DB 執行一次 `psql "$DATABASE_URL" -f db/seed/demo.sql`（可重複執行）。它們不出現在探索頁與後台分析。
+- 靈感頁 / 品牌館的模擬資料（10 個品牌、12 件精選商品，`p01`..`p12`，價格為示意）：部署後同樣在正式 DB 執行一次 `psql "$DATABASE_URL" -f db/seed/catalog.sql`（可重複執行）。真實商品上架後到後台 `/admin/catalog` 把這些品牌與商品下架（ref 不可刪，已加入清單的品項仍對得上）。
 
 
 - 正式 API 網域不同時，建置前設 `NUXT_PUBLIC_API_BASE=https://...`，或改 `nuxt.config.ts` 預設值。

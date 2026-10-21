@@ -28,7 +28,8 @@
         "analytics": "數據分析",
         "cashRefunds": "現金退款",
         "walletDebts": "拒付欠款",
-        "topups": "儲值與爭議"
+        "topups": "儲值與爭議",
+        "catalog": "精選商品與品牌"
       },
       "tabsLabel": "後台功能",
       "tabs": {
@@ -433,6 +434,46 @@
       },
       "notApplied": "這筆儲值單的狀態已變更，沒有做任何動作（{name}，NT$ {amount}）。",
       "stale": "這筆儲值單的狀態不允許此操作，已重新載入列表。"
+    },
+    "catalog": {
+      "title": "品牌與精選商品",
+      "tabsLabel": "品牌或商品",
+      "tab": {
+        "brands": "品牌",
+        "products": "商品"
+      },
+      "newBrand": "新增品牌",
+      "newProduct": "新增商品",
+      "loading": "載入中…",
+      "emptyBrands": "還沒有品牌",
+      "emptyProducts": "還沒有商品",
+      "on": "上架",
+      "off": "下架",
+      "edit": "編輯",
+      "loadMore": "載入更多",
+      "saved": "已儲存",
+      "curated": "Wishly 精選",
+      "allBrands": "全部品牌",
+      "brand": "品牌",
+      "logoStatus": "Logo 狀態：{s}",
+      "imageStatus": "圖片狀態：{s}",
+      "brandForm": "品牌",
+      "productForm": "商品",
+      "slug": "代稱（slug，建立後不可改）",
+      "name": "名稱",
+      "description": "簡介",
+      "website": "官網網址",
+      "ref": "商品代號（ref，建立後不可改）",
+      "productTitle": "商品名稱",
+      "spec": "規格",
+      "note": "推薦說明",
+      "price": "價格（NT$）",
+      "productUrl": "商品連結",
+      "sort": "排序（小的在前）",
+      "active": "上架中",
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "儲存中…"
     }
   }
 }

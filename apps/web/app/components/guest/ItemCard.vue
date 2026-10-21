@@ -8,7 +8,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
 // image_status 非 ready 時 API 不給 image_url，顯示灰色佔位
 </script>
 <template>
-  <li class="g-card g-item" :class="{ full }">
+  <li :id="`item-${item.id}`" class="g-card g-item" :class="{ full }">
     <img v-if="item.image_url" class="g-thumb" :src="item.image_url" alt="" loading="lazy">
     <div v-else class="g-thumb">{{ $t('guest.card.thumb') }}</div>
     <div class="g-body">

@@ -1204,18 +1204,30 @@ async fn item_create(
         order_status: None,
     };
     apply_item(m, &mut i)?;
+    // 僅建立時可帶；PATCH 不處理（沿用 apply_item 外的欄位即忽略）
+    let catalog_ref = text(m, "catalog_ref", 0, 64)?.flatten();
+    if catalog_ref
+        .as_deref()
+        .is_some_and(|r| !crate::inspire::valid_ref(r))
+    {
+        return Err(AppError::invalid(
+            "/catalog_ref",
+            "FORMAT",
+            "catalog_ref 格式不正確",
+        ));
+    }
     if mode == "crowdfund" {
         init_crowdfund(&st.pool, m, &mut i, w.event_date).await?;
     }
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, description, brand, spec, image_key, image_status, product_url, unit_price_amount, priority, qty_needed, sort_order,
-                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount)
+                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref)
          VALUES ($1,$2,$3,$4,$5,$6,$7::image_status,$8,$9,$10::item_priority,$11,
                  (SELECT coalesce(max(sort_order),0)+10 FROM wishlist_items WHERE wishlist_id=$1),
-                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17) RETURNING id")
+                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18) RETURNING id")
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref)
         .fetch_one(&st.pool).await?;
     let row: I = sqlx::query_as(&format!("SELECT {ICOLS} FROM wishlist_items WHERE id=$1"))
         .bind(id)

@@ -102,7 +102,19 @@ onMounted(async () => {
   meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include', headers: nativeHeaders() }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(() => {})
   if (hold(st.value) || st.value === 404) await loadClient()
   startLive()
+  nextTick(focusItem)
 })
+// 深連結 ?item=<id>：項目渲染後（僅 client，不影響 SSR / CDN 快取）捲到該卡並加亮
+const focusId = route.query.item
+let focused = false
+function focusItem() {
+  if (focused || typeof focusId !== 'string') return
+  const el = document.getElementById(`item-${focusId}`)
+  if (!el) return
+  focused = true
+  el.scrollIntoView({ block: 'center' }); el.classList.add('g-hl')
+}
+watch(() => items.value.length, () => nextTick(focusItem))
 function startLive() {
   if (live || !data.value) return
   live = createLiveRefresh({

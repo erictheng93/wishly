@@ -18,6 +18,8 @@
       "dark": "深色",
       "label": "主題：{mode}（點擊切換）",
       "title": "主題：{mode}"
-    }
+    },
+    "inspire": "靈感",
+    "brands": "品牌館"
   }
 }

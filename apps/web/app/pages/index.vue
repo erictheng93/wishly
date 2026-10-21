@@ -24,6 +24,8 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
         <b class="l-logo">WISHLY</b>
         <nav>
           <NuxtLink to="/explore" class="l-nav-link">{{ $t('me.home.explore') }}</NuxtLink>
+          <NuxtLink to="/inspire" class="l-nav-link">{{ $t('me.home.inspire') }}</NuxtLink>
+          <NuxtLink to="/brands" class="l-nav-link">{{ $t('me.home.brands') }}</NuxtLink>
           <NuxtLink to="/#scenes" class="l-nav-link">{{ $t('me.home.seeDemo') }}</NuxtLink>
           <LocaleSwitch />
           <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>

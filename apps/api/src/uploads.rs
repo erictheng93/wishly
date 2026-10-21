@@ -378,11 +378,12 @@ async fn presign(
     let dir = match r.purpose.as_str() {
         "cover" => "covers",
         "item" => "items",
+        "catalog" => "catalog", // 品牌 logo / 精選商品圖（僅後台使用）
         _ => {
             return Err(AppError::invalid(
                 "/purpose",
                 "ENUM",
-                "purpose 必須為 cover 或 item",
+                "purpose 必須為 cover、item 或 catalog",
             ))
         }
     };
@@ -433,7 +434,7 @@ pub fn valid_key(k: &str) -> bool {
     let Some((id, ext)) = f.rsplit_once('.') else {
         return false;
     };
-    matches!(dir, "covers" | "items")
+    matches!(dir, "covers" | "items" | "catalog")
         && matches!(ext, "jpg" | "png" | "webp")
         && Uuid::parse_str(id).is_ok()
 }

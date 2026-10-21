@@ -242,6 +242,69 @@
     "grantErr": {
       "points": "Points must be a non-zero integer (use a negative number to deduct)",
       "max": "Maximum 1,000,000 pts per grant"
+    },
+    "inspire": {
+      "seoTitle": "Gift inspiration {'|'} Wishly",
+      "seoDesc": "Curated gift ideas by recipient, occasion and budget. Add any to your wishlist in one tap.",
+      "heading": "Gift inspiration",
+      "recipient": "For",
+      "occasion": "Occasion",
+      "budget": "Budget",
+      "all": "Any",
+      "b": {
+        "lt1000": "Under NT$1,000",
+        "1000-3000": "NT$1,000–3,000",
+        "gt3000": "NT$3,000+"
+      },
+      "empty": "No products match. Try other filters.",
+      "add": "Add to my wishlist",
+      "view": "View product",
+      "pickTitle": "Add to which list?",
+      "loading": "Loading your lists…",
+      "noLists": "You have no lists to add to yet",
+      "create": "Create a list",
+      "loadErr": "Could not load your lists. Please try again.",
+      "who": "Who wants this",
+      "whoTitle": "Who wants this",
+      "scope": {
+        "all": "All",
+        "public": "Public",
+        "friends": "Friends",
+        "selected": "Close friends"
+      },
+      "loginHint": "Log in to see wishes from friends and close friends.",
+      "whoEmpty": "Nobody has wished for this yet",
+      "whoErr": "Failed to load. Please try again later.",
+      "retry": "Retry",
+      "left": "{n} still needed",
+      "done": "Fully gifted",
+      "gift": "Gift this",
+      "r": {
+        "partner": "Partner",
+        "elder": "Elders",
+        "baby": "Baby",
+        "friend": "Friend"
+      },
+      "o": {
+        "birthday": "Birthday",
+        "full_month": "Baby full month",
+        "housewarming": "Housewarming",
+        "holiday": "Holiday"
+      },
+      "soonTitle": "Curated picks are coming soon",
+      "soonBody": "We are choosing gifts worth giving. Check back soon."
+    },
+    "brands": {
+      "seoTitle": "Brands {'|'} Wishly",
+      "seoDesc": "Wishly brand hall: browse partner brands and their picks, and add them to your wishlist in one tap.",
+      "heading": "Brands",
+      "soonTitle": "The brand hall opens soon",
+      "soonBody": "Partner brands are moving in. Check back soon.",
+      "brandTitle": "{name} {'|'} Wishly Brands",
+      "notFound": "Brand not found",
+      "back": "Back to brands",
+      "website": "Brand website",
+      "noProducts": "Products from this brand are coming soon"
     }
   }
 }
