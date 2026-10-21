@@ -121,6 +121,7 @@
 - [ ] `api.<域名>` 的 DNS 為 Tunnel（CNAME 至 `<tunnel>.cfargotunnel.com`，proxied）。
 - [ ] 快取規則（README〈CDN 快取與受限清單〉）：
   - `/api/v1/public/*`：Edge TTL 選「Use cache-control header if present」，**不要**用 Cache Everything＋覆寫 TTL。
+  - 同一條規則的 Browser TTL 選「Respect origin TTL」。沒設會套用網域預設的 4 小時，瀏覽器會把公開 API 快取到 `max-age=14400`，CDN purge 也清不掉（2026-10-21 發現）。
   - `/api/v1/restricted/*`：不套任何快取規則。
   - `/api/v1/*/events`（SSE）：不快取、不緩衝、不壓縮。
 - [ ] WAF／速率限制規則；**對外封鎖或限流 `/readyz`**（它查 DB）；`/healthz` 可開放。
