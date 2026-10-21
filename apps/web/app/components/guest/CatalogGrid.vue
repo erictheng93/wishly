@@ -13,8 +13,8 @@ const lists = ref<any[]>([]), loading = ref(false), err = ref('')
 async function open(p: CatalogProduct) {
   pick.value = p; loading.value = true; err.value = ''
   try {
-    const r = await api('/wishlists', { query: { limit: 50 } })
-    lists.value = r.data.filter((w: any) => w.status !== 'archived' && w.status !== 'closed')
+    const r = await api('/wishlists', { query: { limit: 50, status: 'draft,active' } })
+    lists.value = r.data
   } catch (e) { if (pick.value) err.value = t('guest.inspire.loadErr') } finally { loading.value = false }
 }
 function choose(id: string) {

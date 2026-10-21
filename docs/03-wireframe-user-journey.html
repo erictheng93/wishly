@@ -2215,7 +2215,7 @@ flowchart TD
 <h3 id="w-others">5.29 未繪製頁面的組裝說明</h3>
 <ul>
 <li><b>/terms、/privacy</b>：純內容頁（SSR 靜態），含個資蒐集告知、Cookie 與本機儲存說明（列出 <code>ws_session</code>、<code>ws_guest</code>、localStorage 的 <code>ws_guest_token</code> 等用途與保存期間，以及行為分析工具）。頁尾與捐助 sheet 都連到此處；P2 另增點數 / 禮物卡使用條款與退款政策。</li>
-<li><b>/dashboard</b>：AppHeader + WishlistCard 列表（標題、類型徽章、完成度、狀態 draft/active/closed/archived）+ 右下浮動「＋ 新建」（44px+）。empty：「還沒有清單，建立第一份吧」。API：GET <code>/wishlists</code>、DELETE <code>/wishlists/{id}</code>（二次確認）。</li>
+<li><b>/dashboard</b>：AppHeader + WishlistCard 列表（標題、類型徽章、完成度、狀態 draft/active/closed/archived）+ 右下浮動「＋ 新建」（44px+）。empty：「還沒有清單，建立第一份吧」。整張卡片可點進編輯頁；卡內為「進度」「封存」按鈕。頂部「已封存的清單」切換列出封存清單，卡片改顯示「取消封存」。API：GET <code>/wishlists?status=draft,active,closed</code>（一般列表排除封存）/ <code>?status=archived</code>、DELETE <code>/wishlists/{id}</code>（二次確認）、PATCH <code>/wishlists/{id}</code> <code>{"status":"closed"}</code>（取消封存）。</li>
 <li><b>/org/{id}</b> <span class="ph p2">P2</span>：成員表（org_role 徽章 owner / coordinator / volunteer）、據點列表、新增據點（地址 + 地圖選點）。API：GET <code>/orgs/{id}</code>、POST <code>/orgs/{id}/members</code>、PATCH <code>/orgs/{id}/members/{user_id}</code>、POST <code>/orgs/{id}/sites</code>。</li>
 </ul>
 

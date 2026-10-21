@@ -7,11 +7,11 @@ const list = ref<any[]>([])
 const cursor = ref<string | null>(null)
 const loading = ref(true), err = ref('')
 const del = ref<any>(null), delBusy = ref(false), delErr = ref('')
-const archived = ref(false) // 切到已封存列表（後端依 status 篩選）
+const archived = ref(false) // 切到已封存列表；一般列表由後端排除已封存，分頁才不會被佔位
 async function load(more = false) {
   loading.value = true; err.value = ''
   try {
-    const r = await api('/wishlists', { query: { limit: 20, cursor: more ? cursor.value : undefined, status: archived.value ? 'archived' : undefined } })
+    const r = await api('/wishlists', { query: { limit: 20, cursor: more ? cursor.value : undefined, status: archived.value ? 'archived' : 'draft,active,closed' } })
     list.value = more ? [...list.value, ...r.data] : r.data
     cursor.value = r.next_cursor
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
@@ -28,7 +28,6 @@ async function unarchive(w: any) {
 }
 function toggleArchived() { archived.value = !archived.value; list.value = []; load() }
 onMounted(() => load())
-const visible = computed(() => archived.value ? list.value : list.value.filter(w => w.status !== 'archived'))
 </script>
 <template>
   <main class="c-page">
@@ -36,13 +35,13 @@ const visible = computed(() => archived.value ? list.value : list.value.filter(w
     <button class="c-btn c-mb16" @click="toggleArchived">{{ archived ? $t('lists.dashboard.backToLists') : $t('lists.dashboard.showArchived') }}</button>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('lists.common.retry') }}</button></p>
     <p v-else-if="loading && !list.length" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
-    <p v-else-if="!visible.length && archived" class="c-center c-mute">{{ $t('lists.dashboard.archivedEmpty') }}</p>
-    <div v-else-if="!visible.length" class="c-center">
+    <p v-else-if="!list.length && archived" class="c-center c-mute">{{ $t('lists.dashboard.archivedEmpty') }}</p>
+    <div v-else-if="!list.length" class="c-center">
       <p class="c-mute">{{ $t('lists.dashboard.empty') }}</p>
       <NuxtLink to="/lists/new" class="c-btn primary">{{ $t('lists.dashboard.create') }}</NuxtLink>
     </div>
     <div class="c-grid">
-    <article v-for="w in visible" :key="w.id" class="c-card link" :class="{ bad: w.moderation_status === 'hidden' }">
+    <article v-for="w in list" :key="w.id" class="c-card link" :class="{ bad: w.moderation_status === 'hidden' }">
       <div class="c-row">
         <img v-if="w.cover_image_url" class="c-thumb" :src="w.cover_image_url" alt="">
         <div class="c-grow">
@@ -65,7 +64,7 @@ const visible = computed(() => archived.value ? list.value : list.value.filter(w
     </article>
     </div>
     <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">{{ $t('lists.dashboard.loadMore') }}</button>
-    <NuxtLink v-if="visible.length && !archived" to="/lists/new" class="c-btn primary c-fab">{{ $t('lists.dashboard.newFab') }}</NuxtLink>
+    <NuxtLink v-if="list.length && !archived" to="/lists/new" class="c-btn primary c-fab">{{ $t('lists.dashboard.newFab') }}</NuxtLink>
     <CreatorConfirm :open="!!del" :title="$t('lists.dashboard.archiveTitle')" :text="$t('lists.dashboard.archiveText', { title: del?.title })" :ok="$t('lists.dashboard.archiveOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
   </main>
 </template>

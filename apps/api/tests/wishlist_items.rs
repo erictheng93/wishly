@@ -262,5 +262,30 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     )
     .await;
     assert_eq!(l["data"][0]["status"], "archived");
+    // 多個狀態以逗號分隔：排除已封存
+    call_app(
+        &app,
+        "POST",
+        "/wishlists",
+        &ck(&a),
+        Some(json!({ "type": "personal", "title": "另一份" })),
+    )
+    .await;
+    let (_, _, l) = call_app(
+        &app,
+        "GET",
+        "/wishlists?status=draft,active,closed",
+        &ck(&a),
+        None,
+    )
+    .await;
+    let d = l["data"].as_array().unwrap();
+    assert_eq!((d.len(), d[0]["title"].as_str()), (1, Some("另一份")));
+    assert_eq!(
+        call_app(&app, "GET", "/wishlists?status=active,bogus", &ck(&a), None)
+            .await
+            .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
     assert_all_reconciled(&pool).await;
 }

@@ -38,7 +38,7 @@
       "loadMore": "Tải thêm",
       "newFab": "+ Mới",
       "archiveTitle": "Lưu trữ danh sách",
-      "archiveText": "Sau khi lưu trữ \"{title}\", trang công khai sẽ ngừng hoạt động ngay và bạn bè không thể mở nữa (các đóng góp hiện có vẫn được giữ).",
+      "archiveText": "Sau khi lưu trữ \"{title}\", trang công khai sẽ ngừng hoạt động ngay và bạn bè không thể mở nữa. Các đăng ký tặng quà hiện có vẫn được giữ; điểm đã góp cho các món gây quỹ chưa đạt mục tiêu sẽ được hoàn lại cho người góp và không được khôi phục nếu bỏ lưu trữ. Bạn có thể bỏ lưu trữ sau trong \"Danh sách đã lưu trữ\".",
       "archiveOk": "Xác nhận lưu trữ",
       "showArchived": "Danh sách đã lưu trữ",
       "backToLists": "← Quay lại danh sách của tôi",

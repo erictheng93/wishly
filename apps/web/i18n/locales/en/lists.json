@@ -38,7 +38,7 @@
       "loadMore": "Load more",
       "newFab": "+ New",
       "archiveTitle": "Archive list",
-      "archiveText": "After archiving \"{title}\", its public page stops working right away and friends can no longer open it (existing pledges are kept).",
+      "archiveText": "After archiving \"{title}\", its public page stops working right away and friends can no longer open it. Existing gift claims are kept; points pledged to crowdfunded items that haven't reached their goal are refunded to the donors and won't come back if you unarchive. You can unarchive it later from \"Archived lists\".",
       "archiveOk": "Confirm archive",
       "showArchived": "Archived lists",
       "backToLists": "← Back to my lists",

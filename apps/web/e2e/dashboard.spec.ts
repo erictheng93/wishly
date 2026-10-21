@@ -24,6 +24,7 @@ test('儀表板：整張卡片點進編輯頁，卡內按鈕各自運作，封�
     await page.goto('/dashboard')
     await card.getByRole('button', { name: '封存' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page.getByText(/尚未達標的認捐點數會全數退回捐贈者錢包，之後取消封存也不會恢復/)).toBeVisible()
     await page.getByRole('button', { name: '確認封存' }).click()
     await expect(card).toHaveCount(0)
     // 直接開網址仍可進編輯頁，但只能看
@@ -50,4 +51,21 @@ test('儀表板：整張卡片點進編輯頁，卡內按鈕各自運作，封�
     await page.getByRole('button', { name: '取消封存' }).click()
     await expect(page.getByText('清單已結束，品項無法修改。')).toBeVisible()
   })
+})
+
+test('儀表板：已封存的清單不佔一般列表的分頁', async ({ page }) => {
+  const u = await registerUser({ tag: 'dashpage' })
+  const keep = await createList(u) // 最早建立，id 最小；被 20 份較新的封存清單排在後面
+  for (let i = 0; i < 20; i++) {
+    const w = await (await u.api.post('wishlists', { data: { type: 'personal', title: `封存 ${i}` } })).json()
+    expect((await u.api.delete(`wishlists/${w.id}`)).status()).toBe(204)
+  }
+  await loginBrowser(page.context(), u)
+  await page.goto('/dashboard')
+  await expect(page.getByRole('link', { name: keep.title })).toBeVisible()
+  await expect(page.locator('article.c-card')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: '載入更多' })).toHaveCount(0)
+  await page.getByRole('button', { name: '已封存的清單' }).click()
+  await expect(page.locator('article.c-card')).toHaveCount(20)
+  await expect(page.getByRole('link', { name: keep.title })).toHaveCount(0)
 })

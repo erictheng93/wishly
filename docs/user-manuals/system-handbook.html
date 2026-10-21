@@ -383,13 +383,14 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <p>收到通知：訪客捐助後第一封<b>即時寄出</b>，之後同一清單的新捐助<b>合併為每日台北 09:00 的彙整信</b>。在「帳號設定 → 通知」可關閉，或點信中的一鍵退訂連結。</p>
 
 <h3 id="c-lifecycle">4.8 結束、重開、封存</h3>
-<div class="flow"><span>draft 草稿</span><i>→</i><span>active 使用中</span><i>⇄</i><span>closed 已結束</span><i>→</i><span class="end">archived 已封存</span></div>
+<div class="flow"><span>draft 草稿</span><i>→</i><span>active 使用中</span><i>⇄</i><span>closed 已結束</span><i>⇄</i><span class="end">archived 已封存</span></div>
 <table>
 <tr><th>動作</th><th>效果</th></tr>
 <tr><td>發佈（draft → active）</td><td>需通過發佈檢查；朋友可開啟</td></tr>
 <tr><td>結束清單（active → closed）</td><td>不再接受捐助 / 認捐，品項不可修改；頁面顯示「這份清單已結束」。到了「自動結束時間」會自動結束，結束前 24 小時寄提醒信</td></tr>
 <tr><td>重新開放（closed → active）</td><td>若自動結束時間已過，API 會直接拒絕重新開放（<code>VALIDATION_FAILED</code>，「請延後或清除後再開啟」），須先延後或清除結束時間</td></tr>
-<tr><td>封存（任何非 archived → archived）</td><td>在儀表板按「封存」；公開頁立即失效，<b>既有捐助保留</b>；進行中的認捐點數會退回捐贈者錢包。封存不可復原</td></tr>
+<tr><td>封存（任何非 archived → archived）</td><td>在儀表板卡片按「封存」並確認；公開頁立即失效，清單從儀表板移到「已封存的清單」。<b>既有禮物捐助保留</b>；眾籌品項進行中（pledged）的認捐點數會全數退回捐贈者錢包</td></tr>
+<tr><td>取消封存（archived → closed）</td><td>儀表板「已封存的清單」或編輯頁按「取消封存」，清單回到「已結束」，要再收禮須另按「重新開放」。封存時已退回的認捐點數<b>不會</b>再扣回</td></tr>
 </table>
 <p>被營運下架（<code>hidden</code>）的清單，儀表板與編輯頁會顯示下架原因；分享停用，公開頁回 <code>410</code>。若有誤判請聯絡客服申訴。</p>
 
@@ -590,8 +591,8 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <h2 id="rules">7. 業務規則與狀態機</h2>
 
 <h3>7.1 清單</h3>
-<div class="flow"><span>draft</span><i>→</i><span>active</span><i>⇄</i><span>closed</span><i>→</i><span class="end">archived</span></div>
-<p>允許的轉換：draft→active、active→closed、closed→active、draft / active / closed → archived。其他一律 <code>VALIDATION_FAILED</code>（<code>TRANSITION</code>）。另有獨立欄位 <code>moderation_status</code>（<code>ok</code> / <code>hidden</code>）；<code>DELETE /wishlists/{id}</code> 的語意是封存。</p>
+<div class="flow"><span>draft</span><i>→</i><span>active</span><i>⇄</i><span>closed</span><i>⇄</i><span class="end">archived</span></div>
+<p>允許的轉換：draft→active、active→closed、closed→active、draft / active / closed → archived、archived→closed（取消封存，PATCH 只能單獨帶 <code>status</code>）。其他一律 <code>VALIDATION_FAILED</code>（<code>TRANSITION</code>）。另有獨立欄位 <code>moderation_status</code>（<code>ok</code> / <code>hidden</code>）；<code>DELETE /wishlists/{id}</code> 的語意是封存。</p>
 
 <h3>7.2 捐助（數量型）</h3>
 <div class="flow"><span>reserved</span><i>→</i><span>purchased</span><i>→</i><span class="end">delivered</span></div>

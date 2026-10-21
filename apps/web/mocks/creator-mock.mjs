@@ -175,7 +175,8 @@ http.createServer(async (req, res) => {
   }
   if (p === '/wishlists' && m === 'GET') {
     if (!authed()) return
-    const data = [...lists.values()].filter((w) => w.owner.id === me.id && w.status !== 'archived').reverse().map((w) => ({ id: w.id, type: w.type, status: w.status, slug: w.slug, title: w.title, event_date: w.event_date, cover_image_url: w.cover_image_url, surprise_locked: pub(w).surprise_locked, moderation_status: w.moderation_status, moderation_reason: w.moderation_reason, completion: completion(w), updated_at: w.updated_at }))
+    const st = url.searchParams.get('status')?.split(',') // 同後端：可用逗號列多個狀態
+    const data = [...lists.values()].filter((w) => w.owner.id === me.id && (!st || st.includes(w.status))).reverse().map((w) => ({ id: w.id, type: w.type, status: w.status, slug: w.slug, title: w.title, event_date: w.event_date, cover_image_url: w.cover_image_url, surprise_locked: pub(w).surprise_locked, moderation_status: w.moderation_status, moderation_reason: w.moderation_reason, completion: completion(w), updated_at: w.updated_at }))
     return send(res, 200, { data, next_cursor: null })
   }
   if ((g = p.match(/^\/wishlists\/([^/]+)$/))) {

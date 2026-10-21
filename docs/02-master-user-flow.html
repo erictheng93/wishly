@@ -997,6 +997,7 @@ stateDiagram-v2
   closed --> active : owner 重新開啟
   closed --> archived : owner 封存 或 DELETE
   draft --> archived : DELETE 無資料的草稿
+  archived --> closed : owner 取消封存 PATCH status=closed
   archived --> [*]
 </pre>
 <pre class="mermaid">
@@ -1027,7 +1028,7 @@ sequenceDiagram
 </tbody></table>
 <table class="meta"><tbody>
 <tr><td>前置條件</td><td>owner 登入且為清單擁有者。</td></tr>
-<tr><td>規則</td><td>允許轉換：draft→active、active→closed、closed→active（重新開啟，owner 反悔用，須 expires_at 已過的 reserved claim 不復活）、closed→archived、draft→archived。其他一律 <code>INVALID_STATE_TRANSITION</code>。<code>DELETE /wishlists/{id}</code> 語意為封存：draft 且無任何資料時實體刪除（連同 R2 物件由 F9 清理），其餘設為 archived 並寫 <code>deleted_at</code>，保留 claims 供稽核與對帳。archived 資料保留 90 天後匿名化（刪除 guests.contact 與暱稱），期限待決。<b>已決（自動結束）</b>：<code>wishlists.closes_at</code>（timestamptz，選填，預設 NULL = 不設期限，建立與 PATCH 皆可設 / 清除，設定時須為未來時間）。到期時捐助 / 認捐在交易內即時回 <code>WISHLIST_CLOSED</code>；F9 的 <code>close_due</code> 每 5 分鐘把到期的 active 轉 closed（同手動關閉，並清 CDN）；到期前 24 小時寄一次 <code>wishlist.closing</code> 提醒給創建者（<code>closes_reminded_at</code>，改期後重新提醒）。closed→active 時若 <code>closes_at</code> 已過須先延後或清除，避免被立刻關回。不自動封存、不自動刪除；眾籌品項仍由各自的 <code>funding_deadline</code> 管。</td></tr>
+<tr><td>規則</td><td>允許轉換：draft→active、active→closed、closed→active（重新開啟，owner 反悔用，須 expires_at 已過的 reserved claim 不復活）、closed→archived、draft→archived、archived→closed（取消封存；PATCH 只能單獨帶 status，封存時已退回的認捐點數不再扣回）。其他一律 <code>INVALID_STATE_TRANSITION</code>。<code>DELETE /wishlists/{id}</code> 語意為封存：draft 且無任何資料時實體刪除（連同 R2 物件由 F9 清理），其餘設為 archived 並寫 <code>deleted_at</code>，保留 claims 供稽核與對帳。archived 資料保留 90 天後匿名化（刪除 guests.contact 與暱稱），期限待決。<b>已決（自動結束）</b>：<code>wishlists.closes_at</code>（timestamptz，選填，預設 NULL = 不設期限，建立與 PATCH 皆可設 / 清除，設定時須為未來時間）。到期時捐助 / 認捐在交易內即時回 <code>WISHLIST_CLOSED</code>；F9 的 <code>close_due</code> 每 5 分鐘把到期的 active 轉 closed（同手動關閉，並清 CDN）；到期前 24 小時寄一次 <code>wishlist.closing</code> 提醒給創建者（<code>closes_reminded_at</code>，改期後重新提醒）。closed→active 時若 <code>closes_at</code> 已過須先延後或清除，避免被立刻關回。不自動封存、不自動刪除；眾籌品項仍由各自的 <code>funding_deadline</code> 管。</td></tr>
 <tr><td>API</td><td><code>PATCH /wishlists/{id}</code>（body 含 <code>status</code>）、<code>DELETE /wishlists/{id}</code></td></tr>
 <tr><td>交易邊界</td><td><code>SELECT … FOR UPDATE</code> 鎖 wishlist（會等待 F4 持有的 <code>FOR SHARE</code>）→ 驗證轉換 → UPDATE status 與時間戳 →（P2，closed / archived 時）同交易將該清單 <code>funding_status='open'</code> 的眾籌品項轉 <code>expired</code> 並寫 <code>expired_at</code>（捐贈者進入 7 天選擇期，見 F6e）→ INSERT audit_logs → <code>pg_notify('ws_events','wishlist.updated')</code> → COMMIT；CDN purge 與 R2 清理在 COMMIT 後透過 outbox/job。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>WISHLIST_CLOSED</code> 409（對 claim/contribution 建立與 guest 改動）；<code>INVALID_STATE_TRANSITION</code> 409；<code>NOT_FOUND</code> 404；<code>UNAUTHORIZED</code> 401。</td></tr>

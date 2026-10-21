@@ -429,10 +429,15 @@ async fn list(
             "limit 必須介於 1 與 100",
         ));
     }
-    if q.status
+    // status 可用逗號列多個（如 draft,active,closed：儀表板排除已封存，分頁才不被佔位）
+    let status: Option<Vec<String>> = q
+        .status
         .as_deref()
-        .is_some_and(|s| !["draft", "active", "closed", "archived"].contains(&s))
-    {
+        .map(|s| s.split(',').map(str::to_string).collect());
+    if status.as_ref().is_some_and(|v| {
+        v.iter()
+            .any(|s| !["draft", "active", "closed", "archived"].contains(&s.as_str()))
+    }) {
         return Err(AppError::invalid("/status", "ENUM", "status 不正確"));
     }
     if q.ty
@@ -453,8 +458,8 @@ async fn list(
     };
     let rows: Vec<W> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {WCOLS} FROM wishlists WHERE owner_id=$1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id < $2)
-         AND ($3::text IS NULL OR status::text=$3) AND ($4::text IS NULL OR type::text=$4) ORDER BY id DESC LIMIT $5")))
-        .bind(u.id).bind(after).bind(&q.status).bind(&q.ty).bind(limit + 1).fetch_all(&st.pool).await?;
+         AND ($3::text[] IS NULL OR status::text = ANY($3)) AND ($4::text IS NULL OR type::text=$4) ORDER BY id DESC LIMIT $5")))
+        .bind(u.id).bind(after).bind(&status).bind(&q.ty).bind(limit + 1).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > limit;
     let rows = &rows[..rows.len().min(limit as usize)];
     let ids: Vec<Uuid> = rows.iter().map(|w| w.id).collect();
