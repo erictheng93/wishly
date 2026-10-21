@@ -187,7 +187,7 @@ flowchart LR
 <thead><tr><th>動作</th><th>guest</th><th>owner</th><th>org owner</th><th>coordinator</th><th>volunteer</th><th>staff</th><th>系統</th><th>備註</th></tr></thead>
 <tbody>
 <tr><td>瀏覽公開清單 / 訂閱 SSE</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td>依 visibility：public 任何人（含探索頁 <code>GET /public/wishlists</code>）；friends / selected 需登入且符合條件；private 僅 owner（D51）</td></tr>
-<tr><td>建立 / 編輯 / 發佈 / 關閉 personal、registry 清單</td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>僅清單 owner_id 本人</td></tr>
+<tr><td>建立 / 編輯 / 發佈 / 關閉 personal（心願清單）清單（registry 僅舊資料，D58）</td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>僅清單 owner_id 本人</td></tr>
 <tr><td>管理品項、上傳圖片</td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>relief 品項依 org 角色</td></tr>
 <tr><td>數量捐助</td><td class="c">●</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">—</td><td class="c">—</td><td>D50：新認捐須登入（<code>ws_session</code> / Bearer），guest 欄的 ● 僅指瀏覽，未登入 POST 回 401 且不寫入；技術上不禁止自己捐助自己的清單。眾籌認捐需登入，見下方錢包列</td></tr>
 <tr><td>改量 / 取消自己的捐助</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>會員憑登入身分；舊訪客憑 guest_token（不可增量，PATCH 增量回 401）；非本人一律 404</td></tr>
@@ -1696,7 +1696,7 @@ sequenceDiagram
 
 <h4>4.2 訪客探索（D51）</h4>
 <table class="meta"><tbody>
-<tr><td>端點</td><td><code>GET /public/wishlists?page=&amp;type=</code>（type 為 registry / relief，其他值 422；page 1–100）。免登入、不讀 cookie，與 <code>/public/wishlists/{slug}</code> 同樣 <code>public, s-maxage=10, stale-while-revalidate=60</code> 可被 CDN 快取。</td></tr>
+<tr><td>端點</td><td><code>GET /public/wishlists?page=&amp;type=</code>（type 為 registry / relief，其他值 422；page 1–100。D58 起前端不提供類型篩選，參數保留給 relief 上線）。免登入、不讀 cookie，與 <code>/public/wishlists/{slug}</code> 同樣 <code>public, s-maxage=10, stale-while-revalidate=60</code> 可被 CDN 快取。</td></tr>
 <tr><td>列入條件</td><td>visibility = public、status = active、未刪除、moderation ok、至少 1 個品項、未結束（closes_at 為空或未到）、未處於驚喜鎖定、擁有者未刪除且未封鎖。依建立時間新到舊，每頁 24 筆。</td></tr>
 <tr><td>回應</td><td><code>{ wishlists: [{ slug, title, type, cover_image_url, event_date, owner: { display_name, handle }, item_count, completion_pct }], next_page: number | null }</code></td></tr>
 <tr><td>訪客權限</td><td>訪客可瀏覽探索頁與清單，但不能認捐、眾籌或加好友，一律須登入（D50）。清單被收緊時探索頁最多殘留約 1 分鐘快取卡片，點進去仍依 check_wishlist 回 403 / 404。</td></tr>

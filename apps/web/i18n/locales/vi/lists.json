@@ -8,8 +8,7 @@
       "edit": "Sửa",
       "close": "Đóng",
       "reasonSuffix": ". Lý do: {reason}",
-      "registry": "Danh sách quà tặng",
-      "personal": "Điều ước cá nhân"
+      "personal": "Danh sách điều ước"
     },
     "new": {
       "pageTitle": "Tạo danh sách",

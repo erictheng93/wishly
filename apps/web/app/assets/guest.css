@@ -97,3 +97,10 @@ dialog.g-dialog:focus-visible{outline:0}
 /* 橫放手機等短視窗：頂欄不固定 */
 @media (max-height:500px) and (orientation:landscape){ .g-top{position:static} }
 .g-demos{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--mute);margin-bottom:12px}.g-demos a{color:var(--link)}.g-demos a[aria-current=page]{color:var(--fg);font-weight:700;text-decoration:none}
+/* 窄螢幕：一列放不下（越南文尤甚）就截斷，改成兩列——品牌、語系、主題在上，導覽連結換到下一列並可再折行 */
+@media (max-width:767px){
+  .g-top{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:0;overflow-x:visible;padding-bottom:4px}
+  .g-top::after{content:'';order:1;flex-basis:100%}
+  .g-top a:first-child{margin-right:auto}
+  .g-top a+a{order:2;font-size:12px;letter-spacing:.04em;min-height:40px}
+}

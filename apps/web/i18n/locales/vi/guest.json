@@ -113,10 +113,8 @@
       "seoTitle": "Khám phá danh sách công khai {'|'} Wishly",
       "seoDesc": "Xem các danh sách quà ước và danh sách cứu trợ công khai, đăng nhập để nhận tặng.",
       "heading": "Khám phá danh sách công khai",
-      "typeGroup": "Loại danh sách",
       "type": {
-        "all": "Tất cả",
-        "registry": "Đăng ký quà tặng",
+        "wishlist": "Danh sách điều ước",
         "relief": "Cứu trợ"
       },
       "empty": "Hiện chưa có danh sách công khai nào.",

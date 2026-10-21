@@ -170,6 +170,9 @@ test('探索頁 /explore：訪客看得到公開清單，看不到僅好友清�
     await more.click(); await anon.waitForTimeout(300)
   }
   await expect(card).toBeVisible()
+  // 舊 registry 清單（createList 預設）也顯示「心願清單」；類型篩選已移除
+  await expect(anon.getByRole('article').filter({ has: card })).toContainText('心願清單')
+  await expect(anon.getByRole('group', { name: '清單類型' })).toHaveCount(0)
   await expect(anon.getByRole('link', { name: fr.title })).toHaveCount(0)
   await card.click()
   await expect(anon.getByRole('heading', { level: 1, name: pub.title })).toBeVisible()

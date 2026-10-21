@@ -153,8 +153,8 @@
         "other": "其他"
       },
       "wishlistType": {
-        "personal": "個人心願",
-        "registry": "禮物登記",
+        "personal": "心願清單",
+        "registry": "禮物登記（舊類型）",
         "relief": "救助"
       },
       "wishlistVisibility": {

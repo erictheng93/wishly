@@ -3,7 +3,7 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('lists.new.pageTitle') })
 const { api } = useApi()
-const f = reactive({ type: 'registry', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends' })
+const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends' })
 const allowed = ref<string[]>([])
 const cover = ref<string | null>(null)
 const upBusy = ref(false), busy = ref(false), err = ref(''), dateErr = ref('')
@@ -30,9 +30,9 @@ async function submit() {
     <CreatorHeader :title="$t('lists.new.pageTitle')" back="/dashboard" />
     <form @submit.prevent="submit">
       <div class="c-field"><span>{{ $t('lists.new.type') }}</span>
+        <!-- 類型決定行為（relief 需據點、組織），目前只開放 personal；開放新類型時在此加選項 -->
         <div class="c-seg">
           <label><input v-model="f.type" type="radio" value="personal"><span>{{ $t('lists.common.personal') }}</span></label>
-          <label><input v-model="f.type" type="radio" value="registry"><span>{{ $t('lists.common.registry') }}</span></label>
         </div>
       </div>
       <label class="c-field"><span>{{ $t('lists.new.title', { n: f.title.length }) }}</span><input v-model="f.title" maxlength="100" required :placeholder="$t('lists.new.titlePh')"></label>

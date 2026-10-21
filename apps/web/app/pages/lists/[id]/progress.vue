@@ -75,14 +75,14 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
         <div class="c-big">{{ pct }}%</div>
         <div class="c-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100" :aria-label="$t('lists.progress.overall')"><i :style="{ width: pct + '%' }" /></div>
         <p class="c-mute">{{ $t('lists.progress.complete', { done: d.totals.fulfilled_count, total: d.totals.item_count }) }}<template v-if="!locked">{{ $t('lists.progress.qtyPart', { claimed: d.totals.qty_claimed, needed: d.totals.qty_needed }) }}</template></p>
-        <p v-if="!locked && d.totals.target_points" class="c-mute">{{ $t('lists.progress.pointsLine', { pledged: fmtPts(d.totals.pledged_points), target: fmtPts(d.totals.target_points), n: d.totals.funded_item_count ?? 0 }) }}</p>
+        <p v-if="!locked && d.totals.target_points" class="c-mute">{{ $t('lists.progress.pointsLine', { pledged: fmtPts(d.totals.pledged_points), target: fmtPts(d.totals.target_points), n: d.totals.funded_item_count ?? 0 }, d.totals.funded_item_count ?? 0) }}</p>
         <p class="c-mute c-small">{{ status === 'live' ? $t('lists.progress.live') : status === 'polling' ? $t('lists.progress.polling') : '' }}　{{ $t('lists.progress.updatedAt', { time: updatedAt }) }}</p>
       </section>
 
       <section v-if="locked" class="c-mask" role="status">
         <strong>{{ $t('lists.progress.surprise') }}</strong>
         <p>{{ $t('lists.progress.surpriseDesc') }}</p>
-        <p>{{ $t('lists.progress.countdown', { days, hms, at: new Date(d.unlock_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }) }}</p>
+        <p>{{ $t('lists.progress.countdown', { days, hms, at: new Date(d.unlock_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }, days) }}</p>
       </section>
 
       <p v-if="!d.totals.item_count" class="c-center c-mute">{{ $t('lists.progress.noItems') }}</p>

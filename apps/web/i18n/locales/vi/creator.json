@@ -153,8 +153,8 @@
         "other": "Khác"
       },
       "wishlistType": {
-        "personal": "Điều ước cá nhân",
-        "registry": "Danh sách quà tặng",
+        "personal": "Danh sách điều ước",
+        "registry": "Đăng ký quà tặng (loại cũ)",
         "relief": "Cứu trợ"
       },
       "wishlistVisibility": {

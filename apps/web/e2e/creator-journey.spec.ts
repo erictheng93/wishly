@@ -27,6 +27,9 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
 
   await test.step('建立清單', async () => {
     await page.getByRole('link', { name: '＋ 建立清單' }).click()
+    // 類型只剩「心願清單」（禮物登記已合併）
+    await expect(page.getByRole('radio', { name: '心願清單' })).toBeChecked()
+    await expect(page.getByRole('radio', { name: '禮物登記' })).toHaveCount(0)
     await page.getByLabel(/清單名稱/).fill(title)
     await page.getByRole('radio', { name: /^公開/ }).check() // 預設是僅好友；下面要用未登入訪客開分享連結
     await page.getByRole('button', { name: '建立並新增品項' }).click()

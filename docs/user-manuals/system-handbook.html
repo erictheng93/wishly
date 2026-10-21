@@ -142,10 +142,10 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><th>功能</th><th>狀態</th><th>說明</th></tr>
 <tr><td>Email＋密碼註冊 / 登入（OTP 驗證）</td><td><span class="tag live">已實作</span></td><td>OTP 僅用於註冊驗證與忘記密碼，不是登入方式</td></tr>
 <tr><td>Google / LINE 登入與綁定</td><td><span class="tag live">已實作</span></td><td>可在設定頁綁定 / 解除，至少保留一種</td></tr>
-<tr><td>清單 CRUD、品項 CRUD、排序、圖片上傳</td><td><span class="tag live">已實作</span></td><td>類型 <code>personal</code>（個人心願）/ <code>registry</code>（禮物登記）</td></tr>
+<tr><td>清單 CRUD、品項 CRUD、排序、圖片上傳</td><td><span class="tag live">已實作</span></td><td>類型「心願清單」（<code>personal</code>；舊 <code>registry</code> 清單同樣顯示為心願清單，D58）</td></tr>
 <tr><td>登入後數量認捐（D50；原訪客免註冊）</td><td><span class="tag live">已實作</span></td><td>含修改、取消、狀態標記、逾期釋放、冪等重送；既有訪客認捐（舊資料）仍可管理但不可增量</td></tr>
 <tr><td>清單可見性 4 種</td><td><span class="tag live">已實作</span></td><td>public / friends（預設）/ selected（摯友）/ private</td></tr>
-<tr><td>公開清單探索頁 <code>/explore</code></td><td><span class="tag live">已實作</span></td><td>訪客可瀏覽所有人的公開清單；認捐仍須登入</td></tr>
+<tr><td>公開清單探索頁 <code>/explore</code></td><td><span class="tag live">已實作</span></td><td>訪客可瀏覽所有人的公開清單（不分類型，無篩選，D58）；認捐仍須登入</td></tr>
 <tr><td>驚喜模式、自動結束時間</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>即時更新（SSE，失敗退輪詢）</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>好友、邀請連結、個人頁、指定名單</td><td><span class="tag live">已實作</span></td><td></td></tr>
@@ -303,7 +303,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <p>在 <code>/dashboard</code> 按「＋ 建立清單」（<code>/lists/new</code>）：</p>
 <table>
 <tr><th>欄位</th><th>說明 / 限制</th></tr>
-<tr><td>清單類型</td><td><b>個人心願</b>（<code>personal</code>）或<b>禮物登記</b>（<code>registry</code>，孕婦 / 婚禮等）。兩者功能相同，差別在顯示與分析</td></tr>
+<tr><td>清單類型</td><td>目前只有<b>心願清單</b>（<code>personal</code>），生日、待產、婚禮都用它。原本的「禮物登記」（<code>registry</code>）功能完全相同，已合併（D58）；舊清單照常運作。日後開放救災時會在此多一個選項</td></tr>
 <tr><td>清單名稱</td><td>必填，1–100 字</td></tr>
 <tr><td>說明</td><td>選填；介面限 300 字（API 上限 2000）</td></tr>
 <tr><td>封面圖</td><td>選填；jpg / png / webp，5 MB 內</td></tr>
@@ -1091,7 +1091,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <h3>14.2 狀態枚舉速查</h3>
 <table>
 <tr><th>名稱</th><th>值</th></tr>
-<tr><td><code>wishlist_type</code></td><td>personal、registry、relief（尚未開放建立）</td></tr>
+<tr><td><code>wishlist_type</code></td><td>personal、registry（D58 起不再由前端建立，僅舊資料）、relief（尚未開放建立）</td></tr>
 <tr><td><code>wishlist_status</code></td><td>draft、active、closed、archived</td></tr>
 <tr><td><code>visibility</code></td><td>public、friends、selected、private（link、password 已於 0016 移除）</td></tr>
 <tr><td><code>moderation_status</code></td><td>ok、hidden</td></tr>

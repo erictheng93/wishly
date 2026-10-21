@@ -183,6 +183,7 @@ main{padding:0 16px 60px}
 <tr><th>版本</th><td>v0.5</td></tr>
 <tr><th>日期</th><td>2026-10-12</td></tr>
 <tr><th>狀態</th><td>Draft</td></tr>
+<tr><th>D58 變更</th><td>清單類型 personal / registry 合併為「心願清單」：5.5 建立清單的類型只剩一個選項（欄位保留給日後 relief）、清單卡片一律標「心願清單」、5.36 探索頁移除類型篩選。見 PRD D58。</td></tr>
 <tr><th>D51 變更</th><td>清單可見性精簡為 public / friends（所有好友，預設）/ selected（摯友）/ private；移除知道連結與密碼保護（含 5.35 密碼門檻、3.10 密碼清單旅程）。新增訪客探索頁 /explore（5.36 與 3.10）。下文 v0.5 提及 link / password / 解鎖之處已被取代。</td></tr>
 <tr><th>v0.5 變更</th><td>對齊 10/11 已實作功能，補齊原文件缺漏的畫面與流程：Email＋密碼註冊 / 登入 / 忘記密碼（5.30）、好友（5.31）、好友邀請連結（5.32）、個人頁（5.33）、清單可見性選擇器（5.34）、受限清單門檻頁（5.35）、帳號設定的個人頁與捐助可見度、捐助可見度（5.36）；新增旅程 3.9 / 3.10、User Flow 4.12 至 4.16、路由對照與實作覆蓋矩陣（5.37）、E2E 必測情境（13.1）。5.2 登入頁改以實作為準（密碼為主，OTP 僅用於註冊與重設）。</td></tr>
 <tr><th>v0.4 變更</th><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。本文件對應：檢舉與下架畫面、/admin、/settings、個資告知與 Email 管理連結、圖片 EXIF 提示、發票選項、錢包凍結、已驗證組織徽章、第 12 至 14 節。</td></tr>
@@ -307,7 +308,7 @@ flowchart TD
 <thead><tr><th>階段</th><th>行為</th><th>想法</th><th>情緒</th><th>觸點</th><th>機會</th></tr></thead>
 <tbody>
 <tr><td>1 發現</td><td>朋友的 LINE 訊息帶來 Wishly 連結，或搜尋「待產清單 分享」</td><td>「上次收了三組奶瓶組，這次想先講清楚」</td><td>期待 / 略懷疑</td><td>首頁 /</td><td>首屏以「不重複、不尷尬」為訴求，放範例分享頁預覽</td></tr>
-<tr><td>2 登入建立</td><td>選 LINE 登入；選 registry、輸入名稱「小愛的待產清單」、預產期</td><td>「不想再記一組密碼」</td><td>順暢</td><td>/login、/lists/new</td><td>LINE Login 置頂；registry 預設，活動日用日期選擇器</td></tr>
+<tr><td>2 登入建立</td><td>選 LINE 登入；輸入名稱「小愛的待產清單」、預產期</td><td>「不想再記一組密碼」</td><td>順暢</td><td>/login、/lists/new</td><td>LINE Login 置頂；類型預設「心願清單」（D58），活動日用日期選擇器</td></tr>
 <tr><td>3 加品項</td><td>逐項新增：奶瓶 ×10、奶粉 ×2（MVP 皆為數量捐助）。<span class="ph p2">P2</span> 另加嬰兒推車：從商品目錄選，設為眾籌</td><td>「推車太貴，大家分攤比較好開口，但錢不要經過我的手」</td><td>認真 / 稍累</td><td>/lists/{id}/edit、新增品項 sheet</td><td>P0 眾籌選項灰掉標示 P2；P1 貼網址自動帶入標題與圖片；P2 CatalogPicker 直接算出 target_points</td></tr>
 <tr><td>4 設驚喜與收件地址</td><td>開驚喜模式；<span class="ph p2">P2</span> 有眾籌品項時填收件地址（發佈前必填）</td><td>「我想保留拆禮物的驚喜，但包裹要寄得到」</td><td>安心</td><td>建立頁開關、收件地址設定</td><td>解釋「活動日前只看完成度與彙總（已下單 N / 運送中 M）」；說明地址只有你與履約人員看得到，捐贈者看不到</td></tr>
 <tr><td>5 分享</td><td>按「分享」→ 傳到家族群組、朋友群</td><td>「連結點開要一眼看懂」</td><td>期待</td><td>ShareSheet、LINE OG 預覽</td><td>OG 卡片含完成度與封面；LINE 分享帶 <code>openExternalBrowser</code> 選項</td></tr>
@@ -826,7 +827,7 @@ flowchart TD
 <div class="btn pri">開始建立清單</div>
 <div class="btn ghost">看範例清單</div>
 <div class="card" style="flex-direction:column"><b>三步驟</b><div class="row"><span class="b teal">1</span>列出想要的</div><div class="row"><span class="b teal">2</span>傳給 LINE 好友</div><div class="row"><span class="b teal">3</span>即時看到誰捐助</div></div>
-<div class="row"><div class="card fl" style="flex-direction:column"><b>生日 / 個人</b><span class="lbl">personal</span></div><div class="card fl" style="flex-direction:column"><b>待產 / 婚禮</b><span class="lbl">registry</span></div></div>
+<div class="row"><div class="card fl" style="flex-direction:column"><b>心願清單</b><span class="lbl">personal（生日、待產、婚禮皆適用，D58）</span></div></div>
 <div class="lbl" style="text-align:center">救災物資地圖（<span class="b gray">P2</span>）→</div>
 <div class="lbl" style="text-align:center">服務條款・隱私權政策・Cookie 與本機儲存說明</div>
 </div></div><div class="cap">/ 首頁（訪客未登入）</div></div>
@@ -880,7 +881,7 @@ flowchart TD
 <div class="st"><span>9:41</span><span></span></div>
 <div class="ab">‹ 建立清單</div>
 <div class="bd">
-<div><div class="lbl"><b>清單類型</b></div><div class="seg"><span class="on">個人心願<br><small style="font-size:11px">personal</small></span><span>禮物登記<br><small style="font-size:11px">registry</small></span></div></div>
+<div><div class="lbl"><b>清單類型</b></div><div class="seg"><span class="on">心願清單<br><small style="font-size:11px">personal</small></span></div></div>
 <div><div class="lbl"><b>清單名稱</b></div><div class="inp">例如：小愛的待產清單</div><div class="lbl" style="text-align:right">0 / 40</div></div>
 <div><div class="lbl"><b>活動日</b>（選填）</div><div class="inp">2026 / 12 / 20　📅</div></div>
 <div class="card" style="align-items:center"><div class="col"><b>驚喜模式</b><span class="lbl">活動日前，你只看得到完成度，看不到誰送了什麼。</span></div><div class="sw"></div></div>
@@ -890,8 +891,8 @@ flowchart TD
 </div></div><div class="cap">/lists/new</div></div>
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>元件</th><td>SegmentedControl（type）、TextField（title，必填 1–40 字）、DateField（event_date，原生 <code>&lt;input type="date"&gt;</code>）、SwitchRow ×2（surprise_mode、show_claimer_names）</td></tr>
-<tr><th>狀態</th><td>loading：送出時按鈕 spinner；error：<code>VALIDATION_FAILED</code> 對應欄位顯示錯誤，其餘 toast；離線：停用送出並保留草稿（localStorage）。type 只開放 personal / registry；relief 由 P2 的 /org 流程建立。</td></tr>
-<tr><th>互動</th><td>surprise_mode 開啟但 event_date 空白 → 日期欄紅框並捲動到該欄；切換 type 為 personal 時，數量欄預設隱藏（預設 1）。成功後導向 /lists/{id}/edit。</td></tr>
+<tr><th>狀態</th><td>loading：送出時按鈕 spinner；error：<code>VALIDATION_FAILED</code> 對應欄位顯示錯誤，其餘 toast；離線：停用送出並保留草稿（localStorage）。type 只開放 personal（「心願清單」，D58）；relief 由 P2 的 /org 流程建立，屆時在此欄加選項。</td></tr>
+<tr><th>互動</th><td>surprise_mode 開啟但 event_date 空白 → 日期欄紅框並捲動到該欄；成功後導向 /lists/{id}/edit。</td></tr>
 <tr><th>API</th><td>POST <code>/wishlists</code>（body: wishlist_type, title, event_date, surprise_mode, show_claimer_names；建立後 status=draft）</td></tr>
 </tbody></table></div></div></div>
 
@@ -2000,8 +2001,8 @@ flowchart TD
 <div class="bd">
 <div class="card" style="flex-direction:column"><b style="font-size:17px">小愛</b><span class="lbl">@amy_wang</span><div class="btn pri">送出好友邀請</div></div>
 <div class="lbl"><b>心願清單</b></div>
-<div class="card" style="flex-direction:column"><b>小愛的待產清單</b><div class="row"><span class="b teal">僅好友</span><span class="lbl">禮物登記</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
-<div class="card" style="flex-direction:column"><b>生日小物</b><div class="row"><span class="b teal">公開</span><span class="lbl">個人心願</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
+<div class="card" style="flex-direction:column"><b>小愛的待產清單</b><div class="row"><span class="b teal">僅好友</span><span class="lbl">心願清單</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
+<div class="card" style="flex-direction:column"><b>生日小物</b><div class="row"><span class="b teal">公開</span><span class="lbl">心願清單</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
 <div class="lbl"><b>捐助紀錄</b></div>
 <div class="card" style="flex-direction:column"><b>奶瓶 240ml × 2</b><span class="b gray">已捐助</span><span class="lbl">送給 阿明・阿明的生日清單・2026/10/05</span></div>
 </div></div><div class="cap">/u/amy_wang：relation = none</div></div>
@@ -2011,7 +2012,7 @@ flowchart TD
 <div class="bd">
 <div class="card" style="flex-direction:column"><b style="font-size:17px">小愛</b><span class="lbl">@amy_wang</span><div class="btn pri">登入以加好友</div></div>
 <div class="lbl"><b>心願清單</b></div>
-<div class="card" style="flex-direction:column"><b>生日小物</b><div class="row"><span class="b teal">公開</span><span class="lbl">個人心願</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
+<div class="card" style="flex-direction:column"><b>生日小物</b><div class="row"><span class="b teal">公開</span><span class="lbl">心願清單</span></div><div class="prog s"><i style="width:40%"></i></div><span class="lbl">完成度 40%（5 件）</span></div>
 <div class="lbl"><b>捐助紀錄</b></div>
 <div class="lbl">目前沒有可看的捐助紀錄。</div>
 </div></div><div class="cap">relation = anonymous（只看得到 public 內容）</div></div>
@@ -2101,7 +2102,7 @@ flowchart TD
 <h3 id="w-explore">5.36 探索頁 /explore（D51）<span class="ph p0">P0</span></h3>
 <div class="spec"><div class="tw"><table><tbody>
 <tr><th>用途</th><td>訪客（免登入）瀏覽所有人的公開清單；沒有連結也能發現清單。</td></tr>
-<tr><th>元件</th><td>GuestTop（含「探索」入口）、TypeFilter（全部 / 禮物登記 / 救助）、ExploreCard（封面、標題、擁有者連結 /u/{handle}、完成度進度條、品項數）、LoadMore。</td></tr>
+<tr><th>元件</th><td>GuestTop（含「探索」入口）、ExploreCard（封面、標題、擁有者連結 /u/{handle}、完成度進度條、品項數）、LoadMore。</td></tr>
 <tr><th>狀態</th><td>loading / ok / empty（沒有公開清單）/ error（重試）；有 <code>next_page</code> 才顯示「載入更多」。SSR 輸出，標題與描述供 SEO。</td></tr>
 <tr><th>互動</th><td>點卡片進 /s/{slug}（免登入瀏覽，認捐需登入，D50）；切換類型重新從第 1 頁載入。首頁導覽列與 hero 另有「探索」入口。</td></tr>
 <tr><th>API</th><td>GET <code>/public/wishlists?page=&amp;type=</code>（不讀 cookie，可 CDN 快取，每頁 24 筆，回 <code>next_page</code>）。</td></tr>
@@ -2756,7 +2757,7 @@ async function waitTopup(before) {
 <tr><td>事件白名單</td><td>攔截 PostHog 請求</td><td>事件名與屬性皆在 12 節白名單內，不含暱稱與聯絡方式</td></tr>
 <tr><td>密碼註冊與登入</td><td>全新 Email；Mailpit 取得 OTP</td><td>註冊 → 輸入 OTP → 進 /dashboard；登出後以密碼登入成功；錯誤密碼顯示「帳號或密碼錯誤」；重複 Email 驗證顯示「此 Email 已註冊」</td></tr>
 <tr><td>忘記密碼</td><td>已註冊帳號</td><td>寄出 OTP → 設新密碼 → 回 /login 顯示「密碼已重設」；舊密碼失效、其他裝置 session 被撤銷</td></tr>
-<tr><td>探索頁</td><td>多位使用者各有 public / friends / selected / private 清單</td><td>匿名開 /explore 只看到 public 且有品項的清單；類型篩選與載入更多正常；點進清單可瀏覽但「我要送」要求登入</td></tr>
+<tr><td>探索頁</td><td>多位使用者各有 public / friends / selected / private 清單</td><td>匿名開 /explore 只看到 public 且有品項的清單；卡片標「心願清單」、無類型篩選（D58）；載入更多正常；點進清單可瀏覽但「我要送」要求登入</td></tr>
 <tr><td>好友清單</td><td>visibility=friends</td><td>未登入「請先登入」→ 登入後非好友「僅限好友」→ 成為好友後可看；解除好友後再次被擋</td></tr>
 <tr><td>指定清單</td><td>visibility=selected 名單含甲不含乙</td><td>甲可看、乙 NOT_ALLOWED；解除好友後甲被自動移出名單</td></tr>
 <tr><td>邀請連結</td><td>甲產生連結、乙開啟</td><td>未登入顯示「登入後成為好友」；登入後成為好友；自己開啟 SELF_INVITE；撤銷後 404；重新產生後舊連結失效</td></tr>

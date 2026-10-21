@@ -80,7 +80,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
             <span class="c-grow">
               <NuxtLink v-if="b.handle" :to="`/u/${b.handle}`"><strong>{{ b.display_name }}</strong></NuxtLink>
               <strong v-else>{{ b.display_name }}</strong>
-              <span class="c-mute"> · {{ b.days ? $t('me.friends.bdIn', { n: b.days }) : $t('me.friends.bdToday') }}</span>
+              <span class="c-mute"> · {{ b.days ? $t('me.friends.bdIn', { n: b.days }, b.days) : $t('me.friends.bdToday') }}</span>
             </span>
           </div>
         </section>
@@ -107,7 +107,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
               <div class="c-mute">{{ ago(e.at) }}</div>
             </div>
             <span v-if="e.kind === 'delivered'" class="c-badge delivered">{{ $t('creator.analytics.claimStatus.delivered') }}</span>
-            <span v-else-if="e.wishlist.closes_at" class="c-badge fr-hot">{{ daysLeft(e.wishlist.closes_at) ? $t('me.friends.closesIn', { n: daysLeft(e.wishlist.closes_at) }) : $t('me.friends.closesToday') }}</span>
+            <span v-else-if="e.wishlist.closes_at" class="c-badge fr-hot">{{ daysLeft(e.wishlist.closes_at) ? $t('me.friends.closesIn', { n: daysLeft(e.wishlist.closes_at) }, daysLeft(e.wishlist.closes_at)) : $t('me.friends.closesToday') }}</span>
           </div>
           <NuxtLink :to="`/s/${e.wishlist.slug}`" class="fr-item">
             <img v-if="e.item.image_url" :src="e.item.image_url" alt="" class="c-thumb" loading="lazy">
@@ -121,7 +121,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
             </span>
           </NuxtLink>
           <template v-if="e.kind === 'items_added'">
-            <p class="c-mute c-mt">{{ $t('me.friends.progress', { n: e.wishlist.item_count, pct: e.wishlist.completion_pct }) }}</p>
+            <p class="c-mute c-mt">{{ $t('me.friends.progress', { n: e.wishlist.item_count, pct: e.wishlist.completion_pct }, e.wishlist.item_count) }}</p>
             <div class="c-bar"><i :style="{ width: `${e.wishlist.completion_pct}%` }" /></div>
             <div class="c-row wrap c-mt12">
               <NuxtLink :to="`/s/${e.wishlist.slug}`" class="c-btn primary">{{ e.item.open ? $t('me.friends.give') : $t('me.friends.viewList') }}</NuxtLink>

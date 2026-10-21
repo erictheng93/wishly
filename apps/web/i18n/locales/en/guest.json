@@ -113,14 +113,12 @@
       "seoTitle": "Explore public lists {'|'} Wishly",
       "seoDesc": "Browse everyone's public wishlists and relief lists. Sign in to pledge.",
       "heading": "Explore public lists",
-      "typeGroup": "List type",
       "type": {
-        "all": "All",
-        "registry": "Gift registry",
+        "wishlist": "Wishlist",
         "relief": "Relief"
       },
       "empty": "There are no public lists yet.",
-      "itemCount": "{n} items",
+      "itemCount": "{n} item | {n} items",
       "by": " · by",
       "completionAria": "{pct}% complete",
       "completion": "{pct}% complete",

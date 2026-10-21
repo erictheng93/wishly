@@ -40,7 +40,7 @@ const visible = computed(() => list.value.filter(w => w.status !== 'archived'))
           <NuxtLink :to="`/lists/${w.id}/edit`"><strong>{{ w.title }}</strong></NuxtLink>
           <div class="c-row wrap">
             <CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" />
-            <span class="c-mute">{{ w.type === 'registry' ? $t('lists.common.registry') : $t('lists.common.personal') }}</span>
+            <span class="c-mute">{{ $t('lists.common.personal') }}</span>
           </div>
           <div class="c-mute">{{ $t('lists.dashboard.completion', { pct: w.completion?.completion_pct ?? 0, done: w.completion?.fulfilled_count ?? 0, total: w.completion?.item_count ?? 0 }) }}</div>
         </div>

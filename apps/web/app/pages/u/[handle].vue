@@ -61,9 +61,9 @@ const accept = () => run(async () => {
               <div class="c-row wrap">
                 <span class="c-badge">{{ visLabel(w.visibility) }}</span>
                 <span v-if="w.status === 'closed'" class="c-badge">{{ $t('me.profile.closed') }}</span>
-                <span class="c-mute">{{ w.type === 'registry' ? $t('me.profile.registry') : $t('me.profile.personal') }}</span>
+                <span class="c-mute">{{ $t('me.profile.personal') }}</span>
               </div>
-              <div class="c-mute">{{ $t('me.profile.completion', { pct: w.completion_pct ?? 0, n: w.item_count }) }}</div>
+              <div class="c-mute">{{ $t('me.profile.completion', { pct: w.completion_pct ?? 0, n: w.item_count }, w.item_count) }}</div>
             </div>
           </div>
         </article>

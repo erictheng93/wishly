@@ -113,10 +113,8 @@
       "seoTitle": "探索公開清單｜Wishly",
       "seoDesc": "瀏覽大家公開的心願清單與救助清單，登入會員後即可捐助。",
       "heading": "探索公開清單",
-      "typeGroup": "清單類型",
       "type": {
-        "all": "全部",
-        "registry": "禮物登記",
+        "wishlist": "心願清單",
         "relief": "救助"
       },
       "empty": "目前沒有公開的清單。",

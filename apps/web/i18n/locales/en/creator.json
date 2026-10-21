@@ -153,8 +153,8 @@
         "other": "Other"
       },
       "wishlistType": {
-        "personal": "Personal wish",
-        "registry": "Gift registry",
+        "personal": "Wishlist",
+        "registry": "Gift registry (legacy)",
         "relief": "Relief"
       },
       "wishlistVisibility": {
