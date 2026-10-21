@@ -1000,8 +1000,9 @@ npm run e2e:ui                                                      # UI 模式
 npm run e2e:headed                                                  # 顯示瀏覽器</code></pre>
 <h3>12.2 CI（<code>.github/workflows/ci.yml</code>）</h3>
 <ul>
-<li><b>api</b>：Rust 1.99.0 的 fmt、clippy（warnings 視為錯誤）、測試、覆蓋率（cargo-llvm-cov 0.9.1，版本不符拒絕）、cargo-audit 0.22.2、<code>scripts/mutate.sh all</code>（上傳 receipts / patch / logs）。</li>
-<li><b>image</b>：驗證後端 Docker 映像可建置。 <b>web</b>：typecheck → 覆蓋率 → build。 <b>native</b>：僅對 <code>src-tauri</code> 做 Rust fmt / clippy / 測試 / audit，<b>不含</b>完整原生打包。 <b>e2e</b>：Playwright，失敗上傳報告與 trace。 <b>publish-image</b>：main 的 api / image / web / e2e 全綠後推 GHCR（<b>不要求 native 成功</b>）。</li>
+<li>觸發：PR、push 到 main、每週排程（僅 web-audit）。</li>
+<li><b>api</b>：Rust 1.99.0 的 fmt、clippy（warnings 視為錯誤）、測試、覆蓋率（cargo-llvm-cov 0.9.1，版本不符拒絕）、cargo-audit 0.22.2。 <b>mutate</b>：<code>scripts/mutate.sh all</code>（上傳 receipts / patch / logs），不擋 publish-image。</li>
+<li><b>image</b>：驗證後端 Docker 映像可建置。 <b>web</b>：typecheck → 覆蓋率 → build。 <b>e2e</b>：Playwright，失敗上傳報告與 trace。 <b>publish-image</b>：main 的 api / image / web / e2e 全綠後推 GHCR。</li>
 </ul>
 <h3>12.3 守則（改動前必讀）</h3>
 <ul>

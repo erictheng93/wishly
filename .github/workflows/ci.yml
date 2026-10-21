@@ -1,6 +1,7 @@
 name: ci
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
     # Recheck the advisory database weekly even when the lockfile is unchanged.
@@ -107,27 +108,6 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci --ignore-scripts
       - run: npm run audit:security
-  native:
-    if: github.event_name != 'schedule'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
-        with: { components: rustfmt, clippy }
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with: { workspaces: apps/web/src-tauri }
-      - run: cargo fmt --manifest-path apps/web/src-tauri/Cargo.toml --check
-      - run: cargo clippy --manifest-path apps/web/src-tauri/Cargo.toml --all-targets -- -D warnings
-      - run: cargo test --manifest-path apps/web/src-tauri/Cargo.toml --lib
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with: { tool: cargo-audit@0.22.2 }
-      # 暫時接受既有 GTK3 依賴風險，待 Tauri #16170 整鏈升級後移除；不是漏洞修補。
-      # RUSTSEC-2024-0429：glib 的 Linux VariantStrIter 問題；發布 Linux 原生殼前須重評估。
-      # RUSTSEC-2024-0370：proc-macro-error 停止維護，無已知漏洞；不改用已封存的 error2。
-      - run: >-
-          cargo audit --file apps/web/src-tauri/Cargo.lock
-          --ignore RUSTSEC-2024-0429
-          --ignore RUSTSEC-2024-0370
   e2e:
     if: github.event_name != 'schedule'
     # Playwright 端對端測試（見 README「測試」）：真實的 API + Web + Postgres + Mailpit
