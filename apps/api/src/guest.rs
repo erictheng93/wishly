@@ -167,11 +167,11 @@ async fn me(
             .await?
     };
     let limit = p.limit.unwrap_or(20).clamp(1, 50);
-    let mut rows: Vec<Row> = sqlx::query_as(&format!(
+    let mut rows: Vec<Row> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {CLAIM_COLS}, i.title AS item_title, i.image_key, i.image_status::text AS image_status,
                 w.slug::text AS slug, w.title AS wl_title, w.event_date, w.status::text AS wl_status
          FROM claims c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
-         WHERE (CASE WHEN $4 THEN c.user_id ELSE c.guest_id END) = $1 AND ($2::uuid IS NULL OR c.id < $2) ORDER BY c.id DESC LIMIT $3"))
+         WHERE (CASE WHEN $4 THEN c.user_id ELSE c.guest_id END) = $1 AND ($2::uuid IS NULL OR c.id < $2) ORDER BY c.id DESC LIMIT $3")))
         .bind(id).bind(p.cursor).bind(limit + 1).bind(is_user).fetch_all(&st.pool).await?;
     let next = if rows.len() as i64 > limit {
         rows.truncate(limit as usize);

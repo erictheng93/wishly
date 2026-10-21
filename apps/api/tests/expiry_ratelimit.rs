@@ -42,7 +42,7 @@ async fn seed_claim(pool: &PgPool, item: Uuid, qty: i32, status: &str, expires: 
         .execute(pool)
         .await
         .unwrap();
-    sqlx::query_scalar(&format!("INSERT INTO claims (item_id, guest_id, claimer_name, qty, status, expires_at) VALUES ($1, $2, 'g', $3, $4::claim_status, {expires}) RETURNING id"))
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!("INSERT INTO claims (item_id, guest_id, claimer_name, qty, status, expires_at) VALUES ($1, $2, 'g', $3, $4::claim_status, {expires}) RETURNING id")))
         .bind(item).bind(g).bind(qty).bind(status).fetch_one(pool).await.unwrap()
 }
 

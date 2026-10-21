@@ -197,9 +197,9 @@ impl W {
 }
 
 async fn load_owned(pool: &PgPool, id: Uuid, user: Uuid) -> R<W> {
-    sqlx::query_as(&format!(
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {WCOLS} FROM wishlists WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL"
-    ))
+    )))
     .bind(id)
     .bind(user)
     .fetch_optional(pool)
@@ -451,16 +451,16 @@ async fn list(
                 .ok_or_else(|| AppError::invalid("/cursor", "FORMAT", "cursor 無效"))?,
         ),
     };
-    let rows: Vec<W> = sqlx::query_as(&format!(
+    let rows: Vec<W> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {WCOLS} FROM wishlists WHERE owner_id=$1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id < $2)
-         AND ($3::text IS NULL OR status::text=$3) AND ($4::text IS NULL OR type::text=$4) ORDER BY id DESC LIMIT $5"))
+         AND ($3::text IS NULL OR status::text=$3) AND ($4::text IS NULL OR type::text=$4) ORDER BY id DESC LIMIT $5")))
         .bind(u.id).bind(after).bind(&q.status).bind(&q.ty).bind(limit + 1).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > limit;
     let rows = &rows[..rows.len().min(limit as usize)];
     let ids: Vec<Uuid> = rows.iter().map(|w| w.id).collect();
     let stats: Vec<(Uuid, i64, i64, i64, i64)> = sqlx::query_as(
-        &format!("SELECT wishlist_id, count(*), count(*) FILTER (WHERE {CLAIMED_SQL} >= qty_needed), sum({CLAIMED_SQL})::bigint, sum(qty_needed)::bigint FROM wishlist_items
-         WHERE wishlist_id = ANY($1) AND deleted_at IS NULL GROUP BY wishlist_id")).bind(&ids).fetch_all(&st.pool).await?;
+        sqlx::AssertSqlSafe(format!("SELECT wishlist_id, count(*), count(*) FILTER (WHERE {CLAIMED_SQL} >= qty_needed), sum({CLAIMED_SQL})::bigint, sum(qty_needed)::bigint FROM wishlist_items
+         WHERE wishlist_id = ANY($1) AND deleted_at IS NULL GROUP BY wishlist_id"))).bind(&ids).fetch_all(&st.pool).await?;
     let data: Vec<Value> = rows.iter().map(|w| {
         let (c, f, q, nd) = stats.iter().find(|s| s.0 == w.id).map(|s| (s.1, s.2, s.3, s.4)).unwrap_or((0, 0, 0, 0));
         let j = w.json();
@@ -536,7 +536,7 @@ impl I {
 }
 
 async fn items_of(pool: &PgPool, wid: Uuid) -> R<Vec<I>> {
-    Ok(sqlx::query_as(&format!("SELECT {ICOLS} FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL ORDER BY sort_order, id")).bind(wid).fetch_all(pool).await?)
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!("SELECT {ICOLS} FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL ORDER BY sort_order, id"))).bind(wid).fetch_all(pool).await?)
 }
 
 async fn get_one(
@@ -1229,17 +1229,19 @@ async fn item_create(
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
         .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref)
         .fetch_one(&st.pool).await?;
-    let row: I = sqlx::query_as(&format!("SELECT {ICOLS} FROM wishlist_items WHERE id=$1"))
-        .bind(id)
-        .fetch_one(&st.pool)
-        .await?;
+    let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {ICOLS} FROM wishlist_items WHERE id=$1"
+    )))
+    .bind(id)
+    .fetch_one(&st.pool)
+    .await?;
     Ok((StatusCode::CREATED, Json(row.json(w.surprise_locked))).into_response())
 }
 
 /// 取得擁有者的品項及其清單狀態
 async fn owned_item(pool: &PgPool, item: Uuid, user: Uuid) -> R<(I, String, bool)> {
-    let i: Option<I> = sqlx::query_as(&format!(
-        "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL AND wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$2 AND deleted_at IS NULL)"))
+    let i: Option<I> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL AND wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$2 AND deleted_at IS NULL)")))
         .bind(item).bind(user).fetch_optional(pool).await?;
     let i = i.ok_or(AppError::NotFound)?;
     let w = load_owned(pool, i.wishlist_id, user).await?;
@@ -1346,9 +1348,9 @@ async fn item_update(
     }
     let mut tx = st.pool.begin().await?;
     // 鎖住品項後再讀：funding 規則（已有認捐 / pledged_points）要看到最新值，並與捐助 / 認捐的條件式 UPDATE 互斥
-    let mut i: I = sqlx::query_as(&format!(
+    let mut i: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL FOR UPDATE"
-    ))
+    )))
     .bind(id)
     .fetch_optional(&mut *tx)
     .await?
@@ -1412,10 +1414,12 @@ async fn item_update(
         });
     }
     crate::dashboard::notify(&mut *tx, i.wishlist_id).await?;
-    let row: I = sqlx::query_as(&format!("SELECT {ICOLS} FROM wishlist_items WHERE id=$1"))
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
+    let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {ICOLS} FROM wishlist_items WHERE id=$1"
+    )))
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(Json(row.json(locked)))
 }

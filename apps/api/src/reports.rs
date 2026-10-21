@@ -207,8 +207,8 @@ async fn list(
             "open | actioned | dismissed",
         ));
     }
-    let rows: Vec<(Uuid, Value)> = sqlx::query_as(&format!(
-        "{REPORT_SQL} WHERE r.status = $1::report_status AND ($2::uuid IS NULL OR r.id > $2) ORDER BY r.id LIMIT $3"))
+    let rows: Vec<(Uuid, Value)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "{REPORT_SQL} WHERE r.status = $1::report_status AND ($2::uuid IS NULL OR r.id > $2) ORDER BY r.id LIMIT $3")))
         .bind(status).bind(q.cursor).bind(limit(&q) + 1).fetch_all(&st.pool).await?;
     Ok(page(rows, limit(&q)))
 }
@@ -257,10 +257,11 @@ async fn handle(
         json!({ "status": b.status, "note": b.note }),
     )
     .await?;
-    let (_, v): (Uuid, Value) = sqlx::query_as(&format!("{REPORT_SQL} WHERE r.id = $1"))
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
+    let (_, v): (Uuid, Value) =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!("{REPORT_SQL} WHERE r.id = $1")))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
     tx.commit().await?;
     Ok(Json(v))
 }

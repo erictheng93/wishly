@@ -62,7 +62,7 @@ async fn explore(
             ))
         }
     };
-    let rows: Vec<ExploreRow> = sqlx::query_as(&format!(
+    let rows: Vec<ExploreRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
                 o.display_name, o.handle,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
@@ -76,7 +76,7 @@ async fn explore(
            AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND ($1::text IS NULL OR w.type::text = $1)
            AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
-         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL))
+         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL)))
         .bind(ty).bind(EXPLORE_PAGE + 1).bind((page - 1) * EXPLORE_PAGE).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > EXPLORE_PAGE;
     let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, ev, on, oh, n, got, need)| json!({
@@ -227,11 +227,11 @@ async fn render(
     }
 
     let items: Vec<It> = sqlx::query_as(
-        &format!("SELECT i.id, i.title, i.brand, i.spec, i.image_key, i.image_status::text AS image_status, i.product_url, i.unit_price_amount,
+        sqlx::AssertSqlSafe(format!("SELECT i.id, i.title, i.brand, i.spec, i.image_key, i.image_status::text AS image_status, i.product_url, i.unit_price_amount,
                 i.priority::text AS priority, i.funding_mode::text AS funding_mode, i.qty_needed, i.qty_claimed,
                 i.target_points, i.pledged_points, i.funding_status::text AS funding_status, ({}) AS display_status, i.funding_deadline
          FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id
-         WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id", crate::points::DISPLAY_STATUS_SQL))
+         WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id", crate::points::DISPLAY_STATUS_SQL)))
         .bind(w.id).fetch_all(&st.pool).await?;
 
     // 驚喜鎖定期間無論 show_claimer_names 為何一律不輸出（伺服器端強制）

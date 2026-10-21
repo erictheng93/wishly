@@ -143,9 +143,9 @@ async fn crowdfunding_checks_reject_invalid_money_and_lifecycle_shapes(pool: PgP
         ("fulfillment_type='catalog'", "items_concierge_only"),
     ] {
         rejected(
-            sqlx::query(&format!(
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "UPDATE wishlist_items SET {assignment} WHERE id=$1"
-            ))
+            )))
             .bind(item)
             .execute(&pool)
             .await,

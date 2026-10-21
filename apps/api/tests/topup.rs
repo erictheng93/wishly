@@ -325,7 +325,10 @@ async fn status_of(pool: &PgPool, no: &str) -> String {
 }
 
 async fn count(pool: &PgPool, sql: &str) -> i64 {
-    sqlx::query_scalar(sql).fetch_one(pool).await.unwrap()
+    sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_owned()))
+        .fetch_one(pool)
+        .await
+        .unwrap()
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

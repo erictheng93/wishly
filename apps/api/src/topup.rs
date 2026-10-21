@@ -766,10 +766,10 @@ async fn list(
     user: CurrentUser,
     Query(q): Query<ListQuery>,
 ) -> Result<Response, AppError> {
-    let rows: Vec<TopupRow> = sqlx::query_as(&format!(
+    let rows: Vec<TopupRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {TOPUP_COLS} FROM topups t JOIN point_wallets w ON w.id = t.wallet_id
           WHERE w.user_id = $1 ORDER BY t.created_at DESC, t.id DESC LIMIT $2"
-    ))
+    )))
     .bind(user.id)
     .bind(q.limit.unwrap_or(20).clamp(1, 50))
     .fetch_all(&st.pool)
@@ -785,10 +785,10 @@ async fn detail(
     user: CurrentUser,
     Path(id): Path<Uuid>,
 ) -> Result<Response, AppError> {
-    let row: Option<TopupRow> = sqlx::query_as(&format!(
+    let row: Option<TopupRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {TOPUP_COLS} FROM topups t JOIN point_wallets w ON w.id = t.wallet_id
           WHERE t.id = $1 AND w.user_id = $2"
-    ))
+    )))
     .bind(id)
     .bind(user.id)
     .fetch_optional(&st.pool)

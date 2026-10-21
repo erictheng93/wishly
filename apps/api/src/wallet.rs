@@ -115,7 +115,7 @@ async fn contributions(
     };
     let lim = limit(q.limit);
     let window = "(i.funding_status = 'expired' AND now() < i.expired_at + interval '7 days')";
-    let mut rows: Vec<(Uuid, Value)> = sqlx::query_as(&format!(
+    let mut rows: Vec<(Uuid, Value)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT c.id, jsonb_build_object(
            'contribution', {C_JSON},
            'item', jsonb_build_object('id', i.id, 'title', i.title, 'image_key', i.image_key, 'image_status', i.image_status,
@@ -128,7 +128,7 @@ async fn contributions(
          FROM contributions c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = c.wishlist_id
          LEFT JOIN purchase_orders po ON po.item_id = i.id
          WHERE c.user_id = $1 AND ($2::text IS NULL OR c.status::text = $2) AND ($3::uuid IS NULL OR c.id < $3)
-         ORDER BY c.id DESC LIMIT $4"))
+         ORDER BY c.id DESC LIMIT $4")))
         .bind(user.id).bind(&q.status).bind(cursor).bind(lim + 1).fetch_all(&st.pool).await?;
     let mut next = None;
     if rows.len() as i64 > lim {

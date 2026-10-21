@@ -80,7 +80,7 @@ async fn profile(
 
     // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private 不列）
     // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）
-    let lists: Vec<ProfileWishlist> = sqlx::query_as(&format!(
+    let lists: Vec<ProfileWishlist> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({claimed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
@@ -91,7 +91,7 @@ async fn profile(
                 OR (w.visibility::text IN ('friends', 'selected') AND $3)
                 OR (w.visibility::text = 'friends' AND $4)
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $2)))
-         ORDER BY w.created_at DESC, w.id DESC", claimed = crate::wishlists::CLAIMED_SQL))
+         ORDER BY w.created_at DESC, w.id DESC", claimed = crate::wishlists::CLAIMED_SQL)))
         .bind(uid).bind(viewer).bind(is_self).bind(friend).fetch_all(&st.pool).await?;
     let wishlists: Vec<Value> = lists
         .into_iter()

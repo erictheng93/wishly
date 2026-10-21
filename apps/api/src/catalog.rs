@@ -171,9 +171,9 @@ impl Brand {
 }
 
 async fn public_brands(State(st): State<AppState>) -> R<Response> {
-    let rows: Vec<Brand> = sqlx::query_as(&format!(
+    let rows: Vec<Brand> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {BCOLS} FROM brands WHERE active ORDER BY sort_order, name, id"
-    ))
+    )))
     .fetch_all(&st.pool)
     .await?;
     Ok(cached(
@@ -182,9 +182,9 @@ async fn public_brands(State(st): State<AppState>) -> R<Response> {
 }
 
 async fn public_brand(State(st): State<AppState>, Path(slug): Path<String>) -> R<Response> {
-    let b: Brand = sqlx::query_as(&format!(
+    let b: Brand = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {BCOLS} FROM brands WHERE active AND slug = $1"
-    ))
+    )))
     .bind(slug)
     .fetch_optional(&st.pool)
     .await?
@@ -343,9 +343,9 @@ impl Brand {
 }
 
 async fn admin_brands(State(st): State<AppState>, _s: Staff) -> R<Response> {
-    let rows: Vec<Brand> = sqlx::query_as(&format!(
+    let rows: Vec<Brand> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {BCOLS} FROM brands ORDER BY sort_order, name, id"
-    ))
+    )))
     .fetch_all(&st.pool)
     .await?;
     Ok(no_store(
@@ -401,9 +401,9 @@ async fn create_brand(
         return Err(AppError::invalid("/name", "REQUIRED", "必填"));
     }
     let mut tx = st.pool.begin().await?;
-    let row: Brand = sqlx::query_as(&format!(
+    let row: Brand = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "INSERT INTO brands (slug, name, description, logo_key, logo_status, website_url, active, sort_order)
-         VALUES ($1,$2,$3,$4, CASE WHEN $4::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$5,$6,$7) RETURNING {BCOLS}"))
+         VALUES ($1,$2,$3,$4, CASE WHEN $4::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$5,$6,$7) RETURNING {BCOLS}")))
         .bind(&b.slug).bind(&b.name).bind(&b.description).bind(&b.logo_key).bind(&b.website_url).bind(b.active).bind(b.sort_order)
         .fetch_one(&mut *tx).await.map_err(|e| conflict(e, "SLUG_TAKEN", "slug"))?;
     audit(
@@ -428,17 +428,17 @@ async fn patch_brand(
     let m = body(v)?;
     immutable(&m, "slug")?;
     let mut tx = st.pool.begin().await?;
-    let mut b: Brand = sqlx::query_as(&format!(
+    let mut b: Brand = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {BCOLS} FROM brands WHERE id=$1 FOR UPDATE"
-    ))
+    )))
     .bind(id)
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
     b.merge(&m)?;
-    let row: Brand = sqlx::query_as(&format!(
+    let row: Brand = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "UPDATE brands SET name=$2, description=$3, logo_key=$4, logo_status=CASE WHEN $4::text IS NULL THEN 'none' ELSE 'ready' END::image_status,
-                website_url=$5, active=$6, sort_order=$7 WHERE id=$1 RETURNING {BCOLS}"))
+                website_url=$5, active=$6, sort_order=$7 WHERE id=$1 RETURNING {BCOLS}")))
         .bind(id).bind(&b.name).bind(&b.description).bind(&b.logo_key).bind(&b.website_url).bind(b.active).bind(b.sort_order)
         .fetch_one(&mut *tx).await?;
     audit(
@@ -551,10 +551,10 @@ async fn admin_products(
     Query(q): Query<AdminProductQ>,
 ) -> R<Response> {
     let page = q.page.unwrap_or(1).clamp(1, 1000);
-    let mut rows: Vec<Prod> = sqlx::query_as(&format!(
+    let mut rows: Vec<Prod> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {PCOLS} FROM catalog_products WHERE ($1::uuid IS NULL OR brand_id = $1)
          ORDER BY sort_order, created_at DESC, id LIMIT $2 OFFSET $3"
-    ))
+    )))
     .bind(q.brand_id)
     .bind(PAGE + 1)
     .bind((page - 1) * PAGE)
@@ -613,9 +613,9 @@ async fn create_product(
         }
     }
     let mut tx = st.pool.begin().await?;
-    let row: Prod = sqlx::query_as(&format!(
+    let row: Prod = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "INSERT INTO catalog_products (ref, brand_id, title, spec, note, price_amount, image_key, image_status, product_url, recipients, occasions, active, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12) RETURNING {PCOLS}"))
+         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12) RETURNING {PCOLS}")))
         .bind(&p.ref_).bind(p.brand_id).bind(&p.title).bind(&p.spec).bind(&p.note).bind(p.price_amount).bind(&p.image_key)
         .bind(&p.product_url).bind(&p.recipients).bind(&p.occasions).bind(p.active).bind(p.sort_order)
         .fetch_one(&mut *tx).await.map_err(|e| conflict(e, "REF_TAKEN", "ref"))?;
@@ -641,18 +641,18 @@ async fn patch_product(
     let m = body(v)?;
     immutable(&m, "ref")?;
     let mut tx = st.pool.begin().await?;
-    let mut p: Prod = sqlx::query_as(&format!(
+    let mut p: Prod = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {PCOLS} FROM catalog_products WHERE id=$1 FOR UPDATE"
-    ))
+    )))
     .bind(id)
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
     p.merge(&m, &st.pool).await?;
-    let row: Prod = sqlx::query_as(&format!(
+    let row: Prod = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "UPDATE catalog_products SET brand_id=$2, title=$3, spec=$4, note=$5, price_amount=$6, image_key=$7,
                 image_status=CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,
-                product_url=$8, recipients=$9, occasions=$10, active=$11, sort_order=$12 WHERE id=$1 RETURNING {PCOLS}"))
+                product_url=$8, recipients=$9, occasions=$10, active=$11, sort_order=$12 WHERE id=$1 RETURNING {PCOLS}")))
         .bind(id).bind(p.brand_id).bind(&p.title).bind(&p.spec).bind(&p.note).bind(p.price_amount).bind(&p.image_key)
         .bind(&p.product_url).bind(&p.recipients).bind(&p.occasions).bind(p.active).bind(p.sort_order)
         .fetch_one(&mut *tx).await?;

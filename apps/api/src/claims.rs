@@ -233,10 +233,10 @@ async fn create(
         return Err(diagnose(&st, item_id, req.qty).await?);
     };
 
-    let ins = sqlx::query_as::<_, ClaimRow>(&format!(
+    let ins = sqlx::query_as::<_, ClaimRow>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO claims AS c (item_id, user_id, claimer_name, qty, note, expires_at, visibility, is_anonymous)
          VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + $6::int * interval '1 hour' END, $7::text::share_level, $8)
-         RETURNING {CLAIM_COLS}"))
+         RETURNING {CLAIM_COLS}")))
         .bind(item_id).bind(me.id).bind(&name).bind(req.qty).bind(&req.note).bind(ttl)
         .bind(req.visibility.as_deref()) // NULL 時由 trigger 套帳號預設
         .bind(req.is_anonymous.unwrap_or(false))
@@ -553,20 +553,20 @@ async fn apply(
         && p.note.is_none()
         && p.visibility.is_none()
     {
-        sqlx::query_as(&format!(
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "SELECT {CLAIM_COLS} FROM claims c WHERE c.id = $1"
-        ))
+        )))
         .bind(id)
         .fetch_one(&mut *tx)
         .await?
     } else {
-        sqlx::query_as(&format!(
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "UPDATE claims c SET qty = COALESCE($2, qty), note = COALESCE($3, note), visibility = COALESCE($5::text::share_level, visibility), status = $4::text::claim_status,
                purchased_at = CASE WHEN $4::text = 'purchased' THEN now() ELSE purchased_at END,
                delivered_at = CASE WHEN $4::text = 'delivered' THEN now() ELSE delivered_at END,
                cancelled_at = CASE WHEN $4::text = 'cancelled' THEN now() ELSE cancelled_at END,
                expires_at = CASE WHEN $4::text <> 'reserved' THEN NULL ELSE expires_at END
-             WHERE c.id = $1 RETURNING {CLAIM_COLS}"))
+             WHERE c.id = $1 RETURNING {CLAIM_COLS}")))
             .bind(id).bind(new_qty).bind(&p.note).bind(&new_status).bind(&p.visibility).fetch_one(&mut *tx).await?
     };
     let (n, c): (i32, i32) =

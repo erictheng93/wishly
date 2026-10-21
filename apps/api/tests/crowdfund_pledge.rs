@@ -1265,10 +1265,12 @@ async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool
         "0004_crowdfund.sql",
         "0005_social.sql",
     ] {
-        sqlx::raw_sql(&std::fs::read_to_string(dir.join(name)).unwrap())
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::raw_sql(sqlx::AssertSqlSafe(
+            std::fs::read_to_string(dir.join(name)).unwrap(),
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
     }
     let TestUser {
         id: owner,
@@ -1306,10 +1308,12 @@ async fn contribution_visibility_migration_preserves_existing_scope(pool: PgPool
             .fetch_one(&pool)
             .await
             .unwrap();
-    sqlx::raw_sql(&std::fs::read_to_string(dir.join("0006_contribution_visibility.sql")).unwrap())
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(
+        std::fs::read_to_string(dir.join("0006_contribution_visibility.sql")).unwrap(),
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
     let after: Value = sqlx::query_scalar(
         "SELECT jsonb_agg(to_jsonb(c) - 'visibility' ORDER BY c.id) FROM contributions c",
     )
