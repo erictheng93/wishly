@@ -455,7 +455,7 @@ async fn backfill_gives_legacy_balances_and_open_pledges_a_lot(pool: PgPool) {
             .join("../../db/migrations/0022_point_lots.sql"),
     )
     .unwrap();
-    let backfill = &sql[sql.find("-- ---------- 回填").unwrap()..];
+    let backfill = sql[sql.find("-- ---------- 回填").unwrap()..].to_string();
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM point_lots")
             .fetch_one(&pool)
@@ -463,7 +463,10 @@ async fn backfill_gives_legacy_balances_and_open_pledges_a_lot(pool: PgPool) {
             .unwrap(),
         0
     );
-    sqlx::raw_sql(backfill).execute(&pool).await.unwrap();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(backfill))
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let got: Vec<(Uuid, i64, i64, bool)> = sqlx::query_as(
         "SELECT wallet_id, original_points, remaining_points, cash_refundable FROM point_lots ORDER BY original_points",

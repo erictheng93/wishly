@@ -17,7 +17,7 @@ async fn days_of(pool: &PgPool, uid: Uuid) -> Vec<String> {
 
 /// 台北今天 + k 天（SQL 計算，不用 Rust 本地時間）
 async fn day(pool: &PgPool, k: i32) -> String {
-    sqlx::query_scalar(&format!("SELECT ({TODAY} + $1)::text"))
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT ({TODAY} + $1)::text")))
         .bind(k)
         .fetch_one(pool)
         .await
@@ -25,9 +25,9 @@ async fn day(pool: &PgPool, k: i32) -> String {
 }
 
 async fn seed(pool: &PgPool, uid: Uuid, k: i32) {
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO user_activity_days (user_id, day) VALUES ($1, {TODAY} + $2)"
-    ))
+    )))
     .bind(uid)
     .bind(k)
     .execute(pool)
@@ -217,9 +217,9 @@ async fn analytics_retention_cohorts(pool: PgPool) {
     ];
     for (reg, acts) in specs {
         let u = user(&pool, "x").await;
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE users SET created_at = (({TODAY} + $2)::timestamp + interval '12 hours') AT TIME ZONE 'Asia/Taipei' WHERE id = $1"
-        ))
+        )))
         .bind(u.id)
         .bind(reg)
         .execute(&pool)
@@ -231,9 +231,9 @@ async fn analytics_retention_cohorts(pool: PgPool) {
     }
     // staff 同條件也不入 cohort
     let st_u = staff(&pool, "S2").await;
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "UPDATE users SET created_at = (({TODAY} - 70)::timestamp + interval '12 hours') AT TIME ZONE 'Asia/Taipei' WHERE id = $1"
-    ))
+    )))
     .bind(st_u.id)
     .execute(&pool)
     .await

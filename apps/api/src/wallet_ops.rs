@@ -584,9 +584,9 @@ async fn auto_json(pool: &sqlx::PgPool, user: Uuid) -> R<Value> {
     let (enabled, threshold, amount, cap, last4): (bool, i64, i64, i64, Option<String>) =
         sqlx::query_as("SELECT enabled, threshold_points, amount, monthly_cap_amount, card_last4::text FROM wallet_auto_topups WHERE user_id = $1")
             .bind(user).fetch_optional(pool).await?.unwrap_or((false, 500, 1000, 10_000, None));
-    let used: i64 = sqlx::query_scalar(&format!(
+    let used: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT COALESCE(sum(t.amount), 0)::bigint FROM topups t JOIN point_wallets w ON w.id = t.wallet_id
-          WHERE w.user_id = $1 AND t.is_auto AND t.status IN ('pending', 'paid') AND t.created_at >= {MONTH_START}"))
+          WHERE w.user_id = $1 AND t.is_auto AND t.status IN ('pending', 'paid') AND t.created_at >= {MONTH_START}")))
         .bind(user).fetch_one(pool).await?;
     Ok(json!({
         "enabled": enabled, "threshold_points": threshold, "amount": amount, "monthly_cap_amount": cap,

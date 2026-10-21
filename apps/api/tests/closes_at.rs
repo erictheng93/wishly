@@ -19,9 +19,9 @@ async fn deadline_list(pool: &PgPool, owner: Uuid, status: &'static str, closes_
         },
     )
     .await;
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "UPDATE wishlists SET closes_at={closes_sql} WHERE id=$1"
-    ))
+    )))
     .bind(list.id)
     .execute(pool)
     .await

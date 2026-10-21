@@ -82,8 +82,10 @@ async fn list(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
                 Option<String>,
                 chrono::DateTime<chrono::Utc>,
             );
-            let rows: Vec<FriendRequestRow> =
-                sqlx::query_as(&sql).bind(u.id).fetch_all(&pool).await?;
+            let rows: Vec<FriendRequestRow> = sqlx::query_as(sqlx::AssertSqlSafe(sql))
+                .bind(u.id)
+                .fetch_all(&pool)
+                .await?;
             Ok::<_, AppError>(rows.into_iter().map(|(id, uid, n, h, at)| json!({ "id": id, "user": { "id": uid, "display_name": n, "handle": h }, "created_at": at })).collect::<Vec<_>>())
         }
     };
@@ -286,7 +288,7 @@ struct FeedList {
 /// 好友動態：近 30 天好友清單新增的品項（每份清單一則）＋ 我送出的禮物被標記送達；另附 30 天內的好友生日。
 /// 清單可見性與 access::check_wishlist 同規則（private 不列、selected 需在名單），只列上線中、未截止的清單。
 async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
-    let lists: Vec<FeedList> = sqlx::query_as(&format!(
+    let lists: Vec<FeedList> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "WITH fr AS (SELECT CASE WHEN user_a = $1 THEN user_b ELSE user_a END AS id FROM friendships WHERE user_a = $1 OR user_b = $1)
          SELECT w.slug::text AS slug, w.title, w.created_at > now() - interval '30 days' AS is_new, w.event_date, w.closes_at,
                 o.id AS owner_id, o.display_name, o.handle,
@@ -309,7 +311,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
            AND (w.visibility::text IN ('public', 'friends')
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $1)))
            AND s.n_new > 0
-         ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL))
+         ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL)))
         .bind(u.id).fetch_all(&st.pool).await?;
     let mut events: Vec<(chrono::DateTime<chrono::Utc>, Value)> = lists.into_iter().map(|r| (r.at, json!({
         "kind": "items_added", "at": r.at, "owner": { "id": r.owner_id, "display_name": r.display_name, "handle": r.handle },

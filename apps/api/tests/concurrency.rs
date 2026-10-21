@@ -39,11 +39,13 @@ async fn gate<'a>(pool: &'a PgPool, table: &str, id: Uuid) -> (Transaction<'a, P
     } else {
         "UPDATE"
     };
-    sqlx::query(&format!("SELECT id FROM {table} WHERE id=$1 FOR {mode}"))
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "SELECT id FROM {table} WHERE id=$1 FOR {mode}"
+    )))
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
     (tx, pid)
 }
 /// Poll actual database lock state, scoped to this test's isolated database.

@@ -209,8 +209,8 @@ async fn snapshot(pool: &PgPool, wid: Uuid) -> Result<Option<Snap>, sqlx::Error>
         Option<String>,
     );
     let items: Vec<SnapshotRow> = sqlx::query_as(
-        &format!("SELECT i.id, i.qty_needed, i.qty_claimed, i.funding_mode::text, i.pledged_points, i.target_points, i.funding_status::text, ({}) AS display_status
-                    FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL", crate::points::DISPLAY_STATUS_SQL))
+        sqlx::AssertSqlSafe(format!("SELECT i.id, i.qty_needed, i.qty_claimed, i.funding_mode::text, i.pledged_points, i.target_points, i.funding_status::text, ({}) AS display_status
+                    FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL", crate::points::DISPLAY_STATUS_SQL)))
         .bind(wid).fetch_all(pool).await?;
     Ok(Some(Snap {
         owner_id,

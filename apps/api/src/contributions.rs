@@ -71,9 +71,9 @@ async fn audit(
 }
 
 async fn contribution_json(tx: &mut Tx<'_>, id: Uuid) -> Result<Value, AppError> {
-    Ok(sqlx::query_scalar(&format!(
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT {C_JSON} FROM contributions c WHERE c.id = $1"
-    ))
+    )))
     .bind(id)
     .fetch_one(&mut **tx)
     .await?)
