@@ -23,6 +23,7 @@
 4. **重新部署 `api`。** 專案 `wishly` → 環境 `production` → Application `api`（App Name `wishly-api-qyob9a`）→ Deploy / Redeploy，讓它重新拉 `ghcr.io/erictheng93/wishly-api:latest`。
    - **不要刪除重建 `db` 服務**：DB 容器名會改變，`DATABASE_URL` 失效。
    - replicas 維持 1。
+   - **General → Provider 必須是 Docker**（`ghcr.io/erictheng93/wishly-api:latest`，憑證填在該分頁）。若是 Git / Github，Dokploy 會在 VPS 上編譯（2026-10-21 曾被改成 Git）。Docker 模式下 Redeploy 只拉映像，幾秒就完成。
    - 不要在 VPS 上 `git pull` 或編譯。
 5. **看 Dokploy 日誌**，確認啟動、migration 沒有錯誤。
 6. **驗證：**
@@ -69,6 +70,7 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 
 - [ ] CI `publish-image` 綠色，`latest` SHA 正確
 - [ ] 有 migration？向前相容、舊檔未改
+- [ ] Dokploy `api` 的 Provider 是 Docker，部署後映像有 GHCR 的 RepoDigest（`docker image inspect`）
 - [ ] Dokploy 只重新部署 `api`
 - [ ] `/healthz`、`/readyz` 皆 200
 - [ ] 前端首頁 200，手動走一次捐助流程
