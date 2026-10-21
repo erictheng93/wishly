@@ -39,7 +39,11 @@
       "newFab": "＋ 新建",
       "archiveTitle": "封存清單",
       "archiveText": "封存「{title}」後，公開頁會立即失效，朋友無法再開啟（既有捐助仍保留）。",
-      "archiveOk": "確認封存"
+      "archiveOk": "確認封存",
+      "showArchived": "已封存的清單",
+      "backToLists": "← 返回我的清單",
+      "archivedEmpty": "沒有已封存的清單",
+      "unarchive": "取消封存"
     },
     "edit": {
       "pageTitle": "編輯清單",
@@ -82,6 +86,7 @@
       "published": "已發佈",
       "ended": "清單已結束",
       "reopened": "已重新開放",
+      "unarchive": "取消封存",
       "errStale": "這份清單已在其他地方被修改，請重新載入",
       "errHasClaims": "此品項已有捐助。若仍要刪除，捐助將一併取消，請再按一次確認。",
       "publish": "發佈並分享",

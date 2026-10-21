@@ -563,14 +563,19 @@ async fn update(
     let mut w = load_owned(&st.pool, id, u.id).await?;
     let was_servable = crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status);
     if w.status == "archived" {
+        let only = |s: &str| {
+            m.get("status").is_some_and(|v| v == s)
+                && m.keys()
+                    .all(|k| k == "status" || k == "expected_updated_at")
+        };
         // 重複封存為冪等（FR-15）：只帶 status=archived（與 expected_updated_at）時直接回目前狀態
-        if m.get("status").is_some_and(|v| v == "archived")
-            && m.keys()
-                .all(|k| k == "status" || k == "expected_updated_at")
-        {
+        if only("archived") {
             return Ok(Json(w.json()));
         }
-        return Err(closed());
+        // 取消封存只能回到 closed（要再收捐助由創建者重開）；封存時退回的眾籌點數不會再扣回
+        if !only("closed") {
+            return Err(closed());
+        }
     }
     let exp = expected(m)?;
     if let Some(v) = text(m, "title", 1, 100)? {
@@ -628,6 +633,7 @@ async fn update(
                     | ("draft", "archived")
                     | ("active", "archived")
                     | ("closed", "archived")
+                    | ("archived", "closed")
             );
         if !ok {
             return Err(AppError::invalid(

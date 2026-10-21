@@ -142,6 +142,46 @@ async fn unlocked_keeps_specific_errors(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
+async fn unarchive_returns_to_closed(pool: PgPool) {
+    let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
+    let (wid, _) = list(&pool, o, false, 30).await;
+    let uri = format!("/wishlists/{wid}");
+    call(&pool, "DELETE", &uri, &ck(&t), None).await;
+    // 不能直接跳回 active，也不能順便改其他欄位
+    for body in [
+        json!({ "status": "active" }),
+        json!({ "status": "closed", "title": "x" }),
+    ] {
+        let (s, _, b) = call(&pool, "PATCH", &uri, &ck(&t), Some(body)).await;
+        assert_eq!(
+            (s.as_u16(), b["code"].as_str()),
+            (409, Some("WISHLIST_CLOSED"))
+        );
+    }
+    let (s, _, b) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&t),
+        Some(json!({ "status": "closed" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["status"], "closed");
+    let (s, _, b) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&t),
+        Some(json!({ "status": "active" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["status"], "active");
+    common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
 async fn archive_is_idempotent(pool: PgPool) {
     let common::TestUser { id: o, token: t } = common::user(&pool, "u").await;
     let (wid, _) = list(&pool, o, false, 30).await;
