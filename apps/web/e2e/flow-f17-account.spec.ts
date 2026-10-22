@@ -30,7 +30,7 @@ test('匯出資料：下載 JSON 含個人資料、清單與捐助；每日第 4
   await expect(alert).toBeInViewport()
 })
 
-test('刪除帳號：需輸入確認字；有點數時擋下並說明；刪除後登出、清單下架、無法再登入', async ({ page }) => {
+test('刪除帳號：需輸入確認字與密碼；密碼錯誤擋下；有點數時擋下並說明；刪除後登出、清單下架、無法再登入', async ({ page }) => {
   const me = await registerUser({ tag: 'delete' })
   const list = await createList(me)
   const staff = await registerUser({ tag: 'staff' }); makeStaff(staff.email)
@@ -51,6 +51,13 @@ test('刪除帳號：需輸入確認字；有點數時擋下並說明；刪除�
   await dlg.getByLabel('請輸入「刪除」以確認').fill('刪')
   await expect(ok).toBeDisabled()
   await dlg.getByLabel('請輸入「刪除」以確認').fill('刪除')
+  await expect(ok).toBeDisabled() // 有密碼登入者還要輸入目前密碼
+  const pw = dlg.getByLabel('目前密碼', { exact: true })
+  await pw.fill('wrong-password')
+  await ok.click()
+  await expect(dlg.getByText('密碼不正確')).toBeVisible()
+  expect((await me.api.get('me')).status()).toBe(200)
+  await pw.fill(me.password)
   await ok.click()
   await expect(dlg.getByText('50 點餘額')).toBeVisible()
   await expect(dlg).toBeVisible()

@@ -19,6 +19,7 @@
     "generic": "發生錯誤，請稍後再試",
     "ACCOUNT_BLOCKED": "帳號已停權，請聯絡客服",
     "ACCOUNT_HAS_POINTS": "帳號仍有點數或進行中的認捐，請先到錢包處理並聯絡客服",
+    "REAUTH_REQUIRED": "為了安全，請重新登入後再刪除帳號",
     "ACCOUNT_HAS_BALANCE": "帳號仍有餘額或進行中的交易，請先處理後再刪除",
     "AMOUNT_MISMATCH": "付款金額與訂單不符",
     "AUTO_TOPUP_LIMIT_REACHED": "單次儲值金額不可大於每月上限",

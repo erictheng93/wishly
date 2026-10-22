@@ -105,7 +105,10 @@
       "word": "DELETE",
       "prompt": "Type \"{word}\" to confirm",
       "hasPoints": "{detail} (you can withdraw contributions in \"My points\")",
-      "hasBalance": "{detail} (balance {balance} points, {pledged} open contributions, {orders} open orders). Please resolve these before deleting."
+      "hasBalance": "{detail} (balance {balance} points, {pledged} open contributions, {orders} open orders). Please resolve these before deleting.",
+      "password": "Current password",
+      "badPassword": "Incorrect password",
+      "relogin": "Sign in again"
     },
     "terms": "Terms of Service",
     "privacy": "Privacy Policy"
