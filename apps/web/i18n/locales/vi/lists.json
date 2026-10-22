@@ -8,7 +8,13 @@
       "edit": "Sửa",
       "close": "Đóng",
       "reasonSuffix": ". Lý do: {reason}",
-      "personal": "Danh sách điều ước"
+      "personal": "Danh sách điều ước",
+      "ttl": "Thời hạn mua",
+      "ttl7": "7 ngày (mặc định)",
+      "ttl14": "14 ngày",
+      "ttl30": "30 ngày",
+      "ttlNone": "Không giới hạn",
+      "ttlHint": "Sau khi nhận, cần đánh dấu đã mua trong thời hạn này, quá hạn sẽ tự động nhường cho bạn bè khác."
     },
     "new": {
       "pageTitle": "Tạo danh sách",

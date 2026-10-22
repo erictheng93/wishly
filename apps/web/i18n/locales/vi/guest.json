@@ -185,7 +185,8 @@
       "doneLine": "Bạn đã nhận tặng {title} × {qty}, cảm ơn bạn!",
       "doneHint": "Xem, đánh dấu đã mua hoặc hủy trong \"Quà tôi đã nhận\".",
       "lineBrowser": "Trong trình duyệt tích hợp của LINE, hãy giữ trạng thái đăng nhập; chạm ⋯ ở góc phải trên rồi chọn \"Mở bằng trình duyệt mặc định\" sẽ ổn định hơn.",
-      "viewMyClaims": "Xem quà tôi đã nhận"
+      "viewMyClaims": "Xem quà tôi đã nhận",
+      "doneDeadline": "Vui lòng đánh dấu đã mua trong Đóng góp của tôi trước {date}, quá hạn sẽ được nhường cho bạn bè khác."
     },
     "live": {
       "live": "Cập nhật trực tiếp",

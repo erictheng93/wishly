@@ -8,7 +8,13 @@
       "edit": "編輯",
       "close": "關閉",
       "reasonSuffix": "。原因：{reason}",
-      "personal": "心願清單"
+      "personal": "心願清單",
+      "ttl": "購買期限",
+      "ttl7": "7 天（預設）",
+      "ttl14": "14 天",
+      "ttl30": "30 天",
+      "ttlNone": "不限",
+      "ttlHint": "認領後需在期限內標記已購買，逾期自動釋出給其他朋友"
     },
     "new": {
       "pageTitle": "建立清單",

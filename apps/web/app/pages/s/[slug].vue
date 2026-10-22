@@ -240,6 +240,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <GuestDialog v-if="done" labelledby="done-title" @close="done = null"><div class="g-sheet center">
       <h1 id="done-title" class="ok">{{ $t('guest.slug.doneTitle') }}</h1>
       <p>{{ $t('guest.slug.doneLine', { title: done.title, qty: done.claim.qty }) }}</p>
+      <p v-if="done.claim.expires_at" class="js-done-deadline">{{ $t('guest.slug.doneDeadline', { date: fmtTime(done.claim.expires_at) }) }}</p>
       <div class="g-banner ok">{{ $t('guest.slug.doneHint') }}</div>
       <div v-if="isLineBrowser()" class="g-banner">{{ $t('guest.slug.lineBrowser') }}</div>
       <NuxtLink class="g-btn block" to="/me/claims">{{ $t('guest.slug.viewMyClaims') }}</NuxtLink>

@@ -185,7 +185,8 @@
       "doneLine": "You pledged {title} × {qty}. Thank you!",
       "doneHint": "View, mark as purchased, or cancel in \"My pledges\".",
       "lineBrowser": "In the LINE in-app browser, stay signed in; tapping ⋯ at the top right and choosing \"Open in default browser\" is more reliable.",
-      "viewMyClaims": "View my pledges"
+      "viewMyClaims": "View my pledges",
+      "doneDeadline": "Please mark it as purchased in My pledges before {date}, or it will be released to other friends."
     },
     "live": {
       "live": "Live updates",

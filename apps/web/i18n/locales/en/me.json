@@ -139,14 +139,16 @@
       "markPurchased": "Mark as purchased",
       "markDelivered": "Mark as delivered",
       "cancel": "Cancel",
-      "closedHint": "This list has ended. You can only cancel.",
+      "closedHint": "This list has ended. You can still mark items as purchased / delivered or cancel, but you can no longer change quantities.",
       "itemChanged": "The owner changed this item on {time}. Please re-check the quantity and spec.",
       "ackItemChange": "Got it",
       "past": "Past records ({n})",
       "wipe": "Delete my nickname and contact info",
       "confirmCancelPurchased": "The list owner will be notified. Cancel this pledge?",
       "confirmCancel": "Cancel this pledge?",
-      "confirmWipe": "Delete your nickname and contact info? Your pledges are kept as \"Deleted guest\", and this device will no longer be able to manage them."
+      "confirmWipe": "Delete your nickname and contact info? Your pledges are kept as \"Deleted guest\", and this device will no longer be able to manage them.",
+      "deadline": "Please mark as purchased before {date}",
+      "extend": "Extend 7 days"
     },
     "wallet": {
       "title": "My points",
