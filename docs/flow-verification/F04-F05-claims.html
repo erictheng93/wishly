@@ -13,7 +13,7 @@
 <p class="sub">驗證日期 2026-10-21 · 規格 <a href="../02-master-user-flow.html">02 Master User Flow</a> v0.5（含 D50 認捐須登入）· 環境：本機 e2e 堆疊（API :8081、web :3012、Mailpit、PostGIS）</p>
 
 <h2>結論</h2>
-<p>主路徑（登入認捐 → 已購買 → 已送達；擁有者標送達 / 取消；防超賣；冪等重送）皆符合規格。發現 <b>3 個缺陷已直接修正</b>、<b>1 個開 issue</b>、<b>4 項與規格不一致需決策</b>（見<a href="decisions.html">待決事項</a>）。</p>
+<p>主路徑（登入認捐 → 已購買 → 已送達；擁有者標送達 / 取消；防超賣；冪等重送）皆符合規格。發現 <b>5 個缺陷已直接修正</b>、<b>1 個開 issue</b>、<b>4 項與規格不一致需決策</b>（見<a href="decisions.html">待決事項</a>）。</p>
 
 <h2>驗證方式</h2>
 <table>
@@ -65,6 +65,11 @@
 
 <h3>B5 · 英文 / 越南文介面顯示中文錯誤 <span class="tag issue">Issue #29</span></h3>
 <p>後端 <code>detail</code> 只有中文，前端 29 個頁面 / 元件直接顯示。範圍跨前後端、需選方案，故開 <a href="https://github.com/erictheng93/wishly/issues/29">#29</a> 而非在此修。</p>
+
+<h2>裝置與解析度</h2>
+<p>新增的 flow-* E2E 已加入 <code>mobile</code>（iPhone 13，390×664、觸控）與 <code>tablet</code>（iPad gen 7，810×1080）兩個 project，三種裝置皆通過。另以 Playwright 在 320 寬、iPhone 13、iPad Mini 直式、iPad 橫式、1280、1920 六種解析度掃描 <code>/s/{slug}</code>、<code>/me/claims</code>、<code>/lists/{id}/progress</code>：檢查水平捲動與超出視窗的元素（皆無），並逐張看截圖。</p>
+<h3>B9 · 我的捐助：狀態徽章與「誰看得到」黏在一起 <span class="tag fixed">已修正</span></h3>
+<p>手機寬度（320 / 390）下，「已捐助」徽章自成一行且帶左邊距，緊接著「誰看得到」沒有間隔，看起來像同一個標籤。改為徽章接在品名後（與其他頁一致），可見度選單獨立一行。</p>
 
 <h2>探索觀察（未列缺陷）</h2>
 <ul>

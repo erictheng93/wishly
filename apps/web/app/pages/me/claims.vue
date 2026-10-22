@@ -71,9 +71,8 @@ const wipe = () => {
         <div v-for="r in g.list" :key="r.claim.id" class="g-card g-item">
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
-            <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}</div>
-            <span class="g-badge">{{ label(r.claim.status) }}</span>
-            <label v-if="r.claim.visibility" class="g-mute">{{ $t('me.whoSees') }}
+            <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}<span class="g-badge">{{ label(r.claim.status) }}</span></div>
+            <label v-if="r.claim.visibility" class="g-mute g-vis">{{ $t('me.whoSees') }}
               <select :value="r.claim.visibility" @change="setVis(r, $event)"><option value="public">{{ $t('me.vis.public') }}</option><option value="friends">{{ $t('me.vis.friends') }}</option><option value="private">{{ $t('me.vis.private') }}</option></select>
             </label>
             <div class="g-actions">

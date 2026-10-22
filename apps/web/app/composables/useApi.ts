@@ -1,3 +1,4 @@
+import { apiErrMsg, problemDetail } from '../utils/errors'
 // 創建者端 API 客戶端：cookie（ws_session）驗證；原生殼改用 Bearer（見 utils/native.ts）、RFC 9457 錯誤正規化
 export class CreatorApiError extends Error {
   constructor(public status: number, public code: string, public detail: string, public errors: any[] = [], public body: any = {}) { super(detail) }
@@ -8,8 +9,8 @@ export function errMsg(e: any): string {
   if (!(e instanceof CreatorApiError)) return t('auth.api.unknown')
   if (e.code === 'READ_ONLY_MODE') return t('auth.api.readOnly')
   if (e.code === 'NETWORK') return t('auth.api.network')
-  if (e.errors.length) return e.errors.map((x: any) => x.detail).join('；')
-  return e.detail
+  if (e.errors.length) return e.errors.map((x: any) => problemDetail(x)).join('；')
+  return apiErrMsg({ ...e.body, status: e.status, code: e.code, detail: e.detail })
 }
 
 export function useApi() {
@@ -23,7 +24,10 @@ export function useApi() {
     } catch (e: any) {
       const status = e.statusCode || e.status || 0
       const d = e.data && typeof e.data === 'object' ? e.data : {}
-      const err = new CreatorApiError(status, d.code || (status ? 'HTTP_' + status : 'NETWORK'), d.detail || t(status === 404 ? 'auth.api.notFound' : 'auth.api.connFail'), d.errors || [], { ...d, retry_after: Number(e.response?.headers?.get?.('retry-after')) || undefined })
+      const code = d.code || (status ? 'HTTP_' + status : 'NETWORK')
+      const errors = (d.errors || []).map((x: any) => ({ ...x, detail: problemDetail(x) }))
+      const detail = status === 404 && !d.detail ? t('auth.api.notFound') : apiErrMsg({ ...d, status, code })
+      const err = new CreatorApiError(status, code, detail, errors, { ...d, errors, retry_after: Number(e.response?.headers?.get?.('retry-after')) || undefined })
       const blocked = err.code === 'ACCOUNT_BLOCKED'
       if (import.meta.client && (blocked || (err.code === 'UNAUTHORIZED' && !noRedirect))) {
         useState('auth-user').value = null

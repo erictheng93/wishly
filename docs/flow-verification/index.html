@@ -32,7 +32,7 @@
 <h2>彙總</h2>
 <div class="wrap"><table>
 <tr><th>流程</th><th>已修正</th><th>Issue</th><th>待決</th><th>新增自動化</th></tr>
-<tr><td>F4/F5</td><td>4（B1–B4）</td><td><a href="https://github.com/erictheng93/wishly/issues/29">#29</a></td><td><a href="decisions.html#q1">Q1</a>–<a href="decisions.html#q5">Q5</a></td><td>後端 3、E2E 3、單元 1</td></tr>
+<tr><td>F4/F5</td><td>5（B1–B4、B9）</td><td><a href="https://github.com/erictheng93/wishly/issues/29">#29</a></td><td><a href="decisions.html#q1">Q1</a>–<a href="decisions.html#q5">Q5</a></td><td>後端 3、E2E 3、單元 1</td></tr>
 <tr><td>F2/F8</td><td>3（B6–B8）</td><td>—</td><td><a href="decisions.html#q6">Q6</a></td><td>後端 2、E2E 2</td></tr>
 </table></div>
 
@@ -42,6 +42,7 @@
 <li>API 探測：以腳本逐條打規則（含邊界值、非法轉換、權限）。</li>
 <li>Playwright 手動探索：<code>playwright-cli</code> 以各角色實際操作 UI（連點、返回、重整、語系、窄螢幕）。</li>
 <li>為缺口補自動化：後端 <code>apps/api/tests/*.rs</code>、E2E <code>apps/web/e2e/flow-*.spec.ts</code>（真實 API）。修正的缺陷皆先確認測試在修正前會失敗。</li>
+<li>裝置：flow-* E2E 同時跑桌機、手機（iPhone 13）、平板（iPad）三個 project；另以 Playwright 掃 320 / 390 / iPad 直橫 / 1280 / 1920 六種解析度，檢查溢出並看截圖。</li>
 <li>處置：小範圍且規格明確 → 直接修；跨模組或要選方案 → GitHub issue（詳述重現與建議）；規格與實作衝突或需產品判斷 → 待決事項。</li>
 </ol>
 </main>

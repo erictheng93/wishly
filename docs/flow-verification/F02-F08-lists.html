@@ -59,6 +59,9 @@
 <p>全套 E2E 並行執行時，新排序測試偶發失敗，追查後確認：每按一次「上移 / 下移」就各自送出一個 <code>POST /items/reorder</code>（帶當下完整順序），請求並行；在網路 / 伺服器較忙時，先送出的可能較晚寫入，後端留下舊順序，重整後畫面「跳回去」。</p>
 <p>修正：<code>edit.vue</code> 的 <code>move()</code> 改為佇列依序送出。E2E 等兩次回應都完成才重整，連跑 5 次皆通過。</p>
 
+<h2>裝置與解析度</h2>
+<p>新增的 flow-* E2E 已加入 <code>mobile</code>（iPhone 13，390×664、觸控）與 <code>tablet</code>（iPad gen 7，810×1080）兩個 project，三種裝置皆通過。另以 Playwright 在 320 寬、iPhone 13、iPad Mini 直式、iPad 橫式、1280、1920 六種解析度掃描 <code>/lists/new</code>、<code>/lists/{id}/edit</code>、<code>/dashboard</code>：檢查水平捲動與超出視窗的元素（皆無），並逐張看截圖。</p>
+
 <h2>探索觀察（未列缺陷）</h2>
 <ul>
 <li>「建立並新增品項」建立後停在編輯頁的空狀態，需再按一次「＋ 新增品項」；編輯頁已支援 <code>?add=1</code> 自動開啟，可考慮帶上。</li>

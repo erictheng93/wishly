@@ -1,4 +1,4 @@
-import { apiErrMsg } from '../utils/errors'
+import { apiErrMsg, problemDetail } from '../utils/errors'
 import { nativeHeaders } from '../utils/native'
 // 訪客 token 儲存 + API 呼叫。
 // LINE in-app browser 的 localStorage / cookie 可能被清掉或停用，所以依序寫入多處、讀取時取第一個有值的：
@@ -53,7 +53,8 @@ export function useGuest() {
       const status = e.response.status
       if (status === 401 && tk && !opt.keepToken) setGuestToken(null)
       const code = d.code ?? 'UNKNOWN'
-      throw new ApiError(status, code, apiErrMsg({ status, code, detail: d.detail }), d)
+      const errors = (d.errors ?? []).map((x: any) => ({ ...x, detail: problemDetail(x) }))
+      throw new ApiError(status, code, apiErrMsg({ ...d, status, code }), { ...d, errors })
     }
   }
   const newKey = () => crypto.randomUUID()
