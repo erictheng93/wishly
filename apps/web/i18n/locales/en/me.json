@@ -139,6 +139,7 @@
       "markPurchased": "Mark as purchased",
       "markDelivered": "Mark as delivered",
       "cancel": "Cancel",
+      "closedHint": "This list has ended. You can only cancel.",
       "past": "Past records ({n})",
       "wipe": "Delete my nickname and contact info",
       "confirmCancelPurchased": "The list owner will be notified. Cancel this pledge?",

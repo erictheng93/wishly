@@ -487,6 +487,16 @@ async fn apply(
             _ => return Err(bad()),
         }
     }
+    // Q2：清單結束後捐助者只能取消，不能再推進為已購買 / 已送達；擁有者不受限（F8）
+    let closed =
+        matches!(wl_status.as_str(), "closed" | "archived") || (wl_status == "active" && past_due);
+    if closed && !by_owner && new_status != cur && new_status != "cancelled" {
+        return Err(AppError::problem(
+            409,
+            "WISHLIST_CLOSED",
+            "此清單已結束，只能取消捐助",
+        ));
+    }
     let cancelling = new_status == "cancelled";
     let mut new_qty = None;
     if let (Some(q), false) = (p.qty, cancelling) {

@@ -139,6 +139,7 @@
       "markPurchased": "標記已購買",
       "markDelivered": "標記已送達",
       "cancel": "取消",
+      "closedHint": "清單已結束，只能取消",
       "past": "過去的紀錄（{n}）",
       "wipe": "刪除我的暱稱與聯絡方式",
       "confirmCancelPurchased": "建立者會收到通知，確定要取消捐助？",

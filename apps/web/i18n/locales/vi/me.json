@@ -139,6 +139,7 @@
       "markPurchased": "Đánh dấu đã mua",
       "markDelivered": "Đánh dấu đã giao",
       "cancel": "Hủy",
+      "closedHint": "Danh sách đã kết thúc, bạn chỉ có thể hủy.",
       "past": "Lịch sử ({n})",
       "wipe": "Xóa biệt danh và thông tin liên hệ của tôi",
       "confirmCancelPurchased": "Người tạo sẽ nhận được thông báo. Bạn chắc chắn muốn hủy lượt đăng ký tặng này?",

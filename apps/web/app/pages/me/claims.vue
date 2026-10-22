@@ -7,6 +7,8 @@ const state = ref<'loading' | 'ok' | 'empty' | 'error'>('loading')
 const guest = ref<any>(null), rows = ref<any[]>([]), recoverFailed = ref(false), msg = ref('')
 const editing = ref(false), nick = ref('')
 const label = (s: string) => t(`me.claims.status.${s}`)
+// Q2：清單結束後捐助者只能取消（後端回 409 WISHLIST_CLOSED）
+const closed = (w: any) => ['closed', 'archived'].includes(w.status)
 const active = computed(() => rows.value.filter(r => ['reserved', 'purchased', 'delivered'].includes(r.claim.status)))
 const past = computed(() => rows.value.filter(r => !active.value.includes(r)))
 const groups = computed(() => {
@@ -76,8 +78,11 @@ const wipe = () => {
               <select :value="r.claim.visibility" @change="setVis(r, $event)"><option value="public">{{ $t('me.vis.public') }}</option><option value="friends">{{ $t('me.vis.friends') }}</option><option value="private">{{ $t('me.vis.private') }}</option></select>
             </label>
             <div class="g-actions">
-              <button v-if="r.claim.status === 'reserved'" class="g-btn sm" @click="setStatus(r, 'purchased')">{{ $t('me.claims.markPurchased') }}</button>
-              <button v-if="r.claim.status === 'purchased'" class="g-btn sm" @click="setStatus(r, 'delivered')">{{ $t('me.claims.markDelivered') }}</button>
+              <template v-if="!closed(r.wishlist)">
+                <button v-if="r.claim.status === 'reserved'" class="g-btn sm" @click="setStatus(r, 'purchased')">{{ $t('me.claims.markPurchased') }}</button>
+                <button v-if="r.claim.status === 'purchased'" class="g-btn sm" @click="setStatus(r, 'delivered')">{{ $t('me.claims.markDelivered') }}</button>
+              </template>
+              <span v-else-if="r.claim.status !== 'delivered'" class="g-mute">{{ $t('me.claims.closedHint') }}</span>
               <button v-if="r.claim.status !== 'delivered'" class="g-btn ghost sm" @click="cancel(r)">{{ $t('me.claims.cancel') }}</button>
             </div>
           </div>
