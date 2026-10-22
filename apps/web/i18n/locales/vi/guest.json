@@ -156,6 +156,8 @@
       "owner": " (chủ sở hữu: {name})",
       "loginToView": "Đăng nhập để xem",
       "addFriend": "Đến trang của {name} để kết bạn",
+      "sendFriendRequest": "Gửi lời mời kết bạn đến {name}",
+      "friendRequestSent": "Đã gửi lời mời kết bạn. Bạn có thể xem danh sách này sau khi họ chấp nhận.",
       "noJs": "Cần bật JavaScript để nhận tặng; bạn vẫn có thể xem danh sách.",
       "offline": "Bạn đang ngoại tuyến. Đang hiển thị nội dung tải lần trước, tạm dừng nhận tặng.",
       "lineHint": "Muốn lưu lại phần nhận tặng? Chạm ⋯ ở góc phải trên và chọn \"Mở bằng trình duyệt mặc định\" để dễ tìm lại. ",

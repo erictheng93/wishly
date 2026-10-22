@@ -156,6 +156,8 @@
       "owner": " (owner: {name})",
       "loginToView": "Sign in to view",
       "addFriend": "Go to {name}'s page to add as a friend",
+      "sendFriendRequest": "Send a friend request to {name}",
+      "friendRequestSent": "Friend request sent. You can view this list once they accept.",
       "noJs": "JavaScript is required to pledge; you can still view the list.",
       "offline": "You are offline. Showing the last loaded content; pledging is paused.",
       "lineHint": "Want to keep your pledges? Tap ⋯ at the top right and choose \"Open in default browser\" so they are easier to find later. ",

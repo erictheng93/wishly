@@ -159,6 +159,14 @@ function onFunded(r: any) {
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
 function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }
+// Q9：非好友看到好友限定清單時，直接用擁有者 ID 送好友邀請（擁有者不一定有 handle / 個人頁）
+const { api: authApi } = useApi()
+const friendReq = ref<'idle' | 'busy' | 'sent'>('idle'), friendErr = ref('')
+async function sendFriendRequest() {
+  friendReq.value = 'busy'; friendErr.value = ''
+  try { await authApi('/friends/requests', { method: 'POST', body: { to: gate.value.owner.id } }); friendReq.value = 'sent' }
+  catch (e) { friendErr.value = errMsg(e); friendReq.value = 'idle' }
+}
 function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = false }
 </script>
 
@@ -171,7 +179,12 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
         <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
         <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.slug.loginToView') }}</NuxtLink>
-        <NuxtLink v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.handle" class="g-btn" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink>
+        <template v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.id">
+          <button class="g-btn" :disabled="friendReq !== 'idle'" @click="sendFriendRequest">{{ $t('guest.slug.sendFriendRequest', { name: gate.owner.display_name }) }}</button>
+          <p v-if="friendReq === 'sent'" role="status">{{ $t('guest.slug.friendRequestSent') }}</p>
+          <p v-if="friendErr" class="g-banner err" role="alert">{{ friendErr }}</p>
+          <p v-if="gate.owner.handle"><NuxtLink class="g-link" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink></p>
+        </template>
       <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
     <div v-else-if="failed && !data" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>

@@ -156,6 +156,8 @@
       "owner": "（擁有者：{name}）",
       "loginToView": "登入後查看",
       "addFriend": "前往 {name} 的頁面加好友",
+      "sendFriendRequest": "送出好友邀請給 {name}",
+      "friendRequestSent": "已送出好友邀請，對方接受後就能看到這份清單",
       "noJs": "需要 JavaScript 才能捐助；你仍可查看清單內容",
       "offline": "目前離線，顯示的是上次載入的內容，捐助功能暫停。",
       "lineHint": "想把捐助保存起來？點右上角 ⋯ 選「用預設瀏覽器開啟」，之後比較不會找不到。 ",
