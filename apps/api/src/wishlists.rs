@@ -1458,6 +1458,14 @@ async fn item_delete(
         .bind(wid)
         .execute(&mut *tx)
         .await?;
+    // 持清單列鎖後再讀狀態：closed / archived 不可增刪品項（F8），與新增 / 修改品項一致
+    let status: String = sqlx::query_scalar("SELECT status::text FROM wishlists WHERE id=$1")
+        .bind(wid)
+        .fetch_one(&mut *tx)
+        .await?;
+    if matches!(status.as_str(), "closed" | "archived") {
+        return Err(closed());
+    }
     if item.funding_mode == "crowdfund" {
         let (captured, pledged): (i64, i64) = sqlx::query_as(
             "SELECT count(*) FILTER (WHERE status = 'captured'), count(*) FILTER (WHERE status = 'pledged') FROM contributions WHERE item_id = $1")

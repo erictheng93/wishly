@@ -450,12 +450,9 @@ async fn apply(
     };
     // 清單擁有者（F5）：只能推進 delivered 或取消；驚喜鎖定期間看不到捐助，一律禁止
     let by_owner = !mine && matches!(actor, Actor::User(u) if u == owner_id);
+    // 非本人一律 404，不洩漏捐助存在（F5）
     if !mine && !by_owner {
-        return Err(AppError::problem(
-            403,
-            "FORBIDDEN",
-            "只有捐助者本人可以操作",
-        ));
+        return Err(AppError::NotFound);
     }
     if by_owner
         && (locked
@@ -482,7 +479,8 @@ async fn apply(
     let mut new_status = cur.clone();
     if let Some(s) = p.status.as_deref() {
         match (cur.as_str(), s) {
-            ("cancelled", "cancelled") => {} // 冪等 no-op
+            // 目標狀態與現況相同：冪等 no-op，回目前資料（F5）
+            (a, b) if a == b => {}
             ("reserved", "purchased")
             | ("reserved" | "purchased", "delivered")
             | ("reserved" | "purchased", "cancelled") => new_status = s.into(),
@@ -562,9 +560,9 @@ async fn apply(
     } else {
         sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "UPDATE claims c SET qty = COALESCE($2, qty), note = COALESCE($3, note), visibility = COALESCE($5::text::share_level, visibility), status = $4::text::claim_status,
-               purchased_at = CASE WHEN $4::text = 'purchased' THEN now() ELSE purchased_at END,
-               delivered_at = CASE WHEN $4::text = 'delivered' THEN now() ELSE delivered_at END,
-               cancelled_at = CASE WHEN $4::text = 'cancelled' THEN now() ELSE cancelled_at END,
+               purchased_at = CASE WHEN $4::text = 'purchased' AND c.status::text <> 'purchased' THEN now() ELSE purchased_at END,
+               delivered_at = CASE WHEN $4::text = 'delivered' AND c.status::text <> 'delivered' THEN now() ELSE delivered_at END,
+               cancelled_at = CASE WHEN $4::text = 'cancelled' AND c.status::text <> 'cancelled' THEN now() ELSE cancelled_at END,
                expires_at = CASE WHEN $4::text <> 'reserved' THEN NULL ELSE expires_at END
              WHERE c.id = $1 RETURNING {CLAIM_COLS}")))
             .bind(id).bind(new_qty).bind(&p.note).bind(&new_status).bind(&p.visibility).fetch_one(&mut *tx).await?

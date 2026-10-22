@@ -204,7 +204,7 @@ async fn signed_in_member_can_manage_own_legacy_guest_claim(pool: PgPool) {
     .await;
     assert_eq!(
         (s, b["code"].as_str()),
-        (StatusCode::FORBIDDEN, Some("FORBIDDEN")),
+        (StatusCode::NOT_FOUND, Some("NOT_FOUND")),
         "{b}"
     );
     assert_eq!(qty_claimed(&pool, it).await, 3);

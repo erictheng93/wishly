@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>流程驗證待決事項</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="index.html">← 流程驗證總覽</a></p>
+<h1>待決事項：規格與實作不一致</h1>
+<p class="sub">流程驗證過程中，凡是「改規格或改程式都說得通」、或需要產品 / 法遵判斷的項目都記在這裡，不擅自修。每項附建議；決定後再依結論改程式或改 02 文件。</p>
+
+<div class="note">狀態：<span class="tag decide">待決</span> 等你決定 · <span class="tag pass">已決</span> 已有結論並處理</div>
+
+<h2 id="q1">Q1 · 擁有者能否把「已送達」改回取消？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F5 狀態機：<code>delivered → cancelled</code>「僅 owner 或 coordinator 更正誤標」，並回補 qty_claimed。</td></tr>
+<tr><th>現況</th><td><code>claims.rs</code> 一律禁止，<code>owner_claim_actions.rs</code> 斷言 409；04 契約也寫「已 delivered 不可取消」，所以是 02 與 04 互相矛盾。進度頁「標為已送達」無確認框。</td></tr>
+<tr><th>影響</th><td>擁有者誤點「標為已送達」後無法撤回，該品項永遠被算作已送達、不會釋出給其他人。</td></tr>
+<tr><th>選項</th><td>A. 照規格開放 owner 取消 delivered（並回補）。<br>B. 維持禁止，但在「標為已送達」加二次確認，並更新規格。<br>C. 新增 owner 專用「退回已購買 / 已捐助」而非取消。</td></tr>
+<tr><th>建議</th><td><b>B</b>：改動最小、避免「送達後又取消」讓捐助者困惑；若常有誤標再做 C。</td></tr>
+</table>
+
+<h2 id="q2">Q2 · 清單關閉後，捐助者還能取消 / 標已購買嗎？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F8 狀態表：closed 時「guest 不可改量 / 取消捐助」，owner 仍可標 delivered 與取消；F5 錯誤碼 <code>WISHLIST_CLOSED</code>「清單 closed / archived 後，guest 不可再改量或取消」。（規格寫於 D50 之前，「guest」即捐助者。）</td></tr>
+<tr><th>現況</th><td>改量已擋（409）；<b>取消、標 purchased / delivered 仍可</b>（實測 closed 清單上 DELETE 回 204）。</td></tr>
+<tr><th>影響</th><td>關閉後捐助者取消會讓已結束清單的完成度往下掉；但禁止取消也代表捐助者無法撤回已無法履行的承諾。</td></tr>
+<tr><th>選項</th><td>A. 照規格：closed 後捐助者的取消回 409，標 purchased / delivered 仍允許（推進履約）。<br>B. 維持現況並改規格（關閉只停止新捐助與加量）。</td></tr>
+<tr><th>建議</th><td><b>B</b>：捐助者在活動結束後仍需能標「已送達」與撤回；請確認。</td></tr>
+</table>
+
+<h2 id="q3">Q3 · 已購買的捐助能改數量嗎？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F5「改量 PATCH quantity（僅 reserved 可改）」。</td></tr>
+<tr><th>現況</th><td>reserved 與 purchased 都可改量（加量同樣走條件式 UPDATE，不會超賣）。</td></tr>
+<tr><th>補充</th><td>04 契約寫「qty 只能在 reserved / purchased 時改」，與實作一致，只有 02 落後。</td></tr>
+<tr><th>建議</th><td>維持現況，併入 <a href="#q6">Q6</a> 更新 02。</td></tr>
+</table>
+
+<h2 id="q4">Q4 · 「每人每清單有效捐助最多 30 筆」上限 <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F4 步驟 5：每使用者每清單有效 claim 上限 30。</td></tr>
+<tr><th>現況</th><td>沒有「有效筆數」上限，改為限流：同清單每小時 15 次、每人每小時 30 次（429）。長期來看同一人仍可在一份清單累積任意多筆。</td></tr>
+<tr><th>建議</th><td>維持限流並在規格註明取代（每品項本來就只能有一筆有效捐助，上限等同品項數）；若擔心洗單再補 DB 計數上限。</td></tr>
+</table>
+
+<h2 id="q5">Q5 · 完成度百分比的定義 <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F7：<code>completion_pct = items_done / items_total</code>（主數字），<code>claimed_pct</code> 為數量比例。</td></tr>
+<tr><th>現況</th><td>公開頁、儀表板都以數量比例為主數字（例：2 品項、數量 3/4 → 顯示 75%，同時顯示 1 / 2 項）。有測試固定此行為（<code>unified_pct…</code>）。</td></tr>
+<tr><th>建議</th><td>更新規格為現況（數量比例對送禮者較直觀）。</td></tr>
+</table>
+<h2 id="q6">Q6 · 02 文件落後於 04 契約與實作（批次更新） <span class="tag decide">待決</span></h2>
+<p>以下 02 的描述與實作不同，但實作與較新的 04 契約一致，判斷為 02 未同步。建議一次更新 02 對應段落；若其中某項其實要以 02 為準，請標出來，我再改程式。</p>
+<table>
+<tr><th>#</th><th>02 現寫</th><th>實作 / 04</th><th>流程</th></tr>
+<tr><td>a</td><td>改量僅 reserved</td><td>reserved / purchased 皆可（Q3）</td><td>F5</td></tr>
+<tr><td>b</td><td>delivered → cancelled：owner 可更正</td><td>不可（Q1，若選 A 則改程式）</td><td>F5</td></tr>
+<tr><td>c</td><td>非法清單狀態轉換回 409 <code>INVALID_STATE_TRANSITION</code></td><td>422 <code>VALIDATION_FAILED</code>，<code>errors[].code=TRANSITION</code>；archived 上的其他修改回 409 <code>WISHLIST_CLOSED</code></td><td>F8</td></tr>
+<tr><td>d</td><td>DELETE 空草稿實體刪除</td><td>一律封存（D13）</td><td>F8</td></tr>
+<tr><td>e</td><td>狀態圖無 active → archived</td><td>允許（DELETE 與 PATCH 皆可）</td><td>F8</td></tr>
+<tr><td>f</td><td>F7 completion_pct = items_done / items_total</td><td>主數字為數量比例（Q5）</td><td>F7</td></tr>
+</table>
+</main>
+</body>
+</html>

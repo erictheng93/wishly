@@ -58,13 +58,13 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 
 - Migration 只向前相容（expand → migrate → contract）：**同一版不要移除舊欄位**。回滾後端時，資料庫已套用的 migration 必須與舊版程式相容。
 - **已套用的 migration 檔案內容不可修改**（連註解也不行），sqlx 會因 checksum 不符拒絕啟動。要改請新增 migration。
-- 高風險 migration 前先手動備份並記錄。目前尚無自動備份（見 `docs/TODO.md` P0），別假設可以還原。
+- 高風險 migration 前先手動執行一次 `/opt/wishly-backup/db-backup.sh`（§6），確認輸出 `ok` 再部署。
 
 ## 4. 回滾
 
 - **後端**：Dokploy 保留前一個部署版本，可一鍵切回。確認新 migration 與舊版相容後才回滾。
 - **前端**：Cloudflare Pages 部署紀錄切回前一版。
-- **資料**：只能靠備份，見 §3。
+- **資料**：只能靠備份，見 §6。
 
 ## 5. 更新前後速查
 
@@ -74,3 +74,37 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 - [ ] Dokploy 只重新部署 `api`
 - [ ] `/healthz`、`/readyz` 皆 200
 - [ ] 前端首頁 200，手動走一次捐助流程
+
+## 6. 資料庫備份與還原
+
+目前是方案 B：排程 `pg_dump`，**RPO = 1 小時**、沒有 PITR。方案 A（WAL-G）完成後改寫本節。腳本在 repo 的 `scripts/db-*`，VPS 上放在 `/opt/wishly-backup/`（改了腳本要用 `scp` 同步，不在 VPS 上 `git pull`）。
+
+| 項目 | 位置 |
+|---|---|
+| 排程 | `/etc/cron.d/wishly-backup`，每小時第 17 分；日誌 `journalctl -t wishly-backup` |
+| 本機副本 | `/var/backups/wishly/wishly-<UTC 時間>.dump`（0600，保留最近 48 份） |
+| 異地副本 | R2 `wishly-db-backups/postgres/`；憑證在 `/etc/wishly-backup/r2.env`（0600，範本 `scripts/db-backup.r2.env.example`）。檔案不存在時只做本機備份 |
+| 格式 | `pg_dump -Fc -Z zstd`：先壓縮再落地、上傳；`pg_restore` 直接讀 |
+
+**還原演練**（每季一次，記錄在 `docs/TODO.md` 已完成區）：
+
+```sh
+ssh root@<VPS>
+/opt/wishly-backup/db-restore-drill.sh "$(ls -1t /var/backups/wishly/*.dump | head -1)"
+# 從 R2 演練：先 docker run --rm --env-file /etc/wishly-backup/r2.env -v /tmp:/data rclone/rclone:1.68.2 copy r2:wishly-db-backups/postgres/<檔名> /data/
+```
+
+腳本會在無網路的暫存容器還原，然後跑 `db-reconcile.sql`（與測試的 `assert_all_reconciled` 同條件）。最後一行 `還原演練通過…耗時 N 秒` 就是資料庫部分的 RTO，對帳失敗會以非 0 結束。
+
+**真正還原到正式**（資料毀損、誤刪）：
+1. Dokploy 停掉 `api`，避免繼續寫入。
+2. 先備份現況：`/opt/wishly-backup/db-backup.sh`（留作事後分析）。
+3. 在既有 `db` 容器內重建資料庫（**不要刪除重建 `db` 服務**，否則容器名改變）。postgis 映像在預設庫預裝了擴充，所以要從 `template0` 建，否則 `pg_restore` 會撞到 `schema "tiger" already exists`：
+   ```sh
+   D=wishly-db-2y7t3r-db-1
+   docker exec $D psql -U wishly -d postgres -c "DROP DATABASE wishly WITH (FORCE)"
+   docker exec $D createdb -U wishly -T template0 wishly
+   docker exec -i $D pg_restore -U wishly -d wishly --no-owner --exit-on-error < /var/backups/wishly/<檔名>.dump
+   docker exec -i $D psql -U wishly -d wishly -X < /opt/wishly-backup/db-reconcile.sql
+   ```
+4. 啟動 `api`，執行 §1 的驗證。

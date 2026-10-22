@@ -82,13 +82,15 @@ async function remove(force = false) {
     if (e.code === 'ITEM_HAS_CLAIMS') del.value.force = true
   } finally { delBusy.value = false }
 }
-async function move(i: number, d: number) {
+// 連按排序時依序送出：並行的請求可能晚到先寫，後端留下的順序會與畫面不同
+let reorderQ: Promise<unknown> = Promise.resolve()
+function move(i: number, d: number) {
   const a = [...items.value]; const j = i + d
   if (j < 0 || j >= a.length) return
   ;[a[i], a[j]] = [a[j], a[i]]
   items.value = a
-  try { await api(`/wishlists/${id}/items/reorder`, { method: 'POST', body: { item_ids: a.map(x => x.id) } }) }
-  catch (e) { err.value = errMsg(e); await load(true) }
+  reorderQ = reorderQ.then(() => api(`/wishlists/${id}/items/reorder`, { method: 'POST', body: { item_ids: a.map(x => x.id) } }))
+    .catch(async (e) => { err.value = errMsg(e); await load(true) })
 }
 async function copy() {
   try { await copyText(shareUrl.value); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
@@ -143,7 +145,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
 
-      <details class="c-card">
+      <!-- 封存後只能取消封存（後端拒絕其他修改），不顯示設定與分享 -->
+      <details v-if="w.status !== 'archived'" class="c-card">
         <summary>{{ $t('lists.edit.settings') }}</summary>
         <form class="c-mt12" @submit.prevent="saveMeta">
           <label class="c-field"><span>{{ $t('lists.edit.name') }}</span><input v-model="meta.title" maxlength="100" required></label>
@@ -165,7 +168,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 
       <div class="c-bottom"><div>
         <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? $t('lists.edit.publishing') : $t('lists.edit.publish') }}</button>
-        <button v-else class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
+        <button v-else-if="w.status !== 'archived'" class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
       </div></div>
     </template>
 

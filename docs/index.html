@@ -34,6 +34,7 @@ th{background:var(--code-bg)}
   <a class="card" href="02-master-user-flow.html"><div class="no">02</div><h2>Master User Flow</h2><p>主流程、狀態機、交易邊界、併發控制、背景工作、錯誤碼。</p><span class="aud">後端 Rust 工程師</span></a>
   <a class="card" href="03-wireframe-user-journey.html"><div class="no">03</div><h2>Wireframe &amp; User Journey</h2><p>用戶旅程、User Flow、手機線框圖、元件規格、PWA、文案。</p><span class="aud">前端 Vue/Nuxt 工程師</span></a>
   <a class="card" href="04-data-schema-api-contract.html"><div class="no">04</div><h2>Data Schema &amp; API Contract</h2><p>ER 圖、PostgreSQL DDL、API 契約、TS / Rust 型別。</p><span class="aud">前後端共同</span></a>
+  <a class="card" href="flow-verification/index.html"><div class="no">QA</div><h2>流程驗證</h2><p>逐條驗證 02 的子流程：排程、各流程報告、缺陷處置與待決事項。</p><span class="aud">全體 / QA</span></a>
   <a class="card" href="user-manuals/system-handbook.html"><div class="no">手冊</div><h2>系統手冊</h2><p>操作手冊（創建者、訪客、營運）、業務規則、API、部署維運與疑難排解。</p><span class="aud">全體 / 營運 / 維運</span></a>
 </div>
 <div class="note">
@@ -48,7 +49,7 @@ th{background:var(--code-bg)}
 <tr><td>認捐狀態</td><td>pledged → captured（達標下單）；released（退回錢包）／reallocated（轉投其他品項）</td></tr>
 <tr><td>品項募集狀態</td><td>open → funded → fulfilled；expired（截止未達標）</td></tr>
 <tr><td>分期</td><td>P0 MVP（personal + registry 數量捐助）· P1（連結預覽、通知、換裝置找回）· P2-A 錢包＋眾籌＋自動儲值 · P2-B 禮物卡＋回饋星星 · P2-C 企業禮券 · P2-D 救災</td></tr>
-<tr><td>清單可見性</td><td>public · link（預設）· friends · selected · password · private；公開路徑 <code>/public/…</code> 可被 CDN 快取、不讀 cookie，受限內容走 <code>/restricted/…</code>（no-store）</td></tr>
+<tr><td>清單可見性</td><td>public · friends（預設）· selected · private（D51 移除 link、password）；公開路徑 <code>/public/…</code> 可被 CDN 快取、不讀 cookie，受限內容走 <code>/restricted/…</code>（no-store）</td></tr>
 <tr><td>前端路由</td><td>以實作為準：/lists/new、/lists/{id}/edit、/lists/{id}/progress、/settings、/me/wallet（對照表見 03 的 5.37）</td></tr>
 <tr><td>API</td><td><code>https://api.wishly.tw/api/v1</code>，錯誤格式 RFC 9457 problem+json，建立類 POST 必須帶 Idempotency-Key</td></tr>
 </table>

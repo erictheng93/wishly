@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>流程驗證總覽</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="../index.html">← 文件索引</a></p>
+<h1>02 Master User Flow 驗證</h1>
+<p class="sub">逐條對照 <a href="../02-master-user-flow.html">02 Master User Flow</a> v0.5 的子流程，以「自動化 E2E / 整合測試」＋「Playwright 驅動的手動探索」驗證。每條流程結束後產出報告；缺陷可直接修的就修，範圍大的開 issue，需要產品判斷的進 <a href="decisions.html">待決事項</a>。起始日 2026-10-21。</p>
+
+<h2>起點</h2>
+<p>驗證前已有大量測試（後端 54 個整合測試檔、E2E 27 個 spec / 127 個案例，基準全綠），但沒有與 02 子流程逐條對應；部分 E2E（儲值、現金退款、後台爭議）全以 mock 執行；<code>apps/web/qa/*.mjs</code> 探索腳本仍用匿名認捐，D50 後已失效。</p>
+
+<h2>排程（依優先級）</h2>
+<div class="wrap"><table>
+<tr><th>波次</th><th>流程</th><th>理由</th><th>狀態</th><th>報告</th></tr>
+<tr><td rowspan="2">W1 核心交易 P0</td><td>F4 數量捐助 · F5 狀態變更</td><td>產品核心、超賣與金額正確性</td><td><span class="tag pass">完成</span></td><td><a href="F04-F05-claims.html">F4/F5</a></td></tr>
+<tr><td>F8 關閉 / 封存 · F2 建立清單與品項</td><td>狀態機與捐助互斥；排序、發佈檢查、上傳無測試</td><td><span class="tag pass">完成</span></td><td><a href="F02-F08-lists.html">F2/F8</a></td></tr>
+<tr><td rowspan="2">W2 存取與社群 P0</td><td>F21 可見性 · F3 分享頁</td><td>隱私外洩風險（CDN 快取、受限內容）</td><td><span class="tag todo">下一個</span></td><td>—</td></tr>
+<tr><td>F20 好友 · F22 個人頁</td><td>解除好友、婉拒、private 404 等 E2E 缺口</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
+<tr><td rowspan="2">W3 帳號與營運 P0</td><td>F1 登入 · F17 刪除與匯出</td><td>F17 無 E2E、與規格多處不一致</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
+<tr><td>F15 檢舉下架 · F16 通知 · F7 儀表板</td><td>下架對寫入的 410、恢復連結、驚喜遮罩</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
+<tr><td>W4 金流 P2-A</td><td>F6a–F6f 錢包眾籌 · F18 拒付</td><td>前端 E2E 全為 mock，需補真實 webhook 入帳路徑</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
+<tr><td>W5</td><td>F9 背景工作</td><td>多個 job 未實作，盤點並記錄</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
+<tr><td>不驗證</td><td>F10 救災 · F11 自動儲值（僅設定 CRUD）· F12 禮物卡 · F13 星星 · F14 企業禮券 · F19 電子發票（僅選項）</td><td>尚未實作，僅記錄現況</td><td><span class="tag na">N/A</span></td><td>—</td></tr>
+</table></div>
+
+<h2>彙總</h2>
+<div class="wrap"><table>
+<tr><th>流程</th><th>已修正</th><th>Issue</th><th>待決</th><th>新增自動化</th></tr>
+<tr><td>F4/F5</td><td>4（B1–B4）</td><td><a href="https://github.com/erictheng93/wishly/issues/29">#29</a></td><td><a href="decisions.html#q1">Q1</a>–<a href="decisions.html#q5">Q5</a></td><td>後端 3、E2E 3、單元 1</td></tr>
+<tr><td>F2/F8</td><td>3（B6–B8）</td><td>—</td><td><a href="decisions.html#q6">Q6</a></td><td>後端 2、E2E 2</td></tr>
+</table></div>
+
+<h2>每條流程的作法</h2>
+<ol>
+<li>對照 02 的規則、錯誤碼、交易邊界，列出可驗證項目，並對應既有測試。</li>
+<li>API 探測：以腳本逐條打規則（含邊界值、非法轉換、權限）。</li>
+<li>Playwright 手動探索：<code>playwright-cli</code> 以各角色實際操作 UI（連點、返回、重整、語系、窄螢幕）。</li>
+<li>為缺口補自動化：後端 <code>apps/api/tests/*.rs</code>、E2E <code>apps/web/e2e/flow-*.spec.ts</code>（真實 API）。修正的缺陷皆先確認測試在修正前會失敗。</li>
+<li>處置：小範圍且規格明確 → 直接修；跨模組或要選方案 → GitHub issue（詳述重現與建議）；規格與實作衝突或需產品判斷 → 待決事項。</li>
+</ol>
+</main>
+</body>
+</html>
