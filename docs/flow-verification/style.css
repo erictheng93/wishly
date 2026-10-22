@@ -16,4 +16,4 @@ th{background:var(--code)}
 .pass{background:var(--okbg);color:var(--ok)}.fixed{background:var(--okbg);color:var(--ok)}
 .issue{background:var(--soft);color:var(--bad)}.decide{background:var(--warnbg);color:var(--warn)}
 .todo{background:var(--code);color:var(--muted)}.na{background:var(--code);color:var(--muted)}
-.note{border-left:4px solid var(--accent);background:var(--code);padding:10px 14px;margin:12px 0}
+.note{border:1px solid var(--border);background:var(--code);padding:10px 14px;margin:12px 0}
