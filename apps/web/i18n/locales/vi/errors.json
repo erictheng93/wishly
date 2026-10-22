@@ -73,7 +73,7 @@
     "READ_ONLY_MODE": "Hệ thống đang bảo trì. Vui lòng thử lại sau.",
     "REALLOCATION_NOT_ALLOWED": "Không thể chuyển cam kết sang món này. Hãy kiểm tra thời hạn lựa chọn và mục tiêu còn lại.",
     "RECOVERY_UNAVAILABLE": "Hiện không thể khôi phục tài khoản này. Hãy kiểm tra email và liên hệ hỗ trợ.",
-    "SERVICE_UNAVAILABLE": "Dịch vụ xác minh tạm thời không khả dụng. Vui lòng thử lại sau.",
+    "SERVICE_UNAVAILABLE": "Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.",
     "SHIPPING_ADDRESS_REQUIRED": "Vui lòng điền địa chỉ nhận hàng của danh sách trước.",
     "SSE_CAPACITY": "Kết nối cập nhật trực tiếp đã đầy. Vui lòng thử lại sau.",
     "STAFF_ONLY": "Thao tác này chỉ dành cho nhân viên quản trị.",

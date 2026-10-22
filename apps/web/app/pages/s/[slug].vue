@@ -169,7 +169,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
     <div v-else-if="forbidden" class="g-center">
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
-        <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.code === 'FRIENDS_ONLY' && gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
+        <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
         <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.slug.loginToView') }}</NuxtLink>
         <NuxtLink v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.handle" class="g-btn" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink>
       <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>

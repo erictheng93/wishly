@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>存取與社群驗證</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="index.html">← 流程驗證總覽</a></p>
+<h1>F3 分享頁 · F21 可見性 · F20 好友 · F22 個人頁</h1>
+<p class="sub">驗證日期 2026-10-22 · 規格 <a href="../02-master-user-flow.html">02</a> v0.5（含 D51 可見性精簡）· 環境：本機 e2e 堆疊</p>
+
+<h2>結論</h2>
+<p>存取控制是本波重點，<b>可見性矩陣、受限路徑、好友關係全數符合規格，沒有發現資料外洩</b>：公開路徑不讀 cookie、受限內容 no-store、私人清單與不存在不可區分、捐助 / SSE / 檢舉都經 <code>check_wishlist</code>、解除好友與收緊可見度立即生效。發現 <b>2 個缺陷已修正</b>，<b>3 項待決</b>（<a href="decisions.html#q7">Q7</a>–<a href="decisions.html#q9">Q9</a>）。</p>
+
+<h2>驗證方式</h2>
+<table>
+<tr><td>API 探測</td><td>4 種可見性 × 5 種身分（匿名 / 擁有者 / 好友 / 非好友 / 摯友）的公開與受限路徑、Cache-Control、Set-Cookie；受限清單上的捐助、SSE、檢舉；收緊可見度、解除好友；探索頁列入條件；好友申請 / 接受 / 婉拒 / 互加 / 邀請連結；handle 規則；個人頁依 relation 的內容。</td></tr>
+<tr><td>Playwright 手動探索</td><td>好友 / 匿名 / 非好友 / 擁有者開僅好友清單時，以 MutationObserver 記錄門檻文案是否曾出現在畫面上（hydrate 閃爍）；SSR 狀態碼與 OG meta（含 FB / LINE UA）；SSE 標頭、心跳、每 IP 上限；驚喜清單在擁有者 / 訪客端的呈現。</td></tr>
+<tr><td>裝置</td><td>flow-f21 / flow-f22 與既有 social.spec 在桌機、iPhone 13、iPad 三個 project 共 21 個案例通過；另在 320 / iPhone 13 / iPad 直橫 / 1280 / 1920 掃描 /explore、/friends、/u/{handle}、/invite/{token}、門檻頁，無水平溢出並逐張看過截圖。</td></tr>
+<tr><td>自動化（新增）</td><td>E2E <code>flow-f21-visibility.spec.ts</code>（3 個）、<code>flow-f22-profile.spec.ts</code>（2 個），皆真實 API、三種裝置。</td></tr>
+<tr><td>既有自動化</td><td>後端 visibility.rs、explore.rs、social.rs、profiles.rs、cdn_invalidation.rs、dashboard_privacy.rs、wishlist_events.rs；E2E social、errors、guest-journey、live-updates。</td></tr>
+</table>
+
+<h2>F21 可見性矩陣（實測）</h2>
+<div class="wrap"><table>
+<tr><th>visibility</th><th>匿名</th><th>擁有者</th><th>好友</th><th>非好友</th><th>摯友名單內</th></tr>
+<tr><td>public</td><td>200</td><td>200</td><td>200</td><td>200</td><td>200</td></tr>
+<tr><td>friends</td><td>403 LOGIN_REQUIRED</td><td>200</td><td>200</td><td>403 FRIENDS_ONLY</td><td>200（也是好友）</td></tr>
+<tr><td>selected</td><td>403 LOGIN_REQUIRED</td><td>200</td><td>403 NOT_ALLOWED</td><td>403 NOT_ALLOWED</td><td>200</td></tr>
+<tr><td>private</td><td>404</td><td>200</td><td>404</td><td>404</td><td>404</td></tr>
+</table></div>
+<p><code>/public/wishlists/{slug}</code>：public 回 <code>public, s-maxage=10, stale-while-revalidate=60</code>，帶 cookie 也只回 public，回應無 Set-Cookie；其餘一律 no-store。<code>/restricted/…</code> 永遠 <code>private, no-store</code>。</p>
+
+<h2>規則對照</h2>
+<div class="wrap"><table>
+<tr><th>規則</th><th>結果</th><th>證據</th></tr>
+<tr><td>F21 新清單預設 friends；link / password 回 422</td><td><span class="tag pass">通過</span></td><td>API 探測</td></tr>
+<tr><td>F21 指定名單只能選好友 → 422 <code>NOT_FRIEND</code></td><td><span class="tag pass">通過</span></td><td>API 探測、visibility.rs</td></tr>
+<tr><td>F21 捐助 / SSE / 檢舉先過 check_wishlist</td><td><span class="tag pass">通過</span></td><td>非好友捐助 403 FRIENDS_ONLY、SSE 匿名 / 非好友 403、檢舉 private 404</td></tr>
+<tr><td>F21 收緊可見度立即生效、探索頁移除</td><td><span class="tag pass">通過（新增 E2E）</span></td><td>flow-f21 #2；CDN purge 見 cdn_invalidation.rs</td></tr>
+<tr><td>F21 解除好友後失去存取，並同時移出指定名單</td><td><span class="tag pass">通過（新增 E2E）</span></td><td>flow-f21 #3、social.rs unfriend_clears_allowed_users</td></tr>
+<tr><td>F21 私人清單對他人與「不存在」不可區分</td><td><span class="tag pass">通過（新增 E2E）</span></td><td>flow-f21 #1：好友開私人清單 HTTP 404、同一個 404 頁</td></tr>
+<tr><td>F21 hydrate 期間不閃現門檻頁</td><td><span class="tag pass">通過</span></td><td>好友 / 擁有者在桌機與 iPhone 13 皆未出現門檻文案</td></tr>
+<tr><td>F21 門檻頁顯示「由誰建立」</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B10</td></tr>
+<tr><td>F21 非好友可「前往個人頁加好友」</td><td><span class="tag decide">待決</span></td><td>擁有者沒有 handle 時沒有任何加好友途徑 → <a href="decisions.html#q9">Q9</a></td></tr>
+<tr><td>4.2 探索頁只列 public、active、有品項、未結束、未驚喜鎖定</td><td><span class="tag pass">通過</span></td><td>空清單 / closed / 驚喜鎖定 / closes_at 已過皆不列入</td></tr>
+<tr><td>F3 SSR + OG（og:title / description / image / url），爬蟲 UA 同一份</td><td><span class="tag pass">通過</span></td><td>curl 一般、facebookexternalhit、LINE UA</td></tr>
+<tr><td>F3 draft / private / 不存在 → 404 且 noindex</td><td><span class="tag pass">通過</span></td><td>SSR 狀態碼</td></tr>
+<tr><td>F3 SSE：text/event-stream、no-cache、X-Accel-Buffering: no、20 秒心跳</td><td><span class="tag pass">通過</span></td><td>23 秒內收到 <code>: heartbeat</code></td></tr>
+<tr><td>F3 SSE 每 IP 同時 5 條</td><td><span class="tag decide">不一致</span></td><td>實作 16 條（超過回 429）→ <a href="decisions.html#q7">Q7</a></td></tr>
+<tr><td>F3 驚喜模式：擁有者看到遮罩，訪客照常看到 x/y</td><td><span class="tag pass">通過</span></td><td>擁有者無數字、訪客「已捐助 1 / 2」</td></tr>
+<tr><td>F3 公開頁顯示「這是驚喜清單」提示</td><td><span class="tag decide">未實作</span></td><td>訪客端沒有任何提示 → <a href="decisions.html#q8">Q8</a></td></tr>
+<tr><td>F20 對象不存在 / 自己 / 已是好友 → 一律 202（不洩漏帳號）</td><td><span class="tag pass">通過</span></td><td>API 探測</td></tr>
+<tr><td>F20 只有收件者能接受（他人 404），互相申請自動成為好友，婉拒 / 撤回</td><td><span class="tag pass">通過</span></td><td>API 探測、social.rs</td></tr>
+<tr><td>F20 邀請連結：重新產生作廢舊連結、自己接受 422 <code>SELF_INVITE</code>、可多人使用、撤銷後 404、接受需登入</td><td><span class="tag pass">通過</span></td><td>API 探測</td></tr>
+<tr><td>F22 handle 3–30 小寫英數底線，重複 409 <code>HANDLE_TAKEN</code></td><td><span class="tag pass">通過（新增 E2E）</span></td><td>flow-f22 #2：設定頁顯示「已被使用」，換一個後出現個人頁連結</td></tr>
+<tr><td>F22 relation（anonymous / self / friend）與清單、捐助依可見度過濾</td><td><span class="tag pass">通過</span></td><td>public / friends / private 三筆捐助：匿名看 1、好友看 2、本人看 3</td></tr>
+<tr><td>F22 驚喜鎖定 / 下架清單的捐助不顯示、最多 50 筆</td><td><span class="tag pass">通過（程式與既有測試）</span></td><td>profiles.rs SQL 條件、social.rs</td></tr>
+<tr><td>F22 個人頁一律 noindex</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B11</td></tr>
+</table></div>
+
+<h2>缺陷與處置</h2>
+<h3>B10 · 未登入看到的門檻頁沒有顯示清單建立者 <span class="tag fixed">已修正</span></h3>
+<p>F21：403 回應帶 <code>owner</code>「供門檻頁顯示由誰建立」。實作只在 <code>FRIENDS_ONLY</code> 時顯示，未登入（<code>LOGIN_REQUIRED</code>）與 <code>NOT_ALLOWED</code> 時訪客不知道是誰的清單、是否值得登入。改為回應有 owner 就顯示（<code>pages/s/[slug].vue</code>）；flow-f21 #2 覆蓋。</p>
+
+<h3>B11 · 個人頁沒有 noindex <span class="tag fixed">已修正</span></h3>
+<p>F22「個人頁一律 noindex」。<code>/u/**</code> 為 client 渲染（<code>ssr: false</code>），伺服器回的 HTML 殼沒有 robots meta，noindex 要等 JS 執行後才加上；不執行 JS 或先抓 HTML 的爬蟲看不到。改在 <code>nuxt.config.ts</code> routeRules 對 <code>/u/**</code> 回 <code>X-Robots-Tag: noindex</code>；flow-f22 #1 驗證回應標頭。<b>注意</b>：已在本機 node 預設驗證，Cloudflare Pages 上線後建議 <code>curl -I https://wishly.tw/u/xxx</code> 確認標頭仍在。</p>
+
+<h3>測試穩定性 · flow-f05 擁有者取消捐助偶發失敗 <span class="tag fixed">已修正</span></h3>
+<p>全套並行時偶發：進度頁因 SSE 重抓而重繪，第一次「取消捐助」若點在重繪中沒有跳出確認框，<code>page.once('dialog')</code> 的處理器會殘留到第二次，兩個處理器同時處理同一個對話框。改為每次點擊前等待該次對話框並處理；三種裝置 × 3 次、6 個 worker 並行共 27 次皆通過。屬測試問題，產品行為無誤。</p>
+
+<h2>探索觀察（未列缺陷）</h2>
+<ul>
+<li>受限清單的 SSR 回 HTTP 200（標題「需要權限才能查看」、noindex），02 寫「SSR 為 403」；client 端重抓後顯示正確內容或門檻，且 SSR body 不含門檻文案，對使用者無影響。</li>
+<li>/s/{slug} 的 HTML 回應會帶 <code>Set-Cookie: ws_locale</code>（依 Accept-Language）；HTML 目前沒有 CDN 快取，不影響。若日後要快取分享頁 HTML，需先拿掉。</li>
+<li>品項全刪光的清單 OG 描述為「已完成 0%，還有 0 項等你捐助」，文案略怪（此清單也不會出現在探索頁）。</li>
+<li>320 寬時 /friends 的「name@example.com 或 @handle」佔位文字被截斷；個人頁捐助紀錄「送給 b ·」行尾多一個分隔點。</li>
+</ul>
+</main>
+</body>
+</html>

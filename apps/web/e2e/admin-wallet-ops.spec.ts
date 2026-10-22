@@ -117,7 +117,7 @@ test('現金退款：空列表與載入失敗可重試', async ({ page }) => {
   let fail = true
   await mock(page, /\/api\/v1\/admin\/cash-refunds(\?|$)/, () => (fail ? problem(500, 'INTERNAL', '內部錯誤') : ok({ data: [], next_cursor: null })))
   await page.goto('/admin/cash-refunds'); await hydrated(page)
-  await expect(page.getByRole('alert')).toContainText('內部錯誤')
+  await expect(page.getByRole('alert')).toContainText('系統暫時發生問題')
   fail = false
   await page.getByRole('button', { name: '重試' }).click()
   await expect(page.getByText('沒有符合的申請')).toBeVisible()

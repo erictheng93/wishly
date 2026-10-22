@@ -41,12 +41,17 @@ test('擁有者：進度頁標記已送達、取消他人捐助（需確認）�
   await rows.filter({ hasText: '×1' }).getByRole('button', { name: '標為已送達' }).click()
   await expect(rows.filter({ hasText: '×1' }).getByText('已送達')).toBeVisible()
 
-  page.once('dialog', d => d.dismiss())
-  await rows.filter({ hasText: '×2' }).getByRole('button', { name: '取消捐助' }).click()
+  // 逐次等對話框出現再處理：進度頁會因 SSE 重抓而重繪，用 page.once 可能讓處理器留到下一次
+  const cancel = async (accept: boolean) => {
+    // confirm() 開著時 click 不會結束，所以對話框一出現就處理，再等 click 與處理都完成
+    const handled = page.waitForEvent('dialog').then(d => accept ? d.accept() : d.dismiss())
+    await rows.filter({ hasText: '×2' }).getByRole('button', { name: '取消捐助' }).click()
+    await handled
+  }
+  await cancel(false)
   await expect(rows.filter({ hasText: '×2' }).getByText('已捐助')).toBeVisible()
 
-  page.once('dialog', d => d.accept())
-  await rows.filter({ hasText: '×2' }).getByRole('button', { name: '取消捐助' }).click()
+  await cancel(true)
   await expect(rows.filter({ hasText: '×2' }).getByText('已取消')).toBeVisible()
   await expect(page.getByText('數量 1 / 3')).toBeVisible()
 })

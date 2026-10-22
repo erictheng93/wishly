@@ -64,6 +64,29 @@
 <tr><td>e</td><td>狀態圖無 active → archived</td><td>允許（DELETE 與 PATCH 皆可）</td><td>F8</td></tr>
 <tr><td>f</td><td>F7 completion_pct = items_done / items_total</td><td>主數字為數量比例（Q5）</td><td>F7</td></tr>
 </table>
+<h2 id="q7">Q7 · SSE 每 IP 同時連線上限：5 還是 16？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F3 / 6.2：每 IP 同時 5 條，超過 429。</td></tr>
+<tr><th>現況</th><td><code>dashboard.rs MAX_SSE_PER_IP = 16</code>（另有全域 2000），實測第 17 條起回 429；commit 74b3ddc 未說明為何不是 5。</td></tr>
+<tr><th>考量</th><td>台灣行動網路大量使用電信 CGNAT，同一出口 IP 後面可能有很多人；辦公室 / 家庭也共用 IP。上限太低時，同一個人開兩三個分頁加上家人一起看就會被拒，前端退回輪詢（仍可用，但即時性下降）。</td></tr>
+<tr><th>建議</th><td>維持 16 並更新規格；若要防濫用，交給 Cloudflare 邊緣的「SSE 新連線每分鐘每 IP 10 次」規則。</td></tr>
+</table>
+
+<h2 id="q8">Q8 · 驚喜清單是否要對訪客顯示提示？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F3：「公開頁顯示『這是驚喜清單』提示」。03 線框沒有畫。</td></tr>
+<tr><th>現況</th><td>未實作。擁有者看到「驚喜模式中」遮罩；訪客端完全沒有提示。</td></tr>
+<tr><th>影響</th><td>送禮者不知道這是驚喜，可能在聊天或留言中提前透露。</td></tr>
+<tr><th>建議</th><td>在分享頁標題下加一行提示，例如「這是驚喜清單：活動日前建立者看不到誰送了什麼，請先別透露喔」。需要你確認文案後我再實作（含 en / vi）。</td></tr>
+</table>
+
+<h2 id="q9">Q9 · 清單擁有者沒有設定帳號代號時，非好友如何加好友？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>F21：FRIENDS_ONLY 時「前往個人頁加好友」。</td></tr>
+<tr><th>現況</th><td>只有擁有者有 handle 才出現按鈕；handle 可為空（預設為空），此時門檻頁只剩「回首頁」，對方完全沒有下一步。</td></tr>
+<tr><th>選項</th><td>A. 無 handle 時顯示「請向 {name} 索取好友邀請連結」說明。<br>B. 門檻頁直接提供「送出好友申請」（後端已有 <code>POST /friends/requests</code>，但需要可定址的對象：可讓 403 回應帶不可猜的 user id，或新增「對清單擁有者申請」端點）。</td></tr>
+<tr><th>建議</th><td>先做 A（只改前端文案，0 後端改動），B 視需求再議。</td></tr>
+</table>
 </main>
 </body>
 </html>

@@ -63,8 +63,13 @@
 <h3>B4 · 非擁有者開進度頁顯示「連線失敗」 <span class="tag fixed">已修正</span></h3>
 <p>API 正確回 404，但 404 的 problem 沒有 <code>detail</code>，<code>useApi</code> 一律退回「連線失敗，請稍後再試」，使用者會以為是網路問題而重試。修正：沒有 detail 的 404 改顯示「找不到這個項目，可能已被刪除或你沒有權限」（三語），影響所有創建者頁。E2E flow-f05 #3、vitest 覆蓋。</p>
 
-<h3>B5 · 英文 / 越南文介面顯示中文錯誤 <span class="tag issue">Issue #29</span></h3>
+<h3>B5 · 英文 / 越南文介面顯示中文錯誤 <span class="tag fixed">Issue #29 已修（4437cc1）</span></h3>
 <p>後端 <code>detail</code> 只有中文，前端 29 個頁面 / 元件直接顯示。範圍跨前後端、需選方案，故開 <a href="https://github.com/erictheng93/wishly/issues/29">#29</a> 而非在此修。</p>
+<p>後續：#29 由另一個工作階段修正（前端依錯誤碼翻譯，5xx 不顯示後端 detail，commit 4437cc1）。稽核結果：</p>
+<ul>
+<li><b>提交歸屬</b>：#29 的初始修正（<code>useApi.ts</code>、<code>useGuest.ts</code>、<code>utils/errors.ts</code>、<code>tests/apiErrorLocale.test.ts</code>、<code>tests/setup.ts</code>）因 W1 提交時用了 <code>git add -A</code>，被併進 1a1f187（訊息只寫裝置驗證）。內容本身無誤且 4437cc1 建立在其上，不改寫歷史；之後一律以明確路徑提交。</li>
+<li><b>E2E 回歸</b>：4437cc1 未跑瀏覽器 E2E，造成 3 個失敗。其中 2 個（後台現金退款、眾籌可見度儲存失敗）是測試仍期待顯示 500 的後端 detail，屬預期行為改變，已更新斷言；1 個是 <code>SERVICE_UNAVAILABLE</code> 被翻成「驗證服務暫時無法使用」——後端目前只有 Turnstile 用這個碼，但 02 規格也用它表示連線池耗盡 / lock_timeout 等一般 503，在認捐表單出現「驗證服務」會誤導，已改為通用的「服務暫時無法使用」（三語）。修正後全套 E2E 157 / 157 通過。</li>
+</ul>
 
 <h2>裝置與解析度</h2>
 <p>新增的 flow-* E2E 已加入 <code>mobile</code>（iPhone 13，390×664、觸控）與 <code>tablet</code>（iPad gen 7，810×1080）兩個 project，三種裝置皆通過。另以 Playwright 在 320 寬、iPhone 13、iPad Mini 直式、iPad 橫式、1280、1920 六種解析度掃描 <code>/s/{slug}</code>、<code>/me/claims</code>、<code>/lists/{id}/progress</code>：檢查水平捲動與超出視窗的元素（皆無），並逐張看截圖。</p>

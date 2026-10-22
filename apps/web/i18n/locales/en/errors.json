@@ -73,7 +73,7 @@
     "READ_ONLY_MODE": "The system is under maintenance. Please try again later.",
     "REALLOCATION_NOT_ALLOWED": "This pledge cannot be moved to that item. Check the selection period and remaining target.",
     "RECOVERY_UNAVAILABLE": "This account cannot be recovered right now. Check the email and contact support.",
-    "SERVICE_UNAVAILABLE": "The verification service is temporarily unavailable. Please try again later.",
+    "SERVICE_UNAVAILABLE": "The service is temporarily unavailable. Please try again later.",
     "SHIPPING_ADDRESS_REQUIRED": "Please fill in the list's shipping address first.",
     "SSE_CAPACITY": "Live updates are at capacity. Please try again later.",
     "STAFF_ONLY": "This action is only available to staff.",
