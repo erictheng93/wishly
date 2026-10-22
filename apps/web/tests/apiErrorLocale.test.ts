@@ -61,6 +61,21 @@ describe.each([
 
   it('errMsg also translates errors constructed outside the transport', () => {
     expect(errMsg(new CreatorApiError(409, 'INVALID_STATE_TRANSITION', '不允許的狀態轉換'))).toBe(stale)
+    expect(errMsg(new CreatorApiError(422, 'VALIDATION_FAILED', '資料無效', [{ pointer: '/phone', code: 'FORMAT', detail: '電話格式不正確' }]))).toBe(phone)
+  })
+
+  it('retains zero remaining quantities and interpolates crowdfunding points', async () => {
+    const data = { code: 'ITEM_FULLY_CLAIMED', detail: '剩餘 0 件', remaining: 0 }
+    fetch.mockRejectedValue({ response: { status: 409 }, data })
+    const full = await useGuest().api('/items/item/claims').catch(e => e)
+    expect(full.detail).toContain('0')
+    expect(full.data.remaining).toBe(0)
+
+    fetch.mockRejectedValue({ statusCode: 409, response: { status: 409 }, data: { code: 'CROWDFUND_TARGET_EXCEEDED', detail: '還差 25 點', remaining_points: 25 } })
+    const funding = await useApi().api('/items/item/contributions').catch(e => e)
+    expect(funding.detail).toContain('25')
+    expect(funding.detail).not.toMatch(/[\u3400-\u9fff]|\{\w+\}/)
+    expect(funding.body.remaining_points).toBe(25)
   })
 })
 
@@ -72,4 +87,13 @@ it('resolves messages from the current locale on each call', () => {
   expect(apiErrMsg(e)).toBe('Không thể thực hiện thao tác này nữa. Hãy tải lại trang rồi thử lại.')
   i18n.locale.value = 'zh-Hant'
   expect(apiErrMsg(e)).toBe(e.detail)
+  expect(apiErrMsg({ status: 500, code: 'INTERNAL_ERROR', detail: 'secret database error' })).not.toContain('secret')
+})
+
+it('preserves specific Traditional Chinese creator limits instead of replacing them with HTTP fallbacks', async () => {
+  i18n.locale.value = 'zh-Hant'
+  fetch.mockRejectedValue({ statusCode: 429, response: { status: 429 }, data: { code: 'RATE_LIMITED', detail: '匯出每日最多 3 次' } })
+  const error = await useApi().api('/me/export').catch(e => e)
+  expect(error.detail).toBe('匯出每日最多 3 次')
+  expect(errMsg(error)).toBe('匯出每日最多 3 次')
 })

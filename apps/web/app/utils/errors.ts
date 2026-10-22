@@ -5,7 +5,7 @@ type Problem = { code?: string, status?: number, detail?: string, pointer?: stri
 // 後端只提供中文 detail；非中文介面遇到未知碼時使用當地語系的通用訊息。
 export function problemDetail(e: Problem): string {
   const { t, te, locale } = useNuxtApp().$i18n
-  if (locale.value === 'zh-Hant' && e.detail) return e.detail
+  if (locale.value === 'zh-Hant' && e.detail && (e.status ?? 0) < 500) return e.detail
   let key = `errors.${e.code}`
   if (e.pointer !== undefined) {
     const field = `errors.fields.${e.pointer.slice(1).replaceAll('/', '_')}_${e.code}`
@@ -24,7 +24,7 @@ export function reportErrMsg(e: { code?: string, status?: number, detail?: strin
   return { msg: apiErrMsg(e), resetCaptcha: true }
 }
 
-// 一般 API 錯誤 → 使用者文案：先看 code / HTTP 狀態（不依賴後端是否有補 detail），其餘才用 detail
+// 一般 API 錯誤 → 使用者文案：先看 code / HTTP 狀態，未知碼由 problemDetail 提供語系備援。
 export function apiErrMsg(e: Problem): string {
   const s = e.status ?? 0
   if (e.code === 'NETWORK' || e.status === 0) return t('errors.network')
