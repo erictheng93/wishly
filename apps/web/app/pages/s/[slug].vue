@@ -77,8 +77,13 @@ const myClaims = ref<Record<string, any>>({})
 async function loadMine() {
   try { // 不先檢查 token：登入使用者靠 session cookie 捐助，沒有 guest token
     const r = await api('/guest/me?limit=100')
-    myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, c.claim]))
+    myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, { ...c.claim, item_changed_at: c.item_changed_at }]))
   } catch { /* 401：token 失效，當作沒有 */ }
+}
+// Q13：建立者改過品項內容的提醒，按「知道了」後隱藏
+async function ackChange(id: string) {
+  const c = myClaims.value[id]
+  try { await api(`/claims/${c.id}`, { method: 'PATCH', body: { ack_item_change: true } }); myClaims.value = { ...myClaims.value, [id]: { ...c, item_changed_at: null } } } catch { /* 下次載入仍會顯示 */ }
 }
 // 建立者本人 + 驚喜鎖定中 → 軟性遮蔽：看得到數量，不能捐助；捐助者姓名由 API 在鎖定期間就不輸出（GET /me 比對 owner.id）
 const isOwner = ref(false)
@@ -209,7 +214,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
-          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" />
+          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>

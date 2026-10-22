@@ -29,6 +29,29 @@ pub async fn enqueue_donors<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
+/// Q13：建立者修改品項內容後，通知進行中的捐助者（reserved / purchased，含有 email 的舊訪客）與眾籌認捐者（pledged）。
+/// 連續修改合併：延後 10 分鐘寄，notifications_item_changed_uk 讓同一人同一品項只留一筆待寄；內容寄信時才讀最新品項。
+pub async fn enqueue_item_changed<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    item_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO notifications (user_id, guest_id, channel, kind, payload, scheduled_at)
+         SELECT r.user_id, r.guest_id, 'email'::notification_channel, 'claim.item_changed',
+                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', i.id, 'crowdfund', i.funding_mode = 'crowdfund'),
+                now() + interval '10 minutes'
+           FROM wishlist_items i
+           JOIN (SELECT user_id, guest_id FROM claims WHERE item_id = $1 AND status IN ('reserved', 'purchased')
+                 UNION SELECT user_id, NULL::uuid FROM contributions WHERE item_id = $1 AND status = 'pledged') r ON true
+           LEFT JOIN users u ON u.id = r.user_id
+           LEFT JOIN guests g ON g.id = r.guest_id
+          WHERE i.id = $1
+            AND ((u.email IS NOT NULL AND u.deleted_at IS NULL) OR (g.email IS NOT NULL AND g.deleted_at IS NULL))
+         ON CONFLICT DO NOTHING")
+        .bind(item_id).execute(ex).await?;
+    Ok(())
+}
+
 /// 唯一寄信點。設了 CF_ACCOUNT_ID + CF_EMAIL_API_TOKEN 就走 Cloudflare Email Service REST API
 /// （production 啟動時強制要求）；否則 dev 走 SMTP → Mailpit。錯誤字串不含 token。
 pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Result<(), String> {
@@ -364,6 +387,18 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("Chủ danh sách \"{title}\" đã gỡ món quà bạn đóng góp, khoản đóng góp này đã bị hủy.\nXem các món khác: {manage}\n"),
             ),
         ),
+        "claim.item_changed" => {
+            // 眾籌認捐在錢包管理，一般捐助在「我的捐助」
+            let link = if payload["crowdfund"] == true { &wallet } else { &manage };
+            (
+                l.pick(format!("【Wishly】你捐助的《{item}》內容有更新"), format!("[Wishly] \"{item}\" you pledged for was updated"), format!("[Wishly] \"{item}\" bạn đóng góp đã được cập nhật")),
+                l.pick(
+                    format!("清單《{title}》的建立者修改了「{item}」的內容（例如數量、規格或說明）。購買前請再確認一次數量與規格。\n管理我的捐助：{link}\n"),
+                    format!("The owner of list \"{title}\" updated \"{item}\" (for example its quantity, spec or description). Please re-check the quantity and spec before buying.\nManage my pledges: {link}\n"),
+                    format!("Chủ danh sách \"{title}\" đã cập nhật \"{item}\" (ví dụ số lượng, quy cách hoặc mô tả). Vui lòng kiểm tra lại số lượng và quy cách trước khi mua.\nQuản lý đóng góp của tôi: {link}\n"),
+                ),
+            )
+        }
         "wishlist.closing" => {
             // 以台北時間顯示；解析失敗就只講「24 小時內」
             let at = payload.get("closes_at").and_then(Value::as_str).and_then(|t| t.parse::<chrono::DateTime<chrono::Utc>>().ok())

@@ -1395,6 +1395,19 @@ async fn item_update(
         )
     };
     let before = product(&i);
+    // Q13：捐助者看得到的內容（排序、圖片處理狀態不算）；同值重送不算修改
+    let visible = |i: &I| {
+        (
+            product(i),
+            i.priority.clone(),
+            i.qty_needed,
+            i.funding_mode.clone(),
+            i.target_points,
+            i.funding_deadline,
+            i.fulfillment_type.clone(),
+        )
+    };
+    let seen = visible(&i);
     let frozen = i.funding_mode == "crowdfund" && i.funding_status.as_deref() != Some("open");
     apply_item(m, &mut i)?;
     apply_funding(&mut tx, m, &mut i, event, locked).await?;
@@ -1410,14 +1423,15 @@ async fn item_update(
     if locked && i.qty_needed < old_qty {
         return Err(surprise_locked_err());
     }
+    let changed = visible(&i) != seen;
     // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與捐助競爭
-    let res = sqlx::query("UPDATE wishlist_items SET title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
+    let res = sqlx::query("UPDATE wishlist_items SET content_changed_at = CASE WHEN $19 THEN now() ELSE content_changed_at END, title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
                  unit_price_amount=$9, priority=$10::item_priority, qty_needed=$11, funding_mode=$13::funding_mode, target_points=$14,
                  funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18
                  WHERE id=$1 AND qty_claimed <= $11 AND ($12::timestamptz IS NULL OR updated_at=$12)")
         .bind(id).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status).bind(&i.product_url)
         .bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed).bind(exp)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(changed)
         .execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         let cur: Option<(DateTime<Utc>, i32)> = sqlx::query_as(
@@ -1431,6 +1445,9 @@ async fn item_update(
             Some((u, _)) if exp.is_some_and(|e| e != u) => stale(),
             _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已捐助數量。"),
         });
+    }
+    if changed {
+        crate::notify::enqueue_item_changed(&mut *tx, id).await?;
     }
     crate::dashboard::notify(&mut *tx, i.wishlist_id).await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(

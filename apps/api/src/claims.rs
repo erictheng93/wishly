@@ -303,6 +303,9 @@ struct PatchReq {
     note: Option<String>,
     status: Option<String>,
     visibility: Option<String>,
+    /// Q13：捐助者確認已看過品項修改（只記時間，不算狀態 / 數量變更）
+    #[serde(default)]
+    ack_item_change: bool,
 }
 
 async fn update(
@@ -313,11 +316,16 @@ async fn update(
     body: Bytes,
 ) -> Result<Response, AppError> {
     let p: PatchReq = parse(&body)?;
-    if p.qty.is_none() && p.note.is_none() && p.status.is_none() && p.visibility.is_none() {
+    if p.qty.is_none()
+        && p.note.is_none()
+        && p.status.is_none()
+        && p.visibility.is_none()
+        && !p.ack_item_change
+    {
         return Err(AppError::invalid(
             "/",
             "REQUIRED",
-            "至少需提供 qty、note、status 或 visibility",
+            "至少需提供 qty、note、status、visibility 或 ack_item_change",
         ));
     }
     share_level(&p.visibility)?;
@@ -366,6 +374,7 @@ async fn cancel(
             note: None,
             status: Some("cancelled".into()),
             visibility: None,
+            ack_item_change: false,
         },
     )
     .await?;
@@ -459,6 +468,7 @@ async fn apply(
             || p.qty.is_some()
             || p.note.is_some()
             || p.visibility.is_some()
+            || p.ack_item_change
             || !matches!(p.status.as_deref(), Some("delivered" | "cancelled")))
     {
         return Err(AppError::problem(
@@ -555,6 +565,12 @@ async fn apply(
             tracing::error!(%id, "qty_claimed drift");
             return Err(AppError::Db(sqlx::Error::RowNotFound));
         }
+    }
+    if p.ack_item_change {
+        sqlx::query("UPDATE claims SET item_change_seen_at = now() WHERE id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
     }
     let claim: ClaimRow = if new_status == cur
         && new_qty.is_none()
