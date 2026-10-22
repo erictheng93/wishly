@@ -185,7 +185,8 @@
       "doneLine": "你捐助了 {title} × {qty}，謝謝你",
       "doneHint": "可在「我的捐助」查看、標記已購買或取消。",
       "lineBrowser": "LINE 內建瀏覽器請保持登入狀態；點右上角 ⋯ →「用預設瀏覽器開啟」會更穩定。",
-      "viewMyClaims": "查看我的捐助"
+      "viewMyClaims": "查看我的捐助",
+      "doneDeadline": "請在 {date} 前到「我的捐助」標記已購買，逾期會自動釋出給其他朋友"
     },
     "live": {
       "live": "即時更新中",

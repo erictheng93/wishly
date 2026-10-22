@@ -368,7 +368,8 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     let vis = one_of(m, "visibility", VIS)?.unwrap_or("friends");
     let names = boolean(m, "show_claimer_names")?.unwrap_or(false);
     let surprise = boolean(m, "surprise_mode")?.unwrap_or(false);
-    let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.flatten();
+    // Q12：未帶欄位 = 預設購買期限 7 天；明確 null = 不限
+    let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.unwrap_or(Some(168));
     let closes = closes_at(m)?.flatten();
     future_only(closes)?;
     if surprise && !event.is_some_and(|d| d > today_tw()) {
@@ -709,6 +710,9 @@ async fn update(
         release_pledged(&mut tx, &[id]).await?;
     }
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線立即重驗可見性 / 狀態
+    if was_active && matches!(w.status.as_str(), "closed" | "archived") {
+        crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
+    }
     tx.commit().await?;
     // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
     if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) {
@@ -719,15 +723,18 @@ async fn update(
 
 /// closes_at 到期 → active 轉 closed（同手動關閉；冪等，多實例安全）。捐助 / 認捐路徑另外即時檢查 closes_at，這裡只負責狀態與快取。
 pub async fn close_due(pool: &PgPool) -> Result<usize, sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let rows: Vec<(Uuid, String)> = sqlx::query_as(
         "UPDATE wishlists SET status = 'closed', closed_at = now()
          WHERE status = 'active' AND closes_at <= now() RETURNING id, slug::text",
     )
-    .fetch_all(pool)
+    .fetch_all(&mut *tx)
     .await?;
     for (id, _) in &rows {
-        crate::dashboard::notify(pool, *id).await?;
+        crate::dashboard::notify(&mut *tx, *id).await?;
+        crate::claims::grace_on_close(&mut tx, *id).await?;
     }
+    tx.commit().await?;
     if !rows.is_empty() {
         crate::cdn::purge_wishlists(rows.iter().map(|r| r.1.trim().to_string()).collect());
     } // 公開快取副本的 status 要更新
@@ -757,6 +764,9 @@ async fn archive(
     sqlx::query("UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) WHERE id=$1 AND status<>'archived'").bind(id).execute(&mut *tx).await?;
     release_pledged(&mut tx, &[id]).await?;
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線收到後關閉
+    if !matches!(w.status.as_str(), "closed" | "archived") {
+        crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
+    }
     tx.commit().await?;
     crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     Ok(StatusCode::NO_CONTENT)

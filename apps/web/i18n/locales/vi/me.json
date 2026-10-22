@@ -139,14 +139,16 @@
       "markPurchased": "Đánh dấu đã mua",
       "markDelivered": "Đánh dấu đã giao",
       "cancel": "Hủy",
-      "closedHint": "Danh sách đã kết thúc, bạn chỉ có thể hủy.",
+      "closedHint": "Danh sách đã kết thúc: bạn vẫn có thể đánh dấu đã mua / đã giao hoặc hủy, nhưng không thể đổi số lượng.",
       "itemChanged": "Chủ danh sách đã sửa món này lúc {time}. Vui lòng kiểm tra lại số lượng và quy cách.",
       "ackItemChange": "Đã hiểu",
       "past": "Lịch sử ({n})",
       "wipe": "Xóa biệt danh và thông tin liên hệ của tôi",
       "confirmCancelPurchased": "Người tạo sẽ nhận được thông báo. Bạn chắc chắn muốn hủy lượt đăng ký tặng này?",
       "confirmCancel": "Bạn chắc chắn muốn hủy lượt đăng ký tặng này?",
-      "confirmWipe": "Xóa biệt danh và thông tin liên hệ của bạn? Lịch sử tặng quà sẽ được giữ lại dưới tên \"Khách đã xóa\", và thiết bị này sẽ không thể quản lý nữa."
+      "confirmWipe": "Xóa biệt danh và thông tin liên hệ của bạn? Lịch sử tặng quà sẽ được giữ lại dưới tên \"Khách đã xóa\", và thiết bị này sẽ không thể quản lý nữa.",
+      "deadline": "Vui lòng đánh dấu đã mua trước {date}",
+      "extend": "Gia hạn 7 ngày"
     },
     "wallet": {
       "title": "Điểm của tôi",

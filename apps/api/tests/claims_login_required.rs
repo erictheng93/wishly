@@ -316,6 +316,12 @@ async fn qty_increase_reapplies_create_gates(pool: PgPool) {
             Some(json!({ "qty": 1 })),
         )
         .await;
+        // 結束的清單（deadline 已過）不可再改數量（CTO 決議）；其餘情況減量仍可
+        if name == "deadline" {
+            assert_eq!(s, StatusCode::CONFLICT, "{name} {b}");
+            assert_eq!(b["code"], "WISHLIST_CLOSED");
+            continue;
+        }
         assert_eq!(s, StatusCode::OK, "{name} 減量仍可 {b}");
         assert_eq!(qty_claimed(&pool, it).await, 1, "{name}");
     }

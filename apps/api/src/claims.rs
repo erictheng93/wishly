@@ -29,7 +29,7 @@ pub fn routes() -> Router<AppState> {
 
 /// claims 以別名 `c` 查詢
 pub const CLAIM_COLS: &str = "c.id, c.item_id, c.qty, c.status::text AS status, c.claimer_name, c.note, c.expires_at,
-    c.created_at, c.updated_at, c.purchased_at, c.delivered_at, c.cancelled_at, c.visibility::text AS visibility, c.is_anonymous";
+    c.created_at, c.updated_at, c.purchased_at, c.delivered_at, c.cancelled_at, c.visibility::text AS visibility, c.is_anonymous, c.extended_at";
 
 #[derive(FromRow, Serialize)]
 pub struct ClaimRow {
@@ -48,6 +48,8 @@ pub struct ClaimRow {
     /// 登入者捐助的公開層級（public/friends/private）；舊訪客捐助為 null
     pub visibility: Option<String>,
     pub is_anonymous: bool,
+    /// Q12：捐助者延長購買期限的時間（只能延長一次）
+    pub extended_at: Option<DateTime<Utc>>,
 }
 
 /// trim + 字元驗證；空（含只有零寬字元）→ None
@@ -220,26 +222,32 @@ async fn create(
     }
     // 4.1 (b)：條件式 UPDATE 取得 item row lock 並驗證剩餘量。
     // 偏差：加 moderation_status='ok' 與 visibility<>'private'，下架/私人清單不可捐助。
-    let upd: Option<(i32, i32, Option<i32>)> = sqlx::query_as(
+    let upd: Option<(i32, i32, Option<i32>, Option<chrono::NaiveDate>)> = sqlx::query_as(
         "UPDATE wishlist_items i SET qty_claimed = i.qty_claimed + $2
          FROM wishlists w
          WHERE i.id = $1 AND w.id = i.wishlist_id
            AND w.status = 'active' AND (w.closes_at IS NULL OR w.closes_at > now()) AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.visibility <> 'private'
            AND i.deleted_at IS NULL AND i.funding_mode = 'quantity' AND i.qty_claimed + $2 <= i.qty_needed
-         RETURNING i.qty_needed, i.qty_claimed, w.claim_ttl_hours")
+         RETURNING i.qty_needed, i.qty_claimed, w.claim_ttl_hours, w.event_date")
         .bind(item_id).bind(req.qty).fetch_optional(&mut *tx).await?;
-    let Some((needed, claimed, ttl)) = upd else {
+    let Some((needed, claimed, ttl, event)) = upd else {
         tx.rollback().await?;
         return Err(diagnose(&st, item_id, req.qty).await?);
     };
 
+    // Q12 購買期限：清單設定（NULL = 不限）；有活動日且「活動日台北 00:00 前 3 天」較早就用它，但至少保留 48 小時。
+    // LEAST 忽略 NULL：沒有活動日時只看清單設定。
     let ins = sqlx::query_as::<_, ClaimRow>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO claims AS c (item_id, user_id, claimer_name, qty, note, expires_at, visibility, is_anonymous)
-         VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + $6::int * interval '1 hour' END, $7::text::share_level, $8)
+         VALUES ($1, $2, $3, $4, $5,
+                 CASE WHEN $6::int IS NULL THEN NULL ELSE LEAST(now() + $6::int * interval '1 hour',
+                   CASE WHEN $9::date IS NOT NULL THEN GREATEST(now() + interval '48 hours', ($9::date::timestamp AT TIME ZONE 'Asia/Taipei') - interval '3 days') END) END,
+                 $7::text::share_level, $8)
          RETURNING {CLAIM_COLS}")))
         .bind(item_id).bind(me.id).bind(&name).bind(req.qty).bind(&req.note).bind(ttl)
         .bind(req.visibility.as_deref()) // NULL 時由 trigger 套帳號預設
         .bind(req.is_anonymous.unwrap_or(false))
+        .bind(event)
         .fetch_one(&mut *tx).await;
     let claim = match ins {
         Ok(c) => c,
@@ -266,6 +274,7 @@ async fn create(
         json!({ "qty": req.qty }),
     )
     .await?;
+    crate::notify::enqueue_purchase_reminders(&mut *tx, &[claim.id]).await?;
     let resp = json!({ "claim": claim, "item": item_json(item_id, needed, claimed) });
     idempotency::finish(&mut tx, &scope, key, 201, &resp).await?;
     let wid = wishlist_of(&mut tx, item_id).await?;
@@ -306,6 +315,9 @@ struct PatchReq {
     /// Q13：捐助者確認已看過品項修改（只記時間，不算狀態 / 數量變更）
     #[serde(default)]
     ack_item_change: bool,
+    /// Q12：捐助者把購買期限延長 7 天（只能一次）
+    #[serde(default)]
+    extend: bool,
 }
 
 async fn update(
@@ -321,11 +333,12 @@ async fn update(
         && p.status.is_none()
         && p.visibility.is_none()
         && !p.ack_item_change
+        && !p.extend
     {
         return Err(AppError::invalid(
             "/",
             "REQUIRED",
-            "至少需提供 qty、note、status、visibility 或 ack_item_change",
+            "至少需提供 qty、note、status、visibility、ack_item_change 或 extend",
         ));
     }
     share_level(&p.visibility)?;
@@ -375,6 +388,7 @@ async fn cancel(
             status: Some("cancelled".into()),
             visibility: None,
             ack_item_change: false,
+            extend: false,
         },
     )
     .await?;
@@ -469,6 +483,7 @@ async fn apply(
             || p.note.is_some()
             || p.visibility.is_some()
             || p.ack_item_change
+            || p.extend
             || !matches!(p.status.as_deref(), Some("delivered" | "cancelled")))
     {
         return Err(AppError::problem(
@@ -497,15 +512,42 @@ async fn apply(
             _ => return Err(bad()),
         }
     }
-    // Q2：清單結束後捐助者只能取消，不能再推進為已購買 / 已送達；擁有者不受限（F8）
+    // 清單結束後（CTO 決議放寬 Q2）：捐助者仍可標記已購買 / 已送達、取消、改備註與公開層級；
+    // 不可改數量（下方 WISHLIST_CLOSED）與延長期限。結束當下的寬限見 grace_on_close。
     let closed =
         matches!(wl_status.as_str(), "closed" | "archived") || (wl_status == "active" && past_due);
-    if closed && !by_owner && new_status != cur && new_status != "cancelled" {
-        return Err(AppError::problem(
-            409,
-            "WISHLIST_CLOSED",
-            "此清單已結束，只能取消捐助",
-        ));
+    // Q12：延長購買期限 7 天，一次為限；清單結束後不可延長。claim 已在上面 FOR UPDATE 鎖住。
+    if p.extend {
+        if new_status != "reserved" {
+            return Err(bad());
+        }
+        if closed {
+            return Err(AppError::problem(
+                409,
+                "WISHLIST_CLOSED",
+                "此清單已結束，只能取消捐助",
+            ));
+        }
+        let (has_expiry, used): (bool, bool) = sqlx::query_as(
+            "SELECT expires_at IS NOT NULL, extended_at IS NOT NULL FROM claims WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if used {
+            return Err(AppError::problem(
+                409,
+                "EXTENSION_USED",
+                "購買期限只能延長一次",
+            ));
+        }
+        if !has_expiry {
+            return Err(bad());
+        }
+        sqlx::query("UPDATE claims SET expires_at = expires_at + interval '7 days', extended_at = now() WHERE id = $1")
+            .bind(id).execute(&mut *tx).await?;
+        // 舊提醒的 expires_at 已不符，寄信時 worker 會取消
+        crate::notify::enqueue_purchase_reminders(&mut *tx, &[id]).await?;
     }
     let cancelling = new_status == "cancelled";
     let mut new_qty = None;
@@ -513,7 +555,7 @@ async fn apply(
         if !["reserved", "purchased"].contains(&cur.as_str()) {
             return Err(bad());
         }
-        if wl_status != "active" {
+        if wl_status != "active" || past_due {
             return Err(AppError::problem(
                 409,
                 "WISHLIST_CLOSED",
@@ -628,6 +670,36 @@ async fn wishlist_of(tx: &mut Transaction<'_, Postgres>, item_id: Uuid) -> Resul
     )
 }
 
+/// CTO 決議（Q2 × Q12）：清單結束時，期限不足 7 天的 reserved 捐助一律延到 now()+7 天（不縮短；NULL = 不限不動），
+/// 通知捐助者去標記已購買 / 已送達，並依新期限重排提醒。回傳受影響的捐助數。
+/// 呼叫端已持有清單列鎖，且須放在交易最後：這裡只取 claims 列鎖、之後不再鎖 item，不會與 apply / expire_due 的 item → claim 鎖序成環；
+/// 也不能提前鎖 item，否則與 release_pledged 的 錢包 → item 鎖序衝突。
+pub async fn grace_on_close(
+    tx: &mut Transaction<'_, Postgres>,
+    wishlist_id: Uuid,
+) -> Result<usize, sqlx::Error> {
+    let ids: Vec<Uuid> = sqlx::query_scalar(
+        "WITH g AS (
+           UPDATE claims c SET expires_at = now() + interval '7 days'
+             FROM wishlist_items i
+            WHERE i.id = c.item_id AND i.wishlist_id = $1 AND c.status = 'reserved'
+              AND c.expires_at IS NOT NULL AND c.expires_at < now() + interval '7 days'
+           RETURNING c.id, c.user_id, c.guest_id, c.item_id, c.expires_at),
+         n AS (
+           INSERT INTO notifications (user_id, guest_id, channel, kind, payload)
+           SELECT user_id, guest_id, 'email'::notification_channel, 'claim.list_closed',
+                  jsonb_build_object('wishlist_id', $1::uuid, 'item_id', item_id, 'claim_id', id, 'expires_at', expires_at)
+             FROM g)
+         SELECT id FROM g",
+    )
+    .bind(wishlist_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    // 獨立語句才看得到上面更新後的 expires_at
+    crate::notify::enqueue_purchase_reminders(&mut **tx, &ids).await?;
+    Ok(ids.len())
+}
+
 /// FR-08：把逾期的 reserved 捐助設為 expired 並回補 qty_claimed，回傳釋放的捐助數。
 /// 鎖序同 apply()：先鎖 item（依 id 排序）再動 claim；UPDATE ... WHERE status='reserved' 保證多實例 / 與取消競態時只回補一次。
 pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
@@ -637,14 +709,24 @@ pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
     let rows: Vec<(Uuid, i64)> = sqlx::query_as(
         "WITH x AS (
            UPDATE claims SET status = 'expired', expires_at = NULL
-           WHERE status = 'reserved' AND expires_at <= now() RETURNING id, item_id, qty),
+           WHERE status = 'reserved' AND expires_at <= now() RETURNING id, item_id, qty, user_id, guest_id),
          r AS (
            UPDATE wishlist_items i SET qty_claimed = i.qty_claimed - s.q
            FROM (SELECT item_id, sum(qty)::int AS q FROM x GROUP BY item_id) s
-           WHERE i.id = s.item_id RETURNING i.wishlist_id),
+           WHERE i.id = s.item_id RETURNING i.wishlist_id, i.id),
          a AS (
            INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff)
-           SELECT 'system'::actor_type, 'claim.expire', 'claims', id, jsonb_build_object('qty', qty) FROM x)
+           SELECT 'system'::actor_type, 'claim.expire', 'claims', id, jsonb_build_object('qty', qty) FROM x),
+         -- Q12：通知捐助者；擁有者每個品項一封且不帶捐助者（驚喜安全）。清單已結束也照樣釋出，不重開清單
+         nd AS (
+           INSERT INTO notifications (user_id, guest_id, channel, kind, payload)
+           SELECT x.user_id, x.guest_id, 'email'::notification_channel, 'claim.expired',
+                  jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', x.item_id, 'claim_id', x.id)
+             FROM x JOIN wishlist_items i ON i.id = x.item_id),
+         nw AS (
+           INSERT INTO notifications (user_id, channel, kind, payload)
+           SELECT w.owner_id, 'email'::notification_channel, 'item.reopened', jsonb_build_object('wishlist_id', w.id, 'item_id', r.id)
+             FROM r JOIN wishlists w ON w.id = r.wishlist_id)
          SELECT DISTINCT wishlist_id, (SELECT count(*) FROM x) FROM r")
         .fetch_all(&mut *tx).await?;
     for (w, _) in &rows {

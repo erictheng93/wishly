@@ -1,4 +1,5 @@
-//! Q2：清單結束（closed / archived / closes_at 已過）後，捐助者只能取消，不能標記已購買 / 已送達；擁有者不受限（F8）。
+//! 清單結束（closed / archived / closes_at 已過）後（Q2，經 CTO 決議放寬）：捐助者仍可標記已購買 / 已送達、取消、改備註；
+//! 不能改數量、不能延長購買期限；擁有者不受限（F8）。
 mod common;
 use axum::http::StatusCode;
 use serde_json::json;
@@ -26,13 +27,14 @@ async fn patch(pool: &PgPool, c: Uuid, h: &[(&str, String)], body: serde_json::V
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn donor_can_only_cancel_after_list_closes(pool: PgPool) {
+async fn donor_can_mark_and_cancel_but_not_change_qty_after_list_closes(pool: PgPool) {
     for close in CLOSERS {
         let o = user(&pool, "o").await;
         let wl = wishlist(&pool, o.id, ListOpts::default()).await;
         let it = item(&pool, wl.id, "奶瓶", 5).await;
         let (t, c) = user_claim(&pool, it, 2).await;
         let (tp, cp) = user_claim(&pool, it, 1).await;
+        let (tx, cx) = user_claim(&pool, it, 2).await;
         assert_eq!(
             patch(&pool, cp, &ck(&tp), json!({"status":"purchased"}))
                 .await
@@ -41,18 +43,26 @@ async fn donor_can_only_cancel_after_list_closes(pool: PgPool) {
         );
         sqlx::query(close).bind(wl.id).execute(&pool).await.unwrap();
 
+        // CTO 決議放寬 Q2：結束後仍可標記已購買 / 已送達
         for (tok, id, s) in [
             (&t, c, "purchased"),
             (&t, c, "delivered"),
             (&tp, cp, "delivered"),
         ] {
             let (st, _, b) = patch(&pool, id, &ck(tok), json!({ "status": s })).await;
-            assert_eq!(st, StatusCode::CONFLICT, "{close} {s}: {b}");
+            assert_eq!(st, StatusCode::OK, "{close} {s}: {b}");
+            assert_eq!(b["claim"]["status"], s);
+        }
+        // 數量不能增減、期限不能延長
+        for body in [
+            json!({"qty": 3}),
+            json!({"qty": 1}),
+            json!({"extend": true}),
+        ] {
+            let (st, _, b) = patch(&pool, cx, &ck(&tx), body.clone()).await;
+            assert_eq!(st, StatusCode::CONFLICT, "{close} {body}: {b}");
             assert_eq!(b["code"], "WISHLIST_CLOSED");
         }
-        // 同狀態 no-op 仍冪等
-        let (st, _, b) = patch(&pool, cp, &ck(&tp), json!({"status":"purchased"})).await;
-        assert_eq!(st, StatusCode::OK, "{close}: {b}");
         // 備註 / 公開層級仍可改
         let (st, _, b) = patch(
             &pool,
@@ -64,18 +74,16 @@ async fn donor_can_only_cancel_after_list_closes(pool: PgPool) {
         assert_eq!(st, StatusCode::OK, "{close}: {b}");
         assert_eq!(b["claim"]["note"], "晚點寄");
         // 取消仍允許並回補數量
-        assert_eq!(qty_claimed(&pool, it).await, 3);
-        let (st, _, _) = call(&pool, "DELETE", &format!("/claims/{c}"), &ck(&t), None).await;
+        assert_eq!(qty_claimed(&pool, it).await, 5);
+        let (st, _, _) = call(&pool, "DELETE", &format!("/claims/{cx}"), &ck(&tx), None).await;
         assert_eq!(st, StatusCode::NO_CONTENT, "{close}");
-        let (st, _, b) = patch(&pool, cp, &ck(&tp), json!({"status":"cancelled"})).await;
-        assert_eq!(st, StatusCode::OK, "{close}: {b}");
-        assert_eq!(qty_claimed(&pool, it).await, 0);
+        assert_eq!(qty_claimed(&pool, it).await, 3);
     }
     assert_claims_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn legacy_guest_cannot_mark_purchased_after_close(pool: PgPool) {
+async fn legacy_guest_can_mark_purchased_after_close(pool: PgPool) {
     let o = user(&pool, "o").await;
     let wl = wishlist(
         &pool,
@@ -88,15 +96,15 @@ async fn legacy_guest_cannot_mark_purchased_after_close(pool: PgPool) {
     .await;
     let it = item(&pool, wl.id, "奶瓶", 2).await;
     let (g, c) = legacy_guest_claim(&pool, it, 1, None).await;
+    let (g2, c2) = legacy_guest_claim(&pool, it, 1, None).await;
     sqlx::query(CLOSERS[0])
         .bind(wl.id)
         .execute(&pool)
         .await
         .unwrap();
     let (st, _, b) = patch(&pool, c, &gt(&g), json!({"status":"purchased"})).await;
-    assert_eq!(st, StatusCode::CONFLICT, "{b}");
-    assert_eq!(b["code"], "WISHLIST_CLOSED");
-    let (st, _, _) = call(&pool, "DELETE", &format!("/claims/{c}"), &gt(&g), None).await;
+    assert_eq!(st, StatusCode::OK, "{b}");
+    let (st, _, _) = call(&pool, "DELETE", &format!("/claims/{c2}"), &gt(&g2), None).await;
     assert_eq!(st, StatusCode::NO_CONTENT);
     assert_claims_reconciled(&pool).await;
 }

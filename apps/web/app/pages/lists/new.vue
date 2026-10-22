@@ -3,7 +3,7 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('lists.new.pageTitle') })
 const { api } = useApi()
-const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends' })
+const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 as number | null })
 const allowed = ref<string[]>([])
 const cover = ref<string | null>(null)
 const upBusy = ref(false), busy = ref(false), err = ref(''), dateErr = ref('')
@@ -16,7 +16,7 @@ async function submit() {
   if (f.closes_at && f.closes_at <= toLocalInput(new Date().toISOString())) { dateErr.value = t('lists.new.errClose'); return }
   busy.value = true
   try {
-    const body: any = { type: f.type, title: f.title.trim(), description: f.description || null, event_date: f.event_date || null, closes_at: fromLocalInput(f.closes_at), visibility: f.visibility, surprise_mode: f.surprise_mode, show_claimer_names: f.show_claimer_names }
+    const body: any = { type: f.type, title: f.title.trim(), description: f.description || null, event_date: f.event_date || null, closes_at: fromLocalInput(f.closes_at), visibility: f.visibility, surprise_mode: f.surprise_mode, show_claimer_names: f.show_claimer_names, claim_ttl_hours: f.claim_ttl_hours }
     if (cover.value) body.cover_image_key = cover.value
     const w = await api('/wishlists', { method: 'POST', body })
     // 名單寫入失敗不擋導頁：清單已建立，編輯頁會顯示目前名單，可再調整
@@ -41,6 +41,7 @@ async function submit() {
       <label class="c-field"><span>{{ $t('lists.new.event') }}</span><input v-model="f.event_date" type="date" :min="today"></label>
       <label class="c-field"><span>{{ $t('lists.new.closes') }}</span><input v-model="f.closes_at" type="datetime-local" :min="nowLocal"></label>
       <p v-if="dateErr" class="c-err" role="alert">{{ dateErr }}</p>
+      <CreatorTtlPicker v-model="f.claim_ttl_hours" />
       <label class="c-switch"><input v-model="f.surprise_mode" type="checkbox"><span>{{ $t('lists.new.surprise') }}<br><small class="c-mute">{{ $t('lists.new.surpriseHint') }}</small></span></label>
       <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>{{ $t('lists.new.showNames') }}<br><small class="c-mute">{{ $t('lists.new.showNamesHint') }}</small></span></label>
       <CreatorVisibilityPicker v-model:visibility="f.visibility" v-model:users="allowed" />
