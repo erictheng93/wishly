@@ -203,9 +203,9 @@ http.createServer(async (req, res) => {
     return send(res, 200, {
       wishlist_id: w.id, surprise_locked: locked, unlock_at: w.event_date ? new Date(unlockAt(w)).toISOString() : null,
       totals: { ...completion(w), qty_needed: it.reduce((s, i) => s + i.qty_needed, 0), qty_claimed: it.reduce((s, i) => s + i.qty_claimed, 0), target_points: 0, pledged_points: 0, funded_item_count: 0 },
-      items: it.map((i) => ({ item_id: i.id, title: i.title, funding_mode: 'quantity', qty_needed: i.qty_needed, qty_claimed: locked ? null : i.qty_claimed, target_points: null, pledged_points: null, funding_status: null })),
+      items: it.map((i) => ({ item_id: i.id, title: i.title, funding_mode: 'quantity', qty_needed: i.qty_needed, qty_claimed: i.qty_claimed, claimer_count: claims.filter((c) => c.item_id === i.id && ['reserved', 'purchased', 'delivered'].includes(c.status)).length, target_points: null, pledged_points: null, funding_status: null })),
       orders_summary: { funded_count: 0, ordered_count: 0, shipped_count: 0, delivered_count: 0 },
-      claims: locked ? null : claims.filter((c) => it.some((i) => i.id === c.item_id)), contributions: locked ? null : [],
+      claims: locked ? [] : claims.filter((c) => it.some((i) => i.id === c.item_id)), contributions: [],
     })
   }
   if ((g = p.match(/^\/wishlists\/([^/]+)\/items$/)) && m === 'POST') {

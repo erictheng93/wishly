@@ -74,7 +74,6 @@
         "medium": "Trung bình",
         "low": "Thấp"
       },
-      "masked": "Đang ở chế độ bất ngờ",
       "raised": "Đã góp",
       "leftPts": " · còn thiếu {n} điểm",
       "target": "Mục tiêu",
@@ -168,7 +167,8 @@
       "date": "Ngày: {date} · ",
       "endsAt": "Kết thúc {time} · ",
       "createdBy": "Tạo bởi {name}",
-      "maskedBanner": "Bạn đang xem với tư cách người tạo. Tiến độ từng món được ẩn cho đến khi mở khóa.",
+      "maskedBanner": "Bạn đang xem với tư cách người tạo. Bạn xem được tiến độ từng món, nhưng không biết ai tặng gì cho đến khi mở khóa.",
+      "surpriseHint": "Đây là danh sách bất ngờ: trước ngày sự kiện, người tạo sẽ không biết ai tặng gì, xin đừng tiết lộ nhé",
       "completion": "Hoàn thành {pct}% · {done} / {total} món",
       "empty": "Người tạo vẫn đang chuẩn bị danh sách, hãy quay lại sau nhé.",
       "loginHint": "Cần đăng nhập để nhận tặng.",

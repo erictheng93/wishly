@@ -74,7 +74,6 @@
         "medium": "Medium",
         "low": "Low"
       },
-      "masked": "Surprise mode on",
       "raised": "Raised",
       "leftPts": " · {n} pts to go",
       "target": "Goal",
@@ -168,7 +167,8 @@
       "date": "Date: {date} · ",
       "endsAt": "Ends {time} · ",
       "createdBy": "Created by {name}",
-      "maskedBanner": "You are viewing as the creator. Item progress is hidden until unlocked.",
+      "maskedBanner": "You are viewing as the creator. You can see each item's progress, but not who gave what until it unlocks.",
+      "surpriseHint": "This is a surprise list: the creator can't see who gave what until the event day, so please keep it a secret",
       "completion": "{pct}% complete · {done} / {total} items",
       "empty": "The creator is still preparing this list. Check back later.",
       "loginHint": "Pledging requires signing in.",
