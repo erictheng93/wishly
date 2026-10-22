@@ -29,7 +29,8 @@ async fn dashboard_locked_totals_and_moderation(pool: PgPool) {
     )
     .await;
     assert_eq!(v["totals"]["qty_claimed"], 1);
-    assert!(v["items"][0]["qty_claimed"].is_null() && v["claims"].is_null());
+    assert_eq!(v["items"][0]["qty_claimed"], 1);
+    assert!(v["claims"].as_array().is_some_and(|a| a.is_empty()), "{v}");
     assert_eq!(v["moderation_status"], "ok");
     sqlx::query(
         "UPDATE wishlists SET moderation_status='hidden', moderation_reason='違規' WHERE id=$1",

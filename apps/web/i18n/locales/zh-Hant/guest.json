@@ -74,7 +74,6 @@
         "medium": "中",
         "low": "低"
       },
-      "masked": "驚喜模式中",
       "raised": "已募",
       "leftPts": "・還差 {n} 點",
       "target": "目標",
@@ -166,7 +165,8 @@
       "date": "日期 {date}・",
       "endsAt": "{time} 結束・",
       "createdBy": "由 {name} 建立",
-      "maskedBanner": "你正以建立者身分瀏覽，解鎖前不顯示各品項進度。",
+      "maskedBanner": "你正以建立者身分瀏覽：解鎖前看得到各品項進度，但看不到是誰送的。",
+      "surpriseHint": "這是驚喜清單：活動日前建立者看不到誰送了什麼，請先別透露喔",
       "completion": "完成度 {pct}%・{done} / {total} 項",
       "empty": "建立者還在準備清單，晚點再回來看看",
       "loginHint": "認捐需要登入會員。",

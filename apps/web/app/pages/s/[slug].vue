@@ -80,10 +80,10 @@ async function loadMine() {
     myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, c.claim]))
   } catch { /* 401：token 失效，當作沒有 */ }
 }
-// 建立者本人 + 驚喜模式 → 軟性遮蔽（GET /me 比對 owner.id）
+// 建立者本人 + 驚喜鎖定中 → 軟性遮蔽：看得到數量，不能捐助；捐助者姓名由 API 在鎖定期間就不輸出（GET /me 比對 owner.id）
 const isOwner = ref(false)
 const me = ref<any>(null) // 已登入使用者：捐助以帳號名稱進行，不再問暱稱
-const masked = computed(() => isOwner.value && !!data.value?.surprise_mode)
+const masked = computed(() => isOwner.value && !!data.value?.surprise_locked)
 
 let live: ReturnType<typeof createLiveRefresh> | undefined
 // 認捐需登入：開啟前先等 /me 回來；未登入（含只有舊訪客 token）一律導去登入並帶回本頁。SSR 一律先當未登入渲染（按鈕為登入連結），client 確認登入後才換成「我要送」
@@ -189,10 +189,9 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       </p>
       <p v-if="data.description">{{ data.description }}</p>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
-      <template v-else>
-        <div class="g-mute">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
-        <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
-      </template>
+      <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
+      <div class="g-mute">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
+      <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
       <p v-if="!items.length" class="g-center g-mute">{{ $t('guest.slug.empty') }}</p>
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">

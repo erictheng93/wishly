@@ -811,8 +811,16 @@ async fn dashboard(
         }
         _ => None,
     };
+    // 每品項幾人認領（有效 claims / pledged+captured contributions 筆數）：鎖定期間也輸出，只有人數、沒有身分
+    let counts: HashMap<Uuid, i64> = sqlx::query_as(
+        "SELECT c.item_id, count(*) FROM claims c JOIN wishlist_items i ON i.id = c.item_id
+          WHERE i.wishlist_id = $1 AND c.status IN ('reserved', 'purchased', 'delivered') GROUP BY c.item_id
+         UNION ALL
+         SELECT item_id, count(*) FROM contributions WHERE wishlist_id = $1 AND status IN ('pledged', 'captured') GROUP BY item_id")
+        .bind(id).fetch_all(&st.pool).await?.into_iter().collect();
+    // 驚喜鎖定：名單一律空陣列（不輸出姓名、留言、時間、claim id）
     let claims = if locked {
-        Value::Null
+        json!([])
     } else {
         type ClaimDashboardRow = (
             Uuid,
@@ -836,9 +844,9 @@ async fn dashboard(
         )
     };
     // 捐贈者名單（受捐者的核心需求）：誰、捐多少、何時捐、何時達標（captured_at）。只列 pledged / captured；
-    // 匿名者一律顯示「匿名朋友」，不輸出 email 或 user_id。驚喜鎖定時整份為 null。
+    // 匿名者一律顯示「匿名朋友」，不輸出 email 或 user_id。驚喜鎖定時為空陣列。
     let (contributions, funded_at) = if locked {
-        (Value::Null, HashMap::new())
+        (json!([]), HashMap::new())
     } else {
         type Row = (
             Uuid,
@@ -885,8 +893,8 @@ async fn dashboard(
         "items": items.iter().map(|i| {
             let cf = i.funding_mode == "crowdfund";
             json!({ "item_id": i.id, "title": i.title, "funding_mode": i.funding_mode, "qty_needed": i.qty_needed,
-                "qty_claimed": if locked { None } else { Some(i.qty_claimed) },
-                "target_points": i.target_points, "pledged_points": if cf && !locked { Some(i.pledged_points) } else { None },
+                "qty_claimed": i.qty_claimed, "claimer_count": counts.get(&i.id).copied().unwrap_or(0),
+                "target_points": i.target_points, "pledged_points": cf.then_some(i.pledged_points),
                 "funding_status": i.funding_status.as_ref().filter(|_| !locked),
                 "display_status": if locked { None } else { display_status(i.funding_status.as_deref(), i.order_status.as_deref()) },
                 "funding_deadline": i.funding_deadline, "funded_at": funded_at.get(&i.id) })
