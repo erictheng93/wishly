@@ -54,6 +54,8 @@ CASES = {
     "charge-back-idempotent": (API + "wallet_ops.rs", "charge_back", 'if status != "paid" && status != "disputed" {', "if false {", "wallet_ops", "charge_back_recovers_remaining_lot_records_debt_and_is_idempotent"),
     "topup-dispute-row-lock": (API + "wallet_ops.rs", "lock_topup", "FROM topups WHERE id = $1 FOR UPDATE", "FROM topups WHERE id = $1", "wallet_ops", "concurrent_lost_waits_on_topup_row_lock_and_charges_back_once"),
     "topup-dispute-state-guard": (API + "wallet_ops.rs", "topup_dispute", "if !applied && !already {", "if false {", "wallet_ops", "staff_dispute_rejects_bad_state_input_and_non_staff"),
+    "item-changed-on-conflict": (API + "notify.rs", "enqueue_item_changed", "ON CONFLICT DO NOTHING", "", "item_change_notice", "edits_coalesce_into_one_pending_mail_per_active_donor"),
+    "item-changed-uk": ("db/migrations/0029_item_change_notice.sql", None, "CREATE UNIQUE INDEX notifications_item_changed_uk", "CREATE INDEX notifications_item_changed_uk", "item_change_notice", "edits_coalesce_into_one_pending_mail_per_active_donor"),
     "activity-on-conflict": (API + "session.rs", None, "ON CONFLICT DO NOTHING", "", "activity_days", "stale_session_with_existing_row_still_advances_last_seen"),
     "activity-not-exists": (API + "session.rs", None, " OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)", "", "activity_days", "fresh_session_but_missing_today_row_reinserts"),
 }
@@ -95,6 +97,8 @@ FAILURE_MARKERS.update({
     "topup-query-sig": "二次確認被略過：回應簽章錯誤",
     "topup-dispute-row-lock": "charge_back applied twice",
     "topup-dispute-state-guard": "pending 不可",
+    "item-changed-on-conflict": "item PATCH failed: true",
+    "item-changed-uk": "one pending item_changed per donor",
     "activity-on-conflict": "ON CONFLICT DO NOTHING missing: last_seen_at not advanced",
     "activity-not-exists": "NOT EXISTS clause missing: today's row not re-inserted",
     "lot-debit-order": "扣點順序必須是 bonus",

@@ -42,7 +42,9 @@ const cancel = (r: any) => {
   const text = t(r.claim.status === 'purchased' ? 'me.claims.confirmCancelPurchased' : 'me.claims.confirmCancel')
   if (confirm(text)) guard(async () => { await api(`/claims/${r.claim.id}`, { method: 'DELETE' }); r.claim.status = 'cancelled' })
 }
-const setVis = (r: any, ev: Event) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { visibility: (ev.target as HTMLSelectElement).value } })).claim) })
+// Q13：建立者改過品項內容，捐助者按「知道了」後隱藏
+const ackChange = (r: any) => guard(async () => { await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { ack_item_change: true } }); r.item_changed_at = null })
+const setVis =(r: any, ev: Event) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { visibility: (ev.target as HTMLSelectElement).value } })).claim) })
 const saveNick = () => guard(async () => { guest.value = (await api('/guest/me', { method: 'PATCH', body: { display_name: nick.value } })).guest; editing.value = false })
 const wipe = () => {
   if (confirm(t('me.claims.confirmWipe'))) guard(async () => {
@@ -74,6 +76,7 @@ const wipe = () => {
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
             <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}<span class="g-badge">{{ label(r.claim.status) }}</span></div>
+            <div v-if="r.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(r.item_changed_at) }) }}<button class="g-link" @click="ackChange(r)">{{ $t('me.claims.ackItemChange') }}</button></div>
             <label v-if="r.claim.visibility" class="g-mute g-vis">{{ $t('me.whoSees') }}
               <select :value="r.claim.visibility" @change="setVis(r, $event)"><option value="public">{{ $t('me.vis.public') }}</option><option value="friends">{{ $t('me.vis.friends') }}</option><option value="private">{{ $t('me.vis.private') }}</option></select>
             </label>
