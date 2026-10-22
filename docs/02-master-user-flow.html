@@ -106,6 +106,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>日期</td><td>2026-10-12</td></tr>
 <tr><td>狀態</td><td>Draft</td></tr>
 <tr><td>D51 變更（2026-10-18）</td><td>清單可見性精簡為 public / friends / selected / private，新清單預設 friends；移除 <code>link</code>（知道連結）與 <code>password</code>（密碼保護），連同 <code>POST /public/wishlists/{slug}/unlock</code>、<code>X-List-Access</code>、SSE <code>?access=</code>、<code>access_password</code> / <code>has_password</code>、錯誤碼 <code>PASSWORD_REQUIRED</code> / <code>WRONG_PASSWORD</code>（migration 0016，既有 link / password 清單收緊為 friends）。新增訪客探索 <code>GET /public/wishlists</code>（見 F21）。下文 v0.5 描述的 link / password 已被取代。</td></tr>
+<tr><td>流程驗證決策（2026-10-22）</td><td>依 <a href="flow-verification/decisions.html">流程驗證待決事項</a> 的決策更新：delivered 不可取消、擁有者標送達需確認（Q1）；清單結束後捐助者只能取消（Q2）；purchased 可改量（Q3）；不設每清單捐助筆數上限（Q4）；完成度為數量比例並即時更新（Q5）；SSE 每 IP 16 條（Q7）；驚喜清單訪客提示、鎖定期擁有者可看每品項數量但看不到是誰（Q8）；好友申請可用使用者 ID（Q9）；刪帳號前重新驗證（Q10）；另同步 02 落後實作 / 04 之處（Q6 a–k）。</td></tr>
 <tr><td>v0.5 變更</td><td>對齊 10/11 已實作的功能（原文件停在 10/8，流程圖落後實作）：新增 F1-c Email＋密碼註冊 / 登入 / 忘記密碼（登入頁實際入口）、F20 好友與邀請連結、F21 清單可見性與存取（好友 / 指定 / 密碼 / CDN 受限路徑）、F22 個人頁與捐助可見度；更新角色矩陣、錯誤碼（LOGIN_REQUIRED、FRIENDS_ONLY、NOT_ALLOWED、PASSWORD_REQUIRED、WRONG_PASSWORD、INVALID_CREDENTIALS、EMAIL_EXISTS、HANDLE_TAKEN、NOT_FRIEND、SELF_INVITE）；修正 F1-a 的 OTP_INVALID 狀態碼為 400（與實作與 04 一致）。</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證（本文件新增 F15 到 F19、6.7 到 6.9，並更新 F2、F9、F10）。前端部署為 Cloudflare Pages（Pages Functions SSR），Workers 為備案。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值（F11）、電子禮物卡（F12）、回饋星星（F13）、企業禮券（F14）；點數改為分批（point lots）管理。</td></tr>
@@ -470,7 +471,7 @@ sequenceDiagram
 <tr><td>快取策略</td><td>
 <ul>
 <li><code>GET /public/wishlists/{slug}</code>：<code>Cache-Control: public, s-maxage=10, stale-while-revalidate=30, stale-if-error=600</code>；relief 尖峰時由設定檔調為 s-maxage=30~60。回應<strong>不得</strong>含 <code>Set-Cookie</code>（否則 Cloudflare 不快取），也不得依 cookie 或 guest_token 變化內容（所有「我的」資料走 <code>/guest/me</code>）。</li>
-<li>404 快取 5 秒（吸收掃描流量，又不致讓剛發佈的清單長時間 404）。</li>
+<li>404 為 no-store（不快取；掃描流量由 Cloudflare 邊緣限流吸收）。</li>
 <li>失效：擁有者 PATCH 清單 / 品項、發佈、關閉、封存，於 COMMIT 後以 <code>Cache-Tag: wl-{wishlist_id}</code> 呼叫 Cloudflare purge-by-tag（走 F9 outbox 非同步重試，purge 失敗不影響主請求；最差情況 10 秒 TTL 自然過期）。</li>
 <li>捐助 / 認捐造成的計數變化<strong>不</strong> purge（頻率高），靠 10 秒 TTL + SSE 補足即時性。</li>
 <li>帶 <code>ETag</code> 支援 If-None-Match 回 304。</li>
@@ -487,7 +488,7 @@ sequenceDiagram
 </tbody></table>
 failed / cancelled 的訂單已觸發退點，品項回 open 或 expired，故不另有對外狀態。display_status 不含訂單金額、單號與收件資訊。</td></tr>
 <tr><td>驚喜模式</td><td>公開頁仍顯示 x/y，讓其他送禮者避免重複；驚喜模式遮罩的是<strong>建立者端</strong>（F7 dashboard 與通知），非公開頁。公開頁顯示「這是驚喜清單」提示；公開 DTO 回傳 <code>id</code>、<code>owner.id</code>、<code>surprise_mode</code>；前端以 <code>GET /me</code> 的 user id 比對 <code>owner.id</code>，若是建立者本人且 <code>surprise_mode=true</code> 則顯示「驚喜模式中」遮罩並隱藏捐助數（回應仍可被 CDN 共用，因為不依使用者變化）。此為軟性防護，見待決問題。</td></tr>
-<tr><td>SSE</td><td><code>text/event-stream</code>、<code>Cache-Control: no-cache</code>、<code>X-Accel-Buffering: no</code>；事件 <code>item.updated</code>（payload：item_id、qty_claimed、qty_needed，（P2）pledged_points、target_points、funding_status、display_status，無個資）與 <code>wishlist.updated</code>（status、title 變更）；每 20 秒送註解心跳防 idle timeout；不支援 replay，斷線重連（EventSource 自動）後前端重抓一次快照。每 IP 同時最多 5 條連線。多 instance 扇出：各 instance 維持一條直連 Postgres 的 <code>LISTEN ws_events</code>，交易內以 <code>pg_notify</code>（COMMIT 才送達）發佈，instance 轉送給本機訂閱者。經 Cloudflare Tunnel 與 Traefik（Dokploy）轉送：須確認代理未緩衝、讀寫與 idle 逾時不會切斷長連線（Spike S3 實測）；伺服器每條連線最長 30 分鐘後主動結束，client 自動重連。</td></tr>
+<tr><td>SSE</td><td><code>text/event-stream</code>、<code>Cache-Control: no-cache</code>、<code>X-Accel-Buffering: no</code>；事件 <code>item.updated</code>（payload：item_id、qty_claimed、qty_needed，（P2）pledged_points、target_points、funding_status、display_status，無個資）與 <code>wishlist.updated</code>（status、title 變更）；每 20 秒送註解心跳防 idle timeout；不支援 replay，斷線重連（EventSource 自動）後前端重抓一次快照。每 IP 同時最多 16 條連線（流程驗證 Q7：電信 CGNAT 下大量使用者共用 IP；超過回 429，前端改輪詢）。多 instance 扇出：各 instance 維持一條直連 Postgres 的 <code>LISTEN ws_events</code>，交易內以 <code>pg_notify</code>（COMMIT 才送達）發佈，instance 轉送給本機訂閱者。經 Cloudflare Tunnel 與 Traefik（Dokploy）轉送：須確認代理未緩衝、讀寫與 idle 逾時不會切斷長連線（Spike S3 實測）；伺服器每條連線最長 30 分鐘後主動結束，client 自動重連。</td></tr>
 <tr><td>OG 預覽</td><td>LINE / FB 爬蟲不執行 JS，故 <code>/s/{slug}</code> 必須在 Pages SSR 輸出 meta：<code>og:title</code>、<code>og:description</code>（含完成度文字）、<code>og:image</code>（封面圖，經 CDN，建議 1200x630）、<code>og:url</code>。爬蟲 UA 命中同一份快取，不另走特殊路徑。</td></tr>
 <tr><td>API</td><td><code>GET /public/wishlists/{slug}</code>、<code>GET /public/wishlists/{slug}/events</code>、<code>GET /guest/me</code></td></tr>
 <tr><td>交易邊界</td><td>純讀取，不開顯式交易；以單一查詢（或同一 snapshot 的 REPEATABLE READ READ ONLY 交易）取清單與品項，避免讀到不一致的 qty_claimed。SSE 連線不持有 DB 連線（僅共用 LISTEN 連線）。</td></tr>
@@ -568,7 +569,7 @@ RETURNING qty_claimed, qty_needed;
 <tr><td>Request 要點</td><td>body 含 <code>quantity</code>（整數 ≥ 1，≤ 99）、選填 <code>note</code>；D50 起不再有 <code>nickname</code> / <code>display_name</code> / <code>contact</code> / <code>email</code>（顯示名稱採帳號暱稱）。完整欄位見 Schema/API 文件。</td></tr>
 <tr><td>guest_token 發放</td><td>已停用（D50，不再建立新 guest）。D50 前行為：無有效 token 時：產生 32 bytes CSPRNG token，base64url 編碼；DB <code>guests.guest_token_hash</code> 只存 SHA-256（UNIQUE index，查詢即 constant-time 等效）；回應 body 回傳明文一次，同時 <code>Set-Cookie: ws_guest=…; HttpOnly; Secure; SameSite=Lax; Max-Age=15552000</code>（180 天，滑動），前端另存 localStorage 並於之後請求帶 <code>X-Guest-Token</code>（LINE in-app browser cookie 不穩的備援）。</td></tr>
 <tr><td>guest_token 驗證</td><td>legacy（僅管理既有訪客認捐）。優先序：<code>X-Guest-Token</code> header &gt; <code>ws_guest</code> cookie。取 SHA-256 查 <code>guests</code>。<strong>建立型端點</strong>（D50 前遇到未知 token 會簽發新 token）已改為須登入，不再簽發 token。<strong>修改型端點</strong>（PATCH/DELETE）遇到缺少/未知 token 回 <code>UNAUTHORIZED</code>。<code>guests.last_seen_at</code> 每小時最多更新一次，避免熱點寫入。</td></tr>
-<tr><td>步驟</td><td>1) 中介層限流與 token 解析。2) BEGIN；寫入 idempotency 占位（ON CONFLICT DO NOTHING，見下）。3) <code>FOR SHARE</code> 讀 wishlist 狀態。4) （D50 起無此步驟，不再建立 guest）。5) 檢查「同一使用者對同品項已有有效 claim」→ <code>CLAIM_ALREADY_EXISTS</code>（改量走 PATCH）；每使用者每清單有效 claim 上限 30。6) 條件式 UPDATE。7) INSERT claims：status=reserved，<code>expires_at</code> = now() + 清單的 <code>claim_ttl_hours</code>（personal/registry 預設 NULL＝不逾期；relief 預設 48 小時）。8) INSERT audit_logs。9) <code>pg_notify</code>。10) 寫回 idempotency 回應。11) COMMIT。</td></tr>
+<tr><td>步驟</td><td>1) 中介層限流與 token 解析。2) BEGIN；寫入 idempotency 占位（ON CONFLICT DO NOTHING，見下）。3) <code>FOR SHARE</code> 讀 wishlist 狀態。4) （D50 起無此步驟，不再建立 guest）。5) 檢查「同一使用者對同品項已有有效 claim」→ <code>CLAIM_ALREADY_EXISTS</code>（改量走 PATCH）；不設每清單筆數上限（流程驗證 Q4；同品項本就只能有一筆有效 claim），防洗單交給限流：同清單每小時 15 次、每人每小時 30 次。6) 條件式 UPDATE。7) INSERT claims：status=reserved，<code>expires_at</code> = now() + 清單的 <code>claim_ttl_hours</code>（personal/registry 預設 NULL＝不逾期；relief 預設 48 小時）。8) INSERT audit_logs。9) <code>pg_notify</code>。10) 寫回 idempotency 回應。11) COMMIT。</td></tr>
 <tr><td>API</td><td><code>POST /items/{item_id}/claims</code>；未登入回 401；<code>GET /guest/me</code>、<code>PATCH /guest/me</code> 為舊訪客資料的管理端點（legacy）；改量 / 變更狀態見 F5。</td></tr>
 <tr><td>交易邊界</td><td>BEGIN…COMMIT 內：idempotency 占位、<code>FOR SHARE</code> 讀 wishlist、條件式 UPDATE、INSERT claims、INSERT audit_logs、<code>pg_notify</code>、寫回 idempotency。<strong>交易內禁止</strong>任何外部 I/O（寄信、HTTP）。目標交易時間 &lt; 10 ms，因為熱門品項的 item 列鎖是序列化點。設 <code>lock_timeout=2s</code>、<code>statement_timeout=5s</code>。為什麼用 <code>FOR SHARE</code> 讀 wishlist：許多捐助可同時持有 share lock（互不阻塞），而 F8 關閉清單的 <code>UPDATE wishlists</code> 會等待進行中的捐助完成，之後的捐助必看到 closed，沒有「關閉後仍成功捐助」的競態。SSE 的 <code>pg_notify</code> 在 COMMIT 才送達，回滾則不送。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>ITEM_FULLY_CLAIMED</code> 409（回應附 <code>remaining</code> 剩餘數量，前端可建議改捐助較少數量）；<code>WISHLIST_CLOSED</code> 409；<code>FUNDING_MODE_MISMATCH</code> 409；<code>CLAIM_ALREADY_EXISTS</code> 409；<code>VALIDATION_FAILED</code> 422；<code>IDEMPOTENCY_KEY_REQUIRED</code> 400；<code>IDEMPOTENCY_CONFLICT</code> 409（同 key 但請求內容不同）；<code>NOT_FOUND</code> 404；<code>RATE_LIMITED</code> 429；<code>SERVICE_UNAVAILABLE</code> 503（lock_timeout 或連線池耗盡）；<code>READ_ONLY_MODE</code> 503。</td></tr>
@@ -597,8 +598,7 @@ stateDiagram-v2
   purchased --> delivered : owner 或 coordinator 或 捐助者
   reserved --> cancelled : 捐助者 或 owner 或 coordinator
   purchased --> cancelled : 捐助者 或 owner 或 coordinator
-  delivered --> cancelled : 僅 owner 或 coordinator 更正誤標
-  reserved --> expired : 系統 job 僅限有 expires_at
+   reserved --> expired : 系統 job 僅限有 expires_at
   cancelled --> [*]
   expired --> [*]
   delivered --> [*]
@@ -610,14 +610,14 @@ stateDiagram-v2
 <tr><td>reserved → purchased</td><td>捐助者本人</td><td>清除 <code>expires_at</code>（已購買不再逾期）；寫 <code>purchased_at</code></td></tr>
 <tr><td>reserved / purchased → delivered</td><td>捐助者本人、owner、org coordinator/owner</td><td>寫 <code>delivered_at</code>；不改 qty_claimed（delivered 仍計入）。驚喜模式解鎖前 owner 看不到 claims，故實際上只有捐助者可標。relief 由 receipts 流程（F10）觸發</td></tr>
 <tr><td>reserved / purchased → cancelled</td><td>捐助者本人、owner、coordinator</td><td><strong>回補</strong>：<code>qty_claimed -= claim.quantity</code>；owner 取消時 audit 記錄原因；P1 通知捐助者</td></tr>
-<tr><td>delivered → cancelled</td><td>owner、coordinator</td><td>更正誤標；同樣回補。捐助者本人不可（避免送出後反悔）</td></tr>
+<tr><td>delivered → cancelled</td><td>無（流程驗證 Q1）</td><td>delivered 為終態，任何人都不可取消；擁有者「標為已送達」前須二次確認以免誤標</td></tr>
 <tr><td>reserved → expired</td><td>系統（F9）</td><td>僅 <code>expires_at &lt;= now()</code>；回補 qty_claimed；personal/registry 預設不設 expires_at 故不會發生</td></tr>
 <tr><td>cancelled / expired → 其他</td><td>無</td><td>終態；想再捐助需（登入後）重新 POST 新 claim（新 Idempotency-Key）</td></tr>
 </tbody></table>
 <table class="meta"><tbody>
 <tr><td>前置條件</td><td>捐助者操作需登入且 claim 屬於該會員，或（舊資料）持有效 guest_token 且 claim 屬於該 guest；舊訪客只能減量、改備註 / 可見性、取消，PATCH 增量回 401（D50）；owner/coordinator 操作需 <code>ws_session</code> 且為該清單（或 org）有權者。</td></tr>
 <tr><td>API</td><td><code>PATCH /claims/{claim_id}</code>（body：<code>status</code> 目標狀態，或 <code>quantity</code> 改量，二擇一）；<code>DELETE /claims/{claim_id}</code>（等同 PATCH status=cancelled，回 204；claim 列保留，不實體刪除）。</td></tr>
-<tr><td>改量</td><td>PATCH <code>quantity</code>（僅 reserved 可改）：delta = 新 − 舊。delta &gt; 0 使用與 F4 相同的條件式 UPDATE（不足回 <code>ITEM_FULLY_CLAIMED</code>）；delta &lt; 0 直接回補。</td></tr>
+<tr><td>改量</td><td>PATCH <code>quantity</code>（reserved / purchased 可改；流程驗證 Q3）：delta = 新 − 舊。delta &gt; 0 使用與 F4 相同的條件式 UPDATE（不足回 <code>ITEM_FULLY_CLAIMED</code>）；delta &lt; 0 直接回補。</td></tr>
 <tr><td>交易邊界</td><td>BEGIN → <code>SELECT item_id FROM claims WHERE id=$1</code>（不加鎖）→ 依鎖順序 <code>SELECT … FROM wishlist_items WHERE id=$item FOR UPDATE</code> → <code>SELECT … FROM claims WHERE id=$1 FOR UPDATE</code> → 驗證轉換合法與授權 → <code>UPDATE claims SET status…</code> → 若為 cancelled/expired 或減量：<code>UPDATE wishlist_items SET qty_claimed = qty_claimed - $n WHERE id=$item AND qty_claimed &gt;= $n</code>（0 rows 代表計數損毀，ROLLBACK 並告警，見對帳）→ INSERT audit_logs（含 before/after status）→ <code>pg_notify</code> → COMMIT。先鎖 item 再鎖 claim，與 F4、F9 同序，避免 deadlock。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>INVALID_STATE_TRANSITION</code> 409（含非法轉換，如 cancelled → purchased）；<code>UNAUTHORIZED</code> 401（缺登入身分 / guest_token，或舊訪客 PATCH 增量，D50）；<code>NOT_FOUND</code> 404（claim 不屬於該 guest；不洩漏存在性）；<code>FORBIDDEN</code> 403（已登入但無權，如 volunteer 取消他人捐助）；<code>WISHLIST_CLOSED</code> 409（清單 closed/archived 後，guest 不可再改量或取消，owner/coordinator 仍可標 delivered 與取消）；<code>ITEM_FULLY_CLAIMED</code> 409（增量失敗）；<code>VALIDATION_FAILED</code> 422。</td></tr>
 <tr><td>冪等性</td><td>PATCH/DELETE 以「目標狀態」語意設計：目標狀態與現況相同 → 直接回 200（含目前資料），不重複回補、不重複寫 audit。不強制 Idempotency-Key；改量 PATCH 若需要精準重送保護，客戶端應送「新的絕對 quantity」而非 delta，伺服器自行計算差額，因此重送天然安全。</td></tr>
@@ -976,7 +976,7 @@ sequenceDiagram
 <li><code>funded_pct</code>（crowdfund 品項，P2）= Σ pledged_points / Σ target_points（硬上限，不會超過 100%）。</li>
 <li><code>items_done / items_total</code>：quantity 品項 qty_claimed ≥ qty_needed，或 crowdfund 品項 <code>funding_status</code> ∈ {funded, fulfilled} 視為完成。</li>
 <li><code>delivered_pct</code> = delivered 狀態 claims 數量 / Σ qty_needed。</li>
-<li><code>completion_pct</code>（總覽主數字）= items_done / items_total。</li>
+<li><code>completion_pct</code>（總覽主數字）= Σ min(qty_claimed, qty_needed) / Σ qty_needed（數量比例；眾籌以點數比例併入），僅供受捐者參考，認領後即時跳動更新（SSE）；另列 items_done / items_total（流程驗證 Q5）。</li>
 <li>狀態分布：reserved / purchased / delivered 件數；眾籌品項的訂單狀態（pending / placed / shipped / delivered / failed）。建立者不經手款項，沒有「待確認款項」。</li>
 </ul>
 全部由 wishlist_items 的快取欄位 + 一次 GROUP BY 完成，不掃 claims 全表。</td></tr>
@@ -996,7 +996,8 @@ stateDiagram-v2
   active --> closed : owner 關閉 PATCH status=closed
   closed --> active : owner 重新開啟
   closed --> archived : owner 封存 或 DELETE
-  draft --> archived : DELETE 無資料的草稿
+ active --> archived : owner 封存 或 DELETE
+  draft --> archived : DELETE 草稿
   archived --> closed : owner 取消封存 PATCH status=closed
   archived --> [*]
 </pre>
@@ -1028,7 +1029,7 @@ sequenceDiagram
 </tbody></table>
 <table class="meta"><tbody>
 <tr><td>前置條件</td><td>owner 登入且為清單擁有者。</td></tr>
-<tr><td>規則</td><td>允許轉換：draft→active、active→closed、closed→active（重新開啟，owner 反悔用，須 expires_at 已過的 reserved claim 不復活）、closed→archived、draft→archived、archived→closed（取消封存；PATCH 只能單獨帶 status，封存時已退回的認捐點數不再扣回）。其他一律 <code>INVALID_STATE_TRANSITION</code>。<code>DELETE /wishlists/{id}</code> 語意為封存：draft 且無任何資料時實體刪除（連同 R2 物件由 F9 清理），其餘設為 archived 並寫 <code>deleted_at</code>，保留 claims 供稽核與對帳。archived 資料保留 90 天後匿名化（刪除 guests.contact 與暱稱），期限待決。<b>已決（自動結束）</b>：<code>wishlists.closes_at</code>（timestamptz，選填，預設 NULL = 不設期限，建立與 PATCH 皆可設 / 清除，設定時須為未來時間）。到期時捐助 / 認捐在交易內即時回 <code>WISHLIST_CLOSED</code>；F9 的 <code>close_due</code> 每 5 分鐘把到期的 active 轉 closed（同手動關閉，並清 CDN）；到期前 24 小時寄一次 <code>wishlist.closing</code> 提醒給創建者（<code>closes_reminded_at</code>，改期後重新提醒）。closed→active 時若 <code>closes_at</code> 已過須先延後或清除，避免被立刻關回。不自動封存、不自動刪除；眾籌品項仍由各自的 <code>funding_deadline</code> 管。</td></tr>
+<tr><td>規則</td><td>允許轉換：draft→active、active→closed、closed→active（重新開啟，owner 反悔用，須 expires_at 已過的 reserved claim 不復活）、closed→archived、draft→archived、archived→closed（取消封存；PATCH 只能單獨帶 status，封存時已退回的認捐點數不再扣回）。另允許 active → archived（與 DELETE 同義）。其他回 422 <code>VALIDATION_FAILED</code>（<code>errors[].code = TRANSITION</code>）；archived 狀態下除取消封存外的修改回 409 <code>WISHLIST_CLOSED</code>。<code>DELETE /wishlists/{id}</code> 語意為封存（D13）：一律設為 archived，不實體刪除，保留 claims 供稽核與對帳。archived 資料保留 90 天後匿名化（刪除 guests.contact 與暱稱），期限待決。<b>已決（自動結束）</b>：<code>wishlists.closes_at</code>（timestamptz，選填，預設 NULL = 不設期限，建立與 PATCH 皆可設 / 清除，設定時須為未來時間）。到期時捐助 / 認捐在交易內即時回 <code>WISHLIST_CLOSED</code>；F9 的 <code>close_due</code> 每 5 分鐘把到期的 active 轉 closed（同手動關閉，並清 CDN）；到期前 24 小時寄一次 <code>wishlist.closing</code> 提醒給創建者（<code>closes_reminded_at</code>，改期後重新提醒）。closed→active 時若 <code>closes_at</code> 已過須先延後或清除，避免被立刻關回。不自動封存、不自動刪除；眾籌品項仍由各自的 <code>funding_deadline</code> 管。</td></tr>
 <tr><td>API</td><td><code>PATCH /wishlists/{id}</code>（body 含 <code>status</code>）、<code>DELETE /wishlists/{id}</code></td></tr>
 <tr><td>交易邊界</td><td><code>SELECT … FOR UPDATE</code> 鎖 wishlist（會等待 F4 持有的 <code>FOR SHARE</code>）→ 驗證轉換 → UPDATE status 與時間戳 →（P2，closed / archived 時）同交易將該清單 <code>funding_status='open'</code> 的眾籌品項轉 <code>expired</code> 並寫 <code>expired_at</code>（捐贈者進入 7 天選擇期，見 F6e）→ INSERT audit_logs → <code>pg_notify('ws_events','wishlist.updated')</code> → COMMIT；CDN purge 與 R2 清理在 COMMIT 後透過 outbox/job。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>WISHLIST_CLOSED</code> 409（對 claim/contribution 建立與 guest 改動）；<code>INVALID_STATE_TRANSITION</code> 409；<code>NOT_FOUND</code> 404；<code>UNAUTHORIZED</code> 401。</td></tr>
@@ -1069,7 +1070,7 @@ sequenceDiagram
 <tr><td><code>expire_claims</code></td><td>每分鐘</td><td>reserved 且 <code>expires_at &lt;= now()</code> → expired，回補 qty_claimed。<code>expires_at</code> 於 claim 建立時由清單 <code>claim_ttl_hours</code> 計算：personal / registry 預設 NULL（不逾期），relief 預設 48 小時；purchased 後清除。可由 owner 於清單設定覆寫。</td><td>先挑 item，再 <code>FOR UPDATE SKIP LOCKED</code> 鎖 item，再更新 claims（與 F4/F5 同鎖序）；交易內重新檢查條件，因此與使用者同時 purchased / cancel 不衝突</td></tr>
 <tr><td><code>cleanup_idempotency</code></td><td>每小時</td><td>刪除 <code>expires_at &lt; now()</code>（24 小時）的 idempotency_keys，每批 5000 列（<code>DELETE … WHERE ctid IN (SELECT ctid … LIMIT 5000)</code>）迴圈至無列；<code>expires_at</code> 有索引。量大時改為按日分區 DROP PARTITION。</td><td>advisory lock 保證單一執行者</td></tr>
 <tr><td><code>cleanup_misc</code></td><td>每小時</td><td>刪除過期 sessions、已 consumed 或過期超過 1 天的 otp_challenges。</td><td>同上</td></tr>
-<tr><td><code>dispatch_notifications</code> <span class="badge p0">P0</span></td><td>每分鐘 + 事件後立即嘗試</td><td>MVP Email 通知（F16）。Outbox pattern：業務交易內 INSERT <code>notifications</code>（status=pending，<code>scheduled_at</code>，<code>dedupe_key</code> UNIQUE），COMMIT 後才由 job 寄送；至少一次送達，以 <code>dedupe_key</code> 與供應商端 idempotency 降低重複。退避 1m / 5m / 30m / 2h / 6h，第 5 次失敗標 failed 並告警。<strong>彙整寄送</strong>：每日 09:00 Asia/Taipei 處理 <code>owner_digest</code>，於寄送時才計算件數並組信（驚喜模式只寫 N 件新捐助）。LINE 僅用 Messaging API push（<span class="badge p1">P1</span>；<strong>LINE Notify 已於 2025-03-31 終止，不得使用</strong>），需好友關係，未加入則降級為 email。</td><td><code>SKIP LOCKED</code> 搶列；<code>locked_until</code> 租約，崩潰後逾期可被重新搶</td></tr>
+<tr><td><code>dispatch_notifications</code> <span class="badge p0">P0</span></td><td>每分鐘 + 事件後立即嘗試</td><td>MVP Email 通知（F16）。Outbox pattern：業務交易內 INSERT <code>notifications</code>（status=pending，<code>scheduled_at</code>，<code>dedupe_key</code> UNIQUE），COMMIT 後才由 job 寄送；至少一次送達，以 <code>dedupe_key</code> 與供應商端 idempotency 降低重複。目前實作最多 3 次、每次間隔 1 分鐘，失敗標 failed（02 原規劃 5 次指數退避 1m / 5m / 30m / 2h / 6h，視寄送量再調整）。<strong>彙整寄送</strong>：每日 09:00 Asia/Taipei 處理 <code>owner_digest</code>，於寄送時才計算件數並組信（驚喜模式只寫 N 件新捐助）。LINE 僅用 Messaging API push（<span class="badge p1">P1</span>；<strong>LINE Notify 已於 2025-03-31 終止，不得使用</strong>），需好友關係，未加入則降級為 email。</td><td><code>SKIP LOCKED</code> 搶列；<code>locked_until</code> 租約，崩潰後逾期可被重新搶</td></tr>
 <tr><td><code>process_images</code> <span class="badge p0">P0</span></td><td>每分鐘 + 上傳完成後立即嘗試</td><td>處理 <code>image_status='pending'</code> 的圖片：下載 raw、去除 EXIF（含 GPS）、轉向、縮圖、重新編碼、寫入公開前綴、更新 image_key、刪除原檔、purge CDN。失敗重試 3 次後標 failed。</td><td><code>SKIP LOCKED</code>；輸出 key 由 item id 與內容 hash 決定，重跑覆寫同一物件</td></tr>
 <tr><td><code>issue_invoices</code> <span class="badge p2">P2-A</span></td><td>每分鐘 + 入帳後立即嘗試</td><td>處理 <code>invoices.status='pending'</code>（開立）與作廢 / 折讓事件，呼叫電子發票加值中心；指數退避，超過 5 次告警並保持 pending（不影響點數入帳）。</td><td>SKIP LOCKED；以 invoice id 作加值中心端冪等參照</td></tr>
 <tr><td><code>purge_cdn</code></td><td>事件後立即 + 每分鐘重試</td><td>清單變更時 outbox 內 INSERT 一筆 purge 任務（同 notifications 機制，channel = cdn），失敗重試。</td><td>同上</td></tr>
@@ -1411,7 +1412,7 @@ sequenceDiagram
   V->>A: POST /public/wishlists/slug/reports (reason, detail, item_id?) + Turnstile token
   A->>A: 驗證 Turnstile, 每 IP 與每清單限流
   A->>D: INSERT content_reports (open, reporter_guest_id 或 reporter_user_id), INSERT notifications (通知 staff)
-  A-->>V: 202 Accepted
+  A-->>V: 201 (同人 24 小時內重送回同一筆 id)
   S->>A: GET /admin/reports?status=open
   S->>A: PATCH /admin/wishlists/id/moderation (moderation_status=hidden, reason)
   A->>D: BEGIN, SELECT wishlist FOR UPDATE, 更新 moderation_status, moderation_reason, moderated_at, INSERT audit_logs (actor_type=staff), pg_notify wishlist.updated, COMMIT
@@ -1424,7 +1425,7 @@ sequenceDiagram
 </pre>
 <table class="meta"><tbody>
 <tr><td>前置條件</td><td>檢舉：免登入，需通過 Turnstile。審核：<code>users.is_staff</code>（MVP，見營運後台表）。</td></tr>
-<tr><td>規則</td><td><code>content_reports(reason: scam | inappropriate | copyright | personal_info | other, detail, status: open | actioned | dismissed, handled_by, handled_at)</code>。<code>wishlists.moderation_status</code> ∈ ok | hidden，附 <code>moderation_reason</code>、<code>moderated_at</code>。hidden 時：公開 <code>GET /public/wishlists/{slug}</code>、SSE、捐助 / 認捐一律回 <code>410 WISHLIST_REMOVED</code>（與 NOT_FOUND 區分，前端顯示「此清單已被下架」）；410 快取 30 秒並帶 <code>Cache-Tag</code>，恢復（hidden → ok）時 purge。建立者仍可登入看到下架原因，可編輯但無法使公開頁恢復。下架與 status（draft / active / closed / archived）獨立。同一人對同一清單 24 小時內重複檢舉合併為一筆（以 guest / user / IP hash 去重）。</td></tr>
+<tr><td>規則</td><td><code>content_reports(reason: scam | inappropriate | copyright | personal_info | other, detail, status: open | actioned | dismissed, handled_by, handled_at)</code>。<code>wishlists.moderation_status</code> ∈ ok | hidden，附 <code>moderation_reason</code>、<code>moderated_at</code>。hidden 時：公開 <code>GET /public/wishlists/{slug}</code>、SSE、捐助 / 認捐一律回 <code>410 WISHLIST_REMOVED</code>（與 NOT_FOUND 區分，前端顯示「此清單已被下架」）；410 為 no-store（不快取，恢復上架立即生效），下架時以 URL purge CDN。建立者仍可登入看到下架原因，可編輯但無法使公開頁恢復。下架與 status（draft / active / closed / archived）獨立。同一人對同一清單 24 小時內重複檢舉合併為一筆（以 guest / user / IP hash 去重）。</td></tr>
 <tr><td>營運後台（MVP）</td><td>前端 <code>/admin</code>（staff 殼）：清單搜尋（slug / 建立者 email）、清單詳情與下架 / 恢復、檢舉佇列、使用者查詢、系統旗標切換（唯讀模式）。API 皆 STAFF_ONLY：<code>GET /admin/wishlists?q=</code>、<code>GET /admin/users?q=</code>、<code>PUT /admin/system-flags/{key}</code>、<code>GET /admin/reports?status=</code>、<code>PATCH /admin/reports/{id}</code>、<code>PATCH /admin/wishlists/{id}/moderation</code>。所有 staff 動作寫 audit_logs（<code>actor_type=staff</code>），查詢使用者 email 也記錄。P2 的 /admin/orders、/admin/cash-refunds、/admin/corporate 掛在同一個 /admin 殼內。</td></tr>
 <tr><td>API</td><td><code>POST /public/wishlists/{slug}/reports</code>、上述 admin API</td></tr>
 <tr><td>交易邊界</td><td>檢舉：單一短交易（INSERT report + INSERT notifications）。下架：<code>wishlists FOR UPDATE</code> → UPDATE moderation → audit → <code>pg_notify</code> → COMMIT，CDN purge 在 COMMIT 後。</td></tr>
@@ -1458,7 +1459,7 @@ sequenceDiagram
 <table class="meta"><tbody>
 <tr><td>觸發與頻率</td><td>
 <ul>
-<li><b>建立者</b>：清單的<strong>第一筆捐助即時寄出</strong>（<code>scheduled_at = now()</code>）；之後同一清單的捐助合併成<strong>每日彙整一封</strong>（每日 09:00 Asia/Taipei；以 <code>dedupe_key = owner_digest:{wishlist_id}:{date}</code> UNIQUE，<code>ON CONFLICT DO NOTHING</code>，件數於寄送時計算）。建立者可在 <code>/settings</code> 關閉（<code>users.notification_prefs.email_claims</code>，預設 true）。</li>
+<li><b>建立者</b>（<b>D58 已停寄</b>，下列為原設計，保留供參考：會轟炸收件匣也破壞驚喜，migration 0026 取消）：清單的<strong>第一筆捐助即時寄出</strong>（<code>scheduled_at = now()</code>）；之後同一清單的捐助合併成<strong>每日彙整一封</strong>（每日 09:00 Asia/Taipei；以 <code>dedupe_key = owner_digest:{wishlist_id}:{date}</code> UNIQUE，<code>ON CONFLICT DO NOTHING</code>，件數於寄送時計算）。建立者可在 <code>/settings</code> 關閉（<code>users.notification_prefs.email_claims</code>，預設 true）。</li>
 <li><b>驚喜模式內容遮蔽</b>：<code>surprise_mode=true</code> 且 now &lt; unlock_at 時，信件內容只寫「你的清單有 N 件新捐助」，<strong>不含品項名稱與捐助者</strong>；即時信與彙整信皆同。Email 內容在<strong>寄送時</strong>依當下狀態組裝（非入隊時），避免入隊與寄送間狀態改變。</li>
 <li><b>舊訪客（D50 前資料，D50 起不再產生新訪客認捐）</b>：若 contact 是 Email 格式，當時捐助成功已寄確認信，含「管理我的捐助」連結。這是 D15 換裝置找回的 MVP 最小版（P1 做完整版）。每個收件地址 24 小時最多 5 封（防被當垃圾郵件發射器），信末附退訂連結。</li>
 </ul></td></tr>
@@ -1689,7 +1690,7 @@ sequenceDiagram
 <tr><td><code>private</code></td><td>僅擁有者</td><td>404 <code>NOT_FOUND</code>（不洩漏存在）</td><td>否</td></tr>
 </tbody></table></div>
 <table class="meta"><tbody>
-<tr><td>規則</td><td>擁有者本人永遠可看。<code>/public/wishlists/{slug}</code> 為 CDN 可快取路徑，<b>絕不可讀 cookie</b>，只回 public；受限內容只走 <code>/restricted/wishlists/{slug}</code>。清單從可公開收緊為其他可見性時（PATCH visibility），必須呼叫 <code>cdn::purge_wishlists</code> 清除邊緣快取。前端 SSR 拿不到 cookie，受限清單 SSR 為 403，client 端 hydrate 後以憑證重抓，抓取期間不閃現門檻頁。403 回應帶 <code>visibility</code> 與 <code>owner</code>（id、display_name、handle）供門檻頁顯示「由誰建立」與「前往個人頁加好友」。</td></tr>
+<tr><td>規則</td><td>擁有者本人永遠可看。<code>/public/wishlists/{slug}</code> 為 CDN 可快取路徑，<b>絕不可讀 cookie</b>，只回 public；受限內容只走 <code>/restricted/wishlists/{slug}</code>。清單從可公開收緊為其他可見性時（PATCH visibility），必須呼叫 <code>cdn::purge_wishlists</code> 清除邊緣快取。前端 SSR 拿不到 cookie，受限清單 SSR 回 200（noindex、內容不含清單資料），client 端 hydrate 後以憑證重抓，抓取期間不閃現門檻頁。403 回應帶 <code>visibility</code> 與 <code>owner</code>（id、display_name、handle）供門檻頁顯示「由誰建立」與「前往個人頁加好友」。</td></tr>
 <tr><td>建立者端</td><td><code>POST /wishlists</code>、<code>PATCH /wishlists/{id}</code> 帶 <code>visibility</code>（public / friends / selected / private，未帶預設 friends；傳 link / password 回 422，DB 以 CHECK 擋）；<code>PUT /wishlists/{id}/allowed-users</code> 設定指定名單（只能選自己的好友，否則 422 <code>NOT_FRIEND</code>）。切離 selected 後名單保留於 DB 但不生效。</td></tr>
 <tr><td>相關限制</td><td>捐助、認捐、檢舉、SSE 皆先過 <code>check_wishlist</code>：看不到就不能捐助。個人頁與捐助紀錄的可見判斷與此處同源（F22）。</td></tr>
 <tr><td>錯誤碼</td><td><code>LOGIN_REQUIRED</code>、<code>FRIENDS_ONLY</code>、<code>NOT_ALLOWED</code>（皆 403）；<code>NOT_FRIEND</code>、<code>VALIDATION_FAILED</code>（422）；<code>NOT_FOUND</code> 404。</td></tr>
@@ -1772,7 +1773,7 @@ flowchart LR
 <tr><td>應用層（DB 計數）</td><td>OTP：每 email / 每 IP</td><td>每 email 1 次/60 秒且 5 次/小時；每 IP 20 次/小時；單 challenge 5 次驗證</td><td><code>RATE_LIMITED</code></td></tr>
 <tr><td>應用層 <span class="badge p2">P2</span></td><td>儲值 / 認捐 / 現金退款</td><td>儲值 5 次/分鐘/使用者（且每日金額上限）；認捐 20 次/分鐘/使用者；現金退款 3 次/小時/使用者；<code>/webhooks/payments/*</code> 不套用 IP 限流，改驗簽</td><td><code>RATE_LIMITED</code></td></tr>
 <tr><td>應用層</td><td>新 guest 建立</td><td>每 IP 每小時 20 個新 guest（防洗號）</td><td><code>RATE_LIMITED</code></td></tr>
-<tr><td>應用層</td><td>SSE 連線</td><td>每 IP 同時 5 條；每 slug 同時 2000 條（保護單 instance）</td><td>429</td></tr>
+<tr><td>應用層</td><td>SSE 連線</td><td>每 IP 同時 16 條；全域 2000 條（保護單 instance）</td><td>429</td></tr>
 </tbody></table>
 <p><b>原則：</b>具安全意義的限制（OTP 嘗試、鎖定）必須落在 DB，因為 in-memory 計數在多 instance 下實際額度為 N 倍；僅供防濫用的軟限制才用 in-memory。所有 <code>RATE_LIMITED</code> 帶 <code>Retry-After</code>。Cloudflare Turnstile 作為首次捐助的可選人機驗證（待決）。</p>
 

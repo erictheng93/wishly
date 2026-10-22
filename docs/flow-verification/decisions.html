@@ -5,108 +5,98 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>流程驗證待決事項</title>
 <link rel="stylesheet" href="style.css">
+<style>
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+.chip{border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:4px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:.85rem}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+.chip b{margin-left:4px}
+#q{flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font:inherit}
+.sync{font-size:.8rem;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+.dot.off{background:var(--muted)}
+article{border:1px solid var(--border);margin:14px 0;padding:14px 16px;transition:background .6s}
+article.flash{background:var(--warnbg)}
+article h2{border:0;margin:0 0 8px;padding:0;font-size:1.1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+article h2 .id{color:var(--muted);font-size:.85rem}
+article h2 .flow{color:var(--muted);font-size:.8rem;font-weight:400}
+dl{display:grid;grid-template-columns:7em 1fr;gap:6px 12px;margin:0}
+dt{color:var(--muted);font-size:.85rem}dd{margin:0}
+dd.you{font-weight:600}
+.pending{background:var(--warnbg);color:var(--warn)}.decided{background:var(--soft);color:var(--accent)}
+.doing{background:var(--code);color:var(--fg)}.done{background:var(--okbg);color:var(--ok)}
+.ex{margin:6px 0 0;padding-left:1.2em}.ex li{margin:4px 0}
+.new{font-size:.75rem;color:var(--warn);font-weight:600}
+@media (max-width:600px){dl{grid-template-columns:1fr}dt{margin-top:6px}}
+</style>
 </head>
 <body>
 <main>
 <p><a href="index.html">← 流程驗證總覽</a></p>
-<h1>待決事項：規格與實作不一致</h1>
-<p class="sub">流程驗證過程中，凡是「改規格或改程式都說得通」、或需要產品 / 法遵判斷的項目都記在這裡，不擅自修。每項附建議；決定後再依結論改程式或改 02 文件。</p>
-
-<div class="note">狀態：<span class="tag decide">待決</span> 等你決定 · <span class="tag pass">已決</span> 已有結論並處理</div>
-
-<h2 id="q1">Q1 · 擁有者能否把「已送達」改回取消？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F5 狀態機：<code>delivered → cancelled</code>「僅 owner 或 coordinator 更正誤標」，並回補 qty_claimed。</td></tr>
-<tr><th>現況</th><td><code>claims.rs</code> 一律禁止，<code>owner_claim_actions.rs</code> 斷言 409；04 契約也寫「已 delivered 不可取消」，所以是 02 與 04 互相矛盾。進度頁「標為已送達」無確認框。</td></tr>
-<tr><th>影響</th><td>擁有者誤點「標為已送達」後無法撤回，該品項永遠被算作已送達、不會釋出給其他人。</td></tr>
-<tr><th>選項</th><td>A. 照規格開放 owner 取消 delivered（並回補）。<br>B. 維持禁止，但在「標為已送達」加二次確認，並更新規格。<br>C. 新增 owner 專用「退回已購買 / 已捐助」而非取消。</td></tr>
-<tr><th>建議</th><td><b>B</b>：改動最小、避免「送達後又取消」讓捐助者困惑；若常有誤標再做 C。</td></tr>
-</table>
-
-<h2 id="q2">Q2 · 清單關閉後，捐助者還能取消 / 標已購買嗎？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F8 狀態表：closed 時「guest 不可改量 / 取消捐助」，owner 仍可標 delivered 與取消；F5 錯誤碼 <code>WISHLIST_CLOSED</code>「清單 closed / archived 後，guest 不可再改量或取消」。（規格寫於 D50 之前，「guest」即捐助者。）</td></tr>
-<tr><th>現況</th><td>改量已擋（409）；<b>取消、標 purchased / delivered 仍可</b>（實測 closed 清單上 DELETE 回 204）。</td></tr>
-<tr><th>影響</th><td>關閉後捐助者取消會讓已結束清單的完成度往下掉；但禁止取消也代表捐助者無法撤回已無法履行的承諾。</td></tr>
-<tr><th>選項</th><td>A. 照規格：closed 後捐助者的取消回 409，標 purchased / delivered 仍允許（推進履約）。<br>B. 維持現況並改規格（關閉只停止新捐助與加量）。</td></tr>
-<tr><th>建議</th><td><b>B</b>：捐助者在活動結束後仍需能標「已送達」與撤回；請確認。</td></tr>
-</table>
-
-<h2 id="q3">Q3 · 已購買的捐助能改數量嗎？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F5「改量 PATCH quantity（僅 reserved 可改）」。</td></tr>
-<tr><th>現況</th><td>reserved 與 purchased 都可改量（加量同樣走條件式 UPDATE，不會超賣）。</td></tr>
-<tr><th>補充</th><td>04 契約寫「qty 只能在 reserved / purchased 時改」，與實作一致，只有 02 落後。</td></tr>
-<tr><th>建議</th><td>維持現況，併入 <a href="#q6">Q6</a> 更新 02。</td></tr>
-</table>
-
-<h2 id="q4">Q4 · 「每人每清單有效捐助最多 30 筆」上限 <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F4 步驟 5：每使用者每清單有效 claim 上限 30。</td></tr>
-<tr><th>現況</th><td>沒有「有效筆數」上限，改為限流：同清單每小時 15 次、每人每小時 30 次（429）。長期來看同一人仍可在一份清單累積任意多筆。</td></tr>
-<tr><th>建議</th><td>維持限流並在規格註明取代（每品項本來就只能有一筆有效捐助，上限等同品項數）；若擔心洗單再補 DB 計數上限。</td></tr>
-</table>
-
-<h2 id="q5">Q5 · 完成度百分比的定義 <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F7：<code>completion_pct = items_done / items_total</code>（主數字），<code>claimed_pct</code> 為數量比例。</td></tr>
-<tr><th>現況</th><td>公開頁、儀表板都以數量比例為主數字（例：2 品項、數量 3/4 → 顯示 75%，同時顯示 1 / 2 項）。有測試固定此行為（<code>unified_pct…</code>）。</td></tr>
-<tr><th>建議</th><td>更新規格為現況（數量比例對送禮者較直觀）。</td></tr>
-</table>
-<h2 id="q6">Q6 · 02 文件落後於 04 契約與實作（批次更新） <span class="tag decide">待決</span></h2>
-<p>以下 02 的描述與實作不同，但實作與較新的 04 契約一致，判斷為 02 未同步。建議一次更新 02 對應段落；若其中某項其實要以 02 為準，請標出來，我再改程式。</p>
-<table>
-<tr><th>#</th><th>02 現寫</th><th>實作 / 04</th><th>流程</th></tr>
-<tr><td>a</td><td>改量僅 reserved</td><td>reserved / purchased 皆可（Q3）</td><td>F5</td></tr>
-<tr><td>b</td><td>delivered → cancelled：owner 可更正</td><td>不可（Q1，若選 A 則改程式）</td><td>F5</td></tr>
-<tr><td>c</td><td>非法清單狀態轉換回 409 <code>INVALID_STATE_TRANSITION</code></td><td>422 <code>VALIDATION_FAILED</code>，<code>errors[].code=TRANSITION</code>；archived 上的其他修改回 409 <code>WISHLIST_CLOSED</code></td><td>F8</td></tr>
-<tr><td>d</td><td>DELETE 空草稿實體刪除</td><td>一律封存（D13）</td><td>F8</td></tr>
-<tr><td>e</td><td>狀態圖無 active → archived</td><td>允許（DELETE 與 PATCH 皆可）</td><td>F8</td></tr>
-<tr><td>f</td><td>F7 completion_pct = items_done / items_total</td><td>主數字為數量比例（Q5）</td><td>F7</td></tr>
-<tr><td>g</td><td>F16 擁有者第一筆捐助即時信 + 每日彙整，設定頁可關</td><td>D58 已停寄（0026），設定頁無此開關</td><td>F16</td></tr>
-<tr><td>h</td><td>F17 刪帳號回 204、錯誤碼 <code>ACCOUNT_HAS_BALANCE</code>（附 balance 等欄位）</td><td>回 200 <code>{deleted, anonymized_at}</code>（與 04 一致）；錯誤碼為 <code>ACCOUNT_HAS_POINTS</code>（04 寫 ACCOUNT_HAS_BALANCE，前端兩者都處理）。建議 02 / 04 統一為 ACCOUNT_HAS_POINTS</td><td>F17</td></tr>
-<tr><td>i</td><td>F15 檢舉回 202；410 快取 30 秒帶 Cache-Tag；404 快取 5 秒</td><td>檢舉回 201（附 id）；410 / 404 皆 no-store，CDN 以 URL purge（較保守，恢復上架立即生效）</td><td>F15 / F3</td></tr>
-<tr><td>j</td><td>F9 通知寄送失敗重試 5 次、指數退避</td><td>最多 3 次、固定 1 分鐘</td><td>F16 / F9</td></tr>
-<tr><td>k</td><td>F3 受限清單 SSR 回 403</td><td>SSR 回 200 + noindex，hydrate 後重抓（無閃爍、無內容外洩）</td><td>F21</td></tr>
-</table>
-<h2 id="q7">Q7 · SSE 每 IP 同時連線上限：5 還是 16？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F3 / 6.2：每 IP 同時 5 條，超過 429。</td></tr>
-<tr><th>現況</th><td><code>dashboard.rs MAX_SSE_PER_IP = 16</code>（另有全域 2000），實測第 17 條起回 429；commit 74b3ddc 未說明為何不是 5。</td></tr>
-<tr><th>考量</th><td>台灣行動網路大量使用電信 CGNAT，同一出口 IP 後面可能有很多人；辦公室 / 家庭也共用 IP。上限太低時，同一個人開兩三個分頁加上家人一起看就會被拒，前端退回輪詢（仍可用，但即時性下降）。</td></tr>
-<tr><th>建議</th><td>維持 16 並更新規格；若要防濫用，交給 Cloudflare 邊緣的「SSE 新連線每分鐘每 IP 10 次」規則。</td></tr>
-</table>
-
-<h2 id="q8">Q8 · 驚喜清單是否要對訪客顯示提示？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F3：「公開頁顯示『這是驚喜清單』提示」。03 線框沒有畫。</td></tr>
-<tr><th>現況</th><td>未實作。擁有者看到「驚喜模式中」遮罩；訪客端完全沒有提示。</td></tr>
-<tr><th>影響</th><td>送禮者不知道這是驚喜，可能在聊天或留言中提前透露。</td></tr>
-<tr><th>建議</th><td>在分享頁標題下加一行提示，例如「這是驚喜清單：活動日前建立者看不到誰送了什麼，請先別透露喔」。需要你確認文案後我再實作（含 en / vi）。</td></tr>
-</table>
-
-<h2 id="q9">Q9 · 清單擁有者沒有設定帳號代號時，非好友如何加好友？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>F21：FRIENDS_ONLY 時「前往個人頁加好友」。</td></tr>
-<tr><th>現況</th><td>只有擁有者有 handle 才出現按鈕；handle 可為空（預設為空），此時門檻頁只剩「回首頁」，對方完全沒有下一步。</td></tr>
-<tr><th>選項</th><td>A. 無 handle 時顯示「請向 {name} 索取好友邀請連結」說明。<br>B. 門檻頁直接提供「送出好友申請」（後端已有 <code>POST /friends/requests</code>，但需要可定址的對象：可讓 403 回應帶不可猜的 user id，或新增「對清單擁有者申請」端點）。</td></tr>
-<tr><th>建議</th><td>先做 A（只改前端文案，0 後端改動），B 視需求再議。</td></tr>
-</table>
-<h2 id="q10">Q10 · 刪除帳號前是否要求重新驗證？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>02 F17：DELETE /me 需 confirm 字串，<b>且 session 近 10 分鐘內曾驗證，否則先要求重新驗證</b>。04 只要求 confirm。</td></tr>
-<tr><th>現況</th><td>只檢查 <code>confirm: "DELETE"</code>（UI 輸入「刪除」）。拿到 session 的人（共用電腦未登出、被盜 cookie）可直接刪除帳號，無法復原。</td></tr>
-<tr><th>選項</th><td>A. 刪除前要求輸入目前密碼（無密碼帳號改寄 Email OTP）。<br>B. 只要求 session 在 10 分鐘內登入過，否則導去重新登入再回來。<br>C. 維持現況並更新 02。</td></tr>
-<tr><th>建議</th><td><b>A</b>：與「變更密碼」需目前密碼一致，實作集中在 DELETE /me 與設定頁對話框；Google / LINE-only 帳號走 OTP。屬安全強化，需要你決定是否值得增加這一步摩擦。</td></tr>
-</table>
-<h2 id="q11">Q11 · 資料庫 lock / statement 逾時要不要設？ <span class="tag decide">待決</span></h2>
-<table>
-<tr><th>規格</th><td>02 §6.4 / F4：<code>lock_timeout=2s</code>、<code>statement_timeout=5s</code>、<code>idle_in_transaction_session_timeout=10s</code>，逾時回 503 <code>SERVICE_UNAVAILABLE</code>。</td></tr>
-<tr><th>現況</th><td>連線池已補 <code>acquire_timeout=3s</code>，逾時對應也已就緒（55P03 / 57014 → 503），但三個資料庫逾時都沒設定：熱門品項的列鎖若被長交易卡住，捐助請求會一直等。</td></tr>
-<tr><th>風險</th><td>main.rs 的 migration 與背景工作（清理、到期掃描、通知）共用同一個 pool；若用 <code>after_connect</code> 全域設定，長的 migration（建索引、回填）或大批清理可能被 5 秒 statement_timeout 中斷，造成部署失敗。</td></tr>
-<tr><th>選項</th><td>A. migration 用獨立連線（不設逾時），應用程式 pool 以 <code>after_connect</code> 設三個逾時；背景工作需確認單批都在 5 秒內（必要時改小批次）。<br>B. 只在捐助 / 認捐等熱點交易內 <code>SET LOCAL lock_timeout = '2s'</code>，其他維持不設。<br>C. 維持現況。</td></tr>
-<tr><th>建議</th><td><b>B 先做</b>（影響面小、直接保護超賣路徑的使用者體驗），A 搭配一次負載測試再評估。需你確認後實作。</td></tr>
-</table>
+<h1>待決事項</h1>
+<p class="sub">流程驗證中「改規格或改程式都說得通」、或需要產品判斷的項目。內容來自 <code>decisions-data.js</code>，本頁每 3 秒自動同步，有變動的項目會短暫標亮，不需重新整理。</p>
+<div class="bar" id="chips"></div>
+<div class="bar"><input id="q" type="search" placeholder="搜尋標題、決策或內容" aria-label="搜尋"><span class="sync" id="sync"><span class="dot off"></span>載入中…</span></div>
+<div id="list" aria-live="polite"></div>
 </main>
+<script>
+const LABEL = { pending: '待決', decided: '已決・待處理', doing: '實作中', done: '已完成' }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]).replace(/\n/g, '<br>')
+let data = null, prev = {}, filter = 'all', seen = new Set()
+
+function card(d) {
+  const row = (k, v, cls = '') => v ? `<dt>${k}</dt><dd class="${cls}">${esc(v)}</dd>` : ''
+  const list = (k, arr) => arr?.length ? `<dt>${k}</dt><dd><ul class="ex">${arr.map(([h, t]) => `<li><b>${esc(h)}</b>：${esc(t)}</li>`).join('')}</ul></dd>` : ''
+  const table = d.table ? `<dt>清單</dt><dd class="wrap"><table><tr><th>#</th><th>02 原寫</th><th>實作 / 決策</th></tr>${d.table.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></dd>` : ''
+  const links = d.links?.length ? `<dt>相關</dt><dd>${d.links.map(([t, h]) => `<a href="${esc(h)}">${esc(t)}</a>`).join('、')}</dd>` : ''
+  return `<article id="${d.id}" data-s="${d.status}"><h2><span class="id">${d.id.toUpperCase()}</span>${esc(d.title)}<span class="tag ${d.status}">${LABEL[d.status]}</span><span class="flow">${esc(d.flow)}</span>${seen.has(d.id) ? '<span class="new">剛更新</span>' : ''}</h2><dl>
+    ${row('規格', d.spec)}${row('現況', d.current)}${list('說明', d.explain)}${row('你的決策', d.decision, 'you')}${row('處置', d.resolution)}${list('選項', d.options)}${row('建議', d.recommendation)}${table}${links}</dl></article>`
+}
+
+function render() {
+  if (!data) return
+  const counts = { all: data.items.length }
+  for (const d of data.items) counts[d.status] = (counts[d.status] || 0) + 1
+  document.getElementById('chips').innerHTML = ['all', 'pending', 'decided', 'doing', 'done'].map(k =>
+    `<button class="chip" data-f="${k}" aria-pressed="${filter === k}">${k === 'all' ? '全部' : LABEL[k]}<b>${counts[k] || 0}</b></button>`).join('')
+  const q = document.getElementById('q').value.trim().toLowerCase()
+  const items = data.items.filter(d => (filter === 'all' || d.status === filter) && (!q || JSON.stringify(d).toLowerCase().includes(q)))
+  document.getElementById('list').innerHTML = items.map(card).join('') || '<p class="sub">沒有符合的項目</p>'
+  for (const id of seen) document.getElementById(id)?.classList.add('flash')
+  setTimeout(() => document.querySelectorAll('article.flash').forEach(a => a.classList.remove('flash')), 1200)
+}
+
+function apply(next) {
+  const first = !data
+  const changed = []
+  for (const d of next.items) {
+    const s = JSON.stringify(d)
+    if (!first && prev[d.id] !== s) changed.push(d.id)
+    prev[d.id] = s
+  }
+  if (!first && !changed.length && data.updated === next.updated) return
+  changed.forEach(id => seen.add(id))
+  data = next
+  render()
+  if (first && location.hash) document.querySelector(location.hash)?.scrollIntoView()
+}
+
+// file:// 下 fetch 會被擋，改用重新插入 <script> 載入最新資料（加時間戳避免快取）
+function poll() {
+  const s = document.createElement('script')
+  s.src = `decisions-data.js?t=${Date.now()}`
+  s.onload = () => { s.remove(); apply(window.__DECISIONS__); setSync(true) }
+  s.onerror = () => { s.remove(); setSync(false) }
+  document.body.appendChild(s)
+}
+function setSync(ok) {
+  const t = new Date().toLocaleTimeString('zh-TW', { hour12: false })
+  document.getElementById('sync').innerHTML = ok
+    ? `<span class="dot"></span>資料版本 ${esc(data?.updated)} · 已同步 ${t}`
+    : `<span class="dot off"></span>無法讀取 decisions-data.js（${t}）`
+}
+document.getElementById('chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filter = b.dataset.f; render() } })
+document.getElementById('q').addEventListener('input', render)
+poll(); setInterval(poll, 3000)
+</script>
 </body>
 </html>
