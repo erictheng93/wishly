@@ -535,3 +535,18 @@ fn list_closed_copy() {
         );
     }
 }
+
+/// Q14：清單已結束時的到期提醒不能再叫捐助者「延長」（已結束的清單不能延長），改提示標記已購買 / 已送達
+#[test]
+fn reminder_on_ended_list_does_not_offer_extension() {
+    use wishly_api::notify::{render_lang, Lang};
+    let base = json!({ "item": "奶瓶", "expires_at": "2026-11-01T00:00:00Z" });
+    let mut ended = base.clone();
+    ended["ended"] = json!(true);
+    for lang in [Lang::parse("zh-TW"), Lang::parse("en"), Lang::parse("vi")] {
+        let (_, open) = render_lang(lang, "claim.purchase_reminder", "清單", &base);
+        let (_, closed) = render_lang(lang, "claim.purchase_reminder", "清單", &ended);
+        assert!(open.contains('7'), "{open}");
+        assert!(!closed.contains('7'), "{closed}");
+    }
+}

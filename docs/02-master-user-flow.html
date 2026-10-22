@@ -106,7 +106,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>日期</td><td>2026-10-12</td></tr>
 <tr><td>狀態</td><td>Draft</td></tr>
 <tr><td>D51 變更（2026-10-18）</td><td>清單可見性精簡為 public / friends / selected / private，新清單預設 friends；移除 <code>link</code>（知道連結）與 <code>password</code>（密碼保護），連同 <code>POST /public/wishlists/{slug}/unlock</code>、<code>X-List-Access</code>、SSE <code>?access=</code>、<code>access_password</code> / <code>has_password</code>、錯誤碼 <code>PASSWORD_REQUIRED</code> / <code>WRONG_PASSWORD</code>（migration 0016，既有 link / password 清單收緊為 friends）。新增訪客探索 <code>GET /public/wishlists</code>（見 F21）。下文 v0.5 描述的 link / password 已被取代。</td></tr>
-<tr><td>流程驗證決策（2026-10-22）</td><td>依 <a href="flow-verification/decisions.html">流程驗證待決事項</a> 的決策更新：delivered 不可取消、擁有者標送達需確認（Q1）；清單結束後捐助者只能取消（Q2）；purchased 可改量（Q3）；不設每清單捐助筆數上限（Q4）；完成度為數量比例並即時更新（Q5）；SSE 每 IP 16 條（Q7）；驚喜清單訪客提示、鎖定期擁有者可看每品項數量但看不到是誰（Q8）；好友申請可用使用者 ID（Q9）；刪帳號前重新驗證（Q10）；另同步 02 落後實作 / 04 之處（Q6 a–k）。</td></tr>
+<tr><td>流程驗證決策（2026-10-22）</td><td>依 <a href="flow-verification/decisions.html">流程驗證待決事項</a> 的決策更新：delivered 不可取消、擁有者標送達需確認（Q1）；清單結束後不可新認領 / 改量 / 延長，但仍可回報已購買 / 已送達（Q2、Q14）；認領 7 天購買期限、結束寬限（Q12、Q14）；purchased 可改量（Q3）；不設每清單捐助筆數上限（Q4）；完成度為數量比例並即時更新（Q5）；SSE 每 IP 16 條（Q7）；驚喜清單訪客提示、鎖定期擁有者可看每品項數量但看不到是誰（Q8）；好友申請可用使用者 ID（Q9）；刪帳號前重新驗證（Q10）；另同步 02 落後實作 / 04 之處（Q6 a–k）。</td></tr>
 <tr><td>v0.5 變更</td><td>對齊 10/11 已實作的功能（原文件停在 10/8，流程圖落後實作）：新增 F1-c Email＋密碼註冊 / 登入 / 忘記密碼（登入頁實際入口）、F20 好友與邀請連結、F21 清單可見性與存取（好友 / 指定 / 密碼 / CDN 受限路徑）、F22 個人頁與捐助可見度；更新角色矩陣、錯誤碼（LOGIN_REQUIRED、FRIENDS_ONLY、NOT_ALLOWED、PASSWORD_REQUIRED、WRONG_PASSWORD、INVALID_CREDENTIALS、EMAIL_EXISTS、HANDLE_TAKEN、NOT_FRIEND、SELF_INVITE）；修正 F1-a 的 OTP_INVALID 狀態碼為 400（與實作與 04 一致）。</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證（本文件新增 F15 到 F19、6.7 到 6.9，並更新 F2、F9、F10）。前端部署為 Cloudflare Pages（Pages Functions SSR），Workers 為備案。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值（F11）、電子禮物卡（F12）、回饋星星（F13）、企業禮券（F14）；點數改為分批（point lots）管理。</td></tr>
@@ -611,6 +611,7 @@ stateDiagram-v2
 <tr><td>reserved / purchased → delivered</td><td>捐助者本人、owner、org coordinator/owner</td><td>寫 <code>delivered_at</code>；不改 qty_claimed（delivered 仍計入）。驚喜模式解鎖前 owner 看不到 claims，故實際上只有捐助者可標。relief 由 receipts 流程（F10）觸發</td></tr>
 <tr><td>reserved / purchased → cancelled</td><td>捐助者本人、owner、coordinator</td><td><strong>回補</strong>：<code>qty_claimed -= claim.quantity</code>；owner 取消時 audit 記錄原因；P1 通知捐助者</td></tr>
 <tr><td>delivered → cancelled</td><td>無（流程驗證 Q1）</td><td>delivered 為終態，任何人都不可取消；擁有者「標為已送達」前須二次確認以免誤標</td></tr>
+<tr><td>購買期限（Q12 / Q14）</td><td>系統</td><td>認領時 <code>expires_at</code> = 建立時間 + 清單 <code>claim_ttl_hours</code>（新清單預設 168 = 7 天；擁有者可選 7 / 14 / 30 天 / 不限 = NULL）；若活動日 00:00（台北）前 3 天更早則取之，但至少 48 小時。到期前 3 天與 24 小時寄提醒（寄送時認領已非 reserved 或期限已變則取消）。捐助者可延長 7 天一次（<code>PATCH /claims/{id} {"extend": true}</code>；已用過 409 <code>EXTENSION_USED</code>；清單已結束 409 <code>WISHLIST_CLOSED</code>）。清單結束時（手動、自動結束、封存），剩不到 7 天的 reserved 認領期限延到「結束時間 + 7 天」（只延不縮）並寄 <code>claim.list_closed</code>；逾期才釋出，清單結束也照樣回補數量、清單維持結束。逾期通知捐助者 <code>claim.expired</code>、擁有者 <code>item.reopened</code>（不含捐助者名字）。</td></tr>
 <tr><td>reserved → expired</td><td>系統（F9）</td><td>僅 <code>expires_at &lt;= now()</code>；回補 qty_claimed；personal/registry 預設不設 expires_at 故不會發生</td></tr>
 <tr><td>cancelled / expired → 其他</td><td>無</td><td>終態；想再捐助需（登入後）重新 POST 新 claim（新 Idempotency-Key）</td></tr>
 </tbody></table>
@@ -1024,7 +1025,7 @@ sequenceDiagram
 <tbody>
 <tr><td>draft</td><td>404</td><td>不可（404）</td><td>—</td><td>可</td></tr>
 <tr><td>active</td><td>正常</td><td>可</td><td>可</td><td>可</td></tr>
-<tr><td>closed</td><td>唯讀，顯示「已結束」</td><td>409 <code>WISHLIST_CLOSED</code></td><td>owner/coordinator 可標 delivered、cancel；捐助者只能取消（可改備註 / 可見度），不可改量、不可標 purchased / delivered（409 WISHLIST_CLOSED，流程驗證 Q2）；closes_at 已過的 active 清單同樣視為 closed。眾籌（P2）：open 品項隨清單關閉轉 expired，捐贈者進入 7 天選擇期；funded 的訂單照常履約</td><td>僅標題 / 描述；不可增刪品項</td></tr>
+<tr><td>closed</td><td>唯讀，顯示「已結束」</td><td>409 <code>WISHLIST_CLOSED</code></td><td>owner/coordinator 可標 delivered、cancel；捐助者仍可標 purchased / delivered、取消、改備註與可見度（回報已發生的事實）；不可新認領、不可改量、不可延長期限（409 WISHLIST_CLOSED，流程驗證 Q2 / Q14）；closes_at 已過的 active 清單同樣視為 closed。眾籌（P2）：open 品項隨清單關閉轉 expired，捐贈者進入 7 天選擇期；funded 的訂單照常履約</td><td>僅標題 / 描述；不可增刪品項</td></tr>
 <tr><td>archived</td><td>404，owner 列表預設隱藏（可用篩選查看）</td><td>409 <code>WISHLIST_CLOSED</code></td><td>全部唯讀</td><td>不可</td></tr>
 </tbody></table>
 <table class="meta"><tbody>

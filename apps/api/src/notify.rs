@@ -139,15 +139,20 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     }
     let cfg = crate::config::get();
     let n = rows.len();
-    for (id, uid, gid, channel, kind, payload, attempts) in rows {
+    for (id, uid, gid, channel, kind, mut payload, attempts) in rows {
         if kind == "claim.purchase_reminder" {
-            let live: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM claims WHERE id = ($1->>'claim_id')::uuid AND status = 'reserved'
-                                 AND expires_at = ($1->>'expires_at')::timestamptz)")
-                .bind(&payload).fetch_one(pool).await?;
-            if !live {
+            // 寄送當下：認領仍待購且期限沒變才寄；清單已結束（Q14）時改用不提「延長」的文案
+            let ended: Option<bool> = sqlx::query_scalar(
+                "SELECT w.status IN ('closed', 'archived') OR (w.closes_at IS NOT NULL AND w.closes_at <= now())
+                   FROM claims c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
+                  WHERE c.id = ($1->>'claim_id')::uuid AND c.status = 'reserved' AND c.expires_at = ($1->>'expires_at')::timestamptz")
+                .bind(&payload).fetch_optional(pool).await?;
+            let Some(ended) = ended else {
                 sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'claim no longer due' WHERE id = $1").bind(id).execute(pool).await?;
                 continue;
+            };
+            if ended {
+                payload["ended"] = Value::Bool(true);
             }
         }
         let security = matches!(
@@ -460,11 +465,19 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             let at = taipei(payload, "expires_at").unwrap_or_default();
             (
                 l.pick(format!("【Wishly】還沒買《{item}》嗎？"), format!("[Wishly] Haven't bought \"{item}\" yet?"), format!("[Wishly] Bạn chưa mua \"{item}\"?")),
+                if payload["ended"] == true {
+                    l.pick(
+                        format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請在 {at}（台北時間）前標記已購買或已送達；逾期未標記的認領會釋出。\n管理我的捐助：{manage}\n"),
+                        format!("The list \"{title}\" has ended. If you've already bought or given \"{item}\", please mark it as purchased or delivered before {at} (Taipei time); unmarked pledges will be released after that.\nManage my pledges: {manage}\n"),
+                        format!("Danh sách \"{title}\" đã kết thúc. Nếu bạn đã mua hoặc trao \"{item}\", vui lòng đánh dấu đã mua hoặc đã trao trước {at} (giờ Đài Bắc); các đóng góp chưa đánh dấu sẽ được nhường lại sau thời điểm đó.\nQuản lý đóng góp của tôi: {manage}\n"),
+                    )
+                } else {
                 l.pick(
                     format!("還沒買嗎？你在《{title}》認領的「{item}」請在 {at}（台北時間）前標記已購買，或延長 7 天；逾期會自動釋出給其他朋友。\n管理我的捐助：{manage}\n"),
                     format!("Haven't bought it yet? Please mark \"{item}\" from \"{title}\" as purchased before {at} (Taipei time), or extend by 7 days. Otherwise it will be released to other friends.\nManage my pledges: {manage}\n"),
                     format!("Bạn chưa mua? Vui lòng đánh dấu đã mua \"{item}\" trong \"{title}\" trước {at} (giờ Đài Bắc), hoặc gia hạn thêm 7 ngày; quá hạn sẽ tự động nhường cho bạn bè khác.\nQuản lý đóng góp của tôi: {manage}\n"),
-                ),
+                )
+                },
             )
         }
         "claim.list_closed" => {

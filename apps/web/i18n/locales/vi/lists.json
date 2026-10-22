@@ -14,6 +14,7 @@
       "ttl14": "14 ngày",
       "ttl30": "30 ngày",
       "ttlNone": "Không giới hạn",
+      "ttlHours": "{n} giờ",
       "ttlHint": "Sau khi nhận, cần đánh dấu đã mua trong thời hạn này, quá hạn sẽ tự động nhường cho bạn bè khác."
     },
     "new": {

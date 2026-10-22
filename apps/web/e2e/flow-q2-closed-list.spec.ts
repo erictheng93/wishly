@@ -31,9 +31,10 @@ test('清單結束後：我的捐助仍可標記已購買 / 已送達、顯示�
     await expect(card.getByText(hint)).toBeVisible()
     await expect(card.getByRole('button', { name: '延長 7 天' })).toHaveCount(0)
     await card.getByRole('button', { name: '標記已購買' }).click()
-    await expect(card.getByText('已購買')).toBeVisible()
+    await expect(card.getByText('已購買', { exact: true })).toBeVisible()
+    await expect(card.getByText(/前標記已購買/)).toHaveCount(0) // 已購買後不再逾期，不顯示期限
     await card.getByRole('button', { name: '標記已送達' }).click()
-    await expect(card.getByText('已送達')).toBeVisible()
+    await expect(card.getByText('已送達', { exact: true })).toBeVisible()
     await expect(page.getByRole('alert')).toHaveCount(0)
   })
 
