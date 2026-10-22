@@ -1959,7 +1959,8 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <tr><td><code>EMAIL_EXISTS</code></td><td>409</td><td>註冊驗證時該 Email 已有密碼登入</td></tr>
 <tr><td><code>HANDLE_TAKEN</code></td><td>409</td><td>帳號代號（handle）已被使用</td></tr>
 <tr><td><code>READ_ONLY_MODE</code></td><td>503</td><td>唯讀模式開啟時的寫入請求（附 Retry-After）</td></tr>
-<tr><td><code>SERVICE_UNAVAILABLE</code></td><td>503</td><td>連線池耗盡、lock_timeout、下游暫時不可用（附 Retry-After）</td></tr>
+<tr><td><code>SERVICE_UNAVAILABLE</code></td><td>503</td><td>連線池耗盡、lock_timeout、statement_timeout（附 Retry-After）；通用碼，特定下游故障用專屬碼</td></tr>
+<tr><td><code>CAPTCHA_UNAVAILABLE</code></td><td>503</td><td>Turnstile 驗證服務連不上（fail closed）</td></tr>
 <tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期錯誤（不外洩細節，僅回 request_id）</td></tr>
 </tbody></table>
 

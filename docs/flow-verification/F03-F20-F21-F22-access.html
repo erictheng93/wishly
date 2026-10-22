@@ -70,7 +70,7 @@
 <p>F22「個人頁一律 noindex」。<code>/u/**</code> 為 client 渲染（<code>ssr: false</code>），伺服器回的 HTML 殼沒有 robots meta，noindex 要等 JS 執行後才加上；不執行 JS 或先抓 HTML 的爬蟲看不到。改在 <code>nuxt.config.ts</code> routeRules 對 <code>/u/**</code> 回 <code>X-Robots-Tag: noindex</code>；flow-f22 #1 驗證回應標頭。<b>注意</b>：已在本機 node 預設驗證，Cloudflare Pages 上線後建議 <code>curl -I https://wishly.tw/u/xxx</code> 確認標頭仍在。</p>
 
 <h3>測試穩定性 · flow-f05 擁有者取消捐助偶發失敗 <span class="tag fixed">已修正</span></h3>
-<p>全套並行時偶發：進度頁因 SSE 重抓而重繪，第一次「取消捐助」若點在重繪中沒有跳出確認框，<code>page.once('dialog')</code> 的處理器會殘留到第二次，兩個處理器同時處理同一個對話框。改為每次點擊前等待該次對話框並處理；三種裝置 × 3 次、6 個 worker 並行共 27 次皆通過。屬測試問題，產品行為無誤。</p>
+<p>全套並行時偶發：進度頁因 SSE 重抓而重繪，第一次「取消捐助」若點在重繪中沒有跳出確認框，<code>page.once('dialog')</code> 的處理器會殘留到第二次，兩個處理器同時處理同一個對話框。改為每次點擊前等待該次對話框並處理；三種裝置 × 3 次、6 個 worker 並行共 27 次皆通過。這只處理了症狀；後續追到產品端的根因（進度頁重抓競態），見 <a href="F04-F05-claims.html">F4/F5 報告 B15</a>。</p>
 
 <h2>探索觀察（未列缺陷）</h2>
 <ul>

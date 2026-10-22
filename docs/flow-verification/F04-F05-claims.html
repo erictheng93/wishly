@@ -13,7 +13,7 @@
 <p class="sub">驗證日期 2026-10-21 · 規格 <a href="../02-master-user-flow.html">02 Master User Flow</a> v0.5（含 D50 認捐須登入）· 環境：本機 e2e 堆疊（API :8081、web :3012、Mailpit、PostGIS）</p>
 
 <h2>結論</h2>
-<p>主路徑（登入認捐 → 已購買 → 已送達；擁有者標送達 / 取消；防超賣；冪等重送）皆符合規格。發現 <b>5 個缺陷已直接修正</b>、<b>1 個開 issue</b>、<b>4 項與規格不一致需決策</b>（見<a href="decisions.html">待決事項</a>）。</p>
+<p>主路徑（登入認捐 → 已購買 → 已送達；擁有者標送達 / 取消；防超賣；冪等重送）皆符合規格。發現 <b>6 個缺陷已直接修正</b>、<b>1 個開 issue</b>、<b>4 項與規格不一致需決策</b>（見<a href="decisions.html">待決事項</a>）。</p>
 
 <h2>驗證方式</h2>
 <table>
@@ -70,6 +70,24 @@
 <li><b>提交歸屬</b>：#29 的初始修正（<code>useApi.ts</code>、<code>useGuest.ts</code>、<code>utils/errors.ts</code>、<code>tests/apiErrorLocale.test.ts</code>、<code>tests/setup.ts</code>）因 W1 提交時用了 <code>git add -A</code>，被併進 1a1f187（訊息只寫裝置驗證）。內容本身無誤且 4437cc1 建立在其上，不改寫歷史；之後一律以明確路徑提交。</li>
 <li><b>E2E 回歸</b>：4437cc1 未跑瀏覽器 E2E，造成 3 個失敗。其中 2 個（後台現金退款、眾籌可見度儲存失敗）是測試仍期待顯示 500 的後端 detail，屬預期行為改變，已更新斷言；1 個是 <code>SERVICE_UNAVAILABLE</code> 被翻成「驗證服務暫時無法使用」——後端目前只有 Turnstile 用這個碼，但 02 規格也用它表示連線池耗盡 / lock_timeout 等一般 503，在認捐表單出現「驗證服務」會誤導，已改為通用的「服務暫時無法使用」（三語）。修正後全套 E2E 157 / 157 通過。</li>
 </ul>
+<h4>根因追查：503 文案（側邊審查提醒，2026-10-22）</h4>
+<p>提醒的現象正確（一般 503 被說成「驗證服務」），但「資料庫忙碌時也回 SERVICE_UNAVAILABLE」與程式不符。實際根因有兩層：</p>
+<ol>
+<li><b>通用錯誤碼被拿來表示特定故障</b>：後端唯一回 <code>SERVICE_UNAVAILABLE</code> 的地方是 Turnstile siteverify 連不上（<code>reports.rs</code>，檢舉與 OTP 人機驗證共用）。#29 翻譯時只看得到這個用法，於是把通用碼寫成「驗證服務」。前端無從分辨，只改文案會讓 Turnstile 故障變得含糊。</li>
+<li><b>資料庫壅塞根本沒有回 503</b>：<code>AppError::Db</code> 一律 500 <code>INTERNAL_ERROR</code>、無 Retry-After；連線池也沒設 <code>acquire_timeout</code>（sqlx 預設 30 秒），尖峰時請求會卡 30 秒才失敗。02 §6.4 要求 3 秒內回 503 + Retry-After、不排隊堆積。</li>
+</ol>
+<p>修正：</p>
+<ul>
+<li>後端：Turnstile 連不上改用專屬碼 <code>CAPTCHA_UNAVAILABLE</code>（503）；連線池 <code>acquire_timeout = 3s</code>；連線池逾時、<code>lock_timeout</code>（55P03）、<code>statement_timeout</code>（57014）對應 503 <code>SERVICE_UNAVAILABLE</code> + <code>Retry-After: 2</code>，其他資料庫錯誤維持 500。</li>
+<li>前端文案：<code>SERVICE_UNAVAILABLE</code> →「系統忙碌中，請稍後再試」；新增 <code>CAPTCHA_UNAVAILABLE</code> →「人機驗證服務暫時無法使用，請稍後再試」（zh / en / vi）。</li>
+<li>契約：04 錯誤碼表與 TS 型別、02 錯誤碼表補 <code>CAPTCHA_UNAVAILABLE</code>，並寫明 <code>SERVICE_UNAVAILABLE</code> 是通用碼。</li>
+<li>測試：<code>db_overload.rs</code>（真的把只有 1 條連線的 pool 占住 → 503 + Retry-After；製造 lock_timeout → 503；其他錯誤 500）、<code>config_mail.rs</code> 斷言 <code>CAPTCHA_UNAVAILABLE</code>、vitest 三語各驗兩種 503 文案不可混用、guest-errors E2E 改驗「系統忙碌中」。</li>
+</ul>
+<p>未做：02 要求的 <code>lock_timeout=2s</code>、<code>statement_timeout=5s</code>、<code>idle_in_transaction_session_timeout=10s</code> 目前沒有設定，見 <a href="decisions.html#q11">Q11</a>。</p>
+
+<h3>B15 · 進度頁較早的重抓晚到時，會把畫面蓋回舊狀態 <span class="tag fixed">已修正</span></h3>
+<p>追查 flow-f05「擁有者取消捐助」在全套並行時偶發失敗的根因（先前只修了測試的對話框處理，治標）：進度頁有兩個重抓來源——操作後的 <code>load()</code> 與 SSE 事件 debounce 500ms 的 <code>load()</code>——彼此重疊時以「最後回來的回應」為準。若 SSE 觸發的請求在取消前送出、卻在取消後的重抓之後才回來，畫面會退回「已捐助」，直到下一個事件才恢復；擁有者會以為取消沒成功而再按一次。</p>
+<p>修正：<code>progress.vue</code> 為每次 <code>load()</code> 編號，只套用最後一次發出的請求結果。新增 E2E 以 route 攔截讓較早的 dashboard 回應確定最後才到：拿掉修正時失敗（畫面變回「已捐助」），修正後三種裝置 × 3 次共 36 次通過。</p>
 
 <h2>裝置與解析度</h2>
 <p>新增的 flow-* E2E 已加入 <code>mobile</code>（iPhone 13，390×664、觸控）與 <code>tablet</code>（iPad gen 7，810×1080）兩個 project，三種裝置皆通過。另以 Playwright 在 320 寬、iPhone 13、iPad Mini 直式、iPad 橫式、1280、1920 六種解析度掃描 <code>/s/{slug}</code>、<code>/me/claims</code>、<code>/lists/{id}/progress</code>：檢查水平捲動與超出視窗的元素（皆無），並逐張看截圖。</p>

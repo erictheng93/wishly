@@ -35,7 +35,7 @@ struct NewReport {
 }
 
 /// Turnstile siteverify。未設 secret（僅 dev/test）略過。契約錯誤碼表：Turnstile 失敗 = 403 FORBIDDEN（不是 422，
-/// 因為欄位格式本身合法、是人機驗證不通過）；siteverify 連不上 = 503（fail closed，不放行）。secret 不寫入 log。
+/// 因為欄位格式本身合法、是人機驗證不通過）；siteverify 連不上 = 503 CAPTCHA_UNAVAILABLE（fail closed，不放行；不用通用的 SERVICE_UNAVAILABLE，前端才能說清楚是哪個服務）。secret 不寫入 log。
 pub async fn verify_turnstile(
     cfg: &crate::config::Config,
     token: Option<&str>,
@@ -65,7 +65,7 @@ pub async fn verify_turnstile(
             tracing::error!(status = %r.status(), "turnstile siteverify");
             return Err(AppError::problem(
                 503,
-                "SERVICE_UNAVAILABLE",
+                "CAPTCHA_UNAVAILABLE",
                 "人機驗證服務暫時無法使用",
             ));
         }
@@ -73,7 +73,7 @@ pub async fn verify_turnstile(
             tracing::error!(error = %e.without_url(), "turnstile siteverify");
             return Err(AppError::problem(
                 503,
-                "SERVICE_UNAVAILABLE",
+                "CAPTCHA_UNAVAILABLE",
                 "人機驗證服務暫時無法使用",
             ));
         }

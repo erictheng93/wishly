@@ -113,6 +113,21 @@ impl IntoResponse for AppError {
             AppError::WishlistRemoved => (StatusCode::GONE, "WISHLIST_REMOVED", "此清單已被下架"),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", "請先登入"),
             AppError::Problem { .. } | AppError::Extra { .. } => unreachable!(),
+            AppError::Db(e) if is_overload(e) => {
+                // 6.4：連線池取不到 / 鎖等待或語句逾時 → 503 + Retry-After，不排隊堆積
+                tracing::warn!(error = %e, "database overloaded");
+                let mut res = (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    [(header::CONTENT_TYPE, "application/problem+json")],
+                    Json(json!({
+                        "type": "https://wishly.tw/problems/service-unavailable",
+                        "title": "系統忙碌中，請稍後再試", "status": 503, "code": "SERVICE_UNAVAILABLE",
+                    })),
+                )
+                    .into_response();
+                res.headers_mut().insert(header::RETRY_AFTER, 2.into());
+                return res;
+            }
             AppError::Db(e) => {
                 tracing::error!(error = %e, "database error");
                 (
@@ -134,5 +149,14 @@ impl IntoResponse for AppError {
             Json(body),
         )
             .into_response()
+    }
+}
+
+/// 暫時性的資料庫壅塞：連線池逾時、lock_timeout（55P03）、statement_timeout（57014）
+fn is_overload(e: &sqlx::Error) -> bool {
+    match e {
+        sqlx::Error::PoolTimedOut => true,
+        sqlx::Error::Database(d) => matches!(d.code().as_deref(), Some("55P03" | "57014")),
+        _ => false,
     }
 }

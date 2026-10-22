@@ -97,3 +97,14 @@ it('preserves specific Traditional Chinese creator limits instead of replacing t
   expect(error.detail).toBe('匯出每日最多 3 次')
   expect(errMsg(error)).toBe('匯出每日最多 3 次')
 })
+
+// 503 有兩種來源：一般壅塞（SERVICE_UNAVAILABLE）與人機驗證服務連不上（CAPTCHA_UNAVAILABLE），文案不可混用
+it.each(['zh-Hant', 'en', 'vi'])('%s: generic 503 is "busy", only CAPTCHA_UNAVAILABLE mentions verification', locale => {
+  i18n.locale.value = locale
+  const busy = apiErrMsg({ status: 503, code: 'SERVICE_UNAVAILABLE' })
+  const captcha = apiErrMsg({ status: 503, code: 'CAPTCHA_UNAVAILABLE', detail: '人機驗證服務暫時無法使用' })
+  expect(busy).toBe(i18n.t('errors.SERVICE_UNAVAILABLE'))
+  expect(busy).not.toMatch(/驗證|verification|xác minh/i)
+  expect(captcha).toBe(i18n.t('errors.CAPTCHA_UNAVAILABLE'))
+  expect(captcha).not.toBe(busy)
+})

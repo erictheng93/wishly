@@ -99,6 +99,14 @@
 <tr><th>選項</th><td>A. 刪除前要求輸入目前密碼（無密碼帳號改寄 Email OTP）。<br>B. 只要求 session 在 10 分鐘內登入過，否則導去重新登入再回來。<br>C. 維持現況並更新 02。</td></tr>
 <tr><th>建議</th><td><b>A</b>：與「變更密碼」需目前密碼一致，實作集中在 DELETE /me 與設定頁對話框；Google / LINE-only 帳號走 OTP。屬安全強化，需要你決定是否值得增加這一步摩擦。</td></tr>
 </table>
+<h2 id="q11">Q11 · 資料庫 lock / statement 逾時要不要設？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>02 §6.4 / F4：<code>lock_timeout=2s</code>、<code>statement_timeout=5s</code>、<code>idle_in_transaction_session_timeout=10s</code>，逾時回 503 <code>SERVICE_UNAVAILABLE</code>。</td></tr>
+<tr><th>現況</th><td>連線池已補 <code>acquire_timeout=3s</code>，逾時對應也已就緒（55P03 / 57014 → 503），但三個資料庫逾時都沒設定：熱門品項的列鎖若被長交易卡住，捐助請求會一直等。</td></tr>
+<tr><th>風險</th><td>main.rs 的 migration 與背景工作（清理、到期掃描、通知）共用同一個 pool；若用 <code>after_connect</code> 全域設定，長的 migration（建索引、回填）或大批清理可能被 5 秒 statement_timeout 中斷，造成部署失敗。</td></tr>
+<tr><th>選項</th><td>A. migration 用獨立連線（不設逾時），應用程式 pool 以 <code>after_connect</code> 設三個逾時；背景工作需確認單批都在 5 秒內（必要時改小批次）。<br>B. 只在捐助 / 認捐等熱點交易內 <code>SET LOCAL lock_timeout = '2s'</code>，其他維持不設。<br>C. 維持現況。</td></tr>
+<tr><th>建議</th><td><b>B 先做</b>（影響面小、直接保護超賣路徑的使用者體驗），A 搭配一次負載測試再評估。需你確認後實作。</td></tr>
+</table>
 </main>
 </body>
 </html>

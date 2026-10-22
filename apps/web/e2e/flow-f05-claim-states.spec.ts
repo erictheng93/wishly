@@ -64,3 +64,41 @@ test('非擁有者開別人的進度頁：顯示找不到，而不是「連線�
   await expect(page.getByRole('alert')).toContainText('找不到')
   await expect(page.getByRole('alert')).not.toContainText('連線失敗')
 })
+
+test('進度頁：SSE 觸發的較早重抓晚到時，不可蓋掉操作後的新狀態', async ({ page }) => {
+  const owner = await registerUser({ tag: 'owner' })
+  const list = await createList(owner, { items: [{ title: '奶嘴', qty: 2 }, { title: '浴巾', qty: 2 }] })
+  await memberClaim(list.items[0]!.id, 1)
+  await loginBrowser(page.context(), owner)
+  await page.goto(`/lists/${list.id}/progress`)
+  const row = page.locator('article', { hasText: '奶嘴' }).getByRole('listitem')
+  await expect(row.getByText('已捐助')).toBeVisible()
+  await expect(page.getByText('即時更新中')).toBeVisible()
+
+  // 下一次 dashboard 請求（SSE 觸發）先拿到當下快照，但延遲 2 秒才交給頁面
+  let held: Promise<void> | undefined
+  let release!: () => void
+  await page.route('**/dashboard', async route => {
+    if (held) return route.continue()
+    held = new Promise(r => (release = r))
+    const res = await route.fetch()
+    await held
+    await route.fulfill({ response: res })
+  })
+  await memberClaim(list.items[1]!.id, 1) // 觸發 SSE → 重抓（被延遲，內容是取消前的快照）
+  await expect.poll(() => !!held).toBe(true)
+
+  // 取消後的重抓（操作本身 + 取消觸發的 SSE）都完成之後，才放行較早的那個請求，確保它最後到
+  let fresh = 0
+  page.on('response', r => { if (r.url().endsWith('/dashboard')) fresh++ })
+  const handled = page.waitForEvent('dialog').then(d => d.accept())
+  await row.getByRole('button', { name: '取消捐助' }).click()
+  await handled
+  await expect(row.getByText('已取消')).toBeVisible()
+  await expect.poll(() => fresh).toBeGreaterThanOrEqual(2)
+  await page.waitForTimeout(800) // 沒有更多重抓排程
+  release()
+  await expect.poll(() => fresh).toBeGreaterThanOrEqual(3)
+  await page.waitForTimeout(300)
+  await expect(row.getByText('已取消')).toBeVisible()
+})

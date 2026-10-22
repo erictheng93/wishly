@@ -39,7 +39,7 @@ for (const [status, body, text] of [
   [404, { code: 'NOT_FOUND' }, '這個品項已不存在'],
   [410, { code: 'WISHLIST_REMOVED' }, '這份清單已被下架'],
   [429, { code: 'RATE_LIMITED' }, '稍後再試'],
-  [503, { code: 'SERVICE_UNAVAILABLE' }, '服務暫時無法使用'],
+  [503, { code: 'SERVICE_UNAVAILABLE' }, '系統忙碌中'],
 ] as const) {
   test(`${status} 沒有 detail 時依 code / 狀態顯示「${text}」`, async ({ page }) => {
     await page.route(CLAIMS, route => route.request().method() === 'OPTIONS' ? route.fallback() : json(route, status, body))

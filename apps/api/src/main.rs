@@ -16,6 +16,7 @@ async fn main() {
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
     let pool = PgPoolOptions::new()
         .max_connections(10)
+        .acquire_timeout(std::time::Duration::from_secs(3)) // 6.4：取不到連線 3 秒即回 503，不讓請求堆積
         .connect(&url)
         .await
         .expect("db");

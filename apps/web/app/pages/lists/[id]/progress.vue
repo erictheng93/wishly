@@ -13,16 +13,21 @@ const slug = computed(() => w.value?.slug)
 let tm: any, countdown: any
 const left = ref(0)
 
+// SSE 重抓與操作後重抓可能重疊：只套用最後一次發出的請求，避免較早的回應晚到而蓋掉新狀態
+let loadSeq = 0
 async function load() {
+  const seq = ++loadSeq
   try {
     if (!w.value) w.value = (await api(`/wishlists/${id}`)).wishlist
-    d.value = await api(`/wishlists/${id}/dashboard`)
+    const dash = await api(`/wishlists/${id}/dashboard`)
     // 採購單進度：只有含眾籌品項才需要；失敗不影響其他區塊（鎖定時 data 為 null，只有彙總）
-    orders.value = (d.value.items || []).some((i: any) => i.funding_mode === 'crowdfund') ? await api(`/wishlists/${id}/orders`).catch(() => null) : null
+    const ord = (dash.items || []).some((i: any) => i.funding_mode === 'crowdfund') ? await api(`/wishlists/${id}/orders`).catch(() => null) : null
+    if (seq !== loadSeq) return
+    d.value = dash; orders.value = ord
     updatedAt.value = new Date().toLocaleTimeString(dl.value)
     err.value = ''
     startCountdown()
-  } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
+  } catch (e) { if (seq === loadSeq) err.value = errMsg(e) } finally { loading.value = false }
 }
 function startCountdown() {
   clearInterval(countdown)
