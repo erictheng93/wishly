@@ -21,7 +21,7 @@ const hBad = computed(() => !!handle.value && !isValidHandle(handle.value))
 const bio = ref(''), bMonth = ref(''), bDay = ref(''), bVis = ref('friends')
 const bDays = computed(() => daysInMonth(bMonth.value))
 const pad = (n: number) => String(n).padStart(2, '0')
-const exporting = ref(false)
+const exporting = ref(false), exportErr = ref('')
 const showDel = ref(false), word = ref(''), delBusy = ref(false), delErr = ref('')
 const LINK_ERROR_KEYS = ['oauth_failed', 'oauth_unavailable', 'identity_in_use', 'provider_already_linked']
 const linkError = (code: string) => (LINK_ERROR_KEYS.includes(code) ? t(`settings.login.err.${code}`) : '')
@@ -131,13 +131,13 @@ async function saveSocial() {
 }
 async function copyUrl() { try { await copyText(profileUrl.value); copied.value = true } catch { hErr.value = t('settings.social.copyFail') } }
 async function exportData() {
-  exporting.value = true; err.value = ''
+  exporting.value = true; exportErr.value = ''
   try {
     const data = await api('/me/export')
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = Object.assign(document.createElement('a'), { href: url, download: `wishly-export-${new Date().toISOString().slice(0, 10)}.json` })
     a.click(); URL.revokeObjectURL(url)
-  } catch (e) { err.value = errMsg(e) } finally { exporting.value = false }
+  } catch (e) { exportErr.value = errMsg(e) } finally { exporting.value = false }
 }
 async function remove() {
   delBusy.value = true; delErr.value = ''
@@ -243,6 +243,7 @@ async function remove() {
         <h2 class="c-h2">{{ $t('settings.export.title') }}</h2>
         <p class="c-mute">{{ $t('settings.export.hint') }}</p>
         <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? $t('settings.export.busy') : $t('settings.export.btn') }}</button>
+        <p v-if="exportErr" class="c-err" role="alert">{{ exportErr }}</p>
       </section>
       <section class="c-card">
         <button class="c-btn block" @click="logout">{{ $t('settings.logout') }}</button>

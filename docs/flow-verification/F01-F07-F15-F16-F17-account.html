@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>帳號與營運驗證</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="index.html">← 流程驗證總覽</a></p>
+<h1>F1 登入 · F17 刪除與匯出 · F15 檢舉下架 · F16 通知 · F7 儀表板</h1>
+<p class="sub">驗證日期 2026-10-22 · 規格 <a href="../02-master-user-flow.html">02</a> v0.5，對照契約 <a href="../04-data-schema-api-contract.html">04</a> · 環境：本機 e2e 堆疊</p>
+
+<h2>結論</h2>
+<p>登入、鎖定、防帳號列舉、防 open redirect、匯出、刪除、下架 410、儀表板遮罩皆符合規格。發現 <b>3 個缺陷已修正</b>，其中最重要的是 <b>刪帳號沒有擋下未結案的現金退款 / 拒付欠款 / 凍結錢包</b>（點數或欠款會落在已匿名的帳號上）。另有 <b>1 項安全取捨待決</b>（<a href="decisions.html#q10">Q10</a>），數項 02 落後已併入 <a href="decisions.html#q6">Q6</a>。</p>
+
+<h2>驗證方式</h2>
+<table>
+<tr><td>API 探測</td><td>連續錯誤密碼與鎖定後正確密碼、不存在帳號、重複註冊、OTP 對未知 Email、密碼長度；匯出內容與每日上限；刪帳號確認字、刪除後 session / 清單 / 在他人清單的捐助 / 使用者列 / 同 Email 重新註冊；持有點數、退款、欠款、凍結時刪帳號；檢舉去重、非法原因、非 staff；下架 410（API、SSR、SSE）、擁有者看得到原因、重送下架；匿名捐助在儀表板的呈現。</td></tr>
+<tr><td>Playwright 手動探索</td><td>登入頁以 6 種 <code>redirect</code>（<code>//evil</code>、<code>https://evil</code>、<code>/\evil</code>、<code>javascript:</code>、編碼後的 <code>//</code>、站內路徑）實際登入；鎖定後的提示；設定頁匯出、刪帳號對話框。</td></tr>
+<tr><td>裝置</td><td>flow-f17 在桌機、iPhone 13、iPad 共 6 個案例通過；/login、/register、/forgot-password、/settings、/admin、/admin/cash-refunds、/me/wallet 在六種解析度無水平溢出，並看過截圖。</td></tr>
+<tr><td>自動化（新增）</td><td>後端 <code>account_deletion_wallet.rs</code>（2 個）、<code>moderation_idempotent.rs</code>（1 個）；E2E <code>flow-f17-account.spec.ts</code>（2 個，真實 API）。</td></tr>
+<tr><td>既有自動化</td><td>otp.rs、password_google.rs、account_security.rs、mfa_sessions.rs、line_oauth.rs、identities.rs、account_deletion.rs、moderation.rs、notifications.rs、smtp_worker.rs、dashboard_privacy.rs；E2E creator-journey、login-page、identity-settings、moderation、live-updates、unsubscribe。</td></tr>
+</table>
+
+<h2>規則對照</h2>
+<div class="wrap"><table>
+<tr><th>規則</th><th>結果</th><th>證據</th></tr>
+<tr><td>F1-c 密碼錯 / 無帳號同為 401 <code>INVALID_CREDENTIALS</code></td><td><span class="tag pass">通過</span></td><td>API 探測</td></tr>
+<tr><td>F1-c 同 (email, IP) 15 分鐘 5 次即鎖，429 + Retry-After，鎖定期間正確密碼也擋</td><td><span class="tag pass">通過</span></td><td>第 6 次 429、Retry-After: 300</td></tr>
+<tr><td>F1-c 註冊不論是否已註冊都回 202（EMAIL_EXISTS 留到 verify）；OTP 對未知 Email 也 202</td><td><span class="tag pass">通過</span></td><td>API 探測、password_google.rs</td></tr>
+<tr><td>F1-c 密碼 8–128 字</td><td><span class="tag pass">通過</span></td><td>422 RANGE</td></tr>
+<tr><td>F1 redirect 只接受站內相對路徑</td><td><span class="tag pass">通過</span></td><td>5 種外部目標都落在 /dashboard，站內路徑正常導回</td></tr>
+<tr><td>F1-a 純 OTP 登入</td><td><span class="tag na">無 UI</span></td><td>登入頁只提供密碼 / Google / LINE，OTP 僅用於註冊與重設密碼；端點有後端測試（otp.rs）</td></tr>
+<tr><td>F17 匯出 JSON（個人資料、登入方式、清單、捐助、錢包），每日 3 次</td><td><span class="tag pass">通過（新增 E2E）</span></td><td>flow-f17 #1</td></tr>
+<tr><td>F17 匯出被限制時使用者看得到原因</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B12</td></tr>
+<tr><td>F17 刪帳號二次確認（confirm = "DELETE"／UI 輸入「刪除」）</td><td><span class="tag pass">通過（新增 E2E）</span></td><td>flow-f17 #2</td></tr>
+<tr><td>F17 去識別化、撤銷 session、清單封存並下架、在他人清單的未完成捐助取消、同 Email 可重新註冊</td><td><span class="tag pass">通過</span></td><td>API 探測、account_security.rs、flow-f17 #2</td></tr>
+<tr><td>F17 錢包餘額 / pledged 認捐擋刪帳號</td><td><span class="tag pass">通過</span></td><td>flow-f17 #2：「50 點餘額」</td></tr>
+<tr><td>F17 未結案現金退款、wallet_debts open、凍結錢包擋刪帳號</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B13</td></tr>
+<tr><td>F17 刪帳號前 10 分鐘內須重新驗證</td><td><span class="tag decide">待決</span></td><td>未實作（04 也沒有）→ <a href="decisions.html#q10">Q10</a></td></tr>
+<tr><td>F15 檢舉免登入、同人 24 小時去重、原因列舉、非 staff 403 <code>STAFF_ONLY</code></td><td><span class="tag pass">通過</span></td><td>同一使用者兩次檢舉回同一個 id</td></tr>
+<tr><td>F15 下架後公開 API / SSR / SSE / 捐助皆 410 <code>WISHLIST_REMOVED</code>，擁有者看得到原因</td><td><span class="tag pass">通過</span></td><td>API 探測、moderation.spec、claim_transitions.rs</td></tr>
+<tr><td>F15 下架 / 恢復重送不重複 audit</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B14</td></tr>
+<tr><td>F16 擁有者「有新捐助」即時信與每日彙整</td><td><span class="tag decide">02 待更新</span></td><td>D58 已決定停寄（轟炸收件匣、破壞驚喜），migration 0026 取消</td></tr>
+<tr><td>F16 退訂連結、確認信含恢復連結</td><td><span class="tag pass">通過（既有）</span></td><td>exports_notifications.rs、guest_lifecycle.rs、unsubscribe.spec</td></tr>
+<tr><td>F7 匿名捐助對擁有者顯示「匿名朋友」，留言可見；公開頁不露捐助者</td><td><span class="tag pass">通過</span></td><td>API 探測</td></tr>
+<tr><td>F7 驚喜鎖定只回彙總、SSE 觸發重抓</td><td><span class="tag pass">通過（既有）</span></td><td>dashboard_privacy.rs、live-updates.spec</td></tr>
+</table></div>
+
+<h2>缺陷與處置</h2>
+<h3>B12 · 匯出被限制時，錯誤訊息出現在頁面最上方，按鈕附近沒有反應 <span class="tag fixed">已修正</span></h3>
+<p>設定頁的匯出按鈕在頁面下半部，錯誤（如「匯出每日最多 3 次」）寫進頁首的共用錯誤列；在手機與一般桌機上都不在視窗內，使用者按了沒反應會一直重按。E2E 以 <code>toBeInViewport</code> 抓到（視窗內比例 0）。改為匯出區塊自己的錯誤訊息，顯示在按鈕下方。</p>
+
+<h3>B13 · 處理中的現金退款 / 拒付欠款 / 凍結錢包不會擋刪帳號 <span class="tag fixed">已修正</span></h3>
+<p>02 F17 / F18：未結案現金退款、wallet_debts open 須回 409。實作只檢查 pledged 與餘額。實際情境：</p>
+<ul>
+<li>申請全額現金退款後點數已先扣，餘額 0 → 可刪帳號；之後營運拒絕退款，點數退回一個已匿名、無法登入的錢包。</li>
+<li>拒付敗訴後餘額已扣光、欠款 open → 可刪帳號，欠款留在匿名帳號上無法追討。</li>
+<li>爭議中（錢包凍結）餘額 0 → 可刪帳號，之後判定敗訴同上。</li>
+</ul>
+<p>修正：<code>apps/api/src/account.rs</code> 在既有錢包列鎖之後加查三項，任一成立回 409 <code>ACCOUNT_HAS_POINTS</code>（沿用既有錯誤碼，前端已處理）並說明需聯絡客服結案。未改任何鎖語句。<code>account_deletion_wallet.rs</code> 兩個測試已確認修正前失敗。</p>
+
+<h3>B14 · 重送相同的下架 / 恢復會重寫時間並重複寫稽核 <span class="tag fixed">已修正</span></h3>
+<p>F15「PATCH moderation 以目標狀態為準，重送回 200，不重複寫 audit」。實作每次都更新 <code>moderated_at</code>、寫一筆 <code>wishlist.moderate</code>、推 SSE、清 CDN；營運連點就會產生多筆稽核，且下架時間被往後推。改為狀態與原因都沒變時不更新、直接回目前資料；改原因仍視為變更並稽核。<code>moderation_idempotent.rs</code> 覆蓋。</p>
+
+<h2>探索觀察（未列缺陷）</h2>
+<ul>
+<li>登入被鎖定時 UI 顯示「嘗試次數過多，請稍後再試」，沒有帶出後端的等待秒數（Retry-After 300）。</li>
+<li>/admin 在 320 寬時「建議啟用兩步驟驗證」提示的換行與行距不自然。</li>
+<li>F16 通知重試為最多 3 次、固定 1 分鐘；02 寫 5 次指數退避（1m / 5m / 30m / 2h / 6h）。</li>
+</ul>
+</main>
+</body>
+</html>

@@ -200,6 +200,16 @@ async fn delete_me(
     if held.0 > 0 || held.1 > 0 {
         return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {} 筆進行中的認捐、{} 點餘額。請先到錢包撤回認捐，並聯絡客服處理剩餘點數後再刪除帳號。", held.0, held.1)));
     }
+    // F17 / F18：未結案的現金退款（被拒會退點回錢包）、拒付欠款、爭議中凍結的錢包，都要先由客服結案，
+    // 否則點數或欠款會落在已匿名、無法登入的帳號上。
+    let (refunds, debts, frozen): (i64, i64, bool) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM cash_refund_requests r JOIN point_wallets w ON w.id = r.wallet_id WHERE w.user_id = $1 AND r.status IN ('requested', 'processing')),
+                (SELECT count(*) FROM wallet_debts d JOIN point_wallets w ON w.id = d.wallet_id WHERE w.user_id = $1 AND d.status = 'open'),
+                EXISTS (SELECT 1 FROM point_wallets WHERE user_id = $1 AND status = 'frozen')")
+        .bind(id).fetch_one(&mut *tx).await?;
+    if refunds > 0 || debts > 0 || frozen {
+        return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {refunds} 筆處理中的現金退款、{debts} 筆待處理欠款{}。請聯絡客服結案後再刪除帳號。", if frozen { "，且錢包已凍結" } else { "" })));
+    }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL")
         .bind(id)
         .execute(&mut *tx)

@@ -22,9 +22,9 @@
 <tr><td>F8 關閉 / 封存 · F2 建立清單與品項</td><td>狀態機與捐助互斥；排序、發佈檢查、上傳無測試</td><td><span class="tag pass">完成</span></td><td><a href="F02-F08-lists.html">F2/F8</a></td></tr>
 <tr><td rowspan="2">W2 存取與社群 P0</td><td>F21 可見性 · F3 分享頁</td><td>隱私外洩風險（CDN 快取、受限內容）</td><td><span class="tag pass">完成</span></td><td rowspan="2"><a href="F03-F20-F21-F22-access.html">F3/F20/F21/F22</a></td></tr>
 <tr><td>F20 好友 · F22 個人頁</td><td>解除好友、婉拒、private 404 等 E2E 缺口</td><td><span class="tag pass">完成</span></td></tr>
-<tr><td rowspan="2">W3 帳號與營運 P0</td><td>F1 登入 · F17 刪除與匯出</td><td>F17 無 E2E、與規格多處不一致</td><td><span class="tag todo">下一個</span></td><td>—</td></tr>
-<tr><td>F15 檢舉下架 · F16 通知 · F7 儀表板</td><td>下架對寫入的 410、恢復連結、驚喜遮罩</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
-<tr><td>W4 金流 P2-A</td><td>F6a–F6f 錢包眾籌 · F18 拒付</td><td>前端 E2E 全為 mock，需補真實 webhook 入帳路徑</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
+<tr><td rowspan="2">W3 帳號與營運 P0</td><td>F1 登入 · F17 刪除與匯出</td><td>F17 無 E2E、與規格多處不一致</td><td><span class="tag pass">完成</span></td><td rowspan="2"><a href="F01-F07-F15-F16-F17-account.html">F1/F7/F15/F16/F17</a></td></tr>
+<tr><td>F15 檢舉下架 · F16 通知 · F7 儀表板</td><td>下架對寫入的 410、恢復連結、驚喜遮罩</td><td><span class="tag pass">完成</span></td></tr>
+<tr><td>W4 金流 P2-A</td><td>F6a–F6f 錢包眾籌 · F18 拒付</td><td>前端 E2E 全為 mock，需補真實 webhook 入帳路徑</td><td><span class="tag todo">下一個</span></td><td>—</td></tr>
 <tr><td>W5</td><td>F9 背景工作</td><td>多個 job 未實作，盤點並記錄</td><td><span class="tag todo">排程</span></td><td>—</td></tr>
 <tr><td>不驗證</td><td>F10 救災 · F11 自動儲值（僅設定 CRUD）· F12 禮物卡 · F13 星星 · F14 企業禮券 · F19 電子發票（僅選項）</td><td>尚未實作，僅記錄現況</td><td><span class="tag na">N/A</span></td><td>—</td></tr>
 </table></div>
@@ -33,6 +33,7 @@
 <div class="wrap"><table>
 <tr><th>流程</th><th>已修正</th><th>Issue</th><th>待決</th><th>新增自動化</th></tr>
 <tr><td>F4/F5</td><td>5（B1–B4、B9）</td><td><a href="https://github.com/erictheng93/wishly/issues/29">#29</a>（已修）</td><td><a href="decisions.html#q1">Q1</a>–<a href="decisions.html#q5">Q5</a></td><td>後端 3、E2E 3、單元 1</td></tr>
+<tr><td>F1/F7/F15/F16/F17</td><td>3（B12–B14）</td><td>—</td><td><a href="decisions.html#q10">Q10</a>、Q6 g–k</td><td>後端 3、E2E 2（三種裝置）</td></tr>
 <tr><td>F3/F20/F21/F22</td><td>2（B10–B11）</td><td>—</td><td><a href="decisions.html#q7">Q7</a>–<a href="decisions.html#q9">Q9</a></td><td>E2E 5（三種裝置）</td></tr>
 <tr><td>F2/F8</td><td>3（B6–B8）</td><td>—</td><td><a href="decisions.html#q6">Q6</a></td><td>後端 2、E2E 2</td></tr>
 </table></div>

@@ -301,11 +301,21 @@ async fn moderate(
         Option<String>,
         Option<chrono::DateTime<chrono::Utc>>,
     );
+    // 目標狀態與原因都沒變就不更新（F15：重送回 200，不重寫 moderated_at、不重複 audit / 通知）
     let row: Option<ModerationRow> = sqlx::query_as(
         "UPDATE wishlists SET moderation_status = $2::moderation_status, moderation_reason = $3, moderated_at = now(), moderated_by = $4
-         WHERE id = $1 AND deleted_at IS NULL RETURNING id::text, slug::text, moderation_status::text, moderation_reason, moderated_at")
+         WHERE id = $1 AND deleted_at IS NULL
+           AND (moderation_status <> $2::moderation_status OR moderation_reason IS DISTINCT FROM $3)
+         RETURNING id::text, slug::text, moderation_status::text, moderation_reason, moderated_at")
         .bind(id).bind(&b.moderation_status).bind(if hidden { reason } else { None }).bind(sid).fetch_optional(&mut *tx).await?;
-    let (_, slug, ms, mr, at) = row.ok_or(AppError::NotFound)?;
+    let Some((_, slug, ms, mr, at)) = row else {
+        let (_, slug, ms, mr, at): ModerationRow = sqlx::query_as(
+            "SELECT id::text, slug::text, moderation_status::text, moderation_reason, moderated_at FROM wishlists WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+        return Ok(Json(
+            json!({ "id": id, "slug": slug, "moderation_status": ms, "moderation_reason": mr, "moderated_at": at }),
+        ));
+    };
     audit(
         &mut *tx,
         sid,

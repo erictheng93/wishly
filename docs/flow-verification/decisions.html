@@ -63,6 +63,11 @@
 <tr><td>d</td><td>DELETE 空草稿實體刪除</td><td>一律封存（D13）</td><td>F8</td></tr>
 <tr><td>e</td><td>狀態圖無 active → archived</td><td>允許（DELETE 與 PATCH 皆可）</td><td>F8</td></tr>
 <tr><td>f</td><td>F7 completion_pct = items_done / items_total</td><td>主數字為數量比例（Q5）</td><td>F7</td></tr>
+<tr><td>g</td><td>F16 擁有者第一筆捐助即時信 + 每日彙整，設定頁可關</td><td>D58 已停寄（0026），設定頁無此開關</td><td>F16</td></tr>
+<tr><td>h</td><td>F17 刪帳號回 204、錯誤碼 <code>ACCOUNT_HAS_BALANCE</code>（附 balance 等欄位）</td><td>回 200 <code>{deleted, anonymized_at}</code>（與 04 一致）；錯誤碼為 <code>ACCOUNT_HAS_POINTS</code>（04 寫 ACCOUNT_HAS_BALANCE，前端兩者都處理）。建議 02 / 04 統一為 ACCOUNT_HAS_POINTS</td><td>F17</td></tr>
+<tr><td>i</td><td>F15 檢舉回 202；410 快取 30 秒帶 Cache-Tag；404 快取 5 秒</td><td>檢舉回 201（附 id）；410 / 404 皆 no-store，CDN 以 URL purge（較保守，恢復上架立即生效）</td><td>F15 / F3</td></tr>
+<tr><td>j</td><td>F9 通知寄送失敗重試 5 次、指數退避</td><td>最多 3 次、固定 1 分鐘</td><td>F16 / F9</td></tr>
+<tr><td>k</td><td>F3 受限清單 SSR 回 403</td><td>SSR 回 200 + noindex，hydrate 後重抓（無閃爍、無內容外洩）</td><td>F21</td></tr>
 </table>
 <h2 id="q7">Q7 · SSE 每 IP 同時連線上限：5 還是 16？ <span class="tag decide">待決</span></h2>
 <table>
@@ -86,6 +91,13 @@
 <tr><th>現況</th><td>只有擁有者有 handle 才出現按鈕；handle 可為空（預設為空），此時門檻頁只剩「回首頁」，對方完全沒有下一步。</td></tr>
 <tr><th>選項</th><td>A. 無 handle 時顯示「請向 {name} 索取好友邀請連結」說明。<br>B. 門檻頁直接提供「送出好友申請」（後端已有 <code>POST /friends/requests</code>，但需要可定址的對象：可讓 403 回應帶不可猜的 user id，或新增「對清單擁有者申請」端點）。</td></tr>
 <tr><th>建議</th><td>先做 A（只改前端文案，0 後端改動），B 視需求再議。</td></tr>
+</table>
+<h2 id="q10">Q10 · 刪除帳號前是否要求重新驗證？ <span class="tag decide">待決</span></h2>
+<table>
+<tr><th>規格</th><td>02 F17：DELETE /me 需 confirm 字串，<b>且 session 近 10 分鐘內曾驗證，否則先要求重新驗證</b>。04 只要求 confirm。</td></tr>
+<tr><th>現況</th><td>只檢查 <code>confirm: "DELETE"</code>（UI 輸入「刪除」）。拿到 session 的人（共用電腦未登出、被盜 cookie）可直接刪除帳號，無法復原。</td></tr>
+<tr><th>選項</th><td>A. 刪除前要求輸入目前密碼（無密碼帳號改寄 Email OTP）。<br>B. 只要求 session 在 10 分鐘內登入過，否則導去重新登入再回來。<br>C. 維持現況並更新 02。</td></tr>
+<tr><th>建議</th><td><b>A</b>：與「變更密碼」需目前密碼一致，實作集中在 DELETE /me 與設定頁對話框；Google / LINE-only 帳號走 OTP。屬安全強化，需要你決定是否值得增加這一步摩擦。</td></tr>
 </table>
 </main>
 </body>
