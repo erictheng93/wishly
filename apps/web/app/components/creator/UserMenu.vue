@@ -19,7 +19,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
       <NuxtLink to="/me/wallet" role="menuitem">{{ $t('common.points') }}</NuxtLink>
       <NuxtLink to="/settings" role="menuitem">{{ $t('common.settings') }}</NuxtLink>
       <NuxtLink v-if="user.is_staff" to="/admin" role="menuitem">{{ $t('common.admin') }}</NuxtLink>
-      <button type="button" role="menuitem" @click="logout">{{ $t('settings.logout') }}</button>
+      <button type="button" role="menuitem" @click="logout()">{{ $t('settings.logout') }}</button>
     </div>
   </div>
 </template>

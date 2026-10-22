@@ -105,7 +105,10 @@
       "word": "XÓA",
       "prompt": "Nhập \"{word}\" để xác nhận",
       "hasPoints": "{detail} (bạn có thể rút lại lượt góp trong mục \"Điểm của tôi\")",
-      "hasBalance": "{detail} (số dư {balance} điểm, {pledged} lượt góp chưa hoàn tất, {orders} đơn chưa đóng). Vui lòng xử lý trước khi xóa."
+      "hasBalance": "{detail} (số dư {balance} điểm, {pledged} lượt góp chưa hoàn tất, {orders} đơn chưa đóng). Vui lòng xử lý trước khi xóa.",
+      "password": "Mật khẩu hiện tại",
+      "badPassword": "Mật khẩu không đúng",
+      "relogin": "Đăng nhập lại"
     },
     "terms": "Điều khoản dịch vụ",
     "privacy": "Chính sách quyền riêng tư"

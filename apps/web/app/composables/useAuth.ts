@@ -12,11 +12,11 @@ export function useAuth() {
     loaded.value = true
     return user.value
   }
-  async function logout() {
+  async function logout(redirect?: string) {
     try { await api('/auth/logout', { method: 'POST', noRedirect: true }) } catch {}
     user.value = null
     setNativeToken(null)
-    await navigateTo('/login')
+    await navigateTo(redirect ? { path: '/login', query: { redirect } } : '/login')
   }
   const post = (path: string, body: any) => api(path, { method: 'POST', body, noRedirect: true, credentials: 'include' })
   // 成功回 session cookie；重抓 /me 讓全域 user 就緒

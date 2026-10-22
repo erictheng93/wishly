@@ -19,6 +19,7 @@
     "generic": "Đã xảy ra lỗi, vui lòng thử lại sau.",
     "ACCOUNT_BLOCKED": "Tài khoản đã bị đình chỉ. Vui lòng liên hệ hỗ trợ.",
     "ACCOUNT_HAS_POINTS": "Tài khoản vẫn còn điểm hoặc cam kết đang hoạt động. Hãy vào ví và liên hệ hỗ trợ trước khi xóa.",
+    "REAUTH_REQUIRED": "Để bảo mật, vui lòng đăng nhập lại trước khi xóa tài khoản.",
     "ACCOUNT_HAS_BALANCE": "Tài khoản vẫn còn số dư hoặc giao dịch đang hoạt động. Vui lòng xử lý trước khi xóa.",
     "AMOUNT_MISMATCH": "Số tiền thanh toán không khớp với đơn hàng.",
     "AUTO_TOPUP_LIMIT_REACHED": "Số tiền nạp mỗi lần không được vượt quá giới hạn hàng tháng.",

@@ -166,6 +166,49 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     Ok(res)
 }
 
+/// Q10：刪帳前重新驗證，防被盜的 session 直接刪帳。有密碼者驗密碼（每人 15 分鐘 5 次）；
+/// 只有 Google / LINE 者要求 session 在 10 分鐘內建立。在開交易前做：argon2 慢，不可持有列鎖。
+async fn reauth(pool: &sqlx::PgPool, u: &CurrentUser, pw: Option<&str>) -> Result<(), AppError> {
+    let hash: Option<String> = sqlx::query_scalar(
+        "SELECT password_hash FROM auth_identities WHERE user_id=$1 AND provider='email' AND password_hash IS NOT NULL",
+    )
+    .bind(u.id)
+    .fetch_optional(pool)
+    .await?;
+    let Some(hash) = hash else {
+        let fresh: bool = sqlx::query_scalar(
+            "SELECT created_at > now() - interval '10 minutes' FROM sessions WHERE id=$1",
+        )
+        .bind(u.session_id)
+        .fetch_one(pool)
+        .await?;
+        return if fresh {
+            Ok(())
+        } else {
+            Err(AppError::problem(
+                403,
+                "REAUTH_REQUIRED",
+                "為了安全，請重新登入後再刪除帳號",
+            ))
+        };
+    };
+    let pw = pw
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| AppError::invalid("/password", "REQUIRED", "請輸入密碼"))?
+        .to_owned();
+    // 驗證前就計數：超限時連正確密碼也不驗，暴力猜測拿不到判定
+    crate::ratelimit::check(pool, &format!("delete-me-pw:{}", u.id), 5, 900).await?;
+    let ok = crate::auth_ext::argon_run(move || {
+        pw.chars().count() <= 128 && crate::auth_ext::verify_pw(&pw, &hash)
+    })
+    .await?;
+    if ok {
+        Ok(())
+    } else {
+        Err(AppError::problem(401, "INVALID_CREDENTIALS", "密碼不正確"))
+    }
+}
+
 async fn delete_me(
     State(st): State<AppState>,
     u: CurrentUser,
@@ -178,6 +221,7 @@ async fn delete_me(
             "confirm 必須為 \"DELETE\"",
         ));
     }
+    reauth(&st.pool, &u, b.get("password").and_then(Value::as_str)).await?;
     let id = u.id;
     let mut tx = st.pool.begin().await?;
     crate::admin::lock_staff_changes(&mut tx).await?;

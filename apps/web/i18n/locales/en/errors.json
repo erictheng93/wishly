@@ -19,6 +19,7 @@
     "generic": "Something went wrong. Please try again later.",
     "ACCOUNT_BLOCKED": "Your account is suspended. Please contact support.",
     "ACCOUNT_HAS_POINTS": "Your account still has points or active pledges. Open your wallet and contact support before deleting it.",
+    "REAUTH_REQUIRED": "For your security, please sign in again before deleting your account.",
     "ACCOUNT_HAS_BALANCE": "Your account still has a balance or active transactions. Resolve them before deleting it.",
     "AMOUNT_MISMATCH": "The payment amount does not match the order.",
     "AUTO_TOPUP_LIMIT_REACHED": "The top-up amount cannot exceed the monthly limit.",

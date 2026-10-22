@@ -22,7 +22,7 @@ const bio = ref(''), bMonth = ref(''), bDay = ref(''), bVis = ref('friends')
 const bDays = computed(() => daysInMonth(bMonth.value))
 const pad = (n: number) => String(n).padStart(2, '0')
 const exporting = ref(false), exportErr = ref('')
-const showDel = ref(false), word = ref(''), delBusy = ref(false), delErr = ref('')
+const showDel = ref(false), word = ref(''), delPw = ref(''), delBusy = ref(false), delErr = ref(''), delReauth = ref(false)
 const LINK_ERROR_KEYS = ['oauth_failed', 'oauth_unavailable', 'identity_in_use', 'provider_already_linked']
 const linkError = (code: string) => (LINK_ERROR_KEYS.includes(code) ? t(`settings.login.err.${code}`) : '')
 // 網頁版整頁導向供應商再回來；原生殼等 deep link 回來後就地更新
@@ -140,13 +140,14 @@ async function exportData() {
   } catch (e) { exportErr.value = errMsg(e) } finally { exporting.value = false }
 }
 async function remove() {
-  delBusy.value = true; delErr.value = ''
+  delBusy.value = true; delErr.value = ''; delReauth.value = false
   try {
-    await api('/me', { method: 'DELETE', body: { confirm: 'DELETE' } })
+    await api('/me', { method: 'DELETE', body: { confirm: 'DELETE', ...(user.value?.has_password ? { password: delPw.value } : {}) } })
     user.value = null
     await navigateTo('/')
   } catch (e: any) {
-    delErr.value = e.code === 'ACCOUNT_HAS_POINTS' ? t('settings.del.hasPoints', { detail: e.detail }) : e.code === 'ACCOUNT_HAS_BALANCE' ? t('settings.del.hasBalance', { detail: e.detail, balance: e.body.balance ?? 0, pledged: e.body.pledged_count ?? 0, orders: e.body.open_order_count ?? 0 }) : errMsg(e)
+    delReauth.value = e.code === 'REAUTH_REQUIRED'
+    delErr.value = e.code === 'INVALID_CREDENTIALS' ? t('settings.del.badPassword') : e.code === 'ACCOUNT_HAS_POINTS' ? t('settings.del.hasPoints', { detail: e.detail }) : e.code === 'ACCOUNT_HAS_BALANCE' ? t('settings.del.hasBalance', { detail: e.detail, balance: e.body.balance ?? 0, pledged: e.body.pledged_count ?? 0, orders: e.body.open_order_count ?? 0 }) : errMsg(e)
   } finally { delBusy.value = false }
 }
 </script>
@@ -246,18 +247,20 @@ async function remove() {
         <p v-if="exportErr" class="c-err" role="alert">{{ exportErr }}</p>
       </section>
       <section class="c-card">
-        <button class="c-btn block" @click="logout">{{ $t('settings.logout') }}</button>
+        <button class="c-btn block" @click="logout()">{{ $t('settings.logout') }}</button>
       </section>
       <section class="c-card bad">
         <h2 class="c-h2">{{ $t('settings.del.title') }}</h2>
         <p class="c-mute">{{ $t('settings.del.text') }}</p>
-        <button class="c-btn danger" @click="showDel = true; word = ''; delErr = ''">{{ $t('settings.del.btn') }}</button>
+        <button class="c-btn danger" @click="showDel = true; word = ''; delPw = ''; delErr = ''; delReauth = false">{{ $t('settings.del.btn') }}</button>
       </section>
       <p class="c-mute"><NuxtLink to="/terms">{{ $t('settings.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('settings.privacy') }}</NuxtLink></p>
     </template>
     <CreatorConfirm :open="!!removingProvider" :title="$t('settings.login.unlinkTitle', { label: removingLabel })" :text="$t('settings.login.unlinkText')" :ok="$t('settings.login.unlinkOk')" danger :busy="identityBusy" :error="identityErr" @close="!identityBusy && (removingProvider = '')" @ok="unlinkIdentity" />
-    <CreatorConfirm :open="showDel" :title="$t('settings.del.confirmTitle')" :text="$t('settings.del.confirmText')" :ok="$t('settings.del.ok')" danger :busy="delBusy" :disabled="word !== $t('settings.del.word')" :error="delErr" @close="showDel = false" @ok="remove">
+    <CreatorConfirm :open="showDel" :title="$t('settings.del.confirmTitle')" :text="$t('settings.del.confirmText')" :ok="$t('settings.del.ok')" danger :busy="delBusy" :disabled="word !== $t('settings.del.word') || (user?.has_password && !delPw)" :error="delErr" @close="showDel = false" @ok="remove">
       <label class="c-field"><span>{{ $t('settings.del.prompt', { word: $t('settings.del.word') }) }}</span><input v-model="word" autocomplete="off"></label>
+      <CreatorPasswordField v-if="user?.has_password" v-model="delPw" :label="$t('settings.del.password')" autocomplete="current-password" />
+      <button v-if="delReauth" type="button" class="c-btn primary block c-mb" @click="logout('/settings')">{{ $t('settings.del.relogin') }}</button>
     </CreatorConfirm>
   </main>
 </template>
