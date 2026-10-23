@@ -5,13 +5,16 @@ export async function useCatalog(key: string, filter: () => CatalogFilter) {
   const url = `${apiBase}/api/v1/public/catalog/products`
   const { data, error, refresh } = await useAsyncData(key, () => $fetch<any>(url, { query: catalogQuery(filter()) }), { watch: [filter] })
   const extra = ref<CatalogProduct[]>([]), extraNext = ref<number | null | undefined>(undefined), busy = ref(false), moreErr = ref(false)
-  watch(data, () => { extra.value = []; extraNext.value = undefined })
+  let gen = 0 // 篩選變動後丟棄還在途中的「載入更多」回應
+  watch(data, () => { gen++; extra.value = []; extraNext.value = undefined })
   const products = computed<CatalogProduct[]>(() => [...(data.value?.products ?? []), ...extra.value])
   const next = computed(() => extraNext.value !== undefined ? extraNext.value : data.value?.next_page ?? null)
   async function more() {
     busy.value = true; moreErr.value = false
+    const g = gen
     try {
       const r = await $fetch<any>(url, { query: catalogQuery(filter(), next.value) })
+      if (g !== gen) return
       extra.value = [...extra.value, ...r.products]; extraNext.value = r.next_page
     } catch { moreErr.value = true } finally { busy.value = false }
   }

@@ -16,6 +16,7 @@ async function load() {
 }
 // 動態讀取失敗不影響好友管理
 async function loadFeed() {
+  feedErr.value = ''
   try { feed.value = await api('/friends/feed') } catch (e) { feedErr.value = msgOf(e) }
 }
 onMounted(() => { load(); loadFeed() })

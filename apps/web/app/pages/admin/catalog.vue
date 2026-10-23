@@ -123,7 +123,7 @@ const toggle = (list: string[], v: string) => { const i = list.indexOf(v); i < 0
           <label class="c-field"><span>{{ $t('admin.catalog.productTitle') }}</span><input v-model="f.title" maxlength="120" required></label>
           <label class="c-field"><span>{{ $t('admin.catalog.spec') }}</span><input v-model="f.spec" maxlength="200"></label>
           <label class="c-field"><span>{{ $t('admin.catalog.note') }}</span><textarea v-model="f.note" maxlength="500" rows="2" /></label>
-          <label class="c-field"><span>{{ $t('admin.catalog.price') }}</span><input v-model="f.price_amount" type="number" min="0" step="1" inputmode="numeric"></label>
+          <label class="c-field"><span>{{ $t('admin.catalog.price') }}</span><input v-model="f.price_amount" type="number" min="0" step="1" inputmode="numeric" required></label>
           <label class="c-field"><span>{{ $t('admin.catalog.productUrl') }}</span><input v-model="f.product_url" type="url" maxlength="2000" required></label>
           <fieldset class="c-field"><legend>{{ $t('guest.inspire.recipient') }}</legend>
             <label v-for="v in RECIPIENTS" :key="v" class="c-row"><input type="checkbox" :checked="f.recipients.includes(v)" @change="toggle(f.recipients, v)">{{ $t(`guest.inspire.r.${v}`) }}</label>
