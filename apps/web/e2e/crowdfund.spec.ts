@@ -209,13 +209,13 @@ test('截止未達標：捐贈者在 7 天選擇期內轉投到同清單其他�
   await expect(ap.getByRole('status')).toContainText('可見度已更新')
   await ap.reload()
   await expect(visibility).toHaveValue('friends')
-  // 儲存失敗時還原，不讓畫面誤報已成功公開。
+  // 儲存失敗時還原，不讓畫面誤報已成功公開；5xx 不顯示後端 detail（#29）。
   await ap.route('**/api/v1/contributions/*', async route => {
     if (route.request().method() === 'PATCH') await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'INTERNAL_ERROR', detail: '儲存失敗' }) })
     else await route.continue()
   })
   await visibility.selectOption('public')
-  await expect(ap.getByRole('alert')).toContainText('儲存失敗')
+  await expect(ap.getByRole('alert')).toContainText('系統暫時發生問題')
   await expect(visibility).toHaveValue('friends')
   await ap.unroute('**/api/v1/contributions/*')
   await ap.screenshot({ path: 'test-results/contribution-visibility-desktop.png', fullPage: true })

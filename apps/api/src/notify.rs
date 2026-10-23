@@ -29,6 +29,47 @@ pub async fn enqueue_donors<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
+/// Q13：建立者修改品項內容後，通知進行中的捐助者（reserved / purchased，含有 email 的舊訪客）與眾籌認捐者（pledged）。
+/// 連續修改合併：延後 10 分鐘寄，notifications_item_changed_uk 讓同一人同一品項只留一筆待寄；內容寄信時才讀最新品項。
+pub async fn enqueue_item_changed<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    item_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO notifications (user_id, guest_id, channel, kind, payload, scheduled_at)
+         SELECT r.user_id, r.guest_id, 'email'::notification_channel, 'claim.item_changed',
+                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', i.id, 'crowdfund', i.funding_mode = 'crowdfund'),
+                now() + interval '10 minutes'
+           FROM wishlist_items i
+           JOIN (SELECT user_id, guest_id FROM claims WHERE item_id = $1 AND status IN ('reserved', 'purchased')
+                 UNION SELECT user_id, NULL::uuid FROM contributions WHERE item_id = $1 AND status = 'pledged') r ON true
+           LEFT JOIN users u ON u.id = r.user_id
+           LEFT JOIN guests g ON g.id = r.guest_id
+          WHERE i.id = $1
+            AND ((u.email IS NOT NULL AND u.deleted_at IS NULL) OR (g.email IS NOT NULL AND g.deleted_at IS NULL))
+         ON CONFLICT DO NOTHING")
+        .bind(item_id).execute(ex).await?;
+    Ok(())
+}
+
+/// Q12：認領購買期限提醒，截止前 3 天與 24 小時各一封（只排還在未來的）。
+/// payload 記下排程時的 expires_at；寄信時若捐助已不是 reserved 或期限已改（延長），worker 會取消不寄。
+pub async fn enqueue_purchase_reminders<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    claim_ids: &[Uuid],
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO notifications (user_id, guest_id, channel, kind, payload, scheduled_at)
+         SELECT c.user_id, c.guest_id, 'email'::notification_channel, 'claim.purchase_reminder',
+                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', c.item_id, 'claim_id', c.id, 'expires_at', c.expires_at),
+                c.expires_at - d.before
+           FROM claims c JOIN wishlist_items i ON i.id = c.item_id,
+                (VALUES (interval '3 days'), (interval '24 hours')) d(before)
+          WHERE c.id = ANY($1) AND c.status = 'reserved' AND c.expires_at - d.before > now()")
+        .bind(claim_ids).execute(ex).await?;
+    Ok(())
+}
+
 /// 唯一寄信點。設了 CF_ACCOUNT_ID + CF_EMAIL_API_TOKEN 就走 Cloudflare Email Service REST API
 /// （production 啟動時強制要求）；否則 dev 走 SMTP → Mailpit。錯誤字串不含 token。
 pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Result<(), String> {
@@ -98,7 +139,22 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     }
     let cfg = crate::config::get();
     let n = rows.len();
-    for (id, uid, gid, channel, kind, payload, attempts) in rows {
+    for (id, uid, gid, channel, kind, mut payload, attempts) in rows {
+        if kind == "claim.purchase_reminder" {
+            // 寄送當下：認領仍待購且期限沒變才寄；清單已結束（Q14）時改用不提「延長」的文案
+            let ended: Option<bool> = sqlx::query_scalar(
+                "SELECT w.status IN ('closed', 'archived') OR (w.closes_at IS NOT NULL AND w.closes_at <= now())
+                   FROM claims c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
+                  WHERE c.id = ($1->>'claim_id')::uuid AND c.status = 'reserved' AND c.expires_at = ($1->>'expires_at')::timestamptz")
+                .bind(&payload).fetch_optional(pool).await?;
+            let Some(ended) = ended else {
+                sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'claim no longer due' WHERE id = $1").bind(id).execute(pool).await?;
+                continue;
+            };
+            if ended {
+                payload["ended"] = Value::Bool(true);
+            }
+        }
         let security = matches!(
             kind.as_str(),
             "auth.identity_linked" | "auth.identity_unlinked" | "auth.password_changed"
@@ -255,6 +311,19 @@ pub fn render(kind: &str, title: &str, payload: &Value) -> (String, String) {
     render_lang(Lang::Zh, kind, title, payload)
 }
 
+/// payload 的 RFC 3339 時間轉台北時間字串
+fn taipei(payload: &Value, key: &str) -> Option<String> {
+    payload
+        .get(key)
+        .and_then(Value::as_str)
+        .and_then(|t| t.parse::<chrono::DateTime<chrono::Utc>>().ok())
+        .map(|t| {
+            (t + chrono::Duration::hours(8))
+                .format("%Y-%m-%d %H:%M")
+                .to_string()
+        })
+}
+
 pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (String, String) {
     let l = lang;
     let app = crate::config::get().app_url;
@@ -364,10 +433,21 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("Chủ danh sách \"{title}\" đã gỡ món quà bạn đóng góp, khoản đóng góp này đã bị hủy.\nXem các món khác: {manage}\n"),
             ),
         ),
+        "claim.item_changed" => {
+            // 眾籌認捐在錢包管理，一般捐助在「我的捐助」
+            let link = if payload["crowdfund"] == true { &wallet } else { &manage };
+            (
+                l.pick(format!("【Wishly】你捐助的《{item}》內容有更新"), format!("[Wishly] \"{item}\" you pledged for was updated"), format!("[Wishly] \"{item}\" bạn đóng góp đã được cập nhật")),
+                l.pick(
+                    format!("清單《{title}》的建立者修改了「{item}」的內容（例如數量、規格或說明）。購買前請再確認一次數量與規格。\n管理我的捐助：{link}\n"),
+                    format!("The owner of list \"{title}\" updated \"{item}\" (for example its quantity, spec or description). Please re-check the quantity and spec before buying.\nManage my pledges: {link}\n"),
+                    format!("Chủ danh sách \"{title}\" đã cập nhật \"{item}\" (ví dụ số lượng, quy cách hoặc mô tả). Vui lòng kiểm tra lại số lượng và quy cách trước khi mua.\nQuản lý đóng góp của tôi: {link}\n"),
+                ),
+            )
+        }
         "wishlist.closing" => {
             // 以台北時間顯示；解析失敗就只講「24 小時內」
-            let at = payload.get("closes_at").and_then(Value::as_str).and_then(|t| t.parse::<chrono::DateTime<chrono::Utc>>().ok())
-                .map(|t| (t + chrono::Duration::hours(8)).format("%Y-%m-%d %H:%M").to_string());
+            let at = taipei(payload, "closes_at");
             let (at_zh, at_en, at_vi) = match at {
                 Some(a) => (format!("{a}（台北時間）"), format!("{a} (Taipei time)"), format!("{a} (giờ Đài Bắc)")),
                 None => ("24 小時內".into(), "within 24 hours".into(), "trong vòng 24 giờ".into()),
@@ -381,6 +461,61 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 ),
             )
         }
+        "claim.purchase_reminder" => {
+            let at = taipei(payload, "expires_at").unwrap_or_default();
+            (
+                l.pick(format!("【Wishly】還沒買《{item}》嗎？"), format!("[Wishly] Haven't bought \"{item}\" yet?"), format!("[Wishly] Bạn chưa mua \"{item}\"?")),
+                if payload["ended"] == true {
+                    l.pick(
+                        format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請在 {at}（台北時間）前標記已購買或已送達；逾期未標記的認領會釋出。\n管理我的捐助：{manage}\n"),
+                        format!("The list \"{title}\" has ended. If you've already bought or given \"{item}\", please mark it as purchased or delivered before {at} (Taipei time); unmarked pledges will be released after that.\nManage my pledges: {manage}\n"),
+                        format!("Danh sách \"{title}\" đã kết thúc. Nếu bạn đã mua hoặc trao \"{item}\", vui lòng đánh dấu đã mua hoặc đã trao trước {at} (giờ Đài Bắc); các đóng góp chưa đánh dấu sẽ được nhường lại sau thời điểm đó.\nQuản lý đóng góp của tôi: {manage}\n"),
+                    )
+                } else {
+                l.pick(
+                    format!("還沒買嗎？你在《{title}》認領的「{item}」請在 {at}（台北時間）前標記已購買，或延長 7 天；逾期會自動釋出給其他朋友。\n管理我的捐助：{manage}\n"),
+                    format!("Haven't bought it yet? Please mark \"{item}\" from \"{title}\" as purchased before {at} (Taipei time), or extend by 7 days. Otherwise it will be released to other friends.\nManage my pledges: {manage}\n"),
+                    format!("Bạn chưa mua? Vui lòng đánh dấu đã mua \"{item}\" trong \"{title}\" trước {at} (giờ Đài Bắc), hoặc gia hạn thêm 7 ngày; quá hạn sẽ tự động nhường cho bạn bè khác.\nQuản lý đóng góp của tôi: {manage}\n"),
+                )
+                },
+            )
+        }
+        "claim.list_closed" => {
+            let at = taipei(payload, "expires_at").unwrap_or_default();
+            (
+                l.pick(format!("【Wishly】《{title}》已結束，請標記你的捐助"), format!("[Wishly] \"{title}\" has ended: please update your pledge"), format!("[Wishly] \"{title}\" đã kết thúc: vui lòng cập nhật đóng góp")),
+                l.pick(
+                    format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請到「我的捐助」標記已購買或已送達；{at}（台北時間）前沒有標記的認領會釋出。\n管理我的捐助：{manage}\n"),
+                    format!("The list \"{title}\" has ended. If you've already bought or given \"{item}\", please mark it as purchased or delivered in My pledges; claims not marked before {at} (Taipei time) will be released.\nManage my pledges: {manage}\n"),
+                    format!("Danh sách \"{title}\" đã kết thúc. Nếu bạn đã mua hoặc trao \"{item}\", vui lòng đánh dấu đã mua hoặc đã giao trong Đóng góp của tôi; các món chưa đánh dấu trước {at} (giờ Đài Bắc) sẽ được nhường lại.\nQuản lý đóng góp của tôi: {manage}\n"),
+                ),
+            )
+        }
+        "claim.expired" if payload["ended"] == true => (
+            l.pick(format!("【Wishly】「{item}」已超過購買期限"), format!("[Wishly] \"{item}\" passed its purchase deadline"), format!("[Wishly] \"{item}\" đã quá hạn mua")),
+            l.pick(
+                format!("清單《{title}》已結束，你認領的「{item}」在期限前沒有標記已購買，這筆認領已取消。\n管理我的捐助：{manage}\n"),
+                format!("The list \"{title}\" has ended and \"{item}\" wasn't marked as purchased before the deadline, so your claim has been cancelled.\nManage my pledges: {manage}\n"),
+                format!("Danh sách \"{title}\" đã kết thúc và \"{item}\" chưa được đánh dấu đã mua trước hạn, nên lượt nhận của bạn đã bị hủy.\nQuản lý đóng góp của tôi: {manage}\n"),
+            ),
+        ),
+        "claim.expired" => (
+            l.pick(format!("【Wishly】「{item}」已超過購買期限"), format!("[Wishly] \"{item}\" passed its purchase deadline"), format!("[Wishly] \"{item}\" đã quá hạn mua")),
+            l.pick(
+                format!("你在《{title}》認領的「{item}」已超過購買期限，已釋出給其他朋友。\n管理我的捐助：{manage}\n"),
+                format!("The purchase deadline for \"{item}\" you claimed on \"{title}\" has passed, so it has been released to other friends.\nManage my pledges: {manage}\n"),
+                format!("\"{item}\" bạn nhận trong \"{title}\" đã quá hạn mua và đã được nhường cho bạn bè khác.\nQuản lý đóng góp của tôi: {manage}\n"),
+            ),
+        ),
+        // 寄給清單擁有者：不提捐助者是誰（驚喜模式也安全）
+        "item.reopened" => (
+            l.pick(format!("【Wishly】《{title}》有品項重新開放認領"), format!("[Wishly] An item on \"{title}\" is open again"), format!("[Wishly] Có món trong \"{title}\" được mở lại")),
+            l.pick(
+                format!("《{title}》有品項重新開放認領。\n{base}/dashboard\n"),
+                format!("An item on \"{title}\" is open for claiming again.\n{base}/dashboard\n"),
+                format!("Có món trong \"{title}\" được mở lại để nhận.\n{base}/dashboard\n"),
+            ),
+        ),
         "event.reminder" => (
             l.pick(format!("【Wishly】《{title}》活動日快到了"), format!("[Wishly] The event day for \"{title}\" is coming up"), format!("[Wishly] Sắp đến ngày sự kiện của \"{title}\"")),
             l.pick(

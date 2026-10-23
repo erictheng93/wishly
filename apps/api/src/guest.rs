@@ -142,6 +142,7 @@ struct Row {
     wl_title: String,
     event_date: Option<chrono::NaiveDate>,
     wl_status: String,
+    item_changed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// 登入使用者捐助時身分是 User（claims.user_id），也要看得到自己的捐助；訪客則走 guest_id。
@@ -169,7 +170,10 @@ async fn me(
     let limit = p.limit.unwrap_or(20).clamp(1, 50);
     let mut rows: Vec<Row> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {CLAIM_COLS}, i.title AS item_title, i.image_key, i.image_status::text AS image_status,
-                w.slug::text AS slug, w.title AS wl_title, w.event_date, w.status::text AS wl_status
+                w.slug::text AS slug, w.title AS wl_title, w.event_date,
+                CASE WHEN w.status = 'active' AND w.closes_at <= now() THEN 'closed' ELSE w.status::text END AS wl_status,
+                CASE WHEN c.status IN ('reserved', 'purchased') AND i.content_changed_at > COALESCE(c.item_change_seen_at, c.created_at)
+                     THEN i.content_changed_at END AS item_changed_at
          FROM claims c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
          WHERE (CASE WHEN $4 THEN c.user_id ELSE c.guest_id END) = $1 AND ($2::uuid IS NULL OR c.id < $2) ORDER BY c.id DESC LIMIT $3")))
         .bind(id).bind(p.cursor).bind(limit + 1).bind(is_user).fetch_all(&st.pool).await?;
@@ -181,6 +185,7 @@ async fn me(
     };
     let claims: Vec<Value> = rows.into_iter().map(|r| json!({
         "claim": r.claim,
+        "item_changed_at": r.item_changed_at,
         "item": { "id": r.claim.item_id, "title": r.item_title, "image_url": crate::public::image_url(r.image_key.as_deref(), &r.image_status) },
         "wishlist": { "slug": r.slug, "title": r.wl_title, "event_date": r.event_date, "status": r.wl_status },
     })).collect();

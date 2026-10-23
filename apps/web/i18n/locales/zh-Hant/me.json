@@ -139,11 +139,16 @@
       "markPurchased": "標記已購買",
       "markDelivered": "標記已送達",
       "cancel": "取消",
+      "closedHint": "清單已結束：仍可標記已購買 / 已送達或取消，無法再更改數量",
+      "itemChanged": "建立者在 {time} 修改了這個品項，請再確認數量與規格",
+      "ackItemChange": "知道了",
       "past": "過去的紀錄（{n}）",
       "wipe": "刪除我的暱稱與聯絡方式",
       "confirmCancelPurchased": "建立者會收到通知，確定要取消捐助？",
       "confirmCancel": "確定要取消這筆捐助？",
-      "confirmWipe": "確定刪除你的暱稱與聯絡方式？捐助紀錄會保留為「已刪除的訪客」，且此裝置之後無法再管理。"
+      "confirmWipe": "確定刪除你的暱稱與聯絡方式？捐助紀錄會保留為「已刪除的訪客」，且此裝置之後無法再管理。",
+      "deadline": "請在 {date} 前標記已購買",
+      "extend": "延長 7 天"
     },
     "wallet": {
       "title": "我的點數",

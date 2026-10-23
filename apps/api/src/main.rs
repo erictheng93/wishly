@@ -1,4 +1,4 @@
-use sqlx::postgres::PgPoolOptions;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use wishly_api::{app, AppState};
 
 #[tokio::main]
@@ -14,9 +14,13 @@ async fn main() {
     let bind = cfg.bind.clone();
     wishly_api::config::init(cfg);
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+    // Q11：交易開著卻閒置（忘了 commit 等 bug）超過 30 秒即由 DB 中止，避免長時間占著列鎖
+    let opts: PgConnectOptions = url.parse().expect("DATABASE_URL");
+    let opts = opts.options([("idle_in_transaction_session_timeout", "30s")]);
     let pool = PgPoolOptions::new()
         .max_connections(10)
-        .connect(&url)
+        .acquire_timeout(std::time::Duration::from_secs(3)) // 6.4：取不到連線 3 秒即回 503，不讓請求堆積
+        .connect_with(opts)
         .await
         .expect("db");
     sqlx::migrate!("../../db/migrations")

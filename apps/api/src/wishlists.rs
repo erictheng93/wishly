@@ -368,7 +368,8 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     let vis = one_of(m, "visibility", VIS)?.unwrap_or("friends");
     let names = boolean(m, "show_claimer_names")?.unwrap_or(false);
     let surprise = boolean(m, "surprise_mode")?.unwrap_or(false);
-    let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.flatten();
+    // Q12：未帶欄位 = 預設購買期限 7 天；明確 null = 不限
+    let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.unwrap_or(Some(168));
     let closes = closes_at(m)?.flatten();
     future_only(closes)?;
     if surprise && !event.is_some_and(|d| d > today_tw()) {
@@ -709,6 +710,9 @@ async fn update(
         release_pledged(&mut tx, &[id]).await?;
     }
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線立即重驗可見性 / 狀態
+    if was_active && matches!(w.status.as_str(), "closed" | "archived") {
+        crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
+    }
     tx.commit().await?;
     // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
     if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) {
@@ -719,15 +723,18 @@ async fn update(
 
 /// closes_at 到期 → active 轉 closed（同手動關閉；冪等，多實例安全）。捐助 / 認捐路徑另外即時檢查 closes_at，這裡只負責狀態與快取。
 pub async fn close_due(pool: &PgPool) -> Result<usize, sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let rows: Vec<(Uuid, String)> = sqlx::query_as(
         "UPDATE wishlists SET status = 'closed', closed_at = now()
          WHERE status = 'active' AND closes_at <= now() RETURNING id, slug::text",
     )
-    .fetch_all(pool)
+    .fetch_all(&mut *tx)
     .await?;
     for (id, _) in &rows {
-        crate::dashboard::notify(pool, *id).await?;
+        crate::dashboard::notify(&mut *tx, *id).await?;
+        crate::claims::grace_on_close(&mut tx, *id).await?;
     }
+    tx.commit().await?;
     if !rows.is_empty() {
         crate::cdn::purge_wishlists(rows.iter().map(|r| r.1.trim().to_string()).collect());
     } // 公開快取副本的 status 要更新
@@ -757,6 +764,9 @@ async fn archive(
     sqlx::query("UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) WHERE id=$1 AND status<>'archived'").bind(id).execute(&mut *tx).await?;
     release_pledged(&mut tx, &[id]).await?;
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線收到後關閉
+    if !matches!(w.status.as_str(), "closed" | "archived") {
+        crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
+    }
     tx.commit().await?;
     crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     Ok(StatusCode::NO_CONTENT)
@@ -811,8 +821,16 @@ async fn dashboard(
         }
         _ => None,
     };
+    // 每品項幾人認領（有效 claims / pledged+captured contributions 筆數）：鎖定期間也輸出，只有人數、沒有身分
+    let counts: HashMap<Uuid, i64> = sqlx::query_as(
+        "SELECT c.item_id, count(*) FROM claims c JOIN wishlist_items i ON i.id = c.item_id
+          WHERE i.wishlist_id = $1 AND c.status IN ('reserved', 'purchased', 'delivered') GROUP BY c.item_id
+         UNION ALL
+         SELECT item_id, count(*) FROM contributions WHERE wishlist_id = $1 AND status IN ('pledged', 'captured') GROUP BY item_id")
+        .bind(id).fetch_all(&st.pool).await?.into_iter().collect();
+    // 驚喜鎖定：名單一律空陣列（不輸出姓名、留言、時間、claim id）
     let claims = if locked {
-        Value::Null
+        json!([])
     } else {
         type ClaimDashboardRow = (
             Uuid,
@@ -836,9 +854,9 @@ async fn dashboard(
         )
     };
     // 捐贈者名單（受捐者的核心需求）：誰、捐多少、何時捐、何時達標（captured_at）。只列 pledged / captured；
-    // 匿名者一律顯示「匿名朋友」，不輸出 email 或 user_id。驚喜鎖定時整份為 null。
+    // 匿名者一律顯示「匿名朋友」，不輸出 email 或 user_id。驚喜鎖定時為空陣列。
     let (contributions, funded_at) = if locked {
-        (Value::Null, HashMap::new())
+        (json!([]), HashMap::new())
     } else {
         type Row = (
             Uuid,
@@ -885,8 +903,8 @@ async fn dashboard(
         "items": items.iter().map(|i| {
             let cf = i.funding_mode == "crowdfund";
             json!({ "item_id": i.id, "title": i.title, "funding_mode": i.funding_mode, "qty_needed": i.qty_needed,
-                "qty_claimed": if locked { None } else { Some(i.qty_claimed) },
-                "target_points": i.target_points, "pledged_points": if cf && !locked { Some(i.pledged_points) } else { None },
+                "qty_claimed": i.qty_claimed, "claimer_count": counts.get(&i.id).copied().unwrap_or(0),
+                "target_points": i.target_points, "pledged_points": cf.then_some(i.pledged_points),
                 "funding_status": i.funding_status.as_ref().filter(|_| !locked),
                 "display_status": if locked { None } else { display_status(i.funding_status.as_deref(), i.order_status.as_deref()) },
                 "funding_deadline": i.funding_deadline, "funded_at": funded_at.get(&i.id) })
@@ -1387,6 +1405,19 @@ async fn item_update(
         )
     };
     let before = product(&i);
+    // Q13：捐助者看得到的內容（排序、圖片處理狀態不算）；同值重送不算修改
+    let visible = |i: &I| {
+        (
+            product(i),
+            i.priority.clone(),
+            i.qty_needed,
+            i.funding_mode.clone(),
+            i.target_points,
+            i.funding_deadline,
+            i.fulfillment_type.clone(),
+        )
+    };
+    let seen = visible(&i);
     let frozen = i.funding_mode == "crowdfund" && i.funding_status.as_deref() != Some("open");
     apply_item(m, &mut i)?;
     apply_funding(&mut tx, m, &mut i, event, locked).await?;
@@ -1402,14 +1433,15 @@ async fn item_update(
     if locked && i.qty_needed < old_qty {
         return Err(surprise_locked_err());
     }
+    let changed = visible(&i) != seen;
     // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與捐助競爭
-    let res = sqlx::query("UPDATE wishlist_items SET title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
+    let res = sqlx::query("UPDATE wishlist_items SET content_changed_at = CASE WHEN $19 THEN now() ELSE content_changed_at END, title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
                  unit_price_amount=$9, priority=$10::item_priority, qty_needed=$11, funding_mode=$13::funding_mode, target_points=$14,
                  funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18
                  WHERE id=$1 AND qty_claimed <= $11 AND ($12::timestamptz IS NULL OR updated_at=$12)")
         .bind(id).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status).bind(&i.product_url)
         .bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed).bind(exp)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(changed)
         .execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         let cur: Option<(DateTime<Utc>, i32)> = sqlx::query_as(
@@ -1423,6 +1455,9 @@ async fn item_update(
             Some((u, _)) if exp.is_some_and(|e| e != u) => stale(),
             _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已捐助數量。"),
         });
+    }
+    if changed {
+        crate::notify::enqueue_item_changed(&mut *tx, id).await?;
     }
     crate::dashboard::notify(&mut *tx, i.wishlist_id).await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
@@ -1458,6 +1493,14 @@ async fn item_delete(
         .bind(wid)
         .execute(&mut *tx)
         .await?;
+    // 持清單列鎖後再讀狀態：closed / archived 不可增刪品項（F8），與新增 / 修改品項一致
+    let status: String = sqlx::query_scalar("SELECT status::text FROM wishlists WHERE id=$1")
+        .bind(wid)
+        .fetch_one(&mut *tx)
+        .await?;
+    if matches!(status.as_str(), "closed" | "archived") {
+        return Err(closed());
+    }
     if item.funding_mode == "crowdfund" {
         let (captured, pledged): (i64, i64) = sqlx::query_as(
             "SELECT count(*) FILTER (WHERE status = 'captured'), count(*) FILTER (WHERE status = 'pledged') FROM contributions WHERE item_id = $1")

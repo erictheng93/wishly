@@ -38,7 +38,7 @@ test('即時更新：創建者開著進度頁，會員認捐後不重新整理�
   await Promise.all([ownerCtx.close(), guestCtx.close(), owner.api.dispose(), donor.api.dispose()])
 })
 
-test('驚喜模式：進度頁遮蔽捐助者，訪客頁正常', async ({ browser, request }) => {
+test('驚喜模式：進度頁看得到數量但遮蔽捐助者，訪客頁正常', async ({ browser, request }) => {
   const owner = await registerUser()
   const list = await createList(owner, { surprise: true, items: [{ title: '生日蛋糕', qty: 2 }] })
   const ownerCtx = await browser.newContext(), guestCtx = await browser.newContext()
@@ -54,12 +54,15 @@ test('驚喜模式：進度頁遮蔽捐助者，訪客頁正常', async ({ brows
     await expect(gp.locator('li.g-card', { hasText: '生日蛋糕' })).toContainText('1 / 2')
   })
 
-  await test.step('創建者進度頁：只有整體完成度，看不到捐助者與各品項進度', async () => {
+  await test.step('創建者進度頁：看得到各品項數量與人數，看不到捐助者', async () => {
     await op.goto(`/lists/${list.id}/progress`)
     await expect(op.getByRole('status').filter({ hasText: '驚喜模式' })).toBeVisible()
-    await expect(op.getByText('進度已隱藏')).toBeVisible()
+    const card = op.locator('article', { hasText: '生日蛋糕' })
+    await expect(card).toContainText('1 / 2')
+    await expect(card).toContainText('1 人認領')
+    await expect(op.getByText('進度已隱藏')).toHaveCount(0)
     await expect(op.getByText('神秘朋友')).toHaveCount(0)
-    await expect(op.getByText(/數量 \d+ \/ \d+/)).toHaveCount(0)
+    await expect(op.getByRole('button', { name: '標為已送達' })).toHaveCount(0)
   })
 
   await test.step('API 回應本身就不含捐助者（不是只有前端遮罩）', async () => {
@@ -71,9 +74,11 @@ test('驚喜模式：進度頁遮蔽捐助者，訪客頁正常', async ({ brows
     expect(await pub.text()).not.toContain('神秘朋友')
   })
 
-  await test.step('創建者開自己的分享頁：軟性遮蔽且不能捐助', async () => {
+  await test.step('創建者開自己的分享頁：看得到數量、看不到是誰，且不能捐助', async () => {
     await op.goto(`/s/${list.slug}`)
     await expect(op.getByText('你正以建立者身分瀏覽')).toBeVisible()
+    await expect(op.locator('li.g-card', { hasText: '生日蛋糕' })).toContainText('1 / 2')
+    await expect(op.getByText('神秘朋友')).toHaveCount(0)
     await expect(op.getByText('建立者不可捐助自己的清單')).toBeVisible()
     await expect(op.getByRole('button', { name: '我要送' })).toHaveCount(0)
   })

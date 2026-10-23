@@ -33,7 +33,10 @@ async fn surprise_dashboard_hides_claimers(pool: PgPool) {
         "leak: {raw}"
     );
     assert_eq!(v["surprise_locked"], true);
-    assert!(v["claims"].is_null() && v["items"][0]["qty_claimed"].is_null());
+    // Q8：數量照給，名單為空
+    assert_eq!(v["claims"], serde_json::json!([]));
+    assert_eq!(v["items"][0]["qty_claimed"], 1);
+    assert_eq!(v["items"][0]["claimer_count"], 1);
     assert_eq!(v["totals"]["completion_pct"], 50); // 數量計 1/2（totals.qty_claimed 本就輸出）
                                                    // 非擁有者 → 404
     assert_eq!(

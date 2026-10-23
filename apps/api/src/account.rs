@@ -166,6 +166,49 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     Ok(res)
 }
 
+/// Q10：刪帳前重新驗證，防被盜的 session 直接刪帳。有密碼者驗密碼（每人 15 分鐘 5 次）；
+/// 只有 Google / LINE 者要求 session 在 10 分鐘內建立。在開交易前做：argon2 慢，不可持有列鎖。
+async fn reauth(pool: &sqlx::PgPool, u: &CurrentUser, pw: Option<&str>) -> Result<(), AppError> {
+    let hash: Option<String> = sqlx::query_scalar(
+        "SELECT password_hash FROM auth_identities WHERE user_id=$1 AND provider='email' AND password_hash IS NOT NULL",
+    )
+    .bind(u.id)
+    .fetch_optional(pool)
+    .await?;
+    let Some(hash) = hash else {
+        let fresh: bool = sqlx::query_scalar(
+            "SELECT created_at > now() - interval '10 minutes' FROM sessions WHERE id=$1",
+        )
+        .bind(u.session_id)
+        .fetch_one(pool)
+        .await?;
+        return if fresh {
+            Ok(())
+        } else {
+            Err(AppError::problem(
+                403,
+                "REAUTH_REQUIRED",
+                "為了安全，請重新登入後再刪除帳號",
+            ))
+        };
+    };
+    let pw = pw
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| AppError::invalid("/password", "REQUIRED", "請輸入密碼"))?
+        .to_owned();
+    // 驗證前就計數：超限時連正確密碼也不驗，暴力猜測拿不到判定
+    crate::ratelimit::check(pool, &format!("delete-me-pw:{}", u.id), 5, 900).await?;
+    let ok = crate::auth_ext::argon_run(move || {
+        pw.chars().count() <= 128 && crate::auth_ext::verify_pw(&pw, &hash)
+    })
+    .await?;
+    if ok {
+        Ok(())
+    } else {
+        Err(AppError::problem(401, "INVALID_CREDENTIALS", "密碼不正確"))
+    }
+}
+
 async fn delete_me(
     State(st): State<AppState>,
     u: CurrentUser,
@@ -178,6 +221,7 @@ async fn delete_me(
             "confirm 必須為 \"DELETE\"",
         ));
     }
+    reauth(&st.pool, &u, b.get("password").and_then(Value::as_str)).await?;
     let id = u.id;
     let mut tx = st.pool.begin().await?;
     crate::admin::lock_staff_changes(&mut tx).await?;
@@ -199,6 +243,16 @@ async fn delete_me(
         .bind(id).fetch_one(&mut *tx).await?;
     if held.0 > 0 || held.1 > 0 {
         return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {} 筆進行中的認捐、{} 點餘額。請先到錢包撤回認捐，並聯絡客服處理剩餘點數後再刪除帳號。", held.0, held.1)));
+    }
+    // F17 / F18：未結案的現金退款（被拒會退點回錢包）、拒付欠款、爭議中凍結的錢包，都要先由客服結案，
+    // 否則點數或欠款會落在已匿名、無法登入的帳號上。
+    let (refunds, debts, frozen): (i64, i64, bool) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM cash_refund_requests r JOIN point_wallets w ON w.id = r.wallet_id WHERE w.user_id = $1 AND r.status IN ('requested', 'processing')),
+                (SELECT count(*) FROM wallet_debts d JOIN point_wallets w ON w.id = d.wallet_id WHERE w.user_id = $1 AND d.status = 'open'),
+                EXISTS (SELECT 1 FROM point_wallets WHERE user_id = $1 AND status = 'frozen')")
+        .bind(id).fetch_one(&mut *tx).await?;
+    if refunds > 0 || debts > 0 || frozen {
+        return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {refunds} 筆處理中的現金退款、{debts} 筆待處理欠款{}。請聯絡客服結案後再刪除帳號。", if frozen { "，且錢包已凍結" } else { "" })));
     }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL")
         .bind(id)

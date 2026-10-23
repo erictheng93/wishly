@@ -26,7 +26,7 @@ async fn owner_delivers_and_cancels_claims(pool: PgPool) {
     let (_, c1) = user_claim(&pool, it, 1).await;
     let (_, c2) = user_claim(&pool, it, 1).await;
     let url = |c: Uuid| format!("/claims/{c}");
-    // 路人 / 擁有者改數量或 purchased → 403
+    // 路人 → 404（不洩漏存在）；擁有者改數量或 purchased → 403
     assert_eq!(
         call(
             &pool,
@@ -37,7 +37,7 @@ async fn owner_delivers_and_cancels_claims(pool: PgPool) {
         )
         .await
         .0,
-        StatusCode::FORBIDDEN
+        StatusCode::NOT_FOUND
     );
     assert_eq!(
         call(

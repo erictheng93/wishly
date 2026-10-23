@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
 const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean, loginTo?: any }>() // loginTo 有值 = 未登入，認捐鈕改為前往登入
-defineEmits<{ claim: [], fund: [] }>()
+defineEmits<{ claim: [], fund: [], ack: [] }>()
 const crowd = computed(() => props.item.funding_mode === 'crowdfund')
 const ds = computed(() => deriveDisplayStatus(props.item) ?? '')
 const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fully_claimed)
@@ -14,19 +14,19 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
     <div class="g-body">
       <div class="g-title">{{ item.title }}<span v-if="item.priority" class="g-badge" :class="item.priority">{{ $t('guest.card.priority', { level: $t('guest.card.prio.' + item.priority) }) }}</span><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>
       <div v-if="item.brand || item.spec" class="g-mute">{{ [item.brand, item.spec].filter(Boolean).join('・') }}</div>
-      <template v-if="masked"><div class="g-mute">{{ $t('guest.card.masked') }}</div></template>
-      <template v-else-if="crowd">
+      <template v-if="crowd">
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent ?? 0" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: (item.progress_percent ?? 0) + '%' }" /></div>
         <div v-if="item.pledged_points != null" class="g-mute">{{ $t('guest.card.raised') }} <b class="g-num">{{ fmtPts(item.pledged_points) }} / {{ $t('guest.pts', { n: fmtPts(item.target_points) }) }}</b><template v-if="ds === 'open'">{{ $t('guest.card.leftPts', { n: fmtPts(item.remaining_points) }) }}</template></div>
         <div v-else class="g-mute">{{ $t('guest.card.target') }} <b class="g-num">{{ $t('guest.pts', { n: fmtPts(item.target_points) }) }}</b></div>
         <div v-if="item.funding_deadline && ds === 'open'" class="g-mute">{{ $t('guest.card.until', { time: fmtTime(item.funding_deadline) }) }}</div>
-        <div v-if="item.contributors?.length" class="g-mute">{{ $t('guest.card.contributors', { names: item.contributors.map((c: any) => `${c.display_name} ${$t('guest.pts', { n: fmtPts(c.points) })}`).join($t('guest.listSep')) }) }}</div>
+        <div v-if="!masked && item.contributors?.length" class="g-mute">{{ $t('guest.card.contributors', { names: item.contributors.map((c: any) => `${c.display_name} ${$t('guest.pts', { n: fmtPts(c.points) })}`).join($t('guest.listSep')) }) }}</div>
       </template>
       <template v-else>
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: item.progress_percent + '%' }" /></div>
         <div class="g-mute">{{ $t('guest.card.claimed') }} <b class="g-num">{{ item.qty_claimed }} / {{ item.qty_needed }}</b><template v-if="mine">{{ $t('guest.card.mineQty', { n: mine.qty }) }}</template></div>
-        <div v-if="item.claimers?.length" class="g-mute">{{ $t('guest.card.claimedBy', { names: item.claimers.map((c: any) => c.display_name).join($t('guest.listSep')) }) }}</div>
+        <div v-if="!masked && item.claimers?.length" class="g-mute">{{ $t('guest.card.claimedBy', { names: item.claimers.map((c: any) => c.display_name).join($t('guest.listSep')) }) }}</div>
       </template>
+      <div v-if="mine?.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(mine.item_changed_at) }) }}<button class="g-link" @click="$emit('ack')">{{ $t('me.claims.ackItemChange') }}</button></div>
       <div class="g-actions">
         <span v-if="masked" class="g-mute">{{ $t('guest.card.ownerBlocked') }}</span>
         <template v-else-if="crowd">

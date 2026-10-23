@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F4/F5 捐助驗證</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="index.html">← 流程驗證總覽</a></p>
+<h1>F4 數量型捐助 · F5 狀態變更與取消</h1>
+<p class="sub">驗證日期 2026-10-21 · 規格 <a href="../02-master-user-flow.html">02 Master User Flow</a> v0.5（含 D50 認捐須登入）· 環境：本機 e2e 堆疊（API :8081、web :3012、Mailpit、PostGIS）</p>
+
+<h2>結論</h2>
+<p>主路徑（登入認捐 → 已購買 → 已送達；擁有者標送達 / 取消；防超賣；冪等重送）皆符合規格。發現 <b>6 個缺陷已直接修正</b>、<b>1 個開 issue</b>、<b>4 項與規格不一致需決策</b>（見<a href="decisions.html">待決事項</a>）。</p>
+
+<h2>驗證方式</h2>
+<table>
+<tr><th>層級</th><th>內容</th></tr>
+<tr><td>API 探測</td><td>以 <code>curl</code> / 腳本逐條打 F4、F5 規則（qty 邊界、重複捐助、超量、缺 Idempotency-Key、路人 / 匿名操作、各狀態轉換、清單關閉後的行為）。</td></tr>
+<tr><td>Playwright 手動探索</td><td><code>playwright-cli</code> 以捐助者、擁有者、路人三種身分操作 <code>/s/{slug}</code>、<code>/me/claims</code>、<code>/lists/{id}/progress</code>，含連點、確認對話框、英文介面。</td></tr>
+<tr><td>自動化（新增）</td><td>後端 <code>apps/api/tests/claim_transitions.rs</code>（3 個測試）；E2E <code>apps/web/e2e/flow-f05-claim-states.spec.ts</code>（3 個測試，真實 API）；單元 <code>apps/web/tests/useApi.test.ts</code> +1。</td></tr>
+<tr><td>既有自動化</td><td>後端 <code>claims.rs</code>、<code>claims_login_required.rs</code>、<code>concurrency.rs</code>、<code>owner_claim_actions.rs</code>、<code>expiry_ratelimit.rs</code>；E2E <code>login-to-claim</code>、<code>oversell</code>、<code>guest-journey</code>、<code>guest-errors</code>、<code>live-updates</code>。修正後全數通過（cargo test 全綠、vitest 250/250、E2E 基準 127/127）。</td></tr>
+</table>
+
+<h2>規則對照</h2>
+<div class="wrap"><table>
+<tr><th>規格規則</th><th>結果</th><th>證據</th></tr>
+<tr><td>F4 未登入 POST 回 401 且不寫入（D50）</td><td><span class="tag pass">通過</span></td><td>claims_login_required.rs、e2e login-to-claim</td></tr>
+<tr><td>F4 qty 1–99，超出 422 <code>VALIDATION_FAILED</code></td><td><span class="tag pass">通過</span></td><td>API 探測 qty=0 / 100</td></tr>
+<tr><td>F4 同人同品項已有有效 claim → 409 <code>CLAIM_ALREADY_EXISTS</code>（附 claim_id）</td><td><span class="tag pass">通過</span></td><td>claims.rs claim_lifecycle、API 探測</td></tr>
+<tr><td>F4 超量 → 409 <code>ITEM_FULLY_CLAIMED</code> 附 <code>remaining</code></td><td><span class="tag pass">通過</span></td><td>API 探測（remaining=1）</td></tr>
+<tr><td>F4 缺 Idempotency-Key → 400；同 key 重播 / 不同 body → 409</td><td><span class="tag pass">通過</span></td><td>claims.rs idempotency_key_replay_and_conflict、concurrency.rs</td></tr>
+<tr><td>F4-b 併發搶最後一件恰 1 人成功</td><td><span class="tag pass">通過</span></td><td>claims.rs oversell_only_one_wins、e2e oversell</td></tr>
+<tr><td>F4 對眾籌品項數量捐助 → 409 <code>FUNDING_MODE_MISMATCH</code></td><td><span class="tag pass">通過（新增測試）</span></td><td>claim_transitions.rs claim_gates_crowdfund_and_hidden</td></tr>
+<tr><td>F15 × F4 下架清單捐助 → 410 <code>WISHLIST_REMOVED</code> 且不寫入</td><td><span class="tag pass">通過（新增測試）</span></td><td>同上</td></tr>
+<tr><td>F4 closed 清單新捐助 → 409 <code>WISHLIST_CLOSED</code></td><td><span class="tag pass">通過</span></td><td>API 探測、closes_at.rs</td></tr>
+<tr><td>F4 每使用者每清單有效 claim 上限 30</td><td><span class="tag decide">不一致</span></td><td>實作改為每清單每小時 15 次 / 每人每小時 30 次的限流（429）→ <a href="decisions.html#q4">Q4</a></td></tr>
+<tr><td>F5 reserved → purchased → delivered（捐助者）</td><td><span class="tag pass">通過</span></td><td>e2e flow-f05 #1</td></tr>
+<tr><td>F5 owner 標 delivered / 取消他人捐助並回補 qty_claimed</td><td><span class="tag pass">通過</span></td><td>e2e flow-f05 #2、owner_claim_actions.rs</td></tr>
+<tr><td>F5 目標狀態與現況相同 → 200 不重複副作用</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B2</td></tr>
+<tr><td>F5 非本人一律 404（不洩漏存在）</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B1</td></tr>
+<tr><td>F5 cancelled / delivered 之後的非法轉換 → 409 <code>INVALID_STATE_TRANSITION</code></td><td><span class="tag pass">通過（新增測試）</span></td><td>claim_transitions.rs illegal_transitions_and_strangers</td></tr>
+<tr><td>F5 delivered → cancelled：owner 可更正誤標</td><td><span class="tag decide">不一致</span></td><td>實作與既有測試皆禁止 → <a href="decisions.html#q1">Q1</a></td></tr>
+<tr><td>F5 / F8 清單 closed 後捐助者不可改量 / 取消</td><td><span class="tag decide">不一致</span></td><td>改量已擋；取消與標 purchased 仍可 → <a href="decisions.html#q2">Q2</a></td></tr>
+<tr><td>F5 改量僅 reserved 可改</td><td><span class="tag decide">不一致</span></td><td>purchased 也可改量 → <a href="decisions.html#q3">Q3</a></td></tr>
+<tr><td>F5 舊訪客只能減量 / 取消，增量回 401 / 403</td><td><span class="tag pass">通過</span></td><td>claims_login_required.rs legacy_guest_can_cancel_and_decrease_but_not_increase</td></tr>
+</table></div>
+
+<h2>缺陷與處置</h2>
+<h3>B1 · 路人 PATCH / DELETE 別人的捐助回 403 <span class="tag fixed">已修正</span></h3>
+<p>規格（F5 權限矩陣、授權實作原則）：非本人一律 <code>NOT_FOUND</code>，避免洩漏資源存在。實作回 <code>403 FORBIDDEN「只有捐助者本人可以操作」</code>，可用來探測任意 claim id 是否存在。</p>
+<p>修正：<code>apps/api/src/claims.rs</code> 非本人、非擁有者改回 <code>AppError::NotFound</code>；擁有者在驚喜鎖定期間或做非允許操作仍回 403（屬「已登入但角色不足」）。調整 3 個既有測試的預期值。</p>
+
+<h3>B2 · 同一目標狀態重送回 409，UI 連點跳錯 <span class="tag fixed">已修正</span></h3>
+<p>重現：<code>/me/claims</code> 快速點兩下「標記已購買」→ 第二個請求回 <code>409 INVALID_STATE_TRANSITION</code>，橫幅顯示「不允許的狀態轉換」。規格 F5 冪等性：目標狀態與現況相同 → 200 並回目前資料。</p>
+<p>修正：狀態轉換表加入「同狀態 no-op」，不重寫時間戳、不寫第二筆 audit。E2E 以同步雙擊並記錄兩個 PATCH 都回 200；已驗證把修正還原後此測試會失敗。</p>
+
+<h3>B3 · 只改備註會重設 purchased_at <span class="tag fixed">已修正</span></h3>
+<p>修 B2 時發現：<code>UPDATE claims</code> 的 <code>purchased_at / delivered_at / cancelled_at</code> 只看目標狀態，對已購買的捐助改備註（status 不變）會把 <code>purchased_at</code> 改成現在。修正為「狀態真的改變才寫入」，由 <code>same_status_patch_is_idempotent_and_keeps_timestamps</code> 覆蓋。</p>
+
+<h3>B4 · 非擁有者開進度頁顯示「連線失敗」 <span class="tag fixed">已修正</span></h3>
+<p>API 正確回 404，但 404 的 problem 沒有 <code>detail</code>，<code>useApi</code> 一律退回「連線失敗，請稍後再試」，使用者會以為是網路問題而重試。修正：沒有 detail 的 404 改顯示「找不到這個項目，可能已被刪除或你沒有權限」（三語），影響所有創建者頁。E2E flow-f05 #3、vitest 覆蓋。</p>
+
+<h3>B5 · 英文 / 越南文介面顯示中文錯誤 <span class="tag fixed">Issue #29 已修（4437cc1）</span></h3>
+<p>後端 <code>detail</code> 只有中文，前端 29 個頁面 / 元件直接顯示。範圍跨前後端、需選方案，故開 <a href="https://github.com/erictheng93/wishly/issues/29">#29</a> 而非在此修。</p>
+<p>後續：#29 由另一個工作階段修正（前端依錯誤碼翻譯，5xx 不顯示後端 detail，commit 4437cc1）。稽核結果：</p>
+<ul>
+<li><b>提交歸屬</b>：#29 的初始修正（<code>useApi.ts</code>、<code>useGuest.ts</code>、<code>utils/errors.ts</code>、<code>tests/apiErrorLocale.test.ts</code>、<code>tests/setup.ts</code>）因 W1 提交時用了 <code>git add -A</code>，被併進 1a1f187（訊息只寫裝置驗證）。內容本身無誤且 4437cc1 建立在其上，不改寫歷史；之後一律以明確路徑提交。</li>
+<li><b>E2E 回歸</b>：4437cc1 未跑瀏覽器 E2E，造成 3 個失敗。其中 2 個（後台現金退款、眾籌可見度儲存失敗）是測試仍期待顯示 500 的後端 detail，屬預期行為改變，已更新斷言；1 個是 <code>SERVICE_UNAVAILABLE</code> 被翻成「驗證服務暫時無法使用」——後端目前只有 Turnstile 用這個碼，但 02 規格也用它表示連線池耗盡 / lock_timeout 等一般 503，在認捐表單出現「驗證服務」會誤導，已改為通用的「服務暫時無法使用」（三語）。修正後全套 E2E 157 / 157 通過。</li>
+</ul>
+<h4>根因追查：503 文案（側邊審查提醒，2026-10-22）</h4>
+<p>提醒的現象正確（一般 503 被說成「驗證服務」），但「資料庫忙碌時也回 SERVICE_UNAVAILABLE」與程式不符。實際根因有兩層：</p>
+<ol>
+<li><b>通用錯誤碼被拿來表示特定故障</b>：後端唯一回 <code>SERVICE_UNAVAILABLE</code> 的地方是 Turnstile siteverify 連不上（<code>reports.rs</code>，檢舉與 OTP 人機驗證共用）。#29 翻譯時只看得到這個用法，於是把通用碼寫成「驗證服務」。前端無從分辨，只改文案會讓 Turnstile 故障變得含糊。</li>
+<li><b>資料庫壅塞根本沒有回 503</b>：<code>AppError::Db</code> 一律 500 <code>INTERNAL_ERROR</code>、無 Retry-After；連線池也沒設 <code>acquire_timeout</code>（sqlx 預設 30 秒），尖峰時請求會卡 30 秒才失敗。02 §6.4 要求 3 秒內回 503 + Retry-After、不排隊堆積。</li>
+</ol>
+<p>修正：</p>
+<ul>
+<li>後端：Turnstile 連不上改用專屬碼 <code>CAPTCHA_UNAVAILABLE</code>（503）；連線池 <code>acquire_timeout = 3s</code>；連線池逾時、<code>lock_timeout</code>（55P03）、<code>statement_timeout</code>（57014）對應 503 <code>SERVICE_UNAVAILABLE</code> + <code>Retry-After: 2</code>，其他資料庫錯誤維持 500。</li>
+<li>前端文案：<code>SERVICE_UNAVAILABLE</code> →「系統忙碌中，請稍後再試」；新增 <code>CAPTCHA_UNAVAILABLE</code> →「人機驗證服務暫時無法使用，請稍後再試」（zh / en / vi）。</li>
+<li>契約：04 錯誤碼表與 TS 型別、02 錯誤碼表補 <code>CAPTCHA_UNAVAILABLE</code>，並寫明 <code>SERVICE_UNAVAILABLE</code> 是通用碼。</li>
+<li>測試：<code>db_overload.rs</code>（真的把只有 1 條連線的 pool 占住 → 503 + Retry-After；製造 lock_timeout → 503；其他錯誤 500）、<code>config_mail.rs</code> 斷言 <code>CAPTCHA_UNAVAILABLE</code>、vitest 三語各驗兩種 503 文案不可混用、guest-errors E2E 改驗「系統忙碌中」。</li>
+</ul>
+<p>未做：02 要求的 <code>lock_timeout=2s</code>、<code>statement_timeout=5s</code>、<code>idle_in_transaction_session_timeout=10s</code> 目前沒有設定，見 <a href="decisions.html#q11">Q11</a>。</p>
+
+<h3>B15 · 進度頁較早的重抓晚到時，會把畫面蓋回舊狀態 <span class="tag fixed">已修正</span></h3>
+<p>追查 flow-f05「擁有者取消捐助」在全套並行時偶發失敗的根因（先前只修了測試的對話框處理，治標）：進度頁有兩個重抓來源——操作後的 <code>load()</code> 與 SSE 事件 debounce 500ms 的 <code>load()</code>——彼此重疊時以「最後回來的回應」為準。若 SSE 觸發的請求在取消前送出、卻在取消後的重抓之後才回來，畫面會退回「已捐助」，直到下一個事件才恢復；擁有者會以為取消沒成功而再按一次。</p>
+<p>修正：<code>progress.vue</code> 為每次 <code>load()</code> 編號，只套用最後一次發出的請求結果。新增 E2E 以 route 攔截讓較早的 dashboard 回應確定最後才到：拿掉修正時失敗（畫面變回「已捐助」），修正後三種裝置 × 3 次共 36 次通過。</p>
+
+<h2>裝置與解析度</h2>
+<p>新增的 flow-* E2E 已加入 <code>mobile</code>（iPhone 13，390×664、觸控）與 <code>tablet</code>（iPad gen 7，810×1080）兩個 project，三種裝置皆通過。另以 Playwright 在 320 寬、iPhone 13、iPad Mini 直式、iPad 橫式、1280、1920 六種解析度掃描 <code>/s/{slug}</code>、<code>/me/claims</code>、<code>/lists/{id}/progress</code>：檢查水平捲動與超出視窗的元素（皆無），並逐張看截圖。</p>
+<h3>B9 · 我的捐助：狀態徽章與「誰看得到」黏在一起 <span class="tag fixed">已修正</span></h3>
+<p>手機寬度（320 / 390）下，「已捐助」徽章自成一行且帶左邊距，緊接著「誰看得到」沒有間隔，看起來像同一個標籤。改為徽章接在品名後（與其他頁一致），可見度選單獨立一行。</p>
+
+<h2>探索觀察（未列缺陷）</h2>
+<ul>
+<li>公開頁完成度顯示「75% complete · 1 / 2 items」：百分比用數量（3/4），與 F7 <code>completion_pct = items_done / items_total</code> 定義不同；實作已統一為數量比例（<code>dashboard_privacy.rs unified_pct…</code>），視為既定設計，併入 <a href="decisions.html#q5">Q5</a> 請確認是否更新規格。</li>
+<li>擁有者「標為已送達」沒有確認對話框，且目前無法撤回（見 Q1），誤點即不可逆。</li>
+<li>已取消的捐助再 PATCH qty 回 200 並回 cancelled 資料（no-op）：這是 <code>concurrency.rs force_delete_vs_claim_update…</code> 刻意固定的併發行為，保留。</li>
+</ul>
+</main>
+</body>
+</html>

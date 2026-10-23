@@ -10,5 +10,6 @@ export const t = (key: string, params: Record<string, any> = {}): string => {
   const v = key.split('.').reduce((o: any, k) => o?.[k], messages)
   return typeof v === 'string' ? v.replace(/\{(\w+)\}/g, (_, k) => String(params[k] ?? `{${k}}`)) : key
 }
-const i18n = { t, locale: ref('zh-Hant') }
+const te = (key: string) => typeof key.split('.').reduce((o: any, k) => o?.[k], messages) === 'string'
+const i18n = { t, te, locale: ref('zh-Hant') }
 Object.assign(globalThis, { useI18n: () => i18n, useNuxtApp: () => ({ $i18n: i18n }) })

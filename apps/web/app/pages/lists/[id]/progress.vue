@@ -13,16 +13,21 @@ const slug = computed(() => w.value?.slug)
 let tm: any, countdown: any
 const left = ref(0)
 
+// SSE 重抓與操作後重抓可能重疊：只套用最後一次發出的請求，避免較早的回應晚到而蓋掉新狀態
+let loadSeq = 0
 async function load() {
+  const seq = ++loadSeq
   try {
     if (!w.value) w.value = (await api(`/wishlists/${id}`)).wishlist
-    d.value = await api(`/wishlists/${id}/dashboard`)
+    const dash = await api(`/wishlists/${id}/dashboard`)
     // 採購單進度：只有含眾籌品項才需要；失敗不影響其他區塊（鎖定時 data 為 null，只有彙總）
-    orders.value = (d.value.items || []).some((i: any) => i.funding_mode === 'crowdfund') ? await api(`/wishlists/${id}/orders`).catch(() => null) : null
+    const ord = (dash.items || []).some((i: any) => i.funding_mode === 'crowdfund') ? await api(`/wishlists/${id}/orders`).catch(() => null) : null
+    if (seq !== loadSeq) return
+    d.value = dash; orders.value = ord
     updatedAt.value = new Date().toLocaleTimeString(dl.value)
     err.value = ''
     startCountdown()
-  } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
+  } catch (e) { if (seq === loadSeq) err.value = errMsg(e) } finally { loading.value = false }
 }
 function startCountdown() {
   clearInterval(countdown)
@@ -57,7 +62,8 @@ const pct = computed(() => d.value?.totals?.completion_pct ?? 0)
 const busyClaim = ref('')
 const claimErr = ref('')
 async function setStatus(c: any, status: 'delivered' | 'cancelled') {
-  if (status === 'cancelled' && !confirm(t('lists.progress.cancelConfirm', { name: c.claimer_name || t('lists.progress.guest') }))) return
+  // 已送達不可復原（後端不允許退回），兩種操作都先確認
+  if (!confirm(t(status === 'cancelled' ? 'lists.progress.cancelConfirm' : 'lists.progress.deliverConfirm', { name: c.claimer_name || t('lists.progress.guest') }))) return
   busyClaim.value = c.id; claimErr.value = ''
   try { await api(`/claims/${c.id}`, { method: 'PATCH', body: { status } }); await load() }
   catch (e) { claimErr.value = errMsg(e) } finally { busyClaim.value = '' }
@@ -74,7 +80,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
       <section class="c-card c-center">
         <div class="c-big">{{ pct }}%</div>
         <div class="c-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100" :aria-label="$t('lists.progress.overall')"><i :style="{ width: pct + '%' }" /></div>
-        <p class="c-mute">{{ $t('lists.progress.complete', { done: d.totals.fulfilled_count, total: d.totals.item_count }) }}<template v-if="!locked">{{ $t('lists.progress.qtyPart', { claimed: d.totals.qty_claimed, needed: d.totals.qty_needed }) }}</template></p>
+        <p class="c-mute">{{ $t('lists.progress.complete', { done: d.totals.fulfilled_count, total: d.totals.item_count }) }}{{ $t('lists.progress.qtyPart', { claimed: d.totals.qty_claimed, needed: d.totals.qty_needed }) }}</p>
         <p v-if="!locked && d.totals.target_points" class="c-mute">{{ $t('lists.progress.pointsLine', { pledged: fmtPts(d.totals.pledged_points), target: fmtPts(d.totals.target_points), n: d.totals.funded_item_count ?? 0 }, d.totals.funded_item_count ?? 0) }}</p>
         <p class="c-mute c-small">{{ status === 'live' ? $t('lists.progress.live') : status === 'polling' ? $t('lists.progress.polling') : '' }}　{{ $t('lists.progress.updatedAt', { time: updatedAt }) }}</p>
       </section>
@@ -100,6 +106,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
             <div class="c-bar" role="progressbar" :aria-valuenow="fundPct(i)" aria-valuemin="0" aria-valuemax="100" :aria-label="i.title"><i :style="{ width: fundPct(i) + '%' }" /></div>
             <p class="c-mute c-m0">{{ $t('lists.progress.raised', { pledged: fmtPts(i.pledged_points), target: fmtPts(i.target_points) }) }}<template v-if="i.funding_deadline && fundStatus(i) === 'open'">{{ $t('lists.progress.deadline', { time: fmtTime(i.funding_deadline) }) }}</template></p>
           </template>
+          <p v-if="i.claimer_count" class="c-mute c-small c-m0">{{ $t('lists.progress.claimerCount', { n: i.claimer_count }, i.claimer_count) }}</p>
           <div v-if="!locked" class="c-sub">
             <strong class="c-small">{{ $t('lists.progress.donors') }}</strong>
             <p v-if="!(contribsByItem[i.item_id] || []).length" class="c-mute c-m0">{{ $t('lists.progress.noDonors') }}</p>
@@ -134,6 +141,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
           <span v-else>{{ i.qty_claimed }} / {{ i.qty_needed }}</span>
         </div>
         <div v-if="i.qty_claimed !== null" class="c-bar" role="progressbar" :aria-valuenow="Math.min(100, Math.round(i.qty_claimed / i.qty_needed * 100))" aria-valuemin="0" aria-valuemax="100" :aria-label="i.title"><i :style="{ width: Math.min(100, i.qty_claimed / i.qty_needed * 100) + '%' }" /></div>
+        <p v-if="i.claimer_count" class="c-mute c-small c-m0">{{ $t('lists.progress.claimerCount', { n: i.claimer_count }, i.claimer_count) }}</p>
         <ul v-for="c in claimsByItem[i.item_id] || []" :key="c.id" class="c-list">
           <li class="c-row wrap">
             <span class="c-grow" style="flex-basis:100%">{{ c.claimer_name || $t('lists.progress.guest') }} ×{{ c.qty }}<template v-if="c.note"> ・{{ c.note }}</template></span>

@@ -9,15 +9,17 @@
 
 **為什麼是第一優先**：正式環境已有真實資料寫入，PostgreSQL 與後端同機（單點），目前**沒有任何備份**。`SHIPPING_ENC_KEY` 又沒有輪替機制，資料與金鑰任一遺失都無法恢復。
 
-- [ ] **決策並寫入文件**：方案 A（WAL 歸檔＋基底備份，pgBackRest／WAL-G → R2，RPO 約數分鐘、可 PITR）或方案 B（排程 `pg_dump`，RPO = 備份間隔，PRD 的 RPO ≤ 5 分鐘需改寫並由產品負責人接受）。
-- [ ] 先**實測 Dokploy 內建備份**：實際機制（是否 `pg_dump`、能否 PITR、最短排程間隔）、是否支援 Compose 型服務（`db` 是 Compose，不是 Dokploy 管理的 Database 類型，可能不適用）。
-- [ ] 備份目的地用 **R2 的獨立 bucket**（例如 `wishly-backup`），使用**另一組** S3 API Token（只限該 bucket；不得重用 `wishly-media` 的金鑰，也不可放在 VPS 的應用環境變數裡讓應用能讀）。
+- [x] **決策**（2026-10-21，產品負責人）：兩者都做。先上方案 B（每小時 `pg_dump`，暫時 RPO = 1 小時、無 PITR），再做方案 A（WAL-G → R2）以達成 PRD 的 RPO ≤ 5 分鐘、PITR 7 天。操作見 `deploy-runbook.md` §6。
+- [x] 方案 B 上線（2026-10-21）：`scripts/db-backup.sh` 部署到 VPS `/opt/wishly-backup/`，`/etc/cron.d/wishly-backup` 每小時執行；`-Fc -Z zstd` 先壓縮再存與傳，本機保留 48 份（0600）。沒有使用 Dokploy 內建備份：它只支援 Dokploy 的 Database 類型，`db` 是 Compose 服務。
+- [ ] **R2 備份 bucket 與憑證**（由你操作，機密不經代理程式）：建立 `wishly-db-backups`（APAC）、只限該 bucket 的 Object Read & Write token（不得重用 `wishly-media` 的金鑰）、生命週期 30 天刪除；照 `scripts/db-backup.r2.env.example` 寫入 VPS 的 `/etc/wishly-backup/r2.env`（chmod 600）。之後手動執行一次 `db-backup.sh`，確認 R2 上有檔案。
 - [ ] 備份與 `SHIPPING_ENC_KEY` **不放在同一處**；確認該金鑰已存放於**兩個獨立位置**（密碼管理器＋離線）。
-- [ ] **還原演練**：還原到暫存實例（不碰正式 `db` 服務），啟動後端對帳（同 `assert_all_reconciled` 的檢查）通過，記錄實際 **RTO**；之後每季一次。
-- [ ] 備份新鮮度告警：備份失敗或超過 N 小時未成功要通知（備份靜默失敗是最常見的事故）。
+- [x] **還原演練（本機副本）**（2026-10-21）：`db-restore-drill.sh` 在 VPS 上把 `wishly-20261021T090717Z.dump` 還原到無網路的暫存容器，migration 28 全部成功，對帳通過（12 users／8 wishlists／16 items／2 claims），**資料庫還原耗時 8 秒**。之後每季一次。
+- [ ] 還原演練（從 R2 下載）：R2 設好後照 runbook §6 做一次。
+- [ ] 備份新鮮度告警：註冊 healthchecks.io（或同類服務，週期 1 小時、寬限 30 分），把 ping 網址填進 `r2.env` 的 `PING_URL`。腳本只有全部成功才會 ping。
+- [ ] **方案 A：WAL-G**：`db` 掛載 wal-g 執行檔，設定 `archive_mode=on`、`archive_command`、`archive_timeout=300`，每日基底備份並保留 7 天。**需要重啟 `db`**（`archive_mode` 只在啟動時讀取），要排停機時段。完成後做 PITR 演練，並改寫 runbook §6。
 - [ ] 寫「整機掛掉」恢復手冊並計時：新 VPS → Dokploy → 還原 DB → 設環境變數 → Tunnel。
 - [ ] Linode 整機備份／快照啟用，視為輔助（不等於資料庫一致性備份）。
-- [ ] 高風險 migration 前先手動做一次備份並記錄（回滾只能靠備份）。
+- [x] 高風險 migration 前先手動備份：已寫入 runbook §3（執行 `db-backup.sh`）。
 
 相關：清單 §2.1、§7.13、§8。
 

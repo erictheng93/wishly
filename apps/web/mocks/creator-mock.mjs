@@ -169,7 +169,7 @@ http.createServer(async (req, res) => {
     if (!authed()) return
     if (!body.title?.trim()) return problem(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/title', code: 'REQUIRED', detail: '請輸入清單名稱' }] })
     if (body.surprise_mode && (!body.event_date || Date.parse(body.event_date) <= Date.now())) return problem(res, 422, 'VALIDATION_FAILED', '活動日需為未來日期', { errors: [{ pointer: '/event_date', code: 'RANGE', detail: '驚喜模式需設定未來的活動日' }] })
-    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
+    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: 'claim_ttl_hours' in body ? body.claim_ttl_hours : 168, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
     lists.set(w.id, w); itemsBy.set(w.id, [])
     return send(res, 201, pub(w))
   }
@@ -203,9 +203,9 @@ http.createServer(async (req, res) => {
     return send(res, 200, {
       wishlist_id: w.id, surprise_locked: locked, unlock_at: w.event_date ? new Date(unlockAt(w)).toISOString() : null,
       totals: { ...completion(w), qty_needed: it.reduce((s, i) => s + i.qty_needed, 0), qty_claimed: it.reduce((s, i) => s + i.qty_claimed, 0), target_points: 0, pledged_points: 0, funded_item_count: 0 },
-      items: it.map((i) => ({ item_id: i.id, title: i.title, funding_mode: 'quantity', qty_needed: i.qty_needed, qty_claimed: locked ? null : i.qty_claimed, target_points: null, pledged_points: null, funding_status: null })),
+      items: it.map((i) => ({ item_id: i.id, title: i.title, funding_mode: 'quantity', qty_needed: i.qty_needed, qty_claimed: i.qty_claimed, claimer_count: claims.filter((c) => c.item_id === i.id && ['reserved', 'purchased', 'delivered'].includes(c.status)).length, target_points: null, pledged_points: null, funding_status: null })),
       orders_summary: { funded_count: 0, ordered_count: 0, shipped_count: 0, delivered_count: 0 },
-      claims: locked ? null : claims.filter((c) => it.some((i) => i.id === c.item_id)), contributions: locked ? null : [],
+      claims: locked ? [] : claims.filter((c) => it.some((i) => i.id === c.item_id)), contributions: [],
     })
   }
   if ((g = p.match(/^\/wishlists\/([^/]+)\/items$/)) && m === 'POST') {

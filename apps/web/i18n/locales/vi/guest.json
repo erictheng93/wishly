@@ -74,7 +74,6 @@
         "medium": "Trung bình",
         "low": "Thấp"
       },
-      "masked": "Đang ở chế độ bất ngờ",
       "raised": "Đã góp",
       "leftPts": " · còn thiếu {n} điểm",
       "target": "Mục tiêu",
@@ -156,6 +155,8 @@
       "owner": " (chủ sở hữu: {name})",
       "loginToView": "Đăng nhập để xem",
       "addFriend": "Đến trang của {name} để kết bạn",
+      "sendFriendRequest": "Gửi lời mời kết bạn đến {name}",
+      "friendRequestSent": "Đã gửi lời mời kết bạn. Bạn có thể xem danh sách này sau khi họ chấp nhận.",
       "noJs": "Cần bật JavaScript để nhận tặng; bạn vẫn có thể xem danh sách.",
       "offline": "Bạn đang ngoại tuyến. Đang hiển thị nội dung tải lần trước, tạm dừng nhận tặng.",
       "lineHint": "Muốn lưu lại phần nhận tặng? Chạm ⋯ ở góc phải trên và chọn \"Mở bằng trình duyệt mặc định\" để dễ tìm lại. ",
@@ -166,7 +167,8 @@
       "date": "Ngày: {date} · ",
       "endsAt": "Kết thúc {time} · ",
       "createdBy": "Tạo bởi {name}",
-      "maskedBanner": "Bạn đang xem với tư cách người tạo. Tiến độ từng món được ẩn cho đến khi mở khóa.",
+      "maskedBanner": "Bạn đang xem với tư cách người tạo. Bạn xem được tiến độ từng món, nhưng không biết ai tặng gì cho đến khi mở khóa.",
+      "surpriseHint": "Đây là danh sách bất ngờ: trước ngày sự kiện, người tạo sẽ không biết ai tặng gì, xin đừng tiết lộ nhé",
       "completion": "Hoàn thành {pct}% · {done} / {total} món",
       "empty": "Người tạo vẫn đang chuẩn bị danh sách, hãy quay lại sau nhé.",
       "loginHint": "Cần đăng nhập để nhận tặng.",
@@ -183,7 +185,8 @@
       "doneLine": "Bạn đã nhận tặng {title} × {qty}, cảm ơn bạn!",
       "doneHint": "Xem, đánh dấu đã mua hoặc hủy trong \"Quà tôi đã nhận\".",
       "lineBrowser": "Trong trình duyệt tích hợp của LINE, hãy giữ trạng thái đăng nhập; chạm ⋯ ở góc phải trên rồi chọn \"Mở bằng trình duyệt mặc định\" sẽ ổn định hơn.",
-      "viewMyClaims": "Xem quà tôi đã nhận"
+      "viewMyClaims": "Xem quà tôi đã nhận",
+      "doneDeadline": "Vui lòng đánh dấu đã mua trong Đóng góp của tôi trước {date}, quá hạn sẽ được nhường cho bạn bè khác."
     },
     "live": {
       "live": "Cập nhật trực tiếp",

@@ -47,6 +47,7 @@
 .g-radio{display:flex;gap:8px;align-items:center;min-height:44px;margin:0!important}
 .g-inline{display:flex;gap:8px}
 .g-inline input{flex:1;min-width:0;font:inherit;font-size:16px;min-height:44px;padding:8px 12px;border:1px solid var(--line);background:var(--bg-alt);color:var(--fg);box-sizing:border-box}
+.g-vis{display:block;margin-top:6px}
 .g-actions{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .g-h2{font-size:17px;margin:0 0 8px}
 .g-step{display:flex;align-items:center;gap:24px;justify-content:center;margin:16px 0}

@@ -105,7 +105,10 @@
       "word": "刪除",
       "prompt": "請輸入「{word}」以確認",
       "hasPoints": "{detail}（可到「我的點數」撤回認捐）",
-      "hasBalance": "{detail}（餘額 {balance} 點、未完成認捐 {pledged}、未結案訂單 {orders}）請先處理後再刪除。"
+      "hasBalance": "{detail}（餘額 {balance} 點、未完成認捐 {pledged}、未結案訂單 {orders}）請先處理後再刪除。",
+      "password": "目前密碼",
+      "badPassword": "密碼不正確",
+      "relogin": "重新登入"
     },
     "terms": "服務條款",
     "privacy": "隱私權政策"

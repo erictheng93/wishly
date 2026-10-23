@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F2/F8 清單驗證</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="index.html">← 流程驗證總覽</a></p>
+<h1>F2 建立清單與品項 · F8 清單關閉 / 封存</h1>
+<p class="sub">驗證日期 2026-10-21 · 規格 <a href="../02-master-user-flow.html">02</a> v0.5，對照契約 <a href="../04-data-schema-api-contract.html">04</a> · 環境：本機 e2e 堆疊（含 MinIO 上傳）</p>
+
+<h2>結論</h2>
+<p>建立 → 上傳圖片 → 新增 / 排序 / 刪除品項 → 發佈 → 結束 → 重新開放 → 封存 → 取消封存，全程可用。發現 <b>3 個缺陷已修正</b>；另有數項 02 與實作不同，但<b>實作與較新的 04 契約一致</b>，列為「02 文件待更新」（<a href="decisions.html#q6">Q6</a>）。</p>
+
+<h2>驗證方式</h2>
+<table>
+<tr><td>API 探測</td><td>所有狀態轉換組合、發佈檢查（無品項、驚喜模式缺活動日）、QTY_BELOW_CLAIMED、ITEM_HAS_CLAIMS、排序（完整 / 部分 id）、closed 後的各種編輯、STALE_VERSION 樂觀鎖。</td></tr>
+<tr><td>Playwright 手動探索</td><td>/lists/new 表單驗證、上傳非圖片與 PNG、<code>javascript:</code> 商品網址、數量 0、快速連按上移、發佈後分享框、結束 / 重新開放、從儀表板封存、封存後編輯頁、有捐助的品項刪除。</td></tr>
+<tr><td>自動化（新增）</td><td>後端 <code>apps/api/tests/wishlist_lifecycle.rs</code>（2 個測試）；E2E <code>apps/web/e2e/flow-f08-list-lifecycle.spec.ts</code>（2 個測試，真實 API）。</td></tr>
+<tr><td>既有自動化</td><td>wishlist_items.rs、wishlist_guards.rs、closes_at.rs、uploads.rs、hardening.rs、crowdfund_owner.rs；E2E creator-journey、dashboard。</td></tr>
+</table>
+
+<h2>規則對照</h2>
+<div class="wrap"><table>
+<tr><th>規則</th><th>結果</th><th>證據</th></tr>
+<tr><td>F2 新清單預設 visibility = friends（D51）</td><td><span class="tag pass">通過</span></td><td>/lists/new 預設選「所有好友」</td></tr>
+<tr><td>F2 發佈至少 1 個品項，否則 409 <code>WISHLIST_NOT_PUBLISHABLE</code> + errors[]</td><td><span class="tag pass">通過</span></td><td>API 探測；UI 無品項時發佈鈕停用</td></tr>
+<tr><td>F2 驚喜模式需未來活動日</td><td><span class="tag pass">通過</span></td><td>前端「開啟驚喜模式需設定活動日」；API 422</td></tr>
+<tr><td>F2 上傳只收 jpeg/png/webp，伺服器驗內容</td><td><span class="tag pass">通過</span></td><td>假 PNG → confirm 422「無法辨識圖片格式」；真 PNG 轉 webp</td></tr>
+<tr><td>F2 qty_needed 不可低於已捐助 → <code>QTY_BELOW_CLAIMED</code></td><td><span class="tag pass">通過</span></td><td>API 409；UI 欄位 min = 已捐助數</td></tr>
+<tr><td>F2 刪除有捐助的品項 → <code>ITEM_HAS_CLAIMS</code>，force 後取消捐助</td><td><span class="tag pass">通過</span></td><td>UI 二次確認「連同捐助一併刪除」；e2e flow-f08 #1</td></tr>
+<tr><td>F2 排序一次提交完整 id 陣列，部分 id → 422</td><td><span class="tag pass">通過（新增 E2E）</span></td><td>連按上移兩次、重整後保留；公開頁同序</td></tr>
+<tr><td>F2 商品網址只收 http(s)</td><td><span class="tag pass">通過</span></td><td><code>javascript:</code> → 422（訊息露出欄位名 product_url，見觀察）</td></tr>
+<tr><td>F8 發佈後不可退回 draft；draft → closed 不允許</td><td><span class="tag pass">通過（新增測試）</span></td><td>wishlist_lifecycle.rs status_transitions</td></tr>
+<tr><td>F8 不允許的轉換錯誤碼</td><td><span class="tag decide">02 待更新</span></td><td>實作 422 <code>VALIDATION_FAILED</code>（errors[].code = TRANSITION），與 04 一致；02 寫 409 <code>INVALID_STATE_TRANSITION</code></td></tr>
+<tr><td>F8 closed ↔ active、archived → closed（取消封存），同狀態冪等</td><td><span class="tag pass">通過</span></td><td>wishlist_lifecycle.rs、wishlist_guards.rs</td></tr>
+<tr><td>F8 closed / archived 不可增刪改品項、不可排序</td><td><span class="tag fixed">已修正</span></td><td>缺陷 B6（刪除品項原本可成功）</td></tr>
+<tr><td>F8 closed 仍可改標題 / 描述</td><td><span class="tag pass">通過</span></td><td>wishlist_lifecycle.rs</td></tr>
+<tr><td>F8 closed 後 owner 仍可標 delivered</td><td><span class="tag pass">通過</span></td><td>API 探測</td></tr>
+<tr><td>F8 DELETE 空草稿實體刪除</td><td><span class="tag decide">02 待更新</span></td><td>實作一律封存（04 D13：不實體刪除）</td></tr>
+<tr><td>F8 active → archived</td><td><span class="tag decide">02 待更新</span></td><td>02 狀態圖沒有此轉換，但 DELETE 語意本就是封存；04 允許</td></tr>
+<tr><td>F8 封存公開頁 404、儀表板預設隱藏</td><td><span class="tag pass">通過</span></td><td>e2e flow-f08 #2、dashboard.spec</td></tr>
+<tr><td>F8 closes_at 自動關閉、到期前提醒、重開需延後</td><td><span class="tag pass">通過（既有）</span></td><td>closes_at.rs 9 個測試、creator-journey</td></tr>
+</table></div>
+
+<h2>缺陷與處置</h2>
+<h3>B6 · 已結束 / 封存的清單仍可刪除品項 <span class="tag fixed">已修正</span></h3>
+<p>重現：清單 closed 後，<code>PATCH /items/{id}</code>、新增、排序都回 409 <code>WISHLIST_CLOSED</code>，唯獨 <code>DELETE /items/{id}</code> 回 204，品項從已結束的公開頁消失。違反 F8「closed：不可增刪品項」與 04「closed / archived 後修改品項回 WISHLIST_CLOSED」。前端已隱藏刪除鈕，所以只能經 API 觸發。</p>
+<p>修正：<code>apps/api/src/wishlists.rs</code> <code>item_delete</code> 在取得清單列鎖之後讀狀態，closed / archived 回 409。沿用既有 <code>FOR UPDATE</code> 語句、未改鎖序（不需新增 mutant）。<code>closed_and_archived_freeze_items</code> 已確認修正前失敗。</p>
+
+<h3>B7 · 封存清單的編輯頁仍顯示設定表單與「分享」 <span class="tag fixed">已修正</span></h3>
+<p>重現：封存後開 <code>/lists/{id}/edit</code>，「清單設定」可展開並儲存，結果是紅字「清單已關閉或封存，無法修改。」加上無用的「重試」；「分享」可開分享框並複製連結，但連結是 404。</p>
+<p>修正：<code>edit.vue</code> 在 archived 時不顯示設定區塊與分享鈕，只留「取消封存」。e2e flow-f08 #2 覆蓋。</p>
+
+<h3>B8 · 連按排序可能存成與畫面不同的順序 <span class="tag fixed">已修正</span></h3>
+<p>全套 E2E 並行執行時，新排序測試偶發失敗，追查後確認：每按一次「上移 / 下移」就各自送出一個 <code>POST /items/reorder</code>（帶當下完整順序），請求並行；在網路 / 伺服器較忙時，先送出的可能較晚寫入，後端留下舊順序，重整後畫面「跳回去」。</p>
+<p>修正：<code>edit.vue</code> 的 <code>move()</code> 改為佇列依序送出。E2E 等兩次回應都完成才重整，連跑 5 次皆通過。</p>
+
+<h2>裝置與解析度</h2>
+<p>新增的 flow-* E2E 已加入 <code>mobile</code>（iPhone 13，390×664、觸控）與 <code>tablet</code>（iPad gen 7，810×1080）兩個 project，三種裝置皆通過。另以 Playwright 在 320 寬、iPhone 13、iPad Mini 直式、iPad 橫式、1280、1920 六種解析度掃描 <code>/lists/new</code>、<code>/lists/{id}/edit</code>、<code>/dashboard</code>：檢查水平捲動與超出視窗的元素（皆無），並逐張看截圖。</p>
+
+<h2>探索觀察（未列缺陷）</h2>
+<ul>
+<li>「建立並新增品項」建立後停在編輯頁的空狀態，需再按一次「＋ 新增品項」；編輯頁已支援 <code>?add=1</code> 自動開啟，可考慮帶上。</li>
+<li>欄位驗證訊息露出 API 欄位名（「product_url 必須是 http(s) 網址」），屬 <a href="https://github.com/erictheng93/wishly/issues/29">#29</a> 的在地化範圍。</li>
+<li>「結束清單」收在「清單設定」摺疊區內，較不易找到；不阻擋。</li>
+<li>擁有者「結束清單」無確認框：可重新開放，屬可逆操作，合理。</li>
+</ul>
+</main>
+</body>
+</html>

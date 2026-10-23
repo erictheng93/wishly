@@ -276,7 +276,11 @@ async fn turnstile_verification() {
         .unwrap_err();
     assert!(matches!(
         e,
-        wishly_api::error::AppError::Problem { status: 503, .. }
+        wishly_api::error::AppError::Problem {
+            status: 503,
+            code: "CAPTCHA_UNAVAILABLE",
+            ..
+        }
     ));
 }
 

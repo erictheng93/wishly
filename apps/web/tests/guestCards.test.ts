@@ -89,13 +89,13 @@ it.each([
   expect(fund).not.toHaveBeenCalled()
 })
 
-it.each([quantity, crowdfunding])('masked card hides contribution details, progress, product link and actions', item => {
+it.each([quantity, crowdfunding])('masked card shows progress but hides contributors, product link and actions', item => {
   const el = card(item, { masked: true })
-  expect(el.textContent).toContain('驚喜模式中')
   expect(el.textContent).toContain('建立者不可捐助自己的清單')
   expect(el.textContent).not.toContain('送禮者')
   expect(el.textContent).not.toContain('贊助者')
-  expect(el.querySelector('[role="progressbar"]')).toBeNull()
+  expect(el.querySelector('[role="progressbar"]')).not.toBeNull()
+  expect(el.textContent).toContain(item === quantity ? '2 / 5' : '200')
   expect(el.querySelector('button')).toBeNull()
   expect(el.querySelector('a')).toBeNull()
   expect(claim).not.toHaveBeenCalled()

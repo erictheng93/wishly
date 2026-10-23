@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# 排程邏輯備份（checklist §2.1 方案 B）：pg_dump（zstd 壓縮）→ 驗證可讀 → 本機保留 → 上傳 R2。
+# VPS 上由 cron 每小時執行，見 docs/deploy-runbook.md §6。
+set -euo pipefail
+umask 077 # dump 含 email、密碼雜湊，只給 root 讀
+DB=${DB_CONTAINER:-wishly-db-2y7t3r-db-1}
+DIR=${BACKUP_DIR:-/var/backups/wishly}
+ENV_FILE=${R2_ENV_FILE:-/etc/wishly-backup/r2.env}
+KEEP_LOCAL=${KEEP_LOCAL:-48}
+RCLONE_IMAGE=rclone/rclone:1.68.2
+
+mkdir -p "$DIR"
+f="$DIR/wishly-$(date -u +%Y%m%dT%H%M%SZ).dump"
+# -Fc 自帶壓縮，壓縮後才落地與上傳；pg_restore 直接讀，不需另外解壓
+docker exec "$DB" pg_dump -U wishly -d wishly -Fc -Z zstd >"$f.part"
+# 目錄可列出才算完整，避免把截斷的檔案當成備份
+docker exec -i "$DB" pg_restore -l >/dev/null <"$f.part"
+mv "$f.part" "$f"
+
+if [ -f "$ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$ENV_FILE" # R2_BUCKET、RCLONE_CONFIG_R2_*、可選 PING_URL
+    docker run --rm --network host --env-file "$ENV_FILE" -v "$DIR:/data:ro" "$RCLONE_IMAGE" \
+        copyto "/data/$(basename "$f")" "r2:$R2_BUCKET/postgres/$(basename "$f")" --s3-no-check-bucket
+fi
+
+ls -1t "$DIR"/wishly-*.dump | tail -n +$((KEEP_LOCAL + 1)) | xargs -r rm --
+# 全部成功才回報；沒收到 ping 由監控服務告警（備份靜默失敗最危險）
+if [ -n "${PING_URL:-}" ]; then curl -fsS -m 10 "$PING_URL" >/dev/null; fi
+echo "ok $f $(wc -c <"$f") bytes"

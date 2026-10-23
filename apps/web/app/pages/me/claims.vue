@@ -7,6 +7,8 @@ const state = ref<'loading' | 'ok' | 'empty' | 'error'>('loading')
 const guest = ref<any>(null), rows = ref<any[]>([]), recoverFailed = ref(false), msg = ref('')
 const editing = ref(false), nick = ref('')
 const label = (s: string) => t(`me.claims.status.${s}`)
+// 清單結束後仍可標記已購買 / 已送達或取消，但不能改數量、不能延長期限（CTO 決議放寬 Q2）
+const closed = (w: any) => ['closed', 'archived'].includes(w.status)
 const active = computed(() => rows.value.filter(r => ['reserved', 'purchased', 'delivered'].includes(r.claim.status)))
 const past = computed(() => rows.value.filter(r => !active.value.includes(r)))
 const groups = computed(() => {
@@ -36,11 +38,15 @@ onMounted(async () => {
 
 const guard = async (f: () => Promise<any>) => { msg.value = ''; try { await f() } catch (e: any) { msg.value = e.detail } }
 const setStatus = (r: any, status: string) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { status } })).claim) })
+// Q12：購買期限延長 7 天，一次為限
+const extend = (r: any) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { extend: true } })).claim) })
 const cancel = (r: any) => {
   const text = t(r.claim.status === 'purchased' ? 'me.claims.confirmCancelPurchased' : 'me.claims.confirmCancel')
   if (confirm(text)) guard(async () => { await api(`/claims/${r.claim.id}`, { method: 'DELETE' }); r.claim.status = 'cancelled' })
 }
-const setVis = (r: any, ev: Event) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { visibility: (ev.target as HTMLSelectElement).value } })).claim) })
+// Q13：建立者改過品項內容，捐助者按「知道了」後隱藏
+const ackChange = (r: any) => guard(async () => { await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { ack_item_change: true } }); r.item_changed_at = null })
+const setVis =(r: any, ev: Event) => guard(async () => { Object.assign(r.claim, (await api(`/claims/${r.claim.id}`, { method: 'PATCH', body: { visibility: (ev.target as HTMLSelectElement).value } })).claim) })
 const saveNick = () => guard(async () => { guest.value = (await api('/guest/me', { method: 'PATCH', body: { display_name: nick.value } })).guest; editing.value = false })
 const wipe = () => {
   if (confirm(t('me.claims.confirmWipe'))) guard(async () => {
@@ -71,14 +77,17 @@ const wipe = () => {
         <div v-for="r in g.list" :key="r.claim.id" class="g-card g-item">
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
-            <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}</div>
-            <span class="g-badge">{{ label(r.claim.status) }}</span>
-            <label v-if="r.claim.visibility" class="g-mute">{{ $t('me.whoSees') }}
+            <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}<span class="g-badge">{{ label(r.claim.status) }}</span></div>
+            <div v-if="r.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(r.item_changed_at) }) }}<button class="g-link" @click="ackChange(r)">{{ $t('me.claims.ackItemChange') }}</button></div>
+            <label v-if="r.claim.visibility" class="g-mute g-vis">{{ $t('me.whoSees') }}
               <select :value="r.claim.visibility" @change="setVis(r, $event)"><option value="public">{{ $t('me.vis.public') }}</option><option value="friends">{{ $t('me.vis.friends') }}</option><option value="private">{{ $t('me.vis.private') }}</option></select>
             </label>
+            <div v-if="r.claim.status === 'reserved' && r.claim.expires_at" class="g-mute js-deadline">{{ $t('me.claims.deadline', { date: fmtTime(r.claim.expires_at) }) }}</div>
+            <div v-if="closed(r.wishlist) && r.claim.status !== 'delivered'" class="g-mute">{{ $t('me.claims.closedHint') }}</div>
             <div class="g-actions">
               <button v-if="r.claim.status === 'reserved'" class="g-btn sm" @click="setStatus(r, 'purchased')">{{ $t('me.claims.markPurchased') }}</button>
               <button v-if="r.claim.status === 'purchased'" class="g-btn sm" @click="setStatus(r, 'delivered')">{{ $t('me.claims.markDelivered') }}</button>
+              <button v-if="r.claim.status === 'reserved' && r.claim.expires_at && !r.claim.extended_at && !closed(r.wishlist)" class="g-btn ghost sm" @click="extend(r)">{{ $t('me.claims.extend') }}</button>
               <button v-if="r.claim.status !== 'delivered'" class="g-btn ghost sm" @click="cancel(r)">{{ $t('me.claims.cancel') }}</button>
             </div>
           </div>

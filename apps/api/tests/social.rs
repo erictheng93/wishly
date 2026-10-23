@@ -1085,7 +1085,7 @@ async fn claim_visibility_default_override_patch(pool: PgPool) {
             .status(),
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    // 別人不能改
+    // 別人不能改（404，不洩漏存在）
     let (_, tb, _) = handle_user(&pool, "B", None).await;
     assert_eq!(
         common::call(
@@ -1097,7 +1097,7 @@ async fn claim_visibility_default_override_patch(pool: PgPool) {
         )
         .await
         .0,
-        StatusCode::FORBIDDEN
+        StatusCode::NOT_FOUND
     );
     common::assert_all_reconciled(&pool).await;
 }

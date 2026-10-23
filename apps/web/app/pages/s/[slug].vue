@@ -77,13 +77,18 @@ const myClaims = ref<Record<string, any>>({})
 async function loadMine() {
   try { // 不先檢查 token：登入使用者靠 session cookie 捐助，沒有 guest token
     const r = await api('/guest/me?limit=100')
-    myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, c.claim]))
+    myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, { ...c.claim, item_changed_at: c.item_changed_at }]))
   } catch { /* 401：token 失效，當作沒有 */ }
 }
-// 建立者本人 + 驚喜模式 → 軟性遮蔽（GET /me 比對 owner.id）
+// Q13：建立者改過品項內容的提醒，按「知道了」後隱藏
+async function ackChange(id: string) {
+  const c = myClaims.value[id]
+  try { await api(`/claims/${c.id}`, { method: 'PATCH', body: { ack_item_change: true } }); myClaims.value = { ...myClaims.value, [id]: { ...c, item_changed_at: null } } } catch { /* 下次載入仍會顯示 */ }
+}
+// 建立者本人 + 驚喜鎖定中 → 軟性遮蔽：看得到數量，不能捐助；捐助者姓名由 API 在鎖定期間就不輸出（GET /me 比對 owner.id）
 const isOwner = ref(false)
 const me = ref<any>(null) // 已登入使用者：捐助以帳號名稱進行，不再問暱稱
-const masked = computed(() => isOwner.value && !!data.value?.surprise_mode)
+const masked = computed(() => isOwner.value && !!data.value?.surprise_locked)
 
 let live: ReturnType<typeof createLiveRefresh> | undefined
 // 認捐需登入：開啟前先等 /me 回來；未登入（含只有舊訪客 token）一律導去登入並帶回本頁。SSR 一律先當未登入渲染（按鈕為登入連結），client 確認登入後才換成「我要送」
@@ -159,6 +164,14 @@ function onFunded(r: any) {
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
 function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }
+// Q9：非好友看到好友限定清單時，直接用擁有者 ID 送好友邀請（擁有者不一定有 handle / 個人頁）
+const { api: authApi } = useApi()
+const friendReq = ref<'idle' | 'busy' | 'sent'>('idle'), friendErr = ref('')
+async function sendFriendRequest() {
+  friendReq.value = 'busy'; friendErr.value = ''
+  try { await authApi('/friends/requests', { method: 'POST', body: { to: gate.value.owner.id } }); friendReq.value = 'sent' }
+  catch (e) { friendErr.value = errMsg(e); friendReq.value = 'idle' }
+}
 function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = false }
 </script>
 
@@ -169,9 +182,14 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
     <div v-else-if="forbidden" class="g-center">
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
-        <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.code === 'FRIENDS_ONLY' && gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
+        <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
         <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.slug.loginToView') }}</NuxtLink>
-        <NuxtLink v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.handle" class="g-btn" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink>
+        <template v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.id">
+          <button class="g-btn" :disabled="friendReq !== 'idle'" @click="sendFriendRequest">{{ $t('guest.slug.sendFriendRequest', { name: gate.owner.display_name }) }}</button>
+          <p v-if="friendReq === 'sent'" role="status">{{ $t('guest.slug.friendRequestSent') }}</p>
+          <p v-if="friendErr" class="g-banner err" role="alert">{{ friendErr }}</p>
+          <p v-if="gate.owner.handle"><NuxtLink class="g-link" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink></p>
+        </template>
       <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
     <div v-else-if="failed && !data" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
@@ -189,15 +207,14 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       </p>
       <p v-if="data.description">{{ data.description }}</p>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
-      <template v-else>
-        <div class="g-mute">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
-        <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
-      </template>
+      <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
+      <div class="g-mute">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
+      <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
       <p v-if="!items.length" class="g-center g-mute">{{ $t('guest.slug.empty') }}</p>
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
-          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" />
+          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
@@ -223,6 +240,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <GuestDialog v-if="done" labelledby="done-title" @close="done = null"><div class="g-sheet center">
       <h1 id="done-title" class="ok">{{ $t('guest.slug.doneTitle') }}</h1>
       <p>{{ $t('guest.slug.doneLine', { title: done.title, qty: done.claim.qty }) }}</p>
+      <p v-if="done.claim.expires_at" class="js-done-deadline">{{ $t('guest.slug.doneDeadline', { date: fmtTime(done.claim.expires_at) }) }}</p>
       <div class="g-banner ok">{{ $t('guest.slug.doneHint') }}</div>
       <div v-if="isLineBrowser()" class="g-banner">{{ $t('guest.slug.lineBrowser') }}</div>
       <NuxtLink class="g-btn block" to="/me/claims">{{ $t('guest.slug.viewMyClaims') }}</NuxtLink>

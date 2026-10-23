@@ -698,17 +698,18 @@ async fn dashboard_and_orders_hide_everything_while_surprise_locked(pool: PgPool
     )
     .await;
     assert_eq!(d["surprise_locked"], true);
-    assert!(d["contributions"].is_null() && d["claims"].is_null(), "{d}");
+    assert!(
+        d["contributions"] == json!([]) && d["claims"] == json!([]),
+        "{d}"
+    );
     assert!(
         d["totals"]["pledged_points"].is_null() && d["totals"]["funded_item_count"].is_null(),
         "{d}"
     );
     let i = &d["items"][0];
+    assert_eq!(i["pledged_points"], 500, "{i}"); // Q8：點數照給，只遮身分與狀態細節
     assert!(
-        i["pledged_points"].is_null()
-            && i["funding_status"].is_null()
-            && i["display_status"].is_null()
-            && i["funded_at"].is_null(),
+        i["funding_status"].is_null() && i["display_status"].is_null() && i["funded_at"].is_null(),
         "{i}"
     );
     assert!(!d.to_string().contains("阿明"));
@@ -745,6 +746,88 @@ async fn dashboard_and_orders_hide_everything_while_surprise_locked(pool: PgPool
         "{b}"
     );
     common::assert_all_reconciled(&pool).await;
+}
+
+/// Q8：驚喜鎖定期間建立者看得到各品項數量與幾人認領，但看不到是誰、留言或時間
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn locked_dashboard_shows_counts_but_not_who(pool: PgPool) {
+    let TestUser { id: o, token: t } = common::user(&pool, "媽媽").await;
+    let wl = common::wishlist(
+        &pool,
+        o,
+        common::ListOpts {
+            surprise: true,
+            event_offset_days: Some(30),
+            ..Default::default()
+        },
+    )
+    .await;
+    let qi = common::item(&pool, wl.id, "奶瓶", 3).await;
+    common::user_claim(&pool, qi, 1).await; // 捐助者名稱皆為「小明」
+    common::user_claim(&pool, qi, 1).await;
+    let ci = common::crowdfund_item(&pool, wl.id, 1000).await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    let TestUser { id: b, token: _ } = common::user(&pool, "阿華").await;
+    pledge(&pool, ci, a, 300, false).await;
+    pledge(&pool, ci, b, 200, false).await;
+
+    let dash = || async {
+        call(
+            &pool,
+            "GET",
+            &format!("/wishlists/{}/dashboard", wl.id),
+            &ck(&t),
+            None,
+        )
+        .await
+        .2
+    };
+    let find = |d: &Value, id: Uuid| {
+        d["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["item_id"] == id.to_string())
+            .unwrap()
+            .clone()
+    };
+    let d = dash().await;
+    assert_eq!(d["surprise_locked"], true, "{d}");
+    let (q, c) = (find(&d, qi), find(&d, ci));
+    assert_eq!(
+        (q["qty_claimed"].as_i64(), q["claimer_count"].as_i64()),
+        (Some(2), Some(2)),
+        "{q}"
+    );
+    assert_eq!(
+        (c["pledged_points"].as_i64(), c["claimer_count"].as_i64()),
+        (Some(500), Some(2)),
+        "{c}"
+    );
+    assert_eq!(d["claims"], json!([]), "{d}");
+    assert_eq!(d["contributions"], json!([]), "{d}");
+    assert!(
+        c["funded_at"].is_null() && c["funding_status"].is_null(),
+        "{c}"
+    );
+    let raw = d.to_string();
+    for leak in ["小明", "阿明", "阿華", "加油"] {
+        assert!(!raw.contains(leak), "{leak} leaked: {raw}");
+    }
+
+    // 解鎖後名單出現，claimer_count 不變
+    sqlx::query("UPDATE wishlists SET event_date = current_date - 1 WHERE id = $1")
+        .bind(wl.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let d = dash().await;
+    assert_eq!(d["surprise_locked"], false);
+    assert_eq!(find(&d, qi)["claimer_count"], 2);
+    assert_eq!(find(&d, ci)["claimer_count"], 2);
+    assert_eq!(d["claims"].as_array().unwrap().len(), 2);
+    assert_eq!(d["contributions"].as_array().unwrap().len(), 2);
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -957,6 +1040,7 @@ async fn public_page_hides_contributors_while_surprise_locked(pool: PgPool) {
     )
     .await;
     assert_eq!(p["claimers_visible"], false);
+    assert_eq!(p["surprise_locked"], true); // 訪客頁據此顯示「驚喜清單」提示
     assert!(
         p["items"][0].get("contributors").is_none() && !p.to_string().contains("阿明"),
         "{p}"

@@ -36,3 +36,8 @@ it('keeps auth for unrelated 403 responses', async () => {
   expect(token).not.toHaveBeenCalled()
   expect(navigate).not.toHaveBeenCalled()
 })
+
+it('404 without detail says not found, not "connection failed"', async () => {
+  vi.stubGlobal('$fetch', vi.fn().mockRejectedValue({ statusCode: 404, data: { code: 'NOT_FOUND', title: '找不到資源' } }))
+  await expect(useApi().api('/wishlists/x')).rejects.toMatchObject({ code: 'NOT_FOUND', detail: '找不到這個項目，可能已被刪除或你沒有權限' })
+})

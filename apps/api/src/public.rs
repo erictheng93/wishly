@@ -322,7 +322,7 @@ async fn render(
         "cover_image_url": image_url(w.cover_image_key.as_deref(), &w.cover_image_status),
         "event_date": w.event_date, "closes_at": w.closes_at, "id": w.id,
         "owner": { "id": w.owner_id, "display_name": w.owner_name },
-        "surprise_mode": w.surprise_mode, "claimers_visible": visible,
+        "surprise_mode": w.surprise_mode, "surprise_locked": w.locked, "claimers_visible": visible,
         "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
         "items": item_json, "updated_at": w.updated_at,
     });

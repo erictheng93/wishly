@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>流程驗證待決事項</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+.chip{border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:4px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:.85rem}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+.chip b{margin-left:4px}
+#q{flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font:inherit}
+.sync{font-size:.8rem;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+.dot.off{background:var(--muted)}
+article{border:1px solid var(--border);margin:14px 0;padding:14px 16px;transition:background .6s}
+article.flash{background:var(--warnbg)}
+article h2{border:0;margin:0 0 8px;padding:0;font-size:1.1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+article h2 .id{color:var(--muted);font-size:.85rem}
+article h2 .flow{color:var(--muted);font-size:.8rem;font-weight:400}
+dl{display:grid;grid-template-columns:7em 1fr;gap:6px 12px;margin:0}
+dt{color:var(--muted);font-size:.85rem}dd{margin:0}
+dd.you{font-weight:600}
+.pending{background:var(--warnbg);color:var(--warn)}.decided{background:var(--soft);color:var(--accent)}
+.doing{background:var(--code);color:var(--fg)}.done{background:var(--okbg);color:var(--ok)}
+.ex{margin:6px 0 0;padding-left:1.2em}.ex li{margin:4px 0}
+.new{font-size:.75rem;color:var(--warn);font-weight:600}
+@media (max-width:600px){dl{grid-template-columns:1fr}dt{margin-top:6px}}
+</style>
+</head>
+<body>
+<main>
+<p><a href="index.html">← 流程驗證總覽</a></p>
+<h1>待決事項</h1>
+<p class="sub">流程驗證中「改規格或改程式都說得通」、或需要產品判斷的項目。內容來自 <code>decisions-data.js</code>，本頁每 3 秒自動同步，有變動的項目會短暫標亮，不需重新整理。</p>
+<div class="bar" id="chips"></div>
+<div class="bar"><input id="q" type="search" placeholder="搜尋標題、決策或內容" aria-label="搜尋"><span class="sync" id="sync"><span class="dot off"></span>載入中…</span></div>
+<div id="list" aria-live="polite"></div>
+</main>
+<script>
+const LABEL = { pending: '待決', decided: '已決・待處理', doing: '實作中', done: '已完成' }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]).replace(/\n/g, '<br>')
+let data = null, prev = {}, filter = 'all', seen = new Set()
+
+function card(d) {
+  const row = (k, v, cls = '') => v ? `<dt>${k}</dt><dd class="${cls}">${esc(v)}</dd>` : ''
+  const list = (k, arr) => arr?.length ? `<dt>${k}</dt><dd><ul class="ex">${arr.map(([h, t]) => `<li><b>${esc(h)}</b>：${esc(t)}</li>`).join('')}</ul></dd>` : ''
+  const table = d.table ? `<dt>清單</dt><dd class="wrap"><table><tr><th>#</th><th>02 原寫</th><th>實作 / 決策</th></tr>${d.table.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></dd>` : ''
+  const links = d.links?.length ? `<dt>相關</dt><dd>${d.links.map(([t, h]) => `<a href="${esc(h)}">${esc(t)}</a>`).join('、')}</dd>` : ''
+  return `<article id="${d.id}" data-s="${d.status}"><h2><span class="id">${d.id.toUpperCase()}</span>${esc(d.title)}<span class="tag ${d.status}">${LABEL[d.status]}</span><span class="flow">${esc(d.flow)}</span>${seen.has(d.id) ? '<span class="new">剛更新</span>' : ''}</h2><dl>
+    ${row('規格', d.spec)}${row('現況', d.current)}${list('說明', d.explain)}${row('你的決策', d.decision, 'you')}${row('處置', d.resolution)}${list('選項', d.options)}${row('建議', d.recommendation)}${table}${links}</dl></article>`
+}
+
+function render() {
+  if (!data) return
+  const counts = { all: data.items.length }
+  for (const d of data.items) counts[d.status] = (counts[d.status] || 0) + 1
+  document.getElementById('chips').innerHTML = ['all', 'pending', 'decided', 'doing', 'done'].map(k =>
+    `<button class="chip" data-f="${k}" aria-pressed="${filter === k}">${k === 'all' ? '全部' : LABEL[k]}<b>${counts[k] || 0}</b></button>`).join('')
+  const q = document.getElementById('q').value.trim().toLowerCase()
+  const items = data.items.filter(d => (filter === 'all' || d.status === filter) && (!q || JSON.stringify(d).toLowerCase().includes(q)))
+  document.getElementById('list').innerHTML = items.map(card).join('') || '<p class="sub">沒有符合的項目</p>'
+  for (const id of seen) document.getElementById(id)?.classList.add('flash')
+  setTimeout(() => document.querySelectorAll('article.flash').forEach(a => a.classList.remove('flash')), 1200)
+}
+
+function apply(next) {
+  const first = !data
+  const changed = []
+  for (const d of next.items) {
+    const s = JSON.stringify(d)
+    if (!first && prev[d.id] !== s) changed.push(d.id)
+    prev[d.id] = s
+  }
+  if (!first && !changed.length && data.updated === next.updated) return
+  changed.forEach(id => seen.add(id))
+  data = next
+  render()
+  if (first && location.hash) document.querySelector(location.hash)?.scrollIntoView()
+}
+
+// file:// 下 fetch 會被擋，改用重新插入 <script> 載入最新資料（加時間戳避免快取）
+function poll() {
+  const s = document.createElement('script')
+  s.src = `decisions-data.js?t=${Date.now()}`
+  s.onload = () => { s.remove(); apply(window.__DECISIONS__); setSync(true) }
+  s.onerror = () => { s.remove(); setSync(false) }
+  document.body.appendChild(s)
+}
+function setSync(ok) {
+  const t = new Date().toLocaleTimeString('zh-TW', { hour12: false })
+  document.getElementById('sync').innerHTML = ok
+    ? `<span class="dot"></span>資料版本 ${esc(data?.updated)} · 已同步 ${t}`
+    : `<span class="dot off"></span>無法讀取 decisions-data.js（${t}）`
+}
+document.getElementById('chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { filter = b.dataset.f; render() } })
+document.getElementById('q').addEventListener('input', render)
+poll(); setInterval(poll, 3000)
+</script>
+</body>
+</html>

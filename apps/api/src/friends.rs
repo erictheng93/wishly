@@ -99,7 +99,7 @@ struct ReqBody {
     to: String,
 }
 
-/// 一律 202，不洩漏帳號是否存在
+/// `to`：Email、@handle 或使用者 ID。一律 202，不洩漏帳號是否存在
 async fn request(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -114,7 +114,13 @@ async fn request(
             "請輸入 Email 或帳號代號",
         ));
     }
-    let target: Option<Uuid> = if to.contains('@') && !to.starts_with('@') {
+    // Q9：也接受使用者 ID（門檻頁送邀請用）；handle 不含 '-'，不會與 UUID 混淆
+    let target: Option<Uuid> = if let Ok(id) = Uuid::parse_str(&to) {
+        sqlx::query_scalar("SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(&st.pool)
+            .await?
+    } else if to.contains('@') && !to.starts_with('@') {
         sqlx::query_scalar("SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL")
             .bind(&to)
             .fetch_optional(&st.pool)

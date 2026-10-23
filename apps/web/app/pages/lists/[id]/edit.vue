@@ -14,7 +14,7 @@ const pubBusy = ref(false), pubErrs = ref<string[]>([])
 const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
-const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends' })
+const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 })
 const allowed = ref<string[]>([])
 let poll: any
 
@@ -23,7 +23,7 @@ async function load(quiet = false) {
   try {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
-    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility })
+    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours })
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
@@ -61,7 +61,7 @@ async function patchList(body: any, ok = t('lists.edit.saved')) {
   }
 }
 async function saveMeta() {
-  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, visibility: meta.visibility }
+  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, visibility: meta.visibility, claim_ttl_hours: meta.claim_ttl_hours }
   if (!await patchList(body)) return
   if (meta.visibility === 'selected') {
     try { await api(`/wishlists/${id}/allowed-users`, { method: 'PUT', body: { user_ids: allowed.value } }) }
@@ -82,13 +82,15 @@ async function remove(force = false) {
     if (e.code === 'ITEM_HAS_CLAIMS') del.value.force = true
   } finally { delBusy.value = false }
 }
-async function move(i: number, d: number) {
+// 連按排序時依序送出：並行的請求可能晚到先寫，後端留下的順序會與畫面不同
+let reorderQ: Promise<unknown> = Promise.resolve()
+function move(i: number, d: number) {
   const a = [...items.value]; const j = i + d
   if (j < 0 || j >= a.length) return
   ;[a[i], a[j]] = [a[j], a[i]]
   items.value = a
-  try { await api(`/wishlists/${id}/items/reorder`, { method: 'POST', body: { item_ids: a.map(x => x.id) } }) }
-  catch (e) { err.value = errMsg(e); await load(true) }
+  reorderQ = reorderQ.then(() => api(`/wishlists/${id}/items/reorder`, { method: 'POST', body: { item_ids: a.map(x => x.id) } }))
+    .catch(async (e) => { err.value = errMsg(e); await load(true) })
 }
 async function copy() {
   try { await copyText(shareUrl.value); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
@@ -143,13 +145,15 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
 
-      <details class="c-card">
+      <!-- 封存後只能取消封存（後端拒絕其他修改），不顯示設定與分享 -->
+      <details v-if="w.status !== 'archived'" class="c-card">
         <summary>{{ $t('lists.edit.settings') }}</summary>
         <form class="c-mt12" @submit.prevent="saveMeta">
           <label class="c-field"><span>{{ $t('lists.edit.name') }}</span><input v-model="meta.title" maxlength="100" required></label>
           <label class="c-field"><span>{{ $t('lists.edit.desc') }}</span><textarea v-model="meta.description" rows="2" /></label>
           <label class="c-field"><span>{{ $t('lists.edit.event') }}</span><input v-model="meta.event_date" type="date"></label>
           <label class="c-field"><span>{{ $t('lists.edit.closes') }}</span><input v-model="meta.closes_at" type="datetime-local"></label>
+          <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
           <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
           <CreatorVisibilityPicker v-model:visibility="meta.visibility" v-model:users="allowed" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
@@ -165,7 +169,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 
       <div class="c-bottom"><div>
         <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? $t('lists.edit.publishing') : $t('lists.edit.publish') }}</button>
-        <button v-else class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
+        <button v-else-if="w.status !== 'archived'" class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
       </div></div>
     </template>
 
