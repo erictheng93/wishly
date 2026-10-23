@@ -41,6 +41,16 @@ pub struct AppState {
     pub pool: PgPool,
 }
 
+/// Q11：搶同一列的交易（認捐、認捐點數、改捐助狀態）等鎖最多 2 秒；逾時 55P03 由 error.rs 轉 503 + Retry-After，
+/// 不讓排隊的請求占著連線把連線池拖垮。遷移與背景工作不走這裡。
+pub async fn begin_contended(pool: &PgPool) -> Result<points::Tx<'static>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout = '2s'")
+        .execute(&mut *tx)
+        .await?;
+    Ok(tx)
+}
+
 /// 各模組各自提供 `routes()`，在此合併；新增模組只動這一處。
 pub fn app(state: AppState) -> Router {
     Router::new()

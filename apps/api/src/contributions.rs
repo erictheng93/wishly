@@ -167,7 +167,7 @@ async fn create(
 
     let scope = format!("user:{}:POST /items/{{id}}/contributions", user.id);
     let hash = idempotency::request_hash(&format!("POST /items/{item_id}/contributions"), &body);
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     if let idempotency::Begin::Replay(s, b) =
         idempotency::begin(&mut tx, &scope, key, &hash).await?
     {
@@ -389,7 +389,7 @@ async fn withdraw(
     Path(id): Path<Uuid>,
     user: CurrentUser,
 ) -> Result<Response, AppError> {
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     let c: Option<(Uuid, Uuid, Uuid, Uuid)> = sqlx::query_as(
         "SELECT user_id, item_id, wishlist_id, wallet_id FROM contributions WHERE id = $1",
     )
@@ -496,7 +496,7 @@ async fn reallocate(
         )
         .await?;
     }
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     if let idempotency::Begin::Replay(s, b) =
         idempotency::begin(&mut tx, &scope, key, &hash).await?
     {

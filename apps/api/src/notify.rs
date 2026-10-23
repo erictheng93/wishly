@@ -491,6 +491,14 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 ),
             )
         }
+        "claim.expired" if payload["ended"] == true => (
+            l.pick(format!("【Wishly】「{item}」已超過購買期限"), format!("[Wishly] \"{item}\" passed its purchase deadline"), format!("[Wishly] \"{item}\" đã quá hạn mua")),
+            l.pick(
+                format!("清單《{title}》已結束，你認領的「{item}」在期限前沒有標記已購買，這筆認領已取消。\n管理我的捐助：{manage}\n"),
+                format!("The list \"{title}\" has ended and \"{item}\" wasn't marked as purchased before the deadline, so your claim has been cancelled.\nManage my pledges: {manage}\n"),
+                format!("Danh sách \"{title}\" đã kết thúc và \"{item}\" chưa được đánh dấu đã mua trước hạn, nên lượt nhận của bạn đã bị hủy.\nQuản lý đóng góp của tôi: {manage}\n"),
+            ),
+        ),
         "claim.expired" => (
             l.pick(format!("【Wishly】「{item}」已超過購買期限"), format!("[Wishly] \"{item}\" passed its purchase deadline"), format!("[Wishly] \"{item}\" đã quá hạn mua")),
             l.pick(

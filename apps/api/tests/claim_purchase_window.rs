@@ -256,6 +256,23 @@ fn reminder_and_expiry_copy() {
     );
     let (s, _) = render_lang(Lang::Zh, "item.reopened", "寶寶清單", &p);
     assert!(s.contains("《寶寶清單》有品項重新開放認領"), "{s}");
+    // 清單已結束：沒有人能再認領，不能說「釋出給其他朋友」
+    let mut ended = p.clone();
+    ended["ended"] = json!(true);
+    for l in [Lang::Zh, Lang::En, Lang::Vi] {
+        let (_, b) = render_lang(l, "claim.expired", "寶寶清單", &ended);
+        assert!(
+            !b.contains("其他朋友") && !b.contains("other friends") && !b.contains("bạn bè khác"),
+            "{b}"
+        );
+    }
+    let (_, b) = render_lang(Lang::Zh, "claim.expired", "寶寶清單", &ended);
+    assert!(
+        b.contains(
+            "清單《寶寶清單》已結束，你認領的「奶瓶」在期限前沒有標記已購買，這筆認領已取消"
+        ),
+        "{b}"
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -325,10 +342,18 @@ async fn expiry_releases_on_active_and_closed_lists_and_notifies(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(donor, 3);
+    // 已結束清單（b1）的捐助者收「已取消」文案，進行中清單的照舊
+    let ended: Vec<(String, bool)> = sqlx::query_as("SELECT payload->>'claim_id', (payload->>'ended')::bool FROM notifications WHERE kind = 'claim.expired' ORDER BY 1")
+        .fetch_all(&pool).await.unwrap();
+    for (id, e) in ended {
+        assert_eq!(e, id == b1.to_string(), "{id}");
+    }
     let owner: Vec<(Uuid, Value)> = sqlx::query_as("SELECT user_id, payload FROM notifications WHERE kind = 'item.reopened' ORDER BY payload->>'item_id' = $1 DESC")
         .bind(a.to_string()).fetch_all(&pool).await.unwrap();
-    assert_eq!(owner.len(), 2);
+    // 擁有者只收進行中清單的「重新開放」；已結束清單沒有人能再認領，不寄
+    assert_eq!(owner.len(), 1);
     assert_eq!(owner[0].0, o.id);
+    assert_eq!(owner[0].1["item_id"], json!(a.to_string()));
     for (_, p) in &owner {
         let mut keys: Vec<&str> = p.as_object().unwrap().keys().map(String::as_str).collect();
         keys.sort();
@@ -343,7 +368,7 @@ async fn expiry_releases_on_active_and_closed_lists_and_notifies(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(n, 5);
+    assert_eq!(n, 4);
     assert_claims_reconciled(&pool).await;
 }
 
@@ -511,13 +536,18 @@ async fn after_grace_unmarked_claims_expire_but_marked_ones_stay(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(ws, "closed");
-    let n: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM notifications WHERE kind IN ('claim.expired', 'item.reopened')",
+    // 清單已結束：捐助者收「已取消」文案，擁有者不收「重新開放」
+    let sent: Vec<(String, Value)> = sqlx::query_as(
+        "SELECT kind, payload FROM notifications WHERE kind IN ('claim.expired', 'item.reopened')",
     )
-    .fetch_one(&pool)
+    .fetch_all(&pool)
     .await
     .unwrap();
-    assert_eq!(n, 2);
+    assert_eq!(sent.len(), 1, "{sent:?}");
+    assert_eq!(
+        (sent[0].0.as_str(), &sent[0].1["ended"]),
+        ("claim.expired", &json!(true))
+    );
     assert_claims_reconciled(&pool).await;
 }
 

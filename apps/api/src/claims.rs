@@ -175,7 +175,7 @@ async fn create(
     let scope = format!("user:{}:{route}", me.id);
     let hash = idempotency::request_hash(&format!("POST /items/{item_id}/claims"), &body);
 
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     if let idempotency::Begin::Replay(s, b) =
         idempotency::begin(&mut tx, &scope, key, &hash).await?
     {
@@ -435,7 +435,7 @@ async fn apply(
         }
         _ => Ok(()),
     };
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     // F5 交易邊界：先（不加鎖）取 item_id → 鎖 item → 鎖 claim
     let item_id: Uuid = sqlx::query_scalar("SELECT item_id FROM claims WHERE id = $1")
         .bind(id)
@@ -717,16 +717,19 @@ pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
          a AS (
            INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff)
            SELECT 'system'::actor_type, 'claim.expire', 'claims', id, jsonb_build_object('qty', qty) FROM x),
-         -- Q12：通知捐助者；擁有者每個品項一封且不帶捐助者（驚喜安全）。清單已結束也照樣釋出，不重開清單
+         -- Q12：通知捐助者；擁有者每個品項一封且不帶捐助者（驚喜安全）。清單已結束也照樣釋出，不重開清單；
+         -- 此時沒有人能再認領，捐助者改收「已取消」文案（ended），擁有者不寄「重新開放」
          nd AS (
            INSERT INTO notifications (user_id, guest_id, channel, kind, payload)
            SELECT x.user_id, x.guest_id, 'email'::notification_channel, 'claim.expired',
-                  jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', x.item_id, 'claim_id', x.id)
-             FROM x JOIN wishlist_items i ON i.id = x.item_id),
+                  jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', x.item_id, 'claim_id', x.id,
+                                     'ended', w.status IN ('closed', 'archived') OR (w.closes_at IS NOT NULL AND w.closes_at <= now()))
+             FROM x JOIN wishlist_items i ON i.id = x.item_id JOIN wishlists w ON w.id = i.wishlist_id),
          nw AS (
            INSERT INTO notifications (user_id, channel, kind, payload)
            SELECT w.owner_id, 'email'::notification_channel, 'item.reopened', jsonb_build_object('wishlist_id', w.id, 'item_id', r.id)
-             FROM r JOIN wishlists w ON w.id = r.wishlist_id)
+             FROM r JOIN wishlists w ON w.id = r.wishlist_id
+            WHERE w.status = 'active' AND (w.closes_at IS NULL OR w.closes_at > now()))
          SELECT DISTINCT wishlist_id, (SELECT count(*) FROM x) FROM r")
         .fetch_all(&mut *tx).await?;
     for (w, _) in &rows {
