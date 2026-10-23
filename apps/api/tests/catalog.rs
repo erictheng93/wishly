@@ -119,6 +119,18 @@ async fn paging(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
+async fn paging_stops_at_cap(pool: PgPool) {
+    // 超過 100 頁的結果：第 100 頁不能再給 next_page（否則前端會一直重抓被夾回的第 100 頁）
+    sqlx::query("INSERT INTO catalog_products (ref, title, price_amount, product_url, recipients, occasions, active) SELECT 'r' || g, 't', 100, 'https://x.test', '{partner}', '{birthday}', true FROM generate_series(1, 2401) g")
+        .execute(&pool).await.unwrap();
+    let (_, _, v) = call(&pool, "GET", "/public/catalog/products?page=99", &[], None).await;
+    assert_eq!(v["next_page"], 100);
+    let (_, _, v) = call(&pool, "GET", "/public/catalog/products?page=100", &[], None).await;
+    assert_eq!(v["products"].as_array().unwrap().len(), 24);
+    assert_eq!(v["next_page"], Value::Null);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
 async fn public_brands_and_cookies_ignored(pool: PgPool) {
     brand(&pool, "on-brand", true).await;
     brand(&pool, "off-brand", false).await;

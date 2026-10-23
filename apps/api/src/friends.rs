@@ -309,7 +309,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
                   COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0)::bigint AS need
            FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL) s
          JOIN LATERAL (
-           SELECT i.title, i.image_key, i.image_status, i.unit_price_amount, {claimed} < i.qty_needed AS open
+           SELECT i.title, i.image_key, i.image_status, i.unit_price_amount, {open} AS open
            FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL
            ORDER BY i.created_at DESC, i.id DESC LIMIT 1) li ON true
          WHERE w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status = 'active'
@@ -317,7 +317,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
            AND (w.visibility::text IN ('public', 'friends')
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $1)))
            AND s.n_new > 0
-         ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL)))
+         ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL, open = crate::wishlists::OPEN_SQL)))
         .bind(u.id).fetch_all(&st.pool).await?;
     let mut events: Vec<(chrono::DateTime<chrono::Utc>, Value)> = lists.into_iter().map(|r| (r.at, json!({
         "kind": "items_added", "at": r.at, "owner": { "id": r.owner_id, "display_name": r.display_name, "handle": r.handle },
@@ -342,7 +342,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
         "SELECT c.delivered_at, i.title, i.image_key, i.image_status::text, w.slug::text, w.title, o.id, o.display_name, o.handle
          FROM claims c
          JOIN wishlist_items i ON i.id = c.item_id
-         JOIN wishlists w ON w.id = i.wishlist_id AND w.deleted_at IS NULL
+         JOIN wishlists w ON w.id = i.wishlist_id AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
          JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL
          WHERE c.user_id = $1 AND c.status = 'delivered' AND c.delivered_at > now() - interval '30 days'
          ORDER BY c.delivered_at DESC LIMIT 30")

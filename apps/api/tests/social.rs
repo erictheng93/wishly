@@ -1549,6 +1549,17 @@ async fn friend_feed_respects_visibility_and_birthdays(pool: PgPool) {
         .unwrap();
     assert_eq!(gift["item"]["title"], "奶瓶");
     assert_eq!(gift["owner"]["handle"], "ffff");
+    // 清單被下架後，送達動態不再露出其內容
+    sqlx::query("UPDATE wishlists SET moderation_status='hidden', moderation_reason='test' WHERE id = (SELECT wishlist_id FROM wishlist_items WHERE id=$1)")
+        .bind(allowed_item).execute(&pool).await.unwrap();
+    let (_, _, hid) = common::call(&pool, "GET", "/friends/feed", &common::ck(&tme), None).await;
+    assert!(!hid["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|e| e["kind"] == "delivered"));
+    sqlx::query("UPDATE wishlists SET moderation_status='ok' WHERE id = (SELECT wishlist_id FROM wishlist_items WHERE id=$1)")
+        .bind(allowed_item).execute(&pool).await.unwrap();
     let b = body["birthdays"].as_array().unwrap();
     assert_eq!(b.len(), 1);
     assert_eq!(

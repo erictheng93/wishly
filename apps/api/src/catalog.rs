@@ -39,6 +39,8 @@ pub fn routes() -> Router<AppState> {
 }
 
 const PAGE: i64 = 24;
+/// 公開目錄最多翻到第幾頁（超過的頁碼會被夾回，所以最後一頁不給 next_page）
+const MAX_PAGE: i64 = 100;
 const RECIPIENTS: &[&str] = &["partner", "elder", "baby", "friend"];
 const OCCASIONS: &[&str] = &["birthday", "full_month", "housewarming", "holiday"];
 type R<T> = Result<T, AppError>;
@@ -85,7 +87,7 @@ type PubRow = (
 );
 
 async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) -> R<Response> {
-    let page = q.page.unwrap_or(1).clamp(1, 100);
+    let page = q.page.unwrap_or(1).clamp(1, MAX_PAGE);
     let rec = enum_opt(&q.recipient, RECIPIENTS, "/recipient")?;
     let occ = enum_opt(&q.occasion, OCCASIONS, "/occasion")?;
     // 價格區間（含邊界）：lt1000 <1000、1000-3000 含兩端、gt3000 >3000
@@ -129,7 +131,7 @@ async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) 
         })
         .collect();
     Ok(cached(
-        json!({ "products": products, "next_page": more.then_some(page + 1) }),
+        json!({ "products": products, "next_page": (more && page < MAX_PAGE).then_some(page + 1) }),
     ))
 }
 

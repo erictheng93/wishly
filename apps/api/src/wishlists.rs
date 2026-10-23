@@ -113,6 +113,8 @@ pub fn units(mode: &str, needed: i32, claimed: i32, fs: Option<&str>) -> (i64, i
 }
 /// 同 `units` 的 SQL 版（wishlist_items 欄位，無別名）
 pub const CLAIMED_SQL: &str = "CASE WHEN funding_mode = 'crowdfund' THEN (funding_status IN ('funded', 'fulfilled'))::int ELSE qty_claimed END";
+/// 品項是否還能送：眾籌依募資狀態與期限（同 contributions.rs 的檢查），一般品項依剩餘數量
+pub const OPEN_SQL: &str = "CASE WHEN funding_mode = 'crowdfund' THEN funding_status = 'open' AND funding_deadline > now() ELSE qty_claimed < qty_needed END";
 
 /// 清單封存 / 帳號刪除：把這些清單所有品項的 pledged 認捐退回錢包（captured 的採購單照常進行）。
 /// 呼叫端須已在同交易 UPDATE 過 wishlists（取得清單鎖，鎖序：清單 → 錢包 → 品項 → 認捐）。

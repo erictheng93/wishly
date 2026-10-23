@@ -13,8 +13,13 @@ const lists = ref<any[]>([]), loading = ref(false), err = ref('')
 async function open(p: CatalogProduct) {
   pick.value = p; loading.value = true; err.value = ''
   try {
-    const r = await api('/wishlists', { query: { limit: 50, status: 'draft,active' } })
-    lists.value = r.data
+    const all: any[] = []
+    let cursor: string | undefined
+    do {
+      const r = await api('/wishlists', { query: { limit: 100, status: 'draft,active', cursor } })
+      all.push(...r.data); cursor = r.next_cursor ?? undefined
+    } while (cursor)
+    lists.value = all
   } catch (e) { if (pick.value) err.value = t('guest.inspire.loadErr') } finally { loading.value = false }
 }
 function choose(id: string) {

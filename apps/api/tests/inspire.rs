@@ -149,3 +149,45 @@ async fn create_stores_catalog_ref_and_rejects_bad(pool: PgPool) {
             .unwrap();
     assert_eq!(r.as_deref(), Some("cup-1"));
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn crowdfund_open_follows_funding_state(pool: PgPool) {
+    let f = user(&pool, "友").await;
+    let wl = wishlist(
+        &pool,
+        f.id,
+        ListOpts {
+            visibility: Some("public"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let cf = crowdfund_item(&pool, wl.id, 1000).await;
+    sqlx::query("UPDATE wishlist_items SET catalog_ref='cup-1' WHERE id=$1")
+        .bind(cf)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let open = |pool: PgPool| async move {
+        let (_, _, v) = call(&pool, "GET", "/inspire/cup-1/wishes", &[], None).await;
+        v["wishes"][0]["item"]["open"].as_bool().unwrap()
+    };
+    assert!(open(pool.clone()).await);
+    // 期限已過（尚未被背景工作轉成 expired）與已轉 expired 都算結束
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_deadline = now() - interval '1 minute' WHERE id=$1",
+    )
+    .bind(cf)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert!(!open(pool.clone()).await);
+    sqlx::query(
+        "UPDATE wishlist_items SET funding_status = 'expired', expired_at = now() WHERE id=$1",
+    )
+    .bind(cf)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert!(!open(pool.clone()).await);
+}

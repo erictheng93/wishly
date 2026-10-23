@@ -63,7 +63,7 @@ async fn wishes(
     }
     let viewer = crate::access::viewer(&parts, &st).await?;
     let rows: Vec<Row> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT i.id, i.title, i.qty_needed, ({claimed})::int AS got, ({claimed}) < i.qty_needed AS open,
+        "SELECT i.id, i.title, i.qty_needed, ({claimed})::int AS got, ({open}) AS open,
                 w.slug::text, w.title, w.visibility::text, o.id, o.display_name, o.handle
          FROM wishlist_items i
          JOIN wishlists w ON w.id = i.wishlist_id
@@ -79,7 +79,8 @@ async fn wishes(
                 OR (w.visibility::text = 'selected' AND EXISTS (
                       SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $2)))
          ORDER BY open DESC, i.created_at DESC LIMIT 50",
-        claimed = crate::wishlists::CLAIMED_SQL
+        claimed = crate::wishlists::CLAIMED_SQL,
+        open = crate::wishlists::OPEN_SQL
     )))
     .bind(&r)
     .bind(viewer)
