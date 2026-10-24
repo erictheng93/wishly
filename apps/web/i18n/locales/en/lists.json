@@ -124,6 +124,8 @@
       "updatedAt": "Updated at {time}",
       "surprise": "Surprise mode",
       "surpriseDesc": "Until unlocked you can see each item's progress and how many people pledged, but not who; names unlock on the event day.",
+      "noEventDate": "Surprise mode is on but no event date is set; set an event date in the list settings or turn surprise mode off.",
+      "anon": "Anonymous friend",
       "countdown": "Unlocks in {days} day {hms} ({at} Taipei time) | Unlocks in {days} days {hms} ({at} Taipei time)",
       "hms": "{h} h {m} min {s} s",
       "noItems": "No items yet",

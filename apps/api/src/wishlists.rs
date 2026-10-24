@@ -596,6 +596,8 @@ async fn update(
         w.cover_image_status = if v.is_some() { "ready" } else { "none" }.into();
         w.cover_image_key = v;
     }
+    // 沒有活動日的舊資料永遠算鎖定，允許關閉以免卡死；用載入時的日期判斷，同一請求清掉日期不能繞過鎖定
+    let date_locked = w.surprise_locked && w.event_date.is_some();
     if let Some(v) = date(m, "event_date")? {
         w.event_date = v;
     }
@@ -615,7 +617,7 @@ async fn update(
         w.closes_at = v;
     }
     if let Some(v) = boolean(m, "surprise_mode")? {
-        if !v && w.surprise_locked {
+        if !v && date_locked {
             return Err(forbidden("驚喜鎖定期間不可關閉驚喜模式"));
         }
         w.surprise_mode = v;
@@ -631,6 +633,7 @@ async fn update(
         ));
     }
     let was_active = w.status == "active";
+    let old_status = w.status.clone(); // UPDATE 時比對：並行封存 / close_due 改過狀態就當 stale，was_active 才可信
     if let Some(new) = one_of(m, "status", &["draft", "active", "closed", "archived"])? {
         let ok = matches!((w.status.as_str(), new), (a, b) if a == b)
             || matches!(
@@ -702,9 +705,9 @@ async fn update(
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
                  closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END
-                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12)")
+                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
-        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).execute(&mut *tx).await?;
+        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
     }
@@ -763,10 +766,14 @@ async fn archive(
 ) -> R<StatusCode> {
     let w = load_owned(&st.pool, id, u.id).await?;
     let mut tx = st.pool.begin().await?;
-    sqlx::query("UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) WHERE id=$1 AND status<>'archived'").bind(id).execute(&mut *tx).await?;
+    // 交易內讀到的舊狀態才準：並行封存 / close_due 已結束的清單不再重給寬限
+    let was: Option<String> = sqlx::query_scalar(
+        "WITH o AS (SELECT status::text AS s FROM wishlists WHERE id=$1 AND status<>'archived' FOR UPDATE)
+         UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) FROM o WHERE id=$1 RETURNING o.s")
+        .bind(id).fetch_optional(&mut *tx).await?;
     release_pledged(&mut tx, &[id]).await?;
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線收到後關閉
-    if !matches!(w.status.as_str(), "closed" | "archived") {
+    if was.is_some_and(|s| s != "closed") {
         crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
     }
     tx.commit().await?;
@@ -823,12 +830,12 @@ async fn dashboard(
         }
         _ => None,
     };
-    // 每品項幾人認領（有效 claims / pledged+captured contributions 筆數）：鎖定期間也輸出，只有人數、沒有身分
+    // 每品項幾人認領（有效 claims 筆數 / pledged+captured contributions 的不同捐贈者）：鎖定期間也輸出，只有人數、沒有身分
     let counts: HashMap<Uuid, i64> = sqlx::query_as(
         "SELECT c.item_id, count(*) FROM claims c JOIN wishlist_items i ON i.id = c.item_id
           WHERE i.wishlist_id = $1 AND c.status IN ('reserved', 'purchased', 'delivered') GROUP BY c.item_id
          UNION ALL
-         SELECT item_id, count(*) FROM contributions WHERE wishlist_id = $1 AND status IN ('pledged', 'captured') GROUP BY item_id")
+         SELECT item_id, count(DISTINCT user_id) FROM contributions WHERE wishlist_id = $1 AND status IN ('pledged', 'captured') GROUP BY item_id")
         .bind(id).fetch_all(&st.pool).await?.into_iter().collect();
     // 驚喜鎖定：名單一律空陣列（不輸出姓名、留言、時間、claim id）
     let claims = if locked {
@@ -842,15 +849,16 @@ async fn dashboard(
             String,
             Option<String>,
             DateTime<Utc>,
+            bool,
         );
         let rows: Vec<ClaimDashboardRow> = sqlx::query_as(
-            "SELECT c.id, c.item_id, CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.claimer_name END, c.qty, c.status::text, c.note, c.created_at FROM claims c JOIN wishlist_items i ON i.id=c.item_id
+            "SELECT c.id, c.item_id, CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.claimer_name END, c.qty, c.status::text, c.note, c.created_at, c.is_anonymous FROM claims c JOIN wishlist_items i ON i.id=c.item_id
              WHERE i.wishlist_id=$1 ORDER BY c.id").bind(id).fetch_all(&st.pool).await?;
         Value::Array(
             rows.into_iter()
                 .map(|r| {
                     json!({ "id": r.0, "item_id": r.1,
-            "claimer_name": r.2, "qty": r.3, "status": r.4, "note": r.5, "created_at": r.6 })
+            "claimer_name": r.2, "qty": r.3, "status": r.4, "note": r.5, "created_at": r.6, "is_anonymous": r.7 })
                 })
                 .collect(),
         )
@@ -871,10 +879,11 @@ async fn dashboard(
             DateTime<Utc>,
             Option<DateTime<Utc>>,
             Option<DateTime<Utc>>,
+            bool,
         );
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT c.id, c.item_id, c.points, c.refunded_points, c.message, c.status::text,
-                    CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.donor_name END, c.created_at, c.captured_at, c.released_at
+                    CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.donor_name END, c.created_at, c.captured_at, c.released_at, c.is_anonymous
                FROM contributions c JOIN wishlist_items i ON i.id = c.item_id
               WHERE c.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('pledged', 'captured')
               ORDER BY c.created_at, c.id").bind(id).fetch_all(&st.pool).await?;
@@ -885,7 +894,7 @@ async fn dashboard(
             }
         }
         (Value::Array(rows.into_iter().map(|r| json!({ "id": r.0, "item_id": r.1, "points": r.2, "refunded_points": r.3, "spent_points": r.2 - r.3,
-            "message": r.4, "status": r.5, "display_name": r.6, "created_at": r.7, "captured_at": r.8, "released_at": r.9 })).collect()), at)
+            "message": r.4, "status": r.5, "display_name": r.6, "created_at": r.7, "captured_at": r.8, "released_at": r.9, "is_anonymous": r.10 })).collect()), at)
     };
     let (target_sum, pledged_sum) = (
         cf_items().filter_map(|i| i.target_points).sum::<i64>(),

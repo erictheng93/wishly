@@ -614,7 +614,7 @@ async fn apply(
             .execute(&mut *tx)
             .await?;
     }
-    let claim: ClaimRow = if new_status == cur
+    let mut claim: ClaimRow = if new_status == cur
         && new_qty.is_none()
         && p.note.is_none()
         && p.visibility.is_none()
@@ -635,6 +635,10 @@ async fn apply(
              WHERE c.id = $1 RETURNING {CLAIM_COLS}")))
             .bind(id).bind(new_qty).bind(&p.note).bind(&new_status).bind(&p.visibility).fetch_one(&mut *tx).await?
     };
+    // 擁有者看不到匿名者真名（與 dashboard 一致）；is_anonymous 讓前端自行在地化
+    if by_owner && claim.is_anonymous {
+        claim.claimer_name = "匿名朋友".into();
+    }
     let (n, c): (i32, i32) =
         sqlx::query_as("SELECT qty_needed, qty_claimed FROM wishlist_items WHERE id = $1")
             .bind(item_id)
@@ -702,14 +706,19 @@ pub async fn grace_on_close(
 
 /// FR-08：把逾期的 reserved 捐助設為 expired 並回補 qty_claimed，回傳釋放的捐助數。
 /// 鎖序同 apply()：先鎖 item（依 id 排序）再動 claim；UPDATE ... WHERE status='reserved' 保證多實例 / 與取消競態時只回補一次。
+/// 清單已到 closes_at 但 close_due 還沒轉 closed 的先跳過，等 grace_on_close 給結束寬限（不受 tick 順序 / 多實例影響）。
 pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
     let mut tx = pool.begin().await?;
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE status = 'reserved' AND expires_at <= now())
+                   AND NOT EXISTS (SELECT 1 FROM wishlists w WHERE w.id = wishlist_id AND w.status = 'active' AND w.closes_at <= now())
                  ORDER BY id FOR UPDATE").execute(&mut *tx).await?;
     let rows: Vec<(Uuid, i64)> = sqlx::query_as(
         "WITH x AS (
-           UPDATE claims SET status = 'expired', expires_at = NULL
-           WHERE status = 'reserved' AND expires_at <= now() RETURNING id, item_id, qty, user_id, guest_id),
+           UPDATE claims c SET status = 'expired', expires_at = NULL
+           WHERE c.status = 'reserved' AND c.expires_at <= now()
+             AND NOT EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
+                              WHERE i.id = c.item_id AND w.status = 'active' AND w.closes_at <= now())
+           RETURNING c.id, c.item_id, c.qty, c.user_id, c.guest_id),
          r AS (
            UPDATE wishlist_items i SET qty_claimed = i.qty_claimed - s.q
            FROM (SELECT item_id, sum(qty)::int AS q FROM x GROUP BY item_id) s

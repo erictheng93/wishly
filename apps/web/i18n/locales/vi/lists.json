@@ -124,6 +124,8 @@
       "updatedAt": "Cập nhật lúc {time}",
       "surprise": "Chế độ bất ngờ",
       "surpriseDesc": "Trước khi mở khóa, bạn xem được số lượng của từng món và có bao nhiêu người đã nhận tặng, nhưng không biết là ai; danh sách sẽ mở khóa vào ngày diễn ra sự kiện.",
+      "noEventDate": "Chế độ bất ngờ đã bật nhưng chưa đặt ngày sự kiện; hãy đặt ngày sự kiện trong cài đặt danh sách hoặc tắt chế độ bất ngờ.",
+      "anon": "Bạn ẩn danh",
       "countdown": "Còn {days} ngày {hms} nữa sẽ mở khóa ({at} giờ Đài Bắc)",
       "hms": "{h} giờ {m} phút {s} giây",
       "noItems": "Chưa có món quà nào",

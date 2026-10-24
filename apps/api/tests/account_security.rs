@@ -509,3 +509,23 @@ async fn bearer_session_and_native_cors(pool: PgPool) {
     assert!(h.get("access-control-allow-origin").is_none());
     common::assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn export_claims_include_is_anonymous(pool: PgPool) {
+    let owner = common::user(&pool, "o").await;
+    let me = common::user(&pool, "me").await;
+    let wl = common::wishlist(&pool, owner.id, common::ListOpts::default()).await;
+    let it = common::item(&pool, wl.id, "x", 1).await;
+    let (st, _, c) = common::call(
+        &pool,
+        "POST",
+        &format!("/items/{it}/claims"),
+        &[common::ck(&me.token), common::idem(Uuid::new_v4())].concat(),
+        Some(serde_json::json!({"qty": 1, "is_anonymous": true})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    let (st, _, export) = common::call(&pool, "GET", "/me/export", &common::ck(&me.token), None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(export["claims"][0]["is_anonymous"], true);
+}

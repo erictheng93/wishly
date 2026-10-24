@@ -63,7 +63,7 @@ const busyClaim = ref('')
 const claimErr = ref('')
 async function setStatus(c: any, status: 'delivered' | 'cancelled') {
   // 已送達不可復原（後端不允許退回），兩種操作都先確認
-  if (!confirm(t(status === 'cancelled' ? 'lists.progress.cancelConfirm' : 'lists.progress.deliverConfirm', { name: c.claimer_name || t('lists.progress.guest') }))) return
+  if (!confirm(t(status === 'cancelled' ? 'lists.progress.cancelConfirm' : 'lists.progress.deliverConfirm', { name: c.is_anonymous ? t('lists.progress.anon') : c.claimer_name || t('lists.progress.guest') }))) return
   busyClaim.value = c.id; claimErr.value = ''
   try { await api(`/claims/${c.id}`, { method: 'PATCH', body: { status } }); await load() }
   catch (e) { claimErr.value = errMsg(e) } finally { busyClaim.value = '' }
@@ -88,7 +88,8 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
       <section v-if="locked" class="c-mask" role="status">
         <strong>{{ $t('lists.progress.surprise') }}</strong>
         <p>{{ $t('lists.progress.surpriseDesc') }}</p>
-        <p>{{ $t('lists.progress.countdown', { days, hms, at: new Date(d.unlock_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }, days) }}</p>
+        <p v-if="!d.unlock_at">{{ $t('lists.progress.noEventDate') }}</p>
+        <p v-else>{{ $t('lists.progress.countdown', { days, hms, at: new Date(d.unlock_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }, days) }}</p>
       </section>
 
       <p v-if="!d.totals.item_count" class="c-center c-mute">{{ $t('lists.progress.noItems') }}</p>
@@ -113,7 +114,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
             <ul v-else class="c-list">
               <li v-for="c in contribsByItem[i.item_id]" :key="c.id">
                 <div class="c-row wrap">
-                  <span class="c-grow"><strong>{{ c.display_name }}</strong>　{{ $t('lists.progress.pts', { n: fmtPts(c.points) }) }}</span>
+                  <span class="c-grow"><strong>{{ c.is_anonymous ? $t('lists.progress.anon') : c.display_name }}</strong>　{{ $t('lists.progress.pts', { n: fmtPts(c.points) }) }}</span>
                   <span class="c-badge" :class="c.status">{{ label(CONTRIBUTION_STATUS, c.status) }}</span>
                 </div>
                 <div v-if="c.message" class="c-mute">{{ $t('lists.progress.quote', { msg: c.message }) }}</div>
@@ -144,7 +145,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
         <p v-if="i.claimer_count" class="c-mute c-small c-m0">{{ $t('lists.progress.claimerCount', { n: i.claimer_count }, i.claimer_count) }}</p>
         <ul v-for="c in claimsByItem[i.item_id] || []" :key="c.id" class="c-list">
           <li class="c-row wrap">
-            <span class="c-grow" style="flex-basis:100%">{{ c.claimer_name || $t('lists.progress.guest') }} ×{{ c.qty }}<template v-if="c.note"> ・{{ c.note }}</template></span>
+            <span class="c-grow" style="flex-basis:100%">{{ c.is_anonymous ? $t('lists.progress.anon') : c.claimer_name || $t('lists.progress.guest') }} ×{{ c.qty }}<template v-if="c.note"> ・{{ c.note }}</template></span>
             <CreatorStatusBadge :v="c.status" />
             <template v-if="c.status === 'reserved' || c.status === 'purchased'">
               <button class="c-btn" :disabled="busyClaim === c.id" @click="setStatus(c, 'delivered')">{{ $t('lists.progress.markDelivered') }}</button>

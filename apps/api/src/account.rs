@@ -133,7 +133,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
                ORDER BY i.sort_order, i.id), '[]'::jsonb) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL))
          FROM wishlists w WHERE w.owner_id = $1 AND w.deleted_at IS NULL ORDER BY w.id").bind(u.id).fetch_all(&st.pool).await?;
     let claims: Vec<Value> = sqlx::query_scalar(
-        "SELECT jsonb_build_object('id', id, 'item_id', item_id, 'qty', qty, 'status', status::text, 'note', note, 'created_at', created_at)
+        "SELECT jsonb_build_object('id', id, 'item_id', item_id, 'qty', qty, 'status', status::text, 'note', note, 'is_anonymous', is_anonymous, 'created_at', created_at)
            FROM claims WHERE user_id = $1 ORDER BY id").bind(u.id).fetch_all(&st.pool).await?;
     // P2-A：錢包、點數流水與本人的認捐（不含他人資料）
     let wallet: Option<Value> = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'balance', balance, 'status', status::text, 'created_at', created_at) FROM point_wallets WHERE user_id = $1")
@@ -234,6 +234,11 @@ async fn delete_me(
     }
     // P2-A：還有進行中的認捐（pledged）或點數餘額就不能刪帳號（否則點數會憑空消失）。先鎖錢包，與認捐 / 營運發點互斥。
     // captured（已達標、採購中）的認捐不擋：點數已花出，帳號匿名化後 donor_name 一併去識別。
+    // 鎖序同 wallet_ops::lock_topup（topups → 錢包）：已鎖住儲值、正等錢包的爭議 / 拒付先完成，下面才看得到凍結或欠款。
+    sqlx::query("SELECT t.id FROM topups t JOIN point_wallets w ON w.id = t.wallet_id WHERE w.user_id = $1 ORDER BY t.id FOR UPDATE OF t")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("SELECT id FROM point_wallets WHERE user_id = $1 FOR UPDATE")
         .bind(id)
         .execute(&mut *tx)
@@ -253,6 +258,13 @@ async fn delete_me(
         .bind(id).fetch_one(&mut *tx).await?;
     if refunds > 0 || debts > 0 || frozen {
         return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {refunds} 筆處理中的現金退款、{debts} 筆待處理欠款{}。請聯絡客服結案後再刪除帳號。", if frozen { "，且錢包已凍結" } else { "" })));
+    }
+    // 尚未付款的儲值（ATM / 超商代碼可能隔天才付）入帳後會落在已匿名的帳號上：等付款或到期後再刪
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM topups t JOIN point_wallets w ON w.id = t.wallet_id WHERE w.user_id = $1 AND t.status = 'pending' AND t.expires_at > now()")
+        .bind(id).fetch_one(&mut *tx).await?;
+    if pending > 0 {
+        return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {pending} 筆尚未付款的儲值，請完成付款或等待到期後再刪除帳號。")));
     }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL")
         .bind(id)
@@ -281,9 +293,13 @@ async fn delete_me(
         .into_iter()
         .filter(|k| crate::uploads::valid_key(k) || crate::uploads::avatar_url(Some(k)).is_some())
         .collect();
-    let rows: Vec<(Uuid, String)> = sqlx::query_as("UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(closed_at, now()) WHERE owner_id = $1 AND status <> 'archived' RETURNING id, slug::text")
+    let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
+        "WITH o AS (SELECT id, status FROM wishlists WHERE owner_id = $1 AND status <> 'archived' FOR UPDATE)
+         UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(wishlists.closed_at, now())
+           FROM o WHERE wishlists.id = o.id RETURNING wishlists.id, wishlists.slug::text, o.status <> 'closed'")
         .bind(id).fetch_all(&mut *tx).await?;
-    let (archived, slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().unzip();
+    let graced: Vec<Uuid> = rows.iter().filter(|r| r.2).map(|r| r.0).collect(); // 這次才結束的清單，他人捐助要給結束寬限
+    let (archived, slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().map(|r| (r.0, r.1)).unzip();
     crate::wishlists::release_pledged(&mut tx, &archived).await?; // 別人捐在這些清單上、尚未達標的點數退回各自錢包
                                                                   // F-08：取消他人清單上的 reserved 捐助並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE user_id = $1 AND status = 'reserved') ORDER BY id FOR UPDATE")
@@ -299,6 +315,9 @@ async fn delete_me(
          SELECT DISTINCT wishlist_id FROM r").bind(id).fetch_all(&mut *tx).await?;
     for w in wids {
         crate::dashboard::notify(&mut *tx, w).await?;
+    }
+    for w in &graced {
+        crate::claims::grace_on_close(&mut tx, *w).await?; // 在所有 item 鎖之後（鎖序見 grace_on_close）
     }
     sqlx::query("UPDATE claims SET claimer_name = '已刪除的使用者' WHERE user_id = $1")
         .bind(id)

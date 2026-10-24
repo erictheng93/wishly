@@ -1,5 +1,6 @@
 {
   "guest": {
+    "anon": "Ẩn danh",
     "loading": "Đang tải…",
     "loadFailed": "Tạm thời không tải được, vui lòng thử lại sau",
     "reload": "Tải lại",

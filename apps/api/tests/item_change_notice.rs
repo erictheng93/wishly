@@ -228,3 +228,25 @@ fn renders_item_title_in_all_languages() {
     );
     assert!(b.contains("/me/wallet"));
 }
+
+async fn notif_status(pool: &PgPool, item: Uuid, user_id: Option<Uuid>) -> (String, Option<String>) {
+    sqlx::query_as("SELECT status::text, last_error FROM notifications WHERE kind = 'claim.item_changed' AND payload->>'item_id' = $1 AND user_id IS NOT DISTINCT FROM $2")
+        .bind(item.to_string()).bind(user_id).fetch_one(pool).await.unwrap()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cancelled_claimant_notice_is_cancelled_at_send_time(pool: PgPool) {
+    let owner = user(&pool, "擁有者").await;
+    let wl = wishlist(&pool, owner.id, ListOpts::default()).await.id;
+    let it = item(&pool, wl, "玻璃奶瓶", 5).await;
+    let (_, gone) = user_claim(&pool, it, 1).await;
+    let (_, _active) = user_claim(&pool, it, 1).await;
+    patch(&pool, &owner.token, it, json!({ "description": "改了" })).await;
+    let gone_uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id = $1").bind(gone).fetch_one(&pool).await.unwrap();
+    let active_uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id <> $1 AND item_id = $2").bind(gone).bind(it).fetch_one(&pool).await.unwrap();
+    sqlx::query("UPDATE claims SET status = 'cancelled' WHERE id = $1").bind(gone).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE notifications SET scheduled_at = now() WHERE kind = 'claim.item_changed'").execute(&pool).await.unwrap();
+    wishly_api::notify::tick(&pool).await.unwrap();
+    assert_eq!(notif_status(&pool, it, Some(gone_uid)).await, ("cancelled".into(), Some("no longer supporting item".into())));
+    assert_eq!(notif_status(&pool, it, Some(active_uid)).await.0, "sent");
+}

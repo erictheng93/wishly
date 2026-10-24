@@ -583,6 +583,7 @@ async fn dashboard_lists_contributors(pool: PgPool) {
     };
     assert_eq!(by("阿明").len(), 2);
     let anon = by("匿名朋友");
+    assert_eq!(anon[0]["is_anonymous"], true);
     assert_eq!(
         (
             anon.len(),
@@ -960,7 +961,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     assert!(i["funding_deadline"].is_string());
     let cs = i["contributors"].as_array().unwrap();
     assert_eq!(cs.len(), 3, "{cs:?}"); // 阿明(合併) + 匿名 x2；撤回的不列
-    assert_eq!(cs[0], json!({ "display_name": "阿明", "points": 300 }));
+    assert_eq!(cs[0], json!({ "display_name": "阿明", "points": 300, "anonymous": false }));
     assert_eq!(
         cs.iter()
             .filter(|c| c["display_name"] == "匿名朋友")
@@ -980,7 +981,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     );
     assert_eq!(
         d["contributors"],
-        json!([{ "display_name": "路人C", "points": 100 }])
+        json!([{ "display_name": "路人C", "points": 100, "anonymous": false }])
     );
     assert_eq!(
         (
@@ -1959,4 +1960,18 @@ async fn admin_orders_audit_only_returned_rows(pool: PgPool) {
     assert!(p2["next_cursor"].is_null());
     assert_eq!(audits().await, 3);
     common::assert_all_reconciled(&pool).await;
+}
+
+/// 同一人對同一眾籌品項多次 pledge，儀表板 claimer_count 只算 1 人
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn dashboard_claimer_count_dedups_repeat_pledger(pool: PgPool) {
+    let TestUser { id: o, token: t } = common::user(&pool, "媽媽").await;
+    let wl = common::wishlist(&pool, o, common::ListOpts::default()).await;
+    let ci = common::crowdfund_item(&pool, wl.id, 1000).await;
+    let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
+    pledge(&pool, ci, a, 100, false).await;
+    pledge(&pool, ci, a, 100, false).await;
+    let (_, _, d) = call(&pool, "GET", &format!("/wishlists/{}/dashboard", wl.id), &ck(&t), None).await;
+    let c = d["items"].as_array().unwrap().iter().find(|i| i["item_id"] == ci.to_string()).unwrap();
+    assert_eq!((c["pledged_points"].as_i64(), c["claimer_count"].as_i64()), (Some(200), Some(1)), "{c}");
 }

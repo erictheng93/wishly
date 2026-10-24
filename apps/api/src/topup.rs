@@ -611,6 +611,15 @@ async fn credit(pool: &PgPool, id: Uuid, txn: &str) -> Result<(), AppError> {
         return Ok(());
     }
     points::lock_wallets(&mut tx, &[wallet]).await?;
+    // 錢已收到照常入帳；帳號已刪（逾期後才付款）時點數無人能用，需營運退款
+    let deleted: bool = sqlx::query_scalar("SELECT u.deleted_at IS NOT NULL FROM point_wallets w JOIN users u ON u.id = w.user_id WHERE w.id = $1")
+        .bind(wallet).fetch_one(&mut *tx).await?;
+    if deleted {
+        // 留在 audit_logs（後台 /admin/audit-logs 查得到），不只是 log
+        tracing::error!(topup = %id, "topup paid after account deletion; refund manually");
+        sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', 'topup.paid_after_account_delete', 'topups', $1, jsonb_build_object('amount', $2::bigint))")
+            .bind(id).bind(amount).execute(&mut *tx).await?;
+    }
     sqlx::query("UPDATE topups SET status = 'paid', paid_at = now(), provider_txn_id = $2, failure_reason = NULL, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(txn)

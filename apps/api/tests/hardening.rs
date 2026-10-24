@@ -398,3 +398,25 @@ async fn force_delete_still_forbidden_while_surprise_locked(pool: PgPool) {
     assert_eq!(q, 1);
     assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn surprise_off_allowed_without_event_date_but_not_with_future_date(pool: PgPool) {
+    let TestUser { id: owner, token } = user(&pool, "u").await;
+    let (wid, _, _) = fixture(&pool, owner).await;
+    let patch = |pool: PgPool, token: String| async move {
+        call(&pool, "PATCH", &format!("/wishlists/{wid}"), &ck(&token), Some(json!({"surprise_mode": false}))).await
+    };
+    sqlx::query("UPDATE wishlists SET surprise_mode = true, event_date = current_date + 30 WHERE id = $1")
+        .bind(wid).execute(&pool).await.unwrap();
+    assert_eq!(patch(pool.clone(), token.clone()).await.0, StatusCode::FORBIDDEN);
+    // 同一請求清掉日期不能繞過鎖定
+    let (s, _, _) = call(&pool, "PATCH", &format!("/wishlists/{wid}"), &ck(&token), Some(json!({"surprise_mode": false, "event_date": null}))).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    sqlx::query("UPDATE wishlists SET surprise_mode = true, event_date = NULL WHERE id = $1")
+        .bind(wid).execute(&pool).await.unwrap();
+    let (s, _, b) = patch(pool.clone(), token).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let on: bool = sqlx::query_scalar("SELECT surprise_mode FROM wishlists WHERE id=$1")
+        .bind(wid).fetch_one(&pool).await.unwrap();
+    assert!(!on);
+}

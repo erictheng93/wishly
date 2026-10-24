@@ -1341,7 +1341,7 @@ CREATE TABLE notifications (
   user_id       uuid                 REFERENCES users(id) ON DELETE CASCADE,
   guest_id      uuid                 REFERENCES guests(id) ON DELETE CASCADE,   -- 訪客捐助確認信（D39）
   channel       notification_channel NOT NULL,
-  kind          text                 NOT NULL,       -- claim.created / claim.digest / claim.confirmation / event.reminder
+  kind          text                 NOT NULL,       -- claim.confirmation / event.reminder（claim.created / claim.digest 已於 D58 停用，僅見歷史資料）
   payload       jsonb                NOT NULL DEFAULT '{}'::jsonb,
   status        notification_status  NOT NULL DEFAULT 'pending',
   scheduled_at  timestamptz          NOT NULL DEFAULT now(),
@@ -1355,7 +1355,7 @@ CREATE TABLE notifications (
 CREATE UNIQUE INDEX notifications_digest_uk ON notifications (user_id, kind, (payload-&gt;&gt;'wishlist_id'))
   WHERE kind = 'claim.digest' AND status = 'pending';
 CREATE INDEX notifications_due_idx ON notifications (scheduled_at) WHERE status = 'pending';
-CREATE INDEX notifications_user_idx ON notifications (user_id, created_at DESC);</code></pre><div class="tw"><table><thead><tr><th>欄位</th><th>說明</th></tr></thead><tbody><tr><td><code>（MVP）</code></td><td>Email 通知 outbox（D39，自 P1 提前）；LINE Messaging API 仍為 P1（LINE Notify 已於 2025-03-31 終止，不使用）</td></tr><tr><td><code>user_id / guest_id</code></td><td>收件者：建立者（user）或留 Email 的訪客（guest），至少一個（CHECK）；寄信時才解析 email，表內不重複存 email</td></tr><tr><td><code>kind</code></td><td>claim.created（第一筆即時）| claim.digest（每日彙整，count 累加）| claim.confirmation（訪客確認信）| event.reminder（P1）</td></tr><tr><td><code>notifications_digest_uk</code></td><td>同一建立者同一清單同時只有一封 pending 的 claim.digest，後續捐助以 ON CONFLICT 累加 count</td></tr><tr><td><code>payload</code></td><td>只放 wishlist_id 與 count，不含品項與捐助者；驚喜鎖定期間信件只寫「有 N 件新捐助」</td></tr><tr><td><code>status</code></td><td>pending | sent | failed | cancelled（帳號 / 訪客刪除時取消）；attempts / last_error 供重試</td></tr></tbody></table></div><h3 id="t-trg">updated_at triggers</h3><pre><code>-- ---------- updated_at triggers ----------
+CREATE INDEX notifications_user_idx ON notifications (user_id, created_at DESC);</code></pre><div class="tw"><table><thead><tr><th>欄位</th><th>說明</th></tr></thead><tbody><tr><td><code>（MVP）</code></td><td>Email 通知 outbox（D39，自 P1 提前）；LINE Messaging API 仍為 P1（LINE Notify 已於 2025-03-31 終止，不使用）</td></tr><tr><td><code>user_id / guest_id</code></td><td>收件者：建立者（user）或留 Email 的訪客（guest），至少一個（CHECK）；寄信時才解析 email，表內不重複存 email</td></tr><tr><td><code>kind</code></td><td>claim.confirmation（訪客確認信）| event.reminder（P1）</td></tr><tr><td><code>notifications_digest_uk</code></td><td>【D58 已停用】原為同一建立者同一清單同時只有一封 pending 的 claim.digest（歷史資料用）</td></tr><tr><td><code>payload</code></td><td>歷史 claim.* 列只放 wishlist_id 與 count；D58 後不再產生新捐助通知</td></tr><tr><td><code>status</code></td><td>pending | sent | failed | cancelled（帳號 / 訪客刪除時取消）；attempts / last_error 供重試</td></tr></tbody></table></div><h3 id="t-trg">updated_at triggers</h3><pre><code>-- ---------- updated_at triggers ----------
 CREATE TRIGGER users_set_updated_at          BEFORE UPDATE ON users          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER guests_set_updated_at         BEFORE UPDATE ON guests         FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER organizations_set_updated_at  BEFORE UPDATE ON organizations  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -2766,7 +2766,7 @@ Authorization: Bearer &lt;session_token&gt;（原生殼；網頁用 ws_session c
     "is_anonymous": false
   },
   "item": { "id": "0192f3a1-0a11-7c3b-8e5f-2b3c4d5e6f01", "qty_needed": 10, "qty_claimed": 7, "qty_remaining": 3 }
-}</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-IDEMPOTENCY_KEY_REQUIRED"><code>IDEMPOTENCY_KEY_REQUIRED</code></a> <a href="#err-IDEMPOTENCY_CONFLICT"><code>IDEMPOTENCY_CONFLICT</code></a> <a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-VALIDATION_FAILED"><code>VALIDATION_FAILED</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a> <a href="#err-LOGIN_REQUIRED"><code>LOGIN_REQUIRED</code></a> <a href="#err-FRIENDS_ONLY"><code>FRIENDS_ONLY</code></a> <a href="#err-NOT_ALLOWED"><code>NOT_ALLOWED</code></a> <a href="#err-CLAIM_ALREADY_EXISTS"><code>CLAIM_ALREADY_EXISTS</code></a> <a href="#err-ITEM_FULLY_CLAIMED"><code>ITEM_FULLY_CLAIMED</code></a> <a href="#err-WISHLIST_CLOSED"><code>WISHLIST_CLOSED</code></a> <a href="#err-SITE_NOT_ACTIVE"><code>SITE_NOT_ACTIVE</code></a> <a href="#err-FUNDING_MODE_MISMATCH"><code>FUNDING_MODE_MISMATCH</code></a> <a href="#err-RATE_LIMITED"><code>RATE_LIMITED</code></a></div><div class="note"><strong>D50（2026-10-18）：訪客僅能瀏覽，認捐需登入。</strong>負責人理由：「認捐需要消耗點數，未登入無法紀錄點數。」（目前數量認捐本身並未扣點，此決策先讓認捐綁定會員身分。）未登入（含持舊 <code>ws_guest</code> / <code>X-Guest-Token</code> 者）回 401 <code>UNAUTHORIZED</code>（problem+json），不寫入任何資料；前端導向 <code>/login?redirect=</code>。已移除請求欄位 <code>display_name</code>、<code>contact</code>、<code>email</code>（顯示名稱採帳號暱稱，<code>claimer_name</code> 由帳號帶入），回應不再含 <code>guest_token</code>，也不再建立 guest 或寄訪客確認信。若 qty 超過剩餘量回 ITEM_FULLY_CLAIMED，body 內附 <code>remaining</code>（見錯誤範例）。捐助時 user_id 寫入 claims。<s>選填 email（D39）訪客確認信與恢復權杖</s>：已由 D50 取代，僅保留給舊訪客資料（<code>POST /guest/recover</code> 見 Account 章節）。捐助成功同時依建立者的通知設定寫入通知（第一筆即時、之後每日彙整，驚喜模式只寫件數，見 4.10）。<strong>同一人對同一品項只能有一筆有效捐助</strong>（D6）：重複 POST 回 409 <code>CLAIM_ALREADY_EXISTS</code>（body 附 <code>claim_id</code>），改數量請用 PATCH /claims/{claim_id}；DB 以 partial unique index 保證。relief 據點 site_status 非 active 回 <code>SITE_NOT_ACTIVE</code>。<br><strong>v0.5：</strong>(1) 「看得到才能捐助」——先套用與公開頁相同的可見性檢查（觀看者 = 登入者；未登入先回 401），無權回 403 <code>LOGIN_REQUIRED</code> / <code>FRIENDS_ONLY</code> / <code>NOT_ALLOWED</code>（friends / selected 清單訪客不能捐助，須登入）；private 清單非擁有者 404，捐助交易本身也拒絕 private。(2) 選填 <code>visibility</code>（public | friends | private），未帶則由 trigger 套帳號 <code>default_claim_visibility</code>（D50 後新認捐皆為會員，不再有 <code>visibility: null</code>；null 僅見於舊訪客資料）。非法值 422。回應的 claim 新增 <code>visibility</code>。若清單設有 claim_ttl_hours，回應的 claim 會有 <code>expires_at</code>（purchased 後清除）。</div></div><div class="ep" id="ep-patch-claims-claim-id"><h4><span class="badge m-PATCH">PATCH</span><code class="path">/api/v1/claims/{claim_id}</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session / Bearer（捐助者本人）；legacy：X-Guest-Token / ws_guest（D50 前的舊訪客，不可增量）；status=delivered 另允許清單 owner、org owner / coordinator（D5）</div><p>修改自己的捐助：改數量、備註或推進狀態。</p><h5>Request body</h5><pre><code>{ "qty": 2, "note": "改成 2 個", "status": "purchased", "visibility": "public" }</code></pre><h5>Response 200</h5><pre><code>{
+}</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-IDEMPOTENCY_KEY_REQUIRED"><code>IDEMPOTENCY_KEY_REQUIRED</code></a> <a href="#err-IDEMPOTENCY_CONFLICT"><code>IDEMPOTENCY_CONFLICT</code></a> <a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-VALIDATION_FAILED"><code>VALIDATION_FAILED</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a> <a href="#err-LOGIN_REQUIRED"><code>LOGIN_REQUIRED</code></a> <a href="#err-FRIENDS_ONLY"><code>FRIENDS_ONLY</code></a> <a href="#err-NOT_ALLOWED"><code>NOT_ALLOWED</code></a> <a href="#err-CLAIM_ALREADY_EXISTS"><code>CLAIM_ALREADY_EXISTS</code></a> <a href="#err-ITEM_FULLY_CLAIMED"><code>ITEM_FULLY_CLAIMED</code></a> <a href="#err-WISHLIST_CLOSED"><code>WISHLIST_CLOSED</code></a> <a href="#err-SITE_NOT_ACTIVE"><code>SITE_NOT_ACTIVE</code></a> <a href="#err-FUNDING_MODE_MISMATCH"><code>FUNDING_MODE_MISMATCH</code></a> <a href="#err-RATE_LIMITED"><code>RATE_LIMITED</code></a></div><div class="note"><strong>D50（2026-10-18）：訪客僅能瀏覽，認捐需登入。</strong>負責人理由：「認捐需要消耗點數，未登入無法紀錄點數。」（目前數量認捐本身並未扣點，此決策先讓認捐綁定會員身分。）未登入（含持舊 <code>ws_guest</code> / <code>X-Guest-Token</code> 者）回 401 <code>UNAUTHORIZED</code>（problem+json），不寫入任何資料；前端導向 <code>/login?redirect=</code>。已移除請求欄位 <code>display_name</code>、<code>contact</code>、<code>email</code>（顯示名稱採帳號暱稱，<code>claimer_name</code> 由帳號帶入），回應不再含 <code>guest_token</code>，也不再建立 guest 或寄訪客確認信。若 qty 超過剩餘量回 ITEM_FULLY_CLAIMED，body 內附 <code>remaining</code>（見錯誤範例）。捐助時 user_id 寫入 claims。<s>選填 email（D39）訪客確認信與恢復權杖</s>：已由 D50 取代，僅保留給舊訪客資料（<code>POST /guest/recover</code> 見 Account 章節）。<strong>D58：</strong>捐助成功<strong>不再通知建立者</strong>（不寫 claim.created / claim.digest，避免轟炸收件匣、破壞驚喜；4.10 為歷史設計）。選填 <code>is_anonymous</code>（預設 false）：true 時公開頁顯示「匿名」、建立者頁顯示「匿名朋友」，回應 claim 帶 <code>is_anonymous</code>。<strong>同一人對同一品項只能有一筆有效捐助</strong>（D6）：重複 POST 回 409 <code>CLAIM_ALREADY_EXISTS</code>（body 附 <code>claim_id</code>），改數量請用 PATCH /claims/{claim_id}；DB 以 partial unique index 保證。relief 據點 site_status 非 active 回 <code>SITE_NOT_ACTIVE</code>。<br><strong>v0.5：</strong>(1) 「看得到才能捐助」——先套用與公開頁相同的可見性檢查（觀看者 = 登入者；未登入先回 401），無權回 403 <code>LOGIN_REQUIRED</code> / <code>FRIENDS_ONLY</code> / <code>NOT_ALLOWED</code>（friends / selected 清單訪客不能捐助，須登入）；private 清單非擁有者 404，捐助交易本身也拒絕 private。(2) 選填 <code>visibility</code>（public | friends | private），未帶則由 trigger 套帳號 <code>default_claim_visibility</code>（D50 後新認捐皆為會員，不再有 <code>visibility: null</code>；null 僅見於舊訪客資料）。非法值 422。回應的 claim 新增 <code>visibility</code>。若清單設有 claim_ttl_hours，回應的 claim 會有 <code>expires_at</code>（purchased 後清除）。</div></div><div class="ep" id="ep-patch-claims-claim-id"><h4><span class="badge m-PATCH">PATCH</span><code class="path">/api/v1/claims/{claim_id}</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session / Bearer（捐助者本人）；legacy：X-Guest-Token / ws_guest（D50 前的舊訪客，不可增量）；status=delivered 另允許清單 owner、org owner / coordinator（D5）</div><p>修改自己的捐助：改數量、備註或推進狀態。</p><h5>Request body</h5><pre><code>{ "qty": 2, "note": "改成 2 個", "status": "purchased", "visibility": "public" }</code></pre><h5>Response 200</h5><pre><code>{
   "claim": {
     "id": "0192f3b2-4d21-7e4c-a1b2-3c4d5e6f7a01",
     "item_id": "0192f3a1-0a11-7c3b-8e5f-2b3c4d5e6f01",
@@ -3609,6 +3609,8 @@ export interface Claim {
   delivered_at: ISODateTime | null
   cancelled_at: ISODateTime | null
   visibility: ShareLevel | null     // v0.5：訪客捐助為 null；登入者必有值
+  is_anonymous: boolean             // D58：匿名捐助（公開頁顯示「匿名」、建立者頁顯示「匿名朋友」）
+  extended_at: ISODateTime | null   // Q12：已延長購買期限的時間（只能延長一次，再延長回 409 EXTENSION_USED）
 }
 
 export interface Contribution {
@@ -3803,6 +3805,7 @@ export interface PublicWishlist {
 export interface CreateClaimRequest {
   qty: number; note?: string   // D50：已移除 display_name / contact / email；須登入（未登入 401）
   visibility?: ShareLevel // v0.5：未帶 = 帳號預設
+  is_anonymous?: boolean  // D58：選填，預設 false
 }
 
 // ===== 帳號 / 通知 / 營運後台（MVP）=====
@@ -4019,6 +4022,8 @@ pub struct CreateClaimRequest {
     pub qty: i32,
     #[validate(length(max = 200))]
     pub note: Option&lt;String&gt;,
+    pub visibility: Option&lt;String&gt;,
+    pub is_anonymous: Option&lt;bool&gt;,   // D58：未帶 = false
 }   // D50：移除 display_name / contact / email
 
 #[derive(Debug, Serialize, sqlx::FromRow, utoipa::ToSchema)]
@@ -4035,6 +4040,8 @@ pub struct ClaimDto {
     #[serde(with = "time::serde::rfc3339::option")] pub purchased_at: Option&lt;OffsetDateTime&gt;,
     #[serde(with = "time::serde::rfc3339::option")] pub delivered_at: Option&lt;OffsetDateTime&gt;,
     #[serde(with = "time::serde::rfc3339::option")] pub cancelled_at: Option&lt;OffsetDateTime&gt;,
+    pub is_anonymous: bool,   // D58
+    #[serde(with = "time::serde::rfc3339::option")] pub extended_at: Option&lt;OffsetDateTime&gt;,   // Q12：只能延長一次
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow, utoipa::ToSchema)]
