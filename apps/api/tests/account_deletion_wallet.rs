@@ -118,13 +118,24 @@ async fn open_debt_or_frozen_wallet_blocks_account_deletion(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn pending_topup_blocks_account_deletion_until_expired(pool: PgPool) {
     let TestUser { id, token } = user(&pool, "丙").await;
-    sqlx::query("INSERT INTO point_wallets (user_id) VALUES ($1)").bind(id).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO point_wallets (user_id) VALUES ($1)")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO topups (wallet_id, merchant_trade_no, provider, method, amount, expires_at)
         SELECT id, 'Tpend1', 'ecpay', 'atm', 100, now() + interval '1 day' FROM point_wallets WHERE user_id = $1")
         .bind(id).execute(&pool).await.unwrap();
     let (s, b) = delete_me(&pool, &token).await;
-    assert_eq!((s, b["code"].as_str()), (StatusCode::CONFLICT, Some("ACCOUNT_HAS_POINTS")), "{b}");
-    sqlx::query("UPDATE topups SET expires_at = now() - interval '1 minute'").execute(&pool).await.unwrap();
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ACCOUNT_HAS_POINTS")),
+        "{b}"
+    );
+    sqlx::query("UPDATE topups SET expires_at = now() - interval '1 minute'")
+        .execute(&pool)
+        .await
+        .unwrap();
     let (s, b) = delete_me(&pool, &token).await;
     assert_eq!(s, StatusCode::OK, "{b}");
 }

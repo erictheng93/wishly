@@ -665,10 +665,12 @@ async fn backfill_migration_enqueues_reminders_once(pool: PgPool) {
         .await
         .unwrap();
     for _ in 0..2 {
-        sqlx::raw_sql(include_str!("../../../db/migrations/0031_backfill_purchase_reminders.sql"))
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::raw_sql(include_str!(
+            "../../../db/migrations/0031_backfill_purchase_reminders.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
     }
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'claim.purchase_reminder' AND payload->>'claim_id' = $1::text")
         .bind(c)

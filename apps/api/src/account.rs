@@ -264,7 +264,11 @@ async fn delete_me(
         "SELECT count(*) FROM topups t JOIN point_wallets w ON w.id = t.wallet_id WHERE w.user_id = $1 AND t.status = 'pending' AND t.expires_at > now()")
         .bind(id).fetch_one(&mut *tx).await?;
     if pending > 0 {
-        return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {pending} 筆尚未付款的儲值，請完成付款或等待到期後再刪除帳號。")));
+        return Err(AppError::problem(
+            409,
+            "ACCOUNT_HAS_POINTS",
+            format!("帳號還有 {pending} 筆尚未付款的儲值，請完成付款或等待到期後再刪除帳號。"),
+        ));
     }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL")
         .bind(id)

@@ -139,13 +139,27 @@ async fn owner_patch_masks_anonymous_claimer(pool: PgPool) {
     .await;
     assert_eq!(st, StatusCode::CREATED, "{c}");
     let url = format!("/claims/{}", c["claim"]["id"].as_str().unwrap());
-    let (st, _, o) = call(&app, "PATCH", &url, &common::ck(&owner.token), Some(json!({"status": "delivered"}))).await;
+    let (st, _, o) = call(
+        &app,
+        "PATCH",
+        &url,
+        &common::ck(&owner.token),
+        Some(json!({"status": "delivered"})),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK, "{o}");
     assert_eq!(o["claim"]["is_anonymous"], true);
     assert_eq!(o["claim"]["claimer_name"], "匿名朋友");
     assert!(!o.to_string().contains("小華"));
     // 本人看到自己的名字
-    let (st, _, o) = call(&app, "PATCH", &url, &common::ck(&hua.token), Some(json!({"note": "x"}))).await;
+    let (st, _, o) = call(
+        &app,
+        "PATCH",
+        &url,
+        &common::ck(&hua.token),
+        Some(json!({"note": "x"})),
+    )
+    .await;
     assert_eq!(st, StatusCode::OK, "{o}");
     assert_eq!(o["claim"]["claimer_name"], "小華");
 }
