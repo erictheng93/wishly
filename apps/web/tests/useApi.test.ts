@@ -41,3 +41,25 @@ it('404 without detail says not found, not "connection failed"', async () => {
   vi.stubGlobal('$fetch', vi.fn().mockRejectedValue({ statusCode: 404, data: { code: 'NOT_FOUND', title: '找不到資源' } }))
   await expect(useApi().api('/wishlists/x')).rejects.toMatchObject({ code: 'NOT_FOUND', detail: '找不到這個項目，可能已被刪除或你沒有權限' })
 })
+
+it.each([
+  [503, 'READ_ONLY_MODE', 'readOnly'],
+  [503, 'SERVICE_UNAVAILABLE', 'busy'],
+  [522, 'HTTP_522', 'busy'],
+  [429, 'RATE_LIMITED', null],
+])('%i %s → 全站橫幅 %s', async (statusCode, code, kind) => {
+  const headers = new Headers({ 'retry-after': '60' })
+  vi.stubGlobal('$fetch', vi.fn().mockRejectedValue({ statusCode, data: { code }, response: { headers } }))
+  const now = Date.now()
+  await expect(useApi().api('/x', { method: 'POST' })).rejects.toMatchObject({ code })
+  const s = states.get('sys-status')?.value
+  expect(s?.kind ?? null).toBe(kind)
+  if (kind) expect(s.until).toBeGreaterThanOrEqual(now + 60_000)
+})
+
+it.each([[true, 'busy'], [false, null]])('連不到（瀏覽器 onLine=%s）→ 全站橫幅 %s', async (onLine, kind) => {
+  vi.stubGlobal('navigator', { onLine })
+  vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+  await expect(useApi().api('/x')).rejects.toMatchObject({ code: 'NETWORK' })
+  expect(states.get('sys-status')?.value?.kind ?? null).toBe(kind)
+})

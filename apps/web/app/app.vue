@@ -7,5 +7,6 @@ const { locale, locales } = useI18n()
 useHead({ htmlAttrs: { lang: computed(() => locales.value.find(l => typeof l !== 'string' && l.code === locale.value)?.language ?? locale.value) } })
 </script>
 <template>
+  <SystemBanner />
   <NuxtPage />
 </template>

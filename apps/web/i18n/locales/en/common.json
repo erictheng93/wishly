@@ -20,6 +20,13 @@
       "title": "Theme: {mode}"
     },
     "inspire": "Inspiration",
-    "brands": "Brands"
+    "brands": "Brands",
+    "sys": {
+      "busy": "We're experiencing high traffic. Some actions may fail — please try again shortly.",
+      "readOnly": "Maintenance in progress. You can browse, but changes are paused for now.",
+      "busyTitle": "We're a bit busy",
+      "busyDesc": "Lots of people are here right now. Please wait a few seconds and reload.",
+      "reload": "Reload"
+    }
   }
 }

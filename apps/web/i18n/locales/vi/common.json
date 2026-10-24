@@ -20,6 +20,13 @@
       "title": "Giao diện: {mode}"
     },
     "inspire": "Cảm hứng",
-    "brands": "Thương hiệu"
+    "brands": "Thương hiệu",
+    "sys": {
+      "busy": "Hệ thống đang quá tải, một số thao tác có thể thất bại. Vui lòng thử lại sau ít phút.",
+      "readOnly": "Hệ thống đang bảo trì. Bạn vẫn có thể xem nhưng tạm thời chưa thể thêm hoặc sửa.",
+      "busyTitle": "Hệ thống đang bận",
+      "busyDesc": "Hiện có nhiều người truy cập. Vui lòng đợi vài giây rồi tải lại.",
+      "reload": "Tải lại"
+    }
   }
 }
