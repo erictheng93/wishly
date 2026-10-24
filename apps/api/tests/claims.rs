@@ -76,7 +76,7 @@ async fn public_page_happy_and_masking(pool: PgPool) {
     assert_eq!(b["items"][0]["qty_remaining"], 5);
     assert_eq!(
         b["items"][0]["claimers"][0],
-        json!({"display_name": "小明", "qty": 5})
+        json!({"display_name": "小明", "qty": 5, "anonymous": false})
     );
     assert!(b.to_string().find("contact").is_none());
 
@@ -95,7 +95,7 @@ async fn public_page_happy_and_masking(pool: PgPool) {
     let (_, _, b) = call(&app, "GET", "/public/wishlists/Ab3dE5gH7k", &[], None).await;
     assert_eq!(
         b["items"][0]["claimers"],
-        json!([{"display_name": "小明", "qty": 5}, {"display_name": "匿名", "qty": 1}])
+        json!([{"display_name": "小明", "qty": 5, "anonymous": false}, {"display_name": "匿名", "qty": 1, "anonymous": true}])
     );
     assert!(!b.to_string().contains("小華"));
 
@@ -119,6 +119,35 @@ async fn public_page_happy_and_masking(pool: PgPool) {
         .unwrap();
     assert!(locked);
     assert_all_reconciled(&pool).await;
+}
+
+/// 擁有者標記匿名捐助為已送達：回應的 claimer_name 要遮罩，本人則保留原名
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn owner_patch_masks_anonymous_claimer(pool: PgPool) {
+    let app = test_app(&pool);
+    let owner = common::user(&pool, "小米").await;
+    let list = common::wishlist(&pool, owner.id, ListOpts::default()).await;
+    let it = item(&pool, list.id, "玻璃奶瓶", 10).await;
+    let hua = common::user(&pool, "小華").await;
+    let (st, _, c) = call(
+        &app,
+        "POST",
+        &format!("/items/{it}/claims"),
+        &[common::ck(&hua.token), common::idem(Uuid::new_v4())].concat(),
+        Some(json!({"qty": 1, "is_anonymous": true})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    let url = format!("/claims/{}", c["claim"]["id"].as_str().unwrap());
+    let (st, _, o) = call(&app, "PATCH", &url, &common::ck(&owner.token), Some(json!({"status": "delivered"}))).await;
+    assert_eq!(st, StatusCode::OK, "{o}");
+    assert_eq!(o["claim"]["is_anonymous"], true);
+    assert_eq!(o["claim"]["claimer_name"], "匿名朋友");
+    assert!(!o.to_string().contains("小華"));
+    // 本人看到自己的名字
+    let (st, _, o) = call(&app, "PATCH", &url, &common::ck(&hua.token), Some(json!({"note": "x"}))).await;
+    assert_eq!(st, StatusCode::OK, "{o}");
+    assert_eq!(o["claim"]["claimer_name"], "小華");
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

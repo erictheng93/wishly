@@ -1,5 +1,6 @@
 {
   "guest": {
+    "anon": "Anonymous",
     "loading": "Loading…",
     "loadFailed": "Temporarily unable to load. Please try again later.",
     "reload": "Reload",

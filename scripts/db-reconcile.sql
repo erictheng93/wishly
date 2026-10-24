@@ -1,6 +1,12 @@
 -- 還原後的一致性檢查；條件與 apps/api/tests/common/mod.rs 的 assert_*_reconciled 相同，改那邊時一起改。
 \set ON_ERROR_STOP on
 SELECT max(version) AS migration, bool_and(success) AS all_success FROM _sqlx_migrations;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM _sqlx_migrations WHERE success) OR EXISTS (SELECT 1 FROM _sqlx_migrations WHERE NOT success) THEN
+    RAISE EXCEPTION 'migration 狀態不完整：沒有成功紀錄或有失敗的 migration';
+  END IF;
+END $$;
 SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM wishlists) AS wishlists,
        (SELECT count(*) FROM wishlist_items) AS items, (SELECT count(*) FROM claims) AS claims,
        (SELECT count(*) FROM contributions) AS contributions, (SELECT count(*) FROM point_ledger) AS ledger;

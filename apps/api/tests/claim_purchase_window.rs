@@ -580,3 +580,100 @@ fn reminder_on_ended_list_does_not_offer_extension() {
         assert!(!closed.contains('7'), "{closed}");
     }
 }
+
+async fn count_kind(pool: &PgPool, kind: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = $1")
+        .bind(kind)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// 危險順序：expire_due 先跑、close_due 後跑；到期未結束清單的逾期認領不可被釋放，要拿到結束寬限
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn expire_due_before_close_due_still_gets_grace(pool: PgPool) {
+    let (_, wl, it) = setup(&pool, Some(168), None).await;
+    let (_, c) = user_claim(&pool, it, 1).await;
+    sqlx::query("UPDATE claims SET expires_at = now() - interval '1 minute' WHERE id = $1")
+        .bind(c)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE wishlists SET closes_at = now() - interval '1 second' WHERE id = $1")
+        .bind(wl)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(wishly_api::claims::expire_due(&pool).await.unwrap(), 0);
+    assert_eq!(wishly_api::wishlists::close_due(&pool).await.unwrap(), 1);
+
+    let st: String = sqlx::query_scalar("SELECT status::text FROM claims WHERE id = $1")
+        .bind(c)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(st, "reserved");
+    assert!(graced(&pool, c).await);
+    assert_eq!(count_kind(&pool, "claim.list_closed").await, 1);
+    assert_eq!(count_kind(&pool, "claim.expired").await, 0);
+    assert_claims_reconciled(&pool).await;
+}
+
+/// 已結束的清單再封存（或重複封存）不重給寬限、不重複通知
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn archiving_closed_list_does_not_regrace(pool: PgPool) {
+    let (o, wl, it) = setup(&pool, Some(168), None).await;
+    let (_, c) = user_claim(&pool, it, 1).await;
+    sqlx::query("UPDATE wishlists SET closes_at = now() - interval '1 second' WHERE id = $1")
+        .bind(wl)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(wishly_api::wishlists::close_due(&pool).await.unwrap(), 1);
+    let before = expires(&pool, c).await;
+    assert!(graced(&pool, c).await);
+    assert_eq!(count_kind(&pool, "claim.list_closed").await, 1);
+
+    for _ in 0..2 {
+        let _ = call(
+            &pool,
+            "DELETE",
+            &format!("/wishlists/{wl}"),
+            &ck(&o.token),
+            None,
+        )
+        .await;
+        assert_eq!(expires(&pool, c).await, before, "不重給寬限");
+        assert_eq!(count_kind(&pool, "claim.list_closed").await, 1);
+    }
+    let ws: String = sqlx::query_scalar("SELECT status::text FROM wishlists WHERE id = $1")
+        .bind(wl)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(ws, "archived");
+}
+
+/// 0031 補排：未來的 reserved 捐助各補 3 天前 / 24 小時前兩封，重跑不重複
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn backfill_migration_enqueues_reminders_once(pool: PgPool) {
+    let (_, _, it) = setup(&pool, Some(168), None).await;
+    let (_, c) = user_claim(&pool, it, 1).await;
+    sqlx::query("DELETE FROM notifications WHERE kind = 'claim.purchase_reminder'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    for _ in 0..2 {
+        sqlx::raw_sql(include_str!("../../../db/migrations/0031_backfill_purchase_reminders.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind = 'claim.purchase_reminder' AND payload->>'claim_id' = $1::text")
+        .bind(c)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 2);
+}

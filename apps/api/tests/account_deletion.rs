@@ -210,3 +210,39 @@ async fn account_delete_purges_public_lists_after_commit(pool: PgPool) {
     assert_eq!(body["status"], "active");
     assert_all_reconciled(&pool).await;
 }
+
+/// 刪帳號才結束的清單：他人 reserved 捐助延到 now()+7d 並通知；先前已 closed 的清單不重複寬限。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn account_delete_graces_other_claims_only_on_lists_not_already_closed(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let owner = user(&pool, "owner").await;
+    let claimer = user(&pool, "claimer").await;
+    let mut claims = Vec::new();
+    for status in ["active", "closed"] {
+        let wl = wishlist(&pool, owner.id, Default::default()).await.id;
+        sqlx::query("UPDATE wishlists SET status=$2::wishlist_status, closed_at=CASE WHEN $2='closed' THEN now() END WHERE id=$1")
+            .bind(wl).bind(status).execute(&pool).await.unwrap();
+        let it = item(&pool, wl, "i", 2).await;
+        sqlx::query("UPDATE wishlist_items SET qty_claimed=1 WHERE id=$1").bind(it).execute(&pool).await.unwrap();
+        let c: uuid::Uuid = sqlx::query_scalar("INSERT INTO claims (item_id, user_id, claimer_name, qty, expires_at) VALUES ($1, $2, 'c', 1, now() + interval '2 days') RETURNING id")
+            .bind(it).bind(claimer.id).fetch_one(&pool).await.unwrap();
+        claims.push(c);
+    }
+    let (s, _, v) = call(&pool, "DELETE", "/me", &ck(&owner.token), Some(json!({"confirm": "DELETE"}))).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let days = |c: uuid::Uuid| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, f64>("SELECT (extract(epoch FROM expires_at - now())/86400)::float8 FROM claims WHERE id=$1 AND status='reserved'")
+                .bind(c).fetch_one(&pool).await.unwrap()
+        }
+    };
+    let graced = days(claims[0]).await;
+    assert!((6.9..=7.0).contains(&graced), "active list claim not extended to ~7d: {graced}");
+    let untouched = days(claims[1]).await;
+    assert!((1.9..=2.0).contains(&untouched), "already-closed list claim re-graced: {untouched}");
+    let notified: Vec<(Option<String>,)> = sqlx::query_as("SELECT payload->>'claim_id' FROM notifications WHERE user_id=$1 AND kind='claim.list_closed'")
+        .bind(claimer.id).fetch_all(&pool).await.unwrap();
+    assert_eq!(notified, [(Some(claims[0].to_string()),)]);
+    assert_all_reconciled(&pool).await;
+}

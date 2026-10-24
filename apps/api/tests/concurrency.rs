@@ -1558,3 +1558,77 @@ async fn wallet_freeze_vs_reallocate_checks_status_under_lock(pool: PgPool) {
     assert_eq!(item_state(&pool, src).await, (200, "expired".into()));
     common::assert_all_reconciled(&pool).await;
 }
+
+/// 爭議已鎖住 topups 列、正要凍結錢包時刪帳號必須卡在 topups 列鎖（鎖序 topups → 錢包），
+/// 等爭議提交後看到凍結錢包 → 409 ACCOUNT_HAS_POINTS，帳號不被刪。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn account_delete_waits_on_topup_lock_then_sees_dispute_freeze(pool: PgPool) {
+    let _slot = RACE_SLOTS.acquire().await.unwrap();
+    let TestUser { id: u, token } = common::user(&pool, "donor").await;
+    let topup = common::topup_credit(&pool, u, 100).await;
+    // 點數已花光（只動餘額與批次，本測試不做對帳），餘額不會擋住刪除
+    sqlx::query("UPDATE point_lots SET remaining_points=0 WHERE wallet_id=(SELECT id FROM point_wallets WHERE user_id=$1)").bind(u).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE point_wallets SET balance=0 WHERE user_id=$1").bind(u).execute(&pool).await.unwrap();
+    let app = app(AppState { pool: pool.clone() });
+    let (mut gate, pid) = gate(&pool, "topups", topup).await; // 模擬爭議交易已鎖 topups
+    let d = send(&app, ("DELETE", "/me".to_string(), common::ck(&token), Some(json!({"confirm":"DELETE"}))));
+    blocked(&pool, pid, "FROM topups t JOIN point_wallets", 1).await;
+    assert!(wishly_api::wallet_ops::dispute_open(&mut gate, topup).await.unwrap());
+    gate.commit().await.unwrap();
+    let r = finish(d).await;
+    assert_eq!(r.0, StatusCode::CONFLICT, "{}", r.2);
+    assert_eq!(r.2["code"], "ACCOUNT_HAS_POINTS");
+    let deleted: bool = sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM users WHERE id=$1").bind(u).fetch_one(&pool).await.unwrap();
+    assert!(!deleted);
+}
+
+/// A 剛把清單關閉並給寬限（未提交），創建者此時封存：封存的 UPDATE 必須等 A，提交後讀到 closed，
+/// 不再重給寬限（期限不變、claim.list_closed 只有一則）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn archive_vs_concurrent_close_does_not_grace_twice(pool: PgPool) {
+    let _slot = RACE_SLOTS.acquire().await.unwrap();
+    let TestUser { id: owner, token } = common::user(&pool, "owner").await;
+    let TestUser { id: claimer, .. } = common::user(&pool, "claimer").await;
+    let wl = list(&pool, owner).await;
+    let it = quantity(&pool, wl, 2).await;
+    sqlx::query("UPDATE wishlist_items SET qty_claimed=1 WHERE id=$1").bind(it).execute(&pool).await.unwrap();
+    let claim: Uuid = sqlx::query_scalar("INSERT INTO claims (item_id,user_id,claimer_name,qty,expires_at) VALUES ($1,$2,'c',1,now()+interval '1 day') RETURNING id")
+        .bind(it).bind(claimer).fetch_one(&pool).await.unwrap();
+    let app = app(AppState { pool: pool.clone() });
+    let mut a = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *a).await.unwrap();
+    sqlx::query("UPDATE wishlists SET status='closed', closed_at=now() WHERE id=$1").bind(wl).execute(&mut *a).await.unwrap();
+    wishly_api::claims::grace_on_close(&mut a, wl).await.unwrap();
+    let d = send(&app, ("DELETE", format!("/wishlists/{wl}"), common::ck(&token), None));
+    blocked(&pool, pid, "status<>'archived'", 1).await;
+    a.commit().await.unwrap();
+    let r = finish(d).await;
+    assert_eq!(r.0, StatusCode::NO_CONTENT, "{}", r.2);
+    // A 的寬限約為 now()+7d；若封存又給一次，期限會再往後推
+    let (extended_again, n): (bool, i64) = sqlx::query_as(
+        "SELECT (SELECT expires_at > (SELECT max(created_at) FROM notifications WHERE kind='claim.list_closed') + interval '7 days' + interval '1 second' FROM claims WHERE id=$1),
+                (SELECT count(*) FROM notifications WHERE kind='claim.list_closed' AND user_id=$2)")
+        .bind(claim).bind(claimer).fetch_one(&pool).await.unwrap();
+    assert!(!extended_again, "archive re-graced a list that was already closed");
+    assert_eq!(n, 1, "claim.list_closed sent more than once");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patch_wishlist_with_stale_status_returns_409(pool: PgPool) {
+    let _slot = RACE_SLOTS.acquire().await.unwrap();
+    let TestUser { id: owner, token } = common::user(&pool, "owner").await;
+    let wid = list(&pool, owner).await;
+    let app = app(AppState { pool: pool.clone() });
+    // 另一交易把清單結束並持鎖；PATCH 已讀到 active，UPDATE 時狀態對不上
+    let mut tx = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *tx).await.unwrap();
+    sqlx::query("UPDATE wishlists SET status='closed', closed_at=now() WHERE id=$1")
+        .bind(wid).execute(&mut *tx).await.unwrap();
+    let p = send(&app, ("PATCH", format!("/wishlists/{wid}"), common::ck(&token), Some(json!({"title":"x"}))));
+    blocked(&pool, pid, "UPDATE wishlists SET title", 1).await;
+    tx.commit().await.unwrap();
+    let (s, _, b) = finish(p).await;
+    assert_eq!((s, b["code"].as_str()), (StatusCode::CONFLICT, Some("STALE_VERSION")), "{b}");
+    let t: String = sqlx::query_scalar("SELECT title FROM wishlists WHERE id=$1").bind(wid).fetch_one(&pool).await.unwrap();
+    assert_ne!(t, "x");
+}

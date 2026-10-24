@@ -238,18 +238,19 @@ async fn render(
     let visible = w.show_claimer_names && !w.locked;
     let mut claimers: HashMap<Uuid, Vec<Value>> = HashMap::new();
     if visible {
-        let rows: Vec<(Uuid, String, i64)> = sqlx::query_as(
+        let rows: Vec<(Uuid, String, bool, i64)> = sqlx::query_as(
             // 匿名或登入者的捐助非 public → 對外顯示「匿名」（此回應可被共用快取，不做逐觀看者的好友判斷）
-            "SELECT c.item_id, CASE WHEN NOT c.is_anonymous AND (c.visibility IS NULL OR c.visibility = 'public') THEN c.claimer_name ELSE '匿名' END AS n, sum(c.qty)::bigint
+            "SELECT c.item_id, CASE WHEN NOT c.is_anonymous AND (c.visibility IS NULL OR c.visibility = 'public') THEN c.claimer_name ELSE '匿名' END AS n,
+                    (c.is_anonymous OR NOT (c.visibility IS NULL OR c.visibility = 'public')) AS anon, sum(c.qty)::bigint
              FROM claims c JOIN wishlist_items i ON i.id = c.item_id
              WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('reserved','purchased','delivered')
-             GROUP BY c.item_id, n ORDER BY min(c.created_at)")
+             GROUP BY c.item_id, n, anon ORDER BY min(c.created_at)")
             .bind(w.id).fetch_all(&st.pool).await?;
-        for (item, name, qty) in rows {
+        for (item, name, anon, qty) in rows {
             claimers
                 .entry(item)
                 .or_default()
-                .push(json!({ "display_name": name, "qty": qty }));
+                .push(json!({ "display_name": name, "qty": qty, "anonymous": anon }));
         }
     }
 
@@ -265,7 +266,7 @@ async fn render(
         for (item, user, anon, name, points) in rows {
             let list = contributors.entry(item).or_default();
             if anon {
-                list.push(json!({ "display_name": "匿名朋友", "points": points }));
+                list.push(json!({ "display_name": "匿名朋友", "points": points, "anonymous": true }));
                 continue;
             }
             match merged.get(&(item, user)) {
@@ -274,7 +275,7 @@ async fn render(
                 }
                 None => {
                     merged.insert((item, user), list.len());
-                    list.push(json!({ "display_name": name, "points": points }));
+                    list.push(json!({ "display_name": name, "points": points, "anonymous": false }));
                 }
             }
         }

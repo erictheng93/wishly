@@ -19,12 +19,12 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
         <div v-if="item.pledged_points != null" class="g-mute">{{ $t('guest.card.raised') }} <b class="g-num">{{ fmtPts(item.pledged_points) }} / {{ $t('guest.pts', { n: fmtPts(item.target_points) }) }}</b><template v-if="ds === 'open'">{{ $t('guest.card.leftPts', { n: fmtPts(item.remaining_points) }) }}</template></div>
         <div v-else class="g-mute">{{ $t('guest.card.target') }} <b class="g-num">{{ $t('guest.pts', { n: fmtPts(item.target_points) }) }}</b></div>
         <div v-if="item.funding_deadline && ds === 'open'" class="g-mute">{{ $t('guest.card.until', { time: fmtTime(item.funding_deadline) }) }}</div>
-        <div v-if="!masked && item.contributors?.length" class="g-mute">{{ $t('guest.card.contributors', { names: item.contributors.map((c: any) => `${c.display_name} ${$t('guest.pts', { n: fmtPts(c.points) })}`).join($t('guest.listSep')) }) }}</div>
+        <div v-if="!masked && item.contributors?.length" class="g-mute">{{ $t('guest.card.contributors', { names: item.contributors.map((c: any) => `${c.anonymous ? $t('guest.anon') : c.display_name} ${$t('guest.pts', { n: fmtPts(c.points) })}`).join($t('guest.listSep')) }) }}</div>
       </template>
       <template v-else>
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: item.progress_percent + '%' }" /></div>
         <div class="g-mute">{{ $t('guest.card.claimed') }} <b class="g-num">{{ item.qty_claimed }} / {{ item.qty_needed }}</b><template v-if="mine">{{ $t('guest.card.mineQty', { n: mine.qty }) }}</template></div>
-        <div v-if="!masked && item.claimers?.length" class="g-mute">{{ $t('guest.card.claimedBy', { names: item.claimers.map((c: any) => c.display_name).join($t('guest.listSep')) }) }}</div>
+        <div v-if="!masked && item.claimers?.length" class="g-mute">{{ $t('guest.card.claimedBy', { names: item.claimers.map((c: any) => c.anonymous ? $t('guest.anon') : c.display_name).join($t('guest.listSep')) }) }}</div>
       </template>
       <div v-if="mine?.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(mine.item_changed_at) }) }}<button class="g-link" @click="$emit('ack')">{{ $t('me.claims.ackItemChange') }}</button></div>
       <div class="g-actions">

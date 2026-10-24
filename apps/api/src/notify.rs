@@ -154,6 +154,17 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
             if ended {
                 payload["ended"] = Value::Bool(true);
             }
+        } else if kind == "claim.item_changed" {
+            // 延後 10 分鐘寄：這段期間取消 / 撤回 / 轉投 / 品項被刪的就不寄
+            let still: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM claims WHERE item_id = ($1->>'item_id')::uuid AND status IN ('reserved', 'purchased')
+                                  AND (user_id = $2 OR guest_id = $3))
+                     OR EXISTS (SELECT 1 FROM contributions WHERE item_id = ($1->>'item_id')::uuid AND status = 'pledged' AND user_id = $2)")
+                .bind(&payload).bind(uid).bind(gid).fetch_one(pool).await?;
+            if !still {
+                sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'no longer supporting item' WHERE id = $1").bind(id).execute(pool).await?;
+                continue;
+            }
         }
         let security = matches!(
             kind.as_str(),

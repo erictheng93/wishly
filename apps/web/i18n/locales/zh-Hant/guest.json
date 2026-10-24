@@ -1,5 +1,6 @@
 {
   "guest": {
+    "anon": "匿名朋友",
     "loading": "載入中…",
     "loadFailed": "系統暫時無法載入，請稍後再試",
     "reload": "重新載入",

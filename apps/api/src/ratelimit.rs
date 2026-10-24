@@ -77,11 +77,12 @@ pub fn spawn_cleanup(pool: PgPool) {
         let mut n = 0u32;
         loop {
             t.tick().await;
-            if let Err(e) = crate::claims::expire_due(&pool).await {
-                tracing::error!(error=%e, "expire_due");
-            }
+            // 先關到期清單（給捐助結束寬限），再釋放逾期捐助
             if let Err(e) = crate::wishlists::close_due(&pool).await {
                 tracing::error!(error=%e, "close_due");
+            }
+            if let Err(e) = crate::claims::expire_due(&pool).await {
+                tracing::error!(error=%e, "expire_due");
             }
             if let Err(e) = crate::wishlists::remind_closing(&pool).await {
                 tracing::error!(error=%e, "remind_closing");
