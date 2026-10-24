@@ -812,11 +812,21 @@ async fn late_payment_after_account_delete_leaves_audit(pool: PgPool) {
     let u = aged_user(&pool, "儲值者").await;
     let (_, _, v) = order(&pool, &u.token, 500, "atm").await;
     let no = trade_no(&pool, v["topup"]["id"].as_str().unwrap()).await;
-    sqlx::query("UPDATE topups SET status = 'expired', expires_at = now() - interval '1 day'").execute(&pool).await.unwrap();
-    sqlx::query("UPDATE users SET deleted_at = now() WHERE id = $1").bind(u.id).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE topups SET status = 'expired', expires_at = now() - interval '1 day'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE users SET deleted_at = now() WHERE id = $1")
+        .bind(u.id)
+        .execute(&pool)
+        .await
+        .unwrap();
     assert_eq!(notify(&pool, &no, 500).await.2, "1|OK");
     assert_eq!(status_of(&pool, &no).await, "paid");
-    assert_eq!(audit_count(&pool, "topup.paid_after_account_delete").await, 1);
+    assert_eq!(
+        audit_count(&pool, "topup.paid_after_account_delete").await,
+        1
+    );
     assert_points_reconciled(&pool).await;
 }
 

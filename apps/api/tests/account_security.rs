@@ -525,7 +525,8 @@ async fn export_claims_include_is_anonymous(pool: PgPool) {
     )
     .await;
     assert_eq!(st, StatusCode::CREATED, "{c}");
-    let (st, _, export) = common::call(&pool, "GET", "/me/export", &common::ck(&me.token), None).await;
+    let (st, _, export) =
+        common::call(&pool, "GET", "/me/export", &common::ck(&me.token), None).await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(export["claims"][0]["is_anonymous"], true);
 }

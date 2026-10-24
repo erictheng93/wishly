@@ -961,7 +961,10 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     assert!(i["funding_deadline"].is_string());
     let cs = i["contributors"].as_array().unwrap();
     assert_eq!(cs.len(), 3, "{cs:?}"); // 阿明(合併) + 匿名 x2；撤回的不列
-    assert_eq!(cs[0], json!({ "display_name": "阿明", "points": 300, "anonymous": false }));
+    assert_eq!(
+        cs[0],
+        json!({ "display_name": "阿明", "points": 300, "anonymous": false })
+    );
     assert_eq!(
         cs.iter()
             .filter(|c| c["display_name"] == "匿名朋友")
@@ -1971,7 +1974,23 @@ async fn dashboard_claimer_count_dedups_repeat_pledger(pool: PgPool) {
     let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
     pledge(&pool, ci, a, 100, false).await;
     pledge(&pool, ci, a, 100, false).await;
-    let (_, _, d) = call(&pool, "GET", &format!("/wishlists/{}/dashboard", wl.id), &ck(&t), None).await;
-    let c = d["items"].as_array().unwrap().iter().find(|i| i["item_id"] == ci.to_string()).unwrap();
-    assert_eq!((c["pledged_points"].as_i64(), c["claimer_count"].as_i64()), (Some(200), Some(1)), "{c}");
+    let (_, _, d) = call(
+        &pool,
+        "GET",
+        &format!("/wishlists/{}/dashboard", wl.id),
+        &ck(&t),
+        None,
+    )
+    .await;
+    let c = d["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["item_id"] == ci.to_string())
+        .unwrap();
+    assert_eq!(
+        (c["pledged_points"].as_i64(), c["claimer_count"].as_i64()),
+        (Some(200), Some(1)),
+        "{c}"
+    );
 }

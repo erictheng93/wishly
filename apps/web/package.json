@@ -48,6 +48,9 @@
   },
   "overrides": {
     "braces": "git+https://github.com/erictheng93/braces.git#5991a5c00a4c00c68dadfea56f88fa2c5f9d699a",
-    "node-forge": "git+https://github.com/erictheng93/forge.git#bc338d653b0c3b7ca9b2e4a5d4146b9aa4f041d6"
+    "node-forge": "git+https://github.com/erictheng93/forge.git#bc338d653b0c3b7ca9b2e4a5d4146b9aa4f041d6",
+    "miniflare": {
+      "undici": "7.30.1"
+    }
   }
 }

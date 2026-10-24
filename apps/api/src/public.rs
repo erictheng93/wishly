@@ -266,7 +266,9 @@ async fn render(
         for (item, user, anon, name, points) in rows {
             let list = contributors.entry(item).or_default();
             if anon {
-                list.push(json!({ "display_name": "匿名朋友", "points": points, "anonymous": true }));
+                list.push(
+                    json!({ "display_name": "匿名朋友", "points": points, "anonymous": true }),
+                );
                 continue;
             }
             match merged.get(&(item, user)) {
@@ -275,7 +277,9 @@ async fn render(
                 }
                 None => {
                     merged.insert((item, user), list.len());
-                    list.push(json!({ "display_name": name, "points": points, "anonymous": false }));
+                    list.push(
+                        json!({ "display_name": name, "points": points, "anonymous": false }),
+                    );
                 }
             }
         }
