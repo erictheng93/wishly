@@ -1,4 +1,5 @@
 //! GET /public/wishlists/{slug}（契約第 5 章；訪客視角，可被 CDN 快取，只出 public 內容）
+//! GET /public/status（前端維護橫幅用；只回唯讀旗標，可被 CDN 快取 30 秒）
 //! GET /restricted/wishlists/{slug}（好友 / 指定 / 擁有者，依 ws_session，永遠 no-store）
 use crate::{error::AppError, AppState};
 use axum::{
@@ -16,9 +17,24 @@ use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/public/status", get(status))
         .route("/public/wishlists", get(explore))
         .route("/public/wishlists/{slug}", get(wishlist))
         .route("/restricted/wishlists/{slug}", get(restricted))
+}
+
+/// 唯讀維護中就讓前端先掛橫幅，訪客不必填完表單才被 503 擋下。
+async fn status(State(st): State<AppState>) -> Result<Response, AppError> {
+    let v: Option<Value> =
+        sqlx::query_scalar("SELECT value FROM system_flags WHERE key = 'read_only'")
+            .fetch_optional(&st.pool)
+            .await?;
+    let read_only = v.and_then(|v| v.as_bool()) == Some(true);
+    Ok((
+        [(header::CACHE_CONTROL, "public, max-age=30")],
+        Json(json!({ "read_only": read_only })),
+    )
+        .into_response())
 }
 
 const EXPLORE_PAGE: i64 = 24;

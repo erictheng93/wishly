@@ -1,5 +1,6 @@
 import { apiErrMsg, problemDetail } from '../utils/errors'
 import { nativeHeaders } from '../utils/native'
+import { noteUnavailable } from './useSysStatus'
 // 訪客 token 儲存 + API 呼叫。
 // LINE in-app browser 的 localStorage / cookie 可能被清掉或停用，所以依序寫入多處、讀取時取第一個有值的：
 //   localStorage -> JS cookie(ws_guest_js) -> sessionStorage -> 記憶體。
@@ -49,10 +50,11 @@ export function useGuest() {
       return await $fetch(`${apiBase}/api/v1${path}`, { method: (opt.method ?? 'GET') as any, body: opt.body, headers, credentials: 'include' }) as T
     } catch (e: any) {
       const d = e?.data ?? {}
-      if (!e?.response) throw new ApiError(0, 'NETWORK', apiErrMsg({ code: 'NETWORK' }))
+      if (!e?.response) { noteUnavailable(0); throw new ApiError(0, 'NETWORK', apiErrMsg({ code: 'NETWORK' })) }
       const status = e.response.status
       if (status === 401 && tk && !opt.keepToken) setGuestToken(null)
       const code = d.code ?? 'UNKNOWN'
+      noteUnavailable(status, code, Number(e.response.headers?.get?.('retry-after')) || undefined)
       const errors = (d.errors ?? []).map((x: any) => ({ ...x, detail: problemDetail(x) }))
       throw new ApiError(status, code, apiErrMsg({ ...d, status, code }), { ...d, errors })
     }

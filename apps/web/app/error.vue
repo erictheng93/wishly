@@ -7,7 +7,8 @@ const { t } = useI18n()
 const props = defineProps<{ error: { statusCode?: number, status?: number } }>()
 const code = computed(() => props.error?.statusCode ?? props.error?.status ?? 500)
 const missing = computed(() => code.value === 404 || code.value === 403)
-useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : t('auth.error.errorTitle'), robots: 'noindex' })
+const busy = computed(() => code.value === 503 || code.value === 429) // 系統繁忙頁：暫時性，給重新整理
+useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.value ? t('common.sys.busyTitle') : t('auth.error.errorTitle'), robots: 'noindex' })
 </script>
 
 <template>
@@ -16,6 +17,11 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : t('aut
     <template v-if="missing">
       <h1>{{ $t('auth.error.notFoundTitle') }}</h1>
       <p class="g-mute">{{ $t('auth.error.notFoundDesc') }}</p>
+    </template>
+    <template v-else-if="busy">
+      <h1>{{ $t('common.sys.busyTitle') }}</h1>
+      <p class="g-mute">{{ $t('common.sys.busyDesc') }}</p>
+      <button class="g-btn ghost" @click="reloadNuxtApp()">{{ $t('common.sys.reload') }}</button>
     </template>
     <template v-else>
       <h1>{{ $t('auth.error.serverTitle') }}</h1>

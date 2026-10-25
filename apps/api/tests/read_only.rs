@@ -26,6 +26,10 @@ async fn read_only_mode_blocks_writes(pool: PgPool) {
     )
     .await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
+    assert_eq!(
+        call(&pool, "GET", "/public/status", &[], None).await.2["read_only"],
+        false
+    );
     let (_, _, v) = call(&pool, "GET", "/admin/system-flags", &ck(&staff), None).await;
     assert_eq!(v["data"][0]["key"], "read_only");
     assert_eq!(v["data"][0]["value"], false);
@@ -47,6 +51,9 @@ async fn read_only_mode_blocks_writes(pool: PgPool) {
         .0,
         StatusCode::OK
     );
+    let (s, h, v) = call(&pool, "GET", "/public/status", &[], None).await;
+    assert_eq!((s, v["read_only"].as_bool()), (StatusCode::OK, Some(true)));
+    assert_eq!(h["cache-control"], "public, max-age=30");
     let (s, h, v) = call(
         &pool,
         "POST",

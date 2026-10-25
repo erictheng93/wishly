@@ -3,7 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ApiError, useGuest, setGuestToken, getGuestToken } from '../app/composables/useGuest'
 
 const fetch = vi.fn()
+const sys = { value: null as any }
 beforeEach(() => {
+  sys.value = null
+  vi.stubGlobal('useState', () => sys)
   localStorage.clear(); sessionStorage.clear(); setGuestToken(null)
   vi.stubGlobal('useRuntimeConfig', () => ({ public: { apiBase: 'https://api.example.test' } }))
   vi.stubGlobal('$fetch', fetch)
@@ -43,5 +46,6 @@ it('401 clears a stale guest token, but keepToken preserves it (claim POST 401 m
 it('turns disconnected transport into a typed NETWORK error', async () => {
   fetch.mockRejectedValue(new TypeError('offline'))
   await expect(useGuest().api('/me/claims')).rejects.toBeInstanceOf(ApiError)
+  expect(sys.value?.kind).toBe('busy') // happy-dom 的 navigator.onLine 為 true：連不到 = 伺服器端問題
   await expect(useGuest().api('/me/claims')).rejects.toMatchObject({ status: 0, code: 'NETWORK' })
 })
