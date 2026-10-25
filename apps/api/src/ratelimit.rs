@@ -1,4 +1,4 @@
-//! 最小 Postgres 固定視窗限流 + 每小時清除 task（idempotency_keys 24h、rate_limits 2 天、login_failures 1 天）。
+//! 最小 Postgres 固定視窗限流 + 每小時清除 task（idempotency_keys 24h、rate_limits 2 天、login_failures 365 天）。
 use crate::error::AppError;
 use sqlx::PgPool;
 
@@ -57,8 +57,8 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM rate_limits WHERE window_start < now() - interval '2 days'")
         .execute(pool)
         .await?;
-    // 鎖定只看 15 分鐘內；不存在的 email 永遠不會「登入成功」清掉，需定期刪
-    sqlx::query("DELETE FROM login_failures WHERE created_at < now() - interval '1 day'")
+    // 鎖定只看 15 分鐘內，但營運分析最長查 365 天；超出分析範圍的紀錄才清除
+    sqlx::query("DELETE FROM login_failures WHERE created_at < now() - interval '365 days'")
         .execute(pool)
         .await?;
     // 每日活躍紀錄只留 400 天

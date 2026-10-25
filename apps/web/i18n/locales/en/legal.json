@@ -29,7 +29,9 @@
       "rightsH": "Your rights",
       "rightsP": "You can change your nickname in \"My pledges\", or choose \"Delete my nickname and contact info\": we clear your nickname, contact info and email, and keep the pledge record as \"Deleted guest\" so the list owner can reconcile. Emails have a one-click unsubscribe link in the footer.",
       "reportH": "Reports",
-      "reportP": "Reports are reviewed manually and the list owner is not told who reported. To prevent abuse we use Cloudflare Turnstile and rate-limit by IP."
+      "reportP": "Reports are reviewed manually and the list owner is not told who reported. To prevent abuse we use Cloudflare Turnstile and rate-limit by IP.",
+      "loginH": "Sign-in security",
+      "loginP": "To prevent brute-force attacks, when a sign-in fails we record the email and IP address used. This is used for temporary lockouts and human verification, and in aggregate for operational monitoring; records are deleted automatically after 365 days."
     }
   }
 }

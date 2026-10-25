@@ -365,7 +365,7 @@ async fn change_password(
         ));
     }
     revoke_except(&mut tx, u.id, u.session_id).await?;
-    sqlx::query("DELETE FROM login_failures WHERE email=$1")
+    sqlx::query("UPDATE login_failures SET cleared_at=now() WHERE email=$1 AND cleared_at IS NULL")
         .bind(&email)
         .execute(&mut *tx)
         .await?;

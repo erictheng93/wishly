@@ -4,6 +4,33 @@ use common::*;
 use sqlx::PgPool;
 
 #[sqlx::test(migrations = "../../db/migrations")]
+async fn cleanup_preserves_login_failures_for_analytics_ranges(pool: PgPool) {
+    let s = staff(&pool, "營運").await;
+    sqlx::query(
+        "INSERT INTO login_failures (email, ip, created_at)
+         SELECT 'unknown@example.com', '1.1.1.1',
+                (((now() AT TIME ZONE 'Asia/Taipei')::date - age)::timestamp AT TIME ZONE 'Asia/Taipei')
+         FROM unnest(ARRAY[0, 2, 20, 60, 364, 366]) age",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    wishly_api::ratelimit::cleanup(&pool).await.unwrap();
+    for (days, expected) in [(7, 2), (30, 3), (90, 4), (365, 5)] {
+        let (st, _, b) = call(
+            &pool,
+            "GET",
+            &format!("/admin/analytics?days={days}"),
+            &ck(&s.token),
+            None,
+        )
+        .await;
+        assert_eq!(st, 200, "{b}");
+        assert_eq!(b["trust"]["login_failures"], expected, "days={days}");
+    }
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
 async fn guards_and_days_validation(pool: PgPool) {
     let u = user(&pool, "一般").await;
     let s = staff(&pool, "營運").await;
