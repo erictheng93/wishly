@@ -12,6 +12,7 @@ beforeEach(() => {
   for (const [name, value] of Object.entries({
     computed, onBeforeUnmount, onMounted, ref, useId, watch,
     useRoute: () => route,
+    useFriendRequests: () => ({ count: ref(0) }),
     useAuth: () => ({ user: ref({ display_name: '小華', handle: 'hua', is_staff: true }), logout: vi.fn() }),
   })) vi.stubGlobal(name, value)
   mounted = mount(UserMenu, {}, {

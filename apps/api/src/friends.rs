@@ -3,7 +3,7 @@ use crate::{
     access::are_friends,
     error::AppError,
     guest::new_token,
-    ratelimit,
+    notify, ratelimit,
     session::{hash_token, CurrentUser},
     AppState,
 };
@@ -25,6 +25,7 @@ pub fn routes() -> Router<AppState> {
         .route("/friends", get(list))
         .route("/friends/feed", get(feed))
         .route("/friends/requests", post(request))
+        .route("/friends/requests/count", get(request_count))
         .route("/friends/requests/{id}/accept", post(accept))
         .route("/friends/requests/{id}", delete(drop_request))
         .route(
@@ -56,11 +57,11 @@ async fn befriend(ex: &mut sqlx::PgConnection, a: Uuid, b: Uuid) -> R<()> {
     Ok(())
 }
 
-async fn friend_json(pool: &PgPool, me: Uuid, other: Uuid) -> R<Value> {
+async fn friend_json(ex: &mut sqlx::PgConnection, me: Uuid, other: Uuid) -> R<Value> {
     let (x, y) = pair(me, other);
     let (name, handle, since): (String, Option<String>, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
         "SELECT u.display_name, u.handle, f.created_at FROM friendships f JOIN users u ON u.id = $3
-         WHERE f.user_a = $1 AND f.user_b = $2").bind(x).bind(y).bind(other).fetch_one(pool).await?;
+         WHERE f.user_a = $1 AND f.user_b = $2").bind(x).bind(y).bind(other).fetch_one(&mut *ex).await?;
     Ok(json!({ "id": other, "display_name": name, "handle": handle, "since": since }))
 }
 
@@ -138,12 +139,23 @@ async fn request(
             if reverse {
                 befriend(&mut tx, u.id, t).await?;
             } else {
-                sqlx::query("INSERT INTO friend_requests (from_user, to_user) VALUES ($1, $2) ON CONFLICT DO NOTHING").bind(u.id).bind(t).execute(&mut *tx).await?;
+                let new_id: Option<Uuid> = sqlx::query_scalar("INSERT INTO friend_requests (from_user, to_user) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id").bind(u.id).bind(t).fetch_optional(&mut *tx).await?;
+                if let Some(rid) = new_id {
+                    notify::enqueue_friend_request(&mut *tx, t, u.id, rid).await?;
+                }
             }
             tx.commit().await?;
         }
     }
     Ok((StatusCode::ACCEPTED, Json(json!({}))))
+}
+
+/// 導覽列徽章用：待我處理的好友申請數（與 `list` 的 incoming 同一過濾）
+async fn request_count(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM friend_requests r JOIN users o ON o.id = r.from_user AND o.deleted_at IS NULL WHERE r.to_user = $1")
+        .bind(u.id).fetch_one(&st.pool).await?;
+    Ok(Json(json!({ "incoming": n })))
 }
 
 async fn accept(
@@ -161,10 +173,9 @@ async fn accept(
     .await?
     .ok_or(AppError::NotFound)?;
     befriend(&mut tx, u.id, from).await?;
+    let friend = friend_json(&mut tx, u.id, from).await?;
     tx.commit().await?;
-    Ok(Json(
-        json!({ "friend": friend_json(&st.pool, u.id, from).await? }),
-    ))
+    Ok(Json(json!({ "friend": friend })))
 }
 
 async fn drop_request(
@@ -263,10 +274,9 @@ async fn invite_accept(
     }
     let mut tx = st.pool.begin().await?;
     befriend(&mut tx, u.id, inviter).await?;
+    let friend = friend_json(&mut tx, u.id, inviter).await?;
     tx.commit().await?;
-    Ok(Json(
-        json!({ "friend": friend_json(&st.pool, u.id, inviter).await? }),
-    ))
+    Ok(Json(json!({ "friend": friend })))
 }
 
 #[derive(sqlx::FromRow)]

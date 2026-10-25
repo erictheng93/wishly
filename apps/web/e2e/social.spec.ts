@@ -68,6 +68,8 @@ test('好友：邀請連結 + QR → 未登入開連結帶 redirect → 登入�
     await pc.goto(`/u/${a.handle}`); await hydrated(pc)
     await pc.getByRole('button', { name: '送出好友邀請' }).click()
     await expect(pc.getByText('已送出邀請')).toBeVisible()
+    await pa.goto('/dashboard'); await hydrated(pa)
+    await expect(pa.getByRole('img', { name: '1 則好友申請' }).first()).toBeVisible() // 徽章：不開 /friends 就看得到
     await pa.goto('/friends')
     await pa.locator('.c-row', { hasText: c.name }).getByRole('button', { name: '接受' }).click()
     await expect(pa.getByRole('heading', { name: '我的好友（2）' })).toBeVisible()

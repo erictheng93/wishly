@@ -3,6 +3,7 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('common.friends') })
 const { api } = useApi()
+const { count: reqCount } = useFriendRequests()
 const data = ref<any>({ friends: [], incoming: [], outgoing: [] })
 const loading = ref(true), err = ref(''), msg = ref('')
 const to = ref(''), sending = ref(false)
@@ -12,7 +13,7 @@ const feed = ref<any>(null), feedErr = ref('')
 
 const msgOf = (e: any) => apiErrMsg(e)
 async function load() {
-  try { data.value = await api('/friends') } catch (e) { err.value = msgOf(e) } finally { loading.value = false }
+  try { data.value = await api('/friends'); reqCount.value = data.value.incoming.length } catch (e) { err.value = msgOf(e) } finally { loading.value = false }
 }
 // 動態讀取失敗不影響好友管理
 async function loadFeed() {

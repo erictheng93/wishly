@@ -24,10 +24,12 @@ async function run(f: () => Promise<any>) {
 }
 const add = () => run(() => api('/friends/requests', { method: 'POST', body: { to: handle } }))
 // 個人頁沒給申請 id，從 /friends 找對方送來的那筆
+const { refresh: refreshReqCount } = useFriendRequests()
 const accept = () => run(async () => {
   const f = await api('/friends')
   const r = f.incoming.find((x: any) => x.user.id === p.value.user.id)
   if (r) await api(`/friends/requests/${r.id}/accept`, { method: 'POST' })
+  refreshReqCount()
 })
 </script>
 <template>
