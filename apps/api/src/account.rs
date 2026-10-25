@@ -307,7 +307,7 @@ async fn delete_me(
         .await?;
     }
     // 刪除要求與刪帳號同一交易提交：之後就算程序重啟，worker 也會接著刪完
-    crate::uploads::request_retire(&mut *tx, &media).await?;
+    crate::uploads::request_retire(&mut tx, &media).await?;
     let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
         "WITH o AS (SELECT id, status FROM wishlists WHERE owner_id = $1 AND status <> 'archived' FOR UPDATE)
          UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(wishlists.closed_at, now())
