@@ -535,15 +535,21 @@ async fn delete_me_removes_unshared_media_only(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    // 背景 drain（複查的 delete_objects）可能先做完；drain 互斥，本輪結束時之前的刪除都已送出
+    // 把圍欄往回調會讓「調整前一秒內才開始」的背景 drain（複查的 delete_objects）也算在圍欄之後，
+    // 由它標記已刪；所以不數刪除次數，改驗標記者的嘗試戳記晚於圍欄。drain 互斥，本輪結束時先前的刪除都已送出。
     assert!(wishly_api::uploads::drain_media(&pool).await);
     assert!(purged().await, "圍欄過期後的刪除須標記已刪");
-    let mut extra = 0;
+    let after_fence: bool = sqlx::query_scalar(
+        "SELECT bool_and(purge_tried_at > publishing_until) FROM user_media WHERE object_key=$1",
+    )
+    .bind(&active_key)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(after_fence, "標記已刪的那次刪除須在圍欄過期後才開始");
     while let Ok(path) = received.try_recv() {
         assert_eq!(path, format!("/media/{active_key}"));
-        extra += 1;
     }
-    assert!(extra >= 1, "圍欄過期後須再刪一次");
     // The extractor can authenticate before deletion commits. The mutation must
     // revalidate after waiting for the media lock, before touching item rows.
     let stale = user(&pool, "Stale session").await;
