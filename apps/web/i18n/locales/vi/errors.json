@@ -25,6 +25,7 @@
     "AUTO_TOPUP_LIMIT_REACHED": "Số tiền nạp mỗi lần không được vượt quá giới hạn hàng tháng.",
     "BAD_REQUEST": "Yêu cầu không hợp lệ. Hãy tải lại trang rồi thử lại.",
     "BUSY": "Hệ thống đang bận. Vui lòng thử lại sau.",
+    "IMAGE_REMOVED": "Ảnh này đã bị xóa. Vui lòng tải lên lại.",
     "CAPTCHA_REQUIRED": "Vui lòng hoàn tất xác minh không phải robot rồi thử lại.",
     "CAPTCHA_UNAVAILABLE": "Dịch vụ xác minh người dùng tạm thời không khả dụng. Vui lòng thử lại sau.",
     "CLAIM_ALREADY_EXISTS": "Bạn đã cam kết tặng món này. Hãy chỉnh sửa cam kết hiện có.",

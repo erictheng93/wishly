@@ -84,12 +84,21 @@ pub(crate) async fn import_avatar(
             let bytes = avatar_bytes(&client, url).await?;
             let (clean, ct) = tokio::task::spawn_blocking(move || strip_metadata(&bytes)).await.map_err(|e| e.to_string())??;
             let key = format!("avatars/{}.{}", Uuid::new_v4(), ext_of(ct).unwrap());
+            let mut tx = media_tx(&pool, id).await.map_err(|e| format!("{e:?}"))?;
+            remember_media(&mut tx, id, Some(&key)).await.map_err(|e| format!("{e:?}"))?;
+            tx.commit().await.map_err(|e| e.to_string())?;
             ensure_bucket().await;
-            let response = s3_req("PUT", &key, Some((clean, ct))).await.map_err(|e| format!("{e:?}"))?;
-            if !response.status().is_success() { return Err("頭像儲存失敗".into()); }
+            publish_checked(&pool, &key, clean, ct).await.map_err(|e| format!("{e:?}"))?;
+            let mut tx = media_tx(&pool, id).await.map_err(|e| format!("{e:?}"))?;
+            if let Err(e) = remember_media(&mut tx, id, Some(&key)).await {
+                delete_objects(pool.clone(), vec![key]); // 發佈後才被退役（刪帳號）：補刪
+                return Err(format!("{e:?}"));
+            }
             let updated = sqlx::query("UPDATE users SET avatar_key=$2 WHERE id=$1 AND deleted_at IS NULL AND avatar_key IS NOT DISTINCT FROM $3")
-                .bind(id).bind(&key).bind(&old).execute(&pool).await.map_err(|e| e.to_string())?;
-            if updated.rows_affected() == 0 { let _ = s3_req("DELETE", &key, None).await; }
+                .bind(id).bind(&key).bind(&old).execute(&mut *tx).await.map_err(|e| e.to_string())?;
+            let unused = updated.rows_affected() == 0;
+            tx.commit().await.map_err(|e| e.to_string())?;
+            if unused { delete_objects(pool.clone(), vec![key]); }
             Ok(())
         }.await;
         if let Err(error) = result {
@@ -267,13 +276,25 @@ async fn s3_req(
     key: &str,
     body: Option<(Vec<u8>, &str)>,
 ) -> Result<reqwest::Response, AppError> {
+    s3_req_headers(method, key, body, &[]).await
+}
+
+async fn s3_req_headers(
+    method: &str,
+    key: &str,
+    body: Option<(Vec<u8>, &str)>,
+    headers: &[(&str, &str)],
+) -> Result<reqwest::Response, AppError> {
     let s3 = S3::get();
-    let url = s3.presign(method, key, 300, &[], Utc::now());
+    let url = s3.presign(method, key, 300, headers, Utc::now());
     let c = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
     let mut rb = c.request(method.parse().unwrap(), url);
+    for (name, value) in headers {
+        rb = rb.header(*name, *value);
+    }
     if let Some((b, ct)) = body {
         rb = rb.header("content-type", ct).body(b);
     }
@@ -283,23 +304,330 @@ async fn s3_req(
     })
 }
 
-/// 背景刪除 bucket 物件（不阻塞回應），失敗重試 3 次（1s、4s、16s）後只記 log。
-/// ponytail: 程序重啟會遺失尚未成功的刪除（物件殘留）；要保證送達再改成 DB 佇列。
-pub fn delete_objects(keys: Vec<String>) {
-    if keys.is_empty() {
-        return;
+/// Fence image publication at origin commit, even if the HTTP request times out or is cancelled.
+/// Each reservation has different bytes/ETag; a late retry cannot recreate an older writer's fence.
+async fn publish_image(key: &str, bytes: Vec<u8>, ct: &str) -> Result<(), AppError> {
+    let nonce = Uuid::new_v4().to_string().into_bytes();
+    let mut reservation = s3_req_headers(
+        "PUT",
+        key,
+        Some((nonce.clone(), "application/octet-stream")),
+        &[("if-none-match", "*"), ("cache-control", "no-store")],
+    )
+    .await?;
+    if reservation.status() == 412 {
+        let current = s3_req("HEAD", key, None).await?;
+        if current.status().is_success()
+            && current
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .and_then(ext_of)
+                .is_some()
+        {
+            return Ok(()); // A previous confirm already published this immutable image.
+        }
+        let etag = current
+            .headers()
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .filter(|_| current.status().is_success())
+            .ok_or_else(image_busy)?;
+        // Replace a stale reservation with our own nonce; never publish using another attempt's ETag.
+        reservation = s3_req_headers(
+            "PUT",
+            key,
+            Some((nonce, "application/octet-stream")),
+            &[("if-match", etag), ("cache-control", "no-store")],
+        )
+        .await?;
     }
+    if reservation.status() == 412 {
+        return Err(image_busy());
+    }
+    if !reservation.status().is_success() {
+        return Err(AppError::problem(
+            502,
+            "UPSTREAM_ERROR",
+            "儲存服務暫時無法使用",
+        ));
+    }
+    let etag = reservation
+        .headers()
+        .get("etag")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務未提供圖片寫入憑證"))?;
+    let response = s3_req_headers("PUT", key, Some((bytes, ct)), &[("if-match", etag)]).await?;
+    if response.status() == 412 {
+        return Err(image_busy());
+    }
+    if !response.status().is_success() {
+        return Err(AppError::problem(
+            502,
+            "UPSTREAM_ERROR",
+            "儲存服務暫時無法使用",
+        ));
+    }
+    Ok(())
+}
+
+fn image_busy() -> AppError {
+    AppError::problem(503, "BUSY", "圖片正在處理中，請重試或重新上傳")
+}
+
+// 圖片鎖分兩層，都只包短交易，任何 R2 / CDN 呼叫都在交易外：
+// - 使用者鎖：同一使用者的圖片相關寫入與刪帳號互斥（刪帳號後舊 session 不能再掛圖）。
+// - 物件鎖：同一個 key 的「掛到資料列」與「退役」互斥；退役後的 key 永遠不能再掛或再發佈。
+// 鎖序：使用者鎖 → 清單 / 品項列 → 物件鎖。退役只拿物件鎖、只讀不鎖列，不會形成環。
+const MEDIA_USER_LOCK: i32 = 913472;
+const MEDIA_KEY_LOCK: i32 = 913473;
+
+async fn lock_timeout(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> Result<(), AppError> {
+    sqlx::query("SET LOCAL lock_timeout = '2s'")
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+async fn lock_key(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    key: &str,
+) -> Result<(), AppError> {
+    sqlx::query("SELECT pg_advisory_xact_lock($1, hashtext($2))")
+        .bind(MEDIA_KEY_LOCK)
+        .bind(key)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+async fn lock_user(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user: Uuid,
+) -> Result<(), AppError> {
+    sqlx::query("SELECT pg_advisory_xact_lock($1, hashtext($2))")
+        .bind(MEDIA_USER_LOCK)
+        .bind(user.to_string())
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+pub(crate) async fn media_tx(
+    pool: &sqlx::PgPool,
+    user: Uuid,
+) -> Result<sqlx::Transaction<'_, sqlx::Postgres>, AppError> {
+    let mut tx = pool.begin().await?;
+    lock_timeout(&mut tx).await?;
+    lock_user(&mut tx, user).await?;
+    let live: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM users WHERE id=$1 AND deleted_at IS NULL)",
+    )
+    .bind(user)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !live {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(tx)
+}
+
+/// 記下使用者擁有的圖片 key（刪帳號時才找得到），並拒絕已退役的 key；物件鎖持有到交易結束。
+pub(crate) async fn remember_media(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user: Uuid,
+    key: Option<&str>,
+) -> Result<(), AppError> {
+    let Some(key) = key
+        .filter(|k| (valid_key(k) && !k.starts_with("catalog/")) || avatar_url(Some(k)).is_some())
+    else {
+        return Ok(());
+    };
+    lock_key(tx, key).await?;
+    if is_retired(&mut **tx, key).await? {
+        return Err(image_removed());
+    }
+    sqlx::query(
+        "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+    )
+    .bind(user)
+    .bind(key)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn is_retired(db: impl sqlx::PgExecutor<'_>, key: &str) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM user_media WHERE object_key=$1 AND deleted_at IS NOT NULL)",
+    )
+    .bind(key)
+    .fetch_one(db)
+    .await?)
+}
+
+fn image_removed() -> AppError {
+    AppError::problem(409, "IMAGE_REMOVED", "圖片已移除，請重新上傳")
+}
+
+/// 發佈到 origin 後再查一次是否已退役：退役先提交、才刪 origin，所以若發佈晚於刪除，這裡一定看得到並補刪。
+/// 早於刪除的發佈由刪除本身清掉；逾時後才落地的寫入由 publish_image 的 ETag 條件寫擋下。
+/// 跑在獨立 task，客戶端斷線不會在發佈與複查之間中止。
+async fn publish_checked(
+    pool: &sqlx::PgPool,
+    key: &str,
+    bytes: Vec<u8>,
+    ct: &'static str,
+) -> Result<(), AppError> {
+    let (pool, key) = (pool.clone(), key.to_owned());
     tokio::spawn(async move {
-        for key in keys {
-            for wait in [1u64, 4, 16, 0] {
-                match s3_req("DELETE", &key, None).await {
-                    Ok(r) if r.status().is_success() || r.status() == 404 => break,
-                    _ if wait == 0 => tracing::error!(%key, "R2 物件刪除失敗，已放棄"),
-                    _ => tokio::time::sleep(std::time::Duration::from_secs(wait)).await,
-                }
+        let published = publish_image(&key, bytes, ct).await;
+        if is_retired(&pool, &key).await? {
+            // 發佈晚於刪除：重新排入刪除待辦（持久），由 drain 補刪
+            sqlx::query("UPDATE user_media SET purged_at=NULL WHERE object_key=$1")
+                .bind(&key)
+                .execute(&pool)
+                .await?;
+            delete_objects(pool.clone(), vec![key]);
+            return Err(image_removed());
+        }
+        published
+    })
+    .await
+    .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"))?
+}
+
+async fn retire_media(pool: &sqlx::PgPool, key: &str) -> Result<bool, AppError> {
+    let mut tx = pool.begin().await?;
+    lock_timeout(&mut tx).await?;
+    lock_key(&mut tx, key).await?;
+    let referenced: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM wishlists w JOIN users u ON u.id=w.owner_id WHERE w.cover_image_key=$1 AND u.deleted_at IS NULL AND w.deleted_at IS NULL)
+         OR EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id JOIN users u ON u.id=w.owner_id WHERE i.image_key=$1 AND u.deleted_at IS NULL AND w.deleted_at IS NULL AND i.deleted_at IS NULL)
+         OR EXISTS (SELECT 1 FROM users WHERE avatar_key=$1 AND deleted_at IS NULL)")
+        .bind(key).fetch_one(&mut *tx).await?;
+    if referenced {
+        return Ok(false);
+    }
+    // 先提交退役再刪 origin：取消或 DB 失敗都不會讓已刪的 key 被重新掛上
+    sqlx::query("UPDATE user_media SET deleted_at=coalesce(deleted_at, now()) WHERE object_key=$1")
+        .bind(key)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// 要求退役並刪除 bucket 物件：先把要求寫進 DB（重啟後由 spawn_media_worker 接手），
+/// 再立刻在背景處理一次，失敗依 1s、4s、16s 重試；之後交給週期 worker。
+pub fn delete_objects(pool: sqlx::PgPool, keys: Vec<String>) {
+    tokio::spawn(async move {
+        if let Err(error) = request_retire(&pool, &keys).await {
+            tracing::error!(?error, "圖片刪除要求寫入失敗");
+        }
+        for wait in [0u64, 1, 4, 16] {
+            tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+            if drain_media(&pool).await {
+                break;
             }
         }
     });
+}
+
+/// 標記要求退役；刪帳號在自己的交易內呼叫，與刪除同時提交。
+pub(crate) async fn request_retire(
+    db: impl sqlx::PgExecutor<'_>,
+    keys: &[String],
+) -> Result<(), AppError> {
+    sqlx::query("UPDATE user_media SET retire_requested_at=coalesce(retire_requested_at, now()) WHERE object_key = ANY($1)")
+        .bind(keys)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+/// 週期處理 DB 內的刪除待辦（程序重啟、重試用完、R2 暫時故障後都會接著做完）。
+pub fn spawn_media_worker(pool: sqlx::PgPool) {
+    tokio::spawn(async move {
+        loop {
+            drain_media(&pool).await;
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        }
+    });
+}
+
+/// 處理一批待辦：先退役（仍被引用就撤銷要求），再刪 origin 並記 purged_at。
+/// 不在交易內呼叫 R2；多個實例重複刪除無妨（DELETE 冪等）。全部成功回 true。
+pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
+    // 同一程序內一次只跑一個 drain，避免同一 key 被重複刪除；跨實例重複仍無害
+    static DRAIN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _one = DRAIN.lock().await;
+    let mut clean = true;
+    let pending: Vec<String> = match sqlx::query_scalar(
+        "SELECT DISTINCT object_key FROM user_media WHERE retire_requested_at IS NOT NULL AND deleted_at IS NULL LIMIT 100",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(keys) => keys,
+        Err(error) => {
+            tracing::warn!(%error, "讀取圖片退役待辦失敗");
+            return false;
+        }
+    };
+    for key in pending {
+        let result = async {
+            if !retire_media(pool, &key).await? {
+                // 仍被其他清單 / 品項 / 頭像引用：保留圖片，撤銷要求
+                sqlx::query("UPDATE user_media SET retire_requested_at=NULL WHERE object_key=$1 AND deleted_at IS NULL")
+                    .bind(&key)
+                    .execute(pool)
+                    .await?;
+            }
+            Ok::<(), AppError>(())
+        }
+        .await;
+        if let Err(error) = result {
+            tracing::warn!(%key, ?error, "圖片退役失敗，稍後重試");
+            clean = false;
+        }
+    }
+    let due: Vec<String> = match sqlx::query_scalar(
+        "SELECT DISTINCT object_key FROM user_media WHERE deleted_at IS NOT NULL AND purged_at IS NULL LIMIT 100",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(keys) => keys,
+        Err(error) => {
+            tracing::warn!(%error, "讀取圖片刪除待辦失敗");
+            return false;
+        }
+    };
+    let mut deleted = Vec::new();
+    for key in due {
+        let result = async {
+            let response = s3_req("DELETE", &key, None).await?;
+            if !(response.status().is_success() || response.status() == 404) {
+                return Ok(false);
+            }
+            sqlx::query("UPDATE user_media SET purged_at=now() WHERE object_key=$1 AND deleted_at IS NOT NULL AND purged_at IS NULL")
+                .bind(&key)
+                .execute(pool)
+                .await?;
+            Ok::<bool, AppError>(true)
+        }
+        .await;
+        match result {
+            Ok(true) => deleted.push(key),
+            other => {
+                tracing::warn!(%key, ?other, "R2 物件刪除失敗，稍後重試");
+                clean = false;
+            }
+        }
+    }
+    crate::cdn::purge_media(deleted);
+    clean
 }
 
 async fn ensure_bucket() {
@@ -405,6 +733,9 @@ async fn presign(
     ensure_bucket().await;
     let s3 = S3::get();
     let object_key = format!("{dir}/{}.{ext}", Uuid::new_v4());
+    let mut tx = media_tx(&st.pool, user.id).await?;
+    remember_media(&mut tx, user.id, Some(&object_key)).await?;
+    tx.commit().await?;
     let now = Utc::now();
     let len = r.content_length.to_string();
     let url = s3.presign(
@@ -494,8 +825,13 @@ async fn confirm(
         .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"))?;
     match stripped {
         Ok((clean, ct)) if ext_of(ct) == Some(want_ext) => {
-            s3_req("PUT", &r.object_key, Some((clean, ct))).await?;
+            // 先記下擁有權（含舊版 presign 的 key），再在交易外發佈
+            let mut tx = media_tx(&st.pool, user.id).await?;
+            remember_media(&mut tx, user.id, Some(&r.object_key)).await?;
+            tx.commit().await?;
+            let published = publish_checked(&st.pool, &r.object_key, clean, ct).await;
             let _ = s3_req("DELETE", &inc, None).await;
+            published?;
             Ok(Json(
                 json!({ "object_key": r.object_key, "public_url": S3::get().public_url(&r.object_key), "image_status": "ready" }),
             ))
@@ -525,6 +861,70 @@ impl std::fmt::Debug for S3 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 同一張圖片重複記錄（重試 confirm、同時掛到封面與品項）必須冪等
+    #[sqlx::test(migrations = "../../db/migrations")]
+    async fn remember_media_is_idempotent(pool: sqlx::PgPool) {
+        let user: Uuid =
+            sqlx::query_scalar("INSERT INTO users (display_name) VALUES ('u') RETURNING id")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let key = format!("items/{}.jpg", Uuid::new_v4());
+        for _ in 0..2 {
+            let mut tx = media_tx(&pool, user).await.unwrap();
+            let r = remember_media(&mut tx, user, Some(&key)).await;
+            assert!(r.is_ok(), "重複記錄同一張圖片須冪等: {r:?}");
+            tx.commit().await.unwrap();
+        }
+    }
+
+    /// 掛圖交易進行中（尚未提交）時退役：物件鎖讓退役等到掛圖提交，看到引用就不刪。
+    #[sqlx::test(migrations = "../../db/migrations")]
+    async fn retire_waits_for_in_flight_attachment(pool: sqlx::PgPool) {
+        let user: Uuid =
+            sqlx::query_scalar("INSERT INTO users (display_name) VALUES ('u') RETURNING id")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let list: Uuid = sqlx::query_scalar("INSERT INTO wishlists (owner_id, type, slug, title, visibility) VALUES ($1, 'personal', $2, 't', 'private') RETURNING id")
+            .bind(user).bind(Uuid::new_v4().simple().to_string()[..10].to_owned()).fetch_one(&pool).await.unwrap();
+        let key = format!("covers/{}.jpg", Uuid::new_v4());
+        sqlx::raw_sql(
+            "CREATE FUNCTION slow_attach() RETURNS trigger LANGUAGE plpgsql AS $$
+             BEGIN PERFORM pg_sleep(0.5); RETURN NEW; END $$;
+             CREATE TRIGGER slow_attach BEFORE UPDATE ON wishlists FOR EACH ROW EXECUTE FUNCTION slow_attach()",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (p, k) = (pool.clone(), key.clone());
+        let attach = tokio::spawn(async move {
+            let mut tx = media_tx(&p, user).await?;
+            remember_media(&mut tx, user, Some(&k)).await?;
+            sqlx::query("UPDATE wishlists SET cover_image_key=$2 WHERE id=$1")
+                .bind(list)
+                .bind(&k)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+            Ok::<(), AppError>(())
+        });
+        for _ in 0..200 {
+            let sleeping: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event='PgSleep' AND datname=current_database())")
+                .fetch_one(&pool).await.unwrap();
+            if sleeping {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(
+            !retire_media(&pool, &key).await.unwrap(),
+            "引用中的圖片不可退役"
+        );
+        attach.await.unwrap().unwrap();
+        assert!(!is_retired(&pool, &key).await.unwrap());
+    }
 
     #[sqlx::test(migrations = "../../db/migrations")]
     async fn avatar_import_does_not_wait_for_database(pool: sqlx::PgPool) {

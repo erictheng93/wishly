@@ -73,13 +73,116 @@ pub(crate) async fn argon_run<T: Send + 'static>(
         .await
         .map_err(|_| busy())?
         .map_err(|_| busy())?;
-    let r = tokio::task::spawn_blocking(f).await;
-    drop(permit);
-    r.map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "系統錯誤"))
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        f()
+    })
+    .await
+    .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "系統錯誤"))
 }
 
 pub(crate) async fn hash_blocking(p: String) -> Result<String, AppError> {
     argon_run(move || hash_pw(&p)).await?
+}
+
+#[cfg(test)]
+mod argon_tests {
+    use super::{argon_run, AppError, ARGON_SEM};
+    use std::time::Duration;
+
+    // 兩個測試都會佔用全域 ARGON_SEM，同一個測試程序內要排隊
+    static SEM_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// 等 Argon2 名額時不得佔住資料庫連線或開著交易：連線池只有 10 條，登入尖峰不能拖垮其他 API。
+    #[sqlx::test(migrations = "../../db/migrations")]
+    async fn login_holds_no_db_connection_while_waiting_for_argon(pool: sqlx::PgPool) {
+        use tower::ServiceExt;
+        let _serial = SEM_TESTS.lock().await;
+        let held = ARGON_SEM
+            .acquire_many(ARGON_SEM.available_permits() as u32)
+            .await
+            .unwrap();
+        let app = crate::app(crate::AppState { pool: pool.clone() });
+        let req = axum::http::Request::post("/api/v1/auth/login")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(
+                r#"{"email":"slow@example.com","password":"bad-password"}"#,
+            ))
+            .unwrap();
+        let login = tokio::spawn(app.oneshot(req));
+        let mut reserved = false;
+        for _ in 0..100 {
+            reserved = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM login_failures WHERE pending_until IS NOT NULL)",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            if reserved {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(reserved, "登入應先提交預約再等待 Argon2");
+        let open_tx: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND xact_start IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(open_tx, 0, "等 Argon2 期間不得開著交易");
+        drop(held);
+        let res = login.await.unwrap().unwrap();
+        assert_eq!(res.status(), axum::http::StatusCode::UNAUTHORIZED);
+        let settled: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM login_failures WHERE pending_until IS NULL")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(settled, 1, "密碼錯誤定案為一筆失敗");
+    }
+
+    #[tokio::test]
+    async fn cancellation_keeps_argon_permit_until_blocking_job_finishes() {
+        let _serial = SEM_TESTS.lock().await;
+        assert_eq!(argon_run(|| 7).await.unwrap(), 7);
+        assert!(matches!(
+            argon_run(|| panic!("blocking job panicked")).await,
+            Err(AppError::Problem {
+                status: 500,
+                code: "INTERNAL_ERROR",
+                ..
+            })
+        ));
+
+        let held = ARGON_SEM
+            .acquire_many((ARGON_SEM.available_permits() - 1) as u32)
+            .await
+            .unwrap();
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let request = tokio::spawn(argon_run(move || {
+            started_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+        }));
+        tokio::time::timeout(Duration::from_secs(5), started_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+        let still_held = ARGON_SEM.try_acquire().is_err();
+        release_tx.send(()).unwrap();
+        let released = tokio::time::timeout(Duration::from_secs(5), ARGON_SEM.acquire())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            still_held,
+            "cancelled request released a running job's permit"
+        );
+        drop((held, released));
+    }
 }
 
 #[derive(Deserialize)]
@@ -166,6 +269,27 @@ struct LoginReq {
     turnstile_token: Option<String>,
 }
 
+/// 計入鎖定的紀錄：未清除，且是已確定的失敗或仍在有效期的預約（驗證中的嘗試）。
+async fn login_failure_counts<'e>(
+    db: impl sqlx::PgExecutor<'e>,
+    email: &str,
+    ip: &str,
+) -> Result<(i64, i64, i64), AppError> {
+    Ok(sqlx::query_as(
+        "SELECT count(*) FILTER (WHERE email=$1 AND ip=$2), count(*) FILTER (WHERE email=$1), count(*) FILTER (WHERE ip=$2) FROM login_failures
+         WHERE created_at > now() - interval '15 minutes' AND cleared_at IS NULL AND (pending_until IS NULL OR pending_until > now())
+           AND (email=$1 OR ip=$2)")
+        .bind(email).bind(ip).fetch_one(db).await?)
+}
+
+fn login_locked((by_pair, by_email, by_ip): (i64, i64, i64)) -> bool {
+    by_pair >= 5 || by_email >= 20 || by_ip >= 30
+}
+
+fn login_needs_captcha((_, by_email, by_ip): (i64, i64, i64)) -> bool {
+    by_ip >= 3 || by_email >= 3
+}
+
 // IP 見 config::client_ip（TRUSTED_PROXY）。15 分鐘內失敗：同 (email, IP) 5 次即鎖（主要）；
 // 同 email 跨 IP 合計 20 次即鎖（防分散式暴力的上限）；同 IP 30 次即鎖。
 // 取捨：攻擊者單一 IP 只能鎖自己那組 (email, IP)，無法鎖死受害者在別的 IP 的登入；
@@ -180,34 +304,15 @@ async fn login(
     let email = r.email.trim().to_lowercase();
     let headers = parts.headers.clone();
     let ip = crate::config::client_ip(&parts, &crate::config::get());
-    // 先記一筆失敗再計數（含自己）：同時送出的請求彼此看得到，鎖定不會被併發繞過；成功登入才清掉。
-    // 超過門檻被拒的嘗試刪掉自己那筆，不延長鎖定時間。
-    let fid: i64 =
-        sqlx::query_scalar("INSERT INTO login_failures (email, ip) VALUES ($1,$2) RETURNING id")
-            .bind(&email)
-            .bind(&ip)
-            .fetch_one(&st.pool)
-            .await?;
-    let (by_pair, by_email, by_ip): (i64, i64, i64) = sqlx::query_as(
-        "SELECT count(*) FILTER (WHERE email=$1 AND ip=$2), count(*) FILTER (WHERE email=$1), count(*) FILTER (WHERE ip=$2) FROM login_failures
-         WHERE created_at > now() - interval '15 minutes' AND cleared_at IS NULL AND (email=$1 OR ip=$2)").bind(&email).bind(&ip).fetch_one(&st.pool).await?;
-    if by_pair > 5 || by_email > 20 || by_ip > 30 {
-        sqlx::query("DELETE FROM login_failures WHERE id=$1")
-            .bind(fid)
-            .execute(&st.pool)
-            .await?;
+    // 已鎖定的流量只讀，不寫入失敗紀錄或全站計數
+    let counts = login_failure_counts(&st.pool, &email, &ip).await?;
+    if login_locked(counts) {
         return Err(crate::auth::rate_limited(300));
     }
     let busy_site = !crate::ratelimit::allow(&st.pool, "login_global", 300, 900).await?;
-    if by_ip > 3 || by_email > 3 || busy_site {
-        if let Err(e) = crate::auth::require_captcha(r.turnstile_token.as_deref(), &ip).await {
-            // 沒過人機驗證不算密碼失敗，不累計鎖定
-            sqlx::query("DELETE FROM login_failures WHERE id=$1")
-                .bind(fid)
-                .execute(&st.pool)
-                .await?;
-            return Err(e);
-        }
+    let captcha = login_needs_captcha(counts) || busy_site;
+    if captcha {
+        crate::auth::require_captcha(r.turnstile_token.as_deref(), &ip).await?;
     }
     let row: Option<(uuid::Uuid, Option<String>)> = sqlx::query_as(
         "SELECT i.user_id, i.password_hash FROM auth_identities i JOIN users u ON u.id=i.user_id
@@ -220,6 +325,36 @@ async fn login(
         Some((u, h)) => (Some(u), h),
         None => (None, None),
     };
+    // 預約一個嘗試名額：短交易內鎖 email → IP 後重新計數再寫入，最後一個名額只會給一個請求。
+    // 交易在 Turnstile / Argon2 前就提交，登入不會在慢工作期間佔住連線。
+    // 請求中途被取消時預約 30 秒後失效，不再計入鎖定，也不算進分析。
+    let fid: i64 = {
+        let mut tx = crate::begin_contended(&st.pool).await?;
+        for (namespace, key) in [("login_email", &email), ("login_ip", &ip)] {
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
+                .bind(namespace)
+                .bind(key)
+                .execute(&mut *tx)
+                .await?;
+        }
+        let counts = login_failure_counts(&mut *tx, &email, &ip).await?;
+        if login_locked(counts) {
+            return Err(crate::auth::rate_limited(300));
+        }
+        if login_needs_captcha(counts) && !captcha {
+            // 併發請求在預檢後才越過軟門檻：不帶 token 驗證只做本地判斷（不連外），要求客戶端帶 token 重送
+            crate::auth::require_captcha(None, &ip).await?;
+        }
+        let fid = sqlx::query_scalar(
+            "INSERT INTO login_failures (email, ip, pending_until) VALUES ($1,$2, now() + interval '30 seconds') RETURNING id",
+        )
+        .bind(&email)
+        .bind(&ip)
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        fid
+    };
     let pw = r.password;
     let verified = argon_run(move || {
         let real = hash.as_deref();
@@ -230,7 +365,7 @@ async fn login(
     let ok = match verified {
         Ok(v) => v,
         Err(e) => {
-            // 系統忙碌（BUSY）不算使用者的失敗嘗試
+            // 系統忙碌不算使用者的失敗嘗試
             sqlx::query("DELETE FROM login_failures WHERE id=$1")
                 .bind(fid)
                 .execute(&st.pool)
@@ -239,9 +374,13 @@ async fn login(
         }
     };
     let Some(uid) = uid.filter(|_| ok) else {
-        return Err(bad_credentials()); // 驗證前已記下這筆失敗
+        sqlx::query("UPDATE login_failures SET pending_until=NULL WHERE id=$1")
+            .bind(fid)
+            .execute(&st.pool)
+            .await?;
+        return Err(bad_credentials());
     };
-    // 這次成功不是失敗，刪掉自己那筆；先前的失敗只標記清除，留給後台分析
+    // 這次成功不是失敗，刪掉自己的預約；先前的失敗只標記清除，留給後台分析
     sqlx::query("WITH me AS (DELETE FROM login_failures WHERE id=$2) UPDATE login_failures SET cleared_at=now() WHERE email=$1 AND id<>$2 AND cleared_at IS NULL")
         .bind(&email)
         .bind(fid)

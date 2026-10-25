@@ -58,6 +58,14 @@ CASES = {
     "update-status-stale": (API + "wishlists.rs", "update", "AND status=$14::wishlist_status", "AND $14::text IS NOT NULL", "concurrency", "patch_wishlist_with_stale_status_returns_409"),
     "archive-status-for-update": (API + "wishlists.rs", "archive", "WHERE id=$1 AND status<>'archived' FOR UPDATE)", "WHERE id=$1 AND status<>'archived')", "concurrency", "archive_vs_concurrent_close_does_not_grace_twice"),
     "claim-lock-timeout": (API + "claims.rs", "create", "crate::begin_contended(&st.pool).await?", "st.pool.begin().await?", "db_overload", "claim_waiting_on_hot_item_gives_up_with_503"),
+    "login-reserve-lock": (API + "auth_ext.rs", "login", "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", "SELECT hashtext($1), hashtext($2)", "login_accounting", "reservation_lock_serializes_count_and_insert"),
+    "login-count-reservations": (API + "auth_ext.rs", "login_failure_counts", "(pending_until IS NULL OR pending_until > now())", "pending_until IS NULL", "login_accounting", "concurrent_last_ip_slot_admits_only_one_bad_password"),
+    "login-cleared-filter": (API + "auth_ext.rs", "login_failure_counts", "AND cleared_at IS NULL AND", "AND", "account_security", "login_success_clears_lockout_but_keeps_failures_for_analytics"),
+    "login-reserve-commits-before-argon": (API + "auth_ext.rs", "login", "        tx.commit().await?;\n        fid\n", "        std::mem::forget(tx);\n        fid\n", "lib", "auth_ext::argon_tests::login_holds_no_db_connection_while_waiting_for_argon"),
+    "media-key-lock": (API + "uploads.rs", "lock_key", "SELECT pg_advisory_xact_lock($1, hashtext($2))", "SELECT $1::int, hashtext($2)", "lib", "uploads::tests::retire_waits_for_in_flight_attachment"),
+    "media-user-lock": (API + "uploads.rs", "lock_user", "SELECT pg_advisory_xact_lock($1, hashtext($2))", "SELECT $1::int, hashtext($2)", "account_media_cleanup", "delete_me_removes_unshared_media_only"),
+    "media-remember-on-conflict": (API + "uploads.rs", None, "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING", "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2)", "lib", "uploads::tests::remember_media_is_idempotent"),
+    "media-publish-recheck": (API + "uploads.rs", "publish_checked", "if is_retired(&pool, &key).await? {", "if false {", "account_media_cleanup", "delete_me_removes_unshared_media_only"),
     "claim-patch-lock-timeout": (API + "claims.rs", "apply", "crate::begin_contended(&st.pool).await?", "st.pool.begin().await?", "db_overload", "claim_status_change_waiting_on_hot_item_gives_up_with_503"),
     "pledge-lock-timeout": (API + "contributions.rs", "create", "crate::begin_contended(&st.pool).await?", "st.pool.begin().await?", "db_overload", "pledge_waiting_on_hot_item_gives_up_with_503"),
     "item-changed-on-conflict": (API + "notify.rs", "enqueue_item_changed", "ON CONFLICT DO NOTHING", "", "item_change_notice", "edits_coalesce_into_one_pending_mail_per_active_donor"),
@@ -107,6 +115,14 @@ FAILURE_MARKERS.update({
     "archive-status-for-update": "claim.list_closed sent more than once",
     "update-status-stale": "STALE_VERSION",
     "claim-lock-timeout": "請求一直卡在等鎖：交易沒有設 lock_timeout",
+    "login-reserve-lock": "預約時計數與寫入須在同一把鎖內",
+    "login-count-reservations": "最後一個 IP 名額只能放行一個密碼錯誤",
+    "login-cleared-filter": "已清除的失敗不可再計入鎖定",
+    "login-reserve-commits-before-argon": "登入應先提交預約再等待 Argon2",
+    "media-key-lock": "引用中的圖片不可退役",
+    "media-user-lock": "requests should wait for the media lock",
+    "media-remember-on-conflict": "重複記錄同一張圖片須冪等",
+    "media-publish-recheck": "發佈後複查須補刪已退役圖片",
     "claim-patch-lock-timeout": "請求一直卡在等鎖：交易沒有設 lock_timeout",
     "pledge-lock-timeout": "請求一直卡在等鎖：交易沒有設 lock_timeout",
     "item-changed-on-conflict": "item PATCH failed: true",
@@ -179,7 +195,8 @@ def run(name, output):
     # A second interrupted run must never inherit a previous completed receipt.
     for artifact in ("baseline.log", "mutant.log", "restored.log", "mutant.patch", "result.json"):
         (directory / artifact).unlink(missing_ok=True)
-    command = ["cargo", "test", "--manifest-path", "apps/api/Cargo.toml", "--locked", "--test", binary, test, "--", "--exact", "--nocapture"]
+    target = ["--lib"] if binary == "lib" else ["--test", binary]  # "lib": src 內的單元測試，test 寫完整模組路徑
+    command = ["cargo", "test", "--manifest-path", "apps/api/Cargo.toml", "--locked", *target, test, "--", "--exact", "--nocapture"]
     result = {"mutation": name, "path": relative, "binary": binary, "test": test, "command": command,
               "result": "running", "phase": "preparing", "expected_failure_marker": FAILURE_MARKERS[name]}
     original, applied = None, False

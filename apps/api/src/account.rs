@@ -223,7 +223,7 @@ async fn delete_me(
     }
     reauth(&st.pool, &u, b.get("password").and_then(Value::as_str)).await?;
     let id = u.id;
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::uploads::media_tx(&st.pool, id).await?;
     crate::admin::lock_staff_changes(&mut tx).await?;
     let staff: bool = sqlx::query_scalar("SELECT is_staff FROM users WHERE id=$1 FOR UPDATE")
         .bind(id)
@@ -283,20 +283,31 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    // 圖片 key 不綁上傳者：只刪「沒有其他人的清單 / 品項 / 頭像還在引用」的物件；頭像可能是舊外部 URL，只刪真正的 bucket key。
+    // Retain replaced/issued image keys; the worker rechecks sharing under the media lock.
     let media: Vec<String> = sqlx::query_scalar(
-        "SELECT k FROM (SELECT cover_image_key AS k FROM wishlists WHERE owner_id = $1
-                        UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id WHERE w.owner_id = $1
-                        UNION SELECT avatar_key FROM users WHERE id = $1) m
-          WHERE k IS NOT NULL
-            AND NOT EXISTS (SELECT 1 FROM wishlists WHERE cover_image_key = k AND owner_id <> $1)
-            AND NOT EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id WHERE i.image_key = k AND w.owner_id <> $1)
-            AND NOT EXISTS (SELECT 1 FROM users WHERE avatar_key = k AND id <> $1 AND deleted_at IS NULL)")
+        "SELECT object_key FROM user_media WHERE user_id=$1
+         UNION SELECT cover_image_key FROM wishlists WHERE owner_id=$1 AND cover_image_key IS NOT NULL
+         UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id WHERE w.owner_id=$1 AND i.image_key IS NOT NULL
+         UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL")
         .bind(id).fetch_all(&mut *tx).await?;
     let media: Vec<String> = media
         .into_iter()
-        .filter(|k| crate::uploads::valid_key(k) || crate::uploads::avatar_url(Some(k)).is_some())
+        .filter(|k| {
+            (crate::uploads::valid_key(k) && !k.starts_with("catalog/"))
+                || crate::uploads::avatar_url(Some(k)).is_some()
+        })
         .collect();
+    for key in &media {
+        sqlx::query(
+            "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+        )
+        .bind(id)
+        .bind(key)
+        .execute(&mut *tx)
+        .await?;
+    }
+    // 刪除要求與刪帳號同一交易提交：之後就算程序重啟，worker 也會接著刪完
+    crate::uploads::request_retire(&mut *tx, &media).await?;
     let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
         "WITH o AS (SELECT id, status FROM wishlists WHERE owner_id = $1 AND status <> 'archived' FOR UPDATE)
          UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(wishlists.closed_at, now())
@@ -339,6 +350,14 @@ async fn delete_me(
     .await?;
     sqlx::query("UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')")
         .bind(id).execute(&mut *tx).await?;
+    sqlx::query(
+        "UPDATE wishlists SET cover_image_key=NULL, cover_image_status='none' WHERE owner_id=$1",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("UPDATE wishlist_items SET image_key=NULL, image_status='none' WHERE wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$1)")
+        .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")
@@ -346,7 +365,7 @@ async fn delete_me(
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.delete', 'users', $1)")
         .bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
-    crate::uploads::delete_objects(media); // COMMIT 後才刪：交易失敗不會留下指向已刪物件的資料
+    crate::uploads::delete_objects(st.pool.clone(), media); // COMMIT 後才刪：交易失敗不會留下指向已刪物件的資料
     crate::cdn::purge_wishlists(slugs); // 已封存為 private：邊緣快取的公開副本立即清掉
     let mut res = Json(json!({ "deleted": true, "anonymized_at": at })).into_response();
     res.headers_mut().insert(

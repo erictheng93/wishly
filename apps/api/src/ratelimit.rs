@@ -58,7 +58,8 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
         .execute(pool)
         .await?;
     // 鎖定只看 15 分鐘內，但營運分析最長查 365 天；超出分析範圍的紀錄才清除
-    sqlx::query("DELETE FROM login_failures WHERE created_at < now() - interval '365 days'")
+    // 被取消而未定案的登入預約到期後不再計入，一併清掉
+    sqlx::query("DELETE FROM login_failures WHERE created_at < now() - interval '365 days' OR pending_until < now() - interval '1 hour'")
         .execute(pool)
         .await?;
     // 每日活躍紀錄只留 400 天

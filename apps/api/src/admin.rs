@@ -613,7 +613,7 @@ async fn analytics(
            'trust', jsonb_build_object(
              'reports', (SELECT count(*) FROM content_reports WHERE created_at >= (SELECT t FROM lo)),
              'reports_by_reason', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT reason::text s, count(*) n FROM content_reports WHERE created_at >= (SELECT t FROM lo) GROUP BY 1) t),
-             'login_failures', (SELECT count(*) FROM login_failures WHERE created_at >= (SELECT t FROM lo))),
+             'login_failures', (SELECT count(*) FROM login_failures WHERE created_at >= (SELECT t FROM lo) AND pending_until IS NULL)),
            'profile', jsonb_build_object(
              'users', (SELECT count(*) FROM pu),
              'with_bio', (SELECT count(*) FROM pu WHERE bio IS NOT NULL),
