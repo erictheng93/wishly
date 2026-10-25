@@ -29,7 +29,9 @@
       "rightsH": "Quyền của bạn",
       "rightsP": "Bạn có thể đổi biệt danh trong \"Quà tôi đã tặng\", hoặc chọn \"Xóa biệt danh và thông tin liên hệ của tôi\": chúng tôi sẽ xóa biệt danh, thông tin liên hệ và Email, lịch sử tặng được giữ lại dưới tên \"Khách đã xóa\" để người tạo đối chiếu. Cuối email có liên kết hủy nhận thông báo chỉ với một lần bấm.",
       "reportH": "Báo cáo",
-      "reportP": "Báo cáo được xem xét thủ công và người tạo sẽ không biết ai là người báo cáo; để chống lạm dụng, chúng tôi dùng Cloudflare Turnstile và giới hạn tần suất theo IP."
+      "reportP": "Báo cáo được xem xét thủ công và người tạo sẽ không biết ai là người báo cáo; để chống lạm dụng, chúng tôi dùng Cloudflare Turnstile và giới hạn tần suất theo IP.",
+      "loginH": "Bảo mật đăng nhập",
+      "loginP": "Để ngăn tấn công dò mật khẩu, khi đăng nhập thất bại chúng tôi ghi lại Email và địa chỉ IP đã dùng, nhằm tạm khóa và kích hoạt xác minh chống bot, đồng thời dùng ở dạng thống kê để theo dõi bất thường; bản ghi tự động xóa sau 365 ngày."
     }
   }
 }

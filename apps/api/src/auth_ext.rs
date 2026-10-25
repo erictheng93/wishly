@@ -190,7 +190,7 @@ async fn login(
             .await?;
     let (by_pair, by_email, by_ip): (i64, i64, i64) = sqlx::query_as(
         "SELECT count(*) FILTER (WHERE email=$1 AND ip=$2), count(*) FILTER (WHERE email=$1), count(*) FILTER (WHERE ip=$2) FROM login_failures
-         WHERE created_at > now() - interval '15 minutes' AND (email=$1 OR ip=$2)").bind(&email).bind(&ip).fetch_one(&st.pool).await?;
+         WHERE created_at > now() - interval '15 minutes' AND cleared_at IS NULL AND (email=$1 OR ip=$2)").bind(&email).bind(&ip).fetch_one(&st.pool).await?;
     if by_pair > 5 || by_email > 20 || by_ip > 30 {
         sqlx::query("DELETE FROM login_failures WHERE id=$1")
             .bind(fid)
@@ -241,8 +241,10 @@ async fn login(
     let Some(uid) = uid.filter(|_| ok) else {
         return Err(bad_credentials()); // 驗證前已記下這筆失敗
     };
-    sqlx::query("DELETE FROM login_failures WHERE email=$1")
+    // 這次成功不是失敗，刪掉自己那筆；先前的失敗只標記清除，留給後台分析
+    sqlx::query("WITH me AS (DELETE FROM login_failures WHERE id=$2) UPDATE login_failures SET cleared_at=now() WHERE email=$1 AND id<>$2 AND cleared_at IS NULL")
         .bind(&email)
+        .bind(fid)
         .execute(&st.pool)
         .await?;
     session_response(&st.pool, &headers, &ip, "password", uid, false).await
@@ -351,7 +353,7 @@ async fn reset_confirm(
         .bind(uid)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("DELETE FROM login_failures WHERE email=$1")
+    sqlx::query("UPDATE login_failures SET cleared_at=now() WHERE email=$1 AND cleared_at IS NULL")
         .bind(&email)
         .execute(&mut *tx)
         .await?;

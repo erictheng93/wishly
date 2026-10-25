@@ -530,3 +530,64 @@ async fn export_claims_include_is_anonymous(pool: PgPool) {
     assert_eq!(st, StatusCode::OK);
     assert_eq!(export["claims"][0]["is_anonymous"], true);
 }
+
+/// 成功登入只標記清除先前的失敗（後台分析仍算得到），鎖定 / 人機驗證門檻則重新計算；成功那次不算失敗。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn login_success_clears_lockout_but_keeps_failures_for_analytics(pool: PgPool) {
+    let email = format!("{}@example.com", Uuid::new_v4());
+    let uid: Uuid =
+        sqlx::query_scalar("INSERT INTO users (display_name, email) VALUES ('u',$1) RETURNING id")
+            .bind(&email)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    use argon2::{
+        password_hash::{rand_core::OsRng, SaltString},
+        Argon2, PasswordHasher,
+    };
+    let h = Argon2::default()
+        .hash_password(b"correct-horse", &SaltString::generate(&mut OsRng))
+        .unwrap()
+        .to_string();
+    sqlx::query("INSERT INTO auth_identities (user_id, provider, provider_uid, email, password_hash) VALUES ($1,'email',$2,$2,$3)").bind(uid).bind(&email).bind(h).execute(&pool).await.unwrap();
+    let login = |pw: &'static str| {
+        let (p, e) = (pool.clone(), email.clone());
+        async move {
+            common::call_request(
+                &common::test_app(&p),
+                with_peer(
+                    common::request(
+                        "POST",
+                        "/api/v1/auth/login",
+                        &[],
+                        Some(json!({"email": e, "password": pw})),
+                    ),
+                    Some("1.1.1.1"),
+                ),
+            )
+            .await
+            .0
+        }
+    };
+    for _ in 0..4 {
+        assert_eq!(login("bad-password").await, StatusCode::UNAUTHORIZED);
+    }
+    assert_eq!(login("correct-horse").await, StatusCode::OK);
+    // 已清除的 4 筆不再計入 (email, IP) 鎖定：再錯 2 次仍是 401（若照算，第 2 次會變 429）
+    for _ in 0..2 {
+        assert_eq!(login("bad-password").await, StatusCode::UNAUTHORIZED);
+    }
+    let (total, open): (i64, i64) = sqlx::query_as(
+        "SELECT count(*), count(*) FILTER (WHERE cleared_at IS NULL) FROM login_failures WHERE email=$1",
+    )
+    .bind(&email)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (total, open),
+        (6, 2),
+        "成功那次不留紀錄，先前 4 筆保留但已清除"
+    );
+    common::assert_all_reconciled(&pool).await;
+}
