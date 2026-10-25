@@ -42,7 +42,8 @@ test('擁有者：進度頁標記已送達、取消他人捐助（需確認）�
   const delivered = page.waitForEvent('dialog').then(d => d.accept())
   await rows.filter({ hasText: '×1' }).getByRole('button', { name: '標為已送達' }).click()
   await delivered
-  await expect(rows.filter({ hasText: '×1' }).getByText('已送達')).toBeVisible()
+  // exact：否則會比對到按鈕「標為已送達」而提早通過，下一步 click 時 PATCH 還沒回、×1 列按鈕消失造成版面上移，點到 article
+  await expect(rows.filter({ hasText: '×1' }).getByText('已送達', { exact: true })).toBeVisible()
 
   // 逐次等對話框出現再處理：進度頁會因 SSE 重抓而重繪，用 page.once 可能讓處理器留到下一次
   const cancel = async (accept: boolean) => {
