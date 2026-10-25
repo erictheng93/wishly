@@ -18,6 +18,7 @@ type ProfileWishlist = (
     String,
     Option<String>,
     String,
+    Option<String>,
     Option<NaiveDate>,
     i64,
     i64,
@@ -81,7 +82,7 @@ async fn profile(
     // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private 不列）
     // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）
     let lists: Vec<ProfileWishlist> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
+        "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({claimed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
@@ -95,10 +96,10 @@ async fn profile(
         .bind(uid).bind(viewer).bind(is_self).bind(friend).fetch_all(&st.pool).await?;
     let wishlists: Vec<Value> = lists
         .into_iter()
-        .map(|(slug, title, ty, status, vis, ck, cs, ev, n, got, need)| {
+        .map(|(slug, title, ty, status, vis, ck, cs, cp, ev, n, got, need)| {
             json!({
         "slug": slug, "title": title, "type": ty, "status": status, "visibility": vis,
-        "cover_image_url": crate::public::image_url(ck.as_deref(), &cs), "event_date": ev,
+        "cover_image_url": crate::public::image_url(ck.as_deref(), &cs), "cover_preset": cp, "event_date": ev,
         "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })
         })
         .collect();

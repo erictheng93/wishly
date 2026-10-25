@@ -83,7 +83,7 @@ http.createServer(async (req, res) => {
   }
   if (p === '/public/wishlists') {
     const page = +(u.searchParams.get('page') ?? 1), ty = u.searchParams.get('type')
-    const all = Array.from({ length: 30 }, (_, i) => ({ slug: i ? `demo${i}` : 'demo', title: `公開清單 ${i + 1}`, type: i % 3 ? 'registry' : 'relief', cover_image_url: null, event_date: null, owner: { display_name: '小愛', handle: 'xiaoai' }, item_count: 3, completion_pct: (i * 7) % 100 })).filter(w => !ty || w.type === ty)
+    const all = Array.from({ length: 30 }, (_, i) => ({ slug: i ? `demo${i}` : 'demo', title: `公開清單 ${i + 1}`, type: i % 3 ? 'registry' : 'relief', cover_image_url: null, cover_preset: ['birthday', 'wedding', 'baby', 'housewarming', 'graduation', 'holiday', 'travel', 'gift'][i % 8], event_date: null, owner: { display_name: '小愛', handle: 'xiaoai' }, item_count: 3, completion_pct: (i * 7) % 100 })).filter(w => !ty || w.type === ty)
     return send(res, 200, { wishlists: all.slice((page - 1) * 24, page * 24), next_page: all.length > page * 24 ? page + 1 : null })
   }
   if ((m = p.match(/^\/public\/wishlists\/([^/]+)$/))) {
@@ -91,7 +91,7 @@ http.createServer(async (req, res) => {
     if (m[1] === 'gone') return err(res, 410, 'WISHLIST_REMOVED', '已下架')
     if (!['demo', 'closed', 'sseoff'].includes(m[1])) return err(res, 404, 'NOT_FOUND', '找不到')
     const list = items.map(view), done = list.filter(i => i.is_fully_claimed).length
-    return send(res, 200, { slug: m[1], type: 'registry', status: m[1] === 'closed' ? 'closed' : 'active', title: '小愛的待產清單', description: '預產期 12 月，謝謝大家的心意', cover_image_url: null, event_date: '2026-12-20', id: 'w1', owner: { id: 'u1', display_name: '小愛' }, surprise_mode: false, claimers_visible: false, completion: { item_count: list.length, fulfilled_count: done, completion_pct: Math.round(items.reduce((a, i) => a + i.qty_claimed, 0) / items.reduce((a, i) => a + i.qty_needed, 0) * 100) }, items: list, updated_at: new Date().toISOString() })
+    return send(res, 200, { slug: m[1], type: 'registry', status: m[1] === 'closed' ? 'closed' : 'active', title: '小愛的待產清單', description: '預產期 12 月，謝謝大家的心意', cover_image_url: null, cover_preset: 'baby', event_date: '2026-12-20', id: 'w1', owner: { id: 'u1', display_name: '小愛' }, surprise_mode: false, claimers_visible: false, completion: { item_count: list.length, fulfilled_count: done, completion_pct: Math.round(items.reduce((a, i) => a + i.qty_claimed, 0) / items.reduce((a, i) => a + i.qty_needed, 0) * 100) }, items: list, updated_at: new Date().toISOString() })
   }
   if (p.match(/^\/public\/wishlists\/[^/]+\/events$/)) {
     if (p.includes('/sseoff/')) return err(res, 500, 'INTERNAL', '內部錯誤')

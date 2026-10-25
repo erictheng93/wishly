@@ -51,7 +51,7 @@ export default defineEventHandler((event) => {
     progress_percent: i.target_points ? Math.floor(i.pledged_points / i.target_points * 100) : Math.round(i.qty_claimed / i.qty_needed * 100) }))
   const claimed = items.reduce((a, i) => a + i.qty_claimed, 0), needed = items.reduce((a, i) => a + i.qty_needed, 0)
   return { id: `w-${key}`, slug, type: 'registry', status: 'active', title: l.title, description: l.description,
-    cover_image_url: null, event_date: l.event_date, owner: { id: 'u1', display_name: l.owner }, surprise_mode: false, claimers_visible: false,
+    cover_image_url: null, cover_preset: key === 'wedding' ? 'wedding' : key, event_date: l.event_date, owner: { id: 'u1', display_name: l.owner }, surprise_mode: false, claimers_visible: false,
     completion: { item_count: items.length, fulfilled_count: items.filter(i => i.is_fully_claimed).length, completion_pct: Math.round(claimed / needed * 100) },
     items, updated_at: new Date().toISOString() }
 })

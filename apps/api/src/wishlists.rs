@@ -162,6 +162,7 @@ struct W {
     description: Option<String>,
     cover_image_key: Option<String>,
     cover_image_status: String,
+    cover_preset: Option<String>,
     event_date: Option<NaiveDate>,
     show_claimer_names: bool,
     surprise_mode: bool,
@@ -176,7 +177,7 @@ struct W {
     has_shipping_address: bool,
 }
 const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
-  cover_image_key, cover_image_status::text AS cover_image_status, event_date, show_claimer_names, surprise_mode,
+  cover_image_key, cover_image_status::text AS cover_image_status, cover_preset, event_date, show_claimer_names, surprise_mode,
   surprise_locked(surprise_mode, event_date) AS surprise_locked,
   claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, closes_at, created_at, updated_at,
   EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address";
@@ -188,7 +189,7 @@ impl W {
             "id": self.id, "type": self.ty, "status": self.status, "visibility": self.visibility, "slug": self.slug,
             "title": self.title, "description": self.description,
             "cover_image_url": self.cover_image_key.as_ref().filter(|_| self.cover_image_status == "ready").map(|k| img.public_url(k)),
-            "cover_image_status": self.cover_image_status, "event_date": self.event_date,
+            "cover_image_status": self.cover_image_status, "cover_preset": self.cover_preset, "event_date": self.event_date,
             "show_claimer_names": self.show_claimer_names, "surprise_mode": self.surprise_mode, "surprise_locked": self.surprise_locked,
             "claim_ttl_hours": self.claim_ttl_hours, "moderation_status": self.moderation_status,
             "moderation_reason": self.moderation_reason, "moderated_at": self.moderated_at, "closes_at": self.closes_at,
@@ -336,6 +337,23 @@ fn future_only(t: Option<DateTime<Utc>>) -> R<()> {
     }
     Ok(())
 }
+/// 預設封面 id（前端 /covers/{id}.svg）；null 清除。與上傳封面不互斥，顯示優先序由前端決定
+const COVER_PRESETS: &[&str] = &[
+    "birthday",
+    "wedding",
+    "baby",
+    "housewarming",
+    "graduation",
+    "holiday",
+    "travel",
+    "gift",
+];
+fn cover_preset(m: &Map<String, Value>) -> R<Option<Option<String>>> {
+    if matches!(m.get("cover_preset"), Some(Value::Null)) {
+        return Ok(Some(None));
+    }
+    Ok(one_of(m, "cover_preset", COVER_PRESETS)?.map(|s| Some(s.to_string())))
+}
 /// 圖片 key：須為 uploads 發出的格式，且前綴符合用途
 fn image_key(m: &Map<String, Value>, k: &str, dir: &str) -> R<Option<Option<String>>> {
     Ok(match text(m, k, 0, 200)? {
@@ -366,6 +384,7 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
         .ok_or_else(|| AppError::invalid("/title", "REQUIRED", "title 必填"))?;
     let desc = text(m, "description", 0, 2000)?.flatten();
     let cover = image_key(m, "cover_image_key", "covers/")?.flatten();
+    let preset = cover_preset(m)?.flatten();
     let event = date(m, "event_date")?.flatten();
     let vis = one_of(m, "visibility", VIS)?.unwrap_or("friends");
     let names = boolean(m, "show_claimer_names")?.unwrap_or(false);
@@ -383,9 +402,9 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     }
     for _ in 0..5 {
         let r = sqlx::query_scalar::<_, Uuid>(
-            "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, closes_at)
-             VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12) RETURNING id")
-            .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(closes)
+            "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, closes_at, cover_preset)
+             VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12,$13) RETURNING id")
+            .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(closes).bind(&preset)
             .fetch_one(&st.pool).await;
         match r {
             Ok(id) => {
@@ -473,7 +492,7 @@ async fn list(
         let (c, f, q, nd) = stats.iter().find(|s| s.0 == w.id).map(|s| (s.1, s.2, s.3, s.4)).unwrap_or((0, 0, 0, 0));
         let j = w.json();
         json!({ "id": w.id, "type": w.ty, "status": w.status, "slug": w.slug, "title": w.title, "event_date": w.event_date,
-                "cover_image_url": j["cover_image_url"], "surprise_locked": w.surprise_locked,
+                "cover_image_url": j["cover_image_url"], "cover_preset": w.cover_preset, "surprise_locked": w.surprise_locked,
                 "completion": { "item_count": c, "fulfilled_count": f, "completion_pct": completion_pct(q, nd) },
                 "moderation_status": w.moderation_status, "moderation_reason": w.moderation_reason,
                 "updated_at": w.updated_at })
@@ -596,6 +615,9 @@ async fn update(
         w.cover_image_status = if v.is_some() { "ready" } else { "none" }.into();
         w.cover_image_key = v;
     }
+    if let Some(v) = cover_preset(m)? {
+        w.cover_preset = v;
+    }
     // 沒有活動日的舊資料永遠算鎖定，允許關閉以免卡死；用載入時的日期判斷，同一請求清掉日期不能繞過鎖定
     let date_locked = w.surprise_locked && w.event_date.is_some();
     if let Some(v) = date(m, "event_date")? {
@@ -703,11 +725,11 @@ async fn update(
     let mut tx = st.pool.begin().await?;
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
-                 closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END,
+                 closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END, cover_preset=$15,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END
                  WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
-        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).execute(&mut *tx).await?;
+        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).bind(&w.cover_preset).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
     }

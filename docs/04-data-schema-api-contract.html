@@ -718,6 +718,7 @@ CREATE TABLE wishlists (
   description        text,
   cover_image_key    text,
   cover_image_status image_status    NOT NULL DEFAULT 'none',
+  cover_preset       text            CHECK (cover_preset IN ('birthday','wedding','baby','housewarming','graduation','holiday','travel','gift')), -- 預設封面 id，圖在前端 /covers/{id}.svg
   event_date         date,
   show_claimer_names boolean         NOT NULL DEFAULT false,
   surprise_mode      boolean         NOT NULL DEFAULT false,
@@ -2452,6 +2453,7 @@ Vary: Origin</code></pre>
   "title": "小米與阿嘉的寶寶迎接清單",
   "description": "預產期 12 月，謝謝大家的心意",
   "cover_image_key": "covers/0192f3a0-aaaa.webp",
+  "cover_preset": "baby",
   "event_date": "2026-12-01",
   "visibility": "selected",
   "show_claimer_names": false,
@@ -2465,6 +2467,7 @@ Vary: Origin</code></pre>
   "title": "小米與阿嘉的寶寶迎接清單",
   "description": "預產期 12 月，謝謝大家的心意",
   "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp",
+  "cover_preset": null,
   "cover_image_status": "ready",
   "event_date": "2026-12-01",
   "show_claimer_names": false,
@@ -2488,6 +2491,7 @@ Vary: Origin</code></pre>
     { "id": "0192f3a0-7c1e-7b2a-9d4e-1a2b3c4d5e01", "type": "personal", "status": "active", "slug": "Ab3dE5gH7k",
       "title": "小米與阿嘉的寶寶迎接清單", "event_date": "2026-12-01",
       "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp",
+      "cover_preset": null,
       "surprise_locked": true,
       "completion": { "item_count": 12, "fulfilled_count": 4, "completion_pct": 33 },
       "updated_at": "2026-10-08T03:12:45Z" }
@@ -2503,6 +2507,7 @@ Vary: Origin</code></pre>
     "title": "小米與阿嘉的寶寶迎接清單",
     "description": "預產期 12 月，謝謝大家的心意",
     "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp",
+    "cover_preset": null,
     "cover_image_status": "ready",
     "event_date": "2026-12-01",
     "show_claimer_names": false,
@@ -2553,7 +2558,7 @@ Vary: Origin</code></pre>
       "created_at": "2026-10-08T03:15:00Z",
       "updated_at": "2026-10-08T03:15:00Z"
     } ]
-}</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-FORBIDDEN"><code>FORBIDDEN</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a></div><div class="note">非擁有者（含其他使用者）一律回 NOT_FOUND，避免洩漏清單是否存在。收件地址不會回傳明文，只以 <code>has_shipping_address</code> 表示是否已填。</div></div><div class="ep" id="ep-patch-wishlists-id"><h4><span class="badge m-PATCH">PATCH</span><code class="path">/api/v1/wishlists/{id}</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session（擁有者）</div><p>部分更新。可更新 title、description、cover_image_key、event_date、visibility、status、show_claimer_names、surprise_mode、claim_ttl_hours、closes_at（RFC 3339 或 null；設定須為未來時間，未變動的值不檢查；closed→active 時須未過期）。<strong>發佈沒有獨立端點</strong>：以 <code>{ "status": "active" }</code> 發佈。</p><h5>Request body</h5><pre><code>{
+}</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-FORBIDDEN"><code>FORBIDDEN</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a></div><div class="note">非擁有者（含其他使用者）一律回 NOT_FOUND，避免洩漏清單是否存在。收件地址不會回傳明文，只以 <code>has_shipping_address</code> 表示是否已填。</div></div><div class="ep" id="ep-patch-wishlists-id"><h4><span class="badge m-PATCH">PATCH</span><code class="path">/api/v1/wishlists/{id}</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session（擁有者）</div><p>部分更新。可更新 title、description、cover_image_key、cover_preset（8 種內建 id 或 null；不在清單 422；與上傳封面不互斥，顯示以上傳圖 ready 優先由前端決定）、event_date、visibility、status、show_claimer_names、surprise_mode、claim_ttl_hours、closes_at（RFC 3339 或 null；設定須為未來時間，未變動的值不檢查；closed→active 時須未過期）。<strong>發佈沒有獨立端點</strong>：以 <code>{ "status": "active" }</code> 發佈。</p><h5>Request body</h5><pre><code>{
   "status": "active",
   "show_claimer_names": true
 }</code></pre><h5>Response 200</h5><pre><code>（回傳完整 Wishlist，格式同 POST /wishlists 201）</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a> <a href="#err-VALIDATION_FAILED"><code>VALIDATION_FAILED</code></a> <a href="#err-WISHLIST_NOT_PUBLISHABLE"><code>WISHLIST_NOT_PUBLISHABLE</code></a> <a href="#err-SHIPPING_ADDRESS_REQUIRED"><code>SHIPPING_ADDRESS_REQUIRED</code></a> <a href="#err-WISHLIST_CLOSED"><code>WISHLIST_CLOSED</code></a></div><div class="note"><strong>發佈條件（draft → active）：</strong>title 非空；至少 1 個未刪除品項；每個 crowdfund 品項有 target_points、funding_deadline 與 fulfillment_type（P2）；surprise_mode 時 event_date 為今日之後。不符回 409 <code>WISHLIST_NOT_PUBLISHABLE</code>，<code>errors[]</code> 列出缺漏項目。含眾籌品項但尚未填收件地址（PUT /wishlists/{id}/shipping-address）→ 409 <code>SHIPPING_ADDRESS_REQUIRED</code>。status 允許 draft→active→closed→archived（closed 可重開為 active；archived 只能以單獨的 <code>{"status":"closed"}</code> 取消封存回 closed，封存時退回的認捐點數不會再扣回）。closed / archived 後修改品項回 WISHLIST_CLOSED。驚喜鎖定期間不可關閉 surprise_mode（回 FORBIDDEN）。每次成功更新會對 SSE 廣播 wishlist.updated。<br><strong>可見性（D51）：</strong>visibility 可改為 public / friends / selected / private（public 不再限 relief；link / password 回 422）。改為 selected 不會自動清空或要求名單。</div></div><div class="ep" id="ep-delete-wishlists-id"><h4><span class="badge m-DELETE">DELETE</span><code class="path">/api/v1/wishlists/{id}</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session（擁有者）</div><p><strong>封存</strong>（D13）：將 status 設為 archived，不實體刪除。公開頁立即回 404；既有 claims 保留，訪客在 /me/claims 仍可看到（顯示「清單已封存」）；仍有 pledged 認捐時一併退回錢包（P2）。重複 DELETE 回 204（冪等）。可用 PATCH status=closed 取消封存。</p><h5>Response 204</h5><pre><code>（無 body）</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-NOT_FOUND"><code>NOT_FOUND</code></a></div></div><div class="ep" id="ep-get-wishlists-id-dashboard"><h4><span class="badge m-GET">GET</span><code class="path">/api/v1/wishlists/{id}/dashboard</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session（擁有者；relief 為組織成員）</div><p>完成度儀表板。驚喜鎖定期間（surprise_mode 且 now &lt; unlock_at）建立者看得到「多少」但看不到「誰」（Q8）：每品項照常回 qty_claimed / pledged_points 與 <code>claimer_count</code>（有效 claims、pledged / captured contributions 筆數；鎖定與否都回）；<code>claims</code>、<code>contributions</code> 為空陣列，不含暱稱、聯絡方式、留言、逐筆時間與 claim id，也不能對捐助操作；funding_status / display_status / funded_at 仍為 null；眾籌只回採購單彙總 <code>orders_summary</code>（已達標 / 已下單 N / 運送中 M / 已送達），不提供逐品項對應，也不看捐贈者。出貨 / 送達通知只發給捐贈者（D22-11）。</p><h5>Response 200</h5><pre><code>{
@@ -2647,6 +2652,7 @@ Content-Type: application/json</code></pre><pre><code>{
   "title": "小米與阿嘉的寶寶迎接清單",
   "description": "預產期 12 月，謝謝大家的心意",
   "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp",
+  "cover_preset": null,
   "event_date": "2026-12-01",
   "id": "0192f3a0-7c1e-7b2a-9d4e-1a2b3c4d5e01",
   "owner": { "id": "0192f3a0-1111-7000-8000-000000000001", "display_name": "小米" },
@@ -2721,6 +2727,7 @@ type: registry | relief（選填；其他值 → 422 /type。D58 起前端不送
       "title": "小米與阿嘉的寶寶迎接清單",
       "type": "personal",
       "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp",
+      "cover_preset": null,
       "event_date": "2026-12-01",
       "owner": { "display_name": "小米", "handle": "mimi" },
       "item_count": 6,
@@ -2933,7 +2940,7 @@ Set-Cookie: ws_guest=&lt;new guest token&gt;; Path=/; Max-Age=31536000; HttpOnly
   "relation": "friend",
   "wishlists": [
     { "slug": "Ab3dE5gH7k", "title": "小米與阿嘉的寶寶迎接清單", "type": "personal", "status": "active", "visibility": "friends",
-      "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp", "event_date": "2026-12-01",
+      "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp", "cover_preset": null, "event_date": "2026-12-01",
       "item_count": 12, "completion_pct": 33 }
   ],
   "donations": [
@@ -3544,6 +3551,7 @@ export interface Wishlist {
   title: string
   description: string | null
   cover_image_url: string | null
+  cover_preset: string | null  // birthday|wedding|baby|housewarming|graduation|holiday|travel|gift
   event_date: ISODate | null
   show_claimer_names: boolean
   surprise_mode: boolean
@@ -3792,6 +3800,7 @@ export interface PublicWishlist {
   title: string
   description: string | null
   cover_image_url: string | null
+  cover_preset: string | null  // birthday|wedding|baby|housewarming|graduation|holiday|travel|gift
   event_date: ISODate | null
   id: UUID
   owner: { id: UUID; display_name: string }   // 前端比對 /me 的 id，是建立者本人時顯示「驚喜模式中」遮罩
@@ -3823,7 +3832,7 @@ export interface FriendsResponse { friends: Friend[]; incoming: FriendRequest[];
 export interface CreateFriendRequest { to: string }                     // email 或 handle（可帶 @）；一律 202 {}
 export interface FriendInvite { token: string; url: string; expires_at: ISODateTime }
 export interface InvitePreview { inviter: { display_name: string; handle: string | null } }
-export interface ExploreItem { slug: string; title: string; type: WishlistType; cover_image_url: string | null; event_date: string | null
+export interface ExploreItem { slug: string; title: string; type: WishlistType; cover_image_url: string | null; cover_preset: string | null; event_date: string | null
   owner: { display_name: string; handle: string | null }; item_count: number; completion_pct: number }   // D51：GET /public/wishlists
 export interface ExploreResponse { wishlists: ExploreItem[]; next_page: number | null }
 export interface AllowedUsersRequest { user_ids: UUID[] }               // 最多 200，須皆為好友
@@ -3831,7 +3840,7 @@ export interface AllowedUsersResponse { users: UserBrief[] }
 export type Relation = 'anonymous' | 'self' | 'friend' | 'incoming' | 'outgoing' | 'none'   // incoming = 對方已向我申請
 export interface ProfileWishlist {
   slug: string; title: string; type: WishlistType; status: WishlistStatus; visibility: Visibility
-  cover_image_url: string | null; event_date: ISODate | null; item_count: number; completion_pct: number
+  cover_image_url: string | null; cover_preset: string | null; event_date: ISODate | null; item_count: number; completion_pct: number
 }
 export type ProfileDonation = {
   item_title: string; status: string; created_at: ISODateTime

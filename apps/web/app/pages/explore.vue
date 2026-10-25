@@ -31,7 +31,7 @@ async function more() {
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.explore.empty') }}</div>
     <div v-else class="g-grid">
       <article v-for="w in list" :key="w.slug" class="g-card">
-        <img v-if="w.cover_image_url" class="x-cover" :src="w.cover_image_url" alt="" loading="lazy">
+        <img class="x-cover" :src="coverSrc(w)" alt="" loading="lazy">
         <NuxtLink :to="`/s/${w.slug}`" class="x-title">{{ w.title }}</NuxtLink>
         <p class="g-mute">
           {{ typeLabel(w.type) }}・{{ $t('guest.explore.itemCount', { n: w.item_count }, w.item_count) }}<template v-if="w.event_date">・{{ w.event_date }}</template>
@@ -53,4 +53,5 @@ async function more() {
 <style scoped>
 .x-title{display:block;font-weight:700;font-size:18px;color:var(--fg);text-decoration:none;overflow-wrap:anywhere;padding:8px 0}
 .x-cover{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;margin-bottom:8px}
+.x-cover[src$='.svg']{object-fit:contain;background:var(--bg-alt)}
 </style>

@@ -158,6 +158,19 @@
       "ordersTitle": "Crowdfund purchase summary",
       "ordersLine": "Goal reached {funded}・Ordered {ordered}・Shipping {shipped}・Delivered {delivered}",
       "shareList": "Share list"
+    },
+    "cover": {
+      "title": "Cover",
+      "p": {
+        "birthday": "Birthday",
+        "wedding": "Wedding",
+        "baby": "Baby",
+        "housewarming": "Housewarming",
+        "graduation": "Graduation",
+        "holiday": "Holiday",
+        "travel": "Travel",
+        "gift": "Gift"
+      }
     }
   }
 }

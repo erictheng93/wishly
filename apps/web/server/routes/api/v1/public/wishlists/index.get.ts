@@ -7,5 +7,5 @@ const CARDS = [
 export default defineEventHandler((event) => {
   if (!useRuntimeConfig(event).demo) throw createError({ statusCode: 404 })
   const type = String(getQuery(event).type ?? '')
-  return { wishlists: CARDS.map(c => ({ ...c, cover_image_url: null })).filter(c => !type || c.type === type), next_page: null }
+  return { wishlists: CARDS.map(c => ({ ...c, cover_image_url: null, cover_preset: c.slug === 'demo' ? 'birthday' : c.slug })).filter(c => !type || c.type === type), next_page: null }
 })
