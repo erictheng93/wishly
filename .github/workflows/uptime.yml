@@ -1,0 +1,27 @@
+name: uptime
+# 外部探測 /readyz（含 DB）。失敗 → 這個 workflow 失敗 → GitHub 寄信給最後修改排程的人。
+# /readyz 對外由 Cloudflare WAF 封鎖，只放行帶 X-Monitor-Key 的請求（值 = secrets.MONITOR_KEY）。
+# shortcut: GitHub 排程常延遲 5–20 分鐘、repo 60 天無活動會自動停用；需要分鐘級告警時改用 Better Stack 等專門服務。
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions: {}
+jobs:
+  readyz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: GET https://api.wishly.tw/readyz
+        env:
+          MONITOR_KEY: ${{ secrets.MONITOR_KEY }}
+        run: |
+          # 連 3 次失敗（間隔 20 秒）才告警，避免單次網路抖動誤報
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "X-Monitor-Key: $MONITOR_KEY" https://api.wishly.tw/readyz || true)
+            [ "$code" = 200 ] && exit 0
+            echo "::warning::attempt $i: HTTP $code"
+            [ "$i" = 3 ] || sleep 20
+          done
+          echo "::error::/readyz 連續 3 次失敗（403 = MONITOR_KEY 與 WAF 規則不一致；503 = DB 連不到；000 / 52x = 伺服器或 Tunnel 掛了）"
+          exit 1
