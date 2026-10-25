@@ -39,7 +39,7 @@
 ## 2. 基礎設施
 
 ### 2.1 PostgreSQL（同機自管）— 最大風險區
-- [ ] 版本 16；映像選擇：目前 migration **不需要** PostGIS（`0001` 註明 relief 才建，`uuid_v7()` 由 migration 自行建立，無 `CREATE EXTENSION`）。CI 與本機用 `postgis/postgis:16-3.5`（正式目前為 16-3.4；migration 未用 PostGIS，小版本差異不影響），建議正式也換成同一映像以保持一致，P2-D 時不必換庫。以空庫完整跑 migration 驗證。
+- [ ] 版本 16；映像選擇：目前 migration **不需要** PostGIS（`0001` 註明 relief 才建，`uuid_v7()` 由 migration 自行建立，無 `CREATE EXTENSION`）。CI、本機與還原演練用 `postgis/postgis:16-3.6`（正式目前為 16-3.4；migration 未用 PostGIS，小版本差異不影響），建議正式也換成同一映像以保持一致，P2-D 時不必換庫。以空庫完整跑 migration 驗證。
 - [ ] 資料目錄在**具名 volume／獨立磁碟**，不放在容器可寫層；磁碟空間告警（WAL、日誌、備份暫存）。
 - [ ] 不對外開放：只監聽容器網路／回送，`5432` 不暴露在公網；密碼獨立且 ≥ 32 字元。
 - [ ] 連線：後端 `max_connections(10)`；Postgres `max_connections` 大於此值並預留管理連線。單實例不需要 PgBouncer。
