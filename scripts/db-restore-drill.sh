@@ -4,7 +4,7 @@
 set -euo pipefail
 DUMP=${1:?用法：$0 <dump 檔> [reconcile.sql]}
 SQL=${2:-$(dirname "$0")/db-reconcile.sql}
-IMAGE=${PG_IMAGE:-postgis/postgis:16-3.4}
+IMAGE=${PG_IMAGE:-postgis/postgis:16-3.6}
 C=wishly-restore-drill-$$
 start=$(date +%s)
 trap 'docker rm -f "$C" >/dev/null 2>&1 || true' EXIT
