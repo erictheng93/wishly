@@ -55,7 +55,7 @@ const accept = () => run(async () => {
         <p v-if="!p.wishlists.length" class="c-mute">{{ $t('me.profile.noLists') }}</p>
         <article v-for="w in p.wishlists" :key="w.slug" class="c-card">
           <div class="c-row">
-            <img v-if="w.cover_image_url" class="c-thumb" :src="w.cover_image_url" alt="">
+            <img class="c-thumb" :src="coverSrc(w)" alt="">
             <div class="c-grow">
               <NuxtLink :to="`/s/${w.slug}`"><strong>{{ w.title }}</strong></NuxtLink>
               <div class="c-row wrap">

@@ -38,7 +38,7 @@ function seed() {
   const u = { id: uid(), display_name: 'demo', email: 'demo@example.com', avatar_url: null, is_staff: false, notification_prefs: { email_claims: true }, identities: [{ provider: 'email' }], orgs: [] }
   users.set(u.email, u)
   const mk = (title, extra = {}) => {
-    const w = { id: uid(), type: 'registry', status: 'active', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title, description: null, cover_image_url: null, cover_image_status: 'none', event_date: null, show_claimer_names: false, surprise_mode: false, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: u, created_at: now(), updated_at: now(), ...extra }
+    const w = { id: uid(), type: 'registry', status: 'active', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title, description: null, cover_image_url: null, cover_preset: null, cover_image_status: 'none', event_date: null, show_claimer_names: false, surprise_mode: false, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: u, created_at: now(), updated_at: now(), ...extra }
     lists.set(w.id, w)
     itemsBy.set(w.id, [])
     return w
@@ -169,14 +169,14 @@ http.createServer(async (req, res) => {
     if (!authed()) return
     if (!body.title?.trim()) return problem(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/title', code: 'REQUIRED', detail: '請輸入清單名稱' }] })
     if (body.surprise_mode && (!body.event_date || Date.parse(body.event_date) <= Date.now())) return problem(res, 422, 'VALIDATION_FAILED', '活動日需為未來日期', { errors: [{ pointer: '/event_date', code: 'RANGE', detail: '驚喜模式需設定未來的活動日' }] })
-    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: 'claim_ttl_hours' in body ? body.claim_ttl_hours : 168, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
+    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_preset: body.cover_preset ?? null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: 'claim_ttl_hours' in body ? body.claim_ttl_hours : 168, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
     lists.set(w.id, w); itemsBy.set(w.id, [])
     return send(res, 201, pub(w))
   }
   if (p === '/wishlists' && m === 'GET') {
     if (!authed()) return
     const st = url.searchParams.get('status')?.split(',') // 同後端：可用逗號列多個狀態
-    const data = [...lists.values()].filter((w) => w.owner.id === me.id && (!st || st.includes(w.status))).reverse().map((w) => ({ id: w.id, type: w.type, status: w.status, slug: w.slug, title: w.title, event_date: w.event_date, cover_image_url: w.cover_image_url, surprise_locked: pub(w).surprise_locked, moderation_status: w.moderation_status, moderation_reason: w.moderation_reason, completion: completion(w), updated_at: w.updated_at }))
+    const data = [...lists.values()].filter((w) => w.owner.id === me.id && (!st || st.includes(w.status))).reverse().map((w) => ({ id: w.id, type: w.type, status: w.status, slug: w.slug, title: w.title, event_date: w.event_date, cover_image_url: w.cover_image_url, cover_preset: w.cover_preset ?? null, surprise_locked: pub(w).surprise_locked, moderation_status: w.moderation_status, moderation_reason: w.moderation_reason, completion: completion(w), updated_at: w.updated_at }))
     return send(res, 200, { data, next_cursor: null })
   }
   if ((g = p.match(/^\/wishlists\/([^/]+)$/))) {
@@ -190,7 +190,8 @@ http.createServer(async (req, res) => {
         if (!myItems(w).length) errors.push({ pointer: '/items', code: 'REQUIRED', detail: '至少需要 1 個品項' })
         if (errors.length) return problem(res, 409, 'WISHLIST_NOT_PUBLISHABLE', '清單尚不符合發佈條件。', { errors })
       }
-      for (const k of ['title', 'description', 'event_date', 'visibility', 'status', 'show_claimer_names', 'surprise_mode', 'cover_image_key']) if (k in body) w[k] = body[k]
+      for (const k of ['title', 'description', 'event_date', 'visibility', 'status', 'show_claimer_names', 'surprise_mode', 'cover_image_key', 'cover_preset']) if (k in body) w[k] = body[k]
+      if ('cover_image_key' in body) w.cover_image_url = body.cover_image_key ? `${ORIGIN}/favicon.ico` : null
       w.updated_at = now(); broadcast(w, 'wishlist.updated', { status: w.status, title: w.title, completion: completion(w), updated_at: w.updated_at })
       return send(res, 200, pub(w))
     }

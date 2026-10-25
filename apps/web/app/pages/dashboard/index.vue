@@ -43,7 +43,7 @@ onMounted(() => load())
     <div class="c-grid">
     <article v-for="w in list" :key="w.id" class="c-card link" :class="{ bad: w.moderation_status === 'hidden' }">
       <div class="c-row">
-        <img v-if="w.cover_image_url" class="c-thumb" :src="w.cover_image_url" alt="">
+        <img class="c-thumb" :src="coverSrc(w)" alt="">
         <div class="c-grow">
           <NuxtLink :to="`/lists/${w.id}/edit`" class="c-stretch"><strong>{{ w.title }}</strong></NuxtLink>
           <div class="c-row wrap">

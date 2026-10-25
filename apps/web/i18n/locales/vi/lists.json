@@ -158,6 +158,19 @@
       "ordersTitle": "Tổng hợp mua hàng góp quỹ",
       "ordersLine": "Đã đạt mục tiêu {funded}・Đã đặt hàng {ordered}・Đang vận chuyển {shipped}・Đã giao {delivered}",
       "shareList": "Chia sẻ danh sách"
+    },
+    "cover": {
+      "title": "Ảnh bìa",
+      "p": {
+        "birthday": "Sinh nhật",
+        "wedding": "Đám cưới",
+        "baby": "Em bé",
+        "housewarming": "Tân gia",
+        "graduation": "Tốt nghiệp",
+        "holiday": "Lễ hội",
+        "travel": "Du lịch",
+        "gift": "Quà tặng"
+      }
     }
   }
 }

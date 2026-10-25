@@ -158,6 +158,19 @@
       "ordersTitle": "眾籌採購彙總",
       "ordersLine": "已達標 {funded}・已下單 {ordered}・運送中 {shipped}・已送達 {delivered}",
       "shareList": "分享清單"
+    },
+    "cover": {
+      "title": "封面",
+      "p": {
+        "birthday": "生日",
+        "wedding": "結婚",
+        "baby": "寶寶",
+        "housewarming": "喬遷",
+        "graduation": "畢業",
+        "holiday": "節慶",
+        "travel": "旅行",
+        "gift": "送禮"
+      }
     }
   }
 }

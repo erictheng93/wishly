@@ -5,6 +5,7 @@
 .g-top a+a{font-size:13px}
 .g-wrap h1{font-size:30px;margin:28px 0 8px}
 .g-mute{color:var(--mute);font-size:13px;line-height:1.5;letter-spacing:.08em;overflow-wrap:anywhere}
+.g-cover[src$='.svg']{object-fit:contain;background:var(--bg-alt)}
 .g-cover{width:100%;max-height:200px;object-fit:cover;margin-top:16px;display:block}
 .g-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--red);padding:16px;margin:12px 0}
 .g-item{display:flex;gap:16px;list-style:none}

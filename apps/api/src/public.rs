@@ -51,6 +51,7 @@ type ExploreRow = (
     String,
     Option<String>,
     String,
+    Option<String>,
     Option<NaiveDate>,
     String,
     Option<String>,
@@ -79,7 +80,7 @@ async fn explore(
         }
     };
     let rows: Vec<ExploreRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.event_date,
+        "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
                 o.display_name, o.handle,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({claimed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
@@ -95,8 +96,8 @@ async fn explore(
          ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL)))
         .bind(ty).bind(EXPLORE_PAGE + 1).bind((page - 1) * EXPLORE_PAGE).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > EXPLORE_PAGE;
-    let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, ev, on, oh, n, got, need)| json!({
-        "slug": slug, "title": title, "type": ty, "cover_image_url": image_url(ck.as_deref(), &cs), "event_date": ev,
+    let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, cp, ev, on, oh, n, got, need)| json!({
+        "slug": slug, "title": title, "type": ty, "cover_image_url": image_url(ck.as_deref(), &cs), "cover_preset": cp, "event_date": ev,
         "owner": { "display_name": on, "handle": oh }, "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })).collect();
     Ok((
         [(
@@ -125,6 +126,7 @@ struct W {
     description: Option<String>,
     cover_image_key: Option<String>,
     cover_image_status: String,
+    cover_preset: Option<String>,
     event_date: Option<NaiveDate>,
     closes_at: Option<DateTime<Utc>>,
     show_claimer_names: bool,
@@ -190,7 +192,7 @@ async fn render(
     let w: W = sqlx::query_as(
         "SELECT w.id, w.slug::text AS slug, w.type::text AS type, w.status::text AS status, w.visibility::text AS visibility,
                 w.moderation_status::text AS moderation, w.title, w.description, w.cover_image_key,
-                w.cover_image_status::text AS cover_image_status, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
+                w.cover_image_status::text AS cover_image_status, w.cover_preset, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
                 w.owner_id, u.display_name AS owner_name,
                 surprise_locked(w.surprise_mode, w.event_date) AS locked,
                 GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
@@ -341,6 +343,7 @@ async fn render(
     let body = json!({
         "slug": w.slug, "visibility": w.visibility, "type": w.r#type, "status": w.status, "title": w.title, "description": w.description,
         "cover_image_url": image_url(w.cover_image_key.as_deref(), &w.cover_image_status),
+        "cover_preset": w.cover_preset,
         "event_date": w.event_date, "closes_at": w.closes_at, "id": w.id,
         "owner": { "id": w.owner_id, "display_name": w.owner_name },
         "surprise_mode": w.surprise_mode, "surprise_locked": w.locked, "claimers_visible": visible,

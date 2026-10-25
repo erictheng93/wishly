@@ -16,6 +16,7 @@ const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
 const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 })
 const allowed = ref<string[]>([])
+const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null), coverBusy = ref(false)
 let poll: any
 
 async function load(quiet = false) {
@@ -24,6 +25,7 @@ async function load(quiet = false) {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
     Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours })
+    coverPreset.value = r.wishlist.cover_preset ?? null; coverKey.value = null
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
@@ -62,6 +64,9 @@ async function patchList(body: any, ok = t('lists.edit.saved')) {
 }
 async function saveMeta() {
   const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, visibility: meta.visibility, claim_ttl_hours: meta.claim_ttl_hours }
+  // 封面互斥；沒動就不送
+  if (coverKey.value) Object.assign(body, { cover_image_key: coverKey.value, cover_preset: null })
+  else if (coverPreset.value !== (w.value?.cover_preset ?? null)) Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
   if (!await patchList(body)) return
   if (meta.visibility === 'selected') {
     try { await api(`/wishlists/${id}/allowed-users`, { method: 'PUT', body: { user_ids: allowed.value } }) }
@@ -153,12 +158,13 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <label class="c-field"><span>{{ $t('lists.edit.desc') }}</span><textarea v-model="meta.description" rows="2" /></label>
           <label class="c-field"><span>{{ $t('lists.edit.event') }}</span><input v-model="meta.event_date" type="date"></label>
           <label class="c-field"><span>{{ $t('lists.edit.closes') }}</span><input v-model="meta.closes_at" type="datetime-local"></label>
+          <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="coverKey" :current-url="w.cover_image_url" @busy="coverBusy = $event" />
           <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
           <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
           <CreatorVisibilityPicker v-model:visibility="meta.visibility" v-model:users="allowed" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
-          <button class="c-btn block">{{ $t('lists.edit.saveSettings') }}</button>
+          <button class="c-btn block" :disabled="coverBusy">{{ $t('lists.edit.saveSettings') }}</button>
         </form>
         <div class="c-row c-mt">
           <button v-if="w.status === 'active'" class="c-btn c-grow" @click="patchList({ status: 'closed' }, $t('lists.edit.ended'))">{{ $t('lists.edit.endList') }}</button>

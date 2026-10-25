@@ -56,7 +56,8 @@ if (data.value) {
     description: () => data.value?.description ?? undefined,
     ogDescription: () => t('guest.slug.ogDesc', { pct: data.value?.completion?.completion_pct ?? 0, left: left() }),
     // ponytail: 預設圖為靜態檔；動態 /og/{slug}.png（含清單名稱與完成度）之後再做
-    ogImage: () => data.value?.cover_image_url ?? `${origin}/og-default.png`,
+    // 預設封面用同名 PNG（scripts/cover-og.mjs 產生），LINE/FB 不支援 SVG
+    ogImage: () => data.value?.cover_image_url ?? (data.value?.cover_preset ? `${origin}${coverSrc(data.value).replace(/\.svg$/, '.png')}` : `${origin}/og-default.png`),
     ogImageWidth: 1200, ogImageHeight: 630,
     ogType: 'website', ogUrl: () => `${origin}/s/${slug}`, ogLocale: () => ({ 'zh-Hant': 'zh_TW', en: 'en_US', vi: 'vi_VN' } as Record<string, string>)[String(locale.value)], twitterCard: 'summary_large_image',
   })
@@ -201,7 +202,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <div v-if="lineHint" class="g-banner">{{ $t('guest.slug.lineHint') }}<button class="g-link" @click="dismissHint">{{ $t('guest.slug.gotIt') }}</button></div>
       <div v-if="closed" class="g-banner">{{ $t('guest.slug.closed') }}</div>
       <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
-      <img v-if="data.cover_image_url" :src="data.cover_image_url" alt="" class="g-cover">
+      <img :src="coverSrc(data)" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
       <p class="g-mute">
         <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template>{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}
