@@ -2,25 +2,38 @@
 const { user, logout } = useAuth()
 const open = ref(false)
 const root = ref<HTMLElement>()
+const trigger = ref<HTMLButtonElement>()
+const panelId = useId()
 const name = computed(() => user.value?.display_name || user.value?.email || '?')
 function away(e: Event) { if (!root.value?.contains(e.target as Node)) open.value = false }
+function dismiss(e: KeyboardEvent) {
+  if (!open.value) return
+  e.preventDefault()
+  e.stopPropagation()
+  open.value = false
+  trigger.value?.focus()
+}
+function focusout(e: FocusEvent) {
+  // WebKit 點按鈕不給焦點，relatedTarget 為 null；點外面交給 away 處理
+  if (e.relatedTarget && !root.value?.contains(e.relatedTarget as Node)) open.value = false
+}
 onMounted(() => document.addEventListener('click', away))
 onBeforeUnmount(() => document.removeEventListener('click', away))
 watch(() => useRoute().fullPath, () => { open.value = false })
 </script>
 <template>
-  <div v-if="user" ref="root" class="um" @keydown.esc="open = false">
-    <button type="button" class="um-btn" :aria-label="$t('common.accountMenu')" :aria-expanded="open" aria-haspopup="menu" @click="open = !open">{{ name.slice(0, 1).toUpperCase() }}</button>
-    <div v-if="open" class="um-pop" role="menu">
+  <div v-if="user" ref="root" class="um" @keydown.esc="dismiss" @focusout="focusout">
+    <button ref="trigger" type="button" class="um-btn" :aria-label="$t('common.accountMenu')" :aria-expanded="open" :aria-controls="panelId" @click="open = !open">{{ name.slice(0, 1).toUpperCase() }}</button>
+    <nav v-show="open" :id="panelId" class="um-pop" :aria-label="$t('common.accountMenu')">
       <component :is="user.handle ? 'NuxtLink' : 'div'" :to="user.handle ? `/u/${user.handle}` : undefined" class="um-who">
         <b>{{ user.display_name }}</b><small v-if="user.handle">@{{ user.handle }}</small>
       </component>
-      <NuxtLink to="/friends" role="menuitem">{{ $t('common.friends') }}</NuxtLink>
-      <NuxtLink to="/me/wallet" role="menuitem">{{ $t('common.points') }}</NuxtLink>
-      <NuxtLink to="/settings" role="menuitem">{{ $t('common.settings') }}</NuxtLink>
-      <NuxtLink v-if="user.is_staff" to="/admin" role="menuitem">{{ $t('common.admin') }}</NuxtLink>
-      <button type="button" role="menuitem" @click="logout()">{{ $t('settings.logout') }}</button>
-    </div>
+      <NuxtLink to="/friends">{{ $t('common.friends') }}</NuxtLink>
+      <NuxtLink to="/me/wallet">{{ $t('common.points') }}</NuxtLink>
+      <NuxtLink to="/settings">{{ $t('common.settings') }}</NuxtLink>
+      <NuxtLink v-if="user.is_staff" to="/admin">{{ $t('common.admin') }}</NuxtLink>
+      <button type="button" @click="logout()">{{ $t('settings.logout') }}</button>
+    </nav>
   </div>
 </template>
 <style scoped>
