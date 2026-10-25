@@ -29,7 +29,8 @@
 6. **驗證：**
    ```sh
    curl -s -o /dev/null -w "%{http_code}\n" https://api.wishly.tw/healthz   # 200
-   curl -s -o /dev/null -w "%{http_code}\n" https://api.wishly.tw/readyz    # 200
+   curl -s -o /dev/null -w "%{http_code}\n" https://api.wishly.tw/readyz    # 403（對外由 WAF 封鎖，正常）
+   gh workflow run uptime && sleep 5 && gh run watch "$(gh run list -w uptime -L 1 --json databaseId -q '.[0].databaseId')"   # 帶金鑰探測，應成功
    ```
    再手動走一次捐助流程。
 
@@ -72,7 +73,7 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 - [ ] 有 migration？向前相容、舊檔未改
 - [ ] Dokploy `api` 的 Provider 是 Docker，部署後映像有 GHCR 的 RepoDigest（`docker image inspect`）
 - [ ] Dokploy 只重新部署 `api`
-- [ ] `/healthz`、`/readyz` 皆 200
+- [ ] `/healthz` 200；`/readyz` 對外 403、`uptime` workflow 成功
 - [ ] 前端首頁 200，手動走一次捐助流程
 
 ## 6. 資料庫備份與還原
@@ -108,3 +109,28 @@ ssh root@<VPS>
    docker exec -i $D psql -U wishly -d wishly -X < /opt/wishly-backup/db-reconcile.sql
    ```
 4. 啟動 `api`，執行 §1 的驗證。
+
+## 7. 外部監控（/readyz）
+
+`.github/workflows/uptime.yml` 每 5 分鐘帶 `X-Monitor-Key` 打 `https://api.wishly.tw/readyz`，連續 3 次失敗就讓 workflow 失敗，GitHub 寄信告警。`/readyz` 會查 DB，所以對外用 WAF 封鎖，只放行帶金鑰的請求。Dokploy 的內部探針直連容器、不經 Cloudflare，不受影響。
+
+**一次性設定（依序做；金鑰不要貼給任何人或代理程式）：**
+
+1. 在自己的終端機產生金鑰，同時存進 GitHub secret 並複製到剪貼簿（不會印在螢幕上）：
+   ```sh
+   openssl rand -hex 32 | tr -d '\n' | tee >(pbcopy) | gh secret set MONITOR_KEY -R erictheng93/wishly
+   ```
+2. Cloudflare → wishly.tw → Security → WAF → Custom rules → Create rule，名稱 `block-public-readyz`，Edit expression 貼上（把 `<KEY>` 換成剪貼簿內容），Action 選 **Block**：
+   ```
+   (http.host eq "api.wishly.tw" and http.request.uri.path eq "/readyz" and not any(http.request.headers["x-monitor-key"][*] eq "<KEY>"))
+   ```
+3. 驗證：
+   ```sh
+   curl -s -o /dev/null -w "%{http_code}\n" https://api.wishly.tw/readyz   # 403
+   gh workflow run uptime   # 到 Actions 頁確認成功
+   ```
+4. GitHub → Settings → Notifications → Actions：勾選 Email、「Only notify for failed workflows」。排程失敗的信寄給**最後修改排程的人**。
+
+**收到告警時：**看失敗那次的訊息。403 = 金鑰與 WAF 規則不一致（換金鑰時兩邊要一起改）；503 = DB 連不到；000 / 52x = 伺服器或 Tunnel 掛了。
+
+**限制：**GitHub 排程常延遲 5–20 分鐘；repo 60 天沒有任何活動，排程會被自動停用（GitHub 會先寄信）。需要更即時的告警時改用 Better Stack 等專門服務。

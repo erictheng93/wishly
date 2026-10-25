@@ -30,11 +30,11 @@
 - [ ] **輪替驗證過程中外露的機密**（見驗證紀錄 §12.1）：`DATABASE_URL` 的 DB 密碼（用 `ALTER ROLE wishly PASSWORD …`，不必重建 `db` 服務，並同步更新 `db` 服務與 `api` 的環境變數）、`OTP_PEPPER`、`OAUTH_SECRET`、`UNSUB_SECRET`、`TURNSTILE_SECRET`（Cloudflare 上 Roll）。**`SHIPPING_ENC_KEY` 在有真實收件資訊之前輪替最便宜，之後就不能換了**，請先決定。新值只放密碼管理器與 Dokploy，不貼給任何人或代理程式。
 - [ ] **機密外洩防線（本 repo 為公開）**：GitHub secret scanning 與 push protection 已開（2026-10-17 以 `gh api` 確認），但它們只認已知服務商的 token 格式，**認不出十六進位密鑰、`postgres://` 連線字串、Turnstile secret**。補上通用掃描：CI 加 `gitleaks`（或 `trufflehog`）掃 PR 與 push，並建議本機 pre-commit 掃 staged 檔。同時固定提交習慣：只用 `git add <指定檔案>`，不用 `git add .`／`-A`。
 - [ ] **瀏覽器自動化工具的輸出不得含機密**：操作含機密的頁面（Dokploy 環境變數、Cloudflare Token 頁、GitHub PAT 頁）時，不存快照，只用 `eval` 取鍵名／行數；工具的暫存目錄（`.playwright-cli/`）已加進 `.gitignore`，但這只防誤提交，不防機密進入對話上下文。
-- [ ] **`/readyz` 對外限流或封鎖**（它查 DB，目前公網可達並回 200）。`/healthz` 可開放。外部監控改走允許來源。
+- [ ] **`/readyz` 對外封鎖**（它查 DB，目前公網可達並回 200）：Cloudflare WAF 規則只放行帶 `X-Monitor-Key` 的請求，做法見 `docs/deploy-runbook.md`「外部監控」。`/healthz` 可開放。
 - [ ] Dokploy 管理員啟用 **2FA**；確認管理介面（3000）只透過 SSH 通道進入。
 - [ ] **SSH 22 加固**：限來源 IP、僅金鑰登入、關閉密碼登入、fail2ban。注意**不要動外層防火牆既有規則**（Docker 已發布 80/443/3000，靠它擋住）。
 - [ ] 確認 80／443／3000 不可從公網直連（目前只驗證了 8080，見驗證紀錄 §5.3）。
-- [ ] 外部監控與告警：打 `/readyz` 的外部探測；5xx 比率、p95 延遲、磁碟（含 WAL／備份）、記憶體、容器重啟次數、Tunnel 狀態、寄信佇列積壓、逾期捐助未釋放數量。
+- [ ] 外部監控與告警：~~打 `/readyz` 的外部探測~~（`.github/workflows/uptime.yml`，每 5 分鐘，WAF 生效後才算完成）；5xx 比率、p95 延遲、磁碟（含 WAL／備份）、記憶體、容器重啟次數、Tunnel 狀態、寄信佇列積壓、逾期捐助未釋放數量。
 - [ ] `cloudflared` 容器確認 restart policy 為 always；Tunnel 掉線告警（Tunnel 是單點，掛掉全站不可達）。
 - [ ] 記錄並設定提醒：GHCR 讀取 PAT 的**到期日**；R2 S3 Token 若有到期日也一併記錄（到期會讓重新部署／上傳突然失敗）。
 - [ ] VPS 記憶體實測：`free -h`（DB、Dokploy、cloudflared、後端同機執行）。
