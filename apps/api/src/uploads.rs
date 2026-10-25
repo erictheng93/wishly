@@ -484,10 +484,12 @@ async fn publish_checked(
         let published = publish_image(&key, bytes, ct).await;
         if is_retired(&pool, &key).await? {
             // 發佈晚於刪除：重新排入刪除待辦（持久），由 drain 補刪
-            sqlx::query("UPDATE user_media SET purged_at=NULL WHERE object_key=$1")
-                .bind(&key)
-                .execute(&pool)
-                .await?;
+            sqlx::query(
+                "UPDATE user_media SET purged_at=NULL, purge_tried_at=NULL WHERE object_key=$1",
+            )
+            .bind(&key)
+            .execute(&pool)
+            .await?;
             delete_objects(pool.clone(), vec![key]);
             return Err(image_removed());
         }
@@ -507,6 +509,12 @@ async fn retire_media(pool: &sqlx::PgPool, key: &str) -> Result<bool, AppError> 
          OR EXISTS (SELECT 1 FROM users WHERE avatar_key=$1 AND deleted_at IS NULL)")
         .bind(key).fetch_one(&mut *tx).await?;
     if referenced {
+        // 仍被引用：在物件鎖內撤銷要求。request_retire 也持同一把鎖，不會在檢查後、撤銷前插入新要求而被抹掉
+        sqlx::query("UPDATE user_media SET retire_requested_at=NULL WHERE object_key=$1 AND deleted_at IS NULL")
+            .bind(key)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
         return Ok(false);
     }
     // 先提交退役再刪 origin：取消或 DB 失敗都不會讓已刪的 key 被重新掛上
@@ -520,28 +528,54 @@ async fn retire_media(pool: &sqlx::PgPool, key: &str) -> Result<bool, AppError> 
 
 /// 要求退役並刪除 bucket 物件：先把要求寫進 DB（重啟後由 spawn_media_worker 接手），
 /// 再立刻在背景處理一次，失敗依 1s、4s、16s 重試；之後交給週期 worker。
+/// 寫入要求要等物件鎖（見 request_retire），有逾時，所以也在同一組重試內補寫。
 pub fn delete_objects(pool: sqlx::PgPool, keys: Vec<String>) {
     tokio::spawn(async move {
-        if let Err(error) = request_retire(&pool, &keys).await {
-            tracing::error!(?error, "圖片刪除要求寫入失敗");
-        }
+        let mut requested = false;
         for wait in [0u64, 1, 4, 16] {
             tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+            if !requested {
+                let write = async {
+                    let mut tx = pool.begin().await?;
+                    lock_timeout(&mut tx).await?;
+                    request_retire(&mut tx, &keys).await?;
+                    tx.commit().await?;
+                    Ok::<(), AppError>(())
+                };
+                match write.await {
+                    Ok(()) => requested = true,
+                    Err(error) => {
+                        tracing::warn!(?error, "圖片刪除要求寫入失敗，稍後重試");
+                        continue;
+                    }
+                }
+            }
             if drain_media(&pool).await {
                 break;
             }
+        }
+        if !requested {
+            tracing::error!(?keys, "圖片刪除要求寫入失敗，已放棄");
         }
     });
 }
 
 /// 標記要求退役；刪帳號在自己的交易內呼叫，與刪除同時提交。
+/// 持物件鎖到提交：否則 retire_media 可能在本交易提交前判定「仍被引用」、提交後才撤銷，把這筆要求抹掉而漏刪。
+/// 依 key 排序上鎖，避免兩個交易互鎖。
 pub(crate) async fn request_retire(
-    db: impl sqlx::PgExecutor<'_>,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     keys: &[String],
 ) -> Result<(), AppError> {
+    let mut sorted: Vec<&String> = keys.iter().collect();
+    sorted.sort();
+    sorted.dedup();
+    for key in sorted {
+        lock_key(tx, key).await?;
+    }
     sqlx::query("UPDATE user_media SET retire_requested_at=coalesce(retire_requested_at, now()) WHERE object_key = ANY($1)")
         .bind(keys)
-        .execute(db)
+        .execute(&mut **tx)
         .await?;
     Ok(())
 }
@@ -564,7 +598,8 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
     let _one = DRAIN.lock().await;
     let mut clean = true;
     let pending: Vec<String> = match sqlx::query_scalar(
-        "SELECT DISTINCT object_key FROM user_media WHERE retire_requested_at IS NOT NULL AND deleted_at IS NULL LIMIT 100",
+        "SELECT object_key FROM user_media WHERE retire_requested_at IS NOT NULL AND deleted_at IS NULL
+         GROUP BY object_key ORDER BY min(retire_requested_at) LIMIT 100",
     )
     .fetch_all(pool)
     .await
@@ -577,13 +612,8 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
     };
     for key in pending {
         let result = async {
-            if !retire_media(pool, &key).await? {
-                // 仍被其他清單 / 品項 / 頭像引用：保留圖片，撤銷要求
-                sqlx::query("UPDATE user_media SET retire_requested_at=NULL WHERE object_key=$1 AND deleted_at IS NULL")
-                    .bind(&key)
-                    .execute(pool)
-                    .await?;
-            }
+            // 仍被其他清單 / 品項 / 頭像引用：retire_media 保留圖片並撤銷要求
+            retire_media(pool, &key).await?;
             Ok::<(), AppError>(())
         }
         .await;
@@ -593,7 +623,9 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
         }
     }
     let due: Vec<String> = match sqlx::query_scalar(
-        "SELECT DISTINCT object_key FROM user_media WHERE deleted_at IS NOT NULL AND purged_at IS NULL LIMIT 100",
+        // 最久沒試過的先做：一批永久失敗的 key 不會卡住後面的待辦
+        "SELECT object_key FROM user_media WHERE deleted_at IS NOT NULL AND purged_at IS NULL
+         GROUP BY object_key ORDER BY max(purge_tried_at) NULLS FIRST, object_key LIMIT 100",
     )
     .fetch_all(pool)
     .await
@@ -607,12 +639,20 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
     let mut deleted = Vec::new();
     for key in due {
         let result = async {
+            // 本次嘗試的戳記：刪除期間若被 publish_checked 重新排入（戳記清空），完成時不可把它標成已刪
+            let tried = chrono::Utc::now();
+            sqlx::query("UPDATE user_media SET purge_tried_at=$2 WHERE object_key=$1 AND deleted_at IS NOT NULL AND purged_at IS NULL")
+                .bind(&key)
+                .bind(tried)
+                .execute(pool)
+                .await?;
             let response = s3_req("DELETE", &key, None).await?;
             if !(response.status().is_success() || response.status() == 404) {
                 return Ok(false);
             }
-            sqlx::query("UPDATE user_media SET purged_at=now() WHERE object_key=$1 AND deleted_at IS NOT NULL AND purged_at IS NULL")
+            sqlx::query("UPDATE user_media SET purged_at=now() WHERE object_key=$1 AND purge_tried_at=$2 AND purged_at IS NULL")
                 .bind(&key)
+                .bind(tried)
                 .execute(pool)
                 .await?;
             Ok::<bool, AppError>(true)
@@ -924,6 +964,55 @@ mod tests {
         );
         attach.await.unwrap().unwrap();
         assert!(!is_retired(&pool, &key).await.unwrap());
+    }
+
+    /// 共用圖片：刪帳號交易已提交退役要求但尚未提交時，drain 不可判定「仍被引用」後把這筆要求抹掉（漏刪）。
+    #[sqlx::test(migrations = "../../db/migrations")]
+    async fn retire_request_survives_concurrent_drain(pool: sqlx::PgPool) {
+        let new_user = |n: &'static str| {
+            let p = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Uuid>(
+                    "INSERT INTO users (display_name) VALUES ($1) RETURNING id",
+                )
+                .bind(n)
+                .fetch_one(&p)
+                .await
+                .unwrap()
+            }
+        };
+        let (gone, leaving) = (new_user("a").await, new_user("b").await);
+        let key = format!("avatars/{}.jpg", Uuid::new_v4());
+        sqlx::query("UPDATE users SET avatar_key=$2 WHERE id=$1")
+            .bind(leaving)
+            .bind(&key)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO user_media (user_id, object_key, retire_requested_at) VALUES ($1,$3,now()), ($2,$3,NULL)")
+            .bind(gone).bind(leaving).bind(&key).execute(&pool).await.unwrap();
+        // 第二位使用者刪帳號：要求退役、標記刪除，尚未提交
+        let mut tx = pool.begin().await.unwrap();
+        request_retire(&mut tx, std::slice::from_ref(&key))
+            .await
+            .unwrap();
+        sqlx::query("UPDATE users SET deleted_at=now() WHERE id=$1")
+            .bind(leaving)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let (p, k) = (pool.clone(), key.clone());
+        let retire = tokio::spawn(async move { retire_media(&p, &k).await });
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        tx.commit().await.unwrap();
+        retire.await.unwrap().unwrap();
+        let (retired, requested): (bool, bool) = sqlx::query_as(
+            "SELECT bool_or(deleted_at IS NOT NULL), bool_or(retire_requested_at IS NOT NULL) FROM user_media WHERE object_key=$1")
+            .bind(&key).fetch_one(&pool).await.unwrap();
+        assert!(
+            retired || requested,
+            "退役要求不可遺失：已無人引用的圖片必須退役或留在待辦"
+        );
     }
 
     #[sqlx::test(migrations = "../../db/migrations")]

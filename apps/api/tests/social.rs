@@ -1582,3 +1582,101 @@ async fn friend_feed_respects_visibility_and_birthdays(pool: PgPool) {
         StatusCode::UNAUTHORIZED
     );
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn friend_request_count_and_email_notification(pool: PgPool) {
+    let (a, ta, _) = handle_user(&pool, "A", Some("alice")).await;
+    let (_, tb, _) = handle_user(&pool, "B", Some("bobby")).await;
+    let count = |t: String| {
+        let pool = pool.clone();
+        async move {
+            common::call(
+                &pool,
+                "GET",
+                "/friends/requests/count",
+                &common::ck(&t),
+                None,
+            )
+            .await
+            .2["incoming"]
+                .as_i64()
+                .unwrap()
+        }
+    };
+    let request = |t: String, to: &'static str| {
+        let pool = pool.clone();
+        async move {
+            common::call(
+                &pool,
+                "POST",
+                "/friends/requests",
+                &[common::ck(&t), common::idem(Uuid::new_v4())].concat(),
+                Some(json!({ "to": to })),
+            )
+            .await;
+        }
+    };
+    let queued = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM notifications WHERE user_id=$1 AND kind='friend.request'",
+        )
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+    };
+    assert_eq!(count(ta.clone()).await, 0);
+    request(tb.clone(), "alice").await;
+    assert_eq!((count(ta.clone()).await, count(tb.clone()).await), (1, 0));
+    assert_eq!(queued().await, 1);
+    // 撤回後 24 小時內重送：不再排第二封
+    let rid: Uuid = sqlx::query_scalar("SELECT id FROM friend_requests")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    // 先讓 tick 取消已撤回申請的通知
+    let (st, ..) = common::call(
+        &pool,
+        "DELETE",
+        &format!("/friends/requests/{rid}"),
+        &common::ck(&tb),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::NO_CONTENT);
+    wishly_api::notify::tick(&pool).await.unwrap();
+    let status: String = sqlx::query_scalar(
+        "SELECT status::text FROM notifications WHERE user_id=$1 AND kind='friend.request'",
+    )
+    .bind(a)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(status, "cancelled");
+    request(tb.clone(), "alice").await;
+    assert_eq!(queued().await, 1);
+    // 接受後計數歸零
+    let rid: Uuid = sqlx::query_scalar("SELECT id FROM friend_requests")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (st, ..) = common::call(
+        &pool,
+        "POST",
+        &format!("/friends/requests/{rid}/accept"),
+        &common::ck(&ta),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(count(ta.clone()).await, 0);
+    // 互送自動成為好友：不多排通知
+    let (c, tc, _) = handle_user(&pool, "C", Some("carol")).await;
+    request(ta.clone(), "carol").await;
+    request(tc.clone(), "alice").await;
+    assert!(crate_are_friends(&pool, a, c).await);
+    assert_eq!(queued().await, 1);
+    let (subject, body) =
+        wishly_api::notify::render("friend.request", "", &json!({ "from_name": "Bob" }));
+    assert!(subject.contains("Bob") && body.contains("/friends"));
+}

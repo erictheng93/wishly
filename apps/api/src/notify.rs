@@ -52,6 +52,31 @@ pub async fn enqueue_item_changed<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
+/// 好友申請通知收件人（kind friend.request）。同一寄件人 24 小時內只通知一次，避免撤回 / 重送洗信；
+/// 寄信時才讀寄件人名稱，申請已被撤回 / 處理則取消。
+pub async fn enqueue_friend_request<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    to_user: Uuid,
+    from_user: Uuid,
+    request_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO notifications (user_id, channel, kind, payload)
+         SELECT $1, 'email'::notification_channel, 'friend.request',
+                jsonb_build_object('request_id', $3::uuid, 'from_user', $2::uuid)
+          WHERE NOT EXISTS (SELECT 1 FROM notifications
+                             WHERE user_id = $1 AND kind = 'friend.request'
+                               AND payload->>'from_user' = $2::text
+                               AND created_at > now() - interval '24 hours')",
+    )
+    .bind(to_user)
+    .bind(from_user)
+    .bind(request_id)
+    .execute(ex)
+    .await?;
+    Ok(())
+}
+
 /// Q12：認領購買期限提醒，截止前 3 天與 24 小時各一封（只排還在未來的）。
 /// payload 記下排程時的 expires_at；寄信時若捐助已不是 reserved 或期限已改（延長），worker 會取消不寄。
 pub async fn enqueue_purchase_reminders<'e, E: sqlx::PgExecutor<'e>>(
@@ -154,6 +179,17 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
             if ended {
                 payload["ended"] = Value::Bool(true);
             }
+        } else if kind == "friend.request" {
+            // 申請可能已被撤回 / 接受 / 拒絕，或寄件人已刪除帳號：不寄
+            let from_name: Option<String> = sqlx::query_scalar(
+                "SELECT o.display_name FROM friend_requests r JOIN users o ON o.id = r.from_user AND o.deleted_at IS NULL
+                  WHERE r.id = ($1->>'request_id')::uuid")
+                .bind(&payload).fetch_optional(pool).await?;
+            let Some(from_name) = from_name else {
+                sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'friend request no longer pending' WHERE id = $1").bind(id).execute(pool).await?;
+                continue;
+            };
+            payload["from_name"] = Value::String(from_name);
         } else if kind == "claim.item_changed" {
             // 延後 10 分鐘寄：這段期間取消 / 撤回 / 轉投 / 品項被刪的就不寄
             let still: bool = sqlx::query_scalar(
@@ -444,6 +480,17 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("Chủ danh sách \"{title}\" đã gỡ món quà bạn đóng góp, khoản đóng góp này đã bị hủy.\nXem các món khác: {manage}\n"),
             ),
         ),
+        "friend.request" => {
+            let from = payload["from_name"].as_str().unwrap_or_default();
+            (
+                l.pick(format!("【Wishly】{from} 想加你為好友"), format!("[Wishly] {from} wants to be your friend"), format!("[Wishly] {from} muốn kết bạn với bạn")),
+                l.pick(
+                    format!("{from} 向你送出了好友申請。\n接受或婉拒：{base}/friends\n"),
+                    format!("{from} sent you a friend request.\nAccept or decline: {base}/friends\n"),
+                    format!("{from} đã gửi lời mời kết bạn cho bạn.\nChấp nhận hoặc từ chối: {base}/friends\n"),
+                ),
+            )
+        }
         "claim.item_changed" => {
             // 眾籌認捐在錢包管理，一般捐助在「我的捐助」
             let link = if payload["crowdfund"] == true { &wallet } else { &manage };

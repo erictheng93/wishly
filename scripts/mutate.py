@@ -65,6 +65,8 @@ CASES = {
     "media-key-lock": (API + "uploads.rs", "lock_key", "SELECT pg_advisory_xact_lock($1, hashtext($2))", "SELECT $1::int, hashtext($2)", "lib", "uploads::tests::retire_waits_for_in_flight_attachment"),
     "media-user-lock": (API + "uploads.rs", "lock_user", "SELECT pg_advisory_xact_lock($1, hashtext($2))", "SELECT $1::int, hashtext($2)", "account_media_cleanup", "delete_me_removes_unshared_media_only"),
     "media-remember-on-conflict": (API + "uploads.rs", None, "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING", "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2)", "lib", "uploads::tests::remember_media_is_idempotent"),
+    "media-retire-request-lock": (API + "uploads.rs", "request_retire", "        lock_key(tx, key).await?;\n", "        let _ = key;\n", "lib", "uploads::tests::retire_request_survives_concurrent_drain"),
+    "media-purge-rotation": (API + "uploads.rs", "drain_media", "ORDER BY max(purge_tried_at) NULLS FIRST, object_key", "ORDER BY object_key", "media_purge_rotation", "failing_keys_do_not_starve_the_purge_queue"),
     "media-publish-recheck": (API + "uploads.rs", "publish_checked", "if is_retired(&pool, &key).await? {", "if false {", "account_media_cleanup", "delete_me_removes_unshared_media_only"),
     "claim-patch-lock-timeout": (API + "claims.rs", "apply", "crate::begin_contended(&st.pool).await?", "st.pool.begin().await?", "db_overload", "claim_status_change_waiting_on_hot_item_gives_up_with_503"),
     "pledge-lock-timeout": (API + "contributions.rs", "create", "crate::begin_contended(&st.pool).await?", "st.pool.begin().await?", "db_overload", "pledge_waiting_on_hot_item_gives_up_with_503"),
@@ -123,6 +125,8 @@ FAILURE_MARKERS.update({
     "media-user-lock": "requests should wait for the media lock",
     "media-remember-on-conflict": "重複記錄同一張圖片須冪等",
     "media-publish-recheck": "發佈後複查須補刪已退役圖片",
+    "media-retire-request-lock": "退役要求不可遺失",
+    "media-purge-rotation": "失敗的 key 不可一直卡住後面的待辦",
     "claim-patch-lock-timeout": "請求一直卡在等鎖：交易沒有設 lock_timeout",
     "pledge-lock-timeout": "請求一直卡在等鎖：交易沒有設 lock_timeout",
     "item-changed-on-conflict": "item PATCH failed: true",
@@ -162,7 +166,7 @@ INFRA_FAILURES = (
 def mutate(source, function, old, new):
     start, end = 0, len(source)
     if function:
-        functions = list(re.finditer(r"^(?:pub )?(?:async )?fn (\w+)\b", source, re.M))
+        functions = list(re.finditer(r"^(?:pub(?:\(crate\))? )?(?:async )?fn (\w+)\b", source, re.M))
         matches = [i for i, match in enumerate(functions) if match[1] == function]
         if len(matches) != 1:
             raise ValueError(f"expected one function {function}, found {len(matches)}")
