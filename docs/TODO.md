@@ -54,6 +54,7 @@
 - [ ] §7.12 Google／LINE OAuth 各登入一次（issue #6）。
 - [ ] §7.14 重新部署期間進行中請求的失敗數與捐助一致性。
 - [ ] §7.15 手動 kill 容器，確認自動重啟、Tunnel 恢復。
+- [ ] 預設封面分享預覽（PR #36）：部署後拿正式網址貼到 LINE，確認預覽圖會顯示預設封面（`/covers/{id}.png`），而非 `og-default.png`。
 - [ ] 延遲：從**其他網路／機器**重測 `api.wishly.tw`（本次從單一網路量到 connect 最高 5 秒、`cf-ray` 為 SJC，判斷是本機網路抖動但無法定論）。
 - [ ] 寄信：用 Gmail 以外的信箱測 OTP；確認不進垃圾信。穩定後再決定 DMARC 是否維持 `p=reject`（觀察期先 `p=none`；注意 SPF 因 `cf-bounce` 子網域在嚴格對齊下不對齊，DMARC 靠 DKIM 通過）。
 
