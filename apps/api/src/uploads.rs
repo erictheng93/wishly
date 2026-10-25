@@ -472,13 +472,30 @@ fn image_removed() -> AppError {
 
 /// 發佈到 origin 後再查一次是否已退役：退役先提交、才刪 origin，所以若發佈晚於刪除，這裡一定看得到並補刪。
 /// 早於刪除的發佈由刪除本身清掉；逾時後才落地的寫入由 publish_image 的 ETag 條件寫擋下。
-/// 跑在獨立 task，客戶端斷線不會在發佈與複查之間中止。
+/// 跑在獨立 task，客戶端斷線不會在發佈與複查之間中止；程序崩潰則由發佈圍欄（publishing_until）兜底。
 async fn publish_checked(
     pool: &sqlx::PgPool,
     key: &str,
     bytes: Vec<u8>,
     ct: &'static str,
 ) -> Result<(), AppError> {
+    // 物件鎖內確認未退役並寫圍欄：退役也持同一把鎖，所以退役後不會再有新圍欄，drain 看到的圍欄就是最終的。
+    // 10 分鐘 > presign 有效 300 秒 + 最多 4 次各 10 秒逾時的請求：過期後不可能再有寫入落地。
+    let mut tx = pool.begin().await?;
+    lock_timeout(&mut tx).await?;
+    lock_key(&mut tx, key).await?;
+    if is_retired(&mut *tx, key).await? {
+        return Err(image_removed());
+    }
+    let fenced = sqlx::query("UPDATE user_media SET publishing_until=greatest(publishing_until, now() + interval '10 minutes') WHERE object_key=$1")
+        .bind(key)
+        .execute(&mut *tx)
+        .await?;
+    if fenced.rows_affected() == 0 {
+        // 呼叫端須先 remember_media；沒有紀錄就無法在崩潰後找到這張圖
+        return Err(AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"));
+    }
+    tx.commit().await?;
     let (pool, key) = (pool.clone(), key.to_owned());
     tokio::spawn(async move {
         let published = publish_image(&key, bytes, ct).await;
@@ -640,7 +657,9 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
     for key in due {
         let result = async {
             // 本次嘗試的戳記：刪除期間若被 publish_checked 重新排入（戳記清空），完成時不可把它標成已刪
-            let tried = chrono::Utc::now();
+            // 用 DB 時鐘，才能與 publishing_until 比較
+            let tried: chrono::DateTime<chrono::Utc> =
+                sqlx::query_scalar("SELECT now()").fetch_one(pool).await?;
             sqlx::query("UPDATE user_media SET purge_tried_at=$2 WHERE object_key=$1 AND deleted_at IS NOT NULL AND purged_at IS NULL")
                 .bind(&key)
                 .bind(tried)
@@ -650,7 +669,9 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
             if !(response.status().is_success() || response.status() == 404) {
                 return Ok(false);
             }
-            sqlx::query("UPDATE user_media SET purged_at=now() WHERE object_key=$1 AND purge_tried_at=$2 AND purged_at IS NULL")
+            // 發佈圍欄未在本次嘗試前過期：可能還有晚於這次 DELETE 落地的寫入，留給下一輪
+            sqlx::query("UPDATE user_media SET purged_at=now() WHERE object_key=$1 AND purge_tried_at=$2 AND purged_at IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM user_media f WHERE f.object_key=$1 AND f.publishing_until >= $2)")
                 .bind(&key)
                 .bind(tried)
                 .execute(pool)
