@@ -575,7 +575,11 @@ async fn login_success_clears_lockout_but_keeps_failures_for_analytics(pool: PgP
     assert_eq!(login("correct-horse").await, StatusCode::OK);
     // 已清除的 4 筆不再計入 (email, IP) 鎖定：再錯 2 次仍是 401（若照算，第 2 次會變 429）
     for _ in 0..2 {
-        assert_eq!(login("bad-password").await, StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            login("bad-password").await,
+            StatusCode::UNAUTHORIZED,
+            "已清除的失敗不可再計入鎖定"
+        );
     }
     let (total, open): (i64, i64) = sqlx::query_as(
         "SELECT count(*), count(*) FILTER (WHERE cleared_at IS NULL) FROM login_failures WHERE email=$1",

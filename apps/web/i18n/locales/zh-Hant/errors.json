@@ -25,6 +25,7 @@
     "AUTO_TOPUP_LIMIT_REACHED": "單次儲值金額不可大於每月上限",
     "BAD_REQUEST": "請求格式不正確，請重新整理後再試",
     "BUSY": "系統忙碌，請稍後再試",
+    "IMAGE_REMOVED": "圖片已移除，請重新上傳",
     "CAPTCHA_REQUIRED": "請先完成人機驗證後再試",
     "CAPTCHA_UNAVAILABLE": "人機驗證服務暫時無法使用，請稍後再試",
     "CLAIM_ALREADY_EXISTS": "你已捐助此品項，請修改既有捐助",

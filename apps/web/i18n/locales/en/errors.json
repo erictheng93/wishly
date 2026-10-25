@@ -25,6 +25,7 @@
     "AUTO_TOPUP_LIMIT_REACHED": "The top-up amount cannot exceed the monthly limit.",
     "BAD_REQUEST": "The request is invalid. Refresh the page and try again.",
     "BUSY": "The system is busy. Please try again later.",
+    "IMAGE_REMOVED": "This image has been removed. Please upload it again.",
     "CAPTCHA_REQUIRED": "Please complete human verification and try again.",
     "CAPTCHA_UNAVAILABLE": "The human verification service is temporarily unavailable. Please try again later.",
     "CLAIM_ALREADY_EXISTS": "You have already pledged this item. Edit your existing pledge.",

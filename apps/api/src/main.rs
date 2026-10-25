@@ -30,6 +30,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(bind).await.unwrap();
     wishly_api::notify::spawn_worker(pool.clone());
     wishly_api::ratelimit::spawn_cleanup(pool.clone());
+    wishly_api::uploads::spawn_media_worker(pool.clone());
     wishly_api::topup::spawn_expire(pool.clone());
     axum::serve(
         listener,

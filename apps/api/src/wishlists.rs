@@ -199,7 +199,7 @@ impl W {
     }
 }
 
-async fn load_owned(pool: &PgPool, id: Uuid, user: Uuid) -> R<W> {
+async fn load_owned(pool: impl sqlx::PgExecutor<'_>, id: Uuid, user: Uuid) -> R<W> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {WCOLS} FROM wishlists WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL"
     )))
@@ -401,13 +401,16 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
         ));
     }
     for _ in 0..5 {
+        let mut tx = uploads::media_tx(&st.pool, u.id).await?;
+        uploads::remember_media(&mut tx, u.id, cover.as_deref()).await?;
         let r = sqlx::query_scalar::<_, Uuid>(
             "INSERT INTO wishlists (owner_id, type, visibility, slug, title, description, cover_image_key, cover_image_status, event_date, show_claimer_names, surprise_mode, claim_ttl_hours, closes_at, cover_preset)
              VALUES ($1,$2::wishlist_type,$3::visibility,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12,$13) RETURNING id")
             .bind(u.id).bind(ty).bind(vis).bind(new_slug()).bind(&title).bind(&desc).bind(&cover).bind(event).bind(names).bind(surprise).bind(ttl.map(|t| t as i32)).bind(closes).bind(&preset)
-            .fetch_one(&st.pool).await;
+            .fetch_one(&mut *tx).await;
         match r {
             Ok(id) => {
+                tx.commit().await?;
                 let w = load_owned(&st.pool, id, u.id).await?;
                 return Ok((
                     StatusCode::CREATED,
@@ -587,7 +590,9 @@ async fn update(
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {
     let m = obj(&b)?;
-    let mut w = load_owned(&st.pool, id, u.id).await?;
+    let mut tx = uploads::media_tx(&st.pool, u.id).await?;
+    let mut w = load_owned(&mut *tx, id, u.id).await?;
+    uploads::remember_media(&mut tx, u.id, w.cover_image_key.as_deref()).await?;
     let was_servable = crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status);
     if w.status == "archived" {
         let only = |s: &str| {
@@ -680,12 +685,12 @@ async fn update(
                 "SELECT count(*) FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL",
             )
             .bind(id)
-            .fetch_one(&st.pool)
+            .fetch_one(&mut *tx)
             .await?;
             let no_addr: bool = sqlx::query_scalar(
                 "SELECT NOT EXISTS (SELECT 1 FROM shipping_addresses WHERE wishlist_id = $1)
                     AND EXISTS (SELECT 1 FROM wishlist_items WHERE wishlist_id = $1 AND deleted_at IS NULL AND funding_mode = 'crowdfund')")
-                .bind(id).fetch_one(&st.pool).await?;
+                .bind(id).fetch_one(&mut *tx).await?;
             let mut miss = vec![];
             if no_addr {
                 miss.push(json!({ "pointer": "/shipping_address", "code": "SHIPPING_ADDRESS_REQUIRED", "detail": "含眾籌品項的清單需先填寫收件資訊" }));
@@ -722,7 +727,7 @@ async fn update(
             "結束時間已過，請延後或清除後再開啟",
         ));
     }
-    let mut tx = st.pool.begin().await?;
+    uploads::remember_media(&mut tx, u.id, w.cover_image_key.as_deref()).await?;
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
                  closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END, cover_preset=$15,
@@ -1230,7 +1235,8 @@ async fn item_create(
     Json(b): Json<Value>,
 ) -> R<Response> {
     let m = obj(&b)?;
-    let w = load_owned(&st.pool, wid, u.id).await?;
+    let mut tx = uploads::media_tx(&st.pool, u.id).await?;
+    let w = load_owned(&mut *tx, wid, u.id).await?;
     if matches!(w.status.as_str(), "closed" | "archived") {
         return Err(closed());
     }
@@ -1279,8 +1285,9 @@ async fn item_create(
         ));
     }
     if mode == "crowdfund" {
-        init_crowdfund(&st.pool, m, &mut i, w.event_date).await?;
+        init_crowdfund(&mut *tx, m, &mut i, w.event_date).await?;
     }
+    uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, description, brand, spec, image_key, image_status, product_url, unit_price_amount, priority, qty_needed, sort_order,
                 funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref)
@@ -1290,7 +1297,8 @@ async fn item_create(
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
         .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref)
-        .fetch_one(&st.pool).await?;
+        .fetch_one(&mut *tx).await?;
+    tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1"
     )))
@@ -1408,7 +1416,7 @@ async fn item_update(
     if matches!(status.as_str(), "closed" | "archived") {
         return Err(closed());
     }
-    let mut tx = st.pool.begin().await?;
+    let mut tx = uploads::media_tx(&st.pool, u.id).await?;
     // 鎖住品項後再讀：funding 規則（已有認捐 / pledged_points）要看到最新值，並與捐助 / 認捐的條件式 UPDATE 互斥
     let mut i: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL FOR UPDATE"
@@ -1422,6 +1430,7 @@ async fn item_update(
             .bind(i.wishlist_id)
             .fetch_one(&mut *tx)
             .await?;
+    uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let old_qty = i.qty_needed;
     // 鎖定期間品項的 updated_at 被遮蔽（見 I::json），故不做品項版本檢查
     let exp = if locked { None } else { expected(m)? };
@@ -1466,6 +1475,7 @@ async fn item_update(
     if locked && i.qty_needed < old_qty {
         return Err(surprise_locked_err());
     }
+    uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let changed = visible(&i) != seen;
     // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與捐助競爭
     let res = sqlx::query("UPDATE wishlist_items SET content_changed_at = CASE WHEN $19 THEN now() ELSE content_changed_at END, title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
