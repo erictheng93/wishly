@@ -25,7 +25,7 @@
       "sending": "Mengirim…",
       "sendCode": "Kirim kode verifikasi tautan",
       "setPw": "Atur kata sandi masuk Email",
-      "setPwNote": "(diatur dengan kode verifikasi Email, semua perangkat akan keluar)",
+      "setPwNote": " (diatur dengan kode verifikasi Email, semua perangkat akan keluar)",
       "noEmailWarn": "Email belum ditautkan, tidak bisa menerima email pemberitahuan atau mengatur ulang kata sandi.",
       "err": {
         "oauth_failed": "Gagal menautkan, ulangi dan pastikan akun yang dipakai untuk masuk",
@@ -66,7 +66,7 @@
       "handlePh": "Contoh: amy_wang",
       "handleBadHint": "Huruf kecil, angka, garis bawah, 3–30 karakter",
       "handleBadErr": "Handle hanya boleh huruf kecil, angka, garis bawah, 3–30 karakter",
-      "yourPage": "Halaman profilmu:",
+      "yourPage": "Halaman profilmu: ",
       "copy": "Salin",
       "copied": "Tersalin",
       "copyFail": "Tidak bisa menyalin, pilih URL secara manual",

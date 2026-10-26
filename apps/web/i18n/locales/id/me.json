@@ -107,7 +107,7 @@
       "terms": "Ketentuan layanan",
       "privacy": "Kebijakan privasi",
       "inspire": "Inspirasi",
-      "brands": "Paviliun merek"
+      "brands": "Galeri merek"
     },
     "vis": {
       "public": "Publik",
@@ -130,8 +130,8 @@
       "loadFailed": "Gagal memuat",
       "empty1": "Kamu belum mengklaim apa pun. Setelah menerima tautan wishlist dari teman, masuk untuk mengklaim dan kelola di sini.",
       "empty2": "Tidak melihat klaim yang dulu dibuat sebagai tamu? Mungkin karena beda browser atau browser bawaan LINE. Untuk klaim yang memakai Email, kembali lewat tautan \"Kelola klaim saya\" di email konfirmasi.",
-      "signedIn": "(sudah masuk)",
-      "thisDevice": "(perangkat ini)",
+      "signedIn": " (sudah masuk)",
+      "thisDevice": " (perangkat ini)",
       "editNick": "Ubah nama panggilan",
       "nick": "Nama panggilan",
       "save": "Simpan",
@@ -169,7 +169,7 @@
       "noPledges": "Belum ada riwayat patungan. Buka wishlist yang dibagikan temanmu untuk ikut patungan.",
       "noImg": "Tanpa gambar",
       "quoted": "\"{msg}\"",
-      "anon": "(anonim)",
+      "anon": " (anonim)",
       "pledgedAt": "Diklaim {time}",
       "reachedAt": " · Target tercapai {time}",
       "refunded": "Selisih {pts} poin dikembalikan",
@@ -295,17 +295,17 @@
       "invoiceLegend": "Faktur elektronik",
       "carrierType": "Penyimpanan faktur",
       "carrier": {
-        "member": "Penyimpanan member (default)",
+        "member": "Simpan di akun member (default)",
         "mobile_barcode": "Barcode ponsel",
-        "citizen_cert": "Sertifikat warga",
+        "citizen_cert": "Sertifikat Digital Warga Taiwan",
         "donate": "Donasikan faktur",
-        "b2b": "NPWP perusahaan"
+        "b2b": "Nomor pajak perusahaan Taiwan (統編)"
       },
       "field": {
         "mobile": "Barcode ponsel",
-        "cert": "Barcode sertifikat warga",
+        "cert": "Barcode Sertifikat Digital Warga",
         "donate": "Kode donasi",
-        "taxId": "Nomor NPWP",
+        "taxId": "Nomor pajak perusahaan (統編)",
         "buyerName": "Nama perusahaan (opsional)"
       },
       "summary": "Konfirmasi rincian",
@@ -319,9 +319,9 @@
         "amountInt": "Masukkan jumlah berupa bilangan bulat",
         "amountRange": "Jumlah harus antara 100 sampai 50,000",
         "mobile": "Barcode ponsel berupa / diikuti 7 karakter huruf besar atau angka (contoh: /ABC1234)",
-        "cert": "Barcode sertifikat warga berupa 2 huruf besar diikuti 14 angka",
+        "cert": "Barcode Sertifikat Digital Warga berupa 2 huruf besar diikuti 14 angka",
         "donate": "Kode donasi berupa 3 sampai 7 angka",
-        "taxId": "Nomor NPWP berupa 8 angka",
+        "taxId": "Nomor pajak perusahaan (統編) berupa 8 angka",
         "disabled": "Fitur top up belum dibuka",
         "cap": "Poin setelah top up akan melebihi batas {cap} poin (termasuk pesanan top up yang belum dibayar). Kurangi jumlahnya.",
         "limit": "Batas top up harian untuk akun baru adalah NT$ {limit}, hari ini kamu masih bisa top up NT$ {remaining}.",
