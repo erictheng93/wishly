@@ -61,7 +61,7 @@
       "loggedOutN": "Signed out {n} other devices."
     },
     "social": {
-      "title": "Profile and pledges",
+      "title": "Profile and gifts",
       "handle": "Handle (used in your profile URL, optional)",
       "handlePh": "e.g. amy_wang",
       "handleBadHint": "Lowercase letters, digits and underscores, 3–30 characters",
@@ -81,7 +81,7 @@
       "birthdayErr": "Pick both month and day for your birthday, or neither.",
       "birthdayVis": "Who can see your birthday",
       "onlyMe": "Only me",
-      "claimVis": "Who can see your pledges by default"
+      "claimVis": "Who can see your gifts by default"
     },
     "vis": {
       "public": "Public",
@@ -90,7 +90,7 @@
     },
     "export": {
       "title": "Export data",
-      "hint": "Includes your profile, lists and pledge history (JSON).",
+      "hint": "Includes your profile, lists and gift history (JSON).",
       "btn": "Export my data",
       "busy": "Exporting…"
     },

@@ -27,9 +27,9 @@
       "spec": "Quy cách (tùy chọn)",
       "url": "Liên kết sản phẩm (tùy chọn)",
       "mode": "Cách nhận",
-      "modeQty": "Đóng góp theo số lượng",
+      "modeQty": "Tặng trực tiếp",
       "modeCrowd": "Góp quỹ cho điều ước",
-      "modeLocked": "Đã có người đóng góp nên không thể đổi cách nhận.",
+      "modeLocked": "Đã có người nhận tặng hoặc tài trợ nên không thể đổi cách nhận.",
       "targetPoints": "Điểm mục tiêu (bắt buộc, 1 điểm = NT$1)",
       "raisedSuffix": "(đã góp {n})",
       "deadline": "Hạn góp quỹ (giờ Đài Bắc, tùy chọn)",
@@ -38,7 +38,7 @@
       "crowdNote": "Khi đạt mục tiêu, nền tảng sẽ mua và gửi quà cho bạn. Điểm không được quy đổi thành tiền mặt. Bạn cần điền thông tin nhận hàng của danh sách trước.",
       "fundLocked": "Đã đạt mục tiêu hoặc đã hết hạn nên không thể sửa mục tiêu và thời hạn.",
       "qty": "Số lượng cần",
-      "claimedSuffix": "(đã có {n} đóng góp)",
+      "claimedSuffix": "(đã có {n} nhận tặng)",
       "unitPrice": "Giá tham khảo NT$ (tùy chọn)",
       "priority": "Mức ưu tiên",
       "high": "Cao",
@@ -91,7 +91,7 @@
       "pending": "Đang xử lý ảnh",
       "ready": "Ảnh đã sẵn sàng",
       "rejected": "Ảnh không được duyệt",
-      "reserved": "Đã đóng góp",
+      "reserved": "Đã có người nhận tặng",
       "purchased": "Đã mua",
       "delivered": "Đã giao",
       "cancelled": "Đã hủy",
@@ -127,7 +127,7 @@
         "signed_up": "Đăng ký",
         "created_list": "Tạo danh sách",
         "published_list": "Đăng danh sách",
-        "received_claim": "Nhận được đóng góp"
+        "received_claim": "Có người nhận tặng"
       },
       "retention": {
         "d1": "Giữ chân ngày kế tiếp (ngày 1)",
@@ -135,7 +135,7 @@
         "d30": "Ngày 30–59"
       },
       "claimStatus": {
-        "reserved": "Đã đóng góp",
+        "reserved": "Đã có người nhận tặng",
         "purchased": "Đã mua",
         "delivered": "Đã giao",
         "cancelled": "Đã hủy",

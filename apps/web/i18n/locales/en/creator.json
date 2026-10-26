@@ -27,9 +27,9 @@
       "spec": "Specs (optional)",
       "url": "Product link (optional)",
       "mode": "How to get it",
-      "modeQty": "Quantity pledges",
+      "modeQty": "Give directly",
       "modeCrowd": "Wish crowdfunding",
-      "modeLocked": "Someone has already pledged or contributed, so this can no longer be changed.",
+      "modeLocked": "Someone has already claimed or contributed, so this can no longer be changed.",
       "targetPoints": "Target points (required, 1 point = NT$1)",
       "raisedSuffix": "({n} raised)",
       "deadline": "Funding deadline (Taipei time, optional)",
@@ -38,7 +38,7 @@
       "crowdNote": "Once the goal is reached, the platform buys and ships it for you. Points are never paid out to you as cash. You need to fill in the list's shipping info first.",
       "fundLocked": "The goal was reached or the deadline has passed, so the target and deadline can no longer be changed.",
       "qty": "Quantity needed",
-      "claimedSuffix": "({n} pledged)",
+      "claimedSuffix": "({n} claimed)",
       "unitPrice": "Reference price NT$ (optional)",
       "priority": "Priority",
       "high": "High",
@@ -91,7 +91,7 @@
       "pending": "Processing image",
       "ready": "Image ready",
       "rejected": "Image rejected",
-      "reserved": "Pledged",
+      "reserved": "Claimed",
       "purchased": "Purchased",
       "delivered": "Delivered",
       "cancelled": "Cancelled",
@@ -127,7 +127,7 @@
         "signed_up": "Signed up",
         "created_list": "Created a list",
         "published_list": "Published a list",
-        "received_claim": "Received a pledge"
+        "received_claim": "Someone will give"
       },
       "retention": {
         "d1": "Next-day retention (day 1)",
@@ -135,7 +135,7 @@
         "d30": "Days 30–59"
       },
       "claimStatus": {
-        "reserved": "Pledged",
+        "reserved": "Claimed",
         "purchased": "Purchased",
         "delivered": "Delivered",
         "cancelled": "Cancelled",

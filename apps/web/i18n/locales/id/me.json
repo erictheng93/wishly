@@ -2,7 +2,7 @@
   "me": {
     "home": {
       "seoTitle": "Wishly – Wishlist dan berbagi keinginan",
-      "seoDesc": "Buat wishlist dan bagikan lewat satu tautan. Untuk hadiah, ulang tahun, atau pernikahan: teman cukup buka tautannya untuk melihat, lalu masuk untuk mengklaim barang, tanpa dobel dan tanpa kelebihan klaim.",
+      "seoDesc": "Buat wishlist dan bagikan lewat satu tautan. Untuk hadiah, ulang tahun, atau pernikahan: teman cukup buka tautannya untuk melihat, lalu masuk untuk mengklaim hadiah yang mau mereka kasih, tanpa dobel dan tanpa kelebihan klaim.",
       "ogTitle": "Wishly",
       "ogDesc": "Tulis apa yang kamu mau, supaya yang ingin memberi tidak perlu menebak.",
       "myLists": "Wishlist saya",
@@ -12,16 +12,16 @@
       "kicker": "Wishlist × berbagi keinginan",
       "h1": "Wishly",
       "lead": "Tulis apa yang kamu mau, supaya yang ingin memberi tidak perlu menebak.",
-      "sub": "Bagikan seluruh wishlist lewat satu tautan. Teman cukup membuka tautan untuk melihat, lalu masuk untuk mengklaim barang, tanpa dobel dan tanpa kelebihan klaim.",
+      "sub": "Bagikan seluruh wishlist lewat satu tautan. Teman cukup membuka tautan untuk melihat, lalu masuk untuk mengklaim hadiah yang mau mereka kasih, tanpa dobel dan tanpa kelebihan klaim.",
       "ctaExplore": "Jelajahi wishlist publik",
       "ctaDemo": "Lihat contoh wishlist",
-      "demoAria": "Contoh wishlist: tiga barang, salah satunya sudah diklaim",
+      "demoAria": "Contoh wishlist: tiga barang, salah satunya sudah ada yang kasih",
       "demoTitle": "Wishlist ulang tahun An",
       "demoCount": "3 barang",
       "demoThumb1": "Mesin kopi",
       "demoItem1": "Set kopi seduh manual",
       "demoTop": "Paling diinginkan",
-      "demoBy": "Sudah diklaim oleh Kai",
+      "demoBy": "Kai yang kasih",
       "demoThumb2": "Headphone",
       "demoItem2": "Headphone noise cancelling",
       "demoRaised": "Terkumpul $4,800",
@@ -51,7 +51,7 @@
       "originTitle": "Awal mula",
       "origin": [
         "Yang butuh sungkan bilang, yang ingin memberi tidak tahu apa yang kurang. Akhirnya semua kirim botol susu dan tidak ada yang kirim susunya; formulir estafet di grup sering terlewat atau dobel.",
-        "Masalah yang sama pada hadiah dan donasi adalah informasi kebutuhan dan pemberian yang tidak sinkron.",
+        "Masalah yang sama pada urusan hadiah adalah informasi kebutuhan dan pemberian yang tidak sinkron.",
         "Karena itu aku membuat Wishly: tulis yang kamu mau jadi daftar, kirim satu tautan, lalu orang lain bisa melihat dan mengklaimnya. Jumlah tidak akan berlebih, jadi yang butuh dan yang memberi tetap sinkron."
       ],
       "stepsTitle": "Berbagi keinginan dalam tiga langkah",
@@ -65,8 +65,8 @@
           "d": "Kirim lewat LINE, FB, atau saluran apa pun. Gambar pratinjau ikut muncul otomatis."
         },
         "3": {
-          "t": "Teman masuk lalu mengklaim",
-          "d": "Buka tautan untuk melihat, masuk untuk mengklaim barang. Setelah diklaim, orang lain tidak bisa memilihnya lagi."
+          "t": "Teman masuk lalu kasih",
+          "d": "Buka tautan untuk melihat, masuk lalu tekan \"Aku yang kasih\". Setelah diklaim, orang lain tidak bisa memilihnya lagi."
         }
       },
       "featsTitle": "Bikin wishlist lebih berguna",
@@ -81,7 +81,7 @@
         },
         "2": {
           "t": "Pembaruan langsung",
-          "d": "Klaim dan progres tersinkron seketika, tanpa muat ulang halaman."
+          "d": "Siapa yang kasih dan progresnya tersinkron seketika, tanpa muat ulang halaman."
         },
         "3": {
           "t": "Patungan",
@@ -92,7 +92,7 @@
       "faq": {
         "0": {
           "q": "Apakah teman perlu daftar?",
-          "a": "Untuk melihat wishlist tidak perlu. Untuk mengklaim barang, mereka harus masuk dulu."
+          "a": "Untuk melihat wishlist tidak perlu. Untuk kasih hadiah (mengklaim barang), mereka harus masuk dulu."
         },
         "1": {
           "q": "Apakah dua orang bisa memberi barang yang sama?",
@@ -118,7 +118,7 @@
     "loading": "Memuat…",
     "retry": "Coba lagi",
     "claims": {
-      "title": "Klaim saya",
+      "title": "Hadiah dariku",
       "status": {
         "reserved": "Sudah diklaim",
         "purchased": "Sudah dibeli",
@@ -128,8 +128,8 @@
       },
       "recoverFailed": "Tautan pengelolaan ini sudah tidak berlaku (hanya bisa dipakai sekali dan berlaku 30 hari). Kembali ke tautan wishlist dari temanmu, atau hubungi layanan pelanggan.",
       "loadFailed": "Gagal memuat",
-      "empty1": "Kamu belum mengklaim apa pun. Setelah menerima tautan wishlist dari teman, masuk untuk mengklaim dan kelola di sini.",
-      "empty2": "Tidak melihat klaim yang dulu dibuat sebagai tamu? Mungkin karena beda browser atau browser bawaan LINE. Untuk klaim yang memakai Email, kembali lewat tautan \"Kelola klaim saya\" di email konfirmasi.",
+      "empty1": "Kamu belum punya hadiah yang mau dikasih. Setelah menerima tautan wishlist dari teman, masuk untuk mengklaim dan kelola di sini.",
+      "empty2": "Tidak melihat hadiah yang dulu diklaim sebagai tamu? Mungkin karena beda browser atau browser bawaan LINE. Untuk yang memakai Email, kembali lewat tautan \"Kelola hadiah dariku\" di email konfirmasi.",
       "signedIn": " (sudah masuk)",
       "thisDevice": " (perangkat ini)",
       "editNick": "Ubah nama panggilan",
@@ -144,9 +144,9 @@
       "ackItemChange": "Mengerti",
       "past": "Riwayat sebelumnya ({n})",
       "wipe": "Hapus nama panggilan dan kontak saya",
-      "confirmCancelPurchased": "Pemilik akan menerima pemberitahuan. Yakin ingin membatalkan klaim?",
-      "confirmCancel": "Yakin ingin membatalkan klaim ini?",
-      "confirmWipe": "Yakin ingin menghapus nama panggilan dan kontakmu? Riwayat klaim akan tetap ada sebagai \"tamu yang dihapus\", dan perangkat ini tidak bisa mengelolanya lagi.",
+      "confirmCancelPurchased": "Pemilik akan menerima pemberitahuan. Yakin tidak jadi kasih?",
+      "confirmCancel": "Yakin tidak jadi kasih hadiah ini?",
+      "confirmWipe": "Yakin ingin menghapus nama panggilan dan kontakmu? Riwayat hadiah akan tetap ada sebagai \"tamu yang dihapus\", dan perangkat ini tidak bisa mengelolanya lagi.",
       "deadline": "Tandai sudah dibeli sebelum {date}",
       "extend": "Perpanjang 7 hari"
     },
@@ -155,13 +155,13 @@
       "pts": "{pts} poin",
       "visUpdated": "Visibilitas diperbarui",
       "withdrawn": "{pts} poin ditarik kembali",
-      "locked": "Klaim ini tidak bisa ditarik lagi (barang sudah mencapai target atau melewati batas penarikan)",
+      "locked": "Patungan ini tidak bisa ditarik lagi (barang sudah mencapai target atau melewati batas penarikan)",
       "loadOthersFailed": "Gagal memuat barang lain di wishlist yang sama, coba lagi nanti",
       "reallocated": "Sudah dialihkan",
       "reallocNotAllowed": "Tidak bisa dialihkan ke barang ini (mungkin sudah mencapai target, sudah ditutup, atau melewati batas waktu pemilihan). Pilih yang lain lalu coba lagi",
       "available": "Poin tersedia (1 poin = NT$1)",
       "frozen": "Dibekukan",
-      "held": "Sedang diklaim {pts} poin (sudah diklaim, bisa ditarik sebelum target tercapai)",
+      "held": "Sedang patungan {pts} poin (bisa ditarik sebelum target tercapai)",
       "frozenWarn": "Dompet dibekukan sehingga sementara tidak bisa ikut patungan. Hubungi layanan pelanggan.",
       "issuedByPlatform": "Saat ini poin diberikan oleh platform.",
       "topup": "Top up",
@@ -170,7 +170,7 @@
       "noImg": "Tanpa gambar",
       "quoted": "\"{msg}\"",
       "anon": " (anonim)",
-      "pledgedAt": "Diklaim {time}",
+      "pledgedAt": "Patungan {time}",
       "reachedAt": " · Target tercapai {time}",
       "refunded": "Selisih {pts} poin dikembalikan",
       "anonNote": "Patungan anonim di halaman profil hanya terlihat oleh dirimu sendiri.",
@@ -181,7 +181,7 @@
       "ledger": "Buku poin",
       "noLedger": "Belum ada perubahan",
       "ledgerMeta": "{time} · Saldo {bal}",
-      "wdTitle": "Tarik kembali patungan",
+      "wdTitle": "Tarik patungan",
       "wdText": "Tarik kembali {pts} poin untuk \"{item}\"? Poin akan langsung dikembalikan ke dompetmu.",
       "wdOk": "Konfirmasi penarikan",
       "reTitle": "Alihkan ke barang lain",
@@ -192,7 +192,7 @@
       "targetOpt": "{title} (kurang {pts} poin)",
       "refund": "Ajukan pengembalian dana tunai",
       "refundable": "Poin yang bisa dikembalikan tunai: {pts} poin",
-      "refundNone": "Saat ini tidak ada poin yang bisa dikembalikan tunai. Hanya poin hasil top up yang bisa dikembalikan tunai; poin dari kartu hadiah dan dari dukungan tidak bisa.",
+      "refundNone": "Saat ini tidak ada poin yang bisa dikembalikan tunai. Hanya poin hasil top up yang bisa dikembalikan tunai; poin dari kartu hadiah dan dari patungan tidak bisa.",
       "refundFrozen": "Dompet dibekukan, sementara tidak bisa mengajukan pengembalian dana tunai."
     },
     "friends": {
@@ -228,7 +228,7 @@
       "newList": "membuat wishlist baru",
       "delivered": "menerima hadiah darimu",
       "open": "Belum ada yang mengklaim",
-      "taken": "Sudah diklaim",
+      "taken": "Sudah ada yang kasih",
       "give": "Beri hadiah",
       "viewList": "Lihat wishlist",
       "more": "Dan {n} keinginan baru lainnya",
@@ -265,8 +265,8 @@
       "closed": "Ditutup",
       "personal": "Wishlist",
       "completion": "Terpenuhi {pct}% ({n} barang)",
-      "donations": "Riwayat klaim",
-      "noDonations": "Saat ini tidak ada riwayat klaim yang bisa dilihat.",
+      "donations": "Riwayat hadiah",
+      "noDonations": "Saat ini tidak ada riwayat hadiah yang bisa dilihat.",
       "pledgePts": " · {pts} poin",
       "qty": " × {qty}",
       "to": "Untuk {name} · "
@@ -373,8 +373,8 @@
     "refund": {
       "title": "Ajukan pengembalian dana tunai",
       "refundable": "Saldo yang bisa dikembalikan tunai (poin)",
-      "onlyTopup": "Hanya poin hasil top up yang bisa dikembalikan tunai; poin dari kartu hadiah dan dari dukungan tidak bisa.",
-      "none": "Saat ini tidak ada poin yang bisa dikembalikan tunai. Hanya poin hasil top up yang bisa dikembalikan tunai; poin dari kartu hadiah dan dari dukungan tidak bisa.",
+      "onlyTopup": "Hanya poin hasil top up yang bisa dikembalikan tunai; poin dari kartu hadiah dan dari patungan tidak bisa.",
+      "none": "Saat ini tidak ada poin yang bisa dikembalikan tunai. Hanya poin hasil top up yang bisa dikembalikan tunai; poin dari kartu hadiah dan dari patungan tidak bisa.",
       "pending": "Sedang ditinjau: kamu punya {n} pengajuan pengembalian dana yang sedang diproses.",
       "amount": "Poin yang dikembalikan",
       "amountHint": "1 sampai {max}",
@@ -406,7 +406,7 @@
         "amountRange": "Poin harus antara 1 sampai 50,000",
         "amountOver": "Tidak boleh melebihi saldo yang bisa dikembalikan tunai",
         "frozen": "Akun dibekukan, sementara tidak bisa mengajukan pengembalian dana tunai. Hubungi layanan pelanggan.",
-        "notRefundable": "Poin yang bisa dikembalikan tunai hanya {pts} poin (poin kartu hadiah dan dukungan tidak bisa dikembalikan tunai). Kurangi jumlah poin.",
+        "notRefundable": "Poin yang bisa dikembalikan tunai hanya {pts} poin (poin kartu hadiah dan patungan tidak bisa dikembalikan tunai). Kurangi jumlah poin.",
         "insufficient": "Saldo poin tidak cukup (saat ini {bal} poin).",
         "rate": "Pengajuan terlalu sering. Coba lagi sekitar {min} menit lagi.",
         "rateNoMin": "Pengajuan terlalu sering. Coba lagi nanti.",

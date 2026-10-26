@@ -61,7 +61,7 @@
       "loggedOutN": "Đã đăng xuất {n} thiết bị khác."
     },
     "social": {
-      "title": "Trang cá nhân và quà tặng",
+      "title": "Trang cá nhân và tặng quà",
       "handle": "Tên tài khoản (dùng trong địa chỉ trang cá nhân, có thể để trống)",
       "handlePh": "Ví dụ: amy_wang",
       "handleBadHint": "Chữ thường, số và dấu gạch dưới, 3–30 ký tự",
@@ -104,8 +104,8 @@
       "ok": "Xóa vĩnh viễn",
       "word": "XÓA",
       "prompt": "Nhập \"{word}\" để xác nhận",
-      "hasPoints": "{detail} (bạn có thể rút lại lượt góp trong mục \"Điểm của tôi\")",
-      "hasBalance": "{detail} (số dư {balance} điểm, {pledged} lượt góp chưa hoàn tất, {orders} đơn chưa đóng). Vui lòng xử lý trước khi xóa.",
+      "hasPoints": "{detail} (bạn có thể rút lại khoản tài trợ trong mục \"Điểm của tôi\")",
+      "hasBalance": "{detail} (số dư {balance} điểm, {pledged} khoản tài trợ chưa hoàn tất, {orders} đơn chưa đóng). Vui lòng xử lý trước khi xóa.",
       "password": "Mật khẩu hiện tại",
       "badPassword": "Mật khẩu không đúng",
       "relogin": "Đăng nhập lại"
