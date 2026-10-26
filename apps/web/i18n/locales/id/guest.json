@@ -110,7 +110,7 @@
       "sent": "Laporan diterima, kami akan segera menanganinya"
     },
     "explore": {
-      "seoTitle": "Jelajahi wishlist publik｜Wishly",
+      "seoTitle": "Jelajahi wishlist publik {'|'} Wishly",
       "seoDesc": "Lihat wishlist dan daftar bantuan yang dipublikasikan semua orang, masuk sebagai anggota untuk mengklaim.",
       "heading": "Jelajahi wishlist publik",
       "type": {
@@ -144,7 +144,7 @@
       "demoGift": "Hadiah",
       "demoWedding": "Pernikahan",
       "friend": "Teman",
-      "ogTitle": "Bantu pilihkan hadiah untuk {name}｜{title}",
+      "ogTitle": "Bantu pilihkan hadiah untuk {name} {'|'} {title}",
       "ogDesc": "Sudah {pct}% selesai, masih ada {left} barang menunggu klaimmu. Melihat tidak perlu daftar, masuk sebagai anggota untuk mengklaim.",
       "titleForbidden": "Perlu izin untuk melihat",
       "titleGone": "Wishlist ini sudah diturunkan",
@@ -164,7 +164,7 @@
       "gotIt": "Mengerti",
       "closed": "Wishlist ini sudah berakhir",
       "demosAria": "Contoh lainnya",
-      "demosLabel": "Contoh:",
+      "demosLabel": "Contoh: ",
       "date": "Tanggal {date} ・ ",
       "endsAt": "Berakhir {time} ・ ",
       "createdBy": "Dibuat oleh {name}",
