@@ -16,7 +16,7 @@
       "link": "綁定 {label}",
       "keepOne": "先新增另一種登入方式，才能解除目前的方式。",
       "linkEmail": "綁定 Email",
-      "codeSent": "綁定驗證碼已寄到 {email}",
+      "codeSent": "綁定驗證碼已寄到 {email}；重新寄送後請使用最新一封信的驗證碼",
       "confirmEmail": "確認綁定 Email",
       "verifying": "驗證中…",
       "resendIn": "{n} 秒後可重新寄送",

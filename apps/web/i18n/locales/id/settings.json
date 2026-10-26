@@ -16,7 +16,7 @@
       "link": "Tautkan {label}",
       "keepOne": "Tambahkan cara masuk lain dulu sebelum memutuskan yang sekarang.",
       "linkEmail": "Tautkan Email",
-      "codeSent": "Kode verifikasi tautan sudah dikirim ke {email}",
+      "codeSent": "Kode verifikasi tautan sudah dikirim ke {email}. Setelah kirim ulang, gunakan kode dari email terbaru.",
       "confirmEmail": "Konfirmasi tautan Email",
       "verifying": "Memverifikasi…",
       "resendIn": "Bisa kirim ulang dalam {n} detik",
