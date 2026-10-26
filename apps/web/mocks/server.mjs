@@ -109,9 +109,9 @@ http.createServer(async (req, res) => {
     const it = items.find(i => i.id === m[1]); if (!it) return err(res, 404, 'NOT_FOUND', '找不到品項')
     if (!(body.qty >= 1 && body.qty <= 99)) return err(res, 422, 'VALIDATION_FAILED', 'qty 不正確', { errors: [{ pointer: '/qty', code: 'RANGE', detail: 'qty 必須介於 1 與 99' }] })
     const rem = it.qty_needed - it.qty_claimed
-    if (body.qty > rem) return err(res, 409, 'ITEM_FULLY_CLAIMED', `此品項剩餘 ${rem} 件，無法再捐助 ${body.qty} 件。`, { remaining: rem })
+    if (body.qty > rem) return err(res, 409, 'ITEM_FULLY_CLAIMED', `此品項剩餘 ${rem} 件，無法再認領 ${body.qty} 件。`, { remaining: rem })
     const g = mockUser
-    if ([...claims.values()].some(c => c.guest === g && c.item_id === it.id && c.status !== 'cancelled')) return err(res, 409, 'CLAIM_ALREADY_EXISTS', '已捐助過', { claim_id: [...claims.values()].find(c => c.guest === g && c.item_id === it.id).id })
+    if ([...claims.values()].some(c => c.guest === g && c.item_id === it.id && c.status !== 'cancelled')) return err(res, 409, 'CLAIM_ALREADY_EXISTS', '你已經要送這個品項', { claim_id: [...claims.values()].find(c => c.guest === g && c.item_id === it.id).id })
     it.qty_claimed += body.qty
     const c = { id: 'c' + ++n, item_id: it.id, qty: body.qty, status: 'reserved', name: g.name, note: body.note ?? null, at: new Date().toISOString(), guest: g }
     claims.set(c.id, c); broadcast(it)
@@ -119,7 +119,7 @@ http.createServer(async (req, res) => {
     idem.set(key, out); return send(res, 201, out)
   }
   if ((m = p.match(/^\/claims\/([^/]+)$/))) {
-    const c = claims.get(m[1]); if (!guest) return err(res, 401, 'UNAUTHORIZED', '請先捐助')
+    const c = claims.get(m[1]); if (!guest) return err(res, 401, 'UNAUTHORIZED', '請先認領')
     if (!c || c.guest !== guest) return err(res, 404, 'NOT_FOUND', '找不到')
     const it = items.find(i => i.id === c.item_id)
     if (req.method === 'DELETE') { if (c.status !== 'cancelled') { it.qty_claimed -= c.qty; c.status = 'cancelled'; broadcast(it) } return send(res, 204) }

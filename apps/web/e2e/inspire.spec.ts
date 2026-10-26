@@ -87,9 +87,9 @@ test('加到清單 → 誰想要這個（公開 / 朋友）→ 去送並認捐',
   const target = donor.locator(`#item-${itemId}`)
   await expect(target).toHaveClass(/g-hl/)
   await expect(target.getByRole('link', { name: '商品連結' })).toHaveAttribute('href', /momoshop/)
-  await target.getByRole('button', { name: '我要送' }).click()
-  await donor.getByRole('dialog').getByRole('button', { name: '確認捐助' }).click()
-  await expect(donor.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
+  await target.getByRole('button', { name: '我來送' }).click()
+  await donor.getByRole('dialog').getByRole('button', { name: '確定要送' }).click()
+  await expect(donor.getByRole('heading', { name: '✓ 這份交給你了！' })).toBeVisible()
   await donorCtx.close()
 })
 

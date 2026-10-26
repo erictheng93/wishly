@@ -95,14 +95,14 @@ test('僅好友清單：匿名請先登入、非好友被擋並可前往個人�
   await expect(ps.getByRole('link', { name: new RegExp(`前往 ${owner.name} 的頁面加好友`) })).toHaveAttribute('href', `/u/${owner.handle}`)
 
   const pf = await pageFor(browser, friend)
-  // 不等 /me：頁面開啟 sheet 前會自己等登入身分（回歸測試：手快點「我要送」要等到身分確認，不能誤判成未登入）
+  // 不等 /me：頁面開啟 sheet 前會自己等登入身分（回歸測試：手快點「我來送」要等到身分確認，不能誤判成未登入）
   await pf.goto(`/s/${list.slug}`); await hydrated(pf)
   await expect(pf.getByRole('heading', { level: 1, name: list.title })).toBeVisible()
-  await pf.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
+  await pf.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我來送' }).click()
   const sheet = pf.getByRole('dialog')
-  await expect(sheet.getByLabel('這筆捐助誰看得到')).toHaveValue('friends') // 帳號預設
-  await sheet.getByRole('button', { name: '確認捐助' }).click()
-  await expect(pf.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
+  await expect(sheet.getByLabel('誰看得到是你送的')).toHaveValue('friends') // 帳號預設
+  await sheet.getByRole('button', { name: '確定要送' }).click()
+  await expect(pf.getByRole('heading', { name: '✓ 這份交給你了！' })).toBeVisible()
   await closeAll([owner, friend, stranger])
 })
 

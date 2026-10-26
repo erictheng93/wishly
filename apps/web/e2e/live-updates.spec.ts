@@ -10,7 +10,7 @@ test('即時更新：創建者開著進度頁，會員認捐後不重新整理�
 
   await test.step('創建者開進度頁（SSE 已連上、尚無捐助）', async () => {
     await op.goto(`/lists/${list.id}/progress`)
-    await expect(op.getByText('還沒有人捐助')).toBeVisible()
+    await expect(op.getByText('還沒有人認領')).toBeVisible()
     await expect(op.getByText('即時更新中')).toBeVisible()
     await op.evaluate(() => { (window as any).__noReload = true }) // 之後確認沒有整頁重載
   })
@@ -79,8 +79,8 @@ test('驚喜模式：進度頁看得到數量但遮蔽捐助者，訪客頁正�
     await expect(op.getByText('你正以建立者身分瀏覽')).toBeVisible()
     await expect(op.locator('li.g-card', { hasText: '生日蛋糕' })).toContainText('1 / 2')
     await expect(op.getByText('神秘朋友')).toHaveCount(0)
-    await expect(op.getByText('建立者不可捐助自己的清單')).toBeVisible()
-    await expect(op.getByRole('button', { name: '我要送' })).toHaveCount(0)
+    await expect(op.getByText('建立者不能送自己清單上的禮物')).toBeVisible()
+    await expect(op.getByRole('button', { name: '我來送' })).toHaveCount(0)
   })
   await Promise.all([ownerCtx.close(), guestCtx.close(), owner.api.dispose(), donor.api.dispose()])
 })

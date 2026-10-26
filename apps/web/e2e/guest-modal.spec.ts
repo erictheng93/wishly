@@ -20,10 +20,10 @@ test.describe('modal 鍵盤行為', () => {
   test('捐助 sheet：初始焦點在留言欄、Tab 不離開、Esc 關閉、焦點回到觸發按鈕、有 accessible name', async ({ page }) => {
     await page.goto(`/s/${slug}`)
     await hydrated(page)
-    const trigger = page.getByRole('button', { name: '我要送' })
+    const trigger = page.getByRole('button', { name: '我來送' })
     await trigger.focus()
     await trigger.click()
-    const dialog = page.getByRole('dialog', { name: /捐助「奶瓶組」/ })
+    const dialog = page.getByRole('dialog', { name: /我來送「奶瓶組」/ })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByLabel('留言（選填）')).toBeFocused()
     for (let i = 0; i < 16; i++) { await page.keyboard.press('Tab'); expect(await inDialog(page), `Tab #${i + 1}`).toBe(true) }
@@ -36,7 +36,7 @@ test.describe('modal 鍵盤行為', () => {
   test('捐助 sheet：已輸入內容時 Esc / 點背景要二次確認，取消確認則不關閉', async ({ page }) => {
     await page.goto(`/s/${slug}`)
     await hydrated(page)
-    await page.getByRole('button', { name: '我要送' }).click()
+    await page.getByRole('button', { name: '我來送' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByLabel('留言（選填）').fill('小明')
     const asked: string[] = []
@@ -57,7 +57,7 @@ test.describe('modal 鍵盤行為', () => {
   test('沒輸入內容時點背景直接關閉', async ({ page }) => {
     await page.goto(`/s/${slug}`)
     await hydrated(page)
-    await page.getByRole('button', { name: '我要送' }).click()
+    await page.getByRole('button', { name: '我來送' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.mouse.click(4, 4)
     await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -75,9 +75,9 @@ test.describe('modal 鍵盤行為', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(report).toBeFocused()
 
-    await page.getByRole('button', { name: '我要送' }).click()
-        await page.getByRole('button', { name: '確認捐助' }).click()
-    const ok = page.getByRole('dialog', { name: '✓ 捐助成功！' })
+    await page.getByRole('button', { name: '我來送' }).click()
+        await page.getByRole('button', { name: '確定要送' }).click()
+    const ok = page.getByRole('dialog', { name: '✓ 這份交給你了！' })
     await expect(ok).toBeVisible()
     expect(await focusedInDialog(page)).toBe(true)
     for (let i = 0; i < 8; i++) { await page.keyboard.press('Tab'); expect(await inDialog(page), `overlay Tab #${i + 1}`).toBe(true) }

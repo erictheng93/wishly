@@ -87,7 +87,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <li class="l2"><a href="#c-settings">4.10 帳號設定</a></li>
 <li class="l1"><a href="#guest">5. 訪客與贊助者手冊</a></li>
 <li class="l2"><a href="#g-claim">5.1 登入後認捐</a></li>
-<li class="l2"><a href="#g-manage">5.2 管理我的捐助</a></li>
+<li class="l2"><a href="#g-manage">5.2 管理我的送禮</a></li>
 <li class="l2"><a href="#g-fund">5.3 心願眾籌</a></li>
 <li class="l2"><a href="#g-report">5.4 檢舉清單</a></li>
 <li class="l1"><a href="#staff">6. 營運後台手冊</a></li>
@@ -180,8 +180,8 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><th>名詞</th><th>意義</th></tr>
 <tr><td>清單 wishlist</td><td>一組品項的集合；有 10 碼 <code>slug</code>，分享網址為 <code>/s/{slug}</code></td></tr>
 <tr><td>品項 item</td><td>清單內一項想要的東西；取得方式為 <code>quantity</code>（數量捐助）或 <code>crowdfund</code>（心願眾籌）</td></tr>
-<tr><td>捐助 claim</td><td>某人承諾送出某品項的 N 件；狀態 reserved → purchased → delivered，或 cancelled / expired</td></tr>
-<tr><td>認捐 contribution</td><td>以點數贊助眾籌品項的一筆紀錄；pledged → captured，或 released / reallocated</td></tr>
+<tr><td>捐助 claim</td><td>某人承諾送出某品項的 N 件（畫面用詞：「我來送」「認領」「我的送禮」，D59）；狀態 reserved → purchased → delivered，或 cancelled / expired</td></tr>
+<tr><td>認捐 contribution</td><td>以點數贊助眾籌品項的一筆紀錄（畫面用詞：「贊助」，D59）；pledged → captured，或 released / reallocated</td></tr>
 <tr><td>點數</td><td>1 點 = NT$1。只能投入心願品項，不能提領、不能轉讓給受捐者</td></tr>
 <tr><td>錢包 / 帳本</td><td><code>point_wallets</code> 存餘額；<code>point_ledger</code> 只增不改，每次異動寫一筆</td></tr>
 <tr><td>採購單 purchase order</td><td>眾籌達標後建立，由營運人工代購並推進狀態</td></tr>
@@ -326,9 +326,9 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>取得方式</td><td><b>數量捐助</b>：設「需要數量」1–99、可填參考價格<br><b>心願眾籌</b>：設「目標點數」（1 點 = NT$1）與「募集截止」，需先填收件資訊，見下方</td></tr>
 </table>
 <ul>
-<li><b>排序</b>：品項卡片的 ↑ ↓ 按鈕調整順序；訪客端會把「已被捐助完」的品項排到最後。</li>
+<li><b>排序</b>：品項卡片的 ↑ ↓ 按鈕調整順序；訪客端會把「已全數認領」的品項排到最後。</li>
 <li><b>修改數量</b>：不可低於已被捐助的數量（<code>QTY_BELOW_CLAIMED</code>）。驚喜鎖定期間不能調降數量。</li>
-<li><b>刪除品項</b>：若已有捐助，第一次刪除會提示；再按一次「連同捐助一併刪除」會取消這些捐助。驚喜鎖定期間不能刪除品項。已有認捐的眾籌品項刪除時，pledged 的點數會退回捐贈者錢包並通知。</li>
+<li><b>刪除品項</b>：若已有捐助，第一次刪除會提示；再按一次「連同認領一併刪除」會取消這些捐助。驚喜鎖定期間不能刪除品項。已有認捐的眾籌品項刪除時，pledged 的點數會退回捐贈者錢包並通知。</li>
 <li><b>取得方式一旦有人捐助 / 贊助就不能切換</b>；眾籌達標或截止後不能改目標與期限。</li>
 <li><b>並行編輯保護</b>：儲存時會帶 <code>expected_updated_at</code>；若資料已被其他地方修改，回 <code>STALE_VERSION</code>，畫面會提示「重新載入」。</li>
 </ul>
@@ -411,7 +411,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>登入方式</td><td>綁定 / 解除 Email、Google、LINE。至少保留一種；已屬於其他帳號的方式回 <code>IDENTITY_IN_USE</code>，<b>不會合併兩個帳號</b>。綁定 Email 需收驗證碼。解除成功會登出其他裝置，目前裝置保持登入。每次新增 / 解除會寄安全通知信</td></tr>
 <tr><td>變更密碼</td><td>輸入目前密碼與新密碼（8–128 字元）。成功後其他裝置登出；15 分鐘內最多 5 次嘗試。僅有 Email 但還沒密碼的人，用「設定 Email 登入密碼」走驗證碼流程（會登出所有裝置）</td></tr>
 <tr><td>登入裝置</td><td>列出所有 session（裝置、最後使用、IP）；可登出單一裝置或「登出其他所有裝置」</td></tr>
-<tr><td>個人頁與捐助</td><td>設定帳號代號（小寫英文、數字、底線，3–30 字，唯一）；設定「捐助紀錄預設誰看得到」</td></tr>
+<tr><td>個人頁與送禮</td><td>設定帳號代號（小寫英文、數字、底線，3–30 字，唯一）；設定「送禮紀錄預設誰看得到」</td></tr>
 <tr><td>通知</td><td>開關「有人捐助時寄 Email」。沒有 Email 的帳號此開關停用</td></tr>
 <tr><td>匯出資料</td><td>下載 JSON：個人資料、登入方式、清單與品項、你的捐助、錢包與認捐。每帳號每日最多 3 次。他人資料不會出現</td></tr>
 <tr><td>刪除帳號</td><td>輸入「刪除」確認。你的 Email、名稱與登入方式被移除，清單封存並從公開移除，所有 session 登出。若仍有進行中（pledged）的認捐或點數餘額，會回 <code>ACCOUNT_HAS_POINTS</code>，須先撤回認捐並聯絡客服處理餘額。已 captured（採購中）的認捐不阻擋刪除</td></tr>
@@ -425,26 +425,26 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <div class="box note"><b class="t">D50（2026-10-18）：訪客僅能瀏覽，認捐需登入</b>產品負責人決定：認捐需要消耗點數，未登入無法紀錄點數。目前數量認捐本身並未扣點數（只有心願眾籌扣點），此規則先讓認捐綁定會員身分。</div>
 <ol class="steps">
 <li>點開朋友分享的連結（<code>/s/{slug}</code>）。看得到清單標題、說明、完成度與各品項。受限清單可能要求登入或輸入密碼。</li>
-<li>在想送的品項按「<b>我要送</b>」；未登入時按鈕為「<b>登入後認捐</b>」，登入或註冊後會回到原品項。選數量（1–99，不超過剩餘量）。</li>
+<li>在想送的品項按「<b>我來送</b>」；未登入時按鈕為「<b>登入後來送</b>」，登入或註冊後會回到原品項。選數量（1–99，不超過剩餘量）。</li>
 <li>可選填留言（至多 200 字）與這筆捐助的公開層級；不再填暱稱、聯絡方式或 Email，名稱採帳號名稱。</li>
-<li>按「確認捐助」。成功後出現「✓ 捐助成功！」畫面。</li>
+<li>按「確定要送」。成功後出現「✓ 這份交給你了！」畫面。</li>
 </ol>
 <ul>
 <li><b>瀏覽免登入、認捐需登入</b>；可選這筆捐助的公開層級（公開 / 僅好友 / 私人）。</li>
-<li><b>不會超賣</b>：兩人同時搶最後一件，只有一人成功，另一人看到「抱歉，只剩 N 個了」或「剛剛被別人捐助完了」。</li>
-<li><b>同一品項只能有一筆有效捐助</b>；再次捐助會自動切換成「修改我的捐助」。</li>
+<li><b>不會超賣</b>：兩人同時搶最後一件，只有一人成功，另一人看到「抱歉，只剩 N 個了」或「剛剛被別人認領完了」。</li>
+<li><b>同一品項只能有一筆有效捐助</b>；再次捐助會自動切換成「修改我要送的」。</li>
 <li>建立者不能捐助自己的清單。已結束的清單不再接受捐助。</li>
 <li>網路不穩重送是安全的：同一份捐助使用同一把 <code>Idempotency-Key</code>，重送不會重複扣量。</li>
 </ul>
 <div class="box warn"><b class="t">在 LINE 內建瀏覽器</b>登入狀態存放在瀏覽器儲存空間，LINE 關閉後可能需重新登入；可點右上角「⋯」→「用預設瀏覽器開啟」。會員的捐助綁定帳號，換裝置登入即可管理。以下「換裝置找回」僅適用 D50 前的舊訪客捐助。</div>
 
-<h3 id="g-manage">5.2 管理我的捐助（<code>/me/claims</code>）</h3>
+<h3 id="g-manage">5.2 管理我的送禮（<code>/me/claims</code>）</h3>
 <div class="flow"><span>已捐助 reserved</span><i>→</i><span>已購買 purchased</span><i>→</i><span class="end">已送達 delivered</span></div>
 <ul>
 <li>捐助後可按「標記已購買」「標記已送達」；「取消」可在送達前隨時使用（目前取消不會寄通知信給建立者，只有進度頁的即時刷新）。取消後數量立即歸還給其他人。</li>
 <li>可調整這筆捐助誰看得到（僅登入者）；舊訪客捐助（D50 前）可改暱稱，可減量、取消，但<b>不能增加數量</b>（須登入）。</li>
 <li>「過去的紀錄」收納已取消 / 已逾期的捐助。</li>
-<li><b>換裝置找回（舊訪客捐助）</b>：確認信中的「管理我的捐助」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
+<li><b>換裝置找回（舊訪客捐助）</b>：確認信中的「管理我的送禮」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
 <li><b>刪除暱稱與聯絡方式（舊訪客）</b>：頁面底部可抹除個資，捐助紀錄保留為「已刪除的訪客」，此裝置之後無法再管理。</li>
 <li>若建立者設定了「捐助保留時數」，逾期未標記購買的捐助會自動釋放（<code>expired</code>）。</li>
 </ul>
@@ -645,7 +645,7 @@ RETURNING qty_needed, qty_claimed;
 <table>
 <tr><th>種類（kind）</th><th>對象</th><th>時機</th></tr>
 <tr><td><s><code>claim.created</code> / <code>claim.digest</code></s></td><td>建立者</td><td>已停用（D58）：有人捐助時不再寄信給建立者</td></tr>
-<tr><td><code>claim.confirmation</code></td><td>訪客（legacy）</td><td>D50 前捐助時填了 Email（D50 起不再產生）；含「管理我的捐助」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
+<tr><td><code>claim.confirmation</code></td><td>訪客（legacy）</td><td>D50 前捐助時填了 Email（D50 起不再產生）；含「管理我的送禮」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
 <tr><td><code>claim.item_removed</code></td><td>訪客</td><td>你捐助的品項被建立者刪除</td></tr>
 <tr><td><code>wishlist.closing</code></td><td>建立者</td><td>自動結束前 24 小時（一次）</td></tr>
 <tr><td><code>event.reminder</code></td><td>建立者</td><td>僅有信件模板，<b>尚未接入自動提醒</b>（沒有排程或觸發流程建立此通知）</td></tr>
@@ -1053,8 +1053,8 @@ npm run e2e:headed                                                  # 顯示瀏�
 <table>
 <tr><th>症狀</th><th>可能原因 / 解法</th></tr>
 <tr><td>「抱歉，只剩 N 個了」</td><td>別人剛捐助；調低數量或選別項</td></tr>
-<tr><td>「你已經捐助過這個品項」</td><td>同一品項只能一筆有效捐助；已為你切換到「修改」</td></tr>
-<tr><td>找不到之前的捐助</td><td>換了瀏覽器或在 LINE 內建瀏覽器；用確認信中的「管理我的捐助」連結（一次性、30 天）。沒填 Email 就無法找回</td></tr>
+<tr><td>「你已經要送這個品項了」</td><td>同一品項只能一筆有效捐助；已為你切換到「修改」</td></tr>
+<tr><td>找不到之前的捐助</td><td>換了瀏覽器或在 LINE 內建瀏覽器；用確認信中的「管理我的送禮」連結（一次性、30 天）。沒填 Email 就無法找回</td></tr>
 <tr><td>捐助後顯示無法保存身分</td><td>瀏覽器停用儲存；請截圖保存，並改用預設瀏覽器</td></tr>
 <tr><td>無法贊助：餘額不足</td><td>點數目前由平台發放，請聯絡客服</td></tr>
 <tr><td>無法贊助：錢包凍結</td><td>聯絡客服</td></tr>
@@ -1082,7 +1082,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <tr><th>路由</th><th>對象</th><th>渲染</th><th>說明</th></tr>
 <tr><td><code>/</code></td><td>所有人</td><td>SSR</td><td>首頁 landing</td></tr>
 <tr><td><code>/s/{slug}</code></td><td>訪客 / 全部</td><td><b>SSR</b></td><td>分享頁（OG 預覽）</td></tr>
-<tr><td><code>/me/claims</code></td><td>訪客 / 使用者</td><td>SPA</td><td>我的捐助</td></tr>
+<tr><td><code>/me/claims</code></td><td>訪客 / 使用者</td><td>SPA</td><td>我的送禮</td></tr>
 <tr><td><code>/login</code> <code>/register</code> <code>/forgot-password</code></td><td>創建者</td><td>SPA</td><td>驗證</td></tr>
 <tr><td><code>/dashboard</code> <code>/lists/new</code> <code>/lists/{id}/edit</code> <code>/lists/{id}/progress</code></td><td>創建者</td><td>SPA</td><td>清單管理</td></tr>
 <tr><td><code>/me/wallet</code> <code>/friends</code> <code>/invite/{token}</code> <code>/u/{handle}</code> <code>/settings</code></td><td>使用者</td><td>SPA</td><td>錢包、社交、設定</td></tr>

@@ -30,7 +30,7 @@ test('公開頁面（訪客可見）', async ({ page }) => {
   await test.step('/s/{slug} 的捐助 sheet（需登入會員）', async () => {
     const member = await signInPage(page)
     await page.goto(`/s/${list.slug}`)
-    await page.locator('li.g-card').first().getByRole('button', { name: '我要送' }).click()
+    await page.locator('li.g-card').first().getByRole('button', { name: '我來送' }).click()
     const { sw, iw } = await noHScroll(page)
     expect.soft(sw).toBeLessThanOrEqual(iw)
     await expect(page.getByRole('dialog')).toBeVisible()

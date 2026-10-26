@@ -71,7 +71,7 @@ for (const [name, vp] of Object.entries(SIZES)) {
       for (const h of await page.locator('.g-foot a').evaluateAll(as => as.map(a => a.getBoundingClientRect().height))) expect(h).toBeGreaterThanOrEqual(44)
     })
     await test.step('捐助 sheet 在視窗內', async () => {
-      await page.locator('li.g-card').first().getByRole('button', { name: '我要送' }).click()
+      await page.locator('li.g-card').first().getByRole('button', { name: '我來送' }).click()
       const box = (await page.getByRole('dialog').boundingBox())!
       expect(box.x).toBeGreaterThanOrEqual(0)
       expect(box.x + box.width).toBeLessThanOrEqual(vp.width)

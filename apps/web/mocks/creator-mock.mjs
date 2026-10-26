@@ -233,20 +233,20 @@ http.createServer(async (req, res) => {
     const f = findItem(g[1]); if (!f || f.w.owner.id !== me.id) return problem(res, 404, 'NOT_FOUND', '找不到品項')
     if (m === 'PATCH') {
       if (body.expected_updated_at && body.expected_updated_at !== f.i.updated_at) return problem(res, 409, 'STALE_VERSION', '這份資料已在其他地方被修改，請重新載入後再試。')
-      if (body.qty_needed !== undefined && body.qty_needed < f.i.qty_claimed) return problem(res, 409, 'QTY_BELOW_CLAIMED', `數量不可低於已捐助的 ${f.i.qty_claimed} 件`)
+      if (body.qty_needed !== undefined && body.qty_needed < f.i.qty_claimed) return problem(res, 409, 'QTY_BELOW_CLAIMED', `數量不可低於已認領的 ${f.i.qty_claimed} 件`)
       Object.assign(f.i, pickItem(body), { updated_at: now() }); if (body.image_key) setImage(f.i)
       broadcast(f.w, 'item.updated', { item_id: f.i.id, qty_needed: f.i.qty_needed, qty_claimed: f.i.qty_claimed })
       return send(res, 200, f.i)
     }
     if (m === 'DELETE') {
-      if (f.i.qty_claimed > 0 && url.searchParams.get('force') !== 'true') return problem(res, 409, 'ITEM_HAS_CLAIMS', '此品項已有捐助，需帶 force=true')
+      if (f.i.qty_claimed > 0 && url.searchParams.get('force') !== 'true') return problem(res, 409, 'ITEM_HAS_CLAIMS', '此品項已有人認領，需帶 force=true')
       f.a.splice(f.a.indexOf(f.i), 1); broadcast(f.w, 'item.updated', { item_id: f.i.id, deleted: true })
       return send(res, 204)
     }
   }
   if ((g = p.match(/^\/claims\/([^/]+)$/)) && m === 'PATCH') {
     if (!authed()) return
-    const c = claims.find((x) => x.id === g[1]); if (!c) return problem(res, 404, 'NOT_FOUND', '找不到捐助')
+    const c = claims.find((x) => x.id === g[1]); if (!c) return problem(res, 404, 'NOT_FOUND', '找不到這筆認領')
     c.status = body.status; return send(res, 200, { claim: c })
   }
   if (p === '/uploads/presign' && m === 'POST') {

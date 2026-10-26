@@ -225,7 +225,7 @@ async fn create(
         return Err(AppError::problem(
             403,
             "WALLET_FROZEN",
-            "錢包已凍結，無法認捐，請聯絡客服",
+            "錢包已凍結，無法贊助，請聯絡客服",
         ));
     }
 
@@ -302,7 +302,7 @@ async fn diagnose(pool: &PgPool, item_id: Uuid, want: i64) -> Result<Option<AppE
         Some((_, _, _, m, ..)) if m == "hidden" => AppError::WishlistRemoved,
         Some((_, s, v, ..)) if s == "draft" || v == "private" => AppError::NotFound,
         Some((_, s, ..)) if s != "active" => {
-            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受認捐")
+            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受贊助")
         }
         Some((_, _, _, _, mode, ..)) if mode != "crowdfund" => {
             AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是心願眾籌")
@@ -318,7 +318,7 @@ async fn diagnose(pool: &PgPool, item_id: Uuid, want: i64) -> Result<Option<AppE
             AppError::Extra {
                 status: 409,
                 code: "CROWDFUND_TARGET_EXCEEDED",
-                detail: format!("此品項還差 {remaining} 點，無法認捐 {want} 點。"),
+                detail: format!("此品項還差 {remaining} 點，無法贊助 {want} 點。"),
                 extra: json!({ "remaining_points": remaining }),
             }
         }
@@ -353,7 +353,7 @@ async fn update(
         return Err(AppError::problem(
             403,
             "FORBIDDEN",
-            "只有認捐者本人可以修改可見度",
+            "只有贊助者本人可以修改可見度",
         ));
     }
     sqlx::query("UPDATE contributions SET visibility = $2::text::share_level WHERE id = $1")
@@ -380,7 +380,7 @@ fn locked() -> AppError {
     AppError::problem(
         409,
         "CONTRIBUTION_LOCKED",
-        "此筆認捐已達標或已過選擇期，無法撤回",
+        "此筆贊助已達標或已過選擇期，無法撤回",
     )
 }
 
@@ -401,7 +401,7 @@ async fn withdraw(
         return Err(AppError::problem(
             403,
             "FORBIDDEN",
-            "只有認捐者本人可以撤回",
+            "只有贊助者本人可以撤回",
         ));
     }
     // 鎖序：清單 → 錢包 → 品項 → 認捐
@@ -515,7 +515,7 @@ async fn reallocate(
         return Err(AppError::problem(
             403,
             "FORBIDDEN",
-            "只有認捐者本人可以轉投",
+            "只有贊助者本人可以轉投",
         ));
     }
     let tgt = req.target_item_id;

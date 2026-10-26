@@ -559,7 +559,7 @@ fn list_closed_copy() {
     use wishly_api::notify::{render_lang, Lang};
     let p = json!({ "item_title": "奶瓶", "expires_at": "2026-10-29T04:00:00Z" });
     let (_, b) = render_lang(Lang::Zh, "claim.list_closed", "寶寶清單", &p);
-    assert!(b.contains("清單《寶寶清單》已結束。如果你已經買好或送出了「奶瓶」，請到「我的捐助」標記已購買或已送達；2026-10-29 12:00"), "{b}");
+    assert!(b.contains("清單《寶寶清單》已結束。如果你已經買好或送出了「奶瓶」，請到「我的送禮」標記已購買或已送達；2026-10-29 12:00"), "{b}");
     for l in [Lang::En, Lang::Vi, Lang::Id] {
         let (_, b) = render_lang(l, "claim.list_closed", "L", &p);
         assert!(

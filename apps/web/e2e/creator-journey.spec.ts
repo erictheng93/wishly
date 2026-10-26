@@ -94,9 +94,9 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     const slug = shareUrl.split('/').pop()!
     sql(`UPDATE wishlists SET closes_at = now() - interval '1 minute' WHERE slug = '${slug}'`) // 模擬時間流逝；背景 job 每 5 分鐘才轉 closed
     await guest.goto(shareUrl)
-    await guest.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我要送' }).click()
+    await guest.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我來送' }).click()
     const dialog = guest.getByRole('dialog')
-    await dialog.getByRole('button', { name: '確認捐助' }).click()
+    await dialog.getByRole('button', { name: '確定要送' }).click()
     await expect(guest.getByText(/已結束/).first()).toBeVisible()
     await member.api.dispose()
     await ctx.close()

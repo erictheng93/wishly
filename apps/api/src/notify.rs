@@ -440,7 +440,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "crowdfund.funded" => (
             l.pick(format!("【Wishly】《{item}》集資達標了"), format!("[Wishly] \"{item}\" has reached its goal"), format!("[Wishly] \"{item}\" đã đạt mục tiêu góp quà"), format!("[Wishly] Patungan \"{item}\" sudah mencapai target")),
             l.pick(
-                format!("你支持的「{item}」（清單《{title}》）已集資達標，營運團隊會開始代購。\n查看我的點數與捐贈：{wallet}\n"),
+                format!("你支持的「{item}」（清單《{title}》）已集資達標，營運團隊會開始代購。\n查看我的點數與贊助：{wallet}\n"),
                 format!("\"{item}\" (list \"{title}\"), which you backed, has reached its goal. Our team will start purchasing it.\nView my points and contributions: {wallet}\n"),
                 format!("\"{item}\" (danh sách \"{title}\") mà bạn ủng hộ đã đạt mục tiêu, đội ngũ của chúng tôi sẽ bắt đầu mua hộ.\nXem điểm và các khoản đóng góp của tôi: {wallet}\n"),
                 format!("\"{item}\" (wishlist \"{title}\") yang kamu dukung sudah mencapai target. Tim kami akan mulai membelikannya.\nLihat poin dan kontribusiku: {wallet}\n"),
@@ -449,7 +449,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "order.shipped" => (
             l.pick(format!("【Wishly】《{item}》已出貨"), format!("[Wishly] \"{item}\" has shipped"), format!("[Wishly] \"{item}\" đã được gửi đi"), format!("[Wishly] \"{item}\" sudah dikirim")),
             l.pick(
-                format!("你支持的「{item}」（清單《{title}》）已出貨。\n查看我的點數與捐贈：{wallet}\n"),
+                format!("你支持的「{item}」（清單《{title}》）已出貨。\n查看我的點數與贊助：{wallet}\n"),
                 format!("\"{item}\" (list \"{title}\"), which you backed, has shipped.\nView my points and contributions: {wallet}\n"),
                 format!("\"{item}\" (danh sách \"{title}\") mà bạn ủng hộ đã được gửi đi.\nXem điểm và các khoản đóng góp của tôi: {wallet}\n"),
                 format!("\"{item}\" (wishlist \"{title}\") yang kamu dukung sudah dikirim.\nLihat poin dan kontribusiku: {wallet}\n"),
@@ -458,7 +458,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "order.delivered" => (
             l.pick(format!("【Wishly】《{item}》已送達"), format!("[Wishly] \"{item}\" has been delivered"), format!("[Wishly] \"{item}\" đã được giao"), format!("[Wishly] \"{item}\" sudah sampai")),
             l.pick(
-                format!("你支持的「{item}」（清單《{title}》）已送達受贈者，謝謝你的心意。\n查看我的點數與捐贈：{wallet}\n"),
+                format!("你支持的「{item}」（清單《{title}》）已送達受贈者，謝謝你的心意。\n查看我的點數與贊助：{wallet}\n"),
                 format!("\"{item}\" (list \"{title}\"), which you backed, has been delivered to the recipient. Thank you for your kindness.\nView my points and contributions: {wallet}\n"),
                 format!("\"{item}\" (danh sách \"{title}\") mà bạn ủng hộ đã được giao đến người nhận. Cảm ơn tấm lòng của bạn.\nXem điểm và các khoản đóng góp của tôi: {wallet}\n"),
                 format!("\"{item}\" (wishlist \"{title}\") yang kamu dukung sudah sampai ke penerima. Terima kasih atas niat baikmu.\nLihat poin dan kontribusiku: {wallet}\n"),
@@ -467,7 +467,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "order.failed" => (
             l.pick(format!("【Wishly】《{item}》代購未成功，點數已退回"), format!("[Wishly] \"{item}\" could not be purchased; points refunded"), format!("[Wishly] Không mua được \"{item}\", điểm đã được hoàn lại"), format!("[Wishly] \"{item}\" gagal dibeli, poin dikembalikan")),
             l.pick(
-                format!("你支持的「{item}」（清單《{title}》）代購未成功，你捐出的點數已全數退回錢包。\n查看我的點數：{wallet}\n"),
+                format!("你支持的「{item}」（清單《{title}》）代購未成功，你贊助的點數已全數退回錢包。\n查看我的點數：{wallet}\n"),
                 format!("The purchase of \"{item}\" (list \"{title}\"), which you backed, was unsuccessful. All the points you contributed have been refunded to your wallet.\nView my points: {wallet}\n"),
                 format!("Việc mua \"{item}\" (danh sách \"{title}\") mà bạn ủng hộ không thành công. Toàn bộ điểm bạn đã đóng góp đã được hoàn vào ví.\nXem điểm của tôi: {wallet}\n"),
                 format!("Pembelian \"{item}\" (wishlist \"{title}\") yang kamu dukung tidak berhasil. Semua poin yang kamu sumbangkan sudah dikembalikan ke dompetmu.\nLihat poinku: {wallet}\n"),
@@ -476,7 +476,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "funding.expired" => (
             l.pick(format!("【Wishly】《{item}》募集期限已到"), format!("[Wishly] The funding period for \"{item}\" has ended"), format!("[Wishly] \"{item}\" đã hết hạn góp quà"), format!("[Wishly] Masa penggalangan \"{item}\" sudah berakhir")),
             l.pick(
-                format!("「{item}」（清單《{title}》）在期限內未達標。你的點數會再保留 7 天：期間可到錢包撤回，或轉捐給同一份清單的其他品項；逾期未處理會自動退回錢包。\n處理我的捐贈：{wallet}\n"),
+                format!("「{item}」（清單《{title}》）在期限內未達標。你的點數會再保留 7 天：期間可到錢包撤回，或轉投到同一份清單的其他品項；逾期未處理會自動退回錢包。\n處理我的贊助：{wallet}\n"),
                 format!("\"{item}\" (list \"{title}\") did not reach its goal in time. Your points are held for another 7 days: you can withdraw them in your wallet or move them to another item on the same list; if you do nothing they are refunded to your wallet automatically.\nManage my contributions: {wallet}\n"),
                 format!("\"{item}\" (danh sách \"{title}\") chưa đạt mục tiêu trong thời hạn. Điểm của bạn được giữ thêm 7 ngày: bạn có thể rút về ví hoặc chuyển sang món khác trong cùng danh sách; nếu không xử lý, điểm sẽ tự động hoàn vào ví.\nQuản lý đóng góp của tôi: {wallet}\n"),
                 format!("\"{item}\" (wishlist \"{title}\") tidak mencapai target tepat waktu. Poinmu ditahan 7 hari lagi: kamu bisa menariknya ke dompet atau memindahkannya ke barang lain di wishlist yang sama; kalau tidak diurus, poin otomatis dikembalikan ke dompetmu.\nKelola kontribusiku: {wallet}\n"),
@@ -485,25 +485,25 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "item.removed" => (
             l.pick(format!("【Wishly】《{item}》已被移除，點數已退回"), format!("[Wishly] \"{item}\" was removed; points refunded"), format!("[Wishly] \"{item}\" đã bị gỡ, điểm đã được hoàn lại"), format!("[Wishly] \"{item}\" dihapus, poin dikembalikan")),
             l.pick(
-                format!("清單《{title}》的建立者移除了「{item}」（或封存了清單），你捐出的點數已退回錢包。\n查看我的點數：{wallet}\n"),
+                format!("清單《{title}》的建立者移除了「{item}」（或封存了清單），你贊助的點數已退回錢包。\n查看我的點數：{wallet}\n"),
                 format!("The owner of list \"{title}\" removed \"{item}\" (or archived the list), and the points you contributed have been refunded to your wallet.\nView my points: {wallet}\n"),
                 format!("Chủ danh sách \"{title}\" đã gỡ \"{item}\" (hoặc lưu trữ danh sách), điểm bạn đã đóng góp đã được hoàn vào ví.\nXem điểm của tôi: {wallet}\n"),
                 format!("Pemilik wishlist \"{title}\" menghapus \"{item}\" (atau mengarsipkan wishlist), dan poin yang kamu sumbangkan sudah dikembalikan ke dompetmu.\nLihat poinku: {wallet}\n"),
             ),
         ),
         "claim.confirmation" => (
-            l.pick("【Wishly】捐助已確認".into(), "[Wishly] Pledge confirmed".into(), "[Wishly] Đã xác nhận đóng góp".into(), "[Wishly] Klaim dikonfirmasi".into()),
+            l.pick("【Wishly】這份禮物交給你了".into(), "[Wishly] Pledge confirmed".into(), "[Wishly] Đã xác nhận đóng góp".into(), "[Wishly] Klaim dikonfirmasi".into()),
             l.pick(
-                format!("你的捐助已記錄，謝謝你的心意。\n管理我的捐助：{manage}\n"),
+                format!("已記下由你送這份禮物，謝謝你的心意。\n管理我的送禮：{manage}\n"),
                 format!("Your pledge has been recorded. Thank you for your kindness.\nManage my pledges: {manage}\n"),
                 format!("Đóng góp của bạn đã được ghi nhận. Cảm ơn tấm lòng của bạn.\nQuản lý đóng góp của tôi: {manage}\n"),
                 format!("Klaimmu sudah dicatat. Terima kasih atas niat baikmu.\nKelola klaimku: {manage}\n"),
             ),
         ),
         "claim.item_removed" => (
-            l.pick("【Wishly】你捐助的品項已被移除".into(), "[Wishly] An item you pledged for was removed".into(), "[Wishly] Món quà bạn đóng góp đã bị gỡ".into(), "[Wishly] Barang yang kamu klaim dihapus".into()),
+            l.pick("【Wishly】你要送的品項已被移除".into(), "[Wishly] An item you pledged for was removed".into(), "[Wishly] Món quà bạn đóng góp đã bị gỡ".into(), "[Wishly] Barang yang kamu klaim dihapus".into()),
             l.pick(
-                format!("清單《{title}》的建立者移除了你捐助的品項，這筆捐助已取消。\n查看其他品項：{manage}\n"),
+                format!("清單《{title}》的建立者移除了你要送的品項，這筆認領已取消。\n查看其他品項：{manage}\n"),
                 format!("The owner of list \"{title}\" removed the item you pledged for, so this pledge has been cancelled.\nSee other items: {manage}\n"),
                 format!("Chủ danh sách \"{title}\" đã gỡ món quà bạn đóng góp, khoản đóng góp này đã bị hủy.\nXem các món khác: {manage}\n"),
                 format!("Pemilik wishlist \"{title}\" menghapus barang yang kamu klaim, jadi klaim ini dibatalkan.\nLihat barang lainnya: {manage}\n"),
@@ -525,9 +525,9 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             // 眾籌認捐在錢包管理，一般捐助在「我的捐助」
             let link = if payload["crowdfund"] == true { &wallet } else { &manage };
             (
-                l.pick(format!("【Wishly】你捐助的《{item}》內容有更新"), format!("[Wishly] \"{item}\" you pledged for was updated"), format!("[Wishly] \"{item}\" bạn đóng góp đã được cập nhật"), format!("[Wishly] \"{item}\" yang kamu klaim sudah diperbarui")),
+                l.pick(format!("【Wishly】你要送的《{item}》內容有更新"), format!("[Wishly] \"{item}\" you pledged for was updated"), format!("[Wishly] \"{item}\" bạn đóng góp đã được cập nhật"), format!("[Wishly] \"{item}\" yang kamu klaim sudah diperbarui")),
                 l.pick(
-                    format!("清單《{title}》的建立者修改了「{item}」的內容（例如數量、規格或說明）。購買前請再確認一次數量與規格。\n管理我的捐助：{link}\n"),
+                    format!("清單《{title}》的建立者修改了「{item}」的內容（例如數量、規格或說明）。購買前請再確認一次數量與規格。\n管理我的送禮：{link}\n"),
                     format!("The owner of list \"{title}\" updated \"{item}\" (for example its quantity, spec or description). Please re-check the quantity and spec before buying.\nManage my pledges: {link}\n"),
                     format!("Chủ danh sách \"{title}\" đã cập nhật \"{item}\" (ví dụ số lượng, quy cách hoặc mô tả). Vui lòng kiểm tra lại số lượng và quy cách trước khi mua.\nQuản lý đóng góp của tôi: {link}\n"),
                 format!("Pemilik wishlist \"{title}\" mengubah \"{item}\" (misalnya jumlah, spesifikasi, atau deskripsi). Mohon cek lagi jumlah dan spesifikasinya sebelum membeli.\nKelola klaimku: {link}\n"),
@@ -544,7 +544,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             (
                 l.pick(format!("【Wishly】《{title}》即將結束"), format!("[Wishly] \"{title}\" is about to close"), format!("[Wishly] \"{title}\" sắp kết thúc"), format!("[Wishly] \"{title}\" akan segera ditutup")),
                 l.pick(
-                    format!("你的清單《{title}》將於 {at_zh}自動結束，屆時訪客不能再捐助。\n要延長或取消期限：{base}/dashboard\n"),
+                    format!("你的清單《{title}》將於 {at_zh}自動結束，屆時朋友不能再認領。\n要延長或取消期限：{base}/dashboard\n"),
                     format!("Your list \"{title}\" will close automatically {at_en}, after which visitors can no longer pledge.\nTo extend or cancel the deadline: {base}/dashboard\n"),
                     format!("Danh sách \"{title}\" của bạn sẽ tự động kết thúc vào {at_vi}, sau đó khách không thể đóng góp nữa.\nĐể gia hạn hoặc hủy thời hạn: {base}/dashboard\n"),
                 format!("Wishlist \"{title}\" milikmu akan ditutup otomatis pada {at_id}, setelah itu pengunjung tidak bisa mengklaim lagi.\nUntuk memperpanjang atau membatalkan batas waktu: {base}/dashboard\n"),
@@ -557,14 +557,14 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 l.pick(format!("【Wishly】還沒買《{item}》嗎？"), format!("[Wishly] Haven't bought \"{item}\" yet?"), format!("[Wishly] Bạn chưa mua \"{item}\"?"), format!("[Wishly] Belum beli \"{item}\"?")),
                 if payload["ended"] == true {
                     l.pick(
-                        format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請在 {at}（台北時間）前標記已購買或已送達；逾期未標記的認領會釋出。\n管理我的捐助：{manage}\n"),
+                        format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請在 {at}（台北時間）前標記已購買或已送達；逾期未標記的認領會釋出。\n管理我的送禮：{manage}\n"),
                         format!("The list \"{title}\" has ended. If you've already bought or given \"{item}\", please mark it as purchased or delivered before {at} (Taipei time); unmarked pledges will be released after that.\nManage my pledges: {manage}\n"),
                         format!("Danh sách \"{title}\" đã kết thúc. Nếu bạn đã mua hoặc trao \"{item}\", vui lòng đánh dấu đã mua hoặc đã trao trước {at} (giờ Đài Bắc); các đóng góp chưa đánh dấu sẽ được nhường lại sau thời điểm đó.\nQuản lý đóng góp của tôi: {manage}\n"),
                 format!("Wishlist \"{title}\" sudah berakhir. Kalau kamu sudah membeli atau memberikan \"{item}\", mohon tandai sebagai sudah dibeli atau sudah sampai sebelum {at} (waktu Taipei); klaim yang belum ditandai akan dilepas setelah itu.\nKelola klaimku: {manage}\n"),
             )
                 } else {
                 l.pick(
-                    format!("還沒買嗎？你在《{title}》認領的「{item}」請在 {at}（台北時間）前標記已購買，或延長 7 天；逾期會自動釋出給其他朋友。\n管理我的捐助：{manage}\n"),
+                    format!("還沒買嗎？你在《{title}》認領的「{item}」請在 {at}（台北時間）前標記已購買，或延長 7 天；逾期會自動釋出給其他朋友。\n管理我的送禮：{manage}\n"),
                     format!("Haven't bought it yet? Please mark \"{item}\" from \"{title}\" as purchased before {at} (Taipei time), or extend by 7 days. Otherwise it will be released to other friends.\nManage my pledges: {manage}\n"),
                     format!("Bạn chưa mua? Vui lòng đánh dấu đã mua \"{item}\" trong \"{title}\" trước {at} (giờ Đài Bắc), hoặc gia hạn thêm 7 ngày; quá hạn sẽ tự động nhường cho bạn bè khác.\nQuản lý đóng góp của tôi: {manage}\n"),
                 format!("Belum beli? Mohon tandai \"{item}\" dari \"{title}\" sebagai sudah dibeli sebelum {at} (waktu Taipei), atau perpanjang 7 hari. Kalau tidak, barang ini akan dilepas untuk teman lain.\nKelola klaimku: {manage}\n"),
@@ -575,9 +575,9 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "claim.list_closed" => {
             let at = taipei(payload, "expires_at").unwrap_or_default();
             (
-                l.pick(format!("【Wishly】《{title}》已結束，請標記你的捐助"), format!("[Wishly] \"{title}\" has ended: please update your pledge"), format!("[Wishly] \"{title}\" đã kết thúc: vui lòng cập nhật đóng góp"), format!("[Wishly] \"{title}\" sudah berakhir: mohon perbarui klaimmu")),
+                l.pick(format!("【Wishly】《{title}》已結束，請標記你要送的禮物"), format!("[Wishly] \"{title}\" has ended: please update your pledge"), format!("[Wishly] \"{title}\" đã kết thúc: vui lòng cập nhật đóng góp"), format!("[Wishly] \"{title}\" sudah berakhir: mohon perbarui klaimmu")),
                 l.pick(
-                    format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請到「我的捐助」標記已購買或已送達；{at}（台北時間）前沒有標記的認領會釋出。\n管理我的捐助：{manage}\n"),
+                    format!("清單《{title}》已結束。如果你已經買好或送出了「{item}」，請到「我的送禮」標記已購買或已送達；{at}（台北時間）前沒有標記的認領會釋出。\n管理我的送禮：{manage}\n"),
                     format!("The list \"{title}\" has ended. If you've already bought or given \"{item}\", please mark it as purchased or delivered in My pledges; claims not marked before {at} (Taipei time) will be released.\nManage my pledges: {manage}\n"),
                     format!("Danh sách \"{title}\" đã kết thúc. Nếu bạn đã mua hoặc trao \"{item}\", vui lòng đánh dấu đã mua hoặc đã giao trong Đóng góp của tôi; các món chưa đánh dấu trước {at} (giờ Đài Bắc) sẽ được nhường lại.\nQuản lý đóng góp của tôi: {manage}\n"),
                 format!("Wishlist \"{title}\" sudah berakhir. Kalau kamu sudah membeli atau memberikan \"{item}\", mohon tandai sebagai sudah dibeli atau sudah sampai di Klaimku; klaim yang belum ditandai sebelum {at} (waktu Taipei) akan dilepas.\nKelola klaimku: {manage}\n"),
@@ -587,7 +587,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "claim.expired" if payload["ended"] == true => (
             l.pick(format!("【Wishly】「{item}」已超過購買期限"), format!("[Wishly] \"{item}\" passed its purchase deadline"), format!("[Wishly] \"{item}\" đã quá hạn mua"), format!("[Wishly] \"{item}\" melewati batas waktu pembelian")),
             l.pick(
-                format!("清單《{title}》已結束，你認領的「{item}」在期限前沒有標記已購買，這筆認領已取消。\n管理我的捐助：{manage}\n"),
+                format!("清單《{title}》已結束，你認領的「{item}」在期限前沒有標記已購買，這筆認領已取消。\n管理我的送禮：{manage}\n"),
                 format!("The list \"{title}\" has ended and \"{item}\" wasn't marked as purchased before the deadline, so your claim has been cancelled.\nManage my pledges: {manage}\n"),
                 format!("Danh sách \"{title}\" đã kết thúc và \"{item}\" chưa được đánh dấu đã mua trước hạn, nên lượt nhận của bạn đã bị hủy.\nQuản lý đóng góp của tôi: {manage}\n"),
                 format!("Wishlist \"{title}\" sudah berakhir dan \"{item}\" tidak ditandai sebagai sudah dibeli sebelum batas waktu, jadi klaimmu dibatalkan.\nKelola klaimku: {manage}\n"),
@@ -596,7 +596,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         "claim.expired" => (
             l.pick(format!("【Wishly】「{item}」已超過購買期限"), format!("[Wishly] \"{item}\" passed its purchase deadline"), format!("[Wishly] \"{item}\" đã quá hạn mua"), format!("[Wishly] \"{item}\" melewati batas waktu pembelian")),
             l.pick(
-                format!("你在《{title}》認領的「{item}」已超過購買期限，已釋出給其他朋友。\n管理我的捐助：{manage}\n"),
+                format!("你在《{title}》認領的「{item}」已超過購買期限，已釋出給其他朋友。\n管理我的送禮：{manage}\n"),
                 format!("The purchase deadline for \"{item}\" you claimed on \"{title}\" has passed, so it has been released to other friends.\nManage my pledges: {manage}\n"),
                 format!("\"{item}\" bạn nhận trong \"{title}\" đã quá hạn mua và đã được nhường cho bạn bè khác.\nQuản lý đóng góp của tôi: {manage}\n"),
                 format!("Batas waktu pembelian \"{item}\" yang kamu klaim di \"{title}\" sudah lewat, jadi barang ini dilepas untuk teman lain.\nKelola klaimku: {manage}\n"),

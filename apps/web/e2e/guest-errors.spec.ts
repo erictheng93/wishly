@@ -18,9 +18,9 @@ async function open(page: Page, legacyToken = false) {
   await page.goto(`/s/${slug}`)
   await hydrated(page)
   if (legacyToken) await page.evaluate(([k]) => localStorage.setItem(k, 'legacy-guest-token'), [TOKEN_KEY])
-  await page.getByRole('button', { name: '我要送' }).click()
+  await page.getByRole('button', { name: '我來送' }).click()
 }
-const submit = (page: Page) => page.getByRole('button', { name: '確認捐助' }).click()
+const submit = (page: Page) => page.getByRole('button', { name: '確定要送' }).click()
 const json = (route: Route, status: number, body: object) => route.fulfill({
   status, contentType: 'application/json', body: JSON.stringify(body),
   headers: { 'access-control-allow-origin': route.request().headers().origin ?? '*', 'access-control-allow-credentials': 'true' },
@@ -61,7 +61,7 @@ test('留言欄位錯誤只出現一次（橫幅不重複），且表單沒有�
 })
 
 test('超過上限的舊訪客加量：後端 403 LEGACY_CLAIM_READONLY 的說明原文顯示給使用者', async ({ page }) => {
-  const detail = '舊訪客捐助無法增加數量，請以會員身分另行認捐'
+  const detail = '舊訪客的送禮無法增加數量，請登入會員後再送'
   await page.route(CLAIMS, route => route.request().method() === 'OPTIONS' ? route.fallback() : json(route, 403, { code: 'LEGACY_CLAIM_READONLY', detail }))
   await open(page)
   await submit(page)

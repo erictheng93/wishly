@@ -27,9 +27,9 @@
       "spec": "規格（選填）",
       "url": "商品網址（選填）",
       "mode": "取得方式",
-      "modeQty": "數量捐助",
+      "modeQty": "直接送禮",
       "modeCrowd": "心願眾籌",
-      "modeLocked": "已有人捐助或贊助，無法切換取得方式。",
+      "modeLocked": "已有人認領或贊助，無法切換取得方式。",
       "targetPoints": "目標點數（必填，1 點 = NT$1）",
       "raisedSuffix": "（已募 {n}）",
       "deadline": "募集截止（台北時間，選填）",
@@ -38,7 +38,7 @@
       "crowdNote": "達標後由平台代購寄出，點數不會轉成現金給你。需要先填寫清單的收件資訊。",
       "fundLocked": "已達標或截止，目標與期限無法修改。",
       "qty": "需要數量",
-      "claimedSuffix": "（已被捐助 {n}）",
+      "claimedSuffix": "（已認領 {n}）",
       "unitPrice": "參考價格 NT$（選填）",
       "priority": "優先度",
       "high": "高",
@@ -91,7 +91,7 @@
       "pending": "圖片處理中",
       "ready": "圖片就緒",
       "rejected": "圖片未通過",
-      "reserved": "已捐助",
+      "reserved": "已認領",
       "purchased": "已購買",
       "delivered": "已送達",
       "cancelled": "已取消",
@@ -127,7 +127,7 @@
         "signed_up": "註冊",
         "created_list": "建立清單",
         "published_list": "發布清單",
-        "received_claim": "收到捐助"
+        "received_claim": "有人來送"
       },
       "retention": {
         "d1": "次日留存（第 1 天）",
