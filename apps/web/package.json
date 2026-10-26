@@ -44,7 +44,7 @@
     "typescript": "^5.9.3",
     "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12",
-    "wrangler": "^4"
+    "wrangler": "^4.152.0"
   },
   "overrides": {
     "braces": "git+https://github.com/erictheng93/braces.git#5991a5c00a4c00c68dadfea56f88fa2c5f9d699a",
