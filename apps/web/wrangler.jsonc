@@ -5,4 +5,8 @@
   "compatibility_flags": ["nodejs_compat"]
   // 刻意不放 vars：API 網域與 demo 開關在「建置時」寫入 nuxt.config.ts（見 README 部署段落），
   // 避免 wrangler vars 在執行期蓋掉示範設定；wrangler pages deploy 沒有 --config
+  // deploy 時的 esbuild 警告「Ignoring this import ... node:process ... no side effects」無害：
+  // wrangler 打包 Pages _worker.js 時不傳 compatibility_date（buildRawWorker 寫死 void 0，4.152.0 仍是），
+  // 於是把 node:process 換成 unenv polyfill 再丟掉其 side-effect import；runtime 在 nodejs_compat 下本有原生 process。
+  // 不改 --no-bundle：它會讓本機 pages dev 找不到 middleware facade 而起不來。wrangler 修好後可刪這段
 }
