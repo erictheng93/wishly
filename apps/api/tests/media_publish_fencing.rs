@@ -168,6 +168,14 @@ async fn late_origin_writes_cannot_restore_deleted_images(pool: PgPool) {
             .await
         });
         event(&mut starts, &path, true).await;
+        let fenced: bool = sqlx::query_scalar(
+            "SELECT coalesce(bool_and(publishing_until > now()), false) FROM user_media WHERE object_key=$1",
+        )
+        .bind(&key)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(fenced, "寫 origin 前須先記下發佈圍欄");
         if mode == "normal" {
             image_gate.notify_one();
             assert_eq!(confirm.await.unwrap().0, StatusCode::OK);
