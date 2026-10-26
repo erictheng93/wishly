@@ -91,6 +91,9 @@
     "WALLET_FROZEN": "Your wallet is frozen. Please contact support.",
     "WISHLIST_CLOSED": "This list is closed or archived. This action is no longer available.",
     "WISHLIST_NOT_PUBLISHABLE": "Complete the required list details before publishing.",
+    "EXTENSION_USED": "The purchase deadline can only be extended once.",
+    "SLUG_TAKEN": "This slug is already in use. Try another one.",
+    "REF_TAKEN": "This reference is already in use. Try another one.",
     "fields": {
       "REQUIRED": "This field is required.",
       "FORMAT": "Please check the format of this value.",

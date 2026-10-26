@@ -22,7 +22,7 @@ onMounted(async () => {
     const ts = await load()
     if (!box.value) return
     wid = ts.render(box.value, {
-      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: ({ 'zh-Hant': 'zh-tw', en: 'en', vi: 'vi' } as Record<string, string>)[String(locale.value)] ?? 'auto',
+      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: ({ 'zh-Hant': 'zh-tw', en: 'en', vi: 'vi', id: 'id' } as Record<string, string>)[String(locale.value)] ?? 'auto',
       callback: (v: string) => { token.value = v; err.value = '' },
       'expired-callback': () => { token.value = ''; err.value = t('guest.turnstile.expired') },
       'timeout-callback': () => { token.value = ''; err.value = t('guest.turnstile.timeout') },

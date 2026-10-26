@@ -212,6 +212,7 @@ fn renders_item_title_in_all_languages() {
         (Lang::Zh, "確認"),
         (Lang::En, "re-check"),
         (Lang::Vi, "kiểm tra lại"),
+        (Lang::Id, "cek lagi"),
     ] {
         let (s, b) = render_lang(l, "claim.item_changed", "寶寶清單", &p);
         assert!(s.contains("玻璃奶瓶") && b.contains("玻璃奶瓶"), "{l:?}");

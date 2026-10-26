@@ -91,6 +91,9 @@
     "WALLET_FROZEN": "錢包已凍結，請聯絡客服",
     "WISHLIST_CLOSED": "清單已結束或封存，無法執行此操作",
     "WISHLIST_NOT_PUBLISHABLE": "清單尚有未完成的必填內容，請補齊後再發布",
+    "EXTENSION_USED": "購買期限只能延長一次",
+    "SLUG_TAKEN": "這個代稱已被使用，換一個試試",
+    "REF_TAKEN": "這個編號已被使用，換一個試試",
     "fields": {
       "REQUIRED": "此欄位必填",
       "FORMAT": "格式不正確，請檢查輸入內容",

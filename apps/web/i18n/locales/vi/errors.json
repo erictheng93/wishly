@@ -91,6 +91,9 @@
     "WALLET_FROZEN": "Ví đã bị đóng băng. Vui lòng liên hệ hỗ trợ.",
     "WISHLIST_CLOSED": "Danh sách đã đóng hoặc được lưu trữ. Không thể thực hiện thao tác này nữa.",
     "WISHLIST_NOT_PUBLISHABLE": "Vui lòng hoàn tất thông tin bắt buộc của danh sách trước khi đăng.",
+    "EXTENSION_USED": "Hạn mua chỉ có thể gia hạn một lần.",
+    "SLUG_TAKEN": "Slug này đã được sử dụng. Hãy thử slug khác.",
+    "REF_TAKEN": "Mã tham chiếu này đã được sử dụng. Hãy thử mã khác.",
     "fields": {
       "REQUIRED": "Thông tin này là bắt buộc.",
       "FORMAT": "Vui lòng kiểm tra định dạng của giá trị này.",

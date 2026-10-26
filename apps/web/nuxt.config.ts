@@ -12,7 +12,7 @@ export default defineNuxtConfig({
   i18n: {
     strategy: 'no_prefix',
     defaultLocale: 'zh-Hant',
-    locales: [loc('zh-Hant', 'zh-Hant-TW', '繁體中文'), loc('en', 'en', 'English'), loc('vi', 'vi', 'Tiếng Việt')],
+    locales: [loc('zh-Hant', 'zh-Hant-TW', '繁體中文'), loc('en', 'en', 'English'), loc('vi', 'vi', 'Tiếng Việt'), loc('id', 'id', 'Bahasa Indonesia')],
     langDir: 'locales',
     detectBrowserLanguage: { useCookie: true, cookieKey: 'ws_locale', fallbackLocale: 'zh-Hant', redirectOn: 'root' },
   },

@@ -10,6 +10,8 @@ fn render_lang_en_vi() {
     assert!(s.contains("Sắp đến ngày sự kiện"));
     assert_eq!(Lang::parse("vi-VN,vi;q=0.9"), Lang::Vi);
     assert_eq!(Lang::parse("en-US"), Lang::En);
+    assert_eq!(Lang::parse("id-ID"), Lang::Id);
+    assert_eq!(Lang::Id.code(), "id");
     assert_eq!(Lang::parse("fr"), Lang::Zh);
     assert_eq!(
         render_lang(Lang::Zh, "event.reminder", "清單", &p),
