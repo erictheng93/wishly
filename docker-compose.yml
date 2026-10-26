@@ -2,6 +2,7 @@
 services:
   db:
     image: postgis/postgis:16-3.6@sha256:bdd9351e706076260ac21552cd9c1bed01582e69a902b1b5843f83fa0b4c5a9c
+    platform: linux/amd64 # 官方映像沒有 arm64，Apple Silicon 走模擬
     environment:
       POSTGRES_USER: wishly
       POSTGRES_PASSWORD: wishly
