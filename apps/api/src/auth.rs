@@ -271,9 +271,13 @@ async fn send_mail(to: String, code: String, subject: String, lang: crate::notif
         Vi => format!("Mã xác minh của bạn là {code}, có hiệu lực trong 10 phút. Nếu không phải bạn yêu cầu, vui lòng bỏ qua email này."),
         Id => format!("Kode verifikasimu adalah {code}, berlaku selama 10 menit. Kalau bukan kamu yang meminta, abaikan saja email ini."),
     };
-    let r = crate::notify::send_mail(&crate::config::get(), &to, &subject, &body).await;
-    if let Err(e) = r {
-        tracing::error!(error = %e, "send otp mail failed");
+    // 驗證碼不進 DB 佇列（不落明文）；在 10 分鐘效期內就地重試，涵蓋 SMTP / API 短暫失敗。
+    for (i, wait) in [0u64, 5, 30].into_iter().enumerate() {
+        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+        match crate::notify::send_mail(&crate::config::get(), &to, &subject, &body).await {
+            Ok(()) => return,
+            Err(e) => tracing::error!(error = %e, attempt = i + 1, "send otp mail failed"),
+        }
     }
 }
 

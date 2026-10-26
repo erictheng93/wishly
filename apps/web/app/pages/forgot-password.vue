@@ -24,6 +24,7 @@ async function send() {
     else err.value = e.status === 429 ? i18n.t('auth.forgot.rate') : errMsg(e)
   } finally { busy.value = false }
 }
+function changeEmail() { step.value = 'email'; code.value = ''; challengeId.value = ''; err.value = '' }
 async function confirm() {
   err.value = ''
   if (code.value.length < 6) { err.value = i18n.t('auth.forgot.codeLen'); return }
@@ -58,6 +59,7 @@ async function confirm() {
         <button v-if="wait <= 0" type="button" class="c-btn" :disabled="busy" @click="send">{{ $t('auth.forgot.resend') }}</button>
         <span v-else>{{ $t('auth.forgot.resendIn', { n: wait }) }}</span>
       </p>
+      <p class="c-center"><button type="button" class="c-btn" :disabled="busy" @click="changeEmail">{{ $t('auth.forgot.changeEmail') }}</button></p>
     </form>
   </main>
 </template>

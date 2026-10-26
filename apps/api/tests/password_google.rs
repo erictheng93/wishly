@@ -959,3 +959,28 @@ async fn concurrent_failed_logins_bounded_per_ip(pool: PgPool) {
         .unwrap();
     assert!(n <= 30, "Argon2 驗證次數超過上限: {n}");
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reset_request_skips_blocked_account(pool: PgPool) {
+    sqlx::query("INSERT INTO users (display_name,email,blocked_at) VALUES ('b','blocked-reset@example.com',now())")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (st, _, b) = common::call(
+        &pool,
+        "POST",
+        "/auth/password/reset/request",
+        &[],
+        Some(json!({ "email": "blocked-reset@example.com" })),
+    )
+    .await;
+    assert_eq!(st, 202);
+    assert!(b["challenge_id"].is_string(), "回應形狀與一般帳號相同");
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM otp_challenges WHERE email='blocked-reset@example.com'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 0, "停權帳號不寄重設信");
+}
