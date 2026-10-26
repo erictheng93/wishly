@@ -61,7 +61,7 @@
       "loggedOutN": "{n} perangkat lain sudah keluar"
     },
     "social": {
-      "title": "Halaman profil dan klaim",
+      "title": "Halaman profil dan hadiah",
       "handle": "Handle akun (URL halaman profil, boleh kosong)",
       "handlePh": "Contoh: amy_wang",
       "handleBadHint": "Huruf kecil, angka, garis bawah, 3–30 karakter",
@@ -81,7 +81,7 @@
       "birthdayErr": "Pilih bulan dan tanggal sekaligus, atau jangan pilih keduanya",
       "birthdayVis": "Siapa yang bisa melihat ulang tahun",
       "onlyMe": "Hanya aku",
-      "claimVis": "Siapa yang bisa melihat riwayat klaim secara default"
+      "claimVis": "Siapa yang bisa melihat riwayat hadiah secara default"
     },
     "vis": {
       "public": "Publik",
@@ -90,7 +90,7 @@
     },
     "export": {
       "title": "Ekspor data",
-      "hint": "Berisi data pribadi, wishlist, dan riwayat klaim (JSON).",
+      "hint": "Berisi data pribadi, wishlist, dan riwayat hadiah (JSON).",
       "btn": "Ekspor data saya",
       "busy": "Mengekspor…"
     },

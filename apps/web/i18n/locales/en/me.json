@@ -2,7 +2,7 @@
   "me": {
     "home": {
       "seoTitle": "Wishly {'|'} Wishlists and gift sharing",
-      "seoDesc": "Build a wishlist and share it with one link. For gifts, birthdays and weddings: friends open the link to browse, then sign in to pledge a gift. No duplicates, no overselling.",
+      "seoDesc": "Build a wishlist and share it with one link. For gifts, birthdays and weddings: friends open the link to browse, then sign in to claim a gift to give. No duplicates, no overselling.",
       "ogTitle": "Wishly",
       "ogDesc": "List what you want, so the people who want to give never have to guess.",
       "myLists": "My lists",
@@ -12,16 +12,16 @@
       "kicker": "Wishlists × Sharing",
       "h1": "Wishly: wishlists, in sync",
       "lead": "List what you want, so the people who want to give never have to guess.",
-      "sub": "Share your whole wishlist with one link. Friends open it to browse, then sign in to pledge a gift. No duplicates, no overselling.",
+      "sub": "Share your whole wishlist with one link. Friends open it to browse, then sign in to claim a gift to give. No duplicates, no overselling.",
       "ctaExplore": "Explore public lists",
       "ctaDemo": "See an example list",
-      "demoAria": "Example wishlist: three items, one already pledged",
+      "demoAria": "Example wishlist: three items, one already claimed",
       "demoTitle": "Annie's birthday wishes",
       "demoCount": "3 items",
       "demoThumb1": "Coffee",
       "demoItem1": "Pour-over coffee set",
       "demoTop": "Top wish",
-      "demoBy": "Pledged by Kai",
+      "demoBy": "Kai will give this",
       "demoThumb2": "Headphones",
       "demoItem2": "Noise-cancelling headphones",
       "demoRaised": "Raised $4,800",
@@ -44,14 +44,14 @@
         "wedding": {
           "k": "Wedding",
           "t": "Set up the new home in one go",
-          "d": "List appliances, tableware and household goods. Once a guest pledges an item, it is locked right away."
+          "d": "List appliances, tableware and household goods. Once a guest claims an item, it is locked right away."
         }
       },
       "sceneMore": "See the {k} example →",
       "originTitle": "Why I built this",
       "origin": [
         "The person who needs something can’t bring themselves to ask, and the person who wants to give has no idea what’s missing. So everyone buys the same baby bottle and nobody buys the formula.",
-        "Gifting and donating share one problem: supply and demand are out of sync.",
+        "The real problem with gift-giving is that what people want and what others give are out of sync.",
         "That’s why I built Wishly: list what you want, share one link, and let people claim items without ever over-claiming, so the one who needs and the one who gives finally line up."
       ],
       "stepsTitle": "Share your wishes in three steps",
@@ -65,23 +65,23 @@
           "d": "Send it through LINE, Facebook or anywhere else. The preview image comes along automatically."
         },
         "3": {
-          "t": "Friends sign in to pledge",
-          "d": "Open the link to look around. Sign in to pledge an item, and nobody else can pick it afterwards."
+          "t": "Friends sign in to give",
+          "d": "Open the link to look around. Sign in and tap \"I'll give this\"; once claimed, nobody else can pick it."
         }
       },
       "featsTitle": "Make your wishlist work harder",
       "feats": {
         "0": {
           "t": "No overselling",
-          "d": "Each item can be pledged by only one person, even if two people tap at the same moment."
+          "d": "Each item can be claimed by only one person, even if two people tap at the same moment."
         },
         "1": {
           "t": "Browse without an account",
-          "d": "Friends can view a list without an account, and sign in only when they want to pledge."
+          "d": "Friends can view a list without an account, and sign in only when they want to give a gift."
         },
         "2": {
           "t": "Live updates",
-          "d": "Pledges and progress sync instantly. No need to refresh the page."
+          "d": "Who will give what and the progress sync instantly. No need to refresh the page."
         },
         "3": {
           "t": "Group funding",
@@ -92,11 +92,11 @@
       "faq": {
         "0": {
           "q": "Do my friends need to sign up?",
-          "a": "Not to browse a list. To pledge an item they need to sign in first."
+          "a": "Not to browse a list. To give a gift (claim an item) they need to sign in first."
         },
         "1": {
           "q": "Could two people give the same item?",
-          "a": "No. Once an item is pledged it is locked, and pledges that are not completed in time are released automatically."
+          "a": "No. Once an item is claimed it is locked, and claims that are not completed in time are released automatically."
         },
         "2": {
           "q": "Can I show a list only to certain people?",
@@ -118,9 +118,9 @@
     "loading": "Loading…",
     "retry": "Retry",
     "claims": {
-      "title": "My pledges",
+      "title": "My gifts",
       "status": {
-        "reserved": "Pledged",
+        "reserved": "Claimed",
         "purchased": "Purchased",
         "delivered": "Delivered",
         "cancelled": "Cancelled",
@@ -128,8 +128,8 @@
       },
       "recoverFailed": "This management link is no longer valid (it can be used once and is valid for 30 days). Please go back to the list link your friend shared, or contact support.",
       "loadFailed": "Failed to load",
-      "empty1": "You have not pledged anything yet. Once you get a friend's list link, sign in to pledge and manage your pledges here.",
-      "empty2": "Can't see your earlier guest pledges? They may have been made in a different browser or in LINE's built-in browser. If you left an email, use the \"Manage my pledges\" link in the confirmation email.",
+      "empty1": "You have no gifts to give yet. Once you get a friend's list link, sign in to claim one and manage it here.",
+      "empty2": "Can't see gifts you claimed earlier as a guest? They may have been made in a different browser or in LINE's built-in browser. If you left an email, use the \"Manage my gifts\" link in the confirmation email.",
       "signedIn": " (signed in)",
       "thisDevice": " (this device)",
       "editNick": "Change nickname",
@@ -144,9 +144,9 @@
       "ackItemChange": "Got it",
       "past": "Past records ({n})",
       "wipe": "Delete my nickname and contact info",
-      "confirmCancelPurchased": "The list owner will be notified. Cancel this pledge?",
-      "confirmCancel": "Cancel this pledge?",
-      "confirmWipe": "Delete your nickname and contact info? Your pledges are kept as \"Deleted guest\", and this device will no longer be able to manage them.",
+      "confirmCancelPurchased": "The list owner will be notified. Cancel this gift?",
+      "confirmCancel": "Cancel giving this gift?",
+      "confirmWipe": "Delete your nickname and contact info? Your gift records are kept as \"Deleted guest\", and this device will no longer be able to manage them.",
       "deadline": "Please mark as purchased before {date}",
       "extend": "Extend 7 days"
     },
@@ -155,13 +155,13 @@
       "pts": "{pts} pts",
       "visUpdated": "Visibility updated",
       "withdrawn": "Withdrew {pts} points",
-      "locked": "This pledge can no longer be withdrawn (the item has reached its goal or the withdrawal period has passed).",
+      "locked": "This contribution can no longer be withdrawn (the item has reached its goal or the withdrawal period has passed).",
       "loadOthersFailed": "Failed to load the other items in this list. Please try again later.",
       "reallocated": "Moved",
       "reallocNotAllowed": "Can't move your points to this item (it may have reached its goal, closed, or the choice period has passed). Please try another.",
       "available": "Available points (1 point = NT$1)",
       "frozen": "Frozen",
-      "held": "{pts} points pledged (can be withdrawn until the goal is reached)",
+      "held": "{pts} points contributed (can be withdrawn until the goal is reached)",
       "frozenWarn": "Your wallet is frozen and you can't contribute for now. Please contact support.",
       "issuedByPlatform": "Points are currently issued by the platform.",
       "topup": "Top up",
@@ -170,7 +170,7 @@
       "noImg": "No image",
       "quoted": "\"{msg}\"",
       "anon": " (anonymous)",
-      "pledgedAt": "Pledged {time}",
+      "pledgedAt": "Contributed {time}",
       "reachedAt": " · Goal reached {time}",
       "refunded": "{pts} points of the difference refunded",
       "anonNote": "Anonymous contributions are visible only to you on your profile.",
@@ -265,8 +265,8 @@
       "closed": "Closed",
       "personal": "Wishlist",
       "completion": "{pct}% complete ({n} item) | {pct}% complete ({n} items)",
-      "donations": "Pledge history",
-      "noDonations": "No pledge history to show right now.",
+      "donations": "Gift history",
+      "noDonations": "No gift history to show right now.",
       "pledgePts": " · {pts} pts",
       "qty": " × {qty}",
       "to": "For {name} · "
