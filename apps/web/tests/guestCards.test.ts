@@ -28,7 +28,7 @@ it('quantity card exposes inventory, priority and a safe product link and opens 
   expect(el.textContent).toContain('2 / 5')
   expect(el.textContent).toContain('優先度 高')
   expect(el.textContent).toContain('品牌・500ml')
-  expect(el.textContent).toContain('送禮者 已捐助')
+  expect(el.textContent).toContain('送禮者 要送')
   expect(el.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('40')
   const product = el.querySelector<HTMLAnchorElement>('a')!
   expect(product.href).toBe('https://shop.example/bottle')
@@ -45,14 +45,14 @@ it('signed-out quantity card shows a login link instead of the claim button', ()
     { deriveDisplayStatus, displayStatusLabel, fmtPts, fmtTime })
   const el = mounted.el
   expect(el.querySelector('button.js-claim')).toBeNull()
-  const a = [...el.querySelectorAll('a')].find(x => x.textContent === '登入後認捐')!
+  const a = [...el.querySelectorAll('a')].find(x => x.textContent === '登入後來送')!
   expect(JSON.parse(a.getAttribute('href')!)).toEqual({ path: '/login', query: { redirect: '/s/a' } })
 })
 
 it('my existing claim can be edited even when the quantity is fully claimed', () => {
   const el = card({ ...quantity, is_fully_claimed: true, qty_claimed: 5 }, { mine: { qty: 2 } })
-  expect(el.textContent).toContain('你已捐助 2 件')
-  expect(el.querySelector('button')!.textContent).toContain('修改我的捐助')
+  expect(el.textContent).toContain('你要送 2 件')
+  expect(el.querySelector('button')!.textContent).toContain('修改我要送的')
   el.querySelector<HTMLButtonElement>('button')!.click()
   expect(claim).toHaveBeenCalledOnce()
 })
@@ -91,7 +91,7 @@ it.each([
 
 it.each([quantity, crowdfunding])('masked card shows progress but hides contributors, product link and actions', item => {
   const el = card(item, { masked: true })
-  expect(el.textContent).toContain('建立者不可捐助自己的清單')
+  expect(el.textContent).toContain('建立者不能送自己清單上的禮物')
   expect(el.textContent).not.toContain('送禮者')
   expect(el.textContent).not.toContain('贊助者')
   expect(el.querySelector('[role="progressbar"]')).not.toBeNull()
@@ -107,6 +107,6 @@ it('guest header routes home and to claim management without requiring sign in',
   mounted = mount(GuestTop, {}, { NuxtLink })
   const links = [...mounted.el.querySelectorAll('header a')]
   expect(links.map(a => [a.textContent, a.getAttribute('href')])).toEqual([
-    ['Wishly', '/'], ['探索', '/explore'], ['靈感', '/inspire'], ['品牌館', '/brands'], ['我的捐助', '/me/claims'],
+    ['Wishly', '/'], ['探索', '/explore'], ['靈感', '/inspire'], ['品牌館', '/brands'], ['我的送禮', '/me/claims'],
   ])
 })

@@ -108,7 +108,7 @@ fn full(remaining: i32, want: i32) -> AppError {
     AppError::Extra {
         status: 409,
         code: "ITEM_FULLY_CLAIMED",
-        detail: format!("此品項剩餘 {remaining} 件，無法再捐助 {want} 件。"),
+        detail: format!("此品項剩餘 {remaining} 件，無法再認領 {want} 件。"),
         extra: json!({ "remaining": remaining }),
     }
 }
@@ -259,7 +259,7 @@ async fn create(
             return Err(AppError::Extra {
                 status: 409,
                 code: "CLAIM_ALREADY_EXISTS",
-                detail: "你已捐助過此品項，請改用修改數量".into(),
+                detail: "你已經要送這個品項，請改用修改數量".into(),
                 extra: json!({ "claim_id": id }),
             });
         }
@@ -295,10 +295,10 @@ async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, A
         Some((_, _, _, m, ..)) if m == "hidden" => AppError::WishlistRemoved,
         Some((_, s, v, ..)) if s == "draft" || v == "private" => AppError::NotFound,
         Some((_, s, ..)) if s != "active" => {
-            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受捐助")
+            AppError::problem(409, "WISHLIST_CLOSED", "此清單已結束，不再接受認領")
         }
         Some((_, _, _, _, f, _)) if f != "quantity" => {
-            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是數量型捐助")
+            AppError::problem(409, "FUNDING_MODE_MISMATCH", "此品項不是直接送禮")
         }
         Some((.., remaining)) => full(remaining, want),
     })
@@ -489,7 +489,7 @@ async fn apply(
         return Err(AppError::problem(
             403,
             "FORBIDDEN",
-            "清單擁有者只能在驚喜解鎖後標記已送達或取消捐助",
+            "清單擁有者只能在驚喜解鎖後標記已送達或取消認領",
         ));
     }
 
@@ -497,7 +497,7 @@ async fn apply(
         return Err(AppError::invalid(
             "/visibility",
             "NOT_APPLICABLE",
-            "舊訪客捐助沒有公開層級設定",
+            "舊訪客的認領沒有公開層級設定",
         ));
     }
     let bad = || AppError::problem(409, "INVALID_STATE_TRANSITION", "不允許的狀態轉換");
@@ -525,7 +525,7 @@ async fn apply(
             return Err(AppError::problem(
                 409,
                 "WISHLIST_CLOSED",
-                "此清單已結束，只能取消捐助",
+                "此清單已結束，只能取消認領",
             ));
         }
         let (has_expiry, used): (bool, bool) = sqlx::query_as(
@@ -570,7 +570,7 @@ async fn apply(
                 Actor::User(_) => AppError::problem(
                     403,
                     "LEGACY_CLAIM_READONLY",
-                    "舊訪客捐助無法增加數量，請以會員身分另行認捐",
+                    "舊訪客的送禮無法增加數量，請登入會員後再送",
                 ),
             });
         }
@@ -586,7 +586,7 @@ async fn apply(
                 return Err(AppError::problem(
                     409,
                     "WISHLIST_CLOSED",
-                    "此清單已結束，不再接受捐助",
+                    "此清單已結束，不再接受認領",
                 ));
             }
             access?;

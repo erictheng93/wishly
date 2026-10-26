@@ -52,7 +52,7 @@ test('建單成功 → 以隱藏表單 POST 導向綠界（action 與 fields 完
   await expect(page.getByRole('button', { name: '1,000', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('radio', { name: /超商代碼/ }).check()
   await expect(page.getByTestId('summary')).toHaveText('儲值 NT$ 1,000，入帳 1,000 點（1 點 = NT$ 1）')
-  await expect(page.getByText('點數不可提領給受捐者，也不可轉讓。')).toBeVisible()
+  await expect(page.getByText('點數不可提領給收禮者，也不可轉讓。')).toBeVisible()
 
   const nav = page.waitForRequest(r => r.url().startsWith(ECPAY) && r.method() === 'POST')
   await pay(page).click()

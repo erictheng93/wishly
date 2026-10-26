@@ -133,8 +133,8 @@ export function watchProblems(page: Page, ignore: RegExp[] = []) {
 /** 透過 UI 認捐品項（page 必須已登入，見 signInPage）。回傳後停在成功畫面 */
 export async function claimViaUi(page: Page, itemTitle: string, qty = 1) {
   const sheet = page.getByRole('dialog')
-  await page.locator('li.g-card', { hasText: itemTitle }).getByRole('button', { name: '我要送' }).click()
+  await page.locator('li.g-card', { hasText: itemTitle }).getByRole('button', { name: '我來送' }).click()
   for (let i = 1; i < qty; i++) await sheet.getByRole('button', { name: '增加' }).click()
-  await sheet.getByRole('button', { name: '確認捐助' }).click()
-  await expect(page.getByRole('heading', { name: '✓ 捐助成功！' })).toBeVisible()
+  await sheet.getByRole('button', { name: '確定要送' }).click()
+  await expect(page.getByRole('heading', { name: '✓ 這份交給你了！' })).toBeVisible()
 }

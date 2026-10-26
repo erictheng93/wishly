@@ -24,7 +24,7 @@ test('儀表板：整張卡片點進編輯頁，卡內按鈕各自運作，封�
     await page.goto('/dashboard')
     await card.getByRole('button', { name: '封存' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.getByText(/尚未達標的認捐點數會全數退回捐贈者錢包，之後取消封存也不會恢復/)).toBeVisible()
+    await expect(page.getByText(/尚未達標的贊助點數會全數退回贊助者錢包，之後取消封存也不會恢復/)).toBeVisible()
     await page.getByRole('button', { name: '確認封存' }).click()
     await expect(card).toHaveCount(0)
     // 直接開網址仍可進編輯頁，但只能看

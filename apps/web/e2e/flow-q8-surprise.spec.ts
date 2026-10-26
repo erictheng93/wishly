@@ -25,7 +25,7 @@ test('驚喜清單：訪客看到提示，建立者看得到數量但看不到�
     await expect(op.getByText('請先別透露喔')).toHaveCount(0)
     const card = op.locator('li.g-card', { hasText: '拍立得' })
     await expect(card).toContainText('2 / 3')
-    await expect(card).toContainText('建立者不可捐助自己的清單')
+    await expect(card).toContainText('建立者不能送自己清單上的禮物')
     await expect(op.getByText('偷偷送禮人')).toHaveCount(0)
   })
 

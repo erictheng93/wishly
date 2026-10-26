@@ -45,7 +45,7 @@ it('signed-in claim has no nickname/contact/email fields and sends only qty, not
   const request = deferred(); api.mockReturnValue(request.promise)
   const el = claim(null, true, '阿明')
   expect(el.querySelector('#cn, #cc, #ce')).toBeNull()
-  expect(el.textContent).toContain('以 阿明 的身分捐助')
+  expect(el.textContent).toContain('以 阿明 的身分送禮')
   const plus = el.querySelector<HTMLButtonElement>('button[aria-label="增加"]')!
   plus.click(); await nextTick(); plus.click(); await nextTick()
   expect(plus.disabled).toBe(true)

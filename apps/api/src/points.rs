@@ -204,7 +204,7 @@ async fn return_to_allocations(
         return Err(AppError::problem(
             500,
             "INTERNAL_ERROR",
-            "認捐的點數批次分配不足以退回",
+            "贊助的點數批次分配不足以退回",
         ));
     }
     Ok(())

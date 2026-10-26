@@ -1344,7 +1344,7 @@ async fn apply_funding(
             return Err(AppError::problem(
                 409,
                 "FUNDING_MODE_LOCKED",
-                "品項已有捐助或認捐，無法變更募集方式。",
+                "品項已有人認領或贊助，無法變更募集方式。",
             ));
         }
         if mode == "crowdfund" {
@@ -1383,7 +1383,7 @@ async fn apply_funding(
                     return Err(AppError::invalid(
                         "/target_points",
                         "RANGE",
-                        "target_points 必須大於已認捐點數",
+                        "target_points 必須大於已贊助點數",
                     ));
                 }
                 i.target_points = Some(t);
@@ -1496,7 +1496,7 @@ async fn item_update(
         return Err(match cur {
             None => AppError::NotFound,
             Some((u, _)) if exp.is_some_and(|e| e != u) => stale(),
-            _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已捐助數量。"),
+            _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已認領數量。"),
         });
     }
     if changed {
@@ -1560,7 +1560,7 @@ async fn item_delete(
                 return Err(AppError::problem(
                     409,
                     "ITEM_HAS_CLAIMS",
-                    "品項已有進行中的認捐，需帶 force=true 才能刪除。",
+                    "品項已有進行中的贊助，需帶 force=true 才能刪除。",
                 ));
             }
             let ids: Vec<Uuid> = sqlx::query_scalar(
@@ -1592,7 +1592,7 @@ async fn item_delete(
             return Err(AppError::problem(
                 409,
                 "ITEM_HAS_CLAIMS",
-                "品項已有進行中的捐助，需帶 force=true 才能刪除。",
+                "品項已有進行中的認領，需帶 force=true 才能刪除。",
             ));
         }
         // F-09：被取消的捐助逐筆寫 audit、通知有 email 的捐助者（中性內容）

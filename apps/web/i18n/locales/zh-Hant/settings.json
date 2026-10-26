@@ -61,7 +61,7 @@
       "loggedOutN": "已登出 {n} 個其他裝置"
     },
     "social": {
-      "title": "個人頁與捐助",
+      "title": "個人頁與送禮",
       "handle": "帳號代號（個人頁網址，可留空）",
       "handlePh": "例如：amy_wang",
       "handleBadHint": "小寫英文、數字、底線，3–30 字",
@@ -81,7 +81,7 @@
       "birthdayErr": "生日請同時選月和日，或都不選",
       "birthdayVis": "生日誰看得到",
       "onlyMe": "只有自己",
-      "claimVis": "捐助紀錄預設誰看得到"
+      "claimVis": "送禮紀錄預設誰看得到"
     },
     "vis": {
       "public": "公開",
@@ -90,7 +90,7 @@
     },
     "export": {
       "title": "匯出資料",
-      "hint": "包含個人資料、清單與捐助紀錄（JSON）。",
+      "hint": "包含個人資料、清單與送禮紀錄（JSON）。",
       "btn": "匯出我的資料",
       "busy": "匯出中…"
     },
@@ -104,8 +104,8 @@
       "ok": "永久刪除",
       "word": "刪除",
       "prompt": "請輸入「{word}」以確認",
-      "hasPoints": "{detail}（可到「我的點數」撤回認捐）",
-      "hasBalance": "{detail}（餘額 {balance} 點、未完成認捐 {pledged}、未結案訂單 {orders}）請先處理後再刪除。",
+      "hasPoints": "{detail}（可到「我的點數」撤回贊助）",
+      "hasBalance": "{detail}（餘額 {balance} 點、未完成贊助 {pledged}、未結案訂單 {orders}）請先處理後再刪除。",
       "password": "目前密碼",
       "badPassword": "密碼不正確",
       "relogin": "重新登入"

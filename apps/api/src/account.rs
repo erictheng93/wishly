@@ -247,7 +247,7 @@ async fn delete_me(
         "SELECT (SELECT count(*) FROM contributions WHERE user_id = $1 AND status = 'pledged'), (SELECT coalesce(sum(balance), 0)::bigint FROM point_wallets WHERE user_id = $1)")
         .bind(id).fetch_one(&mut *tx).await?;
     if held.0 > 0 || held.1 > 0 {
-        return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {} 筆進行中的認捐、{} 點餘額。請先到錢包撤回認捐，並聯絡客服處理剩餘點數後再刪除帳號。", held.0, held.1)));
+        return Err(AppError::problem(409, "ACCOUNT_HAS_POINTS", format!("帳號還有 {} 筆進行中的贊助、{} 點餘額。請先到錢包撤回贊助，並聯絡客服處理剩餘點數後再刪除帳號。", held.0, held.1)));
     }
     // F17 / F18：未結案的現金退款（被拒會退點回錢包）、拒付欠款、爭議中凍結的錢包，都要先由客服結案，
     // 否則點數或欠款會落在已匿名、無法登入的帳號上。

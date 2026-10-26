@@ -10,7 +10,7 @@ test('捐助者：已購買 → 已送達；連點不出錯；送達後不可取
 
   await page.goto('/me/claims')
   const card = page.locator('.g-item', { hasText: '尿布' })
-  await expect(card.getByText('已捐助')).toBeVisible()
+  await expect(card.getByText('已認領')).toBeVisible()
   // 連點同一按鈕：第二個請求是同一目標狀態，後端冪等回 200，不可出現「不允許的狀態轉換」
   const mark = card.getByRole('button', { name: '標記已購買' })
   const patches: number[] = []
@@ -49,11 +49,11 @@ test('擁有者：進度頁標記已送達、取消他人捐助（需確認）�
   const cancel = async (accept: boolean) => {
     // confirm() 開著時 click 不會結束，所以對話框一出現就處理，再等 click 與處理都完成
     const handled = page.waitForEvent('dialog').then(d => accept ? d.accept() : d.dismiss())
-    await rows.filter({ hasText: '×2' }).getByRole('button', { name: '取消捐助' }).click()
+    await rows.filter({ hasText: '×2' }).getByRole('button', { name: '取消認領' }).click()
     await handled
   }
   await cancel(false)
-  await expect(rows.filter({ hasText: '×2' }).getByText('已捐助')).toBeVisible()
+  await expect(rows.filter({ hasText: '×2' }).getByText('已認領')).toBeVisible()
 
   await cancel(true)
   await expect(rows.filter({ hasText: '×2' }).getByText('已取消')).toBeVisible()
@@ -76,7 +76,7 @@ test('進度頁：SSE 觸發的較早重抓晚到時，不可蓋掉操作後的�
   await loginBrowser(page.context(), owner)
   await page.goto(`/lists/${list.id}/progress`)
   const row = page.locator('article', { hasText: '奶嘴' }).getByRole('listitem')
-  await expect(row.getByText('已捐助')).toBeVisible()
+  await expect(row.getByText('已認領')).toBeVisible()
   await expect(page.getByText('即時更新中')).toBeVisible()
 
   // 下一次 dashboard 請求（SSE 觸發）先拿到當下快照，但延遲 2 秒才交給頁面
@@ -96,7 +96,7 @@ test('進度頁：SSE 觸發的較早重抓晚到時，不可蓋掉操作後的�
   let fresh = 0
   page.on('response', r => { if (r.url().endsWith('/dashboard')) fresh++ })
   const handled = page.waitForEvent('dialog').then(d => d.accept())
-  await row.getByRole('button', { name: '取消捐助' }).click()
+  await row.getByRole('button', { name: '取消認領' }).click()
   await handled
   await expect(row.getByText('已取消')).toBeVisible()
   await expect.poll(() => fresh).toBeGreaterThanOrEqual(2)

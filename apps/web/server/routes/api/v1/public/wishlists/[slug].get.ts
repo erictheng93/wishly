@@ -20,7 +20,7 @@ const LISTS: Record<string, { title: string, description: string, owner: string,
     ],
   },
   gift: {
-    title: 'Mia 的聖誕心願', description: '不知道送什麼的話，看這裡就好，捐助後我會自己標記收到', owner: 'Mia', event_date: '2026-12-25',
+    title: 'Mia 的聖誕心願', description: '不知道送什麼的話，看這裡就好，有人要送的話我會自己標記收到', owner: 'Mia', event_date: '2026-12-25',
     items: [
       q('i1', '羊毛圍巾', 'high', 1, 1, 1200, { spec: '燕麥色' }),
       q('i2', '保溫瓶 500ml', 'medium', 1, 0, 900, { brand: 'Stanley', spec: '霧黑' }),
