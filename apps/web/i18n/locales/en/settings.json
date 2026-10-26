@@ -16,7 +16,7 @@
       "link": "Link {label}",
       "keepOne": "Add another sign-in method before unlinking the current one.",
       "linkEmail": "Link email",
-      "codeSent": "A verification code was sent to {email}",
+      "codeSent": "A verification code was sent to {email}. After resending, use the code from the latest email.",
       "confirmEmail": "Confirm email link",
       "verifying": "Verifying…",
       "resendIn": "Resend in {n}s",

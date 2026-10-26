@@ -16,7 +16,7 @@
       "link": "Liên kết {label}",
       "keepOne": "Hãy thêm một phương thức đăng nhập khác trước khi hủy liên kết phương thức hiện tại.",
       "linkEmail": "Liên kết Email",
-      "codeSent": "Mã xác minh đã được gửi đến {email}",
+      "codeSent": "Mã xác minh đã được gửi đến {email}. Sau khi gửi lại, hãy dùng mã trong email mới nhất.",
       "confirmEmail": "Xác nhận liên kết Email",
       "verifying": "Đang xác minh…",
       "resendIn": "Gửi lại sau {n} giây",
