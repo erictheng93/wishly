@@ -76,6 +76,8 @@ CASES = {
     "item-changed-uk": ("db/migrations/0029_item_change_notice.sql", None, "CREATE UNIQUE INDEX notifications_item_changed_uk", "CREATE INDEX notifications_item_changed_uk", "item_change_notice", "edits_coalesce_into_one_pending_mail_per_active_donor"),
     "activity-on-conflict": (API + "session.rs", None, "ON CONFLICT DO NOTHING", "", "activity_days", "stale_session_with_existing_row_still_advances_last_seen"),
     "activity-not-exists": (API + "session.rs", None, " OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)", "", "activity_days", "fresh_session_but_missing_today_row_reinserts"),
+    "invite-list-allowed-on-conflict": (API + "friends.rs", "invite_accept", "VALUES ($1, $2) ON CONFLICT DO NOTHING", "VALUES ($1, $2)", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),
+    "invite-list-selected-only": (API + "friends.rs", "invite_accept", 'if vis == "selected" {', "if false {", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),
 }
 # Disable exactly one named constraint while retaining valid migration SQL.
 for name, migration, constraint, test in [
@@ -136,6 +138,8 @@ FAILURE_MARKERS.update({
     "item-changed-on-conflict": "item PATCH failed: true",
     "item-changed-uk": "one pending item_changed per donor",
     "activity-on-conflict": "ON CONFLICT DO NOTHING missing: last_seen_at not advanced",
+    "invite-list-allowed-on-conflict": "repeat accept must stay idempotent",
+    "invite-list-selected-only": "accepter must be in allowed users",
     "activity-not-exists": "NOT EXISTS clause missing: today's row not re-inserted",
     "lot-debit-order": "扣點順序必須是 bonus",
     "lot-debit-allocations": "pledge 必須寫入 allocations",

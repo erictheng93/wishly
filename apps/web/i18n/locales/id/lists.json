@@ -109,6 +109,11 @@
       "copied": "Tersalin ✓",
       "copy": "Salin tautan",
       "line": "Kirim lewat LINE",
+      "nativeShare": "Bagikan ke aplikasi lain",
+      "email": "Email",
+      "invite": "Sertakan undangan teman",
+      "invite_friends": "Setelah menerima, mereka menjadi temanmu dan bisa melihat daftar ini. Tautan berlaku 7 hari.",
+      "invite_selected": "Setelah menerima, mereka menjadi temanmu dan otomatis masuk ke daftar teman dekat untuk daftar ini. Berlaku 7 hari dan bisa dipakai banyak orang, jadi kirim hanya ke orang yang kamu mau.",
       "sms": "SMS"
     },
     "progress": {

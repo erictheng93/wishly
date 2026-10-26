@@ -6,6 +6,7 @@
     "removed": "This list has been taken down.",
     "unauthorized": "Your session has expired. Refresh the page and try again; to recover an earlier gift, use the link in your confirmation email.",
     "handleTaken": "This handle is already taken. Try another one.",
+    "LIST_NOT_RESTRICTED": "This list isn't friends-only, so a friend invite can't be attached",
     "selfInvite": "This is your own invite link. Share it with a friend.",
     "loginRequired": "Please sign in to view this list.",
     "friendsOnly": "This list is only open to the owner's friends.",

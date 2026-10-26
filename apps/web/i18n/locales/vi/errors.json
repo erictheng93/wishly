@@ -6,6 +6,7 @@
     "removed": "Danh sách này đã bị gỡ.",
     "unauthorized": "Phiên của bạn đã hết hạn. Hãy tải lại trang rồi thử lại; để tìm lại phần quà đã tặng trước đó, hãy dùng liên kết trong email xác nhận.",
     "handleTaken": "Tên định danh này đã được dùng, hãy thử tên khác.",
+    "LIST_NOT_RESTRICTED": "Danh sách này không giới hạn cho bạn bè nên không thể kèm lời mời kết bạn",
     "selfInvite": "Đây là liên kết mời của chính bạn, hãy chia sẻ cho bạn bè.",
     "loginRequired": "Vui lòng đăng nhập để xem danh sách này.",
     "friendsOnly": "Danh sách này chỉ mở cho bạn bè của chủ sở hữu.",

@@ -8,7 +8,8 @@ use crate::{
     AppState,
 };
 use axum::{
-    extract::{Path, State},
+    body::Bytes,
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
     Json, Router,
@@ -219,48 +220,100 @@ async fn unfriend(
 
 // ---------- 邀請連結 ----------
 
-async fn invite_create(u: CurrentUser, State(st): State<AppState>) -> R<(StatusCode, Json<Value>)> {
+#[derive(Deserialize)]
+struct InviteBody {
+    wishlist_id: Option<Uuid>,
+}
+
+#[derive(Deserialize)]
+struct InviteQ {
+    wishlist_id: Option<Uuid>,
+}
+
+/// body 可省略（舊前端不帶）；有內容才解析
+async fn invite_create(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    body: Bytes,
+) -> R<(StatusCode, Json<Value>)> {
+    let wid = if body.iter().all(u8::is_ascii_whitespace) {
+        None
+    } else {
+        serde_json::from_slice::<InviteBody>(&body)
+            .map_err(|_| AppError::problem(400, "BAD_REQUEST", "body 格式錯誤"))?
+            .wishlist_id
+    };
+    let list = match wid {
+        None => None,
+        Some(w) => {
+            let (slug, title, vis): (String, String, String) = sqlx::query_as("SELECT slug::text, title, visibility::text FROM wishlists WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL")
+                .bind(w).bind(u.id).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
+            if vis != "friends" && vis != "selected" {
+                return Err(AppError::problem(
+                    422,
+                    "LIST_NOT_RESTRICTED",
+                    "只有好友或指定好友可見的清單能附在邀請裡",
+                ));
+            }
+            Some(json!({ "id": w, "slug": slug, "title": title }))
+        }
+    };
     let (token, h) = new_token();
     let mut tx = st.pool.begin().await?;
-    sqlx::query(
-        "UPDATE friend_invites SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
-    )
-    .bind(u.id)
-    .execute(&mut *tx)
-    .await?;
-    let exp: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("INSERT INTO friend_invites (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '7 days') RETURNING expires_at")
-        .bind(u.id).bind(h).fetch_one(&mut *tx).await?;
+    // 一般邀請與每份清單各一條有效邀請，互不撤銷
+    sqlx::query("UPDATE friend_invites SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL AND wishlist_id IS NOT DISTINCT FROM $2")
+        .bind(u.id).bind(wid).execute(&mut *tx).await?;
+    let exp: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("INSERT INTO friend_invites (user_id, token_hash, wishlist_id, expires_at) VALUES ($1, $2, $3, now() + interval '7 days') RETURNING expires_at")
+        .bind(u.id).bind(h).bind(wid).fetch_one(&mut *tx).await?;
     tx.commit().await?;
     Ok((
         StatusCode::CREATED,
         Json(
-            json!({ "token": token, "url": format!("{}/invite/{token}", crate::auth::app_url()), "expires_at": exp }),
+            json!({ "token": token, "url": format!("{}/invite/{token}", crate::auth::app_url()), "expires_at": exp, "wishlist": list }),
         ),
     ))
 }
 
-async fn invite_revoke(u: CurrentUser, State(st): State<AppState>) -> R<StatusCode> {
-    sqlx::query(
-        "UPDATE friend_invites SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
-    )
-    .bind(u.id)
-    .execute(&st.pool)
-    .await?;
+/// 不帶 wishlist_id：撤銷全部有效邀請；帶：只撤銷該清單的
+async fn invite_revoke(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Query(q): Query<InviteQ>,
+) -> R<StatusCode> {
+    sqlx::query("UPDATE friend_invites SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL AND ($2::uuid IS NULL OR wishlist_id = $2)")
+        .bind(u.id).bind(q.wishlist_id).execute(&st.pool).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// 有效邀請 → (邀請者 id, 暱稱, handle)
-async fn find_invite(pool: &PgPool, token: &str) -> R<(Uuid, String, Option<String>)> {
-    sqlx::query_as("SELECT u.id, u.display_name, u.handle FROM friend_invites i JOIN users u ON u.id = i.user_id AND u.deleted_at IS NULL
+/// 有效邀請 → (邀請者 id, 暱稱, handle, 附帶清單 id)
+async fn find_invite(
+    pool: &PgPool,
+    token: &str,
+) -> R<(Uuid, String, Option<String>, Option<Uuid>)> {
+    sqlx::query_as("SELECT u.id, u.display_name, u.handle, i.wishlist_id FROM friend_invites i JOIN users u ON u.id = i.user_id AND u.deleted_at IS NULL
                     WHERE i.token_hash = $1 AND i.revoked_at IS NULL AND i.expires_at > now()")
         .bind(hash_token(token)).fetch_optional(pool).await?.ok_or(AppError::NotFound)
 }
 
+/// 邀請附帶的清單（仍可從邀請進入者）→ (slug, title, visibility)；否則 None，邀請退化成一般好友邀請
+async fn invite_list(
+    pool: impl sqlx::PgExecutor<'_>,
+    wid: Option<Uuid>,
+    inviter: Uuid,
+) -> R<Option<(String, String, String)>> {
+    let Some(wid) = wid else { return Ok(None) };
+    Ok(sqlx::query_as("SELECT slug::text, title, visibility::text FROM wishlists
+                       WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL AND status::text IN ('active', 'closed')
+                         AND moderation_status::text = 'ok' AND visibility::text IN ('friends', 'selected')")
+        .bind(wid).bind(inviter).fetch_optional(pool).await?)
+}
+
 async fn invite_preview(State(st): State<AppState>, Path(token): Path<String>) -> R<Json<Value>> {
-    let (_, n, h) = find_invite(&st.pool, &token).await?;
-    Ok(Json(
-        json!({ "inviter": { "display_name": n, "handle": h } }),
-    ))
+    let (inviter, n, h, wid) = find_invite(&st.pool, &token).await?;
+    let list = invite_list(&st.pool, wid, inviter).await?;
+    Ok(Json(json!({
+        "inviter": { "display_name": n, "handle": h },
+        "wishlist": list.map(|(slug, title, visibility)| json!({ "slug": slug, "title": title, "visibility": visibility })) })))
 }
 
 async fn invite_accept(
@@ -268,15 +321,25 @@ async fn invite_accept(
     State(st): State<AppState>,
     Path(token): Path<String>,
 ) -> R<Json<Value>> {
-    let (inviter, ..) = find_invite(&st.pool, &token).await?;
+    let (inviter, _, _, wid) = find_invite(&st.pool, &token).await?;
     if inviter == u.id {
         return Err(AppError::problem(422, "SELF_INVITE", "不能接受自己的邀請"));
     }
     let mut tx = st.pool.begin().await?;
     befriend(&mut tx, u.id, inviter).await?;
+    let list = invite_list(&mut *tx, wid, inviter).await?;
+    // 產品決定：接受 selected 清單的邀請即自動加入該清單名單
+    if let (Some(w), Some((_, _, vis))) = (wid, &list) {
+        if vis == "selected" {
+            sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(w).bind(u.id).execute(&mut *tx).await?;
+        }
+    }
     let friend = friend_json(&mut tx, u.id, inviter).await?;
     tx.commit().await?;
-    Ok(Json(json!({ "friend": friend })))
+    Ok(Json(
+        json!({ "friend": friend, "wishlist": list.map(|(slug, ..)| json!({ "slug": slug })) }),
+    ))
 }
 
 #[derive(sqlx::FromRow)]
