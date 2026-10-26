@@ -242,7 +242,7 @@ fn reminder_and_expiry_copy() {
             && b.contains("/me/claims"),
         "{b}"
     );
-    for l in [Lang::En, Lang::Vi] {
+    for l in [Lang::En, Lang::Vi, Lang::Id] {
         let (_, b) = render_lang(l, "claim.purchase_reminder", "L", &p);
         assert!(
             b.contains("2026-10-29 12:00") && b.contains("/me/claims"),
@@ -259,10 +259,13 @@ fn reminder_and_expiry_copy() {
     // 清單已結束：沒有人能再認領，不能說「釋出給其他朋友」
     let mut ended = p.clone();
     ended["ended"] = json!(true);
-    for l in [Lang::Zh, Lang::En, Lang::Vi] {
+    for l in [Lang::Zh, Lang::En, Lang::Vi, Lang::Id] {
         let (_, b) = render_lang(l, "claim.expired", "寶寶清單", &ended);
         assert!(
-            !b.contains("其他朋友") && !b.contains("other friends") && !b.contains("bạn bè khác"),
+            !b.contains("其他朋友")
+                && !b.contains("other friends")
+                && !b.contains("bạn bè khác")
+                && !b.contains("teman lain"),
             "{b}"
         );
     }
@@ -557,7 +560,7 @@ fn list_closed_copy() {
     let p = json!({ "item_title": "奶瓶", "expires_at": "2026-10-29T04:00:00Z" });
     let (_, b) = render_lang(Lang::Zh, "claim.list_closed", "寶寶清單", &p);
     assert!(b.contains("清單《寶寶清單》已結束。如果你已經買好或送出了「奶瓶」，請到「我的捐助」標記已購買或已送達；2026-10-29 12:00"), "{b}");
-    for l in [Lang::En, Lang::Vi] {
+    for l in [Lang::En, Lang::Vi, Lang::Id] {
         let (_, b) = render_lang(l, "claim.list_closed", "L", &p);
         assert!(
             b.contains("2026-10-29 12:00") && b.contains("/me/claims"),
@@ -573,7 +576,12 @@ fn reminder_on_ended_list_does_not_offer_extension() {
     let base = json!({ "item": "奶瓶", "expires_at": "2026-11-01T00:00:00Z" });
     let mut ended = base.clone();
     ended["ended"] = json!(true);
-    for lang in [Lang::parse("zh-TW"), Lang::parse("en"), Lang::parse("vi")] {
+    for lang in [
+        Lang::parse("zh-TW"),
+        Lang::parse("en"),
+        Lang::parse("vi"),
+        Lang::parse("id"),
+    ] {
         let (_, open) = render_lang(lang, "claim.purchase_reminder", "清單", &base);
         let (_, closed) = render_lang(lang, "claim.purchase_reminder", "清單", &ended);
         assert!(open.contains('7'), "{open}");

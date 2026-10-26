@@ -1,0 +1,33 @@
+{
+  "common": {
+    "language": "Bahasa",
+    "explore": "Jelajahi",
+    "myClaims": "Klaim saya",
+    "back": "Kembali",
+    "profile": "Profil",
+    "friendRequests": "{n} permintaan pertemanan",
+    "friends": "Teman",
+    "mainMenu": "Menu utama",
+    "myLists": "Wishlist saya",
+    "points": "Poin",
+    "settings": "Pengaturan",
+    "accountMenu": "Menu akun",
+    "admin": "Panel admin",
+    "theme": {
+      "auto": "Otomatis",
+      "light": "Terang",
+      "dark": "Gelap",
+      "label": "Tema: {mode} (klik untuk mengganti)",
+      "title": "Tema: {mode}"
+    },
+    "inspire": "Inspirasi",
+    "brands": "Galeri merek",
+    "sys": {
+      "busy": "Sistem sedang sibuk, beberapa tindakan mungkin gagal. Coba lagi sebentar lagi.",
+      "readOnly": "Sistem sedang dalam pemeliharaan. Saat ini kamu hanya bisa melihat, belum bisa menambah atau mengubah.",
+      "busyTitle": "Sistem sibuk",
+      "busyDesc": "Sedang banyak pengguna. Tunggu beberapa detik lalu muat ulang.",
+      "reload": "Muat ulang"
+    }
+  }
+}

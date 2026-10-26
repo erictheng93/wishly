@@ -3,7 +3,7 @@ export type Count = number | null
 
 export const SUPPRESSED = '<5'
 const t = (k: string) => useNuxtApp().$i18n.t(k)
-const numLocale = () => ({ en: 'en', vi: 'vi' } as Record<string, string>)[useNuxtApp().$i18n.locale.value] ?? 'zh-TW'
+const numLocale = () => ({ en: 'en', vi: 'vi', id: 'id' } as Record<string, string>)[useNuxtApp().$i18n.locale.value] ?? 'zh-TW'
 export const fmtCount = (v: Count | undefined): string => v == null ? SUPPRESSED : v.toLocaleString(numLocale())
 
 /** n/d 的百分比字串；任一為 null/非有限、或分母 ≤ 0 時回「–」。 */

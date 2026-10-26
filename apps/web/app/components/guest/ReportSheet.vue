@@ -28,7 +28,7 @@ onMounted(async () => {
     const ts = await loadTurnstile()
     if (!box.value) return // 載入期間 sheet 已關閉
     wid = ts.render(box.value, {
-      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: ({ 'zh-Hant': 'zh-tw', en: 'en', vi: 'vi' } as Record<string, string>)[String(locale.value)] ?? 'auto',
+      sitekey: siteKey, theme: (document.documentElement.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')), language: ({ 'zh-Hant': 'zh-tw', en: 'en', vi: 'vi', id: 'id' } as Record<string, string>)[String(locale.value)] ?? 'auto',
       callback: (v: string) => { token.value = v; msg.value = '' },
       'expired-callback': () => { token.value = ''; msg.value = t('guest.turnstile.expired') },
       'timeout-callback': () => { token.value = ''; msg.value = t('guest.turnstile.timeout') },

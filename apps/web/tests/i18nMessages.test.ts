@@ -44,3 +44,17 @@ describe('英文單複數', () => {
     expect(t('guest.explore.itemCount', { n: 1 }, { plural: 1, locale: 'vi' })).toBe('1 món')
   })
 })
+
+// #29：後端 detail 只有中文，非中文介面靠 errors.<CODE> 查表；新錯誤碼漏翻就會退回「發生錯誤」
+describe('後端錯誤碼都有文案', () => {
+  const api = fileURLToPath(new URL('../../api/src', import.meta.url))
+  const src = readdirSync(api).filter(f => f.endsWith('.rs')).map(f => readFileSync(join(api, f), 'utf8')).join('\n')
+  const codes = new Set([...src.matchAll(/(?:problem|conflict)\(\s*(?:[^()"]*?,\s*)?"([A-Z][A-Z0-9_]+)"/g)].map(m => m[1]))
+  // apiErrMsg 以專屬 key 或 404 分支處理；DISPUTE_WEBHOOK_NOT_AVAILABLE 只給金流供應商（501）
+  const handled = ['UNAUTHORIZED', 'HANDLE_TAKEN', 'SELF_INVITE', 'NOT_FRIEND', 'RATE_LIMITED', 'NOT_FOUND', 'DISPUTE_WEBHOOK_NOT_AVAILABLE']
+  it.each(readdirSync(root))('%s', (locale) => {
+    const errors = JSON.parse(readFileSync(join(root, locale, 'errors.json'), 'utf8')).errors
+    expect(codes.size).toBeGreaterThan(30)
+    expect([...codes].filter(c => !(c in errors) && !handled.includes(c))).toEqual([])
+  })
+})

@@ -1,0 +1,37 @@
+{
+  "legal": {
+    "terms": {
+      "title": "Ketentuan Layanan",
+      "draft": "Versi: draf (mohon dikonfirmasi bagian hukum sebelum ketentuan resmi diterbitkan)",
+      "s1h": "1. Isi layanan",
+      "s1p": "Wishly adalah platform untuk membuat wishlist, membagikan tautan, dan memungkinkan teman serta keluarga mengklaim barang. Pembelian, pengiriman, dan penyerahan barang antara pengklaim dan pemilik diurus sendiri oleh kedua pihak; platform tidak menangani barang maupun dana.",
+      "s2h": "2. Aturan penggunaan",
+      "s2l1": "Dilarang memposting konten penipuan, tidak pantas, melanggar hak, atau yang membocorkan data pribadi orang lain.",
+      "s2l2": "Dilarang mengklaim secara massal dengan cara otomatis atau mengganggu layanan.",
+      "s2l3": "Jika menemukan konten yang melanggar, gunakan \"Laporkan wishlist ini\" di bagian bawah halaman wishlist; setelah ditinjau secara manual, wishlist dapat diturunkan.",
+      "s3h": "3. Klaim",
+      "s3p": "Melihat tautan yang dibagikan tidak perlu mendaftar, tetapi mengklaim barang mengharuskan masuk sebagai anggota. Satu orang hanya memiliki satu klaim aktif untuk satu barang, dan dapat mengubah jumlah atau membatalkannya kapan saja; klaim yang sudah diterima tidak dapat dibatalkan.",
+      "s4h": "4. Batasan tanggung jawab",
+      "s4p": "Layanan disediakan apa adanya dan kami tidak menjamin layanan tidak akan terganggu. Platform tidak bertanggung jawab memberi ganti rugi atas sengketa yang timbul dari isi wishlist, tautan produk pihak ketiga, atau transaksi kedua pihak, tetapi kami akan membantu menangani konten yang melanggar.",
+      "s5h": "5. Perubahan ketentuan",
+      "s5p": "Perubahan ketentuan akan diumumkan di halaman ini, dan dengan tetap menggunakan layanan, kamu dianggap menyetujuinya."
+    },
+    "privacy": {
+      "title": "Kebijakan Privasi",
+      "draft": "Versi: draf (mohon dikonfirmasi bagian hukum sebelum isi resmi diterbitkan)",
+      "collectH": "Pemberitahuan pengumpulan data pribadi (saat mengklaim)",
+      "c1": "Data yang dikumpulkan: nama panggilan (wajib), kontak (opsional), Email (opsional), pesan (opsional).",
+      "c2": "Tujuan: agar pemilik wishlist tahu siapa yang mengklaim barang apa dan bisa menghubungi kamu; Email dipakai untuk mengirim email konfirmasi klaim dan tautan \"Kelola klaim saya\".",
+      "c3": "Pihak yang dapat melihat: nama panggilan dan kontak hanya terlihat oleh pemilik wishlist; Email tidak ditampilkan kepada pengunjung lain maupun pemilik. Jika pemilik mengaktifkan \"Tampilkan pengklaim\" dan bukan dalam masa kunci kejutan, pengunjung lain dapat melihat nama panggilanmu.",
+      "c4": "Tidak mengisi data ini tidak menghalangi kamu mengklaim, tetapi hanya dengan mengisi Email kamu bisa memulihkan klaim setelah berganti ponsel.",
+      "deviceH": "Penyimpanan di perangkat",
+      "deviceP": "Agar kamu dikenali di \"Klaim saya\", kami menyimpan satu kode pengenal acak (localStorage dan cookie) serta nama panggilan yang terakhir kamu pakai di browsermu. Browser bawaan LINE mungkin menghapus data ini, jadi sebaiknya buka dengan browser default.",
+      "rightsH": "Hakmu",
+      "rightsP": "Kamu bisa mengubah nama panggilan di \"Klaim saya\", atau memilih \"Hapus nama panggilan dan kontak saya\": kami akan menghapus nama panggilan, kontak, dan Email, sedangkan catatan klaim tetap disimpan sebagai \"pengunjung yang dihapus\" agar pemilik bisa mencocokkan catatan. Di bagian bawah email, kamu bisa berhenti berlangganan notifikasi dengan satu klik.",
+      "reportH": "Laporan",
+      "reportP": "Laporan ditinjau secara manual dan identitas pelapor tidak diberitahukan kepada pemilik; untuk mencegah penyalahgunaan, kami memakai Cloudflare Turnstile dan pembatasan laju berdasarkan IP.",
+      "loginH": "Keamanan masuk",
+      "loginP": "Untuk mencegah serangan tebak kata sandi, saat masuk gagal kami mencatat Email dan alamat IP yang dipakai, untuk penguncian sementara dan memicu verifikasi manusia, serta dipakai secara statistik untuk memantau keanehan operasional; catatan disimpan 365 hari lalu dihapus otomatis."
+    }
+  }
+}

@@ -1,7 +1,7 @@
 // P2-A 心願眾籌：純函式（文案對應、時間格式、錯誤歸因、表單轉換），可單元測試
 const T = (k: string, p?: Record<string, any>) => useNuxtApp().$i18n.t(k, p ?? {})
 /** 目前語系對應的 Intl locale（zh-Hant→zh-TW） */
-export const intlLocale = (): string => ({ 'zh-Hant': 'zh-TW', en: 'en', vi: 'vi' } as Record<string, string>)[String(useNuxtApp().$i18n.locale.value)] ?? 'zh-TW'
+export const intlLocale = (): string => ({ 'zh-Hant': 'zh-TW', en: 'en', vi: 'vi', id: 'id' } as Record<string, string>)[String(useNuxtApp().$i18n.locale.value)] ?? 'zh-TW'
 // 文案對照表：值用 getter 延遲到讀取時才翻譯（語系依請求而定，不能在模組載入時求值）；仍是可列舉的一般物件，spread / v-for 可用
 const lazyMap = (prefix: string, keys: string[]): Record<string, string> =>
   Object.defineProperties({}, Object.fromEntries(keys.map(k => [k, { enumerable: true, get: () => T(`${prefix}.${k}`) }])))

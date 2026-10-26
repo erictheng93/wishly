@@ -269,6 +269,7 @@ async fn send_mail(to: String, code: String, subject: String, lang: crate::notif
         Zh => format!("您的驗證碼是 {code}，10 分鐘內有效。若非本人操作請忽略此信。"),
         En => format!("Your verification code is {code}. It is valid for 10 minutes. If this wasn't you, please ignore this email."),
         Vi => format!("Mã xác minh của bạn là {code}, có hiệu lực trong 10 phút. Nếu không phải bạn yêu cầu, vui lòng bỏ qua email này."),
+        Id => format!("Kode verifikasimu adalah {code}, berlaku selama 10 menit. Kalau bukan kamu yang meminta, abaikan saja email ini."),
     };
     let r = crate::notify::send_mail(&crate::config::get(), &to, &subject, &body).await;
     if let Err(e) = r {
@@ -372,6 +373,10 @@ pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
         ("reset", Vi) => "Mã xác minh đặt lại mật khẩu Wishly",
         ("link", Vi) => "Mã xác minh liên kết Email Wishly",
         (_, Vi) => "Mã xác minh đăng nhập Wishly",
+        ("register", Id) => "Kode verifikasi pendaftaran Wishly",
+        ("reset", Id) => "Kode verifikasi atur ulang kata sandi Wishly",
+        ("link", Id) => "Kode verifikasi penautan email Wishly",
+        (_, Id) => "Kode verifikasi masuk Wishly",
     };
     tokio::spawn(send_mail(
         email.to_string(),
@@ -787,11 +792,11 @@ async fn patch_me(
             .await?;
     }
     if let Some(v) = &p.locale {
-        if !["zh-TW", "en", "vi"].contains(&v.as_str()) {
+        if !["zh-TW", "en", "vi", "id"].contains(&v.as_str()) {
             return Err(AppError::invalid(
                 "/locale",
                 "ENUM",
-                "只能是 zh-TW / en / vi",
+                "只能是 zh-TW / en / vi / id",
             ));
         }
         sqlx::query("UPDATE users SET locale=$2 WHERE id=$1")

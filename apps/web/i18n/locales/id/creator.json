@@ -1,0 +1,172 @@
+{
+  "creator": {
+    "confirm": {
+      "cancel": "Batal",
+      "busy": "Memproses…",
+      "ok": "Konfirmasi"
+    },
+    "image": {
+      "typeError": "Gambar hanya JPG, PNG, WebP",
+      "tooBig": "Ukuran gambar maksimal 5 MB",
+      "uploadFail": "Gagal mengunggah",
+      "cover": "Gambar sampul (opsional)",
+      "item": "Gambar (opsional)",
+      "none": "Tanpa gambar",
+      "pick": "Pilih gambar",
+      "uploading": "Mengunggah…",
+      "done": "Sudah diunggah, gambar baru tampil publik setelah selesai diproses",
+      "retry": "Unggah ulang",
+      "hint": "Hanya JPG, PNG, WebP, maksimal 5 MB. Setelah diunggah, info tersembunyi seperti lokasi (EXIF) akan dihapus; jangan unggah foto yang berisi data pribadi."
+    },
+    "itemSheet": {
+      "titleEdit": "Edit barang",
+      "titleNew": "Tambah barang",
+      "name": "Nama (wajib)",
+      "namePh": "Contoh: botol susu",
+      "brand": "Merek (opsional)",
+      "spec": "Spesifikasi (opsional)",
+      "url": "URL produk (opsional)",
+      "mode": "Cara mendapatkan",
+      "modeQty": "Klaim per jumlah",
+      "modeCrowd": "Patungan",
+      "modeLocked": "Sudah ada yang mengklaim atau menyumbang, cara mendapatkan tidak bisa diganti.",
+      "targetPoints": "Target poin (wajib, 1 poin = NT$1)",
+      "raisedSuffix": "(terkumpul {n})",
+      "deadline": "Batas penggalangan (waktu Taipei, opsional)",
+      "deadlineHint": "Jika dikosongkan, dipakai hari acara pukul 23:59; wajib diisi jika wishlist tidak punya hari acara.",
+      "refPrice": "Harga referensi produk NT$ (opsional)",
+      "crowdNote": "Setelah target tercapai, platform membelikan dan mengirimkannya; poin tidak diubah menjadi uang tunai untukmu. Alamat pengiriman wishlist harus diisi dulu.",
+      "fundLocked": "Target sudah tercapai atau sudah ditutup, target dan batas waktu tidak bisa diubah.",
+      "qty": "Jumlah dibutuhkan",
+      "claimedSuffix": "(sudah diklaim {n})",
+      "unitPrice": "Harga referensi NT$ (opsional)",
+      "priority": "Prioritas",
+      "high": "Tinggi",
+      "medium": "Sedang",
+      "low": "Rendah",
+      "cancel": "Batal",
+      "save": "Simpan barang",
+      "saving": "Menyimpan…",
+      "reload": "Muat ulang",
+      "fillAddress": "Isi alamat pengiriman",
+      "errName": "Masukkan nama barang",
+      "errTarget": "Masukkan target poin (bilangan bulat positif)",
+      "errStale": "Barang ini sudah diubah di tempat lain, muat ulang",
+      "errAddr": "Barang patungan perlu alamat pengiriman dulu, supaya platform tahu mengirim ke mana setelah target tercapai."
+    },
+    "otp": {
+      "group": "Kode verifikasi 6 digit",
+      "cell": "Digit ke-{n}"
+    },
+    "password": {
+      "show": "Tampilkan",
+      "hide": "Sembunyikan"
+    },
+    "qr": {
+      "label": "QR code tautan berbagi",
+      "download": "Unduh QR"
+    },
+    "shipping": {
+      "intro": "Setelah patungan mencapai target, platform membelikan dan mengirim ke sini. Hanya kamu dan staf operasional yang memesan yang bisa melihatnya; teman tidak akan pernah melihatnya.",
+      "recipient": "Penerima",
+      "phone": "Telepon",
+      "address": "Alamat",
+      "empty": "Belum diisi. Wishlist yang berisi barang patungan harus mengisinya dulu sebelum dipublikasikan.",
+      "recipientLabel": "Penerima (1–50 karakter)",
+      "phoneLabel": "Telepon (6–20 digit, boleh berisi + - dan spasi)",
+      "addressLabel": "Alamat (5–200 karakter)",
+      "privacy": "Untuk melindungi privasi, isi lengkap harus dimasukkan ulang saat mengubah.",
+      "saved": "Tersimpan",
+      "saving": "Menyimpan…",
+      "update": "Perbarui alamat pengiriman",
+      "save": "Simpan alamat pengiriman"
+    },
+    "status": {
+      "draft": "Draf",
+      "active": "Berjalan",
+      "closed": "Berakhir",
+      "archived": "Diarsipkan",
+      "hidden": "Diturunkan",
+      "ok": "Normal",
+      "pending": "Gambar diproses",
+      "ready": "Gambar siap",
+      "rejected": "Gambar ditolak",
+      "reserved": "Diklaim",
+      "purchased": "Sudah dibeli",
+      "delivered": "Sudah diterima",
+      "cancelled": "Dibatalkan",
+      "open": "Menunggu",
+      "actioned": "Sudah ditangani",
+      "dismissed": "Ditolak"
+    },
+    "vis": {
+      "public": {
+        "label": "Publik",
+        "desc": "Siapa pun bisa melihat (termasuk tamu), tampil di halaman jelajah dan halaman profilmu."
+      },
+      "friends": {
+        "label": "Semua teman",
+        "desc": "Hanya temanmu yang bisa membuka, mereka perlu masuk."
+      },
+      "selected": {
+        "label": "Teman dekat",
+        "desc": "Hanya teman dekat yang kamu pilih dari daftar teman yang bisa membuka, mereka perlu masuk."
+      },
+      "private": {
+        "label": "Pribadi",
+        "desc": "Hanya kamu yang bisa melihat, jika teman membukanya akan tampil tidak ditemukan."
+      },
+      "who": "Siapa yang boleh melihat wishlist ini",
+      "pickTitle": "Pilih teman dekat ({n} dipilih)",
+      "loading": "Memuat teman…",
+      "noFriendsPre": "Belum ada teman. Buka ",
+      "noFriendsPost": " untuk mengundang teman, lalu kembali dan pilih."
+    },
+    "analytics": {
+      "funnel": {
+        "signed_up": "Daftar",
+        "created_list": "Buat wishlist",
+        "published_list": "Publikasikan wishlist",
+        "received_claim": "Menerima klaim"
+      },
+      "retention": {
+        "d1": "Retensi hari berikutnya (hari ke-1)",
+        "d7": "Hari ke-7–13",
+        "d30": "Hari ke-30–59"
+      },
+      "claimStatus": {
+        "reserved": "Diklaim",
+        "purchased": "Sudah dibeli",
+        "delivered": "Sudah diterima",
+        "cancelled": "Dibatalkan",
+        "expired": "Kedaluwarsa"
+      },
+      "actor": {
+        "guest": "Tamu",
+        "user": "Anggota"
+      },
+      "reason": {
+        "scam": "Diduga penipuan",
+        "inappropriate": "Konten tidak pantas",
+        "copyright": "Pelanggaran hak cipta",
+        "personal_info": "Kebocoran data pribadi",
+        "other": "Lainnya"
+      },
+      "wishlistType": {
+        "personal": "Wishlist",
+        "registry": "Registri hadiah (tipe lama)",
+        "relief": "Bantuan"
+      },
+      "wishlistVisibility": {
+        "link": "Tautan",
+        "private": "Pribadi",
+        "public": "Publik"
+      },
+      "shareLevel": {
+        "public": "Publik",
+        "friends": "Teman",
+        "private": "Pribadi"
+      }
+    }
+  }
+}
