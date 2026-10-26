@@ -6,6 +6,7 @@
     "removed": "Wishlist ini sudah diturunkan",
     "unauthorized": "Identitasmu sudah tidak berlaku, muat ulang halaman lalu coba lagi; untuk menemukan hadiah yang dulu kamu klaim, pakai tautan di email konfirmasi",
     "handleTaken": "ID akun ini sudah dipakai, coba yang lain",
+    "LIST_NOT_RESTRICTED": "Daftar ini bukan khusus teman, jadi undangan teman tidak bisa disertakan",
     "selfInvite": "Ini tautan undanganmu sendiri, bagikan ke temanmu",
     "loginRequired": "Masuk dulu untuk melihat wishlist ini",
     "friendsOnly": "Wishlist ini hanya terbuka untuk teman pemilik",

@@ -11,6 +11,7 @@ const loading = ref(true), err = ref(''), msg = ref(''), stale = ref(false)
 const sheet = ref(false), editing = ref<any>(null), prefill = ref<ItemPrefill>({})
 const del = ref<any>(null), delBusy = ref(false), delErr = ref('')
 const pubBusy = ref(false), pubErrs = ref<string[]>([])
+const canNativeShare = ref(false), invite = ref<any>(null), inviteOn = ref(false), inviteBusy = ref(false), inviteErr = ref('')
 const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
@@ -33,6 +34,7 @@ async function load(quiet = false) {
   if (items.value.some(i => i.image_status === 'pending')) poll = setTimeout(() => load(true), 4000) // 圖片處理中輪詢
 }
 onMounted(async () => {
+  canNativeShare.value = typeof navigator !== 'undefined' && !!navigator.share
   await load()
   // 靈感頁連結帶 ?add=1 開啟新增；開完即清掉 query，重整/返回不再重開
   if (!route.query.add || !w.value) return // 載入失敗時保留 query，重整可再試
@@ -44,8 +46,8 @@ onBeforeUnmount(() => clearTimeout(poll))
 const hidden = computed(() => w.value?.moderation_status === 'hidden')
 const shareUrl = computed(() => {
   if (!w.value) return ''
-  const u = w.value.share_url || `${siteOrigin()}/s/${w.value.slug}`
-  return external.value ? u + '?openExternalBrowser=1' : u
+  const u = (inviteOn.value && invite.value?.url) || w.value.share_url || `${siteOrigin()}/s/${w.value.slug}`
+  return external.value ? u + (u.includes('?') ? '&' : '?') + 'openExternalBrowser=1' : u
 })
 function openItem(i: any = null, p: ItemPrefill = {}) { editing.value = i; prefill.value = p; sheet.value = true }
 async function saved() { sheet.value = false; await load(true) }
@@ -101,7 +103,25 @@ async function copy() {
   try { await copyText(shareUrl.value); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
   catch { (document.getElementById('c-share-input') as HTMLInputElement)?.select() }
 }
-const lineHref = computed(() => `https://line.me/R/share?text=${encodeURIComponent(`${w.value?.title ?? ''} ${shareUrl.value}`)}`)
+const canInvite = computed(() => ['friends', 'selected'].includes(w.value?.visibility) && w.value?.status !== 'draft')
+// 可見度變更 → 舊邀請作廢（後端也會依清單撤銷），重置開關與快取
+watch(() => w.value?.visibility, () => { invite.value = null; inviteOn.value = false; inviteErr.value = '' })
+async function toggleInvite() {
+  inviteErr.value = ''
+  if (!inviteOn.value || invite.value) return // 已有快取就不再建新權杖
+  inviteBusy.value = true
+  try { invite.value = await api('/friends/invites', { method: 'POST', body: { wishlist_id: id } }) }
+  catch (e) { inviteOn.value = false; inviteErr.value = errMsg(e) } finally { inviteBusy.value = false }
+}
+const shareText = computed(() => `${w.value?.title ?? ''} ${shareUrl.value}`)
+async function nativeShare() {
+  try { await navigator.share({ title: w.value?.title ?? '', text: w.value?.title ?? '', url: shareUrl.value }) }
+  catch (e: any) { if (e?.name !== 'AbortError') await copy() }
+}
+const mailHref = computed(() => `mailto:?subject=${encodeURIComponent(w.value?.title ?? '')}&body=${encodeURIComponent(shareText.value)}`)
+const waHref = computed(() => `https://wa.me/?text=${encodeURIComponent(shareText.value)}`)
+const threadsHref = computed(() => `https://www.threads.net/intent/post?text=${encodeURIComponent(shareText.value)}`)
+const lineHref = computed(() => `https://line.me/R/share?text=${encodeURIComponent(shareText.value)}`)
 const prio = (p: string) => ['high', 'medium', 'low'].includes(p) ? t(`lists.edit.pri.${p}`) : ''
 const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value.status))
 </script>
@@ -186,10 +206,19 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <p class="c-mute">{{ visDesc(w?.visibility) }}</p>
       <input id="c-share-input" class="c-input c-mb" :value="shareUrl" readonly @focus="($event.target as HTMLInputElement).select()">
       <label class="c-switch"><input v-model="external" type="checkbox"><span>{{ $t('lists.edit.external') }}</span></label>
+      <template v-if="canInvite">
+        <label class="c-switch"><input v-model="inviteOn" type="checkbox" :disabled="inviteBusy" @change="toggleInvite"><span>{{ $t('lists.edit.invite') }}</span></label>
+        <p class="c-mute">{{ $t(`lists.edit.invite_${w.visibility}`) }}</p>
+        <p v-if="inviteErr" class="c-err" role="alert">{{ inviteErr }}</p>
+      </template>
       <div class="c-row wrap">
+        <button v-if="canNativeShare" class="c-btn primary c-grow" @click="nativeShare">{{ $t('lists.edit.nativeShare') }}</button>
         <button class="c-btn c-grow" @click="copy">{{ copied ? $t('lists.edit.copied') : $t('lists.edit.copy') }}</button>
         <a class="c-btn c-grow" :href="lineHref" target="_blank" rel="noopener">{{ $t('lists.edit.line') }}</a>
         <a class="c-btn c-grow" :href="`sms:?&body=${encodeURIComponent(shareUrl)}`">{{ $t('lists.edit.sms') }}</a>
+        <a class="c-btn c-grow" :href="mailHref">{{ $t('lists.edit.email') }}</a>
+        <a class="c-btn c-grow" :href="waHref" target="_blank" rel="noopener">WhatsApp</a>
+        <a class="c-btn c-grow" :href="threadsHref" target="_blank" rel="noopener">Threads</a>
         <a class="c-btn c-grow" :href="`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`" target="_blank" rel="noopener">Facebook</a>
       </div>
       <CreatorQr :text="shareUrl" :size="180" />

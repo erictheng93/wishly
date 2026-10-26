@@ -6,6 +6,7 @@
     "removed": "這份清單已被下架",
     "unauthorized": "你的身分已失效，請重新整理頁面後再試；若要找回之前的送禮，請用確認信中的連結",
     "handleTaken": "這個帳號代號已被使用，換一個試試",
+    "LIST_NOT_RESTRICTED": "這份清單不是好友限定，無法附上好友邀請",
     "selfInvite": "這是你自己的邀請連結，請分享給朋友",
     "loginRequired": "請先登入才能查看這份清單",
     "friendsOnly": "這份清單只開放給擁有者的好友",

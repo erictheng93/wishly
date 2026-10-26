@@ -109,6 +109,11 @@
       "copied": "Đã sao chép ✓",
       "copy": "Sao chép liên kết",
       "line": "Gửi qua LINE",
+      "nativeShare": "Chia sẻ qua ứng dụng khác",
+      "email": "Email",
+      "invite": "Kèm lời mời kết bạn",
+      "invite_friends": "Khi họ chấp nhận, họ sẽ thành bạn của bạn và xem được danh sách này. Liên kết có hiệu lực 7 ngày.",
+      "invite_selected": "Khi họ chấp nhận, họ sẽ thành bạn của bạn và được tự động thêm vào danh sách bạn thân của danh sách này. Có hiệu lực 7 ngày, nhiều người dùng được, chỉ gửi cho người bạn muốn chia sẻ.",
       "sms": "Tin nhắn SMS"
     },
     "progress": {

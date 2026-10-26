@@ -1651,7 +1651,7 @@ sequenceDiagram
 </pre>
 <table class="meta"><tbody>
 <tr><td>前置條件</td><td>雙方皆為登入使用者（<code>ws_session</code>）。申請的 <code>to</code> 可為 Email、@handle 或使用者 ID（流程驗證 Q9：好友限定清單門檻頁以 403 回應中的 <code>owner.id</code> 直接送出邀請；不提供以名字搜尋使用者，避免名單被列舉）。邀請預覽 <code>GET /friends/invites/{token}</code> 為公開端點，只回邀請者 display_name 與 handle。</td></tr>
-<tr><td>規則</td><td><code>friendships</code> 一列一對且 <code>user_a &lt; user_b</code>；同一時間每位使用者只有一條有效邀請連結（重新產生即作廢舊的），預設 7 天有效、可多人重複使用至過期或撤銷；邀請連結 token 只存 SHA-256。接受申請者必須是收件者。解除好友為任一方可做，且<b>雙方清單的指定名單（wishlist_allowed_users）中彼此都會一併移除</b>。</td></tr>
+<tr><td>規則</td><td><code>friendships</code> 一列一對且 <code>user_a &lt; user_b</code>；同一時間每位使用者有一條一般邀請連結，另可為每份 friends / selected 清單各有一條附清單的邀請（重新產生同類型即作廢舊的，互不影響；接受 selected 清單的邀請會自動加入該清單的指定名單），預設 7 天有效、可多人重複使用至過期或撤銷；邀請連結 token 只存 SHA-256。接受申請者必須是收件者。解除好友為任一方可做，且<b>雙方清單的指定名單（wishlist_allowed_users）中彼此都會一併移除</b>。</td></tr>
 <tr><td>API</td><td><code>GET /friends</code>、<code>POST /friends/requests</code>、<code>POST /friends/requests/{id}/accept</code>、<code>DELETE /friends/requests/{id}</code>（收件者婉拒或發送者取消）、<code>DELETE /friends/{user_id}</code>、<code>POST /friends/invites</code>、<code>DELETE /friends/invites</code>、<code>GET /friends/invites/{token}</code>、<code>POST /friends/invites/{token}/accept</code></td></tr>
 <tr><td>交易邊界</td><td>成為好友（<code>befriend</code>）：INSERT friendships ON CONFLICT DO NOTHING 與清除雙向待處理申請在同一交易，冪等；解除好友與清除指定名單在同一交易。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>VALIDATION_FAILED</code> 422（to 為空或超過 200 字）；<code>SELF_INVITE</code> 422；<code>NOT_FOUND</code> 404（申請 / 邀請不存在、非收件者）；<code>RATE_LIMITED</code> 429；<code>UNAUTHORIZED</code> 401。</td></tr>

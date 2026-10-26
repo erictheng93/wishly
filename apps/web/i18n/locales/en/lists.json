@@ -109,6 +109,11 @@
       "copied": "Copied ✓",
       "copy": "Copy link",
       "line": "Send via LINE",
+      "nativeShare": "Share to other apps",
+      "email": "Email",
+      "invite": "Attach a friend invite",
+      "invite_friends": "Once they accept, they become your friend and can see this list. The link is valid for 7 days.",
+      "invite_selected": "Once they accept, they become your friend and are added to this list's close-friends list. Valid for 7 days and usable by multiple people, so only send it to people you want to share with.",
       "sms": "SMS"
     },
     "progress": {
