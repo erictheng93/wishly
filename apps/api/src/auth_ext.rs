@@ -404,12 +404,12 @@ async fn reset_request(
     let email = norm_email(&r.email)?;
     crate::auth::otp_gate(&st.pool, "reset", &email, &ip, r.turnstile_token.as_deref()).await?;
     let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 AND deleted_at IS NULL)",
+        "SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 AND deleted_at IS NULL AND blocked_at IS NULL)",
     )
     .bind(&email)
     .fetch_one(&st.pool)
     .await?;
-    // 帳號不存在或被限流時回隨機 id，回應形狀不變，維持不洩漏帳號
+    // 帳號不存在、已停權或被限流時回隨機 id，回應形狀不變，維持不洩漏帳號
     let mut id = uuid::Uuid::new_v4();
     if exists {
         match issue_otp(&st.pool, &email, "reset", None, None).await {
