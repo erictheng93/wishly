@@ -156,7 +156,7 @@ BEGIN
       RAISE EXCEPTION '組織未通過審核' USING ERRCODE = 'check_violation';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM org_permits WHERE id = NEW.permit_id AND org_id = NEW.org_id
-                   AND status = 'approved' AND current_date BETWEEN valid_from AND valid_to) THEN
+                   AND status = 'approved' AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN valid_from AND valid_to) THEN
       RAISE EXCEPTION '許可未核准或已過期' USING ERRCODE = 'check_violation';
     END IF;
   END IF;

@@ -469,7 +469,7 @@ pub async fn org(pool: &PgPool, owner: Uuid, status: &str) -> Uuid {
 }
 pub async fn permit(pool: &PgPool, org: Uuid, status: &str, valid_to_offset_days: i32) -> Uuid {
     sqlx::query_scalar("INSERT INTO org_permits(org_id,permit_no,valid_from,valid_to,status)
-        VALUES($1,'P-1',current_date-60,current_date+$2,$3) RETURNING id")
+        VALUES($1,'P-1',(now() AT TIME ZONE 'Asia/Taipei')::date-60,(now() AT TIME ZONE 'Asia/Taipei')::date+$2,$3) RETURNING id")
         .bind(org).bind(valid_to_offset_days).bind(status).fetch_one(pool).await.unwrap()
 }
 pub async fn member(pool: &PgPool, org: Uuid, user: Uuid, role: &str) {

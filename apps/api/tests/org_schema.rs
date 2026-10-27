@@ -30,7 +30,8 @@ async fn relief_must_be_public(pool: PgPool) {
     let o = common::org(&pool, u, "verified").await;
     let p = common::permit(&pool, o, "approved", 30).await;
     let (e, _) = common::event(&pool, o).await;
-    assert!(raw_site(&pool, u, "friends", Some(o), Some(e), Some(p), Some("x"), Some("active")).await.is_err());
+    let err = raw_site(&pool, u, "friends", Some(o), Some(e), Some(p), Some("x"), Some("active")).await.unwrap_err();
+    assert_eq!(err.as_database_error().unwrap().constraint(), Some("wishlists_relief_public"));
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -140,4 +141,45 @@ async fn can_manage_wishlist_matrix(pool: PgPool) {
     assert!(!can(creator, Some(o), vol).await);
     assert!(!can(creator, Some(o), off).await);
     assert!(!can(creator, Some(o), creator).await);
+}
+
+/// 觸發器擋下（check_violation、無 constraint 名稱），而非 CHECK 約束
+fn trigger_rejected(r: Result<impl Sized, sqlx::Error>) {
+    let err = r.err().expect("trigger must reject");
+    let db = err.as_database_error().expect("database error");
+    assert_eq!(db.code().as_deref(), Some("23514"));
+    assert_eq!(db.constraint(), None);
+}
+
+async fn insert_active(pool: &PgPool, u: Uuid, o: Uuid, e: Uuid, p: Uuid) -> Result<Uuid, sqlx::Error> {
+    sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title,visibility,org_id,event_id,permit_id,site_address,site_status)
+        VALUES($1,'relief','active',$2,'據點','public',$3,$4,$5,'x','active') RETURNING id")
+        .bind(u).bind(&Uuid::new_v4().simple().to_string()[..10]).bind(o).bind(e).bind(p).fetch_one(pool).await
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn relief_insert_active_checked_by_trigger(pool: PgPool) {
+    let u = common::user(&pool, "A").await.id;
+    let pending = common::org(&pool, u, "pending").await;
+    let pp = common::permit(&pool, pending, "approved", 30).await;
+    let (pe, _) = common::event(&pool, pending).await;
+    trigger_rejected(insert_active(&pool, u, pending, pe, pp).await);
+
+    let u2 = common::user(&pool, "B").await.id;
+    let ok = common::org(&pool, u2, "verified").await;
+    let expired = common::permit(&pool, ok, "approved", -1).await;
+    let (oe, _) = common::event(&pool, ok).await;
+    trigger_rejected(insert_active(&pool, u2, ok, oe, expired).await);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn relief_permit_swap_to_expired_rejected(pool: PgPool) {
+    let u = common::user(&pool, "A").await.id;
+    let o = common::org(&pool, u, "verified").await;
+    let good = common::permit(&pool, o, "approved", 30).await;
+    let expired = common::permit(&pool, o, "approved", -1).await;
+    let (e, _) = common::event(&pool, o).await;
+    let s = common::site(&pool, o, u, e, good, "active").await;
+    let r = sqlx::query("UPDATE wishlists SET permit_id=$1 WHERE id=$2").bind(expired).bind(s.id).execute(&pool).await;
+    trigger_rejected(r);
 }
