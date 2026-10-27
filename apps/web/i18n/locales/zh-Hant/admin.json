@@ -374,6 +374,7 @@
       },
       "amount": "欠款",
       "pts": "{pts} 點",
+      "recovered": "已抵銷",
       "topup": "儲值單",
       "createdAt": "建立時間",
       "resolvedAt": "結案時間",

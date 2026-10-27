@@ -89,6 +89,7 @@
     "UPSTREAM_ERROR": "An external service is temporarily unavailable. Please try again later.",
     "VALIDATION_FAILED": "Please check your input and try again.",
     "WALLET_CAP_EXCEEDED": "This top-up would exceed the wallet balance limit. Please reduce the amount.",
+    "WALLET_DEBT_OPEN": "This wallet still has an open chargeback debt. Resolve it before unfreezing.",
     "WALLET_FROZEN": "Your wallet is frozen. Please contact support.",
     "WISHLIST_CLOSED": "This list is closed or archived. This action is no longer available.",
     "WISHLIST_NOT_PUBLISHABLE": "Complete the required list details before publishing.",

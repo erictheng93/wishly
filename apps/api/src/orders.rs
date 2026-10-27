@@ -533,6 +533,21 @@ async fn set_wallet_status(
             .fetch_optional(&mut *tx)
             .await?
             .ok_or(AppError::NotFound)?;
+    // 拒付欠款未結清就解凍，欠款期間撤回的認捐點數會退回可退現金批次而形成獲利
+    if to == "active"
+        && sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT 1 FROM wallet_debts WHERE wallet_id = $1 AND status = 'open')",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?
+    {
+        return Err(AppError::problem(
+            409,
+            "WALLET_DEBT_OPEN",
+            "錢包仍有未結清的拒付欠款，請先結清或註銷",
+        ));
+    }
     let w: WalletRow = sqlx::query_as("UPDATE point_wallets SET status = $2::wallet_status WHERE id = $1 RETURNING id, user_id, balance, status::text AS status")
         .bind(id).bind(to).fetch_one(&mut *tx).await?;
     audit(

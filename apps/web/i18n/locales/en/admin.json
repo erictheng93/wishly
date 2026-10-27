@@ -374,6 +374,7 @@
       },
       "amount": "Debt",
       "pts": "{pts} points",
+      "recovered": "Offset",
       "topup": "Top-up",
       "createdAt": "Created at",
       "resolvedAt": "Resolved at",

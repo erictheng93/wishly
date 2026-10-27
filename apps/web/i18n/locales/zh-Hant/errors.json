@@ -89,6 +89,7 @@
     "UPSTREAM_ERROR": "外部服務暫時無法使用，請稍後再試",
     "VALIDATION_FAILED": "請檢查輸入內容後再試",
     "WALLET_CAP_EXCEEDED": "儲值後餘額將超過上限，請減少金額",
+    "WALLET_DEBT_OPEN": "錢包仍有未結清的拒付欠款，請先結案再解凍",
     "WALLET_FROZEN": "錢包已凍結，請聯絡客服",
     "WISHLIST_CLOSED": "清單已結束或封存，無法執行此操作",
     "WISHLIST_NOT_PUBLISHABLE": "清單尚有未完成的必填內容，請補齊後再發布",

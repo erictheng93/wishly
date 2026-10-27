@@ -58,6 +58,7 @@ async function submit() {
       <div class="c-mute">{{ d.user?.email }}</div>
       <dl class="c-dl">
         <dt>{{ $t('admin.walletDebts.amount') }}</dt><dd>{{ $t('admin.walletDebts.pts', { pts: fmtPts(d.amount) }) }}</dd>
+        <template v-if="d.recovered_points"><dt>{{ $t('admin.walletDebts.recovered') }}</dt><dd>{{ $t('admin.walletDebts.pts', { pts: fmtPts(d.recovered_points) }) }}</dd></template>
         <dt>{{ $t('admin.walletDebts.topup') }}</dt><dd><code>{{ d.topup_id }}</code></dd>
         <dt>{{ $t('admin.walletDebts.createdAt') }}</dt><dd>{{ fmtTime(d.created_at) }}</dd>
         <template v-if="d.resolved_at"><dt>{{ $t('admin.walletDebts.resolvedAt') }}</dt><dd>{{ fmtTime(d.resolved_at) }}</dd></template>

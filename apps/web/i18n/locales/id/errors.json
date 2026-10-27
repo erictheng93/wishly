@@ -89,6 +89,7 @@
     "UPSTREAM_ERROR": "Layanan eksternal sedang tidak tersedia, coba lagi nanti",
     "VALIDATION_FAILED": "Periksa isian lalu coba lagi",
     "WALLET_CAP_EXCEEDED": "Saldo setelah top up akan melebihi batas, kurangi jumlah",
+    "WALLET_DEBT_OPEN": "Dompet masih memiliki utang chargeback yang belum diselesaikan. Selesaikan sebelum membuka pembekuan.",
     "WALLET_FROZEN": "Dompet dibekukan, hubungi layanan pelanggan",
     "WISHLIST_CLOSED": "Wishlist sudah berakhir atau diarsipkan, tindakan ini tidak bisa dilakukan",
     "WISHLIST_NOT_PUBLISHABLE": "Wishlist masih punya isian wajib yang belum lengkap, lengkapi dulu sebelum dipublikasikan",

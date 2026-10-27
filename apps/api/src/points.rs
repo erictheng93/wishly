@@ -88,7 +88,7 @@ pub async fn post(
     };
     match (delta > 0, e.kind) {
         (true, "release" | "refund") => {
-            return_to_allocations(tx, wallet_id, delta, after, &e).await?
+            return return_to_allocations(tx, wallet_id, delta, after, &e).await;
         }
         (true, kind) => {
             let (source, refundable) = if kind == "topup" {
@@ -177,7 +177,7 @@ async fn return_to_allocations(
     delta: i64,
     after: i64,
     e: &Entry<'_>,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let allocs: Vec<(Uuid, i64)> = sqlx::query_as(
         "SELECT a.lot_id, a.points - a.refunded_points FROM contribution_lot_allocations a JOIN point_lots l ON l.id = a.lot_id
           WHERE a.contribution_id = $1 AND a.points > a.refunded_points
@@ -198,6 +198,7 @@ async fn return_to_allocations(
             .await?;
         running += take;
         ledger(tx, wallet_id, lot, take, running, e).await?;
+        running = offset_charged_back(tx, wallet_id, lot, take, running).await?;
         left -= take;
     }
     if left > 0 {
@@ -207,7 +208,53 @@ async fn return_to_allocations(
             "贊助的點數批次分配不足以退回",
         ));
     }
-    Ok(())
+    Ok(running)
+}
+
+/// 退回批次 `lot` 的 `take` 點（已入帳）後呼叫：若該批次是已拒付 topup 的，且欠款未結清（open / written_off），
+/// 這些點數拒付時已算進欠款，不可復活——改記為抵銷欠款（recovered_points += take），並把點數再扣出批次與錢包，回傳新的 running。
+/// 欠款已 settled（使用者已用現金還清）則不動，點數正常歸使用者。
+/// 單一 UPDATE 判斷並抵銷，不與 debt_patch 競態；抵銷超過 amount 會觸發 CHECK 整筆 rollback（不變式守衛）。
+/// 鎖序：呼叫端已持有錢包列鎖 → wallet_debts 列；debt_patch 只動欠款列、charge_back 是 topups → 錢包 → 欠款，無環。
+async fn offset_charged_back(
+    tx: &mut Tx<'_>,
+    wallet_id: Uuid,
+    lot: Uuid,
+    take: i64,
+    running: i64,
+) -> Result<i64, AppError> {
+    let debt: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE wallet_debts d SET recovered_points = d.recovered_points + $2,
+                status = CASE WHEN d.status = 'open' AND d.recovered_points + $2 = d.amount THEN 'settled'::wallet_debt_status ELSE d.status END,
+                resolved_at = CASE WHEN d.status = 'open' AND d.recovered_points + $2 = d.amount THEN now() ELSE d.resolved_at END,
+                note = CASE WHEN d.status = 'open' AND d.recovered_points + $2 = d.amount THEN coalesce(d.note, '退回點數已全數抵銷') ELSE d.note END
+          FROM point_lots l JOIN topups t ON t.id = l.source_ref_id
+          WHERE l.id = $1 AND l.source = 'topup' AND t.status = 'charged_back' AND d.topup_id = t.id AND d.status IN ('open', 'written_off')
+          RETURNING d.id")
+        .bind(lot).bind(take).fetch_optional(&mut **tx).await?;
+    let Some(debt) = debt else {
+        return Ok(running);
+    };
+    sqlx::query("UPDATE point_lots SET remaining_points = remaining_points - $2 WHERE id = $1")
+        .bind(lot)
+        .bind(take)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("UPDATE point_wallets SET balance = balance - $2 WHERE id = $1")
+        .bind(wallet_id)
+        .bind(take)
+        .execute(&mut **tx)
+        .await?;
+    let running = running - take;
+    let e = Entry {
+        kind: "adjustment",
+        ref_type: "wallet_debt", // 不落在 point_ledger_topup_uk / ref_uk 的部分唯一索引內，同一欠款可多次抵銷
+        ref_id: Some(debt),
+        note: Some("信用卡拒付：退回點數抵銷欠款"),
+        actor: None,
+    };
+    ledger(tx, wallet_id, lot, -take, running, &e).await?;
+    Ok(running)
 }
 
 /// 現金退款申請扣點（4.3h）：只從 cash_refundable 批次先進先出扣；呼叫端須已持有錢包列鎖並檢查未凍結。
@@ -300,8 +347,9 @@ pub async fn cash_refund_restore(
             .await?;
         running += pts;
         ledger(tx, wallet_id, *lot, *pts, running, &e).await?;
+        running = offset_charged_back(tx, wallet_id, *lot, *pts, running).await?;
     }
-    Ok(after)
+    Ok(running)
 }
 
 async fn balance(tx: &mut Tx<'_>, wallet_id: Uuid) -> Result<i64, AppError> {
