@@ -310,8 +310,18 @@ async fn update_user(
     if new_blocked || staff != new_staff {
         revoke_sessions(&mut tx, id).await?;
     }
+    // 新停權：該使用者公開清單的邊緣副本要清掉（內容已改回 404）
+    let purge: Vec<String> = if new_blocked && !blocked {
+        sqlx::query_scalar("SELECT slug::text FROM wishlists WHERE owner_id=$1 AND deleted_at IS NULL AND visibility='public'")
+            .bind(id).fetch_all(&mut *tx).await?
+    } else {
+        vec![]
+    };
     audit(&mut *tx, sid, "user.update", "users", Some(id), json!({"reason":reason,"before":{"is_staff":staff,"blocked":blocked},"after":{"is_staff":new_staff,"blocked":new_blocked}})).await?;
     tx.commit().await?;
+    if !purge.is_empty() {
+        crate::cdn::purge_wishlists(purge.iter().map(|s| s.trim().to_string()).collect());
+    }
     Ok(Json(row))
 }
 

@@ -594,6 +594,7 @@ async fn update(
     let mut w = load_owned(&mut *tx, id, u.id).await?;
     uploads::remember_media(&mut tx, u.id, w.cover_image_key.as_deref()).await?;
     let was_servable = crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status);
+    let old_shown = (w.show_claimer_names, w.surprise_mode, w.event_date); // 影響公開頁姓名顯示
     if w.status == "archived" {
         let only = |s: &str| {
             m.get("status").is_some_and(|v| v == s)
@@ -748,6 +749,9 @@ async fn update(
     tx.commit().await?;
     // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
     if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) {
+        crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
+    } else if was_servable && old_shown != (w.show_claimer_names, w.surprise_mode, w.event_date) {
+        // 仍可公開但姓名顯示條件變了：CDN 副本可能還帶著捐助者姓名
         crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))

@@ -197,7 +197,7 @@ async fn render(
                 surprise_locked(w.surprise_mode, w.event_date) AS locked,
                 GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
          FROM wishlists w JOIN users u ON u.id = w.owner_id
-         WHERE w.slug = $1 AND w.deleted_at IS NULL")
+         WHERE w.slug = $1 AND w.deleted_at IS NULL AND u.blocked_at IS NULL")
         .bind(slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
     if w.status == "draft" || w.status == "archived" {
         return Err(AppError::NotFound);
