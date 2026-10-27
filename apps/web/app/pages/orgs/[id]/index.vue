@@ -16,8 +16,6 @@ onMounted(async () => {
     ;[org.value, sites.value, events.value] = await Promise.all([api(`/orgs/${id}`), api(`/orgs/${id}/sites`), api(`/orgs/${id}/events`)])
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
 })
-// 契約：據點是 wishlist JSON，可能包在 wishlist 欄位內
-const site = (s: any) => s.wishlist ?? s
 </script>
 
 <template>
@@ -47,12 +45,12 @@ const site = (s: any) => s.wishlist ?? s
         <NuxtLink v-if="canEdit" :to="`/orgs/${id}/sites/new`" class="c-btn primary">{{ $t('org.console.newSite') }}</NuxtLink>
         <p v-if="!sites.length" class="c-mute">{{ $t('org.console.noSites') }}</p>
         <ul class="c-list">
-          <li v-for="s in sites" :key="site(s).id">
-            <strong>{{ site(s).title }}</strong>
+          <li v-for="s in sites" :key="s.id">
+            <strong>{{ s.title }}</strong>
             <CreatorStatusBadge v-if="s.site_status" :v="s.site_status" />
             <span class="c-mute">{{ s.site_address }}</span>
-            <NuxtLink v-if="canEdit" :to="`/lists/${site(s).id}`">{{ $t('org.console.edit') }}</NuxtLink>
-            <NuxtLink :to="`/s/${site(s).slug}`">{{ $t('org.console.publicPage') }}</NuxtLink>
+            <NuxtLink v-if="canEdit" :to="`/lists/${s.id}/edit`">{{ $t('org.console.edit') }}</NuxtLink>
+            <NuxtLink :to="`/s/${s.slug}`">{{ $t('org.console.publicPage') }}</NuxtLink>
           </li>
         </ul>
       </section>

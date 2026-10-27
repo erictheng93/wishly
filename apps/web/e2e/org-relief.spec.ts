@@ -30,7 +30,7 @@ test('救災：建立據點、加急缺品項、發布後公開頁可見', async
   await p.locator('input[name=recipient_name]').fill('王小明')
   await p.locator('input[name=recipient_phone]').fill('0912345678')
   await p.getByRole('button', { name: '建立據點' }).click()
-  await expect(p).toHaveURL(/\/lists\/[0-9a-f-]+$/)
+  await expect(p).toHaveURL(/\/lists\/[0-9a-f-]+\/edit$/)
 
   await p.getByRole('button', { name: /新增品項/ }).click()
   await p.getByLabel('名稱（必填）').fill('瓶裝水')

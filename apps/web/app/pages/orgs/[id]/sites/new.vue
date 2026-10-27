@@ -21,7 +21,7 @@ async function submit() {
   err.value = ''; busy.value = true
   try {
     const r = await api(`/orgs/${id}/sites`, { method: 'POST', body: { ...f, title: f.title.trim(), description: f.description || undefined, claim_ttl_hours: f.claim_ttl_hours ?? undefined } })
-    await navigateTo(`/lists/${(r.wishlist ?? r).id}`)
+    await navigateTo(`/lists/${r.id}/edit`)
   } catch (e: any) {
     err.value = e.code === 'ORG_NOT_VERIFIED' ? t('org.relief.notVerified') : errMsg(e)
   } finally { busy.value = false }
