@@ -119,10 +119,17 @@ async fn concurrent_opposite_merges_no_deadlock(pool: PgPool) {
     let o = org(&pool, u.id, "verified").await;
     let (a, _) = event(&pool, o).await;
     let (b, _) = event(&pool, o).await;
+    let deadlocks = || async { sqlx::query_scalar::<_, i64>("SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()").fetch_one(&pool).await.unwrap() };
+    let before = deadlocks().await;
     let (r1, r2) = tokio::join!(merge(&pool, &st.token, a, b), merge(&pool, &st.token, b, a));
     let mut codes = [r1.0.as_u16(), r2.0.as_u16()];
     codes.sort();
-    assert_eq!(codes, [200, 422], "opposite merges deadlocked or both succeeded: {codes:?}");
+    if codes.contains(&500) {
+        wait_until("deadlock statistic", || async { deadlocks().await > before }).await;
+    }
+    let after = deadlocks().await;
+    assert_eq!(after, before, "opposite event merges caused a PostgreSQL deadlock: pg_stat_database.deadlocks {before} -> {after}");
+    assert_eq!(codes, [200, 422], "opposite merges must yield one 200 and one 422: {codes:?}");
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -142,4 +149,22 @@ async fn hide_event_pauses_sites(pool: PgPool) {
     assert_eq!(ss, "paused");
     let (s, _, _) = call(&pool, "PATCH", &path, &ck(&u.token), Some(json!({"moderation_status":"ok"}))).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn merge_into_hidden_422_and_merged_event_not_editable(pool: PgPool) {
+    let st = staff(&pool, "S").await;
+    let u = user(&pool, "A").await;
+    let o = org(&pool, u.id, "verified").await;
+    member(&pool, o, u.id, "owner").await;
+    let (e1, _) = event(&pool, o).await;
+    let (e2, _) = event(&pool, o).await;
+    sqlx::query("UPDATE relief_events SET moderation_status='hidden', moderation_reason='x' WHERE id=$1").bind(e2).execute(&pool).await.unwrap();
+    let (s, v) = merge(&pool, &st.token, e1, e2).await;
+    assert_eq!((s, v["errors"][0]["code"].as_str().unwrap_or("")), (StatusCode::UNPROCESSABLE_ENTITY, "EVENT_HIDDEN"));
+    let (s, _, v) = call(&pool, "PATCH", &format!("/relief-events/{e2}"), &ck(&u.token), Some(json!({"name":"x"}))).await;
+    assert_eq!((s, v["code"].as_str().unwrap()), (StatusCode::CONFLICT, "EVENT_NOT_EDITABLE"));
+    sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1").bind(e1).bind(e2).execute(&pool).await.unwrap();
+    let (s, _, _) = call(&pool, "PATCH", &format!("/relief-events/{e1}"), &ck(&u.token), Some(json!({"name":"x"}))).await;
+    assert_eq!(s, StatusCode::CONFLICT);
 }

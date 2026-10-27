@@ -134,23 +134,32 @@ struct Edit {
 }
 
 async fn edit(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<Edit>) -> R<Json<Value>> {
-    let owner_org: Uuid = sqlx::query_scalar("SELECT created_by_org FROM relief_events WHERE id=$1").bind(id).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
-    // 非建立組織成員也是 403（可附掛據點，但不可改事件）
-    match require_role(&st.pool, owner_org, u.id, "coordinator").await {
-        Err(AppError::NotFound) => return Err(AppError::problem(403, "ORG_ROLE_REQUIRED", "僅建立事件的組織可編輯")),
-        r => r?,
-    };
     let name = opt_text(&b.name, "/name", 80)?;
     if name.as_deref() == Some("") {
         return Err(AppError::invalid("/name", "LENGTH", "名稱不可為空"));
     }
     let desc = opt_text(&b.description, "/description", 2000)?;
     let area = opt_text(&b.area_note, "/area_note", 200)?;
+    let mut tx = st.pool.begin().await?;
+    let (owner_org, merged, mod_status): (Uuid, Option<Uuid>, String) =
+        sqlx::query_as("SELECT created_by_org, merged_into, moderation_status::text FROM relief_events WHERE id=$1 FOR UPDATE")
+            .bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    // 非建立組織成員也是 403（可附掛據點，但不可改事件）
+    match require_role(&mut *tx, owner_org, u.id, "coordinator").await {
+        Err(AppError::NotFound) => return Err(AppError::problem(403, "ORG_ROLE_REQUIRED", "僅建立事件的組織可編輯")),
+        r => r?,
+    };
+    if merged.is_some() || mod_status == "hidden" {
+        return Err(AppError::problem(409, "EVENT_NOT_EDITABLE", "已合併或下架的事件不可編輯"));
+    }
     let v: Value = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "WITH e AS (UPDATE relief_events SET name=COALESCE($2,name), description=COALESCE($3,description), area_note=COALESCE($4,area_note)
            WHERE id=$1 RETURNING *) SELECT {J} FROM e")))
-        .bind(id).bind(&name).bind(&desc).bind(&area).fetch_one(&st.pool).await?;
-    audit_user(&st.pool, u.id, "relief_event.edit", "relief_event", Some(id), json!({"org_id": owner_org})).await?;
+        .bind(id).bind(&name).bind(&desc).bind(&area).fetch_one(&mut *tx).await?;
+    audit_user(&mut *tx, u.id, "relief_event.edit", "relief_event", Some(id), json!({"org_id": owner_org})).await?;
+    let slugs: Vec<String> = sqlx::query_scalar("SELECT slug FROM wishlists WHERE event_id=$1").bind(id).fetch_all(&mut *tx).await?;
+    tx.commit().await?;
+    crate::cdn::purge_wishlists(slugs);
     Ok(Json(v))
 }
 
@@ -165,13 +174,16 @@ async fn merge(Staff(staff): Staff, State(st): State<AppState>, Path(id): Path<U
     }
     let mut tx = st.pool.begin().await?;
     // 兩列依 id 由小到大鎖，A→B 與 B→A 同時進來也不會互鎖
-    let rows = sqlx::query_as::<_, (Uuid, Option<Uuid>)>("SELECT id, merged_into FROM relief_events WHERE id = ANY($1) ORDER BY id FOR UPDATE")
+    let rows = sqlx::query_as::<_, (Uuid, Option<Uuid>, String)>("SELECT id, merged_into, moderation_status::text FROM relief_events WHERE id = ANY($1) ORDER BY id FOR UPDATE")
         .bind(vec![id, b.into]).fetch_all(&mut *tx).await?;
     if rows.len() != 2 {
         return Err(AppError::NotFound);
     }
     if rows.iter().any(|r| r.1.is_some()) {
         return Err(AppError::invalid("/into", "ALREADY_MERGED", "事件已被合併"));
+    }
+    if rows.iter().any(|r| r.0 == b.into && r.2 == "hidden") {
+        return Err(AppError::invalid("/into", "EVENT_HIDDEN", "不可合併到已下架的事件"));
     }
     let slugs: Vec<String> = sqlx::query_scalar("UPDATE wishlists SET event_id=$2 WHERE event_id=$1 RETURNING slug").bind(id).bind(b.into).fetch_all(&mut *tx).await?;
     sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1").bind(id).bind(b.into).execute(&mut *tx).await?;
