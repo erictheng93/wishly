@@ -1,5 +1,5 @@
 // 「可能已登入」旗標（wishly.tw 的 cookie，不含身分、不是憑證）：ws_session 只在 API 網域，
-// 首頁 SSR 讀不到，靠它先畫個人版骨架、免得閃一下行銷版。偽造也只會看到空骨架；效期同 session（30 天）
+// 首頁 SSR 讀不到，靠它先畫個人版骨架、免得閃一下行銷版。偽造也只會看到空骨架；效期同 session 閒置期限（30 天，fetchMe 成功即續期）
 export const useAuthHint = () => useCookie<boolean | null>('ws_hint', { maxAge: 30 * 86400, sameSite: 'lax', path: '/' })
 
 export function useAuth() {

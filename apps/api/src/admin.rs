@@ -31,7 +31,8 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/analytics", get(analytics))
 }
 
-/// 已登入且 is_staff；已啟用 TOTP 者此 session 須已通過驗證。否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。
+/// 已登入且 is_staff；已啟用 TOTP 者此 session 須在 12 小時內通過驗證。否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。
+/// 驗證 12 小時後失效須重驗（session.rs）。
 /// ponytail: 未啟用 TOTP 仍可進後台（前端軟性引導）；要全面強制時改成 `!u.mfa` 即可。
 pub struct Staff(pub Uuid);
 

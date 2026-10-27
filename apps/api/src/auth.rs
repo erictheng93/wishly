@@ -22,6 +22,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 const SESSION_DAYS: i64 = 30;
+/// cookie 活到 session 的絕對上限；實際是否有效以 DB expires_at（閒置續期）為準，故不必每次重設 cookie。
+const SESSION_MAX_DAYS: i64 = 90;
 const OTP_TTL_SECS: i64 = 600;
 const OTP_MAX_ATTEMPTS: i16 = 5;
 
@@ -68,7 +70,7 @@ pub(crate) fn cookie(h: &HeaderMap, name: &str) -> Option<String> {
 pub(crate) fn session_cookie(token: &str) -> String {
     format!(
         "ws_session={token}; Path=/; Max-Age={}; HttpOnly; SameSite=Lax{}",
-        SESSION_DAYS * 86400,
+        SESSION_MAX_DAYS * 86400,
         secure()
     )
 }
