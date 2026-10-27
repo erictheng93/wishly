@@ -12,11 +12,11 @@ export function taxIdOk(s: string): boolean {
 export type OrgForm = Record<string, any> & { verification_status?: string, flagged_fields?: string[], documents?: { kind: string }[] }
 
 // 依缺漏欄位決定從第幾步繼續
-export function stepOf(o: OrgForm): 1 | 2 | 3 | 4 {
+export function stepOf(o: OrgForm, permits: unknown[] = []): 1 | 2 | 3 | 4 {
   if (!o.legal_name || !o.display_name || !o.org_type || !taxIdOk(o.tax_id ?? '') || !o.registration_no || !o.authority) return 1
   if (!o.rep_name || !o.contact_name || !o.contact_phone || !o.public_email) return 2
   const kinds = new Set((o.documents ?? []).map(d => d.kind))
-  if (!kinds.has('registration') || !kinds.has('permit')) return 3
+  if (!kinds.has('registration') || !kinds.has('permit') || !permits.length) return 3
   return 4
 }
 

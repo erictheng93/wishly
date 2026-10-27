@@ -3,7 +3,7 @@
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('org.apply.title') })
-const { api, base } = useApi()
+const { api } = useApi()
 const { user, fetchMe } = useAuth()
 const { switchTo } = useOrgMode()
 
@@ -14,6 +14,7 @@ const loading = ref(true), busy = ref(false), err = ref(''), agree = ref(false)
 const permits = ref<any[]>([])
 const permit = reactive({ permit_no: '', valid_from: '', valid_to: '' })
 const permitFile = ref<File | null>(null)
+const taxErr = ref('')
 const FIELDS = ['legal_name', 'display_name', 'org_type', 'tax_id', 'registration_no', 'authority', 'website', 'intro',
   'rep_name', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone']
 const STEPS: string[][] = [FIELDS.slice(0, 8), FIELDS.slice(8)]
@@ -32,14 +33,15 @@ async function reload(first = false) {
   const o = await api(`/orgs/${org.value.id}`)
   org.value = o
   for (const f of FIELDS) form[f] = o[f] ?? ''
-  if (first) step.value = o.verification_status === 'needs_changes' ? 1 : stepOf(o)
   await loadPermits()
+  if (first) step.value = o.verification_status === 'needs_changes' ? 1 : stepOf(o, permits.value)
 }
 async function loadPermits() { permits.value = await api(`/orgs/${org.value.id}/permits`) }
 async function run(fn: () => Promise<void>) {
   busy.value = true; err.value = ''
   try { await fn() } catch (e: any) {
-    err.value = errMsg(e)
+    err.value = e?.status === 413 ? t('org.apply.fileBig') : errMsg(e)
+    if (e?.code === 'TAX_ID_TAKEN') { step.value = 1; taxErr.value = err.value }
     const p = e?.errors?.[0]?.pointer
     if (e?.code === 'VALIDATION_FAILED' && p) step.value = ptrStep(p)
     if (e?.code === 'ORG_DRAFT_EXISTS') await init()
@@ -72,8 +74,8 @@ async function upload(kind: 'registration' | 'permit', file: File | undefined) {
   if (!file) return null
   if (file.size > 10 * 1024 * 1024) { err.value = t('org.apply.fileBig'); return null }
   if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) { err.value = t('org.apply.fileType'); return null }
-  // 原始檔上傳：不走 useApi 的 JSON 流程，自帶 credentials 與原生殼標頭
-  return await $fetch<any>(`${base}/orgs/${org.value.id}/documents`, { method: 'POST', query: { kind }, body: file, credentials: 'include', headers: { 'Content-Type': file.type, ...nativeHeaders() } })
+  // File 不會被 ofetch 序列化；走 api() 才有錯誤正規化與 401 導向
+  return await api<any>(`/orgs/${org.value.id}/documents`, { method: 'POST', query: { kind }, body: file, headers: { 'Content-Type': file.type } })
 }
 const onFile = (kind: 'registration' | 'permit', e: Event) => {
   const input = e.target as HTMLInputElement
@@ -85,10 +87,15 @@ const delDoc = (id: string) => run(async () => { await api(`/orgs/${org.value.id
 const addPermit = () => run(async () => {
   const d = await upload('permit', permitFile.value ?? undefined)
   if (!d) return
-  await api(`/orgs/${org.value.id}/permits`, { method: 'POST', body: { ...permit, document_id: d.id } })
+  try { await api(`/orgs/${org.value.id}/permits`, { method: 'POST', body: { ...permit, document_id: d.id } }) } catch (e) {
+    await api(`/orgs/${org.value.id}/documents/${d.id}`, { method: 'DELETE' }).catch(() => {}) // 不留孤兒文件
+    throw e
+  }
   Object.assign(permit, { permit_no: '', valid_from: '', valid_to: '' }); permitFile.value = null
   await reload()
 })
+const canReapply = computed(() => !org.value?.resubmit_after || Date.now() >= Date.parse(org.value.resubmit_after))
+const reapply = () => run(async () => { await api(`/orgs/${org.value.id}`, { method: 'PATCH', body: { legal_name: org.value.legal_name } }); await reload(true) })
 const submit = () => run(async () => { await api(`/orgs/${org.value.id}/submit`, { method: 'POST' }); await reload(); await fetchMe(true) })
 const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdraw`, { method: 'POST' }); await reload(); await fetchMe(true) })
 </script>
@@ -112,8 +119,9 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
             <option v-for="ty in ORG_TYPES" :key="ty" :value="ty">{{ $t(`org.apply.type.${ty}`) }}</option>
           </select>
           <textarea v-else-if="f === 'intro'" v-model="form[f]" rows="4" :disabled="!can(f)" @blur="save(f)" />
-          <input v-else v-model="form[f]" :inputmode="f === 'tax_id' ? 'numeric' : undefined" :maxlength="f === 'tax_id' ? 8 : undefined" :disabled="!can(f)" @blur="save(f)">
+          <input v-else v-model="form[f]" :inputmode="f === 'tax_id' ? 'numeric' : undefined" :maxlength="f === 'tax_id' ? 8 : undefined" :disabled="!can(f)" @blur="save(f)" @input="taxErr = ''">
           <small v-if="f === 'tax_id' && taxBad" class="c-err">{{ $t('org.apply.taxBad') }}</small>
+          <small v-else-if="f === 'tax_id' && taxErr" class="c-err">{{ taxErr }}</small>
         </label>
       </section>
 
@@ -160,7 +168,8 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
       <template v-else>
         <p>{{ $t('org.apply.rejected') }}</p>
         <p v-if="org.review_note">{{ org.review_note }}</p>
-        <p v-if="org.resubmit_after" class="c-mute">{{ $t('org.apply.resubmit', { date: org.resubmit_after.slice(0, 10) }) }}</p>
+        <button v-if="canReapply" type="button" class="c-btn" :disabled="busy" @click="reapply">{{ $t('org.apply.reapply') }}</button>
+        <p v-else class="c-mute">{{ $t('org.apply.resubmit', { date: org.resubmit_after.slice(0, 10) }) }}</p>
       </template>
     </section>
   </main>

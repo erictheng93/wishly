@@ -22,6 +22,8 @@ describe('org utils', () => {
     expect(stepOf({ ...base, tax_id: '' })).toBe(1)
     expect(stepOf({ ...base, rep_name: '' })).toBe(2)
     expect(stepOf(base)).toBe(3)
-    expect(stepOf({ ...base, documents: [{ kind: 'registration' }, { kind: 'permit' }] })).toBe(4)
+    const documents = [{ kind: 'registration' }, { kind: 'permit' }]
+    expect(stepOf({ ...base, documents })).toBe(3)
+    expect(stepOf({ ...base, documents }, [{ id: 'p' }])).toBe(4)
   })
 })

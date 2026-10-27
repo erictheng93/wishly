@@ -69,7 +69,8 @@
         "foundation": "Foundation",
         "religious": "Religious body",
         "other": "Other registered body"
-      }
+      },
+      "reapply": "Reapply"
     }
   }
 }
