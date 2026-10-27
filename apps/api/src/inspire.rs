@@ -69,7 +69,7 @@ async fn wishes(
          JOIN wishlists w ON w.id = i.wishlist_id
          JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
          WHERE i.catalog_ref = $1 AND i.deleted_at IS NULL
-           AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status = 'active'
+           AND w.deleted_at IS NULL AND w.org_id IS NULL AND w.moderation_status = 'ok' AND w.status = 'active'
            AND (w.closes_at IS NULL OR w.closes_at > now())
            AND w.owner_id IS DISTINCT FROM $2
            AND ($3::text IS NULL OR w.visibility::text = $3)

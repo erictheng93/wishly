@@ -442,23 +442,23 @@ async fn apply(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(AppError::NotFound)?;
-    let (needed, claimed, wl_status, owner_id, locked, vis, hidden, gone, past_due): (
+    let (needed, claimed, wl_status, can_manage, locked, vis, hidden, gone, past_due): (
         i32,
         i32,
         String,
-        Uuid,
+        bool,
         bool,
         String,
         bool,
         bool,
         bool,
     ) = sqlx::query_as(
-        "SELECT i.qty_needed, i.qty_claimed, w.status::text, w.owner_id,
+        "SELECT i.qty_needed, i.qty_claimed, w.status::text, COALESCE(can_manage_wishlist(w.owner_id, w.org_id, $2), false),
                 surprise_locked(w.surprise_mode, w.event_date),
                 w.visibility::text, w.moderation_status::text = 'hidden',
                 (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now())
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
-         WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).fetch_one(&mut *tx).await?;
+         WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).bind(match actor { Actor::User(u) => Some(u), Actor::Guest(_) => None }).fetch_one(&mut *tx).await?;
     let (guest_id, user_id, cur, old_qty): (Option<Uuid>, Option<Uuid>, String, i32) =
         sqlx::query_as(
             "SELECT guest_id, user_id, status::text, qty FROM claims WHERE id = $1 FOR UPDATE",
@@ -472,7 +472,8 @@ async fn apply(
         Actor::User(u) => user_id == Some(u) || (guest_id.is_some() && guest_id == legacy),
     };
     // 清單擁有者（F5）：只能推進 delivered 或取消；驚喜鎖定期間看不到捐助，一律禁止
-    let by_owner = !mine && matches!(actor, Actor::User(u) if u == owner_id);
+    let by_owner = !mine && can_manage; // 個人清單 = owner；組織據點 = 未停用的 owner / coordinator
+
     // 非本人一律 404，不洩漏捐助存在（F5）
     if !mine && !by_owner {
         return Err(AppError::NotFound);

@@ -87,7 +87,7 @@ async fn profile(
                 (SELECT COALESCE(sum({claimed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          FROM wishlists w
-         WHERE w.owner_id = $1 AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
+         WHERE w.owner_id = $1 AND w.org_id IS NULL AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND (w.visibility::text = 'public'
                 OR (w.visibility::text IN ('friends', 'selected') AND $3)
                 OR (w.visibility::text = 'friends' AND $4)
