@@ -1,10 +1,21 @@
+// 「可能已登入」旗標（wishly.tw 的 cookie，不含身分、不是憑證）：ws_session 只在 API 網域，
+// 首頁 SSR 讀不到，靠它先畫個人版骨架、免得閃一下行銷版。偽造也只會看到空骨架；效期同 session（30 天）
+export const useAuthHint = () => useCookie<boolean | null>('ws_hint', { maxAge: 30 * 86400, sameSite: 'lax', path: '/' })
+
 export function useAuth() {
   const user = useState<any>('auth-user', () => null)
   const loaded = useState<boolean>('auth-loaded', () => false)
   const { api, base } = useApi()
   async function fetchMe(force = false) {
     if (loaded.value && !force) return user.value
-    try { user.value = await api('/me', { noRedirect: true }); useState<string>('auth-error', () => '').value = '' } catch { user.value = null }
+    const hint = useAuthHint()
+    try {
+      user.value = await api('/me', { noRedirect: true }); useState<string>('auth-error', () => '').value = ''
+      hint.value = true
+    } catch (e: any) {
+      user.value = null
+      if (e?.status === 401 || e?.code === 'ACCOUNT_BLOCKED') hint.value = null // 網路錯誤不清：只是暫時連不上
+    }
     // 以目前介面語言為準，讓後端寄信（通知、安全通知）用同一種語言
     const cur = useNuxtApp().$i18n.locale.value
     const want = cur === 'zh-Hant' ? 'zh-TW' : cur
@@ -13,8 +24,10 @@ export function useAuth() {
     return user.value
   }
   async function logout(redirect?: string) {
+    const hint = useAuthHint() // await 之前取：useCookie 需要 Nuxt context
     try { await api('/auth/logout', { method: 'POST', noRedirect: true }) } catch {}
     user.value = null
+    hint.value = null
     setNativeToken(null)
     await navigateTo(redirect ? { path: '/login', query: { redirect } } : '/login')
   }

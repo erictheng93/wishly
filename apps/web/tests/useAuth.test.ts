@@ -13,7 +13,12 @@ beforeEach(() => {
   vi.stubGlobal('useApi', () => ({ api, base: '/api/v1' }))
   vi.stubGlobal('setNativeToken', token)
   vi.stubGlobal('navigateTo', navigate)
+  vi.stubGlobal('useCookie', (key: string) => {
+    if (!states.has(`cookie:${key}`)) states.set(`cookie:${key}`, ref(null))
+    return states.get(`cookie:${key}`)
+  })
 })
+const hint = () => states.get('cookie:ws_hint')?.value
 afterEach(() => { vi.unstubAllGlobals(); vi.resetAllMocks() })
 
 it('shares cached identity, forced refresh replaces stale data and clears auth errors', async () => {
@@ -72,4 +77,30 @@ it('otp challenge id and turnstile token are sent to request / verify / confirm 
   expect(bodies[2]).toMatchObject({ challenge_id: 'c1' })
   await auth.verifyRegister('a@b.c', '123456', 'c1')
   expect(api.mock.calls[3][1].body).toEqual({ email: 'a@b.c', code: '123456', challenge_id: 'c1' })
+})
+
+it('ws_hint is set on sign-in, cleared on 401 or block, kept on network errors', async () => {
+  const auth = useAuth()
+  api.mockResolvedValueOnce({ id: 'me' })
+  await auth.fetchMe(true)
+  expect(hint()).toBe(true)
+  api.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+  await auth.fetchMe(true)
+  expect(hint()).toBe(true)
+  api.mockRejectedValueOnce({ status: 401, code: 'UNAUTHORIZED' })
+  await auth.fetchMe(true)
+  expect(hint()).toBeNull()
+  states.get('cookie:ws_hint')!.value = true
+  api.mockRejectedValueOnce({ status: 403, code: 'ACCOUNT_BLOCKED' })
+  await auth.fetchMe(true)
+  expect(hint()).toBeNull()
+})
+
+it('logout clears ws_hint', async () => {
+  const auth = useAuth()
+  api.mockResolvedValueOnce({ id: 'me' })
+  await auth.fetchMe(true)
+  api.mockRejectedValue(new Error('offline'))
+  await auth.logout()
+  expect(hint()).toBeNull()
 })

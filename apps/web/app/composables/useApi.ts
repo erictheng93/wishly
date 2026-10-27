@@ -34,6 +34,7 @@ export function useApi() {
       const blocked = err.code === 'ACCOUNT_BLOCKED'
       if (import.meta.client && (blocked || (err.code === 'UNAUTHORIZED' && !noRedirect))) {
         useState('auth-user').value = null
+        useAuthHint().value = null
         setNativeToken(null)
         if (blocked) useState<string>('auth-error', () => '').value = 'account_blocked'
         if (!noRedirect) await navigateTo({ path: '/login', query: { redirect: router.currentRoute.value.fullPath, ...(blocked ? { error: 'account_blocked' } : {}) } })
