@@ -307,6 +307,34 @@
       "back": "Back to brands",
       "website": "Brand website",
       "noProducts": "Products from this brand are coming soon"
+    },
+    "relief": {
+      "seoTitle": "Disaster relief - Wishly",
+      "seoDesc": "Relief events and drop-off sites. See what is needed and donate supplies.",
+      "heading": "Disaster relief",
+      "empty": "No active relief events right now.",
+      "banner": "Disaster relief",
+      "bannerBody": "See relief sites and urgently needed supplies",
+      "sites": "{n} sites",
+      "critical": "Critical {n}",
+      "high": "High {n}",
+      "noSites": "No sites are accepting donations right now.",
+      "eventNotFound": "Relief event not found",
+      "orgNotFound": "Organization not found",
+      "back": "Back to relief events",
+      "orgSeo": "{name} - Relief organization",
+      "orgSites": "Drop-off sites",
+      "website": "Website",
+      "verified": "Verified organization",
+      "event": "Event",
+      "address": "Drop-off address",
+      "by": "Organization: ",
+      "paused": "This site has paused intake. Pledging is unavailable for now.",
+      "closedSite": "This site has stopped accepting donations.",
+      "date": "Date: {date}",
+      "counties": "Affected areas: {list}",
+      "loadMore": "Load more",
+      "viewSite": "View site"
     }
   }
 }

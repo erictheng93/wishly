@@ -1,4 +1,5 @@
 // 訪客端契約 mock（docs 04 §5）。node mocks/server.mjs  → http://localhost:8080
+// 救災：/s/relief、/e、/e/quake、/e/quake-old（301 到 quake）、/o/helpers。
 // slug: demo=正常 / closed=已結束 / gone=410 / boom=500 / sseoff=清單正常但 events 回 500（測輪詢備援）/ 其他=404。恢復權杖 "good" 有效。
 // 登入態：帶 ws_session cookie 即視為會員；cookie 值為 staff（ws_session=staff）則為營運人員，可開 /admin/cash-refunds、/admin/wallet-debts、/admin/topups（假資料，id 為 stale 的列一律 409）。
 // 現金退款 /me/refund 需先儲值並在模擬綠界付款後才有可退餘額；MOCK_FROZEN=1 node mocks/server.mjs 可模擬錢包凍結。
@@ -43,6 +44,18 @@ const adminTopups = [
   { id: 'tpd-d', amount: 800, method: 'card', status: 'charged_back', provider: 'ecpay', provider_txn_id: 'T0005', created_at: iso(-200 * 36e5), paid_at: iso(-199 * 36e5), user: usr(16, '已拒付戊'), wallet: { id: 'w16', status: 'frozen' } },
 ]
 
+// 救災（org-relief）：事件 quake（2 個據點）、已合併的舊事件 quake-old → quake、救災清單 relief
+const quake = { id: 'ev1', slug: 'quake', name: '花蓮強震', hazard_type: 'earthquake', counties: ['花蓮縣'], area_note: null, occurred_on: '2026-10-20', description: '花蓮地區強震，多處需要物資。', merged_into: null }
+const reliefOrg = { slug: 'helpers', display_name: '好幫手協會' }
+const reliefSites = [
+  { slug: 'relief', title: '花蓮物資站', site_address: '花蓮縣花蓮市中山路 1 號', site_status: 'active', org: reliefOrg, needs: { critical: 2, high: 1, medium: 0, low: 0 } },
+  { slug: 'relief2', title: '壽豐物資站', site_address: '花蓮縣壽豐鄉中山路 2 號', site_status: 'active', org: reliefOrg, needs: { critical: 0, high: 3, medium: 1, low: 0 } },
+]
+const reliefItems = [
+  { id: 'r1', title: '瓶裝水', brand: null, spec: null, image_url: null, product_url: null, unit_price_amount: null, priority: null, qty_needed: 100, qty_claimed: 20, category: 'water', urgency: 'critical' },
+  { id: 'r2', title: '毛毯', brand: null, spec: null, image_url: null, product_url: null, unit_price_amount: null, priority: null, qty_needed: 50, qty_claimed: 10, category: 'shelter', urgency: 'high' },
+]
+
 const brandList = [
   { slug: 'pigeon', name: 'Pigeon 貝親', description: '日本母嬰用品品牌，奶瓶與清潔系列。', logo_url: null, website_url: 'https://example.com' },
   { slug: 'muji', name: '無印良品', description: '簡約生活選物。', logo_url: null, website_url: 'https://example.com' },
@@ -81,6 +94,16 @@ http.createServer(async (req, res) => {
     const b = brandList.find(x => x.slug === m[1])
     return b ? send(res, 200, { brand: b }) : err(res, 404, 'NOT_FOUND', '找不到')
   }
+  if (p === '/public/relief-events') return send(res, 200, { events: [quake], next_page: null })
+  if ((m = p.match(/^\/public\/relief-events\/([^/]+)$/))) {
+    if (m[1] === 'quake-old') return send(res, 200, { merged_into: 'quake', event: null, sites: [] })
+    if (m[1] !== 'quake') return err(res, 404, 'NOT_FOUND', '找不到')
+    return send(res, 200, { event: quake, sites: reliefSites, merged_into: null })
+  }
+  if ((m = p.match(/^\/public\/orgs\/([^/]+)$/))) {
+    if (m[1] !== reliefOrg.slug) return err(res, 404, 'NOT_FOUND', '找不到')
+    return send(res, 200, { ...reliefOrg, intro: '長期投入災後物資援助。', website: 'https://example.com', public_email: 'hi@example.com', public_phone: null, logo: null, sites: reliefSites.map(({ needs, org, ...x }) => ({ ...x, event: { slug: quake.slug, name: quake.name } })) })
+  }
   if (p === '/public/wishlists') {
     const page = +(u.searchParams.get('page') ?? 1), ty = u.searchParams.get('type')
     const all = Array.from({ length: 30 }, (_, i) => ({ slug: i ? `demo${i}` : 'demo', title: `公開清單 ${i + 1}`, type: i % 3 ? 'registry' : 'relief', cover_image_url: null, cover_preset: ['birthday', 'wedding', 'baby', 'housewarming', 'graduation', 'holiday', 'travel', 'gift'][i % 8], event_date: null, owner: { display_name: '小愛', handle: 'xiaoai' }, item_count: 3, completion_pct: (i * 7) % 100 })).filter(w => !ty || w.type === ty)
@@ -89,6 +112,12 @@ http.createServer(async (req, res) => {
   if ((m = p.match(/^\/public\/wishlists\/([^/]+)$/))) {
     if (m[1] === 'boom') return err(res, 500, 'INTERNAL', '內部錯誤')
     if (m[1] === 'gone') return err(res, 410, 'WISHLIST_REMOVED', '已下架')
+    if (m[1] === 'relief' || m[1] === 'relief2') {
+      const site = reliefSites.find(x => x.slug === m[1]), list = reliefItems.map(view)
+      return send(res, 200, { slug: m[1], type: 'relief', status: 'active', title: site.title, description: null, cover_image_url: null, cover_preset: 'gift', event_date: null, id: 'w9', owner: { id: 'u9', display_name: '好幫手協會' }, surprise_mode: false, claimers_visible: false,
+        org: { ...reliefOrg, verified: true }, event: { slug: quake.slug, name: quake.name }, site_address: site.site_address, site_status: 'active',
+        completion: { item_count: list.length, fulfilled_count: 0, completion_pct: 20 }, items: list, updated_at: new Date().toISOString() })
+    }
     if (!['demo', 'closed', 'sseoff'].includes(m[1])) return err(res, 404, 'NOT_FOUND', '找不到')
     const list = items.map(view), done = list.filter(i => i.is_fully_claimed).length
     return send(res, 200, { slug: m[1], type: 'registry', status: m[1] === 'closed' ? 'closed' : 'active', title: '小愛的待產清單', description: '預產期 12 月，謝謝大家的心意', cover_image_url: null, cover_preset: 'baby', event_date: '2026-12-20', id: 'w1', owner: { id: 'u1', display_name: '小愛' }, surprise_mode: false, claimers_visible: false, completion: { item_count: list.length, fulfilled_count: done, completion_pct: Math.round(items.reduce((a, i) => a + i.qty_claimed, 0) / items.reduce((a, i) => a + i.qty_needed, 0) * 100) }, items: list, updated_at: new Date().toISOString() })

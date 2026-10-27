@@ -307,6 +307,34 @@
       "back": "回品牌館",
       "website": "品牌官網",
       "noProducts": "這個品牌的商品即將上架"
+    },
+    "relief": {
+      "seoTitle": "災害救援｜Wishly",
+      "seoDesc": "各地災害救援事件與收件據點，查看缺口並捐助物資。",
+      "heading": "災害救援",
+      "empty": "目前沒有進行中的救援事件。",
+      "banner": "災害救援",
+      "bannerBody": "查看各地救援據點與急缺物資",
+      "sites": "{n} 個據點",
+      "critical": "急缺 {n}",
+      "high": "高 {n}",
+      "noSites": "目前沒有收件中的據點。",
+      "eventNotFound": "找不到此救援事件",
+      "orgNotFound": "找不到此組織",
+      "back": "回到救援事件",
+      "orgSeo": "{name}｜救援組織",
+      "orgSites": "收件據點",
+      "website": "官方網站",
+      "verified": "已驗證組織",
+      "event": "所屬事件",
+      "address": "收件地址",
+      "by": "組織：",
+      "paused": "此據點目前暫停收件，暫時無法認捐。",
+      "closedSite": "此據點已結束收件，無法認捐。",
+      "date": "發生日期：{date}",
+      "counties": "受災縣市：{list}",
+      "loadMore": "載入更多",
+      "viewSite": "查看據點"
     }
   }
 }
