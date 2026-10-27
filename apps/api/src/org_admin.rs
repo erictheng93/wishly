@@ -106,6 +106,12 @@ async fn review(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uu
         sqlx::query_scalar("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug")
             .bind(id).fetch_all(&mut *tx).await?
     } else { vec![] };
+    // 撤銷時才需要清事件頁與組織頁
+    let (ev, org_slug): (Vec<String>, Option<String>) = if status == "verified" {
+        (sqlx::query_scalar("SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.org_id = $1")
+            .bind(id).fetch_all(&mut *tx).await?,
+         sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id = $1").bind(id).fetch_optional(&mut *tx).await?)
+    } else { (vec![], None) };
     sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
                  SELECT m.user_id, 'email'::notification_channel, 'org.review',
                         jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'decision', $3::text, 'note', $4::text, 'revoked', $5::bool)
@@ -117,6 +123,10 @@ async fn review(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uu
     tx.commit().await?;
     if !slugs.is_empty() {
         crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());
+    }
+    crate::cdn::purge_events(ev);
+    if let Some(o) = org_slug {
+        crate::cdn::purge_org(o);
     }
     Ok(Json(json!({ "id": id, "verification_status": new_status })))
 }
@@ -160,10 +170,15 @@ async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): 
             .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
         slugs
     } else { vec![] };
+    let ev: Vec<String> = if slugs.is_empty() { vec![] } else {
+        sqlx::query_scalar("SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.permit_id = $1")
+            .bind(id).fetch_all(&mut *tx).await?
+    };
     audit(&mut *tx, sid, "permit.review", "org_permits", Some(id), json!({ "decision": b.decision, "from": status, "note": b.note })).await?;
     tx.commit().await?;
     if !slugs.is_empty() {
         crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());
+        crate::cdn::purge_events(ev);
     }
     Ok(Json(json!({ "id": id, "status": new_status })))
 }

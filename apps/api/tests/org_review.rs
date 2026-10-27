@@ -66,13 +66,16 @@ async fn revoke_demotes_active_sites_and_purges(pool: PgPool) {
     let TestUser { token: st, .. } = staff(&pool, "staff").await;
     let o = common::org(&pool, owner, "verified").await;
     let p = common::permit(&pool, o, "approved", 30).await;
-    let (ev, _) = common::event(&pool, o).await;
+    let (ev, evs) = common::event(&pool, o).await;
     let site = common::site(&pool, o, owner, ev, p, "active").await;
+    let os: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1").bind(o).fetch_one(&pool).await.unwrap();
     let (s, _, b) = call(&pool, "POST", &format!("/admin/orgs/{o}/review"), &ck(&st), Some(json!({"decision":"reject","note":"撤銷"}))).await;
     assert_eq!(s, StatusCode::OK, "{b}");
     let status: String = sqlx::query_scalar("SELECT status::text FROM wishlists WHERE id=$1").bind(site.id).fetch_one(&pool).await.unwrap();
     assert_eq!(status, "draft");
     cdn.wait_for(&site.slug).await;
+    cdn.wait_for_url(&common::cdn::event_url(&evs)).await;
+    cdn.wait_for_url(&common::cdn::org_url(&os)).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

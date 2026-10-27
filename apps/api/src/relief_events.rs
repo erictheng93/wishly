@@ -31,7 +31,7 @@ pub const COUNTIES: [&str; 22] = [
 const HAZARDS: [&str; 5] = ["earthquake", "typhoon", "flood", "fire", "other"];
 
 /// 事件 JSON；欄位固定（前端依此）
-const J: &str = "jsonb_build_object('id',id,'slug',slug,'name',name,'hazard_type',hazard_type,'counties',counties,'area_note',area_note,
+pub(crate) const J: &str = "jsonb_build_object('id',id,'slug',slug,'name',name,'hazard_type',hazard_type,'counties',counties,'area_note',area_note,
     'occurred_on',occurred_on,'description',description,'created_by_org',created_by_org,'merged_into',merged_into,
     'moderation_status',moderation_status,'created_at',created_at)";
 
@@ -188,8 +188,10 @@ async fn merge(Staff(staff): Staff, State(st): State<AppState>, Path(id): Path<U
     let slugs: Vec<String> = sqlx::query_scalar("UPDATE wishlists SET event_id=$2 WHERE event_id=$1 RETURNING slug").bind(id).bind(b.into).fetch_all(&mut *tx).await?;
     sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1").bind(id).bind(b.into).execute(&mut *tx).await?;
     audit(&mut *tx, staff, "relief_event.merge", "relief_event", Some(id), json!({"into": b.into, "sites": slugs.len()})).await?;
+    let ev = event_slugs(&mut *tx, &[id, b.into]).await?;
     tx.commit().await?;
     crate::cdn::purge_wishlists(slugs);
+    crate::cdn::purge_events(ev);
     Ok(Json(json!({"id": id, "merged_into": b.into})))
 }
 
@@ -220,7 +222,54 @@ async fn moderate(Staff(staff): Staff, State(st): State<AppState>, Path(id): Pat
         vec![]
     };
     audit(&mut *tx, staff, "relief_event.moderate", "relief_event", Some(id), json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len()})).await?;
+    let ev = event_slugs(&mut *tx, &[id]).await?;
     tx.commit().await?;
     crate::cdn::purge_wishlists(slugs);
+    crate::cdn::purge_events(ev);
     Ok(Json(json!({"id": id, "moderation_status": b.moderation_status})))
+}
+
+/// 事件公開 URL 要清除的 slug
+pub(crate) async fn event_slugs<'e, E: sqlx::PgExecutor<'e>>(ex: E, ids: &[Uuid]) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)").bind(ids).fetch_all(ex).await
+}
+
+/// 許可過期（台北日期）的上線據點暫停，並通知該許可所屬組織的 owner（每組織每許可一封：只對本次剛暫停的據點發，之後不再命中）。
+pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
+    let rows: Vec<(String, Uuid)> = sqlx::query_as(
+        "WITH p AS (UPDATE wishlists w SET site_status = 'paused' FROM org_permits pm
+                     WHERE pm.id = w.permit_id AND w.type = 'relief' AND w.status = 'active' AND w.site_status = 'active'
+                       AND (now() AT TIME ZONE 'Asia/Taipei')::date > pm.valid_to
+                 RETURNING w.slug::text AS slug, w.event_id, w.org_id, w.permit_id),
+              n AS (INSERT INTO notifications (user_id, channel, kind, payload)
+                    SELECT m.user_id, 'email'::notification_channel, 'org.permit_expired',
+                           jsonb_build_object('org_id', o.id, 'display_name', o.display_name, 'permit_no', pm.permit_no)
+                      FROM (SELECT DISTINCT org_id, permit_id FROM p) d
+                      JOIN organizations o ON o.id = d.org_id JOIN org_permits pm ON pm.id = d.permit_id
+                      JOIN org_members m ON m.org_id = o.id AND m.role = 'owner' AND m.disabled_at IS NULL
+                      JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL)
+         SELECT slug, event_id FROM p")
+        .fetch_all(pool).await?;
+    if rows.is_empty() {
+        return Ok(0);
+    }
+    let ids: Vec<Uuid> = rows.iter().map(|r| r.1).collect();
+    let ev = event_slugs(pool, &ids).await?;
+    let n = rows.len();
+    crate::cdn::purge_wishlists(rows.into_iter().map(|r| r.0.trim().to_string()).collect());
+    crate::cdn::purge_events(ev);
+    Ok(n)
+}
+
+/// 每小時檢查一次許可到期
+pub fn spawn_permit_expiry(pool: sqlx::PgPool) {
+    tokio::spawn(async move {
+        let mut t = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            t.tick().await;
+            if let Err(e) = permit_expiry_tick(&pool).await {
+                tracing::error!(error = %e, "permit_expiry_tick");
+            }
+        }
+    });
 }
