@@ -20,6 +20,7 @@ pub mod notify;
 pub mod org_admin;
 pub mod orders;
 pub mod org_members;
+pub mod org_receipts;
 pub mod orgs;
 pub mod points;
 pub mod profiles;
@@ -75,6 +76,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(orgs::routes())
                 .merge(org_admin::routes())
                 .merge(org_members::routes())
+                .merge(org_receipts::routes())
                 .merge(relief_events::routes())
                 .merge(account::routes())
                 .merge(wishlists::routes())
