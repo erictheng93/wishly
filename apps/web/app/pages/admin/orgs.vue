@@ -26,7 +26,7 @@ onMounted(() => load())
 const openId = ref<string | null>(null), detail = ref<any>(null), dLoading = ref(false)
 async function toggle(o: any) {
   if (openId.value === o.id) { openId.value = null; return }
-  openId.value = o.id; await reloadDetail()
+  openId.value = o.id; detail.value = null; await reloadDetail()
 }
 async function reloadDetail() {
   dLoading.value = true; err.value = ''
@@ -40,7 +40,8 @@ async function download(orgId: string, d: any) {
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `${d.kind}-${d.id}.${d.content_type === 'application/pdf' ? 'pdf' : d.content_type === 'image/png' ? 'png' : 'jpg'}`
-    a.click(); URL.revokeObjectURL(a.href)
+    document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(a.href), 0)
   } catch (e) { err.value = errMsg(e) }
 }
 
@@ -63,7 +64,7 @@ const text = computed(() => {
 async function submit() {
   const a = act.value!
   if (a.revoke && a.kind === 'org' && a.step === 1) { a.step = 2; return } // 撤銷組織：二次確認
-  if (a.decision === 'needs_changes' && !flagged.value.length) { aerr.value = t('admin.orgs.flagLabel'); return }
+  if (a.decision === 'needs_changes' && !flagged.value.length) { aerr.value = t('admin.orgs.flagRequired'); return }
   busy.value = true; aerr.value = ''
   try {
     const body: any = { decision: a.decision, note: note.value.trim() || undefined }
@@ -96,8 +97,8 @@ async function submit() {
       <button class="c-btn c-mt" @click="toggle(o)">{{ openId === o.id ? $t('admin.orgs.close') : $t('admin.orgs.view') }}</button>
 
       <div v-if="openId === o.id" class="c-mt">
-        <p v-if="dLoading && !detail" class="c-mute" role="status">{{ $t('admin.orgs.detailLoading') }}</p>
-        <template v-else-if="detail">
+        <p v-if="dLoading && detail?.org.id !== o.id" class="c-mute" role="status">{{ $t('admin.orgs.detailLoading') }}</p>
+        <template v-else-if="detail?.org.id === o.id">
           <dl class="c-dl">
             <template v-for="f in FLAGS.filter(f => f !== 'documents' && f !== 'permits' && f !== 'logo_key')" :key="f">
               <dt>{{ flagLabel(f) }}</dt><dd>{{ detail.org[f] ?? '' }}</dd>

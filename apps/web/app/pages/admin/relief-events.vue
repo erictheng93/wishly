@@ -6,7 +6,10 @@ useHead({ title: () => t('admin.events.title') })
 const { api } = useApi()
 const rows = ref<any[]>([]), next = ref<number | null>(null), loading = ref(false)
 const q = ref(''), err = ref(''), msg = ref('')
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const shown = computed(() => rows.value.filter(e => !q.value.trim() || e.id === q.value.trim() || e.slug === q.value.trim()))
+// 公開列表不含已隱藏事件：輸入列表外的 UUID 時，合成一列讓 staff 直接操作
+const direct = computed(() => (UUID.test(q.value.trim()) && !shown.value.length ? { id: q.value.trim(), name: q.value.trim(), slug: '', counties: [], moderation_status: 'ok', merged_into: null } : null))
 
 async function load(more = false) {
   loading.value = true; err.value = ''
@@ -23,7 +26,6 @@ const into = ref(''), reason = ref(''), busy = ref(false), aerr = ref('')
 const title = computed(() => (act.value ? t(`admin.events.${act.value.kind}`) : ''))
 const text = computed(() => act.value ? t(`admin.events.${act.value.kind === 'merge' ? 'mergeText' : act.value.kind + 'Text'}`, { name: act.value.row.name }) : '')
 function open(row: any, kind: Act['kind']) { act.value = { row, kind }; into.value = ''; reason.value = ''; aerr.value = '' }
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 async function submit() {
   const { row, kind } = act.value!
   busy.value = true; aerr.value = ''
@@ -32,6 +34,7 @@ async function submit() {
       const v = into.value.trim()
       const target = UUID.test(v) ? v : rows.value.find(e => e.slug === v)?.id // slug 只能從已載入的列表解析
       if (!target) { aerr.value = t('admin.events.targetNotFound'); return }
+      if (target === row.id) { aerr.value = t('admin.events.selfMerge'); return }
       await api(`/admin/relief-events/${row.id}/merge`, { method: 'POST', body: { into: target } })
       row.merged_into = target
     } else {
@@ -50,13 +53,15 @@ async function submit() {
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('admin.events.retry') }}</button></p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <p v-if="loading && !rows.length" class="c-mute" role="status">{{ $t('admin.events.loading') }}</p>
-    <p v-else-if="!shown.length && !err" class="c-center c-mute">{{ $t('admin.events.empty') }}</p>
-    <article v-for="e in shown" :key="e.id" class="c-card" :data-event="e.id">
+    <p v-else-if="!shown.length && !direct && !err" class="c-center c-mute">{{ $t('admin.events.empty') }}</p>
+    <article v-for="e in (direct ? [direct] : shown)" :key="e.id" class="c-card" :data-event="e.id">
       <div class="c-row"><strong class="c-grow">{{ e.name }}</strong><span v-if="e.moderation_status === 'hidden'" class="c-badge">{{ $t('admin.events.hiddenBadge') }}</span></div>
-      <div class="c-mute">{{ e.slug }} · {{ e.hazard_type }} · {{ (e.counties || []).join('、') }} · {{ e.occurred_on }}</div>
+      <div v-if="e.slug" class="c-mute">{{ e.slug }} · {{ e.hazard_type }} · {{ (e.counties || []).join('、') }} · {{ e.occurred_on }}</div>
       <div class="c-mute c-small">{{ e.id }}</div>
       <p v-if="e.merged_into" class="c-mute">{{ $t('admin.events.merged', { into: e.merged_into }) }}</p>
       <div class="c-row wrap c-mt">
+        <!-- 直接以 UUID 操作時不知道目前是否已隱藏，兩個方向都給 -->
+        <button v-if="e === direct" class="c-btn c-grow" @click="open(e, 'unhide')">{{ $t('admin.events.unhide') }}</button>
         <button v-if="!e.merged_into" class="c-btn c-grow" @click="open(e, 'merge')">{{ $t('admin.events.merge') }}</button>
         <button class="c-btn c-grow" :class="{ danger: e.moderation_status !== 'hidden' }" @click="open(e, e.moderation_status === 'hidden' ? 'unhide' : 'hide')">{{ $t(`admin.events.${e.moderation_status === 'hidden' ? 'unhide' : 'hide'}`) }}</button>
       </div>

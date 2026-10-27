@@ -542,7 +542,8 @@
         "logo_key": "組織標誌",
         "documents": "文件",
         "permits": "勸募許可"
-      }
+      },
+      "flagRequired": "請至少勾選一個欄位"
     },
     "events": {
       "title": "救災事件管理",
@@ -562,7 +563,8 @@
       "unhideText": "取消隱藏「{name}」？",
       "reasonLabel": "原因",
       "targetNotFound": "找不到該事件，請輸入 id 或已載入列表中的 slug",
-      "done": "已處理"
+      "done": "已處理",
+      "selfMerge": "不能合併到自己"
     }
   }
 }

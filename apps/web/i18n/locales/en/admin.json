@@ -542,7 +542,8 @@
         "logo_key": "Logo",
         "documents": "Documents",
         "permits": "Fundraising permits"
-      }
+      },
+      "flagRequired": "Select at least one field"
     },
     "events": {
       "title": "Disaster events",
@@ -562,7 +563,8 @@
       "unhideText": "Unhide \"{name}\"?",
       "reasonLabel": "Reason",
       "targetNotFound": "Event not found: enter an id, or a slug from the loaded list",
-      "done": "Done"
+      "done": "Done",
+      "selfMerge": "Cannot merge an event into itself"
     }
   }
 }
