@@ -1354,6 +1354,8 @@ fn apply_relief(m: &Map<String, Value>, i: &mut I, relief: bool, create: bool) -
             if m.contains_key(k) {
                 return Err(AppError::invalid(&format!("/{k}"), "NOT_APPLICABLE", &format!("只有救災據點的品項可設定 {k}")));
             }
+        } else if m.get(k).is_some_and(Value::is_null) {
+            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填，不可清空")));
         } else if let Some(v) = one_of(m, k, allowed)? {
             *slot = Some(v.into());
         } else if create {

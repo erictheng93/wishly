@@ -45,6 +45,8 @@ async fn relief_item_requires_category_urgency_422(pool: PgPool) {
     assert_eq!((s, u["urgency"].as_str(), u["category"].as_str()), (StatusCode::OK, Some("critical"), Some("water")));
     let (s, _, u) = call(&pool, "PATCH", &url, &ck(&f.owner.token), Some(json!({"urgency":"x"}))).await;
     assert_eq!((s, pointer(&u)), (StatusCode::UNPROCESSABLE_ENTITY, ("/urgency", "ENUM")));
+    let (s, _, u) = call(&pool, "PATCH", &url, &ck(&f.owner.token), Some(json!({"category":null}))).await;
+    assert_eq!((s, pointer(&u)), (StatusCode::UNPROCESSABLE_ENTITY, ("/category", "REQUIRED")));
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -126,5 +128,29 @@ async fn paused_site_blocks_new_claims_and_pledges(pool: PgPool) {
         let (s, _, v) = call(&pool, "PATCH", &format!("/claims/{cid}"), &ck(&u.token), Some(json!({"qty":2}))).await;
         assert_eq!((s, v["code"].as_str()), (StatusCode::CONFLICT, Some(code)));
     }
+    assert_eq!(balance(&pool, u.id).await, 100);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn paused_site_still_allows_cancel_decrease_and_withdraw(pool: PgPool) {
+    let f = fx(&pool).await;
+    let q = relief_item(&pool, f.site.id, false).await;
+    let c = relief_item(&pool, f.site.id, true).await;
+    let u = user(&pool, "捐").await;
+    grant(&pool, u.id, 100).await;
+    let app = test_app(&pool);
+    let (s, _, v) = call(&pool, "POST", &format!("/items/{q}/claims"), &[ck(&u.token), idem(Uuid::new_v4())].concat(), Some(json!({"qty":3}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let cid = v["claim"]["id"].as_str().unwrap().to_string();
+    let (s, _, v) = pledge(&app, c, &u.token, 10).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let pid = v["contribution"]["id"].as_str().unwrap().to_string();
+    sqlx::query("UPDATE wishlists SET site_status='paused' WHERE id=$1").bind(f.site.id).execute(&pool).await.unwrap();
+    let url = format!("/claims/{cid}");
+    let hdr = ck(&u.token);
+    assert_eq!(call(&pool, "PATCH", &url, &hdr, Some(json!({"qty":2}))).await.0, StatusCode::OK);
+    assert_eq!(call(&pool, "PATCH", &url, &hdr, Some(json!({"status":"cancelled"}))).await.0, StatusCode::OK);
+    let (s, _, v) = call(&pool, "DELETE", &format!("/contributions/{pid}"), &[ck(&u.token), idem(Uuid::new_v4())].concat(), None).await;
+    assert!(s.is_success(), "{s} {v}");
     assert_eq!(balance(&pool, u.id).await, 100);
 }
