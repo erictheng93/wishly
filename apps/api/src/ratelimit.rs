@@ -54,6 +54,10 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM native_auth_codes WHERE expires_at < now()")
         .execute(pool)
         .await?;
+    // 過期或撤銷的 session 保留 30 天供裝置列表/稽核對照後清除
+    sqlx::query("DELETE FROM sessions WHERE expires_at < now() - interval '30 days'")
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM rate_limits WHERE window_start < now() - interval '2 days'")
         .execute(pool)
         .await?;

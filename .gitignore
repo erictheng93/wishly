@@ -18,4 +18,6 @@ apps/web/npm-audit.json
 
 # Playwright CLI 暫存（快照可能含畫面上的機密）
 .playwright-cli/
+
+# superpowers 腦力激盪工具的本機狀態（含 token / pid）
 .superpowers/

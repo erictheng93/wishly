@@ -9,15 +9,19 @@
 
 **為什麼是第一優先**：正式環境已有真實資料寫入，PostgreSQL 與後端同機（單點），目前**沒有任何備份**。`SHIPPING_ENC_KEY` 又沒有輪替機制，資料與金鑰任一遺失都無法恢復。
 
-- [x] **決策**（2026-10-21，產品負責人）：兩者都做。先上方案 B（每小時 `pg_dump`，暫時 RPO = 1 小時、無 PITR），再做方案 A（WAL-G → R2）以達成 PRD 的 RPO ≤ 5 分鐘、PITR 7 天。操作見 `deploy-runbook.md` §6。
+- [x] **決策**（2026-10-21，產品負責人）：兩者都做。方案 B（每小時 `pg_dump`；2026-10-27 曾改為 8 小時，評估容量後改回每小時，30 天約 100 MB），再做方案 A（WAL-G → R2）以達成 PRD 的 RPO ≤ 5 分鐘、PITR 7 天。操作見 `deploy-runbook.md` §6。
 - [x] 方案 B 上線（2026-10-21）：`scripts/db-backup.sh` 部署到 VPS `/opt/wishly-backup/`，`/etc/cron.d/wishly-backup` 每小時執行；`-Fc -Z zstd` 先壓縮再存與傳，本機保留 48 份（0600）。沒有使用 Dokploy 內建備份：它只支援 Dokploy 的 Database 類型，`db` 是 Compose 服務。
-- [ ] **R2 備份 bucket 與憑證**（由你操作，機密不經代理程式）：建立 `wishly-db-backups`（APAC）、只限該 bucket 的 Object Read & Write token（不得重用 `wishly-media` 的金鑰）、生命週期 30 天刪除；照 `scripts/db-backup.r2.env.example` 寫入 VPS 的 `/etc/wishly-backup/r2.env`（chmod 600）。之後手動執行一次 `db-backup.sh`，確認 R2 上有檔案。
+- [x] R2 bucket `wishly-db-backups`（2026-10-27，APAC）：`postgres/` 設 Bucket Lock 30 天（VPS 被入侵、金鑰外流也刪不掉舊備份），生命週期第 31 天刪除（晚於鎖定，避免衝突）。
+- [x] R2 備份憑證（2026-10-27）：專用 token 只限 `wishly-db-backups`、IP 限 VPS 的 IPv4，寫在 VPS `/etc/wishly-backup/r2.env`（0600）。VPS 有動態 IPv6，rclone 以 `--bind 0.0.0.0` 強制走 IPv4，否則會被 IP 過濾擋下（403）。實測以 token 刪除備份得到 `409 ObjectLockedByBucketPolicy`。
 - [ ] 備份與 `SHIPPING_ENC_KEY` **不放在同一處**；確認該金鑰已存放於**兩個獨立位置**（密碼管理器＋離線）。
 - [x] **還原演練（本機副本）**（2026-10-21）：`db-restore-drill.sh` 在 VPS 上把 `wishly-20261021T090717Z.dump` 還原到無網路的暫存容器，migration 28 全部成功，對帳通過（12 users／8 wishlists／16 items／2 claims），**資料庫還原耗時 8 秒**。之後每季一次。
-- [ ] 還原演練（從 R2 下載）：R2 設好後照 runbook §6 做一次。
-- [ ] 備份新鮮度告警：註冊 healthchecks.io（或同類服務，週期 1 小時、寬限 30 分），把 ping 網址填進 `r2.env` 的 `PING_URL`。腳本只有全部成功才會 ping。
-- [ ] **方案 A：WAL-G**：`db` 掛載 wal-g 執行檔，設定 `archive_mode=on`、`archive_command`、`archive_timeout=300`，每日基底備份並保留 7 天。**需要重啟 `db`**（`archive_mode` 只在啟動時讀取），要排停機時段。完成後做 PITR 演練，並改寫 runbook §6。
-- [ ] 寫「整機掛掉」恢復手冊並計時：新 VPS → Dokploy → 還原 DB → 設環境變數 → Tunnel。
+- [x] 還原演練（從 R2 下載）（2026-10-27）：`wishly-20261027T085138Z.dump`（153 KB）從 R2 下載，與本機副本位元組相同；還原後對帳通過（12 users／9 wishlists／19 items／3 claims），耗時 7 秒。
+- [x] 備份新鮮度告警（2026-10-27）：healthchecks.io check `wishly-db-backup`（週期 1 小時、寬限 30 分），網址在 `r2.env` 的 `PING_URL`；`db-backup.sh` 只有 dump、上傳、WAL 歸檔檢查全部成功才 ping，實測 HTTP 200。最新基底備份超過 26 小時也會中止、不 ping（反向測試 `BASE_MAX_AGE_HOURS=0` 得 rc=1）。
+- [x] 方案 A：WAL-G v3.0.9 上線（2026-10-27）：`archive_mode=on`、`archive_timeout=300`（RPO ≤ 5 分鐘），每日基底備份保留 8 份（PITR 7 天），R2 `wal-g/`。`db` 重建一次，停機約 10 秒，`/readyz` 200。PITR 演練：取回基底備份、重播 2 段 WAL、升格後對帳通過，耗時 9 秒。
+- [x] Dokploy 後台的 `db` compose 已補上 `- /opt/wishly-backup/walg:/walg:ro`（2026-10-27，已比對 Dokploy 存的 `composeFile`、VPS 上的檔案與執行中容器的掛載，三者一致）。
+- [x] 指定時間點的 PITR 演練（2026-10-27）：正式庫暫建 `ops_drill.marker`，09:17:48 寫 A、09:17:53 寫 B；`walg-restore-drill.sh '2026-10-27 09:17:50.892224+00'` 還原後只有 A、沒有 B，對帳通過，耗時 9 秒；演練後已 drop 該 schema。
+- [x] 整機恢復手冊（2026-10-27）：`deploy-runbook.md` §8；WAL-G 安裝改為可重跑的 `scripts/walg-setup.sh`（在正式機重跑，產出與現行檔案 sha256 相同）。
+- [ ] 依 runbook §8 實際演練並計時（需開一台暫時的 Linode，演練完刪除；對外的 Tunnel／DNS 不切換）。
 - [ ] Linode 整機備份／快照啟用，視為輔助（不等於資料庫一致性備份）。
 - [x] 高風險 migration 前先手動備份：已寫入 runbook §3（執行 `db-backup.sh`）。
 

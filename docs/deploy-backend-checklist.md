@@ -69,8 +69,12 @@
 
 ### 2.3 VPS 主機
 - [ ] Linode 東京節點；OS 為受支援 LTS；`unattended-upgrades`（或等效）啟用安全更新。
-- [ ] 防火牆（Linode Cloud Firewall 與主機 ufw 擇一以上）：**入站全部拒絕**，包含 80／443（Tunnel 為出站連線）；SSH 限來源 IP，或改經 Tailscale／Cloudflare Access；停用密碼登入、只用金鑰；fail2ban 或等效。
-- [ ] **Dokploy 管理介面不得公開在公網**：預設埠（3000）只允許你的來源 IP／VPN／Tunnel 加 Access 保護。**需實測**目前安裝是否已綁在公網。
+- [x] 防火牆，兩層（2026-10-27 實測）：
+  - 外層 Linode Cloud Firewall：入站只放行 22（封包取樣 5 分鐘只有 22 的 SYN 到達，其餘埠 0 筆）。
+  - 主機第二層 `wishly-firewall.service`（`scripts/vps/wishly-firewall.sh`、`firewall-install.sh`）：`DOCKER-USER` 丟棄 eth0 的所有新連線（Docker 發佈的埠走 FORWARD，ufw／INPUT 擋不到）；`INPUT` 擋 80／443／3000 與 Swarm 2377／7946／4789（IPv6 的 docker-proxy 走 INPUT）。ufw 未啟用。
+  - ⚠ 日後若要讓 Traefik 直接對外服務 80／443，須先改 `wishly-firewall.sh`。
+- [x] SSH 只用金鑰（`scripts/vps/ssh-harden.sh`：`PasswordAuthentication no`、root `prohibit-password`、`MaxAuthTries 3`）＋ fail2ban（sshd jail，systemd backend）。22 仍對全網開放；若要限來源 IP，在 Linode Cloud Firewall 設，鎖死時用 LISH 主控台（root 密碼登入，不受 SSH 設定影響，root 密碼須保留且夠強）。
+- [x] **Dokploy 管理介面不公開**：3000 由兩層防火牆擋下；只經 SSH 通道存取（`ssh -L 3001:localhost:3000 root@<VPS>`，或在 `~/.ssh/config` 設 `LocalForward 3001 localhost:3000` 後 `ssh wishly`；本機 3000 留給 Nuxt dev）。
 - [ ] Docker：日誌輪替（`max-size`／`max-file`），避免日誌塞滿磁碟。
 - [ ] 時間同步（chrony／systemd-timesyncd）；時區 UTC。
 - [ ] 資源上限：容器記憶體／CPU 限制，避免單一服務（含 `image` 解碼）拖垮同機的 Postgres。
@@ -86,9 +90,9 @@
 
 ### 2.5 Cloudflare Tunnel
 - [ ] cloudflared 以容器或系統服務執行並設為自動重啟；憑證／token 當成機密保管。
-- [ ] 公開主機名稱 `api.<域名>` → 指向 Traefik 或直接指向後端容器 `:8080`（擇一，記錄選擇）。**需實測**：該路徑是否保留 `CF-Connecting-IP`、對 SSE 是否不緩衝。
-- [ ] 後端 `BIND`：若 Tunnel 與後端在同一 Docker 網路，需 `0.0.0.0:8080`（容器內）；此時 `bind_warning` 會印 WARN，屬預期，**前提是主機無任何入站規則可繞過 Tunnel**（§2.3），並記錄這個放行理由。
-- [ ] 驗證 API 不可被繞過：從外部直接連 VPS 公網 IP 的 80／443／8080 全部連不上。
+- [x] 公開主機名稱 `api.<域名>` → **直接指向後端容器** `http://wishly-api-…:8080`（不經 Traefik；Traefik 沒有任何指向 API 的路由）。**需實測**：該路徑對 SSE 是否不緩衝。
+- [x] 後端 `BIND=0.0.0.0:8080`（容器內，Tunnel 同 Docker 網路）；`bind_warning` 的 WARN 屬預期。放行理由：API 容器未對主機發佈任何埠，且主機入站由 §2.3 兩層防火牆擋下，`CF-Connecting-IP` 無法被直連者偽造。
+- [x] 驗證 API 不可被繞過（2026-10-27）：`scripts/vps/verify-tunnel-only.sh host` 檢查監聽埠、Docker 發佈埠、DOCKER-USER、Tunnel 設定；`capture` 封包取樣確認外部入站只有 22 到達。註：部分網路會攔截出站 80／443 並假裝握手成功，從那種網路跑 `external` 會誤報 OPEN，以 `capture` 為準。
 - [ ] Tunnel 斷線的行為：cloudflared 重連時 SSE 會斷，client 依 `retry: 5s` 重連；Tunnel 掛掉 = API 對外不可用，要有告警。
 
 ## 3. 環境變數與機密（production 缺漏即拒絕啟動）
@@ -161,7 +165,7 @@
 | 7.2 | 註冊／登入 OTP 實際收信 | 以真實信箱走 F1；確認 `Set-Cookie` 含 `Secure; HttpOnly; SameSite=Lax` |
 | 7.3 | 建清單、訪客捐助、防超賣 | 在 staging 走一遍；正式環境不跑會寫入大量資料的 E2E |
 | 7.4 | 限流以真實用戶 IP 計 | 兩個不同 IP 各打超過額度，確認互不影響（`TRUSTED_PROXY` 與 `CF-Connecting-IP` 生效） |
-| 7.5 | **API 不可繞過 Tunnel** | 對 VPS 公網 IP 直連 80／443／8080 全部失敗 |
+| 7.5 | **API 不可繞過 Tunnel** | 在 VPS 上跑 `scripts/vps/verify-tunnel-only.sh host` 與 `capture`：除 22 外沒有入站 SYN 到達、Tunnel 直連 API 容器；外部直連 80／443／8080 全部失敗（`external`，注意本機網路攔截） |
 | 7.6 | CDN 金絲雀 | `scripts/cdn-canary.mjs` exit 0 |
 | 7.7 | 清單改為受限後立即清快取 | 公開清單先被快取，改成 friends，匿名請求立即得到 403／404 |
 | 7.8 | 圖片上傳與讀取 | 上傳→經 `S3_PUBLIC_BASE` 顯示 |

@@ -1,5 +1,6 @@
 //! 共用身分：Cookie `ws_session=<opaque token>`，DB 只存 SHA-256(token)（sessions.token_hash）。
 //! 簽發 session 的是 auth 模組；其他模組只用 `CurrentUser` extractor。
+//! 期限：閒置 30 天（使用中隨 last_seen_at 一起續期）、自建立起最長 90 天；MFA 通過後 12 小時內有效。
 use crate::{error::AppError, AppState};
 use axum::{
     extract::FromRequestParts,
@@ -63,7 +64,7 @@ impl FromRequestParts<AppState> for CurrentUser {
         let tok = session_token(&parts.headers).ok_or(AppError::Unauthorized)?;
         let row: Option<SessionRow> = sqlx::query_as(
             "SELECT u.id, u.is_staff, u.blocked_at IS NOT NULL AS blocked, s.revoked_at IS NULL AS live, s.id AS session_id,
-                    s.mfa_at IS NOT NULL AS mfa, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
+                    COALESCE(s.mfa_at > now() - interval '12 hours', false) AS mfa, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
                     (s.last_seen_at < now() - interval '5 minutes' OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)) AS stale
              FROM sessions s JOIN users u ON u.id = s.user_id
              WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL")
@@ -75,7 +76,7 @@ impl FromRequestParts<AppState> for CurrentUser {
                 "帳號已停權，請聯絡客服",
             )),
             Some(r) if r.live => {
-                // 裝置列表的「最後使用」與每日活躍紀錄（台北日）：登入後首個請求、跨日首個請求、之後每 5 分鐘最多寫一次；
+                // 裝置列表的「最後使用」、閒置期限續期與每日活躍紀錄（台北日）：登入後首個請求、跨日首個請求、之後每 5 分鐘最多寫一次；
                 // 失敗不影響請求。先寫活躍列再更新 session：FK 會對 users 取 KEY SHARE，若與持有 users 鎖的交易
                 // （刪帳、停權）交錯會死結；SKIP LOCKED 讓被鎖時直接略過（下個請求因 stale 仍成立而補寫）。
                 if r.stale {
@@ -89,7 +90,7 @@ impl FromRequestParts<AppState> for CurrentUser {
                         .await;
                     if done.is_ok() {
                         let _ =
-                            sqlx::query("UPDATE sessions SET last_seen_at = now() WHERE id = $1")
+                            sqlx::query("UPDATE sessions SET last_seen_at = now(), expires_at = LEAST(created_at + interval '90 days', now() + interval '30 days') WHERE id = $1")
                                 .bind(r.session_id)
                                 .execute(&st.pool)
                                 .await;

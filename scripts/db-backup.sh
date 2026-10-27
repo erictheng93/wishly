@@ -20,10 +20,22 @@ mv "$f.part" "$f"
 if [ -f "$ENV_FILE" ]; then
     # shellcheck disable=SC1090
     . "$ENV_FILE" # R2_BUCKET、RCLONE_CONFIG_R2_*、可選 PING_URL
+    # --bind 0.0.0.0 強制 IPv4：token 只放行 VPS 的 IPv4，VPS 的 IPv6 是動態位址
     docker run --rm --network host --env-file "$ENV_FILE" -v "$DIR:/data:ro" "$RCLONE_IMAGE" \
-        copyto "/data/$(basename "$f")" "r2:$R2_BUCKET/postgres/$(basename "$f")" --s3-no-check-bucket
+        copyto "/data/$(basename "$f")" "r2:$R2_BUCKET/postgres/$(basename "$f")" --s3-no-check-bucket --bind 0.0.0.0
 fi
 
+# 方案 A 的 WAL 歸檔：最近一次失敗晚於成功就中止，不 ping，讓告警響（歸檔卡住時 WAL 會堆滿磁碟）
+if [ "$(docker exec "$DB" psql -U wishly -d wishly -Atc "select coalesce(last_failed_time > coalesce(last_archived_time, '-infinity'), false) from pg_stat_archiver")" = t ]; then
+    echo "WAL 歸檔失敗，見 pg_stat_archiver" >&2
+    exit 1
+fi
+# 方案 A 的基底備份每日 03:47 UTC 一次；最新一份超過時限（預設 26 小時，留 2 小時餘裕）就中止
+latest=$(docker exec -u postgres "$DB" /walg/archive.sh backup-list 2>/dev/null | tail -n +2 | awk '{print $2}' | sort | tail -1)
+if [ -z "$latest" ] || [ $(($(date +%s) - $(date -d "$latest" +%s))) -gt $((${BASE_MAX_AGE_HOURS:-26} * 3600)) ]; then
+    echo "WAL-G 基底備份過舊或不存在（最新：${latest:-無}），見 journalctl -t wishly-walg" >&2
+    exit 1
+fi
 ls -1t "$DIR"/wishly-*.dump | tail -n +$((KEEP_LOCAL + 1)) | xargs -r rm --
 # 全部成功才回報；沒收到 ping 由監控服務告警（備份靜默失敗最危險）
 if [ -n "${PING_URL:-}" ]; then curl -fsS -m 10 "$PING_URL" >/dev/null; fi
