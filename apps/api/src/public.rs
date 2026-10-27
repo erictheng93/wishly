@@ -352,7 +352,8 @@ async fn render(
         "cover_image_url": image_url(w.cover_image_key.as_deref(), &w.cover_image_status),
         "cover_preset": w.cover_preset,
         "event_date": w.event_date, "closes_at": w.closes_at, "id": w.id,
-        "owner": { "id": w.owner_id, "display_name": w.owner_name },
+        // 救災據點是組織的，不曝露建立者個人資料（改顯示 org）
+        "owner": if w.r#type == "relief" { Value::Null } else { json!({ "id": w.owner_id, "display_name": w.owner_name }) },
         "surprise_mode": w.surprise_mode, "surprise_locked": w.locked, "claimers_visible": visible,
         "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
         "items": item_json, "updated_at": w.updated_at,
@@ -382,9 +383,21 @@ mod relief {
     pub async fn extend_site(pool: &sqlx::PgPool, id: Uuid, body: &mut Value) -> Result<(), AppError> {
         let v: Value = sqlx::query_scalar(
             "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', o.verification_status = 'verified'),
-                    'event', jsonb_build_object('slug', e.slug, 'name', e.name), 'site_address', w.site_address, 'site_status', w.site_status)
-               FROM wishlists w JOIN organizations o ON o.id = w.org_id JOIN relief_events e ON e.id = w.event_id WHERE w.id = $1")
+                    'site_address', w.site_address, 'site_status', w.site_status)
+               FROM wishlists w JOIN organizations o ON o.id = w.org_id WHERE w.id = $1")
             .bind(id).fetch_one(pool).await?;
+        // 事件：已合併就沿 merged_into 走到最終事件（最多 10 跳）；下架 / 找不到為 null
+        let event: Option<Value> = sqlx::query_scalar(
+            "WITH RECURSIVE c AS (
+               SELECT e.id, e.slug::text AS slug, e.name, e.merged_into, e.moderation_status::text AS m, 0 AS n
+                 FROM wishlists w JOIN relief_events e ON e.id = w.event_id WHERE w.id = $1
+               UNION ALL
+               SELECT e.id, e.slug::text, e.name, e.merged_into, e.moderation_status::text, c.n + 1
+                 FROM c JOIN relief_events e ON e.id = c.merged_into WHERE c.n < 10)
+             SELECT jsonb_build_object('slug', slug, 'name', name) FROM c WHERE merged_into IS NULL AND m = 'ok'")
+            .bind(id).fetch_optional(pool).await?;
+        let mut v = v;
+        v["event"] = event.unwrap_or(Value::Null);
         if let (Some(b), Some(x)) = (body.as_object_mut(), v.as_object()) {
             b.extend(x.clone());
         }

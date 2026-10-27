@@ -88,20 +88,26 @@ async fn record(
     Ok(resp(201, &out, false))
 }
 
+/// 據點的實收總覽：據點摘要 + 全部未刪除品項（沒有實收的 total = 0、entries = []），供志工登記頁使用。
 async fn list(
     State(st): State<AppState>,
     me: CurrentUser,
     Path((org, wid)): Path<(Uuid, Uuid)>,
-) -> Result<Json<Vec<Value>>, AppError> {
+) -> Result<Json<Value>, AppError> {
     require_role(&st.pool, org, me.id, "volunteer").await?;
-    sqlx::query_scalar::<_, i32>("SELECT 1 FROM wishlists WHERE id=$1 AND org_id=$2 AND type='relief' AND deleted_at IS NULL")
+    let site: Value = sqlx::query_scalar(
+        "SELECT jsonb_build_object('id', id, 'title', title, 'slug', slug::text, 'site_status', site_status, 'site_address', site_address)
+           FROM wishlists WHERE id=$1 AND org_id=$2 AND type='relief' AND deleted_at IS NULL")
         .bind(wid).bind(org).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
-    let rows = sqlx::query_scalar(
-        "SELECT jsonb_build_object('item_id', r.item_id, 'total', sum(r.qty), 'entries', jsonb_agg(jsonb_build_object(
-            'qty', r.qty, 'note', r.note, 'recorded_by_name', u.display_name, 'created_at', r.created_at)
-            ORDER BY r.created_at DESC, r.id DESC))
-         FROM receipts r JOIN users u ON u.id = r.recorded_by WHERE r.wishlist_id = $1
-         GROUP BY r.item_id ORDER BY min(r.created_at)")
+    let items: Vec<Value> = sqlx::query_scalar(
+        "SELECT jsonb_build_object('item_id', i.id, 'title', i.title, 'qty_needed', i.qty_needed, 'category', i.category, 'urgency', i.urgency,
+                'total', COALESCE(r.total, 0), 'entries', COALESCE(r.entries, '[]'::jsonb))
+           FROM wishlist_items i
+           LEFT JOIN LATERAL (SELECT sum(x.qty)::bigint AS total, jsonb_agg(jsonb_build_object(
+                'qty', x.qty, 'note', x.note, 'recorded_by_name', u.display_name, 'created_at', x.created_at)
+                ORDER BY x.created_at DESC, x.id DESC) AS entries
+              FROM receipts x JOIN users u ON u.id = x.recorded_by WHERE x.item_id = i.id) r ON true
+          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id")
         .bind(wid).fetch_all(&st.pool).await?;
-    Ok(Json(rows))
+    Ok(Json(json!({ "site": site, "items": items })))
 }

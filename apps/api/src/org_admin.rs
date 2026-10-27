@@ -74,7 +74,7 @@ async fn review(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uu
     if !matches!(b.decision.as_str(), "approve" | "needs_changes" | "reject") {
         return Err(AppError::invalid("/decision", "INVALID", "decision 不合法"));
     }
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     // 鎖組織列：兩位 staff 同時審同一筆時，只有一個轉移會成功
     let (status, display_name): (String, String) =
         sqlx::query_as("SELECT verification_status, display_name FROM organizations WHERE id = $1 FOR UPDATE")
@@ -143,12 +143,12 @@ async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): 
         "reject" => "rejected",
         _ => return Err(AppError::invalid("/decision", "INVALID", "decision 不合法")),
     };
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
     // 鎖序：組織 → 許可（與組織審核一致）
     let org_id: Uuid = sqlx::query_scalar("SELECT org_id FROM org_permits WHERE id = $1")
         .bind(id).fetch_optional(&mut *tx).await?
         .ok_or_else(|| AppError::problem(404, "NOT_FOUND", "許可不存在"))?;
-    let display_name: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id = $1 FOR UPDATE")
+    let (display_name, org_slug): (String, String) = sqlx::query_as("SELECT display_name, slug::text FROM organizations WHERE id = $1 FOR UPDATE")
         .bind(org_id).fetch_one(&mut *tx).await?;
     let (status, permit_no): (String, String) = sqlx::query_as("SELECT status, permit_no FROM org_permits WHERE id = $1 FOR UPDATE")
         .bind(id).fetch_one(&mut *tx).await?;
@@ -179,6 +179,7 @@ async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): 
     if !slugs.is_empty() {
         crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());
         crate::cdn::purge_events(ev);
+        crate::cdn::purge_org(org_slug); // 組織頁只列上線據點，被暫停的要消失
     }
     Ok(Json(json!({ "id": id, "status": new_status })))
 }

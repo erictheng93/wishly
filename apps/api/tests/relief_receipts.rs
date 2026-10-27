@@ -41,11 +41,31 @@ async fn volunteer_records_receipt(pool: PgPool) {
     rec(&pool, &f, 7, Uuid::new_v4()).await;
     let (s, _, v) = call(&pool, "GET", &format!("/orgs/{}/sites/{}/receipts", f.org, f.site.id), &ck(&f.vol.token), None).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(v[0]["item_id"], json!(f.item));
-    assert_eq!(v[0]["total"], 12);
-    assert_eq!(v[0]["entries"].as_array().unwrap().len(), 2);
-    assert_eq!(v[0]["entries"][0]["qty"], 7); // 新的在前
-    assert_eq!(v[0]["entries"][0]["recorded_by_name"], "志工");
+    assert_eq!(v["site"]["id"], json!(f.site.id));
+    assert_eq!((v["site"]["slug"].as_str(), v["site"]["site_status"].as_str()), (Some(f.site.slug.as_str()), Some("active")));
+    let it = &v["items"][0];
+    assert_eq!(it["item_id"], json!(f.item));
+    assert_eq!((it["title"].as_str(), it["qty_needed"].as_i64(), it["category"].as_str(), it["urgency"].as_str()), (Some("礦泉水"), Some(100), Some("water"), Some("high")));
+    assert_eq!(it["total"], 12);
+    assert_eq!(it["entries"].as_array().unwrap().len(), 2);
+    assert_eq!(it["entries"][0]["qty"], 7); // 新的在前
+    assert_eq!(it["entries"][0]["recorded_by_name"], "志工");
+}
+
+/// 志工登記頁要列出全部品項：沒有實收的 total = 0、entries = []；已刪除的品項不列。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn overview_lists_items_without_receipts(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let empty: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,category,urgency,sort_order) VALUES($1,'毛毯',5,'shelter','low',9) RETURNING id")
+        .bind(f.site.id).fetch_one(&pool).await.unwrap();
+    sqlx::query("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,category,urgency,deleted_at) VALUES($1,'已刪',1,'food','low',now())").bind(f.site.id).execute(&pool).await.unwrap();
+    rec(&pool, &f, 4, Uuid::new_v4()).await;
+    let (s, _, v) = call(&pool, "GET", &format!("/orgs/{}/sites/{}/receipts", f.org, f.site.id), &ck(&f.vol.token), None).await;
+    assert_eq!(s, StatusCode::OK);
+    let items = v["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2, "{v}");
+    assert_eq!((items[0]["item_id"].clone(), items[0]["total"].clone()), (json!(f.item), json!(4)));
+    assert_eq!((items[1]["item_id"].clone(), items[1]["total"].clone(), items[1]["entries"].clone()), (json!(empty), json!(0), json!([])));
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

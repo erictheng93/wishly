@@ -512,3 +512,129 @@ async fn org_site_images_survive_creator_deletion(pool: PgPool) {
     let k: Option<String> = sqlx::query_scalar("SELECT cover_image_key FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
     assert_eq!(k.as_deref(), Some(key.as_str()));
 }
+
+/// 恢復營運（site_status 非 active → active）要用 PATCH 後的許可重驗：撤銷 / 過期 / 組織失格都不能復活據點。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn resume_rechecks_permit_and_org(pool: PgPool) {
+    let f = fx(&pool).await;
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    relief_item(&pool, l.id).await;
+    let url = format!("/wishlists/{}", l.id);
+    let tk = ck(&f.coord.token);
+    let patch = |b: Value| call(&pool, "PATCH", &url, &tk, Some(b));
+    let (s, _, e) = patch(json!({"site_status":"paused"})).await;
+    assert_eq!(s, StatusCode::OK, "{e}");
+    sqlx::query("UPDATE org_permits SET status='rejected' WHERE id=$1").bind(f.permit).execute(&pool).await.unwrap();
+    let (s, _, e) = patch(json!({"site_status":"active"})).await;
+    // 不用 assert_eq（失敗時會印出 500 的 INTERNAL_ERROR，被 mutate.py 當成基礎設施失敗）
+    assert!(s == StatusCode::CONFLICT && e["code"] == "PERMIT_INVALID", "resume ignored the revoked permit (status {s})");
+    // 資料庫 trigger 也擋：直接把 site_status 改回 active
+    let err = sqlx::query("UPDATE wishlists SET site_status='active' WHERE id=$1").bind(l.id).execute(&pool).await.unwrap_err();
+    assert_eq!(err.as_database_error().and_then(|d| d.code()).as_deref(), Some("23514"), "{err}");
+    // 過期
+    sqlx::query("UPDATE org_permits SET status='approved', valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date-1 WHERE id=$1").bind(f.permit).execute(&pool).await.unwrap();
+    assert_eq!(patch(json!({"site_status":"active"})).await.0, StatusCode::CONFLICT);
+    // 組織未通過審核
+    sqlx::query("UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date+5 WHERE id=$1").bind(f.permit).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE organizations SET verification_status='pending', verified_at=NULL WHERE id=$1").bind(f.org).execute(&pool).await.unwrap();
+    let (s, _, e) = patch(json!({"site_status":"active"})).await;
+    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::FORBIDDEN, "ORG_NOT_VERIFIED"), "{e}");
+    sqlx::query("UPDATE organizations SET verification_status='verified', verified_at=now() WHERE id=$1").bind(f.org).execute(&pool).await.unwrap();
+    let (s, _, e) = patch(json!({"site_status":"active"})).await;
+    assert_eq!((s, e["site_status"].as_str()), (StatusCode::OK, Some("active")), "{e}");
+}
+
+/// 草稿據點在事件下架後不能上線（與重開 / 建立一致：lock_event 檢查）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn publish_draft_under_hidden_event_is_422(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    relief_item(&pool, id(&v)).await;
+    sqlx::query("UPDATE relief_events SET moderation_status='hidden', moderation_reason='x' WHERE id=$1").bind(f.ev).execute(&pool).await.unwrap();
+    let url = format!("/wishlists/{}", id(&v));
+    let (s, _, e) = call(&pool, "PATCH", &url, &ck(&f.coord.token), Some(json!({"status":"active"}))).await;
+    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::UNPROCESSABLE_ENTITY, "EVENT_UNAVAILABLE"), "{e}");
+}
+
+/// PATCH 讀到的 site_status / event_id 要在 UPDATE 時比對：並行的撤銷 / 下架（暫停）或事件合併改過就回 409，
+/// 不可把舊值寫回（否則改標題會讓被暫停的據點復活、或掛回已合併的事件）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patch_overwriting_concurrent_site_status_or_event_is_409(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (ev2, _) = event(&pool, f.org).await;
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    let app = test_app(&pool);
+    for change in ["site_status='paused'".to_string(), format!("event_id='{ev2}'")] {
+        let mut tx = pool.begin().await.unwrap();
+        let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *tx).await.unwrap();
+        sqlx::query(sqlx::AssertSqlSafe(format!("UPDATE wishlists SET {change} WHERE id=$1"))).bind(l.id).execute(&mut *tx).await.unwrap();
+        let (a2, uri, tok) = (app.clone(), format!("/wishlists/{}", l.id), f.coord.token.clone());
+        let h = tokio::spawn(async move { call_app(&a2, "PATCH", &uri, &ck(&tok), Some(json!({"title":"改標題"}))).await });
+        wait_for_blocked(&pool, pid, 1).await;
+        tx.commit().await.unwrap();
+        let (s, _, e) = h.await.unwrap();
+        assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::CONFLICT, "STALE_VERSION"), "PATCH overwrote a concurrent {change}: {e}");
+    }
+    let (t, ss, ev): (String, String, Uuid) = sqlx::query_as("SELECT title, site_status, event_id FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    assert_eq!((t.as_str(), ss.as_str(), ev), ("據點", "paused", ev2));
+}
+
+/// 最後一位 owner 刪帳號：最早加入的 coordinator 升為 owner，組織不會沒有 owner。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn deleting_last_owner_promotes_earliest_coordinator(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let owner = user(&pool, "owner").await;
+    let o = org(&pool, owner.id, "verified").await;
+    member(&pool, o, owner.id, "owner").await;
+    let (c1, c2) = (user(&pool, "c1").await, user(&pool, "c2").await);
+    member(&pool, o, c1.id, "coordinator").await;
+    member(&pool, o, c2.id, "coordinator").await;
+    let (s, v) = delete_me(&pool, &owner.token).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let roles: Vec<(Uuid, String)> = sqlx::query_as("SELECT user_id, role::text FROM org_members WHERE org_id=$1 AND disabled_at IS NULL ORDER BY created_at").bind(o).fetch_all(&pool).await.unwrap();
+    assert_eq!(roles, vec![(c1.id, "owner".to_string()), (c2.id, "coordinator".to_string())]);
+}
+
+/// 建立者帳號刪除後據點被關閉；新 coordinator 重開時 owner_id 改記操作者，否則認捐查不到 owner 而 404。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reopening_site_with_deleted_creator_takes_over_owner(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    sqlx::query("UPDATE org_members SET role='volunteer' WHERE org_id=$1 AND role='owner'").bind(f.org).execute(&pool).await.unwrap();
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    let item = relief_item(&pool, l.id).await;
+    let (s, v) = delete_me(&pool, &f.coord.token).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let c2 = user(&pool, "coord2").await;
+    member(&pool, f.org, c2.id, "coordinator").await;
+    let (s, _, e) = call(&pool, "PATCH", &format!("/wishlists/{}", l.id), &ck(&c2.token), Some(json!({"status":"active","site_status":"active"}))).await;
+    assert_eq!(s, StatusCode::OK, "{e}");
+    let owner: Uuid = sqlx::query_scalar("SELECT owner_id FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    assert_eq!(owner, c2.id);
+    user_claim(&pool, item, 1).await; // 201 由 helper 斷言
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn relief_site_rejects_show_claimer_names(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    let url = format!("/wishlists/{}", id(&v));
+    let (s, _, e) = call(&pool, "PATCH", &url, &ck(&f.coord.token), Some(json!({"show_claimer_names":true}))).await;
+    assert_eq!((s, e["errors"][0]["pointer"].as_str(), e["errors"][0]["code"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("/show_claimer_names"), Some("NOT_APPLICABLE")), "{e}");
+    assert_eq!(call(&pool, "PATCH", &url, &ck(&f.coord.token), Some(json!({"show_claimer_names":false}))).await.0, StatusCode::OK);
+}
+
+/// 據點 PATCH 改營運狀態後，據點頁與所屬事件頁（含換事件前的舊事件）的快取要清。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn site_patch_purges_site_and_events(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    let (ev2, ev2_slug) = event(&pool, f.org).await;
+    let ev1_slug: String = sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id=$1").bind(f.ev).fetch_one(&pool).await.unwrap();
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    let (s, _, e) = call(&pool, "PATCH", &format!("/wishlists/{}", l.id), &ck(&f.coord.token), Some(json!({"site_status":"paused","event_id":ev2}))).await;
+    assert_eq!(s, StatusCode::OK, "{e}");
+    cdn.wait_for(&l.slug).await;
+    cdn.wait_for_url(&common::cdn::event_url(&ev1_slug)).await;
+    cdn.wait_for_url(&common::cdn::event_url(&ev2_slug)).await;
+}

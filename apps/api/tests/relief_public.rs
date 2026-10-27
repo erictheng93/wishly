@@ -44,6 +44,22 @@ async fn public_site_includes_org_and_event(pool: PgPool) {
     assert_eq!((v["site_address"].as_str(), v["site_status"].as_str()), (Some("花蓮縣某處"), Some("active")));
 }
 
+/// 救災據點不曝露建立者個人資料；事件下架為 null，已合併則解析到最終事件。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn public_site_hides_owner_and_resolves_event(pool: PgPool) {
+    let (_, o, _, a, s) = setup(&pool).await;
+    let path = format!("/public/wishlists/{}", s.slug);
+    let (_, v) = get(&pool, &path).await;
+    assert!(v["owner"].is_null(), "relief page leaked the creator: {}", v["owner"]);
+    let b = event(&pool, o).await;
+    sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1").bind(a.0).bind(b.0).execute(&pool).await.unwrap();
+    let (_, v) = get(&pool, &path).await;
+    assert_eq!(v["event"], json!({"slug": b.1, "name": "測試事件"}), "merged event not resolved: {v}");
+    sqlx::query("UPDATE relief_events SET moderation_status='hidden', moderation_reason='x' WHERE id=$1").bind(b.0).execute(&pool).await.unwrap();
+    let (_, v) = get(&pool, &path).await;
+    assert!(v["event"].is_null(), "hidden event exposed: {v}");
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn explore_excludes_relief(pool: PgPool) {
     let (_, _, _, _, s) = setup(&pool).await;
