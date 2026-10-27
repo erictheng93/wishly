@@ -17,6 +17,21 @@ const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
 const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 })
 const allowed = ref<string[]>([])
+const relief = computed(() => w.value?.type === 'relief')
+// 實收登記：每筆品項一張 sheet；明細來自 GET /orgs/{org}/sites/{id}/receipts
+const receipts = ref<Record<string, any>>({}), rcpt = ref<any>(null), rcptF = reactive({ qty: 1, note: '' }), rcptBusy = ref(false), rcptErr = ref('')
+async function loadReceipts() {
+  if (!relief.value) return
+  try { receipts.value = Object.fromEntries((await api(`/orgs/${w.value.org_id}/sites/${id}/receipts`)).map((r: any) => [r.item_id, r])) } catch { /* 明細失敗不擋編輯 */ }
+}
+function openReceipt(i: any) { rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
+async function saveReceipt() {
+  rcptBusy.value = true; rcptErr.value = ''
+  try {
+    await api(`/orgs/${w.value.org_id}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: { item_id: rcpt.value.id, qty: Number(rcptF.qty), note: rcptF.note || undefined } })
+    rcpt.value = null; await load(true)
+  } catch (e) { rcptErr.value = errMsg(e) } finally { rcptBusy.value = false }
+}
 const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null), coverBusy = ref(false)
 let poll: any
 
@@ -30,6 +45,7 @@ async function load(quiet = false) {
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
+  loadReceipts()
   clearTimeout(poll)
   if (items.value.some(i => i.image_status === 'pending')) poll = setTimeout(() => load(true), 4000) // 圖片處理中輪詢
 }
@@ -65,12 +81,13 @@ async function patchList(body: any, ok = t('lists.edit.saved')) {
   }
 }
 async function saveMeta() {
-  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, visibility: meta.visibility, claim_ttl_hours: meta.claim_ttl_hours }
+  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, claim_ttl_hours: meta.claim_ttl_hours }
+  if (!relief.value) body.visibility = meta.visibility // 救災據點的可見性由後端固定
   // 封面互斥；沒動就不送
   if (coverKey.value) Object.assign(body, { cover_image_key: coverKey.value, cover_preset: null })
   else if (coverPreset.value !== (w.value?.cover_preset ?? null)) Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
   if (!await patchList(body)) return
-  if (meta.visibility === 'selected') {
+  if (!relief.value && meta.visibility === 'selected') {
     try { await api(`/wishlists/${id}/allowed-users`, { method: 'PUT', body: { user_ids: allowed.value } }) }
     catch (e) { msg.value = ''; err.value = errMsg(e) }
   }
@@ -149,6 +166,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
             <strong>{{ i.title }}</strong>
             <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">{{ $t('lists.edit.crowdLine', { pledged: fmtPts(i.pledged_points), target: fmtPts(i.target_points) }) }}<template v-if="i.funding_deadline">{{ $t('lists.edit.until', { time: fmtTime(i.funding_deadline) }) }}</template>{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
             <div v-else class="c-mute">{{ $t('lists.edit.qtyLine', { n: i.qty_needed }) }}{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
+            <div v-if="relief" class="c-mute">{{ $t(`org.relief.category.${i.category}`) }} · {{ $t(`org.relief.urgency.${i.urgency}`) }} · {{ $t('org.relief.received', { n: i.qty_received ?? 0 }) }}</div>
             <CreatorStatusBadge v-if="i.image_status === 'pending' || i.image_status === 'rejected'" :v="i.image_status" />
             <div v-if="i.image_status === 'rejected'" class="c-err">{{ $t('lists.edit.imgRejected') }}</div>
           </div>
@@ -157,6 +175,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <button class="c-btn" :disabled="k === 0" :aria-label="$t('lists.edit.up')" @click="move(k, -1)">↑</button>
           <button class="c-btn" :disabled="k === items.length - 1" :aria-label="$t('lists.edit.down')" @click="move(k, 1)">↓</button>
           <button class="c-btn c-grow" @click="openItem(i)">{{ $t('lists.common.edit') }}</button>
+          <button v-if="relief" class="c-btn" @click="openReceipt(i)">{{ $t('org.relief.receiptBtn') }}</button>
           <button class="c-btn danger" @click="del = { ...i }; delErr = ''">{{ $t('lists.edit.delete') }}</button>
         </div>
       </article>
@@ -165,7 +184,14 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       </div>
       <aside>
 
-      <details ref="addrEl" class="c-card" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
+      <section v-if="relief" class="c-card">
+        <h2 class="c-h2">{{ $t('org.relief.site') }}</h2>
+        <p>{{ $t('org.relief.siteAddr') }}：<a :href="mapsUrl(w.site_address)" target="_blank" rel="noopener">{{ w.site_address }}</a></p>
+        <label class="c-field"><span>{{ $t('org.relief.siteStatus') }}</span>
+          <select name="site_status" :value="w.site_status" @change="patchList({ site_status: ($event.target as HTMLSelectElement).value })"><option v-for="s in ['active', 'paused', 'closed']" :key="s" :value="s">{{ $t(`org.relief.siteStatus.${s}`) }}</option></select>
+        </label>
+      </section>
+      <details v-if="!relief" ref="addrEl" class="c-card" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
         <summary>{{ $t('lists.edit.shipSummary') }}<span v-if="w.has_shipping_address" class="c-badge active">{{ $t('lists.edit.filled') }}</span></summary>
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
@@ -181,7 +207,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="coverKey" :current-url="w.cover_image_url" @busy="coverBusy = $event" />
           <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
           <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
-          <CreatorVisibilityPicker v-model:visibility="meta.visibility" v-model:users="allowed" />
+          <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" v-model:users="allowed" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
           <button class="c-btn block" :disabled="coverBusy">{{ $t('lists.edit.saveSettings') }}</button>
@@ -199,7 +225,17 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       </div></div>
     </template>
 
-    <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
+    <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" :relief="relief" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
+    <CreatorSheet :open="!!rcpt" :title="$t('org.relief.receiptTitle')" @close="rcpt = null">
+      <form v-if="rcpt" @submit.prevent="saveReceipt">
+        <p><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
+        <ul class="c-mute"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
+        <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
+        <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
+        <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>
+        <button class="c-btn primary block" :disabled="rcptBusy">{{ $t('org.relief.receiptSave') }}</button>
+      </form>
+    </CreatorSheet>
     <CreatorConfirm :open="!!del" :title="$t('lists.edit.delTitle')" :text="$t('lists.edit.delText', { title: del?.title })" :ok="del?.force ? $t('lists.edit.delForce') : $t('lists.edit.delOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
     <CreatorSheet :open="showShare" :title="$t('lists.edit.shareTitle')" @close="showShare = false">
       <p v-if="w?.status === 'draft'" class="c-err">{{ $t('lists.edit.draftWarn') }}</p>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ open: boolean; wishlistId: string; item: any | null; prefill?: Record<string, any> }>()
+const props = defineProps<{ open: boolean; wishlistId: string; item: any | null; prefill?: Record<string, any>; relief?: boolean }>()
 const emit = defineEmits<{ close: []; saved: []; reload: []; address: [] }>()
 const { api } = useApi()
 const { t: tr } = useI18n()
@@ -15,14 +15,16 @@ watch(() => props.open, (v) => {
   if (!v) return
   const i = props.item
   const p = i ? {} : props.prefill ?? {} // 預填只用於新增
-  Object.assign(f, { title: i?.title ?? p.title ?? '', brand: i?.brand ?? p.brand ?? '', spec: i?.spec ?? p.spec ?? '', product_url: i?.product_url ?? p.product_url ?? '', qty_needed: i?.qty_needed ?? 1, unit_price_amount: i?.unit_price_amount ?? p.unit_price_amount ?? '', priority: i?.priority ?? 'medium',
+  Object.assign(f, { title: i?.title ?? p.title ?? '', brand: i?.brand ?? p.brand ?? '', spec: i?.spec ?? p.spec ?? '', product_url: i?.product_url ?? p.product_url ?? '', qty_needed: i?.qty_needed ?? 1, unit_price_amount: i?.unit_price_amount ?? p.unit_price_amount ?? '', priority: i?.priority ?? 'medium', category: i?.category ?? '', urgency: i?.urgency ?? '',
     funding_mode: i?.funding_mode === 'crowdfund' ? 'crowdfund' : 'quantity', target_points: i?.target_points ?? '', funding_deadline: toTaipeiInput(i?.funding_deadline), price_snapshot_amount: i?.price_snapshot_amount ?? i?.unit_price_amount ?? '' })
   imageKey.value = null; err.value = ''; stale.value = false; needAddr.value = false; version.value = i?.updated_at ?? null
 })
 async function save() {
   err.value = ''; needAddr.value = false
   if (!f.title.trim()) { err.value = tr('creator.itemSheet.errName'); return }
+  if (props.relief && (!f.category || !f.urgency)) { err.value = tr('org.relief.errRelief'); return }
   const body: any = { title: f.title.trim(), brand: f.brand || null, spec: f.spec || null, product_url: f.product_url || null, priority: f.priority }
+  if (props.relief) Object.assign(body, { category: f.category, urgency: f.urgency })
   if (crowd.value) {
     const t = Number(f.target_points)
     if (!Number.isInteger(t) || t < 1) { err.value = tr('creator.itemSheet.errTarget'); return }
@@ -62,6 +64,12 @@ async function save() {
       <label class="c-field"><span>{{ $t('creator.itemSheet.brand') }}</span><input v-model="f.brand" maxlength="100"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.spec') }}</span><input v-model="f.spec" maxlength="200"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.url') }}</span><input v-model="f.product_url" type="url" maxlength="2000" placeholder="https://"></label>
+      <template v-if="relief">
+        <label class="c-field"><span>{{ $t('org.relief.category') }}</span>
+          <select v-model="f.category" name="category" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="c in CATEGORIES" :key="c" :value="c">{{ $t(`org.relief.category.${c}`) }}</option></select></label>
+        <label class="c-field"><span>{{ $t('org.relief.urgency') }}</span>
+          <select v-model="f.urgency" name="urgency" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="u in URGENCIES" :key="u" :value="u">{{ $t(`org.relief.urgency.${u}`) }}</option></select></label>
+      </template>
       <div class="c-field"><span>{{ $t('creator.itemSheet.mode') }}</span>
         <div class="c-seg" style="margin:0"><label v-for="m in [['quantity', $t('creator.itemSheet.modeQty')], ['crowdfund', $t('creator.itemSheet.modeCrowd')]]" :key="m[0]"><input v-model="f.funding_mode" type="radio" name="funding_mode" :value="m[0]" :disabled="modeLocked"><span>{{ m[1] }}</span></label></div>
         <p v-if="modeLocked" class="c-mute c-small">{{ $t('creator.itemSheet.modeLocked') }}</p>
