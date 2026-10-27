@@ -74,6 +74,11 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>狀態</td><td>Draft</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏：行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。部署平台為 Cloudflare Pages（使用者基於成本決定，D48）。</td></tr>
 <tr><td>後端部署定案（2026-10-15，D49）</td><td>後端與 PostgreSQL 同機部署於 Linode（Akamai）VPS 東京節點，以 Dokploy 管理，經 Cloudflare Tunnel 對外；物件儲存使用 Cloudflare R2；取代原 GCP Cloud Run / Cloud SQL / Cloud Scheduler 規劃。背景工作維持後端行程內排程。影響：備份（RPO / RTO 須自行達成並演練）、SSE 鏈路（Cloudflare → Tunnel → Traefik → API，Spike S3 的受測鏈路隨之改變）、金鑰與資料庫同機的威脅模型。見 <code>docs/deploy-backend-checklist.md</code>。</td></tr>
+<tr><td>組織以專屬 /org 入口登記，成員綁個人帳號（2026-10-27，D60）</td><td>救災據點由「組織」營運，不再是任何人都能開的清單類型。組織從專屬頁 <code>/org</code> 提出申請（草稿 → 送審 → 通過；補正時只能改被標記的欄位，被拒 30 天後才能重新申請；同一統編同時只能有一筆在審或已通過）。組織成員綁個人帳號（<code>org_members</code>：owner / coordinator / volunteer），沒有獨立的組織登入；一個人可同時屬於個人身分與多個組織，在 <code>/org</code> 切換身分操作。成員由 owner 以 email 邀請（7 天效期，被邀請者須用該 email 登入才能接受；組織至少保留一位有效 owner）。據點的管理權限看組織角色（owner / coordinator），建立者離職或刪除帳號不會讓據點失控：帳號刪除時其據點移交給另一位有效的 owner / coordinator，組織已無管理者則據點關閉。據點只能經 <code>POST /orgs/{id}/sites</code> 建立，<code>POST /wishlists</code> 不再接受 <code>type=relief</code>。</td></tr>
+<tr><td>災害事件由組織建立、跨組織共用（2026-10-27，D61）</td><td>災害事件（<code>relief_events</code>：名稱、災種、縣市、日期）由已通過審核的組織（coordinator 以上）建立，但屬於公共資源：任何組織的據點都可掛到同一事件，只有建立事件的組織可改名稱 / 說明。建立前系統以「同縣市、日期前後 7 天」提示相似事件，避免重複。重複事件由平台營運合併（<code>merged_into</code>，舊事件網址導向最終事件）；有問題的事件可下架，下架會暫停其上所有據點，<b>取消下架不會自動恢復據點</b>，須組織手動恢復。公開頁：<code>/relief</code>（事件列表）、事件頁、組織頁，皆可被 CDN 快取，且只顯示組織仍為 verified、據點為上線中的內容。</td></tr>
+<tr><td>救災據點也開放點數眾籌（2026-10-27，D62）</td><td>推翻先前「relief 僅數量型捐助、不接點數」的規則（見 D16 與 P2-D 範圍的舊敘述）。救災據點的品項與一般清單相同，可選 <code>quantity</code>（認領）或 <code>crowdfund</code>（點數眾籌，P2-A 機制）；兩種都必填物資分類 <code>category</code> 與急迫度 <code>urgency</code>。據點暫停（<code>paused</code>）或結束（<code>closed</code>）時不接受新認領與新贊助（<code>SITE_PAUSED</code> / <code>SITE_CLOSED</code>）。眾籌達標後的採購沿用清單的收件地址，據點建立時以「據點地址 + 聯絡人」寫入 <code>shipping_addresses</code>。「實收」登記（<code>receipts</code>）只記錄據點實際收到的數量，與認領 / 贊助的帳務無關。</td></tr>
+<tr><td>捐款收據延到第二階段（2026-10-27，D63）</td><td>組織開立捐款收據（抬頭、統編、年度彙整、稅務用途）牽涉稅務與會計，第一段不做。第一段僅有：組織驗證與勸募許可審核、據點、需求、認領 / 贊助、實收登記。收據待第二階段與法遵確認後再規劃。</td></tr>
+<tr><td>第一階段不做 PostGIS 地圖（2026-10-27，D64）</td><td>第一段救災據點以「事件 → 據點列表（含縣市、地址、各急迫度未滿足需求數）」呈現，不做地圖、座標、bbox / near 查詢與需求彙總端點（<code>GET /public/relief/needs/summary</code>）。<code>wishlists.location</code>、PostGIS 索引與 FR-25 / FR-26 延後；據點只存文字地址 <code>site_address</code>。待有真實據點量與地理需求後再開第二段。許可到期（台北日期）由背景工作每小時檢查，到期的上線據點自動暫停並通知 owner；平台撤銷已核准許可同樣暫停使用該許可的據點；組織被撤銷驗證則所有上線據點降回草稿。</td></tr>
 <tr><td>畫面用詞改為「送」（2026-10-26，D59）</td><td>「捐助 / 認捐」帶有慈善募款的距離感，不符合朋友之間送禮的關係，按鈕也不夠推人行動。畫面文案改為：數量型認領（claim）的行動按鈕「<b>我來送</b>」（未登入「登入後來送」）、確認「確定要送」、成功「✓ 這份交給你了！」；狀態與名詞用「認領 / 要送」（「已認領」「{names} 要送」「已全數認領」），清單頁籤「我的送禮」、紀錄「送禮紀錄」、取得方式「直接送禮」；心願眾籌點數（contribution）統一用「<b>贊助</b>」（含「贊助者」「撤回贊助」），因為那是出一部分點數湊錢，不是整份由你送。電子發票的「捐贈碼 / 捐贈發票」為法定用語，不改；「救助」清單類型不改。<strong>不改 DB、API 與錯誤碼</strong>。en / vi / id 畫面與信件同步採用相同語感（2026-10-26 補）：認領 = 送這份禮物（en Claim / I'll give this、vi nhận tặng / Tôi sẽ tặng、id klaim / Aku yang kasih），贊助 = 出一部分（en contribution、vi tài trợ、id patungan），不再使用 pledge / donor、quyên góp / đóng góp、donatur 等慈善用語；本文件、流程、線框、契約與系統手冊仍以「捐助（claim）/ 認捐（contribution）」作為內部領域術語，線框中的「確認捐助」等舊畫面字樣以本條為準，系統手冊引用畫面原文處已同步。</td></tr>
 <tr><td>清單類型合併為「心願清單」（2026-10-21，D58）</td><td><code>personal</code> 與 <code>registry</code> 功能完全相同（只差顯示與分析），對使用者是無意義的選擇，合併為單一標籤「心願清單」（en：Wishlist），不叫「個人心願」，因為待產 / 婚禮常是夫妻或家庭共同列。<code>/lists/new</code> 保留「清單類型」欄位，目前只有 <code>personal</code> 一個選項；類型決定行為（relief 需據點、組織與 48 小時逾期），P2-D 開放救災時在此加選項，「高雄救災需求品」這類名稱屬於清單標題，不另做自訂類型標籤。<strong>不改 DB 與 API</strong>：<code>wishlist_type</code> enum 保留三值，API 仍接受 <code>registry</code>（相容舊版原生 App 與既有資料），既有 registry 清單不搬移、畫面一律顯示「心願清單」，營運後台統計另標「禮物登記（舊類型）」。探索頁 <code>/explore</code> 移除類型篩選：合併後「心願清單」等於「全部」，relief 尚未開放、「救助」永遠是空的；後端 <code>?type=</code> 參數保留，relief 上線後再加回篩選。</td></tr>
 <tr><td>拒付以營運入口為主（2026-10-19，D57）</td><td>綠界信用卡拒付 / 爭議多半經銀行與綠界特店後台通知，沒有可驗證的官方 webhook 格式，<strong>不猜測供應商爭議格式</strong>。拒付處理以營運人員入口為主：<code>POST /admin/topups/{id}/dispute</code>（action = open | won | lost，Idempotency-Key 必填，寫 audit_logs），搭配 <code>GET /admin/topups?status=</code> 找單與看爭議中清單；另新增 <code>GET /wallet/cash-refunds</code> 供本人查看退款申請進度。供應商 webhook 只保留接口位置 <code>POST /webhooks/payments/{provider}/dispute</code>（固定 501 <code>DISPUTE_WEBHOOK_NOT_AVAILABLE</code>），取得官方格式並驗簽後再接上同一組 <code>wallet_ops</code> 函式。詳見 04 章。</td></tr>
@@ -185,7 +190,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 </tbody></table>
 <h3>3.5 結論與建議</h3>
 <div class="callout">
-<b>建議 Go，但收斂範圍：</b>MVP 先以 personal + registry（尤其孕婦 / 新生兒）驗證「免登入瀏覽、登入後認捐 + LINE 分享」的轉換率（D50 後登入多一步，須留意轉換率下降風險），只做數量捐助、不碰金流。Phase 2 依序為：P2-A 儲值錢包 + 心願眾籌 + 履約 + 自動儲值（須先通過 8.7 法規阻斷項）；P2-B 電子禮物卡 + 回饋星星；P2-C 企業禮券；P2-D relief 救災（仍只用數量捐助，待合作夥伴試點）。效仿星巴克能放大留存與預收現金流，但履約保證成本與禮物卡風控必須先備妥。主要賭注是分享迴路是否自然成立，而不是功能多寡。
+<b>建議 Go，但收斂範圍：</b>MVP 先以 personal + registry（尤其孕婦 / 新生兒）驗證「免登入瀏覽、登入後認捐 + LINE 分享」的轉換率（D50 後登入多一步，須留意轉換率下降風險），只做數量捐助、不碰金流。Phase 2 依序為：P2-A 儲值錢包 + 心願眾籌 + 履約 + 自動儲值（須先通過 8.7 法規阻斷項）；P2-B 電子禮物卡 + 回饋星星；P2-C 企業禮券；P2-D relief 救災（D62 起也開放點數眾籌；待合作夥伴試點）。效仿星巴克能放大留存與預收現金流，但履約保證成本與禮物卡風控必須先備妥。主要賭注是分享迴路是否自然成立，而不是功能多寡。
 </div>
 
 <h2 id="s4">4. 技術棧評估</h2>
@@ -360,7 +365,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 </ul></div>
 
 <h3>6.3 <span class="badge p2">P2</span> Phase 2</h3>
-<p class="muted">Phase 2 分為 P2-A（儲值錢包、心願眾籌、自動儲值：US-17 至 US-26、US-27、US-42、US-43）、P2-B（禮物卡與回饋星星：US-28 至 US-33）、P2-C（企業禮券：US-34）、P2-D（relief 救災：US-13 至 US-16、US-44）。relief 仍只用數量型捐助，不接點數。上線前須先通過 8.7 的法規阻斷項。</p>
+<p class="muted">Phase 2 分為 P2-A（儲值錢包、心願眾籌、自動儲值：US-17 至 US-26、US-27、US-42、US-43）、P2-B（禮物卡與回饋星星：US-28 至 US-33）、P2-C（企業禮券：US-34）、P2-D（relief 救災：US-13 至 US-16、US-44）。relief 起初只用數量型捐助；D62（2026-10-27）改為也開放點數眾籌。上線前須先通過 8.7 的法規阻斷項。</p>
 <div class="story"><span class="id">US-13 組織與據點</span>　身為組織協調員，我想建立組織與據點並指派成員角色。
 <ul>
 <li><b>Given</b> 我是 <code>owner</code>，<b>When</b> 我邀請成員為 <code>coordinator</code> 或 <code>volunteer</code>，<b>Then</b> 成員取得對應權限。</li>
@@ -699,7 +704,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td><span class="badge p2">P2-A</span> 儲值錢包 + 心願眾籌（先做）</td><td>FR-29、FR-31 至 FR-44、FR-60、FR-61：錢包、儲值、自動儲值、點數批次、認捐、達標自動下單、人工代購、退點、現金退款、收件地址、拒付風控、電子發票</td><td>約 18-22 週；<b>前置阻斷：</b>律師 / 會計師審閱與履約保證安排 6-8 週（可與 P1 並行啟動）；商家洽談 2-3 家</td><td>履約保證到位；1 個月內眾籌達標率與履約時間達 KPI；對帳零差異</td></tr>
 <tr><td><span class="badge p2">P2-B</span> 電子禮物卡 + 回饋星星</td><td>FR-45 至 FR-50</td><td>約 8-10 週；前置：禮物卡條款律師確認、風控規則</td><td>禮物卡兌換率與星星兌換率達 KPI；無盜刷事故</td></tr>
 <tr><td><span class="badge p2">P2-C</span> 企業禮券</td><td>FR-51：營運後台代建、批次、發票、CSV；企業自助入口列為未來</td><td>約 4-6 週；前置：至少 1 家企業意向客戶</td><td>首批企業禮券成功發行並對帳</td></tr>
-<tr><td><span class="badge p2">P2-D</span> relief 救災</td><td>FR-23 至 FR-28、FR-62：組織（含驗證）、地圖、彙總、實收、離線佇列（僅數量捐助）</td><td>約 14-18 週；前置：合作夥伴試點 4-6 週</td><td>至少一個組織完成真實或演練場景；尖峰壓測 5,000 RPS 讀取</td></tr>
+<tr><td><span class="badge p2">P2-D</span> relief 救災</td><td>FR-23 至 FR-28、FR-62：組織（含驗證）、地圖、彙總、實收、離線佇列（地圖 FR-25 / FR-26 依 D64 延後；點數眾籌依 D62 開放）</td><td>約 14-18 週；前置：合作夥伴試點 4-6 週</td><td>至少一個組織完成真實或演練場景；尖峰壓測 5,000 RPS 讀取</td></tr>
 </tbody></table>
 <p class="muted">建議里程碑：W0 Spike 與 Schema 定稿；W5 內部 demo（建立 + 分享 + 捐助）；W7 起封閉測試 8 週；W15 Go / No-Go。救災試點可與 P1 並行洽談。</p>
 

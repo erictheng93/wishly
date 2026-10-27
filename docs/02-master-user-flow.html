@@ -1098,46 +1098,51 @@ sequenceDiagram
 </tbody></table>
 
 <h3 id="f10">F10 救災模式 <span class="badge p2">P2</span> <span class="muted">P2-D</span></h3>
-<p>前端據點頁路由為 <code>/relief/sites/{slug}</code>（用 slug 不用 id），頁面資料走 <code>GET /public/wishlists/{slug}</code>；<code>GET /public/relief/sites</code> 每筆回傳 slug。</p>
-<p>概念對應：據點 site = <code>wishlists</code>（type=relief, org_id, <code>location geography(Point,4326)</code>, address, <code>site_status</code>）；捐贈者「認捐」使用 F4 的數量型 claims（relief 品項 funding_mode = quantity）；志工「登記實收」寫入 <code>receipts</code> 並累加 <code>qty_received</code>。relief 不收集災民個資，只記錄據點層級需求。</p>
+<div class="callout"><strong>第一段實作（2026-10-27，PRD D60 至 D64）：</strong>組織以專屬 <code>/org</code> 入口申請並經平台審核；災害事件由組織建立、跨組織共用；據點除數量認領外也開放點數眾籌；捐款收據與 PostGIS 地圖延後（下方 F10-b 的地圖查詢與 F10-c 的離線佇列為舊設計，未實作）。公開頁為 <code>/relief</code>（事件列表）、事件頁、組織頁，以事件為入口列出據點與各急迫度未滿足需求數。</div>
+<p>概念對應：據點 site = <code>wishlists</code>（type=relief，欄位 <code>org_id</code>、<code>event_id</code>、<code>permit_id</code>、<code>site_address</code>、<code>site_status</code>，無座標）；捐贈者可用 F4 的數量型認領，或 P2-A 的點數眾籌贊助（D62）；志工「登記實收」寫入 <code>receipts</code> 並累加 <code>qty_received</code>。relief 不收集災民個資，只記錄據點層級需求。</p>
 <h4>F10-a 組織、成員、據點</h4>
 <pre class="mermaid">
 sequenceDiagram
   autonumber
-  participant U as 組織建立者
+  participant U as 組織建立者（個人帳號）
   participant A as Rust API
   participant D as PostgreSQL
-  U->>A: POST /orgs (name)
-  A->>D: BEGIN, INSERT organizations, INSERT org_members (org_role=owner), INSERT audit_logs, COMMIT
-  A-->>U: 201 org
-  U->>A: POST /orgs/id/members (email, org_role)
-  A->>D: BEGIN, 驗證呼叫者 org_role=owner, 以 email 找 users, INSERT org_members, COMMIT
-  A-->>U: 201 (找不到使用者回 404 USER_NOT_FOUND)
-  U->>A: PATCH /orgs/id/members/user_id (org_role)
-  A->>D: BEGIN, SELECT org_members FOR UPDATE, 若降級最後一位 owner 則拒絕, UPDATE, COMMIT
-  U->>A: POST /orgs/id/sites (title, lat, lng, address, claim_ttl_hours)
-  A->>D: BEGIN, 驗證 coordinator 以上, 產生 slug, INSERT wishlists (type=relief, visibility=public, location=ST_SetSRID(ST_MakePoint(lng,lat),4326)), COMMIT
-  A-->>U: 201 site
-  U->>A: POST /wishlists/site_id/items (relief_category, relief_urgency, qty_needed)
-  U->>A: PATCH /sites/id (site_status=active)
+  participant S as 平台 staff
+  U->>A: POST /orgs (legal_name, display_name)
+  A->>D: BEGIN, INSERT organizations (draft), INSERT org_members (owner), INSERT audit_logs, COMMIT
+  A-->>U: 201 org（每人同時只能有一份草稿，否則 409 ORG_DRAFT_EXISTS）
+  U->>A: PATCH /orgs/id (立案資料), POST /orgs/id/documents, POST /orgs/id/permits
+  U->>A: POST /orgs/id/submit
+  A->>D: 鎖組織列, 檢查必填 + 至少一份立案文件 + 一張勸募許可, status=pending
+  S->>A: POST /admin/orgs/id/review (approve / needs_changes / reject)
+  A-->>U: 寄 org.review 通知給 owner
+  U->>A: POST /orgs/id/invites (email, role)
+  A-->>U: 201 {id, url}（url 由邀請人轉交；既有使用者另收通知信）
+  Note over U,A: 被邀請者登入後 GET /org-invites/token 預覽、POST /org-invites/token/accept 加入
+  U->>A: POST /orgs/id/events (災害事件) 或選既有事件
+  U->>A: POST /orgs/id/sites (title, event_id, permit_id, site_address, recipient_name, recipient_phone)
+  A->>D: BEGIN, 驗證 coordinator 以上, 許可已核准, 鎖事件 FOR SHARE, INSERT wishlists (type=relief, visibility=public, status=draft, site_status=active), 收件資訊寫 shipping_addresses, COMMIT
+  A-->>U: 201 site（之後在 /lists/id/edit 加品項，PATCH status=active 上線）
 </pre>
 <ul>
-<li>成員管理：僅 org owner；<code>PATCH /orgs/{id}/members/{user_id}</code> 可變更角色，禁止讓組織沒有 owner（<code>LAST_OWNER</code>）。成員加入要求對方<strong>已有帳號</strong>（先以 Email OTP / LINE / Google 登入過），以 email 比對 <code>auth_identities</code>；無邀請信流程（待決問題）。</li>
-<li>角色：owner 管成員與組織；coordinator 建 / 改據點與品項、取消捐助、標 delivered；volunteer 登記 receipts 與檢視儀表板。</li>
-<li>座標順序：<code>ST_MakePoint(lng, lat)</code>（經度在前）；API 輸入驗證 lat ∈ [-90,90]、lng ∈ [-180,180]，且限制在台灣與離島合理範圍外時警告（不拒絕，支援海外救援）。</li>
-<li>據點可見度受組織驗證限制（見 F10-0）。</li>
-<li>據點生命週期與 F8 一致，另有 <code>site_status</code>：<code>active</code> 正常；<code>paused</code> 清單仍可見但新捐助回 <code>SITE_NOT_ACTIVE</code> 409（例如據點暫時飽和）；<code>closed</code> 與 wishlist closed 同步，新捐助回 <code>WISHLIST_CLOSED</code>。</li>
+<li>入口：<code>/org</code> 專屬頁，成員綁個人帳號，同一人可切換個人身分與各組織身分；沒有獨立的組織登入。</li>
+<li>申請狀態：draft → pending → verified；審核可要求補正（<code>needs_changes</code>，只能改被標記的欄位，否則 <code>FIELD_LOCKED</code>）或拒絕（<code>rejected</code>，30 天內重新申請回 <code>RESUBMIT_TOO_EARLY</code>）。pending 期間 owner 可撤回成 draft。同一統編在審或已通過時，其他申請回 <code>TAX_ID_TAKEN</code>。</li>
+<li>成員管理：僅 org owner；<code>PATCH /orgs/{id}/members/{user_id}</code> 可變更角色、代稱、停用，禁止讓組織沒有有效 owner（<code>LAST_OWNER</code>）。以 <strong>email 邀請</strong>（7 天效期，owner 可取消）：接受者須以該 email 登入（email 或同 email 的 Google），否則 <code>INVITE_EMAIL_MISMATCH</code>；已是成員回 <code>ALREADY_MEMBER</code>；過期或已取消回 <code>INVITE_EXPIRED</code>。邀請連結為 <code>/org/invite/{token}</code>。</li>
+<li>角色：owner 管成員、組織資料與許可；coordinator 建 / 改據點、品項與災害事件、取消捐助、標 delivered；volunteer 登記實收與檢視。</li>
+<li>據點由 <code>POST /orgs/{id}/sites</code> 建立（<code>POST /wishlists</code> 不接受 type=relief）；上線須組織 verified（<code>ORG_NOT_VERIFIED</code>）且許可已核准、今天在效期內（<code>PERMIT_INVALID</code>）。據點編輯頁為 <code>/lists/{id}/edit</code>。</li>
+<li>據點生命週期與 F8 一致，另有 <code>site_status</code>：<code>active</code> 正常；<code>paused</code> 清單仍可見但新認領 / 贊助回 <code>SITE_PAUSED</code> 409（災害事件被下架、許可被撤銷或到期時系統自動暫停，組織可手動恢復；<strong>事件取消下架不會自動恢復據點</strong>）；<code>closed</code> 回 <code>SITE_CLOSED</code>。</li>
+<li>帳號刪除：該使用者經手的據點移交給組織內另一位有效的 owner / coordinator（優先 owner、最早加入者）；組織已無管理者則據點關閉。</li>
 </ul>
 
-<h4>F10-0 組織驗證（D43）</h4>
+<h4>F10-0 組織驗證（D43，第一段實作版）</h4>
 <table class="meta"><tbody>
-<tr><td>規則</td><td><code>organizations.verification_status</code> ∈ pending（預設）| verified | rejected，附 <code>verified_at</code>、<code>verified_by</code>。驗證文件（立案證書、政府單位證明）經 <code>POST /uploads/presign</code>（purpose=org_document）上傳到 R2 <strong>私有 bucket</strong>，不經 CDN，只有該 org 成員與 staff 以短效簽名網址讀取。</td></tr>
-<tr><td>未驗證限制</td><td>未驗證組織的據點只能維持 <code>status=draft</code>（D52：link 已廢止，未驗證組織的據點維持 draft，驗證通過後才能發布）：不上地圖、不出現在 <code>GET /public/relief/sites</code> 與需求彙總；建立或改成 <code>visibility=public</code> 回 <code>ORG_NOT_VERIFIED</code> 403。通過驗證後，公開頁顯示「已驗證組織」徽章。驗證被撤銷（rejected）時，同交易把該組織所有 public 據點降為 draft 並 purge CDN。</td></tr>
-<tr><td>API</td><td>staff：<code>GET /admin/orgs?verification_status=</code>、<code>PATCH /admin/orgs/{id}/verification</code>（body <code>{status, reason}</code>，STAFF_ONLY，寫 audit_logs）。</td></tr>
-<tr><td>錯誤碼</td><td><code>ORG_NOT_VERIFIED</code> 403；<code>STAFF_ONLY</code> 403。</td></tr>
+<tr><td>規則</td><td><code>organizations.verification_status</code> ∈ draft | pending | needs_changes | verified | rejected。送審須有立案文件（<code>org_documents</code>，上傳至私有儲存，不經 CDN，成員與 staff 以受控端點下載）與至少一張勸募許可（<code>org_permits</code>，各自 pending / approved / rejected，有效期間）。通過審核需至少一張已核准的許可（<code>PERMIT_REQUIRED</code>）。</td></tr>
+<tr><td>未驗證限制</td><td>未驗證組織不能建立災害事件（<code>ORG_NOT_VERIFIED</code> 403），據點不能上線。公開 API 一律檢查組織仍為 verified。驗證被撤銷（verified → rejected）時，同交易把該組織上線據點降回草稿並 purge 事件頁與組織頁快取。撤銷單一已核准許可只暫停使用該許可的據點，不改組織狀態。許可到期（台北日期）由背景工作每小時暫停據點並通知 owner。</td></tr>
+<tr><td>API</td><td>staff：<code>GET /admin/orgs?status=</code>、<code>GET /admin/orgs/{id}</code>、<code>POST /admin/orgs/{id}/review</code>、<code>POST /admin/permits/{id}/review</code>（寫 audit_logs）。</td></tr>
+<tr><td>錯誤碼</td><td><code>ORG_NOT_VERIFIED</code> 403；<code>ORG_ROLE_REQUIRED</code> 403；<code>STAFF_ONLY</code> 403；其餘見契約 04 的救災組織錯誤碼。</td></tr>
 </tbody></table>
 
-<h4>F10-b 地圖查詢與需求彙總</h4>
+<h4>F10-b 地圖查詢與需求彙總（延後，D64；第一段未實作）</h4>
 <pre class="mermaid">
 sequenceDiagram
   autonumber
@@ -1988,7 +1993,7 @@ SELECT w.id FROM point_wallets w LEFT JOIN point_lots l ON l.wallet_id = w.id
 <li><b>Schema 仍待確認</b>：<code>notifications</code> 欄位（scheduled_at、locked_until、to_email）；Email 供應商退信 / 投訴 webhook 端點。</li>
 <li><b>電子發票開立時點</b>：儲值 / 購卡時開，或兌換 / 下單時開，待會計師確認（F19 兩者皆可支援）。</li>
 <li><b>帳號刪除細節</b>：二次確認要求的重新驗證時間窗（本文件 10 分鐘）；金融紀錄保存年限（待會計師）；匯出過大時的非同步寄送。</li>
-<li><b>未來</b>：讓捐贈者以點數購買目錄物資直送 relief 據點（本版 relief 仍只用數量捐助）。</li>
+<li><b>未來</b>：讓捐贈者以點數購買目錄物資直送 relief 據點（relief 據點已開放點數眾籌，D62；目錄直送仍未做）。</li>
 <li><b>跨裝置訪客識別</b>（D50 後僅涉及舊資料；新認捐為會員，登入即跨裝置）：MVP 提供最小版（訪客留 Email 時的確認信含「管理我的捐助」連結，見 F16）；P1 做完整版（含 contact 驗證、無 Email 者的其他找回方式）。</li>
 <li><b>組織成員邀請</b>：規格僅有 <code>POST /orgs/{id}/members</code>，無邀請連結 / 接受邀請端點與資料表。本文件假設對方已有帳號、直接加入。若要「寄邀請信、對方點擊加入」，需新增 <code>org_invites</code> 與接受端點。</li>
 <li><b>LINE Messaging API push</b>（P1）：需使用者已加入官方帳號為好友才能推播，且推播有月則數計費。降級策略為 email，是否足夠？</li>
