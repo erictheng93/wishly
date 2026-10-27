@@ -19,7 +19,7 @@
 - [ ] 備份新鮮度告警：註冊 healthchecks.io（或同類服務，週期 1 小時、寬限 30 分；WAL 歸檔失敗也會讓它不 ping），把 ping 網址填進 `r2.env` 的 `PING_URL`。腳本只有全部成功才會 ping。
 - [x] 方案 A：WAL-G v3.0.9 上線（2026-10-27）：`archive_mode=on`、`archive_timeout=300`（RPO ≤ 5 分鐘），每日基底備份保留 8 份（PITR 7 天），R2 `wal-g/`。`db` 重建一次，停機約 10 秒，`/readyz` 200。PITR 演練：取回基底備份、重播 2 段 WAL、升格後對帳通過，耗時 9 秒。
 - [x] Dokploy 後台的 `db` compose 已補上 `- /opt/wishly-backup/walg:/walg:ro`（2026-10-27，已比對 Dokploy 存的 `composeFile`、VPS 上的檔案與執行中容器的掛載，三者一致）。
-- [ ] 指定時間點的 PITR 演練（`walg-restore-drill.sh '<時間>'`），確認 `recovery_target_time` 生效。
+- [x] 指定時間點的 PITR 演練（2026-10-27）：正式庫暫建 `ops_drill.marker`，09:17:48 寫 A、09:17:53 寫 B；`walg-restore-drill.sh '2026-10-27 09:17:50.892224+00'` 還原後只有 A、沒有 B，對帳通過，耗時 9 秒；演練後已 drop 該 schema。
 - [ ] 寫「整機掛掉」恢復手冊並計時：新 VPS → Dokploy → 還原 DB → 設環境變數 → Tunnel。
 - [ ] Linode 整機備份／快照啟用，視為輔助（不等於資料庫一致性備份）。
 - [x] 高風險 migration 前先手動備份：已寫入 runbook §3（執行 `db-backup.sh`）。
