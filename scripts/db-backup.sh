@@ -30,6 +30,12 @@ if [ "$(docker exec "$DB" psql -U wishly -d wishly -Atc "select coalesce(last_fa
     echo "WAL 歸檔失敗，見 pg_stat_archiver" >&2
     exit 1
 fi
+# 方案 A 的基底備份每日 03:47 UTC 一次；最新一份超過時限（預設 26 小時，留 2 小時餘裕）就中止
+latest=$(docker exec -u postgres "$DB" /walg/archive.sh backup-list 2>/dev/null | tail -n +2 | awk '{print $2}' | sort | tail -1)
+if [ -z "$latest" ] || [ $(($(date +%s) - $(date -d "$latest" +%s))) -gt $((${BASE_MAX_AGE_HOURS:-26} * 3600)) ]; then
+    echo "WAL-G 基底備份過舊或不存在（最新：${latest:-無}），見 journalctl -t wishly-walg" >&2
+    exit 1
+fi
 ls -1t "$DIR"/wishly-*.dump | tail -n +$((KEEP_LOCAL + 1)) | xargs -r rm --
 # 全部成功才回報；沒收到 ping 由監控服務告警（備份靜默失敗最危險）
 if [ -n "${PING_URL:-}" ]; then curl -fsS -m 10 "$PING_URL" >/dev/null; fi
