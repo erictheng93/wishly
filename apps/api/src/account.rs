@@ -283,11 +283,14 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    // 組織據點不屬於個人：轉給其他 owner / coordinator（owner 優先、最早加入），沒人接手就關閉並保持公開；本人的成員資格停用。
-    // 鎖序 organizations(SHARE) → wishlists：與撤銷驗證、據點上線一致，必須先於任何 wishlists 更新。
-    let site_orgs: Vec<Uuid> = sqlx::query_scalar("SELECT DISTINCT org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL")
+    // 組織據點不屬於個人：轉給其他 owner / coordinator（owner 優先、最早加入）；本人的成員資格停用；組織已無人可管理就關閉全部據點（保持公開）。
+    // 鎖序 organizations(FOR UPDATE，依 id) → wishlists：與撤銷驗證、據點上線一致，必須先於任何 wishlists 更新。
+    // 鎖本人所屬的每個組織（不只擁有據點的）：同組織的管理者同時刪帳號會被序列化，後者看得到前者已停用的成員資格。
+    let site_orgs: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT org_id FROM org_members WHERE user_id = $1 AND disabled_at IS NULL
+         UNION SELECT org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL")
         .bind(id).fetch_all(&mut *tx).await?;
-    sqlx::query("SELECT id FROM organizations WHERE id = ANY($1) ORDER BY id FOR SHARE").bind(&site_orgs).execute(&mut *tx).await?;
+    sqlx::query("SELECT id FROM organizations WHERE id = ANY($1) ORDER BY id FOR UPDATE").bind(&site_orgs).execute(&mut *tx).await?;
     let mut site_slugs: Vec<String> = sqlx::query_scalar(
         "WITH s AS (SELECT id, org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL ORDER BY id FOR UPDATE)
          UPDATE wishlists w SET owner_id = r.uid FROM s
@@ -296,16 +299,20 @@ async fn delete_me(
                           ORDER BY (m.role = 'owner') DESC, m.created_at, m.user_id LIMIT 1) r ON true
           WHERE w.id = s.id RETURNING w.slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
+    sqlx::query("UPDATE org_members SET disabled_at = now() WHERE user_id = $1 AND disabled_at IS NULL").bind(id).execute(&mut *tx).await?;
     let closed: Vec<(Uuid, String, bool)> = sqlx::query_as(
-        "WITH o AS (SELECT id, status FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL AND status IN ('draft', 'active') ORDER BY id FOR UPDATE)
+        "WITH o AS (SELECT w.id, w.status FROM wishlists w
+                     WHERE w.org_id = ANY($1) AND w.deleted_at IS NULL AND w.status IN ('draft', 'active')
+                       AND NOT EXISTS (SELECT 1 FROM org_members m JOIN users mu ON mu.id = m.user_id AND mu.deleted_at IS NULL AND mu.blocked_at IS NULL
+                                        WHERE m.org_id = w.org_id AND m.disabled_at IS NULL AND m.role IN ('owner', 'coordinator'))
+                     ORDER BY w.id FOR UPDATE OF w)
          UPDATE wishlists SET status = 'closed', site_status = 'closed', closed_at = COALESCE(wishlists.closed_at, now())
            FROM o WHERE wishlists.id = o.id RETURNING wishlists.id, wishlists.slug::text, o.status = 'active'")
-        .bind(id).fetch_all(&mut *tx).await?;
+        .bind(&site_orgs).fetch_all(&mut *tx).await?;
     for (w, slug, _) in &closed {
         crate::dashboard::notify(&mut *tx, *w).await?;
         site_slugs.push(slug.clone());
     }
-    sqlx::query("UPDATE org_members SET disabled_at = now() WHERE user_id = $1 AND disabled_at IS NULL").bind(id).execute(&mut *tx).await?;
     // Retain replaced/issued image keys; the worker rechecks sharing under the media lock.
     let media: Vec<String> = sqlx::query_scalar(
         "SELECT object_key FROM user_media WHERE user_id=$1

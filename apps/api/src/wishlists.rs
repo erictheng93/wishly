@@ -1154,6 +1154,9 @@ async fn address_put(
 ) -> R<Json<Value>> {
     let m = obj(&b)?;
     let w = load_owned(&st.pool, id, u.id).await?;
+    if w.ty == "relief" {
+        return Err(AppError::invalid("/type", "NOT_APPLICABLE", "救災據點的收件地址請改用 PATCH site_address"));
+    }
     if matches!(w.status.as_str(), "closed" | "archived") {
         return Err(closed());
     }

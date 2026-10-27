@@ -438,3 +438,77 @@ async fn deleting_sole_manager_closes_site_but_keeps_it_public(pool: PgPool) {
     let dis: bool = sqlx::query_scalar("SELECT disabled_at IS NOT NULL FROM org_members WHERE org_id=$1 AND user_id=$2").bind(f.org).bind(f.coord.id).fetch_one(&pool).await.unwrap();
     assert!(dis);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn last_manager_deleting_closes_all_org_sites(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    // 只留兩位 coordinator 當管理者；原 owner 降為 volunteer
+    sqlx::query("UPDATE org_members SET role='volunteer' WHERE org_id=$1 AND role='owner'").bind(f.org).execute(&pool).await.unwrap();
+    let c2 = user(&pool, "coord2").await;
+    member(&pool, f.org, c2.id, "coordinator").await;
+    let vol: Uuid = sqlx::query_scalar("SELECT user_id FROM org_members WHERE org_id=$1 AND role='volunteer'").bind(f.org).fetch_one(&pool).await.unwrap();
+    let s1 = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    let s2 = site(&pool, f.org, vol, f.ev, f.permit, "active").await; // 擁有者不是刪帳號的人
+    let (s, v) = delete_me(&pool, &f.coord.token).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let status = |id: Uuid| sqlx::query_as::<_, (String, String)>("SELECT status::text, visibility::text FROM wishlists WHERE id=$1").bind(id).fetch_one(&pool);
+    assert_eq!(status(s1.id).await.unwrap(), ("active".into(), "public".into()), "still has a coordinator");
+    assert_eq!(status(s2.id).await.unwrap().0, "active");
+    let (s, v) = delete_me(&pool, &c2.token).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for id in [s1.id, s2.id] {
+        assert_eq!(status(id).await.unwrap(), ("closed".into(), "public".into()));
+        let ss: String = sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id=$1").bind(id).fetch_one(&pool).await.unwrap();
+        assert_eq!(ss, "closed");
+    }
+}
+
+/// delete_me 須 FOR UPDATE 鎖本人所屬的組織列：同組織管理者同時刪帳號被序列化。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn delete_me_waits_on_org_lock(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    let app = test_app(&pool);
+    let mut tx = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *tx).await.unwrap();
+    sqlx::query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE").bind(f.org).fetch_one(&mut *tx).await.unwrap();
+    let (a2, tok) = (app.clone(), f.coord.token.clone());
+    let h = tokio::spawn(async move { call_app(&a2, "DELETE", "/me", &ck(&tok), Some(json!({"confirm":"DELETE"}))).await });
+    wait_for_blocked(&pool, pid, 1).await;
+    tx.commit().await.unwrap();
+    let (s, _, v) = h.await.unwrap();
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let owner: Uuid = sqlx::query_scalar("SELECT owner_id FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    assert_ne!(owner, f.coord.id);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn address_put_rejected_on_relief(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    let (s, _, _) = call(&pool, "PUT", &format!("/wishlists/{}/shipping-address", id(&v)), &ck(&f.coord.token),
+        Some(json!({"recipient_name":"某人","phone":"0912345678","address":"台北市中正區某路一號"}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// 據點的圖片不因建立者刪帳號而被清掉：退役檢查看到組織據點引用就保留。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn org_site_images_survive_creator_deletion(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    sqlx::query("UPDATE org_members SET role='volunteer' WHERE org_id=$1 AND role='owner'").bind(f.org).execute(&pool).await.unwrap();
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    let key = format!("covers/{}.jpg", Uuid::new_v4());
+    sqlx::query("UPDATE wishlists SET cover_image_key=$2, cover_image_status='ready' WHERE id=$1").bind(l.id).bind(&key).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO user_media (user_id, object_key) VALUES ($1,$2)").bind(f.coord.id).bind(&key).execute(&pool).await.unwrap();
+    let (s, v) = delete_me(&pool, &f.coord.token).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    wishly_api::uploads::drain_media(&pool).await;
+    let (req, deleted): (bool, bool) = sqlx::query_as("SELECT retire_requested_at IS NOT NULL, deleted_at IS NOT NULL FROM user_media WHERE object_key=$1")
+        .bind(&key).fetch_one(&pool).await.unwrap();
+    assert_eq!((req, deleted), (false, false), "org site cover must not be retired when its creator is deleted");
+    let k: Option<String> = sqlx::query_scalar("SELECT cover_image_key FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    assert_eq!(k.as_deref(), Some(key.as_str()));
+}
