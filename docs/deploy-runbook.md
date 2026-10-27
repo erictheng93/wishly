@@ -78,21 +78,30 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 
 ## 6. 資料庫備份與還原
 
-目前是方案 B：排程 `pg_dump`，**RPO = 1 小時**、沒有 PITR。方案 A（WAL-G）完成後改寫本節。腳本在 repo 的 `scripts/db-*`，VPS 上放在 `/opt/wishly-backup/`（改了腳本要用 `scp` 同步，不在 VPS 上 `git pull`）。
+兩套並行（2026-10-27 起）：**方案 A WAL-G**（WAL 持續歸檔＋每日基底備份，`archive_timeout=300`，**RPO ≤ 5 分鐘、PITR 7 天**）為主；**方案 B 每小時 `pg_dump`** 為獨立備援（有 Bucket Lock，VPS 被入侵也刪不掉）。腳本在 repo 的 `scripts/db-*`，VPS 上放在 `/opt/wishly-backup/`（改了腳本要用 `scp` 同步，不在 VPS 上 `git pull`）。
 
 | 項目 | 位置 |
 |---|---|
 | 排程 | `/etc/cron.d/wishly-backup`，每小時第 17 分；日誌 `journalctl -t wishly-backup` |
-| 本機副本 | `/var/backups/wishly/wishly-<UTC 時間>.dump`（0600，保留最近 48 份） |
-| 異地副本 | R2 `wishly-db-backups/postgres/`；憑證在 `/etc/wishly-backup/r2.env`（0600，範本 `scripts/db-backup.r2.env.example`）。檔案不存在時只做本機備份 |
+| 本機副本 | `/var/backups/wishly/wishly-<UTC 時間>.dump`（0600，保留最近 48 份 ≈ 2 天） |
+| 異地副本 | R2 `wishly-db-backups/postgres/`；憑證在 `/etc/wishly-backup/r2.env`（0600，範本 `scripts/db-backup.r2.env.example`）。檔案不存在時只做本機備份。`postgres/` 有 Bucket Lock 30 天（不可刪、不可覆寫），第 31 天由生命週期刪除 |
 | 格式 | `pg_dump -Fc -Z zstd`：先壓縮再落地、上傳；`pg_restore` 直接讀 |
+| WAL-G | 執行檔與設定在 `/opt/wishly-backup/walg/`（`walg.env` 0400、owner 999，由 `r2.env` 轉出），以 `/walg:ro` 掛進 `db`；歸檔設定用 `ALTER SYSTEM` 寫在資料目錄（`archive_mode=on`、`archive_command='/walg/archive.sh wal-push %p'`）。R2 前綴 `wishly-db-backups/wal-g/`，zstd 壓縮，**沒有 Bucket Lock**（WAL-G 要能自行清理） |
+| 基底備份 | `/etc/cron.d/wishly-walg`，每日 03:47 UTC 執行 `walg-basebackup.sh`，保留 8 份，舊 WAL 一併刪除；日誌 `journalctl -t wishly-walg` |
+| 歸檔監看 | `db-backup.sh` 每小時檢查 `pg_stat_archiver`，最近一次失敗晚於成功就以錯誤結束、不 ping |
 
-**還原演練**（每季一次，記錄在 `docs/TODO.md` 已完成區）：
+⚠ **`db` 的 compose 必須含 `- /opt/wishly-backup/walg:/walg:ro`**（Dokploy 後台與 VPS 上的檔案都要有）。少了這行，容器重建後歸檔會一直失敗，WAL 堆積直到磁碟滿。
+
+**還原演練**（每季一次，兩種都做，記錄在 `docs/TODO.md` 已完成區）：
+
+PITR（方案 A）：`/opt/wishly-backup/walg-restore-drill.sh ['2026-10-27 09:00:00+00']`，從 R2 取最新基底備份、重播 WAL 到指定時間（省略則重播到最後），在暫存容器內升格後對帳；腳本會在暫存實例關掉 `archive_mode`，避免把新時間線推進正式歸檔。
+
+邏輯備份（方案 B）：
 
 ```sh
 ssh root@<VPS>
 /opt/wishly-backup/db-restore-drill.sh "$(ls -1t /var/backups/wishly/*.dump | head -1)"
-# 從 R2 演練：先 docker run --rm --env-file /etc/wishly-backup/r2.env -v /tmp:/data rclone/rclone:1.68.2 copy r2:wishly-db-backups/postgres/<檔名> /data/
+# 從 R2 演練：先 docker run --rm --env-file /etc/wishly-backup/r2.env -v /tmp:/data rclone/rclone:1.68.2 copy --bind 0.0.0.0 r2:wishly-db-backups/postgres/<檔名> /data/
 ```
 
 腳本會在無網路的暫存容器還原，然後跑 `db-reconcile.sql`（與測試的 `assert_all_reconciled` 同條件）。最後一行 `還原演練通過…耗時 N 秒` 就是資料庫部分的 RTO，對帳失敗會以非 0 結束。
