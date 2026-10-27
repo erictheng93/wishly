@@ -35,7 +35,7 @@ async fn status(State(st): State<AppState>) -> Result<Response, AppError> {
     let read_only = v.and_then(|v| v.as_bool()) == Some(true);
     Ok((
         [(header::CACHE_CONTROL, "public, max-age=30")],
-        Json(json!({ "read_only": read_only })),
+        Json(json!({ "read_only": read_only, "orgs_enabled": crate::config::get().orgs_enabled })),
     )
         .into_response())
 }

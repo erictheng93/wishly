@@ -108,6 +108,7 @@
 | `API_BASE_URL` | API 正式網址 | |
 | `OTP_PEPPER`、`OAUTH_SECRET`、`UNSUB_SECRET` | 各自獨立、≥32 字元（`openssl rand -hex 32`） | 更換 `UNSUB_SECRET` 會使既有退訂連結與清單存取權杖失效 |
 | `CF_ACCOUNT_ID`、`CF_EMAIL_API_TOKEN`、`MAIL_FROM` | 必填 | `MAIL_FROM` 網域須已在 Cloudflare Email Service 驗證 |
+| `ORGS_ENABLED` | 預設不設（關） | 公益組織 / 救災功能；法務確認後才設 `true`，關閉時相關路由回 404 |
 | `TRUSTED_PROXY` | `cloudflare` | 前提：API 只能經 Tunnel 到達（§2.3、§2.5） |
 | `CF_ZONE_ID`、`CF_CACHE_PURGE_TOKEN` | `TRUSTED_PROXY=cloudflare` 時必填 | token 只給 Zone → Cache Purge |
 | `TURNSTILE_SECRET` | 必填 | 與前端 `NUXT_PUBLIC_TURNSTILE_SITE_KEY` 成對 |
