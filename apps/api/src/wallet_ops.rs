@@ -275,7 +275,7 @@ async fn debt_list(
         return Err(AppError::invalid("/status", "ENUM", "status 不正確"));
     }
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
-        "SELECT d.id, jsonb_build_object('id', d.id, 'amount', d.amount, 'status', d.status, 'topup_id', d.topup_id,
+        "SELECT d.id, jsonb_build_object('id', d.id, 'amount', d.amount, 'recovered_points', d.recovered_points, 'status', d.status, 'topup_id', d.topup_id,
                 'user', jsonb_build_object('id', u.id, 'display_name', u.display_name, 'email', u.email),
                 'note', d.note, 'resolved_at', d.resolved_at, 'created_at', d.created_at)
            FROM wallet_debts d JOIN point_wallets w ON w.id = d.wallet_id JOIN users u ON u.id = w.user_id
@@ -397,7 +397,8 @@ pub enum ChargedBack {
 
 /// 拒付敗訴：paid | disputed → charged_back；先扣回該 topup 批次剩餘點數（ledger adjustment，ref topup），
 /// 已被花掉的部分記 wallet_debts（balance 仍 >= 0），錢包凍結。重送冪等。
-/// 認捐中的點數視為已花掉（不從 pledged 認捐追回）。
+/// 認捐中的點數視為已花掉（不從 pledged 認捐追回）；之後這些點數若退回（撤回認捐、現金退款被拒絕），
+/// 欠款未結清時由 points::offset_charged_back 抵銷 wallet_debts.recovered_points，不復活為可退現金的點數。
 pub async fn charge_back(tx: &mut Tx<'_>, topup_id: Uuid) -> R<ChargedBack> {
     let (wallet, amount, status) = lock_topup(tx, topup_id).await?;
     if status != "paid" && status != "disputed" {

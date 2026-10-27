@@ -89,6 +89,7 @@
     "UPSTREAM_ERROR": "Dịch vụ bên ngoài tạm thời không khả dụng. Vui lòng thử lại sau.",
     "VALIDATION_FAILED": "Vui lòng kiểm tra thông tin đã nhập rồi thử lại.",
     "WALLET_CAP_EXCEEDED": "Lần nạp này sẽ vượt giới hạn số dư ví. Vui lòng giảm số tiền.",
+    "WALLET_DEBT_OPEN": "Ví vẫn còn khoản nợ chargeback chưa xử lý. Hãy xử lý trước khi mở khóa.",
     "WALLET_FROZEN": "Ví đã bị đóng băng. Vui lòng liên hệ hỗ trợ.",
     "WISHLIST_CLOSED": "Danh sách đã đóng hoặc được lưu trữ. Không thể thực hiện thao tác này nữa.",
     "WISHLIST_NOT_PUBLISHABLE": "Vui lòng hoàn tất thông tin bắt buộc của danh sách trước khi đăng.",

@@ -374,6 +374,7 @@
       },
       "amount": "Tunggakan",
       "pts": "{pts} poin",
+      "recovered": "Diimbangi",
       "topup": "Transaksi top up",
       "createdAt": "Waktu dibuat",
       "resolvedAt": "Waktu ditutup",

@@ -374,6 +374,7 @@
       },
       "amount": "Khoản nợ",
       "pts": "{pts} điểm",
+      "recovered": "Đã bù trừ",
       "topup": "Đơn nạp",
       "createdAt": "Thời gian tạo",
       "resolvedAt": "Thời gian tất toán",

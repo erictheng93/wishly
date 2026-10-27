@@ -386,6 +386,28 @@ async fn charge_back_recovers_remaining_lot_records_debt_and_is_idempotent(pool:
             .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
+    // 欠款未結清不得解凍；結案後才可
+    let wid: Uuid = sqlx::query_scalar("SELECT id FROM point_wallets WHERE user_id = $1")
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (wpath, wck) = (format!("/admin/wallets/{wid}"), ck(&staff.token));
+    let unfreeze = || {
+        call(
+            &pool,
+            "PATCH",
+            &wpath,
+            &wck,
+            Some(json!({ "status": "active", "reason": "測試" })),
+        )
+    };
+    let (s, _, b) = unfreeze().await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("WALLET_DEBT_OPEN"))
+    );
+    assert_eq!(wallet_status(&pool, a).await, "frozen");
     let (s, _, b) = patch(
         json!({ "status": "written_off", "note": "小額核銷" }),
         did.clone(),
@@ -395,6 +417,8 @@ async fn charge_back_recovers_remaining_lot_records_debt_and_is_idempotent(pool:
         (s, b["status"].as_str()),
         (StatusCode::OK, Some("written_off"))
     );
+    assert_eq!(unfreeze().await.0, StatusCode::OK);
+    assert_eq!(wallet_status(&pool, a).await, "active");
     let (s, _, b) = patch(json!({ "status": "settled", "note": "x" }), did).await;
     assert_eq!(
         (s, b["code"].as_str()),
@@ -421,6 +445,171 @@ async fn charge_back_recovers_remaining_lot_records_debt_and_is_idempotent(pool:
     )
     .await;
     assert_eq!(b["data"].as_array().unwrap().len(), 1);
+}
+
+/// 退回點數抵銷拒付欠款：topup 100，認捐 pledges 各筆後拒付；回傳 (甲, token, 品項, 認捐 id 們, topup, 錢包)。
+async fn charged_back_with_pledges(
+    pool: &PgPool,
+    pledges: &[i64],
+) -> (Uuid, String, Vec<Uuid>, Uuid, Uuid) {
+    let owner = common::user(pool, "小米").await;
+    let TestUser { id: a, token: ta } = common::user(pool, "甲").await;
+    let topup = topup_credit(pool, a, 100).await;
+    let wl = common::wishlist(pool, owner.id, Default::default())
+        .await
+        .id;
+    let item = crowdfund_item(pool, wl, 1000).await;
+    let app = test_app(pool);
+    let mut cids = vec![];
+    for n in pledges {
+        let (s, _, r) = pledge(&app, item, &ta, *n).await;
+        assert_eq!(s, StatusCode::CREATED);
+        cids.push(r["contribution"]["id"].as_str().unwrap().parse().unwrap());
+    }
+    let mut tx = pool.begin().await.unwrap();
+    wallet_ops::charge_back(&mut tx, topup).await.unwrap();
+    tx.commit().await.unwrap();
+    (a, ta, cids, topup, item)
+}
+
+async fn withdraw(pool: &PgPool, token: &str, cid: Uuid) {
+    let (s, ..) = call(
+        pool,
+        "DELETE",
+        &format!("/contributions/{cid}"),
+        &ck(token),
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "withdraw failed: {s}");
+}
+
+/// (balance, topup 批次剩餘, recovered_points, 欠款狀態)
+async fn debt_state(pool: &PgPool, user: Uuid, topup: Uuid) -> (i64, i64, i64, String) {
+    let (rec, st): (i64, String) = sqlx::query_as(
+        "SELECT recovered_points, status::text FROM wallet_debts WHERE topup_id = $1",
+    )
+    .bind(topup)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let rem = lots(pool, user).await[0].1;
+    (common::balance(pool, user).await, rem, rec, st)
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn withdrawn_pledge_after_charge_back_offsets_debt_instead_of_reviving_points(pool: PgPool) {
+    let (a, ta, cids, topup, _) = charged_back_with_pledges(&pool, &[70]).await;
+    assert_eq!(debt_state(&pool, a, topup).await, (0, 0, 0, "open".into()));
+    withdraw(&pool, &ta, cids[0]).await;
+    assert_eq!(
+        debt_state(&pool, a, topup).await,
+        (0, 0, 70, "settled".into()),
+        "returned points must offset the charge-back debt"
+    );
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT entry_type::text, delta FROM point_ledger WHERE ref_type IN ('contribution', 'wallet_debt') AND entry_type::text IN ('release', 'adjustment') ORDER BY id")
+        .fetch_all(&pool).await.unwrap();
+    assert!(rows.contains(&("release".into(), 70)) && rows.contains(&("adjustment".into(), -70)));
+    assert_all_reconciled(&pool).await;
+    // 欠款自動結清 → 可解凍
+    let staff = common::staff(&pool, "營運").await;
+    let wid: Uuid = sqlx::query_scalar("SELECT id FROM point_wallets WHERE user_id = $1")
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, ..) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/wallets/{wid}"),
+        &ck(&staff.token),
+        Some(json!({ "status": "active", "reason": "測試" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn partial_offset_keeps_debt_open_and_wallet_frozen(pool: PgPool) {
+    let (a, ta, cids, topup, _) = charged_back_with_pledges(&pool, &[40, 30]).await;
+    withdraw(&pool, &ta, cids[0]).await;
+    assert_eq!(debt_state(&pool, a, topup).await, (0, 0, 40, "open".into()));
+    let staff = common::staff(&pool, "營運").await;
+    let wid: Uuid = sqlx::query_scalar("SELECT id FROM point_wallets WHERE user_id = $1")
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, ..) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/wallets/{wid}"),
+        &ck(&staff.token),
+        Some(json!({ "status": "active", "reason": "測試" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn settled_debt_lets_returned_points_credit_normally(pool: PgPool) {
+    let (a, ta, cids, topup, _) = charged_back_with_pledges(&pool, &[70]).await;
+    sqlx::query("UPDATE wallet_debts SET status = 'settled', resolved_at = now(), note = '已繳清'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    withdraw(&pool, &ta, cids[0]).await;
+    assert_eq!(
+        debt_state(&pool, a, topup).await,
+        (70, 70, 0, "settled".into()),
+        "settled debt must not offset returned points"
+    );
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn written_off_debt_is_still_offset_by_returned_points(pool: PgPool) {
+    let (a, ta, cids, topup, _) = charged_back_with_pledges(&pool, &[70]).await;
+    sqlx::query(
+        "UPDATE wallet_debts SET status = 'written_off', resolved_at = now(), note = '核銷'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    withdraw(&pool, &ta, cids[0]).await;
+    assert_eq!(
+        debt_state(&pool, a, topup).await,
+        (0, 0, 70, "written_off".into())
+    );
+    assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn rejected_cash_refund_after_charge_back_offsets_debt(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let TestUser { id: a, token: ta } = common::user(&pool, "甲").await;
+    let topup = topup_credit(&pool, a, 100).await;
+    let (s, _, b) = refund(&pool, &ta, 60, Uuid::new_v4()).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let id = b["request"]["id"].as_str().unwrap().to_string();
+    let mut tx = pool.begin().await.unwrap();
+    wallet_ops::charge_back(&mut tx, topup).await.unwrap(); // 扣回 40，欠 60
+    tx.commit().await.unwrap();
+    let (s, ..) = process(
+        &pool,
+        &staff.token,
+        &id,
+        json!({ "status": "rejected", "reject_reason": "測試" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        debt_state(&pool, a, topup).await,
+        (0, 0, 60, "settled".into())
+    );
+    assert_all_reconciled(&pool).await;
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
