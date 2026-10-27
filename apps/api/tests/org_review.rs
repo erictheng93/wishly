@@ -146,3 +146,40 @@ async fn concurrent_reviews_apply_once(pool: PgPool) {
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE action='org.review'").fetch_one(&pool).await.unwrap();
     assert_eq!(n, 1);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn revoke_approved_permit_pauses_sites(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let TestUser { id: owner, .. } = user(&pool, "owner").await;
+    let TestUser { token: st, .. } = staff(&pool, "staff").await;
+    let o = common::org(&pool, owner, "verified").await;
+    common::member(&pool, o, owner, "owner").await;
+    let p = common::permit(&pool, o, "approved", 30).await;
+    let (ev, _) = common::event(&pool, o).await;
+    let site = common::site(&pool, o, owner, ev, p, "active").await;
+    let (s, _, b) = call(&pool, "POST", &format!("/admin/permits/{p}/review"), &ck(&st), Some(json!({"decision":"reject","note":"過期"}))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let ss: String = sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id=$1").bind(site.id).fetch_one(&pool).await.unwrap();
+    assert_eq!(ss, "paused");
+    cdn.wait_for(&site.slug).await;
+    assert_eq!(org_status(&pool, o).await, "verified");
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='org.permit_revoked' AND user_id=$1").bind(owner).fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 1);
+}
+
+#[test]
+fn org_review_copy() {
+    use wishly_api::notify::{render_lang, Lang};
+    let cases = [
+        (json!({"decision":"verified"}), "已通過審核", "approved"),
+        (json!({"decision":"needs_changes"}), "需要補件", "needs changes"),
+        (json!({"decision":"rejected"}), "未通過審核", "not approved"),
+        (json!({"decision":"rejected","revoked":true}), "驗證已撤銷", "revoked"),
+    ];
+    for (mut p, zh, en) in cases {
+        p["display_name"] = json!("協會");
+        assert!(render_lang(Lang::Zh, "org.review", "", &p).0.contains(zh));
+        let (s, b) = render_lang(Lang::En, "org.review", "", &p);
+        assert!(s.contains(en) && b.contains("/org/apply"), "{s}");
+    }
+}

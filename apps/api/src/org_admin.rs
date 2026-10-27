@@ -108,10 +108,10 @@ async fn review(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uu
     } else { vec![] };
     sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
                  SELECT m.user_id, 'email'::notification_channel, 'org.review',
-                        jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'decision', $3::text, 'note', $4::text)
+                        jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'decision', $3::text, 'note', $4::text, 'revoked', $5::bool)
                    FROM org_members m JOIN users u ON u.id = m.user_id
                   WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
-        .bind(id).bind(&display_name).bind(new_status).bind(&b.note).execute(&mut *tx).await?;
+        .bind(id).bind(&display_name).bind(new_status).bind(&b.note).bind(status == "verified" && new_status == "rejected").execute(&mut *tx).await?;
     audit(&mut *tx, sid, "org.review", "organizations", Some(id),
           json!({ "decision": b.decision, "from": status, "to": new_status, "note": b.note, "flagged_fields": flagged })).await?;
     tx.commit().await?;
@@ -134,15 +134,36 @@ async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): 
         _ => return Err(AppError::invalid("/decision", "INVALID", "decision 不合法")),
     };
     let mut tx = st.pool.begin().await?;
-    let status: String = sqlx::query_scalar("SELECT status FROM org_permits WHERE id = $1 FOR UPDATE")
+    // 鎖序：組織 → 許可（與組織審核一致）
+    let org_id: Uuid = sqlx::query_scalar("SELECT org_id FROM org_permits WHERE id = $1")
         .bind(id).fetch_optional(&mut *tx).await?
         .ok_or_else(|| AppError::problem(404, "NOT_FOUND", "許可不存在"))?;
-    if status != "pending" {
-        return Err(AppError::problem(409, "INVALID_STATE", format!("許可目前狀態 {status} 不可審核")));
+    let display_name: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id = $1 FOR UPDATE")
+        .bind(org_id).fetch_one(&mut *tx).await?;
+    let (status, permit_no): (String, String) = sqlx::query_as("SELECT status, permit_no FROM org_permits WHERE id = $1 FOR UPDATE")
+        .bind(id).fetch_one(&mut *tx).await?;
+    // pending 可核准 / 退件；approved 只能撤銷（reject）
+    if !(status == "pending" || (status == "approved" && new_status == "rejected")) {
+        return Err(AppError::problem(409, "INVALID_STATE", format!("許可目前狀態 {status} 不可執行 {}", b.decision)));
     }
     sqlx::query("UPDATE org_permits SET status = $2, review_note = $3 WHERE id = $1")
         .bind(id).bind(new_status).bind(&b.note).execute(&mut *tx).await?;
-    audit(&mut *tx, sid, "permit.review", "org_permits", Some(id), json!({ "decision": b.decision, "note": b.note })).await?;
+    // 撤銷已核准許可：使用此許可的上線據點暫停（不改組織狀態）
+    let slugs: Vec<String> = if status == "approved" {
+        let slugs = sqlx::query_scalar("UPDATE wishlists SET site_status = 'paused' WHERE permit_id = $1 AND type = 'relief' AND site_status = 'active' RETURNING slug")
+            .bind(id).fetch_all(&mut *tx).await?;
+        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
+                     SELECT m.user_id, 'email'::notification_channel, 'org.permit_revoked',
+                            jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
+                       FROM org_members m JOIN users u ON u.id = m.user_id
+                      WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
+            .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
+        slugs
+    } else { vec![] };
+    audit(&mut *tx, sid, "permit.review", "org_permits", Some(id), json!({ "decision": b.decision, "from": status, "note": b.note })).await?;
     tx.commit().await?;
+    if !slugs.is_empty() {
+        crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());
+    }
     Ok(Json(json!({ "id": id, "status": new_status })))
 }
