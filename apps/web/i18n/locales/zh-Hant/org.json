@@ -71,6 +71,49 @@
         "other": "其他立案團體"
       },
       "reapply": "重新申請"
+    },
+    "console": {
+      "title": "組織後台",
+      "members": "成員與邀請",
+      "events": "救災事件",
+      "sites": "據點",
+      "newEvent": "新增事件",
+      "newSite": "新增據點",
+      "noEvents": "尚無事件",
+      "noSites": "尚無據點",
+      "edit": "編輯",
+      "publicPage": "公開頁"
+    },
+    "members": {
+      "title": "成員與邀請",
+      "list": "成員",
+      "disabled": "已停用",
+      "role": "角色",
+      "disable": "停用",
+      "enable": "啟用",
+      "inviteTitle": "邀請成員",
+      "handle": "顯示代號（選填）",
+      "send": "寄出邀請",
+      "linkHint": "邀請連結已建立，請複製或掃描 QR 分享",
+      "link": "邀請連結",
+      "copy": "複製",
+      "copied": "已複製",
+      "pending": "待接受的邀請",
+      "noPending": "沒有待接受的邀請",
+      "cancel": "取消邀請",
+      "disableTitle": "停用成員",
+      "disableText": "確定要停用 {name}？對方將無法再操作此組織。",
+      "r": {
+        "owner": "擁有者",
+        "coordinator": "協調員",
+        "volunteer": "志工"
+      }
+    },
+    "invite": {
+      "title": "加入組織",
+      "text": "{org} 邀請你擔任「{role}」",
+      "accept": "接受邀請",
+      "mismatch": "請用 {email} 登入，或請管理者改寄到你的 email"
     }
   }
 }

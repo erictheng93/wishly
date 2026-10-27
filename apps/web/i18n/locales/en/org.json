@@ -71,6 +71,49 @@
         "other": "Other registered body"
       },
       "reapply": "Reapply"
+    },
+    "console": {
+      "title": "Org console",
+      "members": "Members & invites",
+      "events": "Relief events",
+      "sites": "Sites",
+      "newEvent": "New event",
+      "newSite": "New site",
+      "noEvents": "No events yet",
+      "noSites": "No sites yet",
+      "edit": "Edit",
+      "publicPage": "Public page"
+    },
+    "members": {
+      "title": "Members & invites",
+      "list": "Members",
+      "disabled": "Disabled",
+      "role": "Role",
+      "disable": "Disable",
+      "enable": "Enable",
+      "inviteTitle": "Invite a member",
+      "handle": "Handle (optional)",
+      "send": "Send invite",
+      "linkHint": "Invite link created. Copy it or share the QR code.",
+      "link": "Invite link",
+      "copy": "Copy",
+      "copied": "Copied",
+      "pending": "Pending invites",
+      "noPending": "No pending invites",
+      "cancel": "Cancel invite",
+      "disableTitle": "Disable member",
+      "disableText": "Disable {name}? They will no longer be able to act for this organization.",
+      "r": {
+        "owner": "Owner",
+        "coordinator": "Coordinator",
+        "volunteer": "Volunteer"
+      }
+    },
+    "invite": {
+      "title": "Join organization",
+      "text": "{org} invites you as {role}",
+      "accept": "Accept invite",
+      "mismatch": "Please sign in with {email}, or ask the admin to resend the invite to your email"
     }
   }
 }

@@ -36,6 +36,14 @@ it('switchTo 寫入 storage 並導頁；切回個人清除並回 dashboard', () 
   expect(navigate).toHaveBeenLastCalledWith('/dashboard')
 })
 
+it('adopt 只對齊身分、不導頁', () => {
+  const m = useOrgMode()
+  m.adopt('o1')
+  expect(m.current.value).toBe('o1')
+  expect(localStorage.getItem('wishly-org-mode')).toBe('o1')
+  expect(navigate).not.toHaveBeenCalled()
+})
+
 it('localStorage 丟例外也不壞', () => {
   vi.stubGlobal('localStorage', { getItem: () => { throw new Error('x') }, setItem: () => { throw new Error('x') }, removeItem: () => { throw new Error('x') } })
   const m = useOrgMode()

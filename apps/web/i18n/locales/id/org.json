@@ -71,6 +71,49 @@
         "other": "Lembaga terdaftar lainnya"
       },
       "reapply": "Ajukan ulang"
+    },
+    "console": {
+      "title": "Konsol organisasi",
+      "members": "Anggota & undangan",
+      "events": "Peristiwa bantuan",
+      "sites": "Lokasi",
+      "newEvent": "Peristiwa baru",
+      "newSite": "Lokasi baru",
+      "noEvents": "Belum ada peristiwa",
+      "noSites": "Belum ada lokasi",
+      "edit": "Ubah",
+      "publicPage": "Halaman publik"
+    },
+    "members": {
+      "title": "Anggota & undangan",
+      "list": "Anggota",
+      "disabled": "Dinonaktifkan",
+      "role": "Peran",
+      "disable": "Nonaktifkan",
+      "enable": "Aktifkan",
+      "inviteTitle": "Undang anggota",
+      "handle": "Nama pengguna (opsional)",
+      "send": "Kirim undangan",
+      "linkHint": "Tautan undangan dibuat. Salin atau bagikan kode QR.",
+      "link": "Tautan undangan",
+      "copy": "Salin",
+      "copied": "Tersalin",
+      "pending": "Undangan tertunda",
+      "noPending": "Tidak ada undangan tertunda",
+      "cancel": "Batalkan undangan",
+      "disableTitle": "Nonaktifkan anggota",
+      "disableText": "Nonaktifkan {name}? Mereka tidak bisa lagi bertindak untuk organisasi ini.",
+      "r": {
+        "owner": "Pemilik",
+        "coordinator": "Koordinator",
+        "volunteer": "Relawan"
+      }
+    },
+    "invite": {
+      "title": "Gabung organisasi",
+      "text": "{org} mengundang Anda sebagai {role}",
+      "accept": "Terima undangan",
+      "mismatch": "Masuk dengan {email}, atau minta admin mengirim ulang undangan ke email Anda"
     }
   }
 }
