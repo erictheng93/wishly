@@ -18,6 +18,7 @@ pub mod identities;
 pub mod inspire;
 pub mod notify;
 pub mod orders;
+pub mod orgs;
 pub mod points;
 pub mod profiles;
 pub mod public;
@@ -68,6 +69,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(reports::routes())
                 .merge(admin::routes())
                 .merge(orders::routes())
+                .merge(orgs::routes())
                 .merge(account::routes())
                 .merge(wishlists::routes())
                 .merge(uploads::routes())

@@ -210,7 +210,7 @@ async fn load_owned(pool: impl sqlx::PgExecutor<'_>, id: Uuid, user: Uuid) -> R<
     .ok_or(AppError::NotFound)
 }
 
-fn new_slug() -> String {
+pub(crate) fn new_slug() -> String {
     const A: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     let mut r = rand::thread_rng();
     (0..10)
