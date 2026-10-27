@@ -24,6 +24,7 @@ CASES = {
     "cdn-hidden": (API + "reports.rs", "moderate", "crate::cdn::purge_wishlists(vec![slug.clone()]);", "", "cdn_invalidation", CDN_TEST),
     "cdn-account-delete": (API + "account.rs", "delete_me", "crate::cdn::purge_wishlists(slugs);", "", "account_deletion", "account_delete_purges_public_lists_after_commit"),
     "cdn-org-revoke": (API + "org_admin.rs", "review", "crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());", "", "org_review", "revoke_demotes_active_sites_and_purges"),
+    "cdn-permit-expiry": (API + "relief_events.rs", "permit_expiry_tick", "crate::cdn::purge_wishlists(rows.into_iter().map(|r| r.0.trim().to_string()).collect());", "", "relief_public", "permit_expiry_pauses_sites_and_purges"),
     "org-review-for-update": (API + "org_admin.rs", "review", "FROM organizations WHERE id = $1 FOR UPDATE", "FROM organizations WHERE id = $1", "org_review", "concurrent_reviews_apply_once"),
     "cdn-close-due": (API + "wishlists.rs", "close_due", "crate::cdn::purge_wishlists(rows.iter().map(|r| r.1.trim().to_string()).collect());", "", "closes_at", "close_due_purges_due_public_lists_and_keeps_future_lists_cached"),
     "ledger-update": ("db/migrations/0004_crowdfund.sql", None, "BEFORE UPDATE OR DELETE ON point_ledger", "BEFORE DELETE ON point_ledger", "migration_constraints", LEDGER_TEST),

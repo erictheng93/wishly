@@ -444,6 +444,20 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         );
     }
+    if kind == "org.permit_expired" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let no = payload["permit_no"].as_str().unwrap_or("");
+        let url = format!("{app}/orgs/{}", payload["org_id"].as_str().unwrap_or(""));
+        return (
+            l.pick(format!("【Wishly】勸募許可 {no} 已到期"), format!("[Wishly] Fundraising permit {no} expired"), format!("[Wishly] Giấy phép gây quỹ {no} đã hết hạn"), format!("[Wishly] Izin penggalangan dana {no} kedaluwarsa")),
+            l.pick(
+                format!("組織「{name}」的勸募許可 {no} 已到期，使用此許可的救災據點已暫停。\n請上傳新的許可並送審後再恢復據點。\n組織頁面：{url}\n"),
+                format!("The fundraising permit {no} of \"{name}\" has expired, and relief sites using it are paused.\nSubmit a new permit for review, then resume your sites.\nOrganization page: {url}\n"),
+                format!("Giấy phép gây quỹ {no} của \"{name}\" đã hết hạn, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nHãy gửi giấy phép mới để xét duyệt rồi mở lại các điểm.\nTrang tổ chức: {url}\n"),
+                format!("Izin penggalangan dana {no} milik \"{name}\" kedaluwarsa, dan lokasi bantuan yang memakainya dijeda.\nAjukan izin baru untuk ditinjau, lalu lanjutkan lokasi.\nHalaman organisasi: {url}\n"),
+            ),
+        );
+    }
     if kind == "org.review" {
         let name = payload["display_name"].as_str().unwrap_or("");
         let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");

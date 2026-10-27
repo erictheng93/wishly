@@ -21,6 +21,9 @@ pub fn routes() -> Router<AppState> {
         .route("/public/wishlists", get(explore))
         .route("/public/wishlists/{slug}", get(wishlist))
         .route("/restricted/wishlists/{slug}", get(restricted))
+        .route("/public/relief-events", get(relief::events))
+        .route("/public/relief-events/{slug}", get(relief::event))
+        .route("/public/orgs/{slug}", get(relief::org))
 }
 
 /// 唯讀維護中就讓前端先掛橫幅，訪客不必填完表單才被 503 擋下。
@@ -90,6 +93,7 @@ async fn explore(
            AND o.deleted_at IS NULL AND o.blocked_at IS NULL
            AND (w.closes_at IS NULL OR w.closes_at > now())
            AND w.slug::text NOT LIKE 'demo%'   -- 範例清單（db/seed/demo.sql）不上探索頁
+           AND w.type <> 'relief'   -- 救災據點只走 /public/relief-events
            AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND ($1::text IS NULL OR w.type::text = $1)
            AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
@@ -340,7 +344,7 @@ async fn render(
         v
     }).collect();
 
-    let body = json!({
+    let mut body = json!({
         "slug": w.slug, "visibility": w.visibility, "type": w.r#type, "status": w.status, "title": w.title, "description": w.description,
         "cover_image_url": image_url(w.cover_image_key.as_deref(), &w.cover_image_status),
         "cover_preset": w.cover_preset,
@@ -350,8 +354,118 @@ async fn render(
         "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
         "items": item_json, "updated_at": w.updated_at,
     });
+    if w.r#type == "relief" {
+        relief::extend_site(&st.pool, w.id, &mut body).await?;
+    }
     if restricted {
         return Ok((cache, Json(body)).into_response());
     }
     Ok((cache, [(header::ETAG, etag)], Json(body)).into_response())
+}
+
+// ---------- 救災：事件 / 組織公開頁（皆不讀 cookie，可被 CDN 快取） ----------
+mod relief {
+    use super::*;
+    use axum::extract::Query;
+
+    const CACHE: [(header::HeaderName, &str); 1] = [(header::CACHE_CONTROL, "public, s-maxage=10, stale-while-revalidate=60")];
+    const EVENTS_PAGE: i64 = 20;
+    /// 公開可見的據點：上線、public、據點狀態 active、未下架
+    const LIVE_SITE: &str = "w.type = 'relief' AND w.status = 'active' AND w.visibility = 'public' AND w.site_status = 'active'
+        AND w.deleted_at IS NULL AND w.moderation_status = 'ok'";
+
+    /// relief 清單頁多帶組織 / 事件 / 據點資訊
+    pub async fn extend_site(pool: &sqlx::PgPool, id: Uuid, body: &mut Value) -> Result<(), AppError> {
+        let v: Value = sqlx::query_scalar(
+            "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', true),
+                    'event', jsonb_build_object('slug', e.slug, 'name', e.name), 'site_address', w.site_address, 'site_status', w.site_status)
+               FROM wishlists w JOIN organizations o ON o.id = w.org_id JOIN relief_events e ON e.id = w.event_id WHERE w.id = $1")
+            .bind(id).fetch_one(pool).await?;
+        if let (Some(b), Some(x)) = (body.as_object_mut(), v.as_object()) {
+            b.extend(x.clone());
+        }
+        Ok(())
+    }
+
+    #[derive(serde::Deserialize)]
+    pub struct PageQ {
+        page: Option<i64>,
+    }
+
+    pub async fn events(State(st): State<AppState>, Query(q): Query<PageQ>) -> Result<Response, AppError> {
+        let page = q.page.unwrap_or(1).clamp(1, 100);
+        let mut rows: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT {j} FROM relief_events WHERE merged_into IS NULL AND moderation_status = 'ok'
+               AND EXISTS (SELECT 1 FROM wishlists w WHERE w.event_id = relief_events.id AND {LIVE_SITE})
+             ORDER BY occurred_on DESC NULLS LAST, id LIMIT $1 OFFSET $2", j = crate::relief_events::J)))
+            .bind(EVENTS_PAGE + 1).bind((page - 1) * EVENTS_PAGE).fetch_all(&st.pool).await?;
+        let more = rows.len() as i64 > EVENTS_PAGE;
+        rows.truncate(EVENTS_PAGE as usize);
+        Ok((CACHE, Json(json!({ "events": rows, "next_page": more.then_some(page + 1) }))).into_response())
+    }
+
+    pub async fn event(State(st): State<AppState>, Path(slug): Path<String>) -> Result<Response, AppError> {
+        if !crate::validate::slug_ok(&slug) {
+            return Err(AppError::NotFound);
+        }
+        // 沿 merged_into 走到最終事件（最多 10 跳；環或過長視為不存在）
+        let mut cur = slug.clone();
+        let mut seen = vec![slug.clone()];
+        let ev: (Uuid, String, Option<String>, String) = loop {
+            let r: (Uuid, String, Option<String>, String) = sqlx::query_as(
+                "SELECT e.id, e.slug::text, m.slug::text, e.moderation_status::text FROM relief_events e LEFT JOIN relief_events m ON m.id = e.merged_into WHERE e.slug = $1")
+                .bind(&cur).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
+            match r.2.clone() {
+                Some(next) if seen.len() <= 10 && !seen.contains(&next) => {
+                    seen.push(next.clone());
+                    cur = next;
+                }
+                Some(_) => return Err(AppError::NotFound),
+                None => break r,
+            }
+        };
+        if ev.3 != "ok" {
+            return Err(AppError::NotFound);
+        }
+        if seen.len() > 1 {
+            return Ok((CACHE, Json(json!({ "merged_into": ev.1, "event": null, "sites": [] }))).into_response());
+        }
+        let event: Value = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT {} FROM relief_events WHERE id = $1", crate::relief_events::J)))
+            .bind(ev.0).fetch_one(&st.pool).await?;
+        // 尚未滿足：數量型 qty_claimed < qty_needed；眾籌型只有 open 算（funded / fulfilled 已達標，expired 已結束不再募）
+        let sites: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT jsonb_build_object('slug', w.slug, 'title', w.title, 'site_address', w.site_address, 'site_status', w.site_status,
+                      'org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name),
+                      'needs', jsonb_build_object({needs}))
+               FROM wishlists w JOIN organizations o ON o.id = w.org_id
+               LEFT JOIN wishlist_items i ON i.wishlist_id = w.id AND i.deleted_at IS NULL
+              WHERE w.event_id = $1 AND {LIVE_SITE}
+              GROUP BY w.id, o.id ORDER BY w.created_at, w.id",
+            needs = ["critical", "high", "medium", "low"].map(|u| format!(
+                "'{u}', count(i.id) FILTER (WHERE i.urgency = '{u}' AND CASE WHEN i.funding_mode = 'crowdfund' THEN i.funding_status = 'open' ELSE i.qty_claimed < i.qty_needed END)"
+            )).join(","))))
+            .bind(ev.0).fetch_all(&st.pool).await?;
+        Ok((CACHE, Json(json!({ "event": event, "sites": sites, "merged_into": null }))).into_response())
+    }
+
+    pub async fn org(State(st): State<AppState>, Path(slug): Path<String>) -> Result<Response, AppError> {
+        if !crate::validate::slug_ok(&slug) {
+            return Err(AppError::NotFound);
+        }
+        let (id, mut v): (Uuid, Value) = sqlx::query_as(
+            "SELECT id, jsonb_build_object('slug', slug, 'display_name', display_name, 'intro', intro, 'website', website,
+                    'public_email', public_email, 'public_phone', public_phone, 'logo_key', logo_key)
+               FROM organizations WHERE slug = $1 AND verification_status = 'verified'")
+            .bind(&slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
+        let key = v["logo_key"].take();
+        v["logo"] = json!(key.as_str().map(|k| crate::uploads::S3::get().public_url(k)));
+        v.as_object_mut().map(|o| o.remove("logo_key"));
+        let sites: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT jsonb_build_object('slug', w.slug, 'title', w.title, 'site_address', w.site_address, 'site_status', w.site_status,
+                      'event', jsonb_build_object('slug', e.slug, 'name', e.name))
+               FROM wishlists w JOIN relief_events e ON e.id = w.event_id WHERE w.org_id = $1 AND {LIVE_SITE} ORDER BY w.created_at, w.id")))
+            .bind(id).fetch_all(&st.pool).await?;
+        v["sites"] = json!(sites);
+        Ok((CACHE, Json(v)).into_response())
+    }
 }
