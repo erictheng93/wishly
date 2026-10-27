@@ -29,7 +29,9 @@
         "cashRefunds": "Hoàn tiền mặt",
         "walletDebts": "Nợ do chargeback",
         "topups": "Nạp điểm và tranh chấp",
-        "catalog": "Thương hiệu & sản phẩm"
+        "catalog": "Thương hiệu & sản phẩm",
+        "orgs": "Org and permit review",
+        "events": "Disaster events"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
@@ -475,6 +477,94 @@
       "cancel": "Hủy",
       "save": "Lưu",
       "saving": "Đang lưu…"
+    },
+    "orgs": {
+      "title": "Org and permit review",
+      "statusLabel": "Status",
+      "all": "All",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "empty": "No matching applications",
+      "loadMore": "Load more",
+      "view": "View",
+      "close": "Collapse",
+      "submittedAt": "Submitted",
+      "detailLoading": "Loading details…",
+      "status": {
+        "pending": "Pending",
+        "needs_changes": "Needs changes",
+        "verified": "Verified",
+        "rejected": "Rejected"
+      },
+      "permitStatus": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "docs": "Documents",
+      "download": "Download",
+      "docKind": {
+        "registration": "Registration",
+        "permit": "Permit document"
+      },
+      "noDocs": "No documents",
+      "permits": "Fundraising permits",
+      "noPermits": "No permits",
+      "validRange": "{from} ~ {to}",
+      "reviewNote": "Review note",
+      "members": "Members",
+      "orgAction": {
+        "approve": "Approve org",
+        "needs_changes": "Request changes",
+        "reject": "Reject",
+        "revoke": "Revoke org"
+      },
+      "permitAction": {
+        "approve": "Approve permit",
+        "reject": "Reject",
+        "revoke": "Revoke permit"
+      },
+      "noteLabel": "Review note (emailed to the applicant)",
+      "flagLabel": "Fields needing changes (at least one)",
+      "confirm": {
+        "approve": "Approve \"{name}\"? It can then open relief sites.",
+        "needs_changes": "Ask \"{name}\" for changes? The applicant will be notified.",
+        "reject": "Reject \"{name}\"? The applicant can reapply after 30 days.",
+        "revoke": "Revoke the verified org \"{name}\"?",
+        "revoke2": "Confirm again: revoking takes all public sites of \"{name}\" down immediately (back to draft). Revoke?",
+        "permitApprove": "Approve permit {no}?",
+        "permitReject": "Reject permit {no}?",
+        "permitRevoke": "Revoke approved permit {no}? Live sites using this permit will be paused."
+      },
+      "done": "Done",
+      "stale": "This record was updated by someone else; reloaded",
+      "flag": {
+        "logo_key": "Logo",
+        "documents": "Documents",
+        "permits": "Fundraising permits"
+      },
+      "flagRequired": "Select at least one field"
+    },
+    "events": {
+      "title": "Disaster events",
+      "filterLabel": "Filter by id or slug",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "empty": "No events",
+      "loadMore": "Load more",
+      "merged": "Merged into {into}",
+      "hiddenBadge": "Hidden",
+      "merge": "Merge",
+      "hide": "Hide",
+      "unhide": "Unhide",
+      "mergeIntoLabel": "Merge into (event id or slug)",
+      "mergeText": "Merge \"{name}\" into another event? This cannot be undone.",
+      "hideText": "Hide \"{name}\"? It will no longer show publicly.",
+      "unhideText": "Unhide \"{name}\"?",
+      "reasonLabel": "Reason",
+      "targetNotFound": "Event not found: enter an id, or a slug from the loaded list",
+      "done": "Done",
+      "selfMerge": "Cannot merge an event into itself"
     }
   }
 }

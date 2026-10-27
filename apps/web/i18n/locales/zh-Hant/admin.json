@@ -29,7 +29,9 @@
         "cashRefunds": "現金退款",
         "walletDebts": "拒付欠款",
         "topups": "儲值與爭議",
-        "catalog": "精選商品與品牌"
+        "catalog": "精選商品與品牌",
+        "orgs": "組織與許可審核",
+        "events": "救災事件管理"
       },
       "tabsLabel": "後台功能",
       "tabs": {
@@ -475,6 +477,94 @@
       "cancel": "取消",
       "save": "儲存",
       "saving": "儲存中…"
+    },
+    "orgs": {
+      "title": "組織與許可審核",
+      "statusLabel": "狀態",
+      "all": "全部",
+      "retry": "重試",
+      "loading": "載入中…",
+      "empty": "沒有符合的申請",
+      "loadMore": "載入更多",
+      "view": "檢視",
+      "close": "收合",
+      "submittedAt": "送出時間",
+      "detailLoading": "載入詳情…",
+      "status": {
+        "pending": "待審核",
+        "needs_changes": "需補件",
+        "verified": "已通過",
+        "rejected": "已退件"
+      },
+      "permitStatus": {
+        "pending": "待審核",
+        "approved": "已核准",
+        "rejected": "已退件"
+      },
+      "docs": "文件",
+      "download": "下載",
+      "docKind": {
+        "registration": "立案文件",
+        "permit": "勸募許可文件"
+      },
+      "noDocs": "沒有文件",
+      "permits": "勸募許可",
+      "noPermits": "沒有許可",
+      "validRange": "{from} ~ {to}",
+      "reviewNote": "審核備註",
+      "members": "成員",
+      "orgAction": {
+        "approve": "核准組織",
+        "needs_changes": "要求補件",
+        "reject": "退件",
+        "revoke": "撤銷組織"
+      },
+      "permitAction": {
+        "approve": "核准許可",
+        "reject": "退件",
+        "revoke": "撤銷許可"
+      },
+      "noteLabel": "審核備註（會寄給申請人）",
+      "flagLabel": "需補件的欄位（至少一項）",
+      "confirm": {
+        "approve": "核准「{name}」？核准後組織即可開設救災據點。",
+        "needs_changes": "要求「{name}」補件？申請人會收到通知。",
+        "reject": "將「{name}」退件？申請人 30 天後才能重新申請。",
+        "revoke": "撤銷已通過的「{name}」？",
+        "revoke2": "再次確認：撤銷後「{name}」所有公開據點都會立即下架（改為草稿）。確定要撤銷？",
+        "permitApprove": "核准許可 {no}？",
+        "permitReject": "將許可 {no} 退件？",
+        "permitRevoke": "撤銷已核准的許可 {no}？使用此許可的上線據點會被暫停。"
+      },
+      "done": "已處理",
+      "stale": "此筆狀態已被他人更新，已重新載入",
+      "flag": {
+        "logo_key": "組織標誌",
+        "documents": "文件",
+        "permits": "勸募許可"
+      },
+      "flagRequired": "請至少勾選一個欄位"
+    },
+    "events": {
+      "title": "救災事件管理",
+      "filterLabel": "以 id 或 slug 篩選",
+      "retry": "重試",
+      "loading": "載入中…",
+      "empty": "沒有事件",
+      "loadMore": "載入更多",
+      "merged": "已合併至 {into}",
+      "hiddenBadge": "已隱藏",
+      "merge": "合併",
+      "hide": "隱藏",
+      "unhide": "取消隱藏",
+      "mergeIntoLabel": "合併到（事件 id 或 slug）",
+      "mergeText": "將「{name}」合併到另一個事件？合併後無法復原。",
+      "hideText": "隱藏「{name}」？公開頁將不再顯示。",
+      "unhideText": "取消隱藏「{name}」？",
+      "reasonLabel": "原因",
+      "targetNotFound": "找不到該事件，請輸入 id 或已載入列表中的 slug",
+      "done": "已處理",
+      "selfMerge": "不能合併到自己"
     }
   }
 }
