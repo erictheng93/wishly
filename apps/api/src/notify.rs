@@ -391,6 +391,18 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         );
     }
+    if kind == "org.invite" {
+        let (org, url) = (payload["org_display_name"].as_str().unwrap_or(""), payload["url"].as_str().unwrap_or(&app));
+        return (
+            l.pick(format!("【Wishly】邀請你加入「{org}」"), format!("[Wishly] You're invited to join \"{org}\""), format!("[Wishly] Bạn được mời tham gia \"{org}\""), format!("[Wishly] Kamu diundang bergabung dengan \"{org}\"")),
+            l.pick(
+                format!("「{org}」邀請你加入組織。\n請用此 Email 登入後接受邀請（7 天內有效）：{url}\n"),
+                format!("\"{org}\" has invited you to join the organization.\nSign in with this email and accept within 7 days: {url}\n"),
+                format!("\"{org}\" mời bạn tham gia tổ chức.\nHãy đăng nhập bằng email này và chấp nhận trong 7 ngày: {url}\n"),
+                format!("\"{org}\" mengundangmu bergabung dengan organisasi.\nMasuk dengan email ini dan terima dalam 7 hari: {url}\n"),
+            ),
+        );
+    }
     if matches!(kind, "auth.identity_linked" | "auth.identity_unlinked") {
         let linked = kind == "auth.identity_linked";
         let provider = match payload["provider"].as_str() {
