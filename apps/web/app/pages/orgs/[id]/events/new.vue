@@ -6,20 +6,20 @@ useHead({ title: () => t('org.relief.evNewTitle') })
 const { api } = useApi()
 const id = useRoute().params.id as string
 const f = reactive({ name: '', hazard_type: 'earthquake', county: '', counties: [] as string[], occurred_on: '', area_note: '', description: '' })
-const similar = ref<any[]>([]), dismissed = ref(false), busy = ref(false), err = ref('')
+const similar = ref<any[]>([]), dismissed = ref(false), checked = ref(false), busy = ref(false), err = ref('')
 // 查重看主要縣市＋日期（選了會自動勾進受災縣市）；回應過期（使用者又改了條件）就丟棄
 let seq = 0
 watch(() => [f.county, f.occurred_on], async ([county, date]) => {
   const n = ++seq
-  similar.value = []; dismissed.value = false
+  similar.value = []; dismissed.value = false; checked.value = false
   if (county && !f.counties.includes(county)) f.counties.push(county)
   if (!county || !date) return
   try {
     const r = await api('/relief-events/similar', { query: { county, date } })
-    if (n === seq) similar.value = r
-  } catch { /* 查重失敗不擋建立 */ }
+    if (n === seq) { similar.value = r; checked.value = true }
+  } catch { if (n === seq) checked.value = true /* 查重失敗不擋建立 */ }
 })
-const showForm = computed(() => !similar.value.length || dismissed.value)
+const showForm = computed(() => (checked.value && !similar.value.length) || dismissed.value)
 async function submit() {
   err.value = ''
   if (!f.counties.length) { err.value = t('org.relief.evCounties'); return }
@@ -50,7 +50,7 @@ async function submit() {
       <p class="c-mute">{{ $t('org.relief.similarHint') }}</p>
       <article v-for="e in similar" :key="e.id" class="c-card">
         <strong>{{ e.name }}</strong>
-        <div class="c-mute">{{ e.occurred_on }}　{{ (e.counties ?? []).join('、') }}</div>
+        <div class="c-mute">{{ e.occurred_on }} · {{ (e.counties ?? []).join(' / ') }}</div>
         <NuxtLink :to="`/orgs/${id}/sites/new?event=${e.id}`" class="c-btn primary c-mt">{{ $t('org.relief.useThis') }}</NuxtLink>
       </article>
       <button type="button" class="c-btn block" @click="dismissed = true">{{ $t('org.relief.noneOfThese') }}</button>

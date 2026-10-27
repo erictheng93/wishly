@@ -123,9 +123,27 @@
         "fire": "Kebakaran",
         "other": "Lainnya"
       },
-      "category": "Kategori",
-      "urgency": "Tingkat urgensi",
-      "siteStatus": "Status lokasi",
+      "category": {
+        "water": "Air",
+        "food": "Makanan",
+        "medical": "Medis",
+        "hygiene": "Kebersihan",
+        "shelter": "Tempat tinggal",
+        "clothing": "Pakaian",
+        "baby": "Perlengkapan bayi",
+        "other": "Lainnya"
+      },
+      "urgency": {
+        "critical": "Sangat mendesak",
+        "high": "Tinggi",
+        "medium": "Sedang",
+        "low": "Rendah"
+      },
+      "siteStatus": {
+        "active": "Menerima",
+        "paused": "Dijeda",
+        "closed": "Selesai"
+      },
       "evNewTitle": "Tambah peristiwa bantuan",
       "evName": "Nama peristiwa",
       "evHazard": "Jenis bencana",
@@ -156,7 +174,9 @@
       "stSubmit": "Buat lokasi",
       "site": "Lokasi",
       "siteAddr": "Alamat penerimaan",
-      "openMap": "Buka di peta",
+      "siteStatusLabel": "Status lokasi",
+      "categoryLabel": "Kategori",
+      "urgencyLabel": "Tingkat urgensi",
       "pick": "Pilih",
       "errRelief": "Pilih kategori dan tingkat urgensi",
       "received": "Diterima {n}",
@@ -166,8 +186,7 @@
       "receiptNote": "Catatan (opsional)",
       "receiptSave": "Catat",
       "receiptTotal": "Total diterima {n}",
-      "receiptBy": "{name}  {time}",
-      "receiptDone": "Tercatat"
+      "receiptBy": "{name}  {time}"
     }
   }
 }

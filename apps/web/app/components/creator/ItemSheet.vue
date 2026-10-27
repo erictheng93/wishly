@@ -65,9 +65,9 @@ async function save() {
       <label class="c-field"><span>{{ $t('creator.itemSheet.spec') }}</span><input v-model="f.spec" maxlength="200"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.url') }}</span><input v-model="f.product_url" type="url" maxlength="2000" placeholder="https://"></label>
       <template v-if="relief">
-        <label class="c-field"><span>{{ $t('org.relief.category') }}</span>
+        <label class="c-field"><span>{{ $t('org.relief.categoryLabel') }}</span>
           <select v-model="f.category" name="category" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="c in CATEGORIES" :key="c" :value="c">{{ $t(`org.relief.category.${c}`) }}</option></select></label>
-        <label class="c-field"><span>{{ $t('org.relief.urgency') }}</span>
+        <label class="c-field"><span>{{ $t('org.relief.urgencyLabel') }}</span>
           <select v-model="f.urgency" name="urgency" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="u in URGENCIES" :key="u" :value="u">{{ $t(`org.relief.urgency.${u}`) }}</option></select></label>
       </template>
       <div class="c-field"><span>{{ $t('creator.itemSheet.mode') }}</span>

@@ -123,9 +123,27 @@
         "fire": "Fire",
         "other": "Other"
       },
-      "category": "Category",
-      "urgency": "Urgency",
-      "siteStatus": "Site status",
+      "category": {
+        "water": "Water",
+        "food": "Food",
+        "medical": "Medical",
+        "hygiene": "Hygiene",
+        "shelter": "Shelter",
+        "clothing": "Clothing",
+        "baby": "Baby supplies",
+        "other": "Other"
+      },
+      "urgency": {
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "siteStatus": {
+        "active": "Accepting",
+        "paused": "Paused",
+        "closed": "Closed"
+      },
       "evNewTitle": "New relief event",
       "evName": "Event name",
       "evHazard": "Hazard type",
@@ -156,7 +174,9 @@
       "stSubmit": "Create site",
       "site": "Site",
       "siteAddr": "Drop-off address",
-      "openMap": "Open in maps",
+      "siteStatusLabel": "Site status",
+      "categoryLabel": "Category",
+      "urgencyLabel": "Urgency",
       "pick": "Select",
       "errRelief": "Please choose a category and urgency",
       "received": "Received {n}",
@@ -166,8 +186,7 @@
       "receiptNote": "Note (optional)",
       "receiptSave": "Log",
       "receiptTotal": "Total received {n}",
-      "receiptBy": "{name}  {time}",
-      "receiptDone": "Logged"
+      "receiptBy": "{name}  {time}"
     }
   }
 }

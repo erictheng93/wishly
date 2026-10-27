@@ -17,6 +17,7 @@ const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
 const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 })
 const allowed = ref<string[]>([])
+const rcptKey = ref('')
 const relief = computed(() => w.value?.type === 'relief')
 // 實收登記：每筆品項一張 sheet；明細來自 GET /orgs/{org}/sites/{id}/receipts
 const receipts = ref<Record<string, any>>({}), rcpt = ref<any>(null), rcptF = reactive({ qty: 1, note: '' }), rcptBusy = ref(false), rcptErr = ref('')
@@ -24,13 +25,13 @@ async function loadReceipts() {
   if (!relief.value) return
   try { receipts.value = Object.fromEntries((await api(`/orgs/${w.value.org_id}/sites/${id}/receipts`)).map((r: any) => [r.item_id, r])) } catch { /* 明細失敗不擋編輯 */ }
 }
-function openReceipt(i: any) { rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
+function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
 async function saveReceipt() {
   rcptBusy.value = true; rcptErr.value = ''
   try {
-    await api(`/orgs/${w.value.org_id}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: { item_id: rcpt.value.id, qty: Number(rcptF.qty), note: rcptF.note || undefined } })
+    await api(`/orgs/${w.value.org_id}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': rcptKey.value }, noRedirect: true, body: { item_id: rcpt.value.id, qty: Number(rcptF.qty), note: rcptF.note || undefined } })
     rcpt.value = null; await load(true)
-  } catch (e) { rcptErr.value = errMsg(e) } finally { rcptBusy.value = false }
+  } catch (e: any) { rcptErr.value = errMsg(e); if (e.code !== 'NETWORK') rcptKey.value = crypto.randomUUID() } finally { rcptBusy.value = false }
 }
 const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null), coverBusy = ref(false)
 let poll: any
@@ -186,8 +187,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 
       <section v-if="relief" class="c-card">
         <h2 class="c-h2">{{ $t('org.relief.site') }}</h2>
-        <p>{{ $t('org.relief.siteAddr') }}：<a :href="mapsUrl(w.site_address)" target="_blank" rel="noopener">{{ w.site_address }}</a></p>
-        <label class="c-field"><span>{{ $t('org.relief.siteStatus') }}</span>
+        <p class="c-mute">{{ $t('org.relief.siteAddr') }}</p><p><a :href="mapsUrl(w.site_address)" target="_blank" rel="noopener">{{ w.site_address }}</a></p>
+        <label class="c-field"><span>{{ $t('org.relief.siteStatusLabel') }}</span>
           <select name="site_status" :value="w.site_status" @change="patchList({ site_status: ($event.target as HTMLSelectElement).value })"><option v-for="s in ['active', 'paused', 'closed']" :key="s" :value="s">{{ $t(`org.relief.siteStatus.${s}`) }}</option></select>
         </label>
       </section>

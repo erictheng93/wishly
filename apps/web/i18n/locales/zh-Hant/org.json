@@ -123,9 +123,27 @@
         "fire": "火災",
         "other": "其他"
       },
-      "category": "物資類別",
-      "urgency": "急迫程度",
-      "siteStatus": "據點狀態",
+      "category": {
+        "water": "飲水",
+        "food": "食物",
+        "medical": "醫療",
+        "hygiene": "衛生用品",
+        "shelter": "住宿與帳篷",
+        "clothing": "衣物",
+        "baby": "嬰幼兒用品",
+        "other": "其他"
+      },
+      "urgency": {
+        "critical": "急缺",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "siteStatus": {
+        "active": "收件中",
+        "paused": "暫停收件",
+        "closed": "已結束"
+      },
       "evNewTitle": "新增救災事件",
       "evName": "事件名稱",
       "evHazard": "災害類型",
@@ -156,7 +174,9 @@
       "stSubmit": "建立據點",
       "site": "據點",
       "siteAddr": "收件地址",
-      "openMap": "在地圖開啟",
+      "siteStatusLabel": "據點狀態",
+      "categoryLabel": "物資類別",
+      "urgencyLabel": "急迫程度",
       "pick": "請選擇",
       "errRelief": "請選擇類別與急迫程度",
       "received": "已實收 {n}",
@@ -166,8 +186,7 @@
       "receiptNote": "備註（選填）",
       "receiptSave": "登記",
       "receiptTotal": "累計實收 {n}",
-      "receiptBy": "{name}　{time}",
-      "receiptDone": "已登記"
+      "receiptBy": "{name}　{time}"
     }
   }
 }

@@ -13,7 +13,7 @@ onMounted(async () => {
     const [ev, pm] = await Promise.all([api(`/orgs/${id}/events`), api(`/orgs/${id}/permits`)])
     events.value = ev
     const today = taipeiToday()
-    permits.value = pm.filter((p: any) => p.status === 'approved' && p.valid_to >= today)
+    permits.value = pm.filter((p: any) => p.status === 'approved' && p.valid_from <= today && p.valid_to >= today)
     if (permits.value.length === 1) f.permit_id = permits.value[0].id
   } catch (e) { err.value = errMsg(e) }
 })
@@ -33,11 +33,11 @@ async function submit() {
     <CreatorHeader :title="$t('org.relief.stNewTitle')" :back="`/orgs/${id}`" />
     <form class="c-card" @submit.prevent="submit">
       <label class="c-field"><span>{{ $t('org.relief.stEvent') }}</span>
-        <select v-model="f.event_id" name="event_id" required><option value="" disabled>{{ $t('org.relief.stEventPick') }}</option><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}（{{ e.occurred_on }}）</option></select>
+        <select v-model="f.event_id" name="event_id" required><option value="" disabled>{{ $t('org.relief.stEventPick') }}</option><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }} · {{ e.occurred_on }}</option></select>
         <NuxtLink :to="`/orgs/${id}/events/new`">{{ $t('org.relief.stNewEvent') }}</NuxtLink>
       </label>
       <label class="c-field"><span>{{ $t('org.relief.stPermit') }}</span>
-        <select v-model="f.permit_id" name="permit_id" required><option value="" disabled>{{ $t('org.relief.stPermitPick') }}</option><option v-for="p in permits" :key="p.id" :value="p.id">{{ p.permit_no }}（～{{ p.valid_to }}）</option></select>
+        <select v-model="f.permit_id" name="permit_id" required><option value="" disabled>{{ $t('org.relief.stPermitPick') }}</option><option v-for="p in permits" :key="p.id" :value="p.id">{{ p.permit_no }} · {{ p.valid_from }} - {{ p.valid_to }}</option></select>
         <small v-if="!permits.length" class="c-err">{{ $t('org.relief.stNoPermit') }}</small>
       </label>
       <label class="c-field"><span>{{ $t('org.relief.stTitle') }}</span><input v-model="f.title" name="title" maxlength="100" required></label>

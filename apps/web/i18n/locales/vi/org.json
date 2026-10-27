@@ -123,9 +123,27 @@
         "fire": "Hỏa hoạn",
         "other": "Khác"
       },
-      "category": "Loại vật phẩm",
-      "urgency": "Mức khẩn cấp",
-      "siteStatus": "Trạng thái điểm nhận",
+      "category": {
+        "water": "Nước uống",
+        "food": "Thực phẩm",
+        "medical": "Y tế",
+        "hygiene": "Vệ sinh",
+        "shelter": "Chỗ ở",
+        "clothing": "Quần áo",
+        "baby": "Đồ trẻ em",
+        "other": "Khác"
+      },
+      "urgency": {
+        "critical": "Rất khẩn cấp",
+        "high": "Cao",
+        "medium": "Trung bình",
+        "low": "Thấp"
+      },
+      "siteStatus": {
+        "active": "Đang nhận",
+        "paused": "Tạm dừng",
+        "closed": "Đã kết thúc"
+      },
       "evNewTitle": "Thêm sự kiện cứu trợ",
       "evName": "Tên sự kiện",
       "evHazard": "Loại thiên tai",
@@ -156,7 +174,9 @@
       "stSubmit": "Tạo điểm nhận",
       "site": "Điểm nhận",
       "siteAddr": "Địa chỉ nhận hàng",
-      "openMap": "Mở bản đồ",
+      "siteStatusLabel": "Trạng thái điểm nhận",
+      "categoryLabel": "Loại vật phẩm",
+      "urgencyLabel": "Mức khẩn cấp",
       "pick": "Chọn",
       "errRelief": "Vui lòng chọn loại và mức khẩn cấp",
       "received": "Đã nhận {n}",
@@ -166,8 +186,7 @@
       "receiptNote": "Ghi chú (tùy chọn)",
       "receiptSave": "Ghi nhận",
       "receiptTotal": "Tổng đã nhận {n}",
-      "receiptBy": "{name}  {time}",
-      "receiptDone": "Đã ghi nhận"
+      "receiptBy": "{name}  {time}"
     }
   }
 }
