@@ -95,6 +95,10 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-pos{color:var(--ok)}.c-neg{color:var(--bad)}
 /* 窄螢幕：header 內按鈕收緊，避免導覽鈕被擠到第二列、sticky header 變成兩倍高 */
 @media (max-width:767px){.c-head .c-btn{padding:0 10px;letter-spacing:.06em}}
+/* 帳號選單靠右展開：頁首換行時晶片也要貼右，選單才不會超出左邊 */
+.c-head .um{margin-left:auto}
+/* 手機頁首擠：身分晶片只留紅框頭像（寬度同舊頭像 44px），名字在桌面與首頁才顯示 */
+@media (max-width:479px){.c-head .um-name,.c-head .um-caret{display:none}.c-head .um .um-btn{padding:0}}
 @media (max-width:359px){.c-head .c-btn{padding:0 6px;letter-spacing:.02em;font-size:13px;min-width:0}}
 /* 平板 / 桌面：清單改格線、底部面板改置中 modal */
 @media (min-width:768px){

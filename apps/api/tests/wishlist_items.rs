@@ -281,6 +281,7 @@ async fn owner_only_and_item_rules(pool: PgPool) {
     .await;
     let d = l["data"].as_array().unwrap();
     assert_eq!((d.len(), d[0]["title"].as_str()), (1, Some("另一份")));
+    assert_eq!(d[0]["visibility"], "friends"); // 首頁「我的清單」面板顯示可見性
     assert_eq!(
         call_app(&app, "GET", "/wishlists?status=active,bogus", &ck(&a), None)
             .await
