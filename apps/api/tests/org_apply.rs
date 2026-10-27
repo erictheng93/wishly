@@ -161,3 +161,35 @@ async fn volunteer_cannot_patch(pool: PgPool) {
     assert_eq!(s, StatusCode::OK);
     assert!(g.get("contact_phone").is_none());
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reopen_rejected_collides_with_existing_draft(pool: PgPool) {
+    let u = user(&pool, "A").await;
+    let o = org(&pool, u.id, "rejected").await;
+    member(&pool, o, u.id, "owner").await;
+    org(&pool, u.id, "draft").await; // 同一人已有另一份草稿
+    let (s, _, e) = call(&pool, "PATCH", &format!("/orgs/{o}"), &ck(&u.token), Some(json!({"intro":"x"}))).await;
+    assert_eq!((s, e["code"].as_str().unwrap()), (StatusCode::CONFLICT, "ORG_DRAFT_EXISTS"));
+    let st: String = sqlx::query_scalar("SELECT verification_status FROM organizations WHERE id=$1").bind(o).fetch_one(&pool).await.unwrap();
+    assert_eq!(st, "rejected");
+}
+
+/// PATCH 的 lock() 必須 FOR UPDATE：審核端先鎖列並改成 rejected，申請端要等到提交後才看到新狀態。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patch_waits_on_org_row_lock_then_sees_rejection(pool: PgPool) {
+    let u = user(&pool, "A").await;
+    let o = org(&pool, u.id, "draft").await;
+    member(&pool, o, u.id, "owner").await;
+    let app = test_app(&pool);
+    let mut tx = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *tx).await.unwrap();
+    sqlx::query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE").bind(o).fetch_one(&mut *tx).await.unwrap();
+    sqlx::query("UPDATE organizations SET verification_status='rejected', resubmit_after=now()+interval '30 days' WHERE id=$1")
+        .bind(o).execute(&mut *tx).await.unwrap();
+    let (a2, uri, tok) = (app.clone(), format!("/orgs/{o}"), u.token.clone());
+    let h = tokio::spawn(async move { call_app(&a2, "PATCH", &uri, &ck(&tok), Some(json!({"intro":"x"}))).await });
+    wait_for_blocked(&pool, pid, 1).await;
+    tx.commit().await.unwrap();
+    let (s, _, e) = h.await.unwrap();
+    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::CONFLICT, "RESUBMIT_TOO_EARLY"), "owner PATCH overwrote the concurrent rejection: {e}");
+}
