@@ -128,10 +128,54 @@ async fn publish_requires_verified_org_and_valid_permit(pool: PgPool) {
     sqlx::query("UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date+5 WHERE id=$1").bind(f.permit).execute(&pool).await.unwrap();
     let (s, _, e) = publish().await;
     assert_eq!((s, e["status"].as_str()), (StatusCode::OK, Some("active")), "{e}");
-    // 已上線後許可過期：編輯其他欄位回 409，不是 DB trigger 的 500
-    sqlx::query("UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date-1 WHERE id=$1").bind(f.permit).execute(&pool).await.unwrap();
-    let (s, _, e) = call(&pool, "PATCH", &url, &ck(&f.coord.token), Some(json!({"title":"改名"}))).await;
-    assert_eq!((s, e["code"].as_str().unwrap()), (StatusCode::CONFLICT, "PERMIT_INVALID"));
+}
+
+/// 已上線、許可已過期的據點：(PATCH url, wishlist id, fixture)
+async fn expired_active_site(pool: &PgPool) -> (String, Uuid, Fx) {
+    let f = fx(pool).await;
+    let (_, v) = create_site(pool, &f, &f.coord.token, body(&f)).await;
+    let wid = id(&v);
+    relief_item(pool, wid).await;
+    let url = format!("/wishlists/{wid}");
+    let (s, _, e) = call(pool, "PATCH", &url, &ck(&f.coord.token), Some(json!({"status":"active"}))).await;
+    assert_eq!(s, StatusCode::OK, "{e}");
+    sqlx::query("UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date-1 WHERE id=$1").bind(f.permit).execute(pool).await.unwrap();
+    (url, wid, f)
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn expired_permit_does_not_block_editing_pausing_or_closing_active_site(pool: PgPool) {
+    let (url, wid, f) = expired_active_site(&pool).await;
+    let tk = ck(&f.coord.token);
+    let patch = |b: Value| call(&pool, "PATCH", &url, &tk, Some(b));
+    let (s, _, e) = patch(json!({"title":"改名"})).await;
+    assert_eq!((s, e["title"].as_str()), (StatusCode::OK, Some("改名")), "{e}");
+    let (s, _, e) = patch(json!({"site_status":"paused"})).await;
+    assert_eq!((s, e["site_status"].as_str()), (StatusCode::OK, Some("paused")), "{e}");
+    let (s, _, e) = patch(json!({"site_status":"closed"})).await;
+    assert_eq!((s, e["site_status"].as_str()), (StatusCode::OK, Some("closed")), "{e}");
+    let (s, _, e) = patch(json!({"status":"closed"})).await;
+    assert_eq!((s, e["status"].as_str()), (StatusCode::OK, Some("closed")), "{e}");
+    // 重新上線仍要有效許可
+    let (s, _, e) = patch(json!({"status":"active"})).await;
+    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::CONFLICT, "PERMIT_INVALID"));
+    let st: String = sqlx::query_scalar("SELECT status::text FROM wishlists WHERE id=$1").bind(wid).fetch_one(&pool).await.unwrap();
+    assert_eq!(st, "closed");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn changing_permit_on_active_site_requires_a_valid_new_permit(pool: PgPool) {
+    let (url, _, f) = expired_active_site(&pool).await;
+    let tk = ck(&f.coord.token);
+    let expired2 = permit(&pool, f.org, "approved", -2).await;
+    let (s, _, e) = call(&pool, "PATCH", &url, &tk, Some(json!({"permit_id": expired2}))).await;
+    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::CONFLICT, "PERMIT_INVALID"));
+    let pending = permit(&pool, f.org, "pending", 30).await;
+    let (s, _, e) = call(&pool, "PATCH", &url, &tk, Some(json!({"permit_id": pending}))).await;
+    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::CONFLICT, "PERMIT_INVALID"));
+    let fresh = permit(&pool, f.org, "approved", 30).await;
+    let (s, _, e) = call(&pool, "PATCH", &url, &tk, Some(json!({"permit_id": fresh}))).await;
+    assert_eq!((s, e["permit_id"].clone()), (StatusCode::OK, json!(fresh)), "{e}");
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -309,4 +353,88 @@ async fn create_waits_on_event_lock_then_sees_hidden(pool: PgPool) {
     assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::UNPROCESSABLE_ENTITY, "EVENT_UNAVAILABLE"), "site created under a concurrently hidden event: {e}");
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlists WHERE type='relief'").fetch_one(&pool).await.unwrap();
     assert_eq!(n, 0);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn site_has_no_allowed_users(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    let url = format!("/wishlists/{}/allowed-users", id(&v));
+    let tk = ck(&f.coord.token);
+    assert_eq!(call(&pool, "GET", &url, &tk, None).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(call(&pool, "PUT", &url, &tk, Some(json!({"user_ids": []}))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patching_site_address_updates_sealed_shipping_address(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    let wid = id(&v);
+    let url = format!("/wishlists/{wid}");
+    let tk = ck(&f.coord.token);
+    let (s, _, _) = call(&pool, "PATCH", &url, &tk, Some(json!({"site_address":"abcd"}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _, e) = call(&pool, "PATCH", &url, &tk, Some(json!({"site_address":"花蓮縣鳳林鎮中正路二號"}))).await;
+    assert_eq!(s, StatusCode::OK, "{e}");
+    let (n, p, a): (Vec<u8>, Vec<u8>, Vec<u8>) = sqlx::query_as("SELECT recipient_name_enc, phone_enc, address_enc FROM shipping_addresses WHERE wishlist_id=$1")
+        .bind(wid).fetch_one(&pool).await.unwrap();
+    assert_eq!(wishly_api::sealed::open_str(&a).as_deref(), Some("花蓮縣鳳林鎮中正路二號"));
+    assert_eq!(wishly_api::sealed::open_str(&n).as_deref(), Some("王小明")); // 收件人、電話不動
+    assert_eq!(wishly_api::sealed::open_str(&p).as_deref(), Some("0912-345-678"));
+}
+
+/// apply_site_fields 改事件前須先 FOR SHARE 鎖組織列（organizations → relief_events → wishlists），與撤銷驗證互斥。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patching_event_waits_on_org_lock(pool: PgPool) {
+    let f = fx(&pool).await;
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    let (ev2, _) = event(&pool, f.org).await;
+    let app = test_app(&pool);
+    let mut tx = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *tx).await.unwrap();
+    sqlx::query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE").bind(f.org).fetch_one(&mut *tx).await.unwrap();
+    let (a2, uri, tok) = (app.clone(), format!("/wishlists/{}", id(&v)), f.coord.token.clone());
+    let h = tokio::spawn(async move { call_app(&a2, "PATCH", &uri, &ck(&tok), Some(json!({"event_id": ev2}))).await });
+    wait_for_blocked(&pool, pid, 1).await;
+    tx.commit().await.unwrap();
+    let (s, _, e) = h.await.unwrap();
+    assert_eq!((s, e["event_id"].clone()), (StatusCode::OK, json!(ev2)), "{e}");
+}
+
+async fn delete_me(pool: &PgPool, tok: &str) -> (StatusCode, Value) {
+    let (s, _, v) = call(pool, "DELETE", "/me", &ck(tok), Some(json!({"confirm":"DELETE"}))).await;
+    (s, v)
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn deleting_creator_hands_site_to_another_coordinator(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    relief_item(&pool, l.id).await;
+    let (s, v) = delete_me(&pool, &f.coord.token).await;
+    assert_eq!((s, v["deleted"].clone()), (StatusCode::OK, json!(true)), "{v}");
+    let owner: Uuid = sqlx::query_scalar("SELECT owner_id FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    let org_owner: Uuid = sqlx::query_scalar("SELECT user_id FROM org_members WHERE org_id=$1 AND role='owner'").bind(f.org).fetch_one(&pool).await.unwrap();
+    assert_eq!(owner, org_owner, "owner role is preferred over other coordinators");
+    let (st, vis, ss): (String, String, String) = sqlx::query_as("SELECT status::text, visibility::text, site_status FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    assert_eq!((st.as_str(), vis.as_str(), ss.as_str()), ("active", "public", "active"));
+    let dis: bool = sqlx::query_scalar("SELECT disabled_at IS NOT NULL FROM org_members WHERE org_id=$1 AND user_id=$2").bind(f.org).bind(f.coord.id).fetch_one(&pool).await.unwrap();
+    assert!(dis);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn deleting_sole_manager_closes_site_but_keeps_it_public(pool: PgPool) {
+    let _cdn = common::cdn::init();
+    let f = fx(&pool).await;
+    // 組織的 owner 成員改成 volunteer：coord 是唯一能管理的人
+    sqlx::query("UPDATE org_members SET role='volunteer' WHERE org_id=$1 AND role='owner'").bind(f.org).execute(&pool).await.unwrap();
+    let l = site(&pool, f.org, f.coord.id, f.ev, f.permit, "active").await;
+    relief_item(&pool, l.id).await;
+    let (s, v) = delete_me(&pool, &f.coord.token).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (owner, st, vis, ss): (Uuid, String, String, String) = sqlx::query_as("SELECT owner_id, status::text, visibility::text, site_status FROM wishlists WHERE id=$1").bind(l.id).fetch_one(&pool).await.unwrap();
+    assert_eq!((owner, st.as_str(), vis.as_str(), ss.as_str()), (f.coord.id, "closed", "public", "closed"));
+    let dis: bool = sqlx::query_scalar("SELECT disabled_at IS NOT NULL FROM org_members WHERE org_id=$1 AND user_id=$2").bind(f.org).bind(f.coord.id).fetch_one(&pool).await.unwrap();
+    assert!(dis);
 }

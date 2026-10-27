@@ -625,6 +625,7 @@ async fn update(
     }
     let exp = expected(m)?;
     let relief = w.ty == "relief";
+    let old_permit = w.permit_id;
     apply_site_fields(&mut tx, m, &mut w, relief).await?;
     if let Some(v) = text(m, "title", 1, 100)? {
         w.title = v.unwrap_or_default();
@@ -696,7 +697,7 @@ async fn update(
                 &format!("不能從 {} 變更為 {new}", w.status),
             ));
         }
-        if relief && new == "active" {
+        if relief && new == "active" && w.status != "active" {
             relief_publishable(&mut tx, &w).await?;
         }
         if new == "active" && w.status == "draft" {
@@ -736,8 +737,10 @@ async fn update(
             }
         }
         w.status = new.into();
-    } else if relief && w.status == "active" {
-        relief_publishable(&mut tx, &w).await?; // UPDATE 會觸發 DB 的上線守門 trigger，先以 403/409 回應而非 500
+    }
+    // 已上線的據點換許可：新許可也要有效（暫停 / 關閉 / 改其他欄位不重驗，許可到期不該擋住收攤）
+    if relief && old_status == "active" && w.status == "active" && w.permit_id != old_permit {
+        relief_publishable(&mut tx, &w).await?;
     }
     // 只在「進入 active」（發佈 / 重開）時擋已過的結束時間，否則下個 tick 又被關掉；
     // 本來就 active 但已到期、尚未被背景 job 掃到的清單，編輯其他欄位照常放行（有效狀態已是 closed，捐助早被 SQL 擋住）。
@@ -760,6 +763,11 @@ async fn update(
         .bind(&w.site_status).bind(&w.site_address).bind(w.event_id).bind(w.permit_id).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
+    }
+    if relief && m.contains_key("site_address") {
+        // 收件地址 = 據點地址：眾籌採購讀 shipping_addresses，兩邊要一致
+        sqlx::query("UPDATE shipping_addresses SET address_enc = $2 WHERE wishlist_id = $1")
+            .bind(id).bind(crate::sealed::seal(w.site_address.as_deref().unwrap_or_default().as_bytes())).execute(&mut *tx).await?;
     }
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;
@@ -798,7 +806,7 @@ async fn apply_site_fields(tx: &mut crate::points::Tx<'_>, m: &Map<String, Value
     if let Some(v) = new_status {
         w.site_status = Some(v.into());
     }
-    if let Some(v) = text(m, "site_address", 1, 200)? {
+    if let Some(v) = text(m, "site_address", 5, 200)? {
         w.site_address = Some(v.ok_or_else(|| AppError::invalid("/site_address", "REQUIRED", "site_address 不可為空"))?);
     }
     let uuid = |k: &str| -> R<Option<Uuid>> {
@@ -1770,12 +1778,20 @@ async fn allowed_list(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
     ))
 }
 
+/// 據點恆為 public，沒有指定名單
+fn no_relief(w: &W) -> R<()> {
+    if w.ty == "relief" {
+        return Err(AppError::invalid("/type", "NOT_APPLICABLE", "救災據點沒有指定名單"));
+    }
+    Ok(())
+}
+
 async fn allowed_get(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
-    load_owned(&st.pool, id, u.id).await?;
+    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
     allowed_list(&st.pool, id).await
 }
 
@@ -1785,7 +1801,7 @@ async fn allowed_put(
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {
-    load_owned(&st.pool, id, u.id).await?;
+    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
     let mut ids: Vec<Uuid> = obj(&b)?
         .get("user_ids")
         .and_then(|v| serde_json::from_value(v.clone()).ok())
