@@ -1,24 +1,36 @@
 <script setup lang="ts">
 const { user, loaded, fetchMe } = useAuth()
 const { t } = useI18n()
-onMounted(() => fetchMe())
+// SSR 拿不到 ws_session（在 API 網域），先依 ws_hint 猜：猜已登入就直接畫個人版骨架，/me 回來再確認
+const hint = useAuthHint()
+const signedIn = computed(() => loaded.value ? !!user.value : !!hint.value)
+onMounted(() => {
+  fetchMe()
+  if (hint.value && !user.value) loadMine() // 與 /me 並行，不必等身分確認
+})
 // 已登入：Hero 換成歡迎詞＋數字摘要，示意卡換成自己的清單；好友申請數也給頭像紅點用
 const { count: requests, refresh: refreshRequests } = useFriendRequests()
 const { api } = useApi()
 const mine = ref<{ lists: any[], more: boolean } | null>(null)
 const mineErr = ref(false)
+let mineBusy = false
 async function loadMine() {
-  mineErr.value = false
+  mineErr.value = false; mineBusy = true
   // shortcut: 只抓前 100 份算份數與已認領，超過顯示「+」；真有人超過再加後端摘要端點
   try { const r = await api('/wishlists', { query: { limit: 100, status: 'draft,active,closed' }, noRedirect: true }); mine.value = { lists: r.data, more: !!r.next_cursor } }
-  catch { mineErr.value = true }
+  catch { mineErr.value = true } finally { mineBusy = false }
 }
-watch(() => user.value?.id, (id) => { if (id) { refreshRequests(); loadMine() } else mine.value = null }, { immediate: true })
+watch(() => user.value?.id, (id, old) => {
+  if (!id || old) mine.value = null // 登出或換帳號：不留前一位的清單
+  if (!id) return
+  refreshRequests()
+  if (!mine.value && !mineBusy) loadMine()
+}, { immediate: true })
 const plus = computed(() => mine.value?.more ? '+' : '')
 const stats = computed(() => mine.value && { lists: `${mine.value.lists.length}${plus.value}`, claimed: `${mine.value.lists.reduce((n, w) => n + (w.completion?.fulfilled_count ?? 0), 0)}${plus.value}` })
 const visLabel = (v: string) => VIS_OPTIONS.find(o => o.v === v)?.label ?? ''
 const name = computed(() => user.value?.display_name || user.value?.email || '')
-const cta = computed(() => user.value ? { to: '/dashboard', text: t('me.home.myLists') } : { to: '/register', text: t('me.home.start') })
+const cta = computed(() => signedIn.value ? { to: '/dashboard', text: t('me.home.myLists') } : { to: '/register', text: t('me.home.start') })
 
 useSeoMeta({
   title: () => t('me.home.seoTitle'),
@@ -44,12 +56,13 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
           <NuxtLink to="/brands" class="l-nav-link">{{ $t('me.home.brands') }}</NuxtLink>
           <NuxtLink to="/#scenes" class="l-nav-link">{{ $t('me.home.seeDemo') }}</NuxtLink>
           <LocaleSwitch />
-          <!-- 登入狀態未確定前先佔位，避免 SSR 的未登入按鈕閃一下又變 -->
-          <span v-if="!loaded" class="l-auth-wait" aria-hidden="true" />
-          <template v-else-if="user">
+          <!-- 登入狀態未確定前先佔位，避免 SSR 的未登入按鈕閃一下又變；有 ws_hint 時只有晶片要等 -->
+          <template v-if="signedIn">
             <NuxtLink to="/dashboard" class="g-btn sm l-wide">{{ $t('me.home.myLists') }}</NuxtLink>
-            <CreatorUserMenu />
+            <CreatorUserMenu v-if="user" />
+            <span v-else class="l-auth-wait l-chip-wait" aria-hidden="true" />
           </template>
+          <span v-else-if="!loaded" class="l-auth-wait" aria-hidden="true" />
           <template v-else>
             <NuxtLink to="/login" class="g-btn sm ghost">{{ $t('me.home.login') }}</NuxtLink>
             <NuxtLink to="/register" class="g-btn sm l-wide">{{ $t('me.home.start') }}</NuxtLink>
@@ -60,14 +73,15 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 
     <main>
       <section class="l-hero l-in">
-        <div v-if="user" class="l-hero-copy">
+        <div v-if="signedIn" class="l-hero-copy">
           <p class="l-kicker l-on">{{ $t('me.home.signedIn') }}</p>
-          <h1>{{ $t('me.home.welcome', { name }) }}</h1>
+          <!-- 四語系的 {name} 都在句尾：身分未確認前以佔位條補在後面 -->
+          <h1>{{ $t('me.home.welcome', { name: user ? name : '' }) }}<span v-if="!user" class="l-skel l-skel-name" aria-hidden="true" /></h1>
           <p class="l-lead">{{ $t('me.home.todayLead') }}</p>
           <div class="l-stats">
             <NuxtLink to="/dashboard"><b>{{ stats?.lists ?? '–' }}</b>{{ $t('me.home.statLists') }}</NuxtLink>
             <NuxtLink to="/dashboard"><b>{{ stats?.claimed ?? '–' }}</b>{{ $t('me.home.statClaimed') }}</NuxtLink>
-            <NuxtLink to="/friends"><b>{{ requests }}</b>{{ $t('me.home.statRequests') }}</NuxtLink>
+            <NuxtLink to="/friends"><b>{{ user ? requests : '–' }}</b>{{ $t('me.home.statRequests') }}</NuxtLink>
           </div>
           <div class="l-cta">
             <NuxtLink to="/dashboard" class="g-btn">{{ $t('me.home.myLists') }}</NuxtLink>
@@ -86,10 +100,12 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
           </div>
         </div>
 
-        <div v-if="user" class="l-mine">
-          <div class="l-mine-top"><span>{{ $t('me.home.mineTitle', { name }) }}</span><NuxtLink to="/dashboard">{{ $t('me.home.mineAll') }} →</NuxtLink></div>
+        <div v-if="signedIn" class="l-mine">
+          <div class="l-mine-top"><span>{{ user ? $t('me.home.mineTitle', { name }) : $t('me.home.myLists') }}</span><NuxtLink to="/dashboard">{{ $t('me.home.mineAll') }} →</NuxtLink></div>
           <p v-if="mineErr" class="l-mine-msg" role="alert">{{ $t('me.home.mineErr') }} <button type="button" class="g-btn sm ghost" @click="loadMine">{{ $t('lists.common.retry') }}</button></p>
-          <p v-else-if="!mine" class="l-mine-msg" role="status">{{ $t('lists.common.loading') }}</p>
+          <ul v-else-if="!mine" role="status" :aria-label="$t('lists.common.loading')">
+            <li v-for="i in 3" :key="i" aria-hidden="true"><span class="l-skel" /><div class="g-bar" /></li>
+          </ul>
           <p v-else-if="!mine.lists.length" class="l-mine-msg">{{ $t('lists.dashboard.empty') }}</p>
           <ul v-else>
             <li v-for="w in mine.lists.slice(0, 3)" :key="w.id">
@@ -210,6 +226,9 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-nav-link{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.1em}
 /* 已登入：Hero 歡迎詞＋數字摘要、右側自己的清單（取代示意卡） */
 .l-auth-wait{display:inline-block;width:132px;height:44px}
+.l-chip-wait{width:96px;box-sizing:border-box;border:2px solid var(--line)}
+.l-skel{display:inline-block;width:60%;height:1em;background:var(--bg-alt);vertical-align:middle}
+.l-skel-name{width:3em;height:.8em}
 .l-on::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--red);vertical-align:2px}
 .l-stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:24px;border:1px solid var(--line);text-align:left}
 .l-stats a{display:flex;flex-direction:column;min-height:44px;padding:10px 12px;border-right:1px solid var(--line);color:var(--mute);font-size:13px;letter-spacing:.06em}
@@ -229,7 +248,7 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-mine-msg{padding:20px 16px;color:var(--mute);text-align:center}
 .l-mine-new{display:flex;justify-content:center;align-items:center;min-height:48px;border-top:1px dashed var(--red);font-weight:700;font-size:14px;letter-spacing:.1em}
 /* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有），收緊字距與間距讓 CTA 不折行 */
-@media (max-width:479px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
+@media (max-width:479px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-chip-wait{width:72px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
 .l h2{font-size:24px;margin:0 0 24px;text-align:center}
 .l h3{font-size:17px;margin:8px 0}
 .l p{margin:0}

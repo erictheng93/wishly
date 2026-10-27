@@ -4,6 +4,7 @@ import { useApi } from '../app/composables/useApi'
 const states = new Map<string, { value: any }>()
 const navigate = vi.fn()
 const token = vi.fn()
+const hint = { value: true as boolean | null }
 beforeEach(() => {
   states.clear()
   states.set('auth-user', { value: { id: 'blocked-user' } })
@@ -16,6 +17,8 @@ beforeEach(() => {
   vi.stubGlobal('nativeHeaders', () => ({}))
   vi.stubGlobal('setNativeToken', token)
   vi.stubGlobal('navigateTo', navigate)
+  hint.value = true
+  vi.stubGlobal('useAuthHint', () => hint)
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
@@ -25,6 +28,7 @@ it.each([false, true])('clears blocked auth even with noRedirect=%s', async (noR
   expect(states.get('auth-user')?.value).toBeNull()
   expect(states.get('auth-error')?.value).toBe('account_blocked')
   expect(token).toHaveBeenCalledWith(null)
+  expect(hint.value).toBeNull()
   if (noRedirect) expect(navigate).not.toHaveBeenCalled()
   else expect(navigate).toHaveBeenCalledWith({ path: '/login', query: { redirect: '/settings', error: 'account_blocked' } })
 })
