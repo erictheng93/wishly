@@ -88,7 +88,7 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 | 格式 | `pg_dump -Fc -Z zstd`：先壓縮再落地、上傳；`pg_restore` 直接讀 |
 | WAL-G | 執行檔與設定在 `/opt/wishly-backup/walg/`，由 `scripts/walg-setup.sh` 安裝（`walg.env` 0400、owner 999，由 `r2.env` 轉出），以 `/walg:ro` 掛進 `db`；歸檔設定用 `ALTER SYSTEM` 寫在資料目錄（`archive_mode=on`、`archive_command='/walg/archive.sh wal-push %p'`）。R2 前綴 `wishly-db-backups/wal-g/`，zstd 壓縮，**沒有 Bucket Lock**（WAL-G 要能自行清理） |
 | 基底備份 | `/etc/cron.d/wishly-walg`，每日 03:47 UTC 執行 `walg-basebackup.sh`，保留 8 份，舊 WAL 一併刪除；日誌 `journalctl -t wishly-walg` |
-| 歸檔監看 | `db-backup.sh` 每小時檢查 `pg_stat_archiver`，最近一次失敗晚於成功就以錯誤結束、不 ping |
+| 監看 | `db-backup.sh` 每小時檢查：`pg_stat_archiver` 最近一次失敗晚於成功，或最新基底備份超過 26 小時（`BASE_MAX_AGE_HOURS`），就以錯誤結束、不 ping，由 healthchecks.io 告警 |
 
 ⚠ **`db` 的 compose 必須含 `- /opt/wishly-backup/walg:/walg:ro`**（Dokploy 後台與 VPS 上的檔案都要有）。少了這行，容器重建後歸檔會一直失敗，WAL 堆積直到磁碟滿。
 
