@@ -747,11 +747,11 @@ async fn update(
         crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
     }
     tx.commit().await?;
-    // 收緊可見性 / 封存後，邊緣快取的公開副本立即清掉
-    if was_servable && !crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status) {
-        crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
-    } else if was_servable && old_shown != (w.show_claimer_names, w.surprise_mode, w.event_date) {
-        // 仍可公開但姓名顯示條件變了：CDN 副本可能還帶著捐助者姓名
+    // 收緊可見性 / 封存後，或仍可公開但姓名顯示條件變了（副本可能還帶著捐助者姓名），邊緣快取的公開副本立即清掉
+    if was_servable
+        && (!crate::cdn::servable(&w.visibility, &w.status, &w.moderation_status)
+            || old_shown != (w.show_claimer_names, w.surprise_mode, w.event_date))
+    {
         crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
