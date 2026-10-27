@@ -385,7 +385,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
            SELECT i.title, i.image_key, i.image_status, i.unit_price_amount, {open} AS open
            FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL
            ORDER BY i.created_at DESC, i.id DESC LIMIT 1) li ON true
-         WHERE w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status = 'active'
+         WHERE w.deleted_at IS NULL AND w.org_id IS NULL AND w.moderation_status = 'ok' AND w.status = 'active'
            AND (w.closes_at IS NULL OR w.closes_at > now())
            AND (w.visibility::text IN ('public', 'friends')
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $1)))

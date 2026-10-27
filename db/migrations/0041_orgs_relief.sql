@@ -152,6 +152,13 @@ CREATE TRIGGER items_relief_shape BEFORE INSERT OR UPDATE OF wishlist_id, catego
 CREATE FUNCTION wishlists_relief_publish() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW.type = 'relief' AND NEW.status = 'active' THEN
+    -- 只在上線（INSERT / 狀態變成 active）或換許可 / 換組織時檢查；已上線的據點暫停、關閉、改其他欄位不受許可到期影響
+    IF TG_OP = 'UPDATE' THEN
+      IF NEW.status IS NOT DISTINCT FROM OLD.status AND NEW.permit_id IS NOT DISTINCT FROM OLD.permit_id
+         AND NEW.org_id IS NOT DISTINCT FROM OLD.org_id THEN
+        RETURN NEW;
+      END IF;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM organizations WHERE id = NEW.org_id AND verification_status = 'verified') THEN
       RAISE EXCEPTION '組織未通過審核' USING ERRCODE = 'check_violation';
     END IF;

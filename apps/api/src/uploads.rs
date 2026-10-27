@@ -521,8 +521,8 @@ async fn retire_media(pool: &sqlx::PgPool, key: &str) -> Result<bool, AppError> 
     lock_timeout(&mut tx).await?;
     lock_key(&mut tx, key).await?;
     let referenced: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM wishlists w JOIN users u ON u.id=w.owner_id WHERE w.cover_image_key=$1 AND u.deleted_at IS NULL AND w.deleted_at IS NULL)
-         OR EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id JOIN users u ON u.id=w.owner_id WHERE i.image_key=$1 AND u.deleted_at IS NULL AND w.deleted_at IS NULL AND i.deleted_at IS NULL)
+        "SELECT EXISTS (SELECT 1 FROM wishlists w JOIN users u ON u.id=w.owner_id WHERE w.cover_image_key=$1 AND (u.deleted_at IS NULL OR w.org_id IS NOT NULL) AND w.deleted_at IS NULL)
+         OR EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id JOIN users u ON u.id=w.owner_id WHERE i.image_key=$1 AND (u.deleted_at IS NULL OR w.org_id IS NOT NULL) AND w.deleted_at IS NULL AND i.deleted_at IS NULL)
          OR EXISTS (SELECT 1 FROM users WHERE avatar_key=$1 AND deleted_at IS NULL)")
         .bind(key).fetch_one(&mut *tx).await?;
     if referenced {
