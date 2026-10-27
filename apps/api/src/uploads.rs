@@ -491,8 +491,8 @@ async fn publish_checked(
         .bind(key)
         .execute(&mut *tx)
         .await?;
-    if fenced.rows_affected() == 0 {
-        // 呼叫端須先 remember_media；沒有紀錄就無法在崩潰後找到這張圖
+    if fenced.rows_affected() == 0 && !key.starts_with("catalog/") {
+        // 呼叫端須先 remember_media；沒有紀錄就無法在崩潰後找到這張圖。catalog 圖不屬任何使用者、不會退役，免圍欄
         return Err(AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"));
     }
     tx.commit().await?;
@@ -767,7 +767,10 @@ async fn presign(
     let dir = match r.purpose.as_str() {
         "cover" => "covers",
         "item" => "items",
-        "catalog" => "catalog", // 品牌 logo / 精選商品圖（僅後台使用）
+        "catalog" => {
+            crate::admin::require_staff(&user)?; // 品牌 logo / 精選商品圖：不記 user_media、永不退役，只給後台
+            "catalog"
+        }
         _ => {
             return Err(AppError::invalid(
                 "/purpose",
@@ -843,6 +846,9 @@ async fn confirm(
             "FORMAT",
             "object_key 格式不正確",
         ));
+    }
+    if r.object_key.starts_with("catalog/") {
+        crate::admin::require_staff(&user)?;
     }
     crate::ratelimit::check(
         &st.pool,
