@@ -418,6 +418,25 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         );
     }
+    if kind == "org.review" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");
+        let d = payload["decision"].as_str().unwrap_or("");
+        let (zh, en, vi, id) = match d {
+            "verified" => ("已通過審核", "has been approved", "đã được duyệt", "telah disetujui"),
+            "needs_changes" => ("需要補件或修正", "needs changes", "cần bổ sung hoặc chỉnh sửa", "perlu perbaikan"),
+            _ => ("未通過審核", "was not approved", "không được duyệt", "tidak disetujui"),
+        };
+        return (
+            l.pick(format!("【Wishly】組織「{name}」{zh}"), format!("[Wishly] Organization \"{name}\" {en}"), format!("[Wishly] Tổ chức \"{name}\" {vi}"), format!("[Wishly] Organisasi \"{name}\" {id}")),
+            l.pick(
+                format!("你的組織「{name}」{zh}。\n審核備註：{note}\n組織申請頁面：{app}/org/apply\n"),
+                format!("Your organization \"{name}\" {en}.\nReview note: {note}\nOrganization application: {app}/org/apply\n"),
+                format!("Tổ chức \"{name}\" của bạn {vi}.\nGhi chú xét duyệt: {note}\nTrang đăng ký tổ chức: {app}/org/apply\n"),
+                format!("Organisasi \"{name}\" kamu {id}.\nCatatan peninjauan: {note}\nHalaman pendaftaran organisasi: {app}/org/apply\n"),
+            ),
+        );
+    }
     let base = app;
     let manage = match payload.get("recovery_token").and_then(Value::as_str) {
         Some(t) => format!("{base}/me/claims#r={t}"),

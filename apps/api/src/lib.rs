@@ -17,6 +17,7 @@ pub mod idempotency;
 pub mod identities;
 pub mod inspire;
 pub mod notify;
+pub mod org_admin;
 pub mod orders;
 pub mod points;
 pub mod profiles;
@@ -68,6 +69,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(reports::routes())
                 .merge(admin::routes())
                 .merge(orders::routes())
+                .merge(org_admin::routes())
                 .merge(account::routes())
                 .merge(wishlists::routes())
                 .merge(uploads::routes())
