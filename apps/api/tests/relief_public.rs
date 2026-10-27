@@ -11,6 +11,12 @@ async fn relief_item(pool: &PgPool, wl: Uuid, urgency: &str, needed: i32, claime
         .bind(wl).bind(needed).bind(claimed).bind(urgency).execute(pool).await.unwrap();
 }
 
+async fn relief_crowdfund(pool: &PgPool, wl: Uuid, urgency: &str, status: &str) {
+    sqlx::query("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,funding_mode,target_points,pledged_points,funding_status,funding_deadline,fulfillment_type,category,urgency)
+        VALUES($1,'發電機',1,'crowdfund',100,CASE WHEN $3='open' THEN 0 ELSE 100 END,$3::funding_status,now()+interval '7 days','concierge','other',$2)")
+        .bind(wl).bind(urgency).bind(status).execute(pool).await.unwrap();
+}
+
 async fn get(pool: &PgPool, path: &str) -> (StatusCode, Value) {
     let (s, _, v) = call(pool, "GET", path, &[], None).await;
     (s, v)
@@ -74,6 +80,8 @@ async fn event_detail_needs_summary(pool: PgPool) {
     relief_item(&pool, s.id, "critical", 5, 5).await; // 已認滿
     relief_item(&pool, s.id, "critical", 5, 2).await;
     relief_item(&pool, s.id, "low", 3, 0).await;
+    relief_crowdfund(&pool, s.id, "high", "open").await; // 未達標 → 算
+    relief_crowdfund(&pool, s.id, "high", "funded").await; // 已達標 → 不算
     let (st, v) = get(&pool, &format!("/public/relief-events/{}", e.1)).await;
     assert_eq!(st, StatusCode::OK, "{v}");
     assert_eq!(v["merged_into"], Value::Null);
@@ -81,7 +89,7 @@ async fn event_detail_needs_summary(pool: PgPool) {
     let site = &v["sites"][0];
     assert_eq!(site["slug"], s.slug.as_str());
     assert_eq!(site["org"]["display_name"], "測試協會");
-    assert_eq!(site["needs"], json!({"critical": 1, "high": 0, "medium": 0, "low": 1}), "{v}");
+    assert_eq!(site["needs"], json!({"critical": 1, "high": 1, "medium": 0, "low": 1}), "{v}");
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -138,10 +146,31 @@ async fn permit_expiry_pauses_sites_and_purges(pool: PgPool) {
         assert_eq!(ss, "paused");
         cdn.wait_for(&sl.slug).await;
     }
+    cdn.wait_for_url(&common::cdn::event_url(&e.1)).await;
     // 兩個據點、同一許可 → 只通知一次；再跑一次不重發
     assert_eq!(wishly_api::relief_events::permit_expiry_tick(&pool).await.unwrap(), 0);
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='org.permit_expired' AND user_id=$1").bind(u.id).fetch_one(&pool).await.unwrap();
     assert_eq!(n, 1);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn unverified_org_or_draft_site_not_public(pool: PgPool) {
+    let (u, o, p, e, s) = setup(&pool).await;
+    let os: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1").bind(o).fetch_one(&pool).await.unwrap();
+    // 草稿據點（另一個事件）不外洩
+    let (e2, e2s) = event(&pool, o).await;
+    site(&pool, o, u.id, e2, p, "draft").await;
+    assert_eq!(get(&pool, &format!("/public/relief-events/{e2s}")).await.1["sites"].as_array().unwrap().len(), 0);
+    let (_, v) = get(&pool, "/public/relief-events").await;
+    assert_eq!(v["events"].as_array().unwrap().len(), 1, "{v}");
+    // 繞過撤銷流程直接改成 rejected，據點仍是 active
+    sqlx::query("UPDATE organizations SET verification_status='rejected', verified_at=NULL WHERE id=$1").bind(o).execute(&pool).await.unwrap();
+    let (_, v) = get(&pool, &format!("/public/relief-events/{}", e.1)).await;
+    assert!(v["sites"].as_array().unwrap().is_empty(), "{v}");
+    assert!(get(&pool, "/public/relief-events").await.1["events"].as_array().unwrap().is_empty());
+    assert_eq!(get(&pool, &format!("/public/orgs/{os}")).await.0, StatusCode::NOT_FOUND);
+    let (_, v) = get(&pool, &format!("/public/wishlists/{}", s.slug)).await;
+    assert_eq!(v["org"]["verified"], false, "{v}");
 }
 
 #[test]

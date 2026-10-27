@@ -372,12 +372,13 @@ mod relief {
     const EVENTS_PAGE: i64 = 20;
     /// 公開可見的據點：上線、public、據點狀態 active、未下架
     const LIVE_SITE: &str = "w.type = 'relief' AND w.status = 'active' AND w.visibility = 'public' AND w.site_status = 'active'
-        AND w.deleted_at IS NULL AND w.moderation_status = 'ok'";
+        AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
+        AND EXISTS (SELECT 1 FROM organizations vo WHERE vo.id = w.org_id AND vo.verification_status = 'verified')";
 
     /// relief 清單頁多帶組織 / 事件 / 據點資訊
     pub async fn extend_site(pool: &sqlx::PgPool, id: Uuid, body: &mut Value) -> Result<(), AppError> {
         let v: Value = sqlx::query_scalar(
-            "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', true),
+            "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', o.verification_status = 'verified'),
                     'event', jsonb_build_object('slug', e.slug, 'name', e.name), 'site_address', w.site_address, 'site_status', w.site_status)
                FROM wishlists w JOIN organizations o ON o.id = w.org_id JOIN relief_events e ON e.id = w.event_id WHERE w.id = $1")
             .bind(id).fetch_one(pool).await?;
