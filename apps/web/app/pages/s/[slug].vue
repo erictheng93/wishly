@@ -52,7 +52,7 @@ if (data.value) {
   const origin = useRequestURL().origin
   useSeoMeta({
     title: () => data.value?.title,
-    ogTitle: () => t('guest.slug.ogTitle', { name: data.value?.owner?.display_name ?? t('guest.slug.friend'), title: data.value?.title }),
+    ogTitle: () => t('guest.slug.ogTitle', { name: data.value?.owner?.display_name ?? data.value?.org?.display_name ?? t('guest.slug.friend'), title: data.value?.title }),
     description: () => data.value?.description ?? undefined,
     ogDescription: () => t('guest.slug.ogDesc', { pct: data.value?.completion?.completion_pct ?? 0, left: left() }),
     // ponytail: 預設圖為靜態檔；動態 /og/{slug}.png（含清單名稱與完成度）之後再做
@@ -206,7 +206,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <img :src="coverSrc(data)" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
       <p class="g-mute">
-        <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template>{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}
+        <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
       </p>
       <p v-if="data.org" class="g-mute">
         <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>

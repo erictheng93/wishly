@@ -134,6 +134,7 @@ async fn concurrent_opposite_merges_no_deadlock(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn hide_event_pauses_sites(pool: PgPool) {
+    let cdn = common::cdn::init();
     let st = staff(&pool, "S").await;
     let u = user(&pool, "A").await;
     let o = org(&pool, u.id, "verified").await;
@@ -147,6 +148,8 @@ async fn hide_event_pauses_sites(pool: PgPool) {
     assert_eq!(s, StatusCode::OK);
     let ss: String = sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id=$1").bind(w.id).fetch_one(&pool).await.unwrap();
     assert_eq!(ss, "paused");
+    let os: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1").bind(o).fetch_one(&pool).await.unwrap();
+    cdn.wait_for_url(&common::cdn::org_url(&os)).await; // 組織頁只列上線據點
     let (s, _, _) = call(&pool, "PATCH", &path, &ck(&u.token), Some(json!({"moderation_status":"ok"}))).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }

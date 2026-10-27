@@ -223,9 +223,15 @@ async fn moderate(Staff(staff): Staff, State(st): State<AppState>, Path(id): Pat
     };
     audit(&mut *tx, staff, "relief_event.moderate", "relief_event", Some(id), json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len()})).await?;
     let ev = event_slugs(&mut *tx, &[id]).await?;
+    // 下架暫停了據點，所屬組織頁（只列上線據點）也要清
+    let orgs: Vec<String> = if hide {
+        sqlx::query_scalar("SELECT DISTINCT o.slug::text FROM organizations o JOIN wishlists w ON w.org_id = o.id WHERE w.event_id = $1 AND w.type = 'relief'")
+            .bind(id).fetch_all(&mut *tx).await?
+    } else { vec![] };
     tx.commit().await?;
     crate::cdn::purge_wishlists(slugs);
     crate::cdn::purge_events(ev);
+    orgs.into_iter().for_each(crate::cdn::purge_org);
     Ok(Json(json!({"id": id, "moderation_status": b.moderation_status})))
 }
 

@@ -50,6 +50,7 @@ onMounted(async () => {
             <CreatorStatusBadge v-if="s.site_status" :v="s.site_status" />
             <span class="c-mute">{{ s.site_address }}</span>
             <NuxtLink v-if="canEdit" :to="`/lists/${s.id}/edit`">{{ $t('org.console.edit') }}</NuxtLink>
+            <NuxtLink :to="`/orgs/${id}/sites/${s.id}/receipts`">{{ $t('org.console.receipts') }}</NuxtLink>
             <NuxtLink :to="`/s/${s.slug}`">{{ $t('org.console.publicPage') }}</NuxtLink>
           </li>
         </ul>

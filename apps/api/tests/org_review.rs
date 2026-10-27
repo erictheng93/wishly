@@ -165,6 +165,8 @@ async fn revoke_approved_permit_pauses_sites(pool: PgPool) {
     let ss: String = sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id=$1").bind(site.id).fetch_one(&pool).await.unwrap();
     assert_eq!(ss, "paused");
     cdn.wait_for(&site.slug).await;
+    let os: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1").bind(o).fetch_one(&pool).await.unwrap();
+    cdn.wait_for_url(&common::cdn::org_url(&os)).await; // 組織頁只列上線據點
     assert_eq!(org_status(&pool, o).await, "verified");
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='org.permit_revoked' AND user_id=$1").bind(owner).fetch_one(&pool).await.unwrap();
     assert_eq!(n, 1);

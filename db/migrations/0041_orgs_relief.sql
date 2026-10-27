@@ -148,14 +148,14 @@ END $$;
 CREATE TRIGGER items_relief_shape BEFORE INSERT OR UPDATE OF wishlist_id, category, urgency ON wishlist_items
   FOR EACH ROW EXECUTE FUNCTION items_relief_shape();
 
--- relief 據點上線：組織須 verified、許可須 approved 且在效期內（安全網，應用層先檢查）
+-- relief 據點上線（status 與 site_status 皆 active）：組織須 verified、許可須 approved 且在效期內（安全網，應用層先檢查）
 CREATE FUNCTION wishlists_relief_publish() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW.type = 'relief' AND NEW.status = 'active' THEN
-    -- 只在上線（INSERT / 狀態變成 active）或換許可 / 換組織時檢查；已上線的據點暫停、關閉、改其他欄位不受許可到期影響
+  IF NEW.type = 'relief' AND NEW.status = 'active' AND NEW.site_status = 'active' THEN
+    -- 只在上線（INSERT / 狀態變成 active / 由暫停 / 關閉恢復營運）或換許可 / 換組織時檢查；已上線的據點暫停、關閉、改其他欄位不受許可到期影響
     IF TG_OP = 'UPDATE' THEN
-      IF NEW.status IS NOT DISTINCT FROM OLD.status AND NEW.permit_id IS NOT DISTINCT FROM OLD.permit_id
-         AND NEW.org_id IS NOT DISTINCT FROM OLD.org_id THEN
+      IF NEW.status IS NOT DISTINCT FROM OLD.status AND NEW.site_status IS NOT DISTINCT FROM OLD.site_status
+         AND NEW.permit_id IS NOT DISTINCT FROM OLD.permit_id AND NEW.org_id IS NOT DISTINCT FROM OLD.org_id THEN
         RETURN NEW;
       END IF;
     END IF;
@@ -169,7 +169,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
-CREATE TRIGGER wishlists_relief_publish BEFORE INSERT OR UPDATE OF status, org_id, permit_id ON wishlists
+CREATE TRIGGER wishlists_relief_publish BEFORE INSERT OR UPDATE OF status, site_status, org_id, permit_id ON wishlists
   FOR EACH ROW EXECUTE FUNCTION wishlists_relief_publish();
 
 -- ---------- 收據 ----------

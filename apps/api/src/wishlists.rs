@@ -629,7 +629,8 @@ async fn update(
     }
     let exp = expected(m)?;
     let relief = w.ty == "relief";
-    let old_permit = w.permit_id;
+    let old_addr = w.site_address.clone();
+    let (old_permit, old_site_status, old_event) = (w.permit_id, w.site_status.clone(), w.event_id); // UPDATE 時比對：並行撤銷 / 下架 / 合併改過就當 stale
     apply_site_fields(&mut tx, m, &mut w, relief).await?;
     if let Some(v) = text(m, "title", 1, 100)? {
         w.title = v.unwrap_or_default();
@@ -653,6 +654,9 @@ async fn update(
         w.visibility = v.into();
     }
     if let Some(v) = boolean(m, "show_claimer_names")? {
+        if relief && v {
+            return Err(AppError::invalid("/show_claimer_names", "NOT_APPLICABLE", "救災據點不顯示捐助者姓名"));
+        }
         w.show_claimer_names = v;
     }
     if let Some(v) = int(m, "claim_ttl_hours", 1, 24 * 365)? {
@@ -703,6 +707,8 @@ async fn update(
         }
         if relief && new == "active" && w.status != "active" {
             relief_publishable(&mut tx, &w).await?;
+            // 草稿 / 關閉的據點重新上線也不可掛在已下架或已合併的事件下（鎖序 organizations → relief_events）
+            crate::org_sites::lock_event(&mut *tx, w.event_id.ok_or(AppError::NotFound)?).await?;
         }
         if new == "active" && w.status == "draft" {
             let n: i64 = sqlx::query_scalar(
@@ -742,10 +748,13 @@ async fn update(
         }
         w.status = new.into();
     }
-    // 已上線的據點換許可：新許可也要有效（暫停 / 關閉 / 改其他欄位不重驗，許可到期不該擋住收攤）
-    if relief && old_status == "active" && w.status == "active" && w.permit_id != old_permit {
+    // 已上線的據點換許可、或由暫停 / 關閉恢復營運：用 PATCH 後的許可重驗（暫停 / 關閉 / 改其他欄位不重驗，許可到期不該擋住收攤）
+    let resumed = w.site_status.as_deref() == Some("active") && old_site_status.as_deref() != Some("active");
+    if relief && old_status == "active" && w.status == "active" && (w.permit_id != old_permit || resumed) {
         relief_publishable(&mut tx, &w).await?;
     }
+    // 重開為 active 時，建立者帳號已刪除 / 停權就改記操作者，否則認捐會因查不到 owner 而 404
+    let reopening = relief && w.status == "active" && (old_status != "active" || resumed);
     // 只在「進入 active」（發佈 / 重開）時擋已過的結束時間，否則下個 tick 又被關掉；
     // 本來就 active 但已到期、尚未被背景 job 掃到的清單，編輯其他欄位照常放行（有效狀態已是 closed，捐助早被 SQL 擋住）。
     if !was_active && w.status == "active" && w.closes_at.is_some_and(|t| t <= Utc::now()) {
@@ -760,11 +769,15 @@ async fn update(
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
                  closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END, cover_preset=$15,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
-                 site_status=$16, site_address=$17, event_id=$18, permit_id=$19
-                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status")
+                 site_status=$16, site_address=$17, event_id=$18, permit_id=$19,
+                 owner_id = CASE WHEN $20::bool AND EXISTS (SELECT 1 FROM users o WHERE o.id = wishlists.owner_id AND (o.deleted_at IS NOT NULL OR o.blocked_at IS NOT NULL))
+                                 THEN $21 ELSE owner_id END
+                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status
+                   AND site_status IS NOT DISTINCT FROM $22 AND event_id IS NOT DISTINCT FROM $23")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
         .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).bind(&w.cover_preset)
-        .bind(&w.site_status).bind(&w.site_address).bind(w.event_id).bind(w.permit_id).execute(&mut *tx).await?;
+        .bind(&w.site_status).bind(&w.site_address).bind(w.event_id).bind(w.permit_id)
+        .bind(reopening).bind(u.id).bind(&old_site_status).bind(old_event).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
     }
@@ -787,6 +800,13 @@ async fn update(
             || old_shown != (w.show_claimer_names, w.surprise_mode, w.event_date))
     {
         crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
+    }
+    // 據點的公開頁與所屬事件頁（含換事件前的舊事件）會顯示營運狀態 / 地址
+    if relief && (w.site_status != old_site_status || w.site_address != old_addr || w.event_id != old_event || w.status != old_status) {
+        crate::cdn::purge_wishlists(vec![w.slug.trim().to_owned()]); // 與上面的 purge 分開寫：mutate.py 的 cdn-private 以原文唯一定位
+        let evs: Vec<Uuid> = [w.event_id, old_event].into_iter().flatten().collect();
+        let slugs: Vec<String> = sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)").bind(&evs).fetch_all(&st.pool).await.unwrap_or_default();
+        crate::cdn::purge_events(slugs);
     }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
 }

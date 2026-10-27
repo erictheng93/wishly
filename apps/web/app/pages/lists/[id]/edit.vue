@@ -23,7 +23,7 @@ const relief = computed(() => w.value?.type === 'relief')
 const receipts = ref<Record<string, any>>({}), rcpt = ref<any>(null), rcptF = reactive({ qty: 1, note: '' }), rcptBusy = ref(false), rcptErr = ref('')
 async function loadReceipts() {
   if (!relief.value) return
-  try { receipts.value = Object.fromEntries((await api(`/orgs/${w.value.org_id}/sites/${id}/receipts`)).map((r: any) => [r.item_id, r])) } catch { /* 明細失敗不擋編輯 */ }
+  try { receipts.value = Object.fromEntries((await api(`/orgs/${w.value.org_id}/sites/${id}/receipts`)).items.map((r: any) => [r.item_id, r])) } catch { /* 明細失敗不擋編輯 */ }
 }
 function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
 async function saveReceipt() {
@@ -82,7 +82,8 @@ async function patchList(body: any, ok = t('lists.edit.saved')) {
   }
 }
 async function saveMeta() {
-  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), show_claimer_names: meta.show_claimer_names, claim_ttl_hours: meta.claim_ttl_hours }
+  const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), claim_ttl_hours: meta.claim_ttl_hours }
+  if (!relief.value) body.show_claimer_names = meta.show_claimer_names
   if (!relief.value) body.visibility = meta.visibility // 救災據點的可見性由後端固定
   // 封面互斥；沒動就不送
   if (coverKey.value) Object.assign(body, { cover_image_key: coverKey.value, cover_preset: null })
@@ -207,7 +208,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <label class="c-field"><span>{{ $t('lists.edit.closes') }}</span><input v-model="meta.closes_at" type="datetime-local"></label>
           <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="coverKey" :current-url="w.cover_image_url" @busy="coverBusy = $event" />
           <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
-          <label class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
+          <label v-if="!relief" class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
           <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" v-model:users="allowed" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>

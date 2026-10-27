@@ -300,6 +300,16 @@ async fn delete_me(
           WHERE w.id = s.id RETURNING w.slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
     sqlx::query("UPDATE org_members SET disabled_at = now() WHERE user_id = $1 AND disabled_at IS NULL").bind(id).execute(&mut *tx).await?;
+    // 最後一位 owner 離開時，最早加入的有效 coordinator 升為 owner（組織不會變成無 owner；已持有 org 列鎖）
+    sqlx::query(
+        "UPDATE org_members SET role = 'owner' WHERE (org_id, user_id) IN (
+           SELECT DISTINCT ON (m.org_id) m.org_id, m.user_id FROM org_members m
+             JOIN users mu ON mu.id = m.user_id AND mu.deleted_at IS NULL AND mu.blocked_at IS NULL
+            WHERE m.org_id = ANY($1) AND m.disabled_at IS NULL AND m.role = 'coordinator'
+              AND NOT EXISTS (SELECT 1 FROM org_members o JOIN users ou ON ou.id = o.user_id AND ou.deleted_at IS NULL AND ou.blocked_at IS NULL
+                               WHERE o.org_id = m.org_id AND o.disabled_at IS NULL AND o.role = 'owner')
+            ORDER BY m.org_id, m.created_at, m.user_id)")
+        .bind(&site_orgs).execute(&mut *tx).await?;
     let closed: Vec<(Uuid, String, bool)> = sqlx::query_as(
         "WITH o AS (SELECT w.id, w.status FROM wishlists w
                      WHERE w.org_id = ANY($1) AND w.deleted_at IS NULL AND w.status IN ('draft', 'active')
