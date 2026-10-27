@@ -1,6 +1,7 @@
 //! 後台使用者生命週期、權限與稽核查詢的回歸測試。
 mod common;
 use axum::http::StatusCode;
+use common::{call, ck, staff, user, wishlist, ListOpts, TestList, TestUser};
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -798,4 +799,56 @@ async fn recovery_rechecks_email_after_waiting_for_otp_lock(pool: PgPool) {
     .unwrap();
     assert_eq!(n, 0);
     common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn blocked_owner_content_is_not_found_and_purged(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let TestUser { id: owner, .. } = user(&pool, "Owner").await;
+    let TestUser { token: staff, .. } = staff(&pool, "Staff").await;
+    sqlx::query("UPDATE users SET handle='blk_owner' WHERE id=$1")
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let TestList { slug, .. } = wishlist(&pool, owner, ListOpts::default()).await;
+    let list = format!("/public/wishlists/{slug}");
+    let patch = |blocked: bool| json!({"blocked":blocked,"reason":"abuse"});
+    assert_eq!(call(&pool, "GET", &list, &[], None).await.0, StatusCode::OK);
+    assert_eq!(
+        call(&pool, "GET", "/users/blk_owner", &[], None).await.0,
+        StatusCode::OK
+    );
+    let (s, _, r) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/users/{owner}"),
+        &ck(&staff),
+        Some(patch(true)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    cdn.wait_for(&slug).await;
+    assert_eq!(
+        call(&pool, "GET", &list, &[], None).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(&pool, "GET", "/users/blk_owner", &[], None).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (s, _, r) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/users/{owner}"),
+        &ck(&staff),
+        Some(patch(false)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(call(&pool, "GET", &list, &[], None).await.0, StatusCode::OK);
+    assert_eq!(
+        call(&pool, "GET", "/users/blk_owner", &[], None).await.0,
+        StatusCode::OK
+    );
 }

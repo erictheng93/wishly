@@ -375,7 +375,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
                 li.title AS item_title, li.image_key, li.image_status::text AS image_status, li.unit_price_amount, li.open
          FROM wishlists w
          JOIN fr ON fr.id = w.owner_id
-         JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL
+         JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
          CROSS JOIN LATERAL (
            SELECT count(*) FILTER (WHERE i.created_at > now() - interval '30 days') AS n_new, max(i.created_at) AS at, count(*) AS n,
                   COALESCE(sum({claimed}), 0)::bigint AS got,
@@ -416,7 +416,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
          FROM claims c
          JOIN wishlist_items i ON i.id = c.item_id
          JOIN wishlists w ON w.id = i.wishlist_id AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
-         JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL
+         JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
          WHERE c.user_id = $1 AND c.status = 'delivered' AND c.delivered_at > now() - interval '30 days'
          ORDER BY c.delivered_at DESC LIMIT 30")
         .bind(u.id).fetch_all(&st.pool).await?;

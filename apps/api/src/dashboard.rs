@@ -263,7 +263,8 @@ async fn events(
     let slot = SseSlot::acquire(crate::config::client_ip(&parts, &crate::config::get()))?;
     let w: Option<(Uuid, String, Uuid, String)> = sqlx::query_as(
         "SELECT id, moderation_status::text, owner_id, visibility::text FROM wishlists
-          WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')",
+          WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')
+            AND NOT EXISTS (SELECT 1 FROM users WHERE id = owner_id AND blocked_at IS NOT NULL)",
     )
     .bind(&slug)
     .fetch_optional(&st.pool)

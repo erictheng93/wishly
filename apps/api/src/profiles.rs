@@ -48,7 +48,7 @@ async fn profile(
 ) -> Result<Json<Value>, AppError> {
     let viewer = access::viewer(&parts, &st).await?;
     let (uid, name, bio, birthday, bv): (Uuid, String, Option<String>, Option<String>, String) = sqlx::query_as(
-        "SELECT id, display_name, bio, birthday, birthday_visibility::text FROM users WHERE handle = $1 AND deleted_at IS NULL",
+        "SELECT id, display_name, bio, birthday, birthday_visibility::text FROM users WHERE handle = $1 AND deleted_at IS NULL AND blocked_at IS NULL",
     )
     .bind(handle.to_lowercase())
     .fetch_optional(&st.pool)
@@ -123,7 +123,7 @@ async fn profile(
          FROM d
          JOIN wishlist_items i ON i.id = d.item_id
          JOIN wishlists w ON w.id = i.wishlist_id
-         JOIN users o ON o.id = w.owner_id
+         JOIN users o ON o.id = w.owner_id AND o.blocked_at IS NULL
          WHERE w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND (w.visibility::text = 'public'

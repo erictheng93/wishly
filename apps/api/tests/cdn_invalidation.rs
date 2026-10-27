@@ -107,3 +107,32 @@ async fn privacy_archive_and_moderation_send_cdn_purge(pool: PgPool) {
     }
     common::assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn claimer_name_visibility_change_sends_cdn_purge(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let TestUser { id: owner, token } = user(&pool, "Owner").await;
+    let TestList { id, slug } = wishlist(&pool, owner, ListOpts::default()).await;
+    // 無關欄位不清快取
+    let (s, _, r) = call(
+        &pool,
+        "PATCH",
+        &format!("/wishlists/{id}"),
+        &ck(&token),
+        Some(json!({"title":"新標題"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert!(cdn.requests_for(&slug).is_empty());
+    let (s, _, r) = call(
+        &pool,
+        "PATCH",
+        &format!("/wishlists/{id}"),
+        &ck(&token),
+        Some(json!({"show_claimer_names":true})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    cdn.wait_for(&slug).await;
+    assert_eq!(cdn.requests_for(&slug).len(), 1);
+}
