@@ -96,6 +96,23 @@
     "EXTENSION_USED": "Hạn mua chỉ có thể gia hạn một lần.",
     "SLUG_TAKEN": "Slug này đã được sử dụng. Hãy thử slug khác.",
     "REF_TAKEN": "Mã tham chiếu này đã được sử dụng. Hãy thử mã khác.",
+    "SITE_PAUSED": "Điểm này đang tạm dừng và không nhận cam kết lúc này.",
+    "SITE_CLOSED": "Điểm này đã kết thúc.",
+    "INVALID_STATE": "Hành động này không được phép ở trạng thái hiện tại. Hãy tải lại rồi thử lại.",
+    "PERMIT_REQUIRED": "Cần ít nhất một giấy phép gây quỹ đã được duyệt.",
+    "LAST_OWNER": "Tổ chức cần có ít nhất một chủ sở hữu đang hoạt động.",
+    "ORG_ROLE_REQUIRED": "Vai trò của bạn trong tổ chức không đủ quyền. Hãy liên hệ chủ sở hữu.",
+    "INVITE_EXPIRED": "Lời mời đã hết hạn hoặc bị hủy. Hãy xin lời mời mới.",
+    "ALREADY_MEMBER": "Bạn đã là thành viên của tổ chức này.",
+    "EVENT_UNAVAILABLE": "Sự kiện đã chọn không tồn tại, đã được gộp hoặc đã bị ẩn.",
+    "PERMIT_INVALID": "Giấy phép chưa được duyệt hoặc đã hết hạn.",
+    "TAX_ID_TAKEN": "Mã số thuế này đã thuộc về một tổ chức đang chờ duyệt hoặc đã được duyệt.",
+    "ORG_DRAFT_EXISTS": "Bạn đã có một tổ chức bản nháp. Hãy hoàn tất hoặc rút lại trước.",
+    "RESUBMIT_TOO_EARLY": "Chưa đến lúc nộp lại. Hãy thử lại sau.",
+    "ORG_NOT_EDITABLE": "Không thể sửa tổ chức ở trạng thái hiện tại.",
+    "DOCUMENT_IN_USE": "Tài liệu này đang được một giấy phép sử dụng nên không thể xóa.",
+    "ORG_NOT_VERIFIED": "Hành động này chỉ khả dụng sau khi tổ chức được xác minh.",
+    "EVENT_NOT_EDITABLE": "Không thể sửa sự kiện đã gộp hoặc đã bị ẩn.",
     "fields": {
       "REQUIRED": "Thông tin này là bắt buộc.",
       "FORMAT": "Vui lòng kiểm tra định dạng của giá trị này.",
@@ -126,7 +143,10 @@
       "event_date_REQUIRED": "Vui lòng đặt ngày sự kiện trong tương lai.",
       "confirm_INVALID": "Nhập DELETE để xác nhận xóa.",
       "code_FORMAT": "Nhập mã xác minh gồm sáu chữ số.",
-      "handle_FORMAT": "Dùng 3–30 chữ cái thường, chữ số hoặc dấu gạch dưới."
+      "handle_FORMAT": "Dùng 3–30 chữ cái thường, chữ số hoặc dấu gạch dưới.",
+      "TAX_ID_CHECKSUM": "Chữ số kiểm tra của mã số thuế không đúng. Vui lòng kiểm tra lại.",
+      "FIELD_LOCKED": "Hiện không thể sửa trường này.",
+      "EVENT_HIDDEN": "Không thể chọn sự kiện đã bị ẩn."
     }
   }
 }
