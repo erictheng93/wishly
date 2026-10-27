@@ -96,6 +96,23 @@
     "EXTENSION_USED": "購買期限只能延長一次",
     "SLUG_TAKEN": "這個代稱已被使用，換一個試試",
     "REF_TAKEN": "這個編號已被使用，換一個試試",
+    "SITE_PAUSED": "此據點已暫停，暫不接受認領",
+    "SITE_CLOSED": "此據點已結束，無法再操作",
+    "INVALID_STATE": "目前狀態不允許這個操作，請重新整理後再試",
+    "PERMIT_REQUIRED": "需至少一張已核准的勸募許可才能通過審核",
+    "LAST_OWNER": "組織至少需要一位有效的擁有者",
+    "ORG_ROLE_REQUIRED": "你的組織角色權限不足，請聯絡擁有者",
+    "INVITE_EXPIRED": "邀請已過期或已被取消，請向對方索取新的邀請",
+    "ALREADY_MEMBER": "你已經是此組織的成員",
+    "EVENT_UNAVAILABLE": "所選事件不存在、已合併或已下架",
+    "PERMIT_INVALID": "許可尚未核准或已過期",
+    "TAX_ID_TAKEN": "此統一編號已有申請中或已通過的組織",
+    "ORG_DRAFT_EXISTS": "你已有一份草稿組織，請先完成或撤回",
+    "RESUBMIT_TOO_EARLY": "尚未到可重新申請的時間，請稍後再試",
+    "ORG_NOT_EDITABLE": "目前狀態下無法修改組織資料",
+    "DOCUMENT_IN_USE": "此文件已被勸募許可引用，無法刪除",
+    "ORG_NOT_VERIFIED": "組織通過審核後才能執行此操作",
+    "EVENT_NOT_EDITABLE": "已合併或下架的事件無法編輯",
     "fields": {
       "REQUIRED": "此欄位必填",
       "FORMAT": "格式不正確，請檢查輸入內容",
@@ -126,7 +143,10 @@
       "event_date_REQUIRED": "請設定未來的活動日期",
       "confirm_INVALID": "請輸入 DELETE 以確認刪除",
       "code_FORMAT": "驗證碼為 6 位數字",
-      "handle_FORMAT": "帳號代號需為 3–30 碼小寫英數或底線"
+      "handle_FORMAT": "帳號代號需為 3–30 碼小寫英數或底線",
+      "TAX_ID_CHECKSUM": "統一編號檢查碼錯誤，請確認後再輸入",
+      "FIELD_LOCKED": "此欄位目前不可修改",
+      "EVENT_HIDDEN": "不可選擇已下架的事件"
     }
   }
 }

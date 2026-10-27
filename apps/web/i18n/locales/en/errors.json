@@ -96,6 +96,23 @@
     "EXTENSION_USED": "The purchase deadline can only be extended once.",
     "SLUG_TAKEN": "This slug is already in use. Try another one.",
     "REF_TAKEN": "This reference is already in use. Try another one.",
+    "SITE_PAUSED": "This site is paused and not accepting pledges right now.",
+    "SITE_CLOSED": "This site has ended.",
+    "INVALID_STATE": "This action is not allowed in the current state. Refresh and try again.",
+    "PERMIT_REQUIRED": "At least one approved fundraising permit is required.",
+    "LAST_OWNER": "The organization needs at least one active owner.",
+    "ORG_ROLE_REQUIRED": "Your organization role does not allow this. Contact an owner.",
+    "INVITE_EXPIRED": "This invitation has expired or was cancelled. Ask for a new one.",
+    "ALREADY_MEMBER": "You are already a member of this organization.",
+    "EVENT_UNAVAILABLE": "The selected event does not exist, was merged, or is hidden.",
+    "PERMIT_INVALID": "The permit is not approved yet or has expired.",
+    "TAX_ID_TAKEN": "This tax ID already belongs to a pending or approved organization.",
+    "ORG_DRAFT_EXISTS": "You already have a draft organization. Finish or withdraw it first.",
+    "RESUBMIT_TOO_EARLY": "It is too soon to resubmit. Try again later.",
+    "ORG_NOT_EDITABLE": "The organization cannot be edited in its current state.",
+    "DOCUMENT_IN_USE": "This document is used by a permit and cannot be deleted.",
+    "ORG_NOT_VERIFIED": "This action is available only after the organization is verified.",
+    "EVENT_NOT_EDITABLE": "Merged or hidden events cannot be edited.",
     "fields": {
       "REQUIRED": "This field is required.",
       "FORMAT": "Please check the format of this value.",
@@ -126,7 +143,10 @@
       "event_date_REQUIRED": "Please set a future event date.",
       "confirm_INVALID": "Enter DELETE to confirm deletion.",
       "code_FORMAT": "Enter the six-digit verification code.",
-      "handle_FORMAT": "Use 3–30 lowercase letters, numbers, or underscores."
+      "handle_FORMAT": "Use 3–30 lowercase letters, numbers, or underscores.",
+      "TAX_ID_CHECKSUM": "The tax ID check digit is wrong. Please check it.",
+      "FIELD_LOCKED": "This field cannot be changed right now.",
+      "EVENT_HIDDEN": "You cannot pick a hidden event."
     }
   }
 }
