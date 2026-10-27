@@ -86,7 +86,7 @@ NUXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAFYJ9opHhXnE6Dt_ npm run deploy
 | 本機副本 | `/var/backups/wishly/wishly-<UTC 時間>.dump`（0600，保留最近 48 份 ≈ 2 天） |
 | 異地副本 | R2 `wishly-db-backups/postgres/`；憑證在 `/etc/wishly-backup/r2.env`（0600，範本 `scripts/db-backup.r2.env.example`）。檔案不存在時只做本機備份。`postgres/` 有 Bucket Lock 30 天（不可刪、不可覆寫），第 31 天由生命週期刪除 |
 | 格式 | `pg_dump -Fc -Z zstd`：先壓縮再落地、上傳；`pg_restore` 直接讀 |
-| WAL-G | 執行檔與設定在 `/opt/wishly-backup/walg/`（`walg.env` 0400、owner 999，由 `r2.env` 轉出），以 `/walg:ro` 掛進 `db`；歸檔設定用 `ALTER SYSTEM` 寫在資料目錄（`archive_mode=on`、`archive_command='/walg/archive.sh wal-push %p'`）。R2 前綴 `wishly-db-backups/wal-g/`，zstd 壓縮，**沒有 Bucket Lock**（WAL-G 要能自行清理） |
+| WAL-G | 執行檔與設定在 `/opt/wishly-backup/walg/`，由 `scripts/walg-setup.sh` 安裝（`walg.env` 0400、owner 999，由 `r2.env` 轉出），以 `/walg:ro` 掛進 `db`；歸檔設定用 `ALTER SYSTEM` 寫在資料目錄（`archive_mode=on`、`archive_command='/walg/archive.sh wal-push %p'`）。R2 前綴 `wishly-db-backups/wal-g/`，zstd 壓縮，**沒有 Bucket Lock**（WAL-G 要能自行清理） |
 | 基底備份 | `/etc/cron.d/wishly-walg`，每日 03:47 UTC 執行 `walg-basebackup.sh`，保留 8 份，舊 WAL 一併刪除；日誌 `journalctl -t wishly-walg` |
 | 歸檔監看 | `db-backup.sh` 每小時檢查 `pg_stat_archiver`，最近一次失敗晚於成功就以錯誤結束、不 ping |
 
@@ -143,3 +143,57 @@ ssh root@<VPS>
 **收到告警時：**看失敗那次的訊息。403 = 金鑰與 WAF 規則不一致（換金鑰時兩邊要一起改）；503 = DB 連不到；000 / 52x = 伺服器或 Tunnel 掛了。
 
 **限制：**GitHub 排程常延遲 5–20 分鐘；repo 60 天沒有任何活動，排程會被自動停用（GitHub 會先寄信）。需要更即時的告警時改用 Better Stack 等專門服務。
+
+## 8. 整機恢復（VPS 掛掉或遺失）
+
+目標 RTO ≤ 1 小時（PRD），**尚未實際計時**，見 `docs/TODO.md` P0。VPS 上只有以下東西不在 repo 裡，恢復時要從別處取回：
+
+| 東西 | 來源 |
+|---|---|
+| 資料庫 | R2 `wishly-db-backups`：`wal-g/`（PITR，優先）或 `postgres/`（每小時 dump） |
+| `api` 環境變數（含 `SHIPPING_ENC_KEY`）、`db` 的 `POSTGRES_PASSWORD`、GHCR PAT | 密碼管理器 |
+| `/etc/wishly-backup/r2.env` | 密碼管理器（備份 token 的 Access Key ID／Secret） |
+| Tunnel token | Cloudflare Zero Trust → Networks → Tunnels → 既有 tunnel → 重新取得 token |
+
+步驟（每一步完成記下時間）：
+
+1. **建新 VPS**：Linode 東京、Ubuntu 24.04，放入 SSH 公鑰。記下新 IPv4。
+2. **先改 R2 token 的 IP 限制**：Cloudflare → R2 → Manage API Tokens → `wishly-db-backups-rw`，Client IP 改成新 IPv4。否則下載備份會得到 403。
+3. **主機加固**：`scp scripts/vps/*.sh root@<新IP>:/root/` 後依序執行 `ssh-harden.sh`、`firewall-install.sh`（見 checklist §2.3）。
+4. **安裝 Dokploy**：`curl -sSL https://dokploy.com/install.sh | sh`。原本是 v0.30.8，新版介面可能不同。之後只經 `ssh -L 3001:localhost:3000` 進入，先設管理員與 2FA。
+5. **備份工具**：
+   ```sh
+   mkdir -p /opt/wishly-backup /etc/wishly-backup && chmod 700 /opt/wishly-backup /etc/wishly-backup
+   # 從本機：scp scripts/db-*.sh scripts/db-reconcile.sql scripts/walg-*.sh root@<新IP>:/opt/wishly-backup/
+   # 照 §6 的方式在 VPS 上輸入金鑰，寫 /etc/wishly-backup/r2.env（0600）
+   /opt/wishly-backup/walg-setup.sh
+   ```
+6. **建 `db`（Dokploy Compose，Raw）**：專案 `wishly` → 環境 `production` → Compose `db`，內容與舊的相同（`postgis/postgis:16-3.4`、`pgdata` volume、`/opt/wishly-backup/walg:/walg:ro` 掛載、`dokploy-network`、`POSTGRES_PASSWORD` 取自密碼管理器）。**先 Deploy 一次讓 volume 建立，再 Stop**。記下新的 volume 名（`docker volume ls | grep pgdata`）與容器名。
+7. **把資料還原進 volume**（PITR 到最後；要回到特定時間點就加 `recovery_target_time`）：
+   ```sh
+   V=<新的 pgdata volume>
+   docker run --rm --user 999 -v $V:/var/lib/postgresql/data -v /opt/wishly-backup/walg:/walg:ro \
+     --entrypoint sh postgis/postgis:16-3.4 -c '
+   set -e; D=/var/lib/postgresql/data
+   find "$D" -mindepth 1 -delete
+   /walg/archive.sh backup-fetch "$D" LATEST
+   chmod 700 "$D"; touch "$D/recovery.signal"
+   echo "restore_command = '"'"'/walg/archive.sh wal-fetch %f %p'"'"'" >> "$D/postgresql.auto.conf"'
+   ```
+   在 Dokploy Start `db`。重播完會自動升格，之後在新時間線上繼續歸檔到同一個前綴（舊時間線的 WAL 不會被覆寫）。確認方式：
+   ```sh
+   D=<新的 db 容器名>
+   docker exec $D psql -U wishly -d wishly -Atc "select pg_is_in_recovery()"   # f
+   docker exec -i $D psql -U wishly -d wishly -X < /opt/wishly-backup/db-reconcile.sql
+   ```
+   WAL-G 失敗時改用 §6「真正還原到正式」的 pg_dump 流程，從 R2 `postgres/` 下載最新的 dump。
+8. **建 `api`**：Application，Provider **Docker**，`ghcr.io/erictheng93/wishly-api:latest`，在該分頁填 GHCR 憑證；環境變數照 `deploy-verification-2026-10-17.md` §4.2，值取自密碼管理器。**`DATABASE_URL` 的主機改成新的 db 容器名**。replicas 1，不發布埠。
+9. **建 `cloudflared`**（Compose，內容同舊的，填 Tunnel token）。到 Tunnel 的 Routes 把 `api.wishly.tw` 的 Service URL 改成 **新的 api App Name**：`http://<新 App Name>:8080`。
+10. **排程**：
+    ```sh
+    echo "17 * * * * root /opt/wishly-backup/db-backup.sh 2>&1 | logger -t wishly-backup" > /etc/cron.d/wishly-backup
+    echo "47 3 * * * root /opt/wishly-backup/walg-basebackup.sh 2>&1 | logger -t wishly-walg" > /etc/cron.d/wishly-walg
+    /opt/wishly-backup/walg-basebackup.sh && /opt/wishly-backup/db-backup.sh   # 新時間線的第一份基底備份
+    ```
+11. **驗證**：§1 的 `/healthz`、`/readyz`；`scripts/vps/verify-tunnel-only.sh`；手動走一次捐助；Dokploy 的 `db` compose 內容與磁碟上的檔案一致（§6 的 ⚠）。
+12. **收尾**：更新文件中的 VPS IP（本手冊、`deploy-verification`、本機 `~/.ssh/config`）；Linode 舊機若還在，確認刪除前已無需要的資料。
