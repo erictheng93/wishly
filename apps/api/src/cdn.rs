@@ -80,6 +80,21 @@ pub fn purge_wishlists(slugs: Vec<String>) {
     purge_urls(cfg, "files", urls);
 }
 
+/// 事件公開頁（GET /public/relief-events/{slug}）
+pub fn purge_events(slugs: Vec<String>) {
+    let cfg = crate::config::get();
+    let base = cfg.api_base_url.trim_end_matches('/').to_string();
+    let urls = slugs.iter().map(|s| format!("{base}/api/v1/public/relief-events/{}", s.trim())).collect();
+    purge_urls(cfg, "files", urls);
+}
+
+/// 組織公開頁（GET /public/orgs/{slug}）
+pub fn purge_org(slug: String) {
+    let cfg = crate::config::get();
+    let url = format!("{}/api/v1/public/orgs/{}", cfg.api_base_url.trim_end_matches('/'), slug.trim());
+    purge_urls(cfg, "files", vec![url]);
+}
+
 /// 在 R2 DELETE 成功或 404 後呼叫，避免清除快取後又從尚未刪除的 origin 回填。
 pub fn purge_media(keys: Vec<String>) {
     let cfg = crate::config::get();

@@ -96,6 +96,23 @@
     "EXTENSION_USED": "Batas waktu pembelian hanya bisa diperpanjang satu kali",
     "SLUG_TAKEN": "Nama pendek ini sudah dipakai, coba yang lain",
     "REF_TAKEN": "Nomor ini sudah dipakai, coba yang lain",
+    "SITE_PAUSED": "Lokasi ini dijeda dan sedang tidak menerima donasi.",
+    "SITE_CLOSED": "Lokasi ini sudah berakhir.",
+    "INVALID_STATE": "Tindakan ini tidak diizinkan pada status saat ini. Muat ulang lalu coba lagi.",
+    "PERMIT_REQUIRED": "Minimal satu izin penggalangan dana yang disetujui diperlukan.",
+    "LAST_OWNER": "Organisasi membutuhkan minimal satu pemilik aktif.",
+    "ORG_ROLE_REQUIRED": "Peran organisasi Anda tidak cukup untuk tindakan ini. Hubungi pemilik.",
+    "INVITE_EXPIRED": "Undangan sudah kedaluwarsa atau dibatalkan. Minta undangan baru.",
+    "ALREADY_MEMBER": "Anda sudah menjadi anggota organisasi ini.",
+    "EVENT_UNAVAILABLE": "Peristiwa yang dipilih tidak ada, sudah digabung, atau disembunyikan.",
+    "PERMIT_INVALID": "Izin belum disetujui atau sudah kedaluwarsa.",
+    "TAX_ID_TAKEN": "NPWP/nomor pajak ini sudah dipakai organisasi yang sedang diajukan atau disetujui.",
+    "ORG_DRAFT_EXISTS": "Anda sudah memiliki organisasi draf. Selesaikan atau tarik terlebih dahulu.",
+    "RESUBMIT_TOO_EARLY": "Belum waktunya mengajukan ulang. Coba lagi nanti.",
+    "ORG_NOT_EDITABLE": "Organisasi tidak dapat diubah pada status saat ini.",
+    "DOCUMENT_IN_USE": "Dokumen ini dipakai oleh sebuah izin dan tidak dapat dihapus.",
+    "ORG_NOT_VERIFIED": "Tindakan ini hanya tersedia setelah organisasi terverifikasi.",
+    "EVENT_NOT_EDITABLE": "Peristiwa yang digabung atau disembunyikan tidak dapat diedit.",
     "fields": {
       "REQUIRED": "Kolom ini wajib diisi",
       "FORMAT": "Format tidak benar, periksa isian",
@@ -126,7 +143,10 @@
       "event_date_REQUIRED": "Atur tanggal acara di masa depan",
       "confirm_INVALID": "Ketik DELETE untuk mengonfirmasi penghapusan",
       "code_FORMAT": "Kode verifikasi berupa 6 digit angka",
-      "handle_FORMAT": "ID akun harus 3–30 karakter huruf kecil, angka, atau garis bawah"
+      "handle_FORMAT": "ID akun harus 3–30 karakter huruf kecil, angka, atau garis bawah",
+      "TAX_ID_CHECKSUM": "Digit pemeriksa nomor pajak salah. Silakan periksa kembali.",
+      "FIELD_LOCKED": "Kolom ini tidak dapat diubah saat ini.",
+      "EVENT_HIDDEN": "Peristiwa yang disembunyikan tidak dapat dipilih."
     }
   }
 }

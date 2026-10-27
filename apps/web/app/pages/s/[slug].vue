@@ -52,7 +52,7 @@ if (data.value) {
   const origin = useRequestURL().origin
   useSeoMeta({
     title: () => data.value?.title,
-    ogTitle: () => t('guest.slug.ogTitle', { name: data.value?.owner?.display_name ?? t('guest.slug.friend'), title: data.value?.title }),
+    ogTitle: () => t('guest.slug.ogTitle', { name: data.value?.owner?.display_name ?? data.value?.org?.display_name ?? t('guest.slug.friend'), title: data.value?.title }),
     description: () => data.value?.description ?? undefined,
     ogDescription: () => t('guest.slug.ogDesc', { pct: data.value?.completion?.completion_pct ?? 0, left: left() }),
     // ponytail: 預設圖為靜態檔；動態 /og/{slug}.png（含清單名稱與完成度）之後再做
@@ -70,6 +70,7 @@ watch(data, v => { if (v) items.value = v.items })
 const isDone = (i: any) => i.funding_mode === 'crowdfund' ? deriveDisplayStatus(i) !== 'open' : i.is_fully_claimed
 const sorted = computed(() => [...items.value].sort((a, b) => Number(isDone(a)) - Number(isDone(b))))
 const pct = computed(() => data.value?.completion?.completion_pct ?? 0)
+const siteOff = computed(() => !!data.value?.site_status && data.value.site_status !== 'active') // 救災據點非 active 一律當暫停
 const closed = computed(() => data.value?.status === 'closed')
 
 // --- 線上狀態 / LINE 引導 ---
@@ -200,13 +201,19 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <div class="g-banner g-nojs">{{ $t('guest.slug.noJs') }}</div>
       <div v-if="!online" class="g-banner">{{ $t('guest.slug.offline') }}</div>
       <div v-if="lineHint" class="g-banner">{{ $t('guest.slug.lineHint') }}<button class="g-link" @click="dismissHint">{{ $t('guest.slug.gotIt') }}</button></div>
-      <div v-if="closed" class="g-banner">{{ $t('guest.slug.closed') }}</div>
+      <div v-if="data.status === 'closed'" class="g-banner">{{ $t('guest.slug.closed') }}</div>
       <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
       <img :src="coverSrc(data)" alt="" class="g-cover">
       <h1>{{ data.title }}</h1>
       <p class="g-mute">
-        <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template>{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}
+        <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
       </p>
+      <p v-if="data.org" class="g-mute">
+        <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
+        <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="`/e/${data.event.slug}`">{{ data.event.name }}</NuxtLink></template>
+      </p>
+      <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
+      <div v-if="siteOff && !closed" class="g-banner" role="status">{{ data.site_status === 'closed' ? $t('guest.relief.closedSite') : $t('guest.relief.paused') }}</div>
       <p v-if="data.description">{{ data.description }}</p>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
       <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
@@ -216,7 +223,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
-          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
+          :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>

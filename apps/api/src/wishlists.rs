@@ -152,7 +152,7 @@ pub async fn release_pledged(tx: &mut crate::points::Tx<'_>, wishlist_ids: &[Uui
 
 // ---------- 清單 ----------
 #[derive(sqlx::FromRow)]
-struct W {
+pub(crate) struct W {
     id: Uuid,
     ty: String,
     status: String,
@@ -175,15 +175,26 @@ struct W {
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     has_shipping_address: bool,
+    org_id: Option<Uuid>,
+    event_id: Option<Uuid>,
+    permit_id: Option<Uuid>,
+    site_address: Option<String>,
+    site_status: Option<String>,
+    org: Option<Value>,
 }
-const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
+pub(crate) const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
   cover_image_key, cover_image_status::text AS cover_image_status, cover_preset, event_date, show_claimer_names, surprise_mode,
   surprise_locked(surprise_mode, event_date) AS surprise_locked,
   claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, closes_at, created_at, updated_at,
-  EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address";
+  EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address,
+  org_id, event_id, permit_id, site_address, site_status,
+  (SELECT jsonb_build_object('id', o.id, 'slug', o.slug::text, 'display_name', o.display_name) FROM organizations o WHERE o.id = wishlists.org_id) AS org";
+
+/// 擁有權謂詞（綁定 $2 = 使用者）：個人清單看 owner_id（保留 owner 索引），組織據點看 org_members 的角色與 disabled_at。
+const MANAGE: &str = "((org_id IS NULL AND owner_id=$2) OR (org_id IS NOT NULL AND can_manage_wishlist(owner_id, org_id, $2)))";
 
 impl W {
-    fn json(&self) -> Value {
+    pub(crate) fn json(&self) -> Value {
         let img = uploads::S3::get();
         json!({
             "id": self.id, "type": self.ty, "status": self.status, "visibility": self.visibility, "slug": self.slug,
@@ -193,15 +204,17 @@ impl W {
             "show_claimer_names": self.show_claimer_names, "surprise_mode": self.surprise_mode, "surprise_locked": self.surprise_locked,
             "claim_ttl_hours": self.claim_ttl_hours, "moderation_status": self.moderation_status,
             "moderation_reason": self.moderation_reason, "moderated_at": self.moderated_at, "closes_at": self.closes_at,
-            "has_shipping_address": self.has_shipping_address, "org_id": null, "location": null, "address": null, "site_status": null,
+            "has_shipping_address": self.has_shipping_address, "location": null, "address": null,
+            "org_id": self.org_id, "event_id": self.event_id, "permit_id": self.permit_id, "site_address": self.site_address,
+            "site_status": self.site_status, "org": self.org,
             "share_url": format!("{}/s/{}", app_url(), self.slug), "created_at": self.created_at, "updated_at": self.updated_at,
         })
     }
 }
 
-async fn load_owned(pool: impl sqlx::PgExecutor<'_>, id: Uuid, user: Uuid) -> R<W> {
+pub(crate) async fn load_owned(pool: impl sqlx::PgExecutor<'_>, id: Uuid, user: Uuid) -> R<W> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {WCOLS} FROM wishlists WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL"
+        "SELECT {WCOLS} FROM wishlists WHERE id=$1 AND {MANAGE} AND deleted_at IS NULL"
     )))
     .bind(id)
     .bind(user)
@@ -210,7 +223,7 @@ async fn load_owned(pool: impl sqlx::PgExecutor<'_>, id: Uuid, user: Uuid) -> R<
     .ok_or(AppError::NotFound)
 }
 
-fn new_slug() -> String {
+pub(crate) fn new_slug() -> String {
     const A: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     let mut r = rand::thread_rng();
     (0..10)
@@ -482,7 +495,7 @@ async fn list(
         ),
     };
     let rows: Vec<W> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {WCOLS} FROM wishlists WHERE owner_id=$1 AND deleted_at IS NULL AND ($2::uuid IS NULL OR id < $2)
+        "SELECT {WCOLS} FROM wishlists WHERE owner_id=$1 AND org_id IS NULL AND deleted_at IS NULL AND ($2::uuid IS NULL OR id < $2)
          AND ($3::text[] IS NULL OR status::text = ANY($3)) AND ($4::text IS NULL OR type::text=$4) ORDER BY id DESC LIMIT $5")))
         .bind(u.id).bind(after).bind(&status).bind(&q.ty).bind(limit + 1).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > limit;
@@ -536,11 +549,15 @@ struct I {
     price_snapshot_amount: Option<i64>,
     expired_at: Option<DateTime<Utc>>,
     order_status: Option<String>,
+    category: Option<String>,
+    urgency: Option<String>,
+    qty_received: i64,
 }
 const ICOLS: &str = "id, wishlist_id, title, description, brand, spec, image_key, image_status::text AS image_status, product_url, unit_price_amount,
   funding_mode::text AS funding_mode, priority::text AS priority, qty_needed, qty_claimed, sort_order, created_at, updated_at,
   target_points, pledged_points, funding_status::text AS funding_status, funding_deadline, fulfillment_type::text AS fulfillment_type,
-  price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status";
+  price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status,
+  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received";
 
 impl I {
     fn json(&self, locked: bool) -> Value {
@@ -549,8 +566,8 @@ impl I {
             "id": self.id, "wishlist_id": self.wishlist_id, "title": self.title, "description": self.description, "brand": self.brand, "spec": self.spec,
             "image_url": self.image_key.as_ref().filter(|_| self.image_status == "ready").map(|k| uploads::S3::get().public_url(k)),
             "image_status": self.image_status, "product_url": self.product_url, "unit_price_amount": self.unit_price_amount,
-            "funding_mode": self.funding_mode, "priority": self.priority, "category": null, "urgency": null,
-            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": 0,
+            "funding_mode": self.funding_mode, "priority": self.priority, "category": self.category, "urgency": self.urgency,
+            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": self.qty_received,
             // 眾籌欄位：驚喜鎖定時 pledged_points / funding_status / display_status / order_status 一律 null（否則可由「已達標」推知有人捐）
             "target_points": self.target_points, "pledged_points": if cf && !locked { Some(self.pledged_points) } else { None },
             "funding_status": self.funding_status.as_ref().filter(|_| !locked),
@@ -611,6 +628,10 @@ async fn update(
         }
     }
     let exp = expected(m)?;
+    let relief = w.ty == "relief";
+    let old_addr = w.site_address.clone();
+    let (old_permit, old_site_status, old_event) = (w.permit_id, w.site_status.clone(), w.event_id); // UPDATE 時比對：並行撤銷 / 下架 / 合併改過就當 stale
+    apply_site_fields(&mut tx, m, &mut w, relief).await?;
     if let Some(v) = text(m, "title", 1, 100)? {
         w.title = v.unwrap_or_default();
     }
@@ -633,6 +654,9 @@ async fn update(
         w.visibility = v.into();
     }
     if let Some(v) = boolean(m, "show_claimer_names")? {
+        if relief && v {
+            return Err(AppError::invalid("/show_claimer_names", "NOT_APPLICABLE", "救災據點不顯示捐助者姓名"));
+        }
         w.show_claimer_names = v;
     }
     if let Some(v) = int(m, "claim_ttl_hours", 1, 24 * 365)? {
@@ -681,6 +705,11 @@ async fn update(
                 &format!("不能從 {} 變更為 {new}", w.status),
             ));
         }
+        if relief && new == "active" && w.status != "active" {
+            relief_publishable(&mut tx, &w).await?;
+            // 草稿 / 關閉的據點重新上線也不可掛在已下架或已合併的事件下（鎖序 organizations → relief_events）
+            crate::org_sites::lock_event(&mut *tx, w.event_id.ok_or(AppError::NotFound)?).await?;
+        }
         if new == "active" && w.status == "draft" {
             let n: i64 = sqlx::query_scalar(
                 "SELECT count(*) FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL",
@@ -719,6 +748,13 @@ async fn update(
         }
         w.status = new.into();
     }
+    // 已上線的據點換許可、或由暫停 / 關閉恢復營運：用 PATCH 後的許可重驗（暫停 / 關閉 / 改其他欄位不重驗，許可到期不該擋住收攤）
+    let resumed = w.site_status.as_deref() == Some("active") && old_site_status.as_deref() != Some("active");
+    if relief && old_status == "active" && w.status == "active" && (w.permit_id != old_permit || resumed) {
+        relief_publishable(&mut tx, &w).await?;
+    }
+    // 重開為 active 時，建立者帳號已刪除 / 停權就改記操作者，否則認捐會因查不到 owner 而 404
+    let reopening = relief && w.status == "active" && (old_status != "active" || resumed);
     // 只在「進入 active」（發佈 / 重開）時擋已過的結束時間，否則下個 tick 又被關掉；
     // 本來就 active 但已到期、尚未被背景 job 掃到的清單，編輯其他欄位照常放行（有效狀態已是 closed，捐助早被 SQL 擋住）。
     if !was_active && w.status == "active" && w.closes_at.is_some_and(|t| t <= Utc::now()) {
@@ -732,12 +768,23 @@ async fn update(
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
                  closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END, cover_preset=$15,
-                 closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END
-                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status")
+                 closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
+                 site_status=$16, site_address=$17, event_id=$18, permit_id=$19,
+                 owner_id = CASE WHEN $20::bool AND EXISTS (SELECT 1 FROM users o WHERE o.id = wishlists.owner_id AND (o.deleted_at IS NOT NULL OR o.blocked_at IS NOT NULL))
+                                 THEN $21 ELSE owner_id END
+                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status
+                   AND site_status IS NOT DISTINCT FROM $22 AND event_id IS NOT DISTINCT FROM $23")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
-        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).bind(&w.cover_preset).execute(&mut *tx).await?;
+        .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).bind(&w.cover_preset)
+        .bind(&w.site_status).bind(&w.site_address).bind(w.event_id).bind(w.permit_id)
+        .bind(reopening).bind(u.id).bind(&old_site_status).bind(old_event).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
+    }
+    if relief && m.contains_key("site_address") {
+        // 收件地址 = 據點地址：眾籌採購讀 shipping_addresses，兩邊要一致
+        sqlx::query("UPDATE shipping_addresses SET address_enc = $2 WHERE wishlist_id = $1")
+            .bind(id).bind(crate::sealed::seal(w.site_address.as_deref().unwrap_or_default().as_bytes())).execute(&mut *tx).await?;
     }
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;
@@ -754,7 +801,79 @@ async fn update(
     {
         crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     }
+    // 據點的公開頁與所屬事件頁（含換事件前的舊事件）會顯示營運狀態 / 地址
+    if relief && (w.site_status != old_site_status || w.site_address != old_addr || w.event_id != old_event || w.status != old_status) {
+        crate::cdn::purge_wishlists(vec![w.slug.trim().to_owned()]); // 與上面的 purge 分開寫：mutate.py 的 cdn-private 以原文唯一定位
+        let evs: Vec<Uuid> = [w.event_id, old_event].into_iter().flatten().collect();
+        let slugs: Vec<String> = sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)").bind(&evs).fetch_all(&st.pool).await.unwrap_or_default();
+        crate::cdn::purge_events(slugs);
+    }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
+}
+
+/// relief 據點的 PATCH 欄位：type / visibility / org_id 不可改；site_status / site_address / event_id / permit_id 可改（非 relief 不接受）。
+async fn apply_site_fields(tx: &mut crate::points::Tx<'_>, m: &Map<String, Value>, w: &mut W, relief: bool) -> R<()> {
+    const SITE: [&str; 4] = ["site_status", "site_address", "event_id", "permit_id"];
+    if !relief {
+        return match SITE.iter().find(|k| m.contains_key(**k)) {
+            Some(k) => Err(AppError::invalid(&format!("/{k}"), "NOT_APPLICABLE", "只有救災據點可設定此欄位")),
+            None => Ok(()),
+        };
+    }
+    let fixed = [("type", json!(w.ty)), ("visibility", json!(w.visibility)), ("org_id", json!(w.org_id))];
+    if let Some((k, _)) = fixed.iter().find(|(k, cur)| m.get(*k).is_some_and(|v| v != cur)) {
+        return Err(AppError::invalid(&format!("/{k}"), "IMMUTABLE", "救災據點的此欄位不可修改"));
+    }
+    let new_status = one_of(m, "site_status", &["active", "paused", "closed"])?;
+    // 恢復營運（非 active → active）：事件被下架時不可由組織自行恢復（下架會暫停據點）
+    let resuming = new_status == Some("active") && w.site_status.as_deref() != Some("active");
+    if let Some(v) = new_status {
+        w.site_status = Some(v.into());
+    }
+    if let Some(v) = text(m, "site_address", 5, 200)? {
+        w.site_address = Some(v.ok_or_else(|| AppError::invalid("/site_address", "REQUIRED", "site_address 不可為空"))?);
+    }
+    let uuid = |k: &str| -> R<Option<Uuid>> {
+        match m.get(k) {
+            None => Ok(None),
+            Some(Value::String(s)) => s.parse().map(Some).map_err(|_| AppError::invalid(&format!("/{k}"), "FORMAT", "須為 UUID")),
+            _ => Err(AppError::invalid(&format!("/{k}"), "TYPE", "須為 UUID 字串")),
+        }
+    };
+    if let Some(p) = uuid("permit_id")? {
+        let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM org_permits WHERE id = $1 AND org_id = $2)")
+            .bind(p).bind(w.org_id).fetch_one(&mut **tx).await?;
+        if !ok {
+            return Err(AppError::invalid("/permit_id", "INVALID", "許可不屬於此組織"));
+        }
+        w.permit_id = Some(p);
+    }
+    let new_event = uuid("event_id")?;
+    if new_event.is_some() || resuming {
+        // 鎖序 organizations → relief_events → wishlists（與上線檢查、事件合併一致）
+        sqlx::query("SELECT id FROM organizations WHERE id = $1 FOR SHARE").bind(w.org_id).fetch_optional(&mut **tx).await?;
+        let e = new_event.or(w.event_id).ok_or(AppError::NotFound)?;
+        crate::org_sites::lock_event(&mut **tx, e).await?;
+        w.event_id = Some(e);
+    }
+    Ok(())
+}
+
+/// 據點上線（含重開）的應用層檢查：組織須 verified（403）、許可須 approved 且今天（台北）在效期內（409）。DB trigger 為安全網。
+async fn relief_publishable(tx: &mut crate::points::Tx<'_>, w: &W) -> R<()> {
+    let verified: bool = sqlx::query_scalar("SELECT verification_status = 'verified' FROM organizations WHERE id = $1 FOR SHARE") // 鎖序 organizations → wishlists：與撤銷驗證互斥
+        .bind(w.org_id).fetch_optional(&mut **tx).await?.unwrap_or(false);
+    if !verified {
+        return Err(AppError::problem(403, "ORG_NOT_VERIFIED", "組織尚未通過審核，據點不能上線。"));
+    }
+    let valid: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM org_permits WHERE id = $1 AND org_id = $2 AND status = 'approved'
+                        AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN valid_from AND valid_to)")
+        .bind(w.permit_id).bind(w.org_id).fetch_one(&mut **tx).await?;
+    if !valid {
+        return Err(AppError::problem(409, "PERMIT_INVALID", "許可未核准或已過期，據點不能上線。"));
+    }
+    Ok(())
 }
 
 /// closes_at 到期 → active 轉 closed（同手動關閉；冪等，多實例安全）。捐助 / 認捐路徑另外即時檢查 closes_at，這裡只負責狀態與快取。
@@ -1059,6 +1178,9 @@ async fn address_put(
 ) -> R<Json<Value>> {
     let m = obj(&b)?;
     let w = load_owned(&st.pool, id, u.id).await?;
+    if w.ty == "relief" {
+        return Err(AppError::invalid("/type", "NOT_APPLICABLE", "救災據點的收件地址請改用 PATCH site_address"));
+    }
     if matches!(w.status.as_str(), "closed" | "archived") {
         return Err(closed());
     }
@@ -1072,21 +1194,32 @@ async fn address_put(
         req("phone", 6, 20)?,
         req("address", 5, 200)?,
     );
+    check_phone(&phone, "/phone")?;
+    save_address(&st.pool, id, &name, &phone, &addr).await?;
+    Ok(Json(masked(&name, &phone, &addr)))
+}
+
+/// 電話只允許數字、+、-、空白（address_put 與據點建立共用）
+pub(crate) fn check_phone(phone: &str, pointer: &str) -> R<()> {
     if !phone
         .chars()
         .all(|c| c.is_ascii_digit() || matches!(c, '+' | '-' | ' '))
     {
         return Err(AppError::invalid(
-            "/phone",
+            pointer,
             "FORMAT",
             "電話只能包含數字、+、- 與空白",
         ));
     }
+    Ok(())
+}
+/// 收件資訊欄位級加密後 upsert（address_put 與據點建立共用，眾籌 capture_and_order 讀同一張表）
+pub(crate) async fn save_address(ex: impl sqlx::PgExecutor<'_>, id: Uuid, name: &str, phone: &str, addr: &str) -> R<()> {
     sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $3, $4)
                  ON CONFLICT (wishlist_id) DO UPDATE SET recipient_name_enc = EXCLUDED.recipient_name_enc, phone_enc = EXCLUDED.phone_enc, address_enc = EXCLUDED.address_enc")
         .bind(id).bind(crate::sealed::seal(name.as_bytes())).bind(crate::sealed::seal(phone.as_bytes())).bind(crate::sealed::seal(addr.as_bytes()))
-        .execute(&st.pool).await?;
-    Ok(Json(masked(&name, &phone, &addr)))
+        .execute(ex).await?;
+    Ok(())
 }
 
 // ---------- 品項 handlers ----------
@@ -1232,6 +1365,26 @@ async fn init_crowdfund(
     Ok(())
 }
 
+/// relief 品項 category / urgency 必填（建立時），其餘清單不接受；在 app 層擋下，避免落到 trigger 回 500。
+fn apply_relief(m: &Map<String, Value>, i: &mut I, relief: bool, create: bool) -> R<()> {
+    const CAT: &[&str] = &["water", "food", "medical", "hygiene", "shelter", "clothing", "baby", "other"];
+    const URG: &[&str] = &["critical", "high", "medium", "low"];
+    for (k, allowed, slot) in [("category", CAT, &mut i.category), ("urgency", URG, &mut i.urgency)] {
+        if !relief {
+            if m.contains_key(k) {
+                return Err(AppError::invalid(&format!("/{k}"), "NOT_APPLICABLE", &format!("只有救災據點的品項可設定 {k}")));
+            }
+        } else if m.get(k).is_some_and(Value::is_null) {
+            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填，不可清空")));
+        } else if let Some(v) = one_of(m, k, allowed)? {
+            *slot = Some(v.into());
+        } else if create {
+            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")));
+        }
+    }
+    Ok(())
+}
+
 async fn item_create(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -1274,8 +1427,12 @@ async fn item_create(
         price_snapshot_amount: None,
         expired_at: None,
         order_status: None,
+        category: None,
+        urgency: None,
+        qty_received: 0,
     };
     apply_item(m, &mut i)?;
+    apply_relief(m, &mut i, w.ty == "relief", true)?;
     // 僅建立時可帶；PATCH 不處理（沿用 apply_item 外的欄位即忽略）
     let catalog_ref = text(m, "catalog_ref", 0, 64)?.flatten();
     if catalog_ref
@@ -1294,13 +1451,13 @@ async fn item_create(
     uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, description, brand, spec, image_key, image_status, product_url, unit_price_amount, priority, qty_needed, sort_order,
-                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref)
+                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref, category, urgency)
          VALUES ($1,$2,$3,$4,$5,$6,$7::image_status,$8,$9,$10::item_priority,$11,
                  (SELECT coalesce(max(sort_order),0)+10 FROM wishlist_items WHERE wishlist_id=$1),
-                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18) RETURNING id")
+                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20) RETURNING id")
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency)
         .fetch_one(&mut *tx).await?;
     tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
@@ -1315,7 +1472,7 @@ async fn item_create(
 /// 取得擁有者的品項及其清單狀態
 async fn owned_item(pool: &PgPool, item: Uuid, user: Uuid) -> R<(I, String, bool)> {
     let i: Option<I> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL AND wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$2 AND deleted_at IS NULL)")))
+        "SELECT {ICOLS} FROM wishlist_items WHERE id=$1 AND deleted_at IS NULL AND wishlist_id IN (SELECT id FROM wishlists WHERE {MANAGE} AND deleted_at IS NULL)")))
         .bind(item).bind(user).fetch_optional(pool).await?;
     let i = i.ok_or(AppError::NotFound)?;
     let w = load_owned(pool, i.wishlist_id, user).await?;
@@ -1429,8 +1586,8 @@ async fn item_update(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
-    let event: Option<NaiveDate> =
-        sqlx::query_scalar("SELECT event_date FROM wishlists WHERE id=$1")
+    let (event, ty): (Option<NaiveDate>, String) =
+        sqlx::query_as("SELECT event_date, type::text FROM wishlists WHERE id=$1")
             .bind(i.wishlist_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -1466,6 +1623,7 @@ async fn item_update(
     let seen = visible(&i);
     let frozen = i.funding_mode == "crowdfund" && i.funding_status.as_deref() != Some("open");
     apply_item(m, &mut i)?;
+    apply_relief(m, &mut i, ty == "relief", false)?;
     apply_funding(&mut tx, m, &mut i, event, locked).await?;
     // 契約：眾籌品項 funded 之後唯讀；後台採購單即時讀這些欄位，不可事後改商品。同值重送不算修改。
     if frozen && product(&i) != before {
@@ -1484,11 +1642,11 @@ async fn item_update(
     // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與捐助競爭
     let res = sqlx::query("UPDATE wishlist_items SET content_changed_at = CASE WHEN $19 THEN now() ELSE content_changed_at END, title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
                  unit_price_amount=$9, priority=$10::item_priority, qty_needed=$11, funding_mode=$13::funding_mode, target_points=$14,
-                 funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18
+                 funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18, category=$20, urgency=$21
                  WHERE id=$1 AND qty_claimed <= $11 AND ($12::timestamptz IS NULL OR updated_at=$12)")
         .bind(id).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status).bind(&i.product_url)
         .bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed).bind(exp)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(changed)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(changed).bind(&i.category).bind(&i.urgency)
         .execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         let cur: Option<(DateTime<Utc>, i32)> = sqlx::query_as(
@@ -1672,12 +1830,20 @@ async fn allowed_list(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
     ))
 }
 
+/// 據點恆為 public，沒有指定名單
+fn no_relief(w: &W) -> R<()> {
+    if w.ty == "relief" {
+        return Err(AppError::invalid("/type", "NOT_APPLICABLE", "救災據點沒有指定名單"));
+    }
+    Ok(())
+}
+
 async fn allowed_get(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
-    load_owned(&st.pool, id, u.id).await?;
+    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
     allowed_list(&st.pool, id).await
 }
 
@@ -1687,7 +1853,7 @@ async fn allowed_put(
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {
-    load_owned(&st.pool, id, u.id).await?;
+    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
     let mut ids: Vec<Uuid> = obj(&b)?
         .get("user_ids")
         .and_then(|v| serde_json::from_value(v.clone()).ok())

@@ -17,11 +17,17 @@ pub mod idempotency;
 pub mod identities;
 pub mod inspire;
 pub mod notify;
+pub mod org_admin;
+pub mod org_sites;
 pub mod orders;
+pub mod org_members;
+pub mod org_receipts;
+pub mod orgs;
 pub mod points;
 pub mod profiles;
 pub mod public;
 pub mod ratelimit;
+pub mod relief_events;
 pub mod reports;
 pub mod sealed;
 pub mod security;
@@ -68,6 +74,12 @@ pub fn app(state: AppState) -> Router {
                 .merge(reports::routes())
                 .merge(admin::routes())
                 .merge(orders::routes())
+                .merge(orgs::routes())
+                .merge(org_admin::routes())
+                .merge(org_members::routes())
+                .merge(org_receipts::routes())
+                .merge(relief_events::routes())
+                .merge(org_sites::routes())
                 .merge(account::routes())
                 .merge(wishlists::routes())
                 .merge(uploads::routes())

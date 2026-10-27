@@ -215,10 +215,12 @@ async fn create(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(AppError::NotFound)?;
-        sqlx::query("SELECT id FROM wishlists WHERE id = $1 FOR SHARE")
-            .bind(wid)
-            .execute(&mut *tx)
-            .await?;
+        let site: Option<String> =
+            sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id = $1 FOR SHARE")
+                .bind(wid)
+                .fetch_one(&mut *tx)
+                .await?;
+        site_gate(site.as_deref())?;
     }
     // 4.1 (b)：條件式 UPDATE 取得 item row lock 並驗證剩餘量。
     // 偏差：加 moderation_status='ok' 與 visibility<>'private'，下架/私人清單不可捐助。
@@ -284,6 +286,15 @@ async fn create(
 }
 
 /// 4.1 (d)：失敗歸因（rollback 後獨立查詢）
+/// 救災據點暫停 / 結束時不接受新認捐（非據點的 site_status 為 NULL）。
+pub(crate) fn site_gate(s: Option<&str>) -> Result<(), AppError> {
+    match s {
+        Some("paused") => Err(AppError::problem(409, "SITE_PAUSED", "此據點已暫停，暫不接受認領")),
+        Some("closed") => Err(AppError::problem(409, "SITE_CLOSED", "此據點已結束，不再接受認領")),
+        _ => Ok(()),
+    }
+}
+
 async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, AppError> {
     let r: Option<(bool, String, String, String, String, i32)> = sqlx::query_as(
         "SELECT (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), CASE WHEN w.status = 'active' AND w.closes_at <= now() THEN 'closed' ELSE w.status::text END, w.visibility::text, w.moderation_status::text,
@@ -442,23 +453,24 @@ async fn apply(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(AppError::NotFound)?;
-    let (needed, claimed, wl_status, owner_id, locked, vis, hidden, gone, past_due): (
+    let (needed, claimed, wl_status, can_manage, locked, vis, hidden, gone, past_due, site): (
         i32,
         i32,
         String,
-        Uuid,
+        bool,
         bool,
         String,
         bool,
         bool,
         bool,
+        Option<String>,
     ) = sqlx::query_as(
-        "SELECT i.qty_needed, i.qty_claimed, w.status::text, w.owner_id,
+        "SELECT i.qty_needed, i.qty_claimed, w.status::text, COALESCE(can_manage_wishlist(w.owner_id, w.org_id, $2), false),
                 surprise_locked(w.surprise_mode, w.event_date),
                 w.visibility::text, w.moderation_status::text = 'hidden',
-                (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now())
+                (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now()), w.site_status
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
-         WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).fetch_one(&mut *tx).await?;
+         WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).bind(match actor { Actor::User(u) => Some(u), Actor::Guest(_) => None }).fetch_one(&mut *tx).await?;
     let (guest_id, user_id, cur, old_qty): (Option<Uuid>, Option<Uuid>, String, i32) =
         sqlx::query_as(
             "SELECT guest_id, user_id, status::text, qty FROM claims WHERE id = $1 FOR UPDATE",
@@ -472,7 +484,8 @@ async fn apply(
         Actor::User(u) => user_id == Some(u) || (guest_id.is_some() && guest_id == legacy),
     };
     // 清單擁有者（F5）：只能推進 delivered 或取消；驚喜鎖定期間看不到捐助，一律禁止
-    let by_owner = !mine && matches!(actor, Actor::User(u) if u == owner_id);
+    let by_owner = !mine && can_manage; // 個人清單 = owner；組織據點 = 未停用的 owner / coordinator
+
     // 非本人一律 404，不洩漏捐助存在（F5）
     if !mine && !by_owner {
         return Err(AppError::NotFound);
@@ -589,6 +602,7 @@ async fn apply(
                     "此清單已結束，不再接受認領",
                 ));
             }
+            site_gate(site.as_deref())?;
             access?;
         }
         if delta != 0 {

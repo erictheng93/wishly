@@ -391,6 +391,18 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         );
     }
+    if kind == "org.invite" {
+        let (org, url) = (payload["org_display_name"].as_str().unwrap_or(""), payload["url"].as_str().unwrap_or(&app));
+        return (
+            l.pick(format!("【Wishly】邀請你加入「{org}」"), format!("[Wishly] You're invited to join \"{org}\""), format!("[Wishly] Bạn được mời tham gia \"{org}\""), format!("[Wishly] Kamu diundang bergabung dengan \"{org}\"")),
+            l.pick(
+                format!("「{org}」邀請你加入組織。\n請用此 Email 登入後接受邀請（7 天內有效）：{url}\n"),
+                format!("\"{org}\" has invited you to join the organization.\nSign in with this email and accept within 7 days: {url}\n"),
+                format!("\"{org}\" mời bạn tham gia tổ chức.\nHãy đăng nhập bằng email này và chấp nhận trong 7 ngày: {url}\n"),
+                format!("\"{org}\" mengundangmu bergabung dengan organisasi.\nMasuk dengan email ini dan terima dalam 7 hari: {url}\n"),
+            ),
+        );
+    }
     if matches!(kind, "auth.identity_linked" | "auth.identity_unlinked") {
         let linked = kind == "auth.identity_linked";
         let provider = match payload["provider"].as_str() {
@@ -415,6 +427,54 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("The {provider} sign-in method was {action_en} on your account.\nIf this wasn't you, check your account settings and reset your password right away.\nAccount settings: {app}/settings\nThis is an account security notice."),
                 format!("Phương thức đăng nhập {provider} đã được {action_vi} cho tài khoản của bạn.\nNếu không phải bạn thực hiện, hãy kiểm tra cài đặt tài khoản và đặt lại mật khẩu ngay.\nCài đặt tài khoản: {app}/settings\nĐây là thông báo bảo mật tài khoản."),
                 format!("Metode masuk {provider} sudah {action_id} di akun kamu.\nKalau bukan kamu yang melakukannya, segera periksa pengaturan akun dan atur ulang kata sandi.\nPengaturan akun: {app}/settings\nIni adalah pemberitahuan keamanan akun."),
+            ),
+        );
+    }
+    if kind == "org.permit_revoked" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let no = payload["permit_no"].as_str().unwrap_or("");
+        let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");
+        return (
+            l.pick(format!("【Wishly】勸募許可 {no} 已撤銷"), format!("[Wishly] Fundraising permit {no} revoked"), format!("[Wishly] Giấy phép gây quỹ {no} đã bị thu hồi"), format!("[Wishly] Izin penggalangan dana {no} dicabut")),
+            l.pick(
+                format!("組織「{name}」的勸募許可 {no} 已被撤銷，使用此許可的救災據點已暫停。\n備註：{note}\n組織頁面：{app}/org/apply\n"),
+                format!("The fundraising permit {no} of \"{name}\" has been revoked, and relief sites using it are paused.\nNote: {note}\nOrganization page: {app}/org/apply\n"),
+                format!("Giấy phép gây quỹ {no} của \"{name}\" đã bị thu hồi, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nGhi chú: {note}\nTrang tổ chức: {app}/org/apply\n"),
+                format!("Izin penggalangan dana {no} milik \"{name}\" dicabut, dan lokasi bantuan yang memakainya dijeda.\nCatatan: {note}\nHalaman organisasi: {app}/org/apply\n"),
+            ),
+        );
+    }
+    if kind == "org.permit_expired" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let no = payload["permit_no"].as_str().unwrap_or("");
+        let url = format!("{app}/orgs/{}", payload["org_id"].as_str().unwrap_or(""));
+        return (
+            l.pick(format!("【Wishly】勸募許可 {no} 已到期"), format!("[Wishly] Fundraising permit {no} expired"), format!("[Wishly] Giấy phép gây quỹ {no} đã hết hạn"), format!("[Wishly] Izin penggalangan dana {no} kedaluwarsa")),
+            l.pick(
+                format!("組織「{name}」的勸募許可 {no} 已到期，使用此許可的救災據點已暫停。\n請上傳新的許可並送審後再恢復據點。\n組織頁面：{url}\n"),
+                format!("The fundraising permit {no} of \"{name}\" has expired, and relief sites using it are paused.\nSubmit a new permit for review, then resume your sites.\nOrganization page: {url}\n"),
+                format!("Giấy phép gây quỹ {no} của \"{name}\" đã hết hạn, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nHãy gửi giấy phép mới để xét duyệt rồi mở lại các điểm.\nTrang tổ chức: {url}\n"),
+                format!("Izin penggalangan dana {no} milik \"{name}\" kedaluwarsa, dan lokasi bantuan yang memakainya dijeda.\nAjukan izin baru untuk ditinjau, lalu lanjutkan lokasi.\nHalaman organisasi: {url}\n"),
+            ),
+        );
+    }
+    if kind == "org.review" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");
+        let d = payload["decision"].as_str().unwrap_or("");
+        let (zh, en, vi, id) = match d {
+            "verified" => ("已通過審核", "has been approved", "đã được duyệt", "telah disetujui"),
+            "needs_changes" => ("需要補件或修正", "needs changes", "cần bổ sung hoặc chỉnh sửa", "perlu perbaikan"),
+            _ if payload["revoked"].as_bool() == Some(true) => ("驗證已撤銷", "verification has been revoked", "đã bị thu hồi xác minh", "verifikasinya dicabut"),
+            _ => ("未通過審核", "was not approved", "không được duyệt", "tidak disetujui"),
+        };
+        return (
+            l.pick(format!("【Wishly】組織「{name}」{zh}"), format!("[Wishly] Organization \"{name}\" {en}"), format!("[Wishly] Tổ chức \"{name}\" {vi}"), format!("[Wishly] Organisasi \"{name}\" {id}")),
+            l.pick(
+                format!("你的組織「{name}」{zh}。\n審核備註：{note}\n組織申請頁面：{app}/org/apply\n"),
+                format!("Your organization \"{name}\" {en}.\nReview note: {note}\nOrganization application: {app}/org/apply\n"),
+                format!("Tổ chức \"{name}\" của bạn {vi}.\nGhi chú xét duyệt: {note}\nTrang đăng ký tổ chức: {app}/org/apply\n"),
+                format!("Organisasi \"{name}\" kamu {id}.\nCatatan peninjauan: {note}\nHalaman pendaftaran organisasi: {app}/org/apply\n"),
             ),
         );
     }

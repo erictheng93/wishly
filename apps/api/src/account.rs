@@ -131,7 +131,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
            'items', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', i.id, 'title', i.title, 'qty_needed', i.qty_needed,
                'qty_claimed', CASE WHEN surprise_locked(w.surprise_mode, w.event_date) THEN NULL ELSE i.qty_claimed END)
                ORDER BY i.sort_order, i.id), '[]'::jsonb) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL))
-         FROM wishlists w WHERE w.owner_id = $1 AND w.deleted_at IS NULL ORDER BY w.id").bind(u.id).fetch_all(&st.pool).await?;
+         FROM wishlists w WHERE w.owner_id = $1 AND w.org_id IS NULL AND w.deleted_at IS NULL ORDER BY w.id").bind(u.id).fetch_all(&st.pool).await?;
     let claims: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', id, 'item_id', item_id, 'qty', qty, 'status', status::text, 'note', note, 'is_anonymous', is_anonymous, 'created_at', created_at)
            FROM claims WHERE user_id = $1 ORDER BY id").bind(u.id).fetch_all(&st.pool).await?;
@@ -283,11 +283,51 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    // 組織據點不屬於個人：轉給其他 owner / coordinator（owner 優先、最早加入）；本人的成員資格停用；組織已無人可管理就關閉全部據點（保持公開）。
+    // 鎖序 organizations(FOR UPDATE，依 id) → wishlists：與撤銷驗證、據點上線一致，必須先於任何 wishlists 更新。
+    // 鎖本人所屬的每個組織（不只擁有據點的）：同組織的管理者同時刪帳號會被序列化，後者看得到前者已停用的成員資格。
+    let site_orgs: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT org_id FROM org_members WHERE user_id = $1 AND disabled_at IS NULL
+         UNION SELECT org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL")
+        .bind(id).fetch_all(&mut *tx).await?;
+    sqlx::query("SELECT id FROM organizations WHERE id = ANY($1) ORDER BY id FOR UPDATE").bind(&site_orgs).execute(&mut *tx).await?;
+    let mut site_slugs: Vec<String> = sqlx::query_scalar(
+        "WITH s AS (SELECT id, org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL ORDER BY id FOR UPDATE)
+         UPDATE wishlists w SET owner_id = r.uid FROM s
+           JOIN LATERAL (SELECT m.user_id AS uid FROM org_members m JOIN users mu ON mu.id = m.user_id AND mu.deleted_at IS NULL AND mu.blocked_at IS NULL
+                          WHERE m.org_id = s.org_id AND m.disabled_at IS NULL AND m.role IN ('owner', 'coordinator') AND m.user_id <> $1
+                          ORDER BY (m.role = 'owner') DESC, m.created_at, m.user_id LIMIT 1) r ON true
+          WHERE w.id = s.id RETURNING w.slug::text")
+        .bind(id).fetch_all(&mut *tx).await?;
+    sqlx::query("UPDATE org_members SET disabled_at = now() WHERE user_id = $1 AND disabled_at IS NULL").bind(id).execute(&mut *tx).await?;
+    // 最後一位 owner 離開時，最早加入的有效 coordinator 升為 owner（組織不會變成無 owner；已持有 org 列鎖）
+    sqlx::query(
+        "UPDATE org_members SET role = 'owner' WHERE (org_id, user_id) IN (
+           SELECT DISTINCT ON (m.org_id) m.org_id, m.user_id FROM org_members m
+             JOIN users mu ON mu.id = m.user_id AND mu.deleted_at IS NULL AND mu.blocked_at IS NULL
+            WHERE m.org_id = ANY($1) AND m.disabled_at IS NULL AND m.role = 'coordinator'
+              AND NOT EXISTS (SELECT 1 FROM org_members o JOIN users ou ON ou.id = o.user_id AND ou.deleted_at IS NULL AND ou.blocked_at IS NULL
+                               WHERE o.org_id = m.org_id AND o.disabled_at IS NULL AND o.role = 'owner')
+            ORDER BY m.org_id, m.created_at, m.user_id)")
+        .bind(&site_orgs).execute(&mut *tx).await?;
+    let closed: Vec<(Uuid, String, bool)> = sqlx::query_as(
+        "WITH o AS (SELECT w.id, w.status FROM wishlists w
+                     WHERE w.org_id = ANY($1) AND w.deleted_at IS NULL AND w.status IN ('draft', 'active')
+                       AND NOT EXISTS (SELECT 1 FROM org_members m JOIN users mu ON mu.id = m.user_id AND mu.deleted_at IS NULL AND mu.blocked_at IS NULL
+                                        WHERE m.org_id = w.org_id AND m.disabled_at IS NULL AND m.role IN ('owner', 'coordinator'))
+                     ORDER BY w.id FOR UPDATE OF w)
+         UPDATE wishlists SET status = 'closed', site_status = 'closed', closed_at = COALESCE(wishlists.closed_at, now())
+           FROM o WHERE wishlists.id = o.id RETURNING wishlists.id, wishlists.slug::text, o.status = 'active'")
+        .bind(&site_orgs).fetch_all(&mut *tx).await?;
+    for (w, slug, _) in &closed {
+        crate::dashboard::notify(&mut *tx, *w).await?;
+        site_slugs.push(slug.clone());
+    }
     // Retain replaced/issued image keys; the worker rechecks sharing under the media lock.
     let media: Vec<String> = sqlx::query_scalar(
         "SELECT object_key FROM user_media WHERE user_id=$1
-         UNION SELECT cover_image_key FROM wishlists WHERE owner_id=$1 AND cover_image_key IS NOT NULL
-         UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id WHERE w.owner_id=$1 AND i.image_key IS NOT NULL
+         UNION SELECT cover_image_key FROM wishlists WHERE owner_id=$1 AND org_id IS NULL AND cover_image_key IS NOT NULL
+         UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id WHERE w.owner_id=$1 AND w.org_id IS NULL AND i.image_key IS NOT NULL
          UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL")
         .bind(id).fetch_all(&mut *tx).await?;
     let media: Vec<String> = media
@@ -309,12 +349,14 @@ async fn delete_me(
     // 刪除要求與刪帳號同一交易提交：之後就算程序重啟，worker 也會接著刪完
     crate::uploads::request_retire(&mut tx, &media).await?;
     let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
-        "WITH o AS (SELECT id, status FROM wishlists WHERE owner_id = $1 AND status <> 'archived' FOR UPDATE)
+        "WITH o AS (SELECT id, status FROM wishlists WHERE owner_id = $1 AND org_id IS NULL AND status <> 'archived' FOR UPDATE)
          UPDATE wishlists SET status = 'archived', visibility = 'private', closed_at = COALESCE(wishlists.closed_at, now())
            FROM o WHERE wishlists.id = o.id RETURNING wishlists.id, wishlists.slug::text, o.status <> 'closed'")
         .bind(id).fetch_all(&mut *tx).await?;
-    let graced: Vec<Uuid> = rows.iter().filter(|r| r.2).map(|r| r.0).collect(); // 這次才結束的清單，他人捐助要給結束寬限
-    let (archived, slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().map(|r| (r.0, r.1)).unzip();
+    let mut graced: Vec<Uuid> = rows.iter().filter(|r| r.2).map(|r| r.0).collect();
+    graced.extend(closed.iter().filter(|c| c.2).map(|c| c.0)); // 這次才結束的清單，他人捐助要給結束寬限
+    let (archived, mut slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().map(|r| (r.0, r.1)).unzip();
+    slugs.extend(site_slugs); // 據點換了擁有者 / 已關閉：公開快取副本一併清掉
     crate::wishlists::release_pledged(&mut tx, &archived).await?; // 別人捐在這些清單上、尚未達標的點數退回各自錢包
                                                                   // F-08：取消他人清單上的 reserved 捐助並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE user_id = $1 AND status = 'reserved') ORDER BY id FOR UPDATE")
@@ -351,12 +393,12 @@ async fn delete_me(
     sqlx::query("UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')")
         .bind(id).execute(&mut *tx).await?;
     sqlx::query(
-        "UPDATE wishlists SET cover_image_key=NULL, cover_image_status='none' WHERE owner_id=$1",
+        "UPDATE wishlists SET cover_image_key=NULL, cover_image_status='none' WHERE owner_id=$1 AND org_id IS NULL",
     )
     .bind(id)
     .execute(&mut *tx)
     .await?;
-    sqlx::query("UPDATE wishlist_items SET image_key=NULL, image_status='none' WHERE wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$1)")
+    sqlx::query("UPDATE wishlist_items SET image_key=NULL, image_status='none' WHERE wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$1 AND org_id IS NULL)")
         .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,

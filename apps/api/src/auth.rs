@@ -640,11 +640,16 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     .fetch_all(pool)
     .await?;
     let avatar_url = crate::uploads::avatar_url(avatar.as_deref());
+    let orgs: Vec<Value> = sqlx::query_as::<_, (Uuid, String, String, String)>(
+        "SELECT o.id, o.display_name, m.role::text, o.verification_status FROM org_members m JOIN organizations o ON o.id = m.org_id
+         WHERE m.user_id = $1 AND m.disabled_at IS NULL ORDER BY o.created_at")
+        .bind(id).fetch_all(pool).await?
+        .into_iter().map(|(i, n, r, v)| json!({"id": i, "name": n, "role": r, "verification_status": v})).collect();
     Ok(
         json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
                "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "locale": locale, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
-               "orgs": [] }),
-    ) // orgs 為 P2-D，MVP 恆空
+               "orgs": orgs }),
+    )
 }
 
 async fn me(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, AppError> {

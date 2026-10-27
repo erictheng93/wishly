@@ -27,6 +27,7 @@ async function more() {
   <GuestTop />
   <main class="g-wrap">
     <h1>{{ $t('guest.explore.heading') }}</h1>
+    <NuxtLink to="/e" class="g-banner x-relief"><b>{{ $t('guest.relief.banner') }}</b>・{{ $t('guest.relief.bannerBody') }}</NuxtLink>
     <div v-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.explore.empty') }}</div>
     <div v-else class="g-grid">
@@ -51,6 +52,7 @@ async function more() {
 </template>
 
 <style scoped>
+.x-relief{display:block;color:var(--fg);text-decoration:none}
 .x-title{display:block;font-weight:700;font-size:18px;color:var(--fg);text-decoration:none;overflow-wrap:anywhere;padding:8px 0}
 .x-cover{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;margin-bottom:8px}
 .x-cover[src$='.svg']{object-fit:contain;background:var(--bg-alt)}

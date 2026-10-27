@@ -21,6 +21,14 @@ pub fn public_url(slug: &str) -> String {
     format!("https://api.example.test/api/v1/public/wishlists/{slug}")
 }
 
+pub fn event_url(slug: &str) -> String {
+    format!("https://api.example.test/api/v1/public/relief-events/{slug}")
+}
+
+pub fn org_url(slug: &str) -> String {
+    format!("https://api.example.test/api/v1/public/orgs/{slug}")
+}
+
 pub fn init() -> &'static Arc<MockCdn> {
     static MOCK: OnceLock<Arc<MockCdn>> = OnceLock::new();
     MOCK.get_or_init(|| {
@@ -66,7 +74,11 @@ pub fn init() -> &'static Arc<MockCdn> {
 
 impl MockCdn {
     pub fn requests_for(&self, slug: &str) -> Vec<Purge> {
-        let url = public_url(slug);
+        self.requests_for_url(&public_url(slug))
+    }
+
+    pub fn requests_for_url(&self, url: &str) -> Vec<Purge> {
+        let url = url.to_string();
         self.requests
             .lock()
             .unwrap()
@@ -81,18 +93,22 @@ impl MockCdn {
     }
 
     pub async fn wait_for(&self, slug: &str) -> Purge {
+        self.wait_for_url(&public_url(slug)).await
+    }
+
+    pub async fn wait_for_url(&self, url: &str) -> Purge {
         tokio::time::timeout(std::time::Duration::from_secs(5), async {
             loop {
                 let received = self.received.notified();
                 tokio::pin!(received);
                 received.as_mut().enable(); // Register before checking the buffer: no lost wakeups.
-                if let Some(request) = self.requests_for(slug).into_iter().next() {
+                if let Some(request) = self.requests_for_url(url).into_iter().next() {
                     return request;
                 }
                 received.await;
             }
         })
         .await
-        .unwrap_or_else(|_| panic!("CDN purge missing for wishlist {slug}"))
+        .unwrap_or_else(|_| panic!("CDN purge missing for wishlist {url}"))
     }
 }
