@@ -114,7 +114,7 @@ http.createServer(async (req, res) => {
     if (m[1] === 'gone') return err(res, 410, 'WISHLIST_REMOVED', '已下架')
     if (m[1] === 'relief' || m[1] === 'relief2') {
       const site = reliefSites.find(x => x.slug === m[1]), list = reliefItems.map(view)
-      return send(res, 200, { slug: m[1], type: 'relief', status: 'active', title: site.title, description: null, cover_image_url: null, cover_preset: 'gift', event_date: null, id: 'w9', owner: { id: 'u9', display_name: '好幫手協會' }, surprise_mode: false, claimers_visible: false,
+      return send(res, 200, { slug: m[1], type: 'relief', status: 'active', title: site.title, description: null, cover_image_url: null, cover_preset: 'gift', event_date: null, id: 'w9', owner: null, surprise_mode: false, claimers_visible: false,
         org: { ...reliefOrg, verified: true }, event: { slug: quake.slug, name: quake.name }, site_address: site.site_address, site_status: 'active',
         completion: { item_count: list.length, fulfilled_count: 0, completion_pct: 20 }, items: list, updated_at: new Date().toISOString() })
     }

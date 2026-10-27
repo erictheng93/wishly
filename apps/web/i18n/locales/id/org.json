@@ -82,7 +82,8 @@
       "noEvents": "Belum ada peristiwa",
       "noSites": "Belum ada lokasi",
       "edit": "Ubah",
-      "publicPage": "Halaman publik"
+      "publicPage": "Halaman publik",
+      "receipts": "Penerimaan"
     },
     "members": {
       "title": "Anggota & undangan",
@@ -186,7 +187,9 @@
       "receiptNote": "Catatan (opsional)",
       "receiptSave": "Catat",
       "receiptTotal": "Total diterima {n}",
-      "receiptBy": "{name}  {time}"
+      "receiptBy": "{name}  {time}",
+      "receiptsNone": "Lokasi ini belum memiliki barang",
+      "receiptNeeded": "Dibutuhkan {n}"
     }
   }
 }

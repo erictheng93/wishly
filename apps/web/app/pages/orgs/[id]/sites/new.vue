@@ -11,7 +11,7 @@ const busy = ref(false), err = ref('')
 onMounted(async () => {
   try {
     const [ev, pm] = await Promise.all([api(`/orgs/${id}/events`), api(`/orgs/${id}/permits`)])
-    events.value = ev
+    events.value = ev.filter((e: any) => e.moderation_status !== 'hidden' && !e.merged_into) // 下架 / 已合併的事件後端會 422
     const today = taipeiToday()
     permits.value = pm.filter((p: any) => p.status === 'approved' && p.valid_from <= today && p.valid_to >= today)
     if (permits.value.length === 1) f.permit_id = permits.value[0].id

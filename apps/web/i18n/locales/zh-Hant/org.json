@@ -82,7 +82,8 @@
       "noEvents": "尚無事件",
       "noSites": "尚無據點",
       "edit": "編輯",
-      "publicPage": "公開頁"
+      "publicPage": "公開頁",
+      "receipts": "實收登記"
     },
     "members": {
       "title": "成員與邀請",
@@ -186,7 +187,9 @@
       "receiptNote": "備註（選填）",
       "receiptSave": "登記",
       "receiptTotal": "累計實收 {n}",
-      "receiptBy": "{name}　{time}"
+      "receiptBy": "{name}　{time}",
+      "receiptsNone": "此據點還沒有品項",
+      "receiptNeeded": "需求 {n}"
     }
   }
 }

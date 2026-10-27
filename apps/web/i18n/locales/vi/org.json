@@ -82,7 +82,8 @@
       "noEvents": "Chưa có sự kiện",
       "noSites": "Chưa có điểm tiếp nhận",
       "edit": "Sửa",
-      "publicPage": "Trang công khai"
+      "publicPage": "Trang công khai",
+      "receipts": "Ghi nhận nhận hàng"
     },
     "members": {
       "title": "Thành viên & lời mời",
@@ -186,7 +187,9 @@
       "receiptNote": "Ghi chú (tùy chọn)",
       "receiptSave": "Ghi nhận",
       "receiptTotal": "Tổng đã nhận {n}",
-      "receiptBy": "{name}  {time}"
+      "receiptBy": "{name}  {time}",
+      "receiptsNone": "Điểm này chưa có mặt hàng",
+      "receiptNeeded": "Cần {n}"
     }
   }
 }

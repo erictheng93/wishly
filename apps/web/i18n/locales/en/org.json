@@ -82,7 +82,8 @@
       "noEvents": "No events yet",
       "noSites": "No sites yet",
       "edit": "Edit",
-      "publicPage": "Public page"
+      "publicPage": "Public page",
+      "receipts": "Receipts"
     },
     "members": {
       "title": "Members & invites",
@@ -186,7 +187,9 @@
       "receiptNote": "Note (optional)",
       "receiptSave": "Log",
       "receiptTotal": "Total received {n}",
-      "receiptBy": "{name}  {time}"
+      "receiptBy": "{name}  {time}",
+      "receiptsNone": "This site has no items yet",
+      "receiptNeeded": "Needed {n}"
     }
   }
 }
