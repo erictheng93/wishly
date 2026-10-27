@@ -95,6 +95,7 @@ for name, migration, constraint, test in [
     ("check-concierge-only", "0004_crowdfund.sql", "items_concierge_only", CHECK_TEST),
 ]:
     CASES[name] = ("db/migrations/" + migration, None, constraint, None, "migration_constraints", test)
+CASES["check-relief-site"] = ("db/migrations/0041_orgs_relief.sql", None, "wishlists_relief_site", None, "org_schema", "relief_site_requires_org_event_permit_address_status")
 for name, function, condition in [
     ("claims-reconciliation", "assert_claims_reconciled", "drift.is_empty()"),
     ("wallet-reconciliation", "assert_points_reconciled", "bad.is_empty()"),
