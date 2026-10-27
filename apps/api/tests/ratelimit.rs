@@ -169,13 +169,20 @@ async fn cleanup_removes_old_rows(pool: PgPool) {
         .bind(Uuid::new_v4()).bind(Uuid::new_v4()).execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('old', now() - interval '3 days', 1), ('new', now(), 1)").execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO login_failures (email, ip, created_at) SELECT 'a@x.com', '1.1.1.1', now() - make_interval(days => age) FROM unnest(ARRAY[366, 364, 2, 0]) age").execute(&pool).await.unwrap();
+    let u = common::user(&pool, "u").await;
+    sqlx::query("INSERT INTO sessions (user_id, token_hash, expires_at) SELECT $1, decode(md5(age::text), 'hex'), now() - make_interval(days => age) FROM unnest(ARRAY[31, 29]) age")
+        .bind(u.id).execute(&pool).await.unwrap();
     ratelimit::cleanup(&pool).await.unwrap();
-    let (i, r, f): (i64, i64, i64) = sqlx::query_as(
-        "SELECT (SELECT count(*) FROM idempotency_keys), (SELECT count(*) FROM rate_limits), (SELECT count(*) FROM login_failures)",
+    let (i, r, f, s): (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM idempotency_keys), (SELECT count(*) FROM rate_limits), (SELECT count(*) FROM login_failures), (SELECT count(*) FROM sessions)",
     )
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!((i, r, f), (1, 1, 3));
+    assert_eq!(
+        (i, r, f, s),
+        (1, 1, 3, 2),
+        "過期 31 天的 session 應清除，user() 的有效 session 與過期 29 天的保留"
+    );
     common::assert_all_reconciled(&pool).await;
 }

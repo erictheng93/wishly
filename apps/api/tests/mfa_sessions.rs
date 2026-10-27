@@ -357,3 +357,81 @@ async fn logout_is_audited(pool: PgPool) {
     assert_eq!(audit_count(&pool, a.id, "auth.logout").await, 1);
     assert_eq!(call(&pool, "GET", "/me", &ck(&a.token), None).await.0, 401);
 }
+
+async fn expires_in_days(pool: &PgPool, token: &str) -> f64 {
+    sqlx::query_scalar("SELECT extract(epoch FROM expires_at - now())::float8 / 86400 FROM sessions WHERE token_hash = $1")
+        .bind(wishly_api::session::hash_token(token))
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn session_slides_on_use_but_caps_at_90_days(pool: PgPool) {
+    let u = common::user(&pool, "u").await;
+    let t = common::session(&pool, u.id).await;
+    let h = wishly_api::session::hash_token(&t);
+    // 使用中（last_seen 已過 5 分鐘）→ 期限推到 now + 30 天
+    sqlx::query(
+        "UPDATE sessions SET last_seen_at = now() - interval '10 minutes' WHERE token_hash = $1",
+    )
+    .bind(&h)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(call(&pool, "GET", "/me", &ck(&t), None).await.0, 200);
+    let d = expires_in_days(&pool, &t).await;
+    assert!((29.9..=30.0).contains(&d), "未續期：{d}");
+    // 建立已 80 天：只能續到建立後 90 天
+    sqlx::query("UPDATE sessions SET created_at = now() - interval '80 days', last_seen_at = now() - interval '10 minutes' WHERE token_hash = $1")
+        .bind(&h).execute(&pool).await.unwrap();
+    call(&pool, "GET", "/me", &ck(&t), None).await;
+    let d = expires_in_days(&pool, &t).await;
+    assert!((9.9..=10.0).contains(&d), "超過 90 天上限：{d}");
+    // 閒置過期後不再接受（也不會被續期救回）
+    sqlx::query(
+        "UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token_hash = $1",
+    )
+    .bind(&h)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(call(&pool, "GET", "/me", &ck(&t), None).await.0, 401);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn staff_mfa_expires_after_12_hours(pool: PgPool) {
+    let s = common::staff(&pool, "ops").await;
+    sqlx::query("UPDATE users SET totp_enabled_at = now() WHERE id = $1")
+        .bind(s.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let t = common::session(&pool, s.id).await;
+    let set_mfa = |age: &'static str| {
+        let (pool, h) = (pool.clone(), wishly_api::session::hash_token(&t));
+        async move {
+            sqlx::query("UPDATE sessions SET mfa_at = now() - $2::interval WHERE token_hash = $1")
+                .bind(h)
+                .bind(age)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    set_mfa("11 hours").await;
+    assert_eq!(
+        call(&pool, "GET", "/admin/stats", &ck(&t), None).await.0,
+        200
+    );
+    set_mfa("13 hours").await;
+    let r = call(&pool, "GET", "/admin/stats", &ck(&t), None).await;
+    assert_eq!(
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (403, Some("MFA_REQUIRED"))
+    );
+    assert_eq!(
+        call(&pool, "GET", "/me", &ck(&t), None).await.2["mfa_verified"],
+        false
+    );
+}
