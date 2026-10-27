@@ -50,3 +50,26 @@ pub fn event_date(d: NaiveDate, pointer: &str) -> Result<NaiveDate, AppError> {
 pub fn slug_ok(s: &str) -> bool {
     s.len() == 10 && s.bytes().all(|b| b.is_ascii_alphanumeric())
 }
+
+/// 統一編號檢查碼（財政部 2023 新制）：權重 1,2,1,2,1,2,4,1，各積的十位與個位相加後總和須被 5 整除；
+/// 第 7 碼為 7 時，總和 +1 被 5 整除也算通過。
+pub fn tax_id_ok(s: &str) -> bool {
+    if s.len() != 8 || !s.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    let d: Vec<u32> = s.bytes().map(|b| (b - b'0') as u32).collect();
+    let sum: u32 = d.iter().zip([1, 2, 1, 2, 1, 2, 4, 1]).map(|(a, w)| { let p = a * w; p / 10 + p % 10 }).sum();
+    sum % 5 == 0 || (d[6] == 7 && (sum + 1) % 5 == 0)
+}
+
+#[cfg(test)]
+mod tax_id_tests {
+    #[test]
+    fn tax_id_checksum() {
+        assert!(super::tax_id_ok("04595257"));
+        assert!(super::tax_id_ok("12345675")); // 第 7 碼 7 的特例
+        assert!(!super::tax_id_ok("12345678"));
+        assert!(!super::tax_id_ok("1234567"));
+        assert!(!super::tax_id_ok("1234567a"));
+    }
+}
