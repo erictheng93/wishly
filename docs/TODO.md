@@ -16,7 +16,7 @@
 - [ ] 備份與 `SHIPPING_ENC_KEY` **不放在同一處**；確認該金鑰已存放於**兩個獨立位置**（密碼管理器＋離線）。
 - [x] **還原演練（本機副本）**（2026-10-21）：`db-restore-drill.sh` 在 VPS 上把 `wishly-20261021T090717Z.dump` 還原到無網路的暫存容器，migration 28 全部成功，對帳通過（12 users／8 wishlists／16 items／2 claims），**資料庫還原耗時 8 秒**。之後每季一次。
 - [x] 還原演練（從 R2 下載）（2026-10-27）：`wishly-20261027T085138Z.dump`（153 KB）從 R2 下載，與本機副本位元組相同；還原後對帳通過（12 users／9 wishlists／19 items／3 claims），耗時 7 秒。
-- [ ] 備份新鮮度告警：註冊 healthchecks.io（或同類服務，週期 1 小時、寬限 30 分；WAL 歸檔失敗也會讓它不 ping），把 ping 網址填進 `r2.env` 的 `PING_URL`。腳本只有全部成功才會 ping。
+- [x] 備份新鮮度告警（2026-10-27）：healthchecks.io check `wishly-db-backup`（週期 1 小時、寬限 30 分），網址在 `r2.env` 的 `PING_URL`；`db-backup.sh` 只有 dump、上傳、WAL 歸檔檢查全部成功才 ping，實測 HTTP 200。每日基底備份失敗不會觸發此告警。
 - [x] 方案 A：WAL-G v3.0.9 上線（2026-10-27）：`archive_mode=on`、`archive_timeout=300`（RPO ≤ 5 分鐘），每日基底備份保留 8 份（PITR 7 天），R2 `wal-g/`。`db` 重建一次，停機約 10 秒，`/readyz` 200。PITR 演練：取回基底備份、重播 2 段 WAL、升格後對帳通過，耗時 9 秒。
 - [x] Dokploy 後台的 `db` compose 已補上 `- /opt/wishly-backup/walg:/walg:ro`（2026-10-27，已比對 Dokploy 存的 `composeFile`、VPS 上的檔案與執行中容器的掛載，三者一致）。
 - [x] 指定時間點的 PITR 演練（2026-10-27）：正式庫暫建 `ops_drill.marker`，09:17:48 寫 A、09:17:53 寫 B；`walg-restore-drill.sh '2026-10-27 09:17:50.892224+00'` 還原後只有 A、沒有 B，對帳通過，耗時 9 秒；演練後已 drop 該 schema。
