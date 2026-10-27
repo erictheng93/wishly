@@ -307,6 +307,34 @@
       "back": "Kembali ke galeri merek",
       "website": "Situs resmi merek",
       "noProducts": "Produk merek ini segera hadir"
+    },
+    "relief": {
+      "seoTitle": "Bantuan bencana - Wishly",
+      "seoDesc": "Peristiwa bencana dan lokasi penerimaan. Lihat kebutuhan dan donasikan barang.",
+      "heading": "Bantuan bencana",
+      "empty": "Belum ada peristiwa bantuan yang aktif.",
+      "banner": "Bantuan bencana",
+      "bannerBody": "Lihat lokasi bantuan dan barang yang sangat dibutuhkan",
+      "sites": "{n} lokasi",
+      "critical": "Kritis {n}",
+      "high": "Tinggi {n}",
+      "noSites": "Belum ada lokasi yang menerima donasi.",
+      "eventNotFound": "Peristiwa bantuan tidak ditemukan",
+      "orgNotFound": "Organisasi tidak ditemukan",
+      "back": "Kembali ke peristiwa bantuan",
+      "orgSeo": "{name} - Organisasi bantuan",
+      "orgSites": "Lokasi penerimaan",
+      "website": "Situs web",
+      "verified": "Organisasi terverifikasi",
+      "event": "Peristiwa",
+      "address": "Alamat penerimaan",
+      "by": "Organisasi: ",
+      "paused": "Lokasi ini menghentikan sementara penerimaan. Donasi belum tersedia.",
+      "closedSite": "Lokasi ini sudah berhenti menerima donasi.",
+      "date": "Tanggal: {date}",
+      "counties": "Wilayah terdampak: {list}",
+      "loadMore": "Muat lebih banyak",
+      "viewSite": "Lihat lokasi"
     }
   }
 }

@@ -12,7 +12,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
     <img v-if="item.image_url" class="g-thumb" :src="item.image_url" alt="" loading="lazy">
     <div v-else class="g-thumb">{{ $t('guest.card.thumb') }}</div>
     <div class="g-body">
-      <div class="g-title">{{ item.title }}<span v-if="item.priority" class="g-badge" :class="item.priority">{{ $t('guest.card.priority', { level: $t('guest.card.prio.' + item.priority) }) }}</span><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>
+      <div class="g-title">{{ item.title }}<span v-if="item.priority" class="g-badge" :class="item.priority">{{ $t('guest.card.priority', { level: $t('guest.card.prio.' + item.priority) }) }}</span><template v-if="item.urgency"><span class="g-badge">{{ $t('org.relief.category.' + item.category) }}</span><span class="g-badge" :class="item.urgency">{{ $t('org.relief.urgency.' + item.urgency) }}</span></template><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>
       <div v-if="item.brand || item.spec" class="g-mute">{{ [item.brand, item.spec].filter(Boolean).join('・') }}</div>
       <template v-if="crowd">
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent ?? 0" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: (item.progress_percent ?? 0) + '%' }" /></div>

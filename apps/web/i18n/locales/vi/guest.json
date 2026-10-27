@@ -307,6 +307,34 @@
       "back": "Về gian hàng thương hiệu",
       "website": "Trang web thương hiệu",
       "noProducts": "Sản phẩm của thương hiệu này sắp ra mắt"
+    },
+    "relief": {
+      "seoTitle": "Cứu trợ thiên tai - Wishly",
+      "seoDesc": "Các sự kiện cứu trợ và điểm nhận hàng. Xem nhu cầu và quyên góp vật phẩm.",
+      "heading": "Cứu trợ thiên tai",
+      "empty": "Hiện chưa có sự kiện cứu trợ nào.",
+      "banner": "Cứu trợ thiên tai",
+      "bannerBody": "Xem các điểm cứu trợ và vật phẩm cần gấp",
+      "sites": "{n} điểm",
+      "critical": "Khẩn cấp {n}",
+      "high": "Cao {n}",
+      "noSites": "Hiện chưa có điểm nào đang nhận hàng.",
+      "eventNotFound": "Không tìm thấy sự kiện cứu trợ",
+      "orgNotFound": "Không tìm thấy tổ chức",
+      "back": "Về danh sách sự kiện",
+      "orgSeo": "{name} - Tổ chức cứu trợ",
+      "orgSites": "Điểm nhận hàng",
+      "website": "Trang web",
+      "verified": "Tổ chức đã xác minh",
+      "event": "Sự kiện",
+      "address": "Địa chỉ nhận hàng",
+      "by": "Tổ chức: ",
+      "paused": "Điểm này đang tạm ngừng nhận hàng, tạm thời không thể đăng ký.",
+      "closedSite": "Điểm này đã ngừng nhận hàng.",
+      "date": "Ngày: {date}",
+      "counties": "Khu vực bị ảnh hưởng: {list}",
+      "loadMore": "Tải thêm",
+      "viewSite": "Xem điểm"
     }
   }
 }
