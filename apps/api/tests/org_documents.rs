@@ -11,7 +11,10 @@ use uuid::Uuid;
 const PDF: &[u8] = b"%PDF-1.4 secret-registration-content";
 
 async fn up(pool: &PgPool, tok: &str, org: Uuid, ct: &str, body: Vec<u8>) -> (StatusCode, Value) {
-    let req = Request::builder().method("POST").uri(format!("/api/v1/orgs/{org}/documents?kind=registration"))
+    upk(pool, tok, org, "registration", ct, body).await
+}
+async fn upk(pool: &PgPool, tok: &str, org: Uuid, kind: &str, ct: &str, body: Vec<u8>) -> (StatusCode, Value) {
+    let req = Request::builder().method("POST").uri(format!("/api/v1/orgs/{org}/documents?kind={kind}"))
         .header("cookie", format!("ws_session={tok}")).header("content-type", ct).body(Body::from(body)).unwrap();
     let (s, _, v) = call_request(&test_app(pool), req).await;
     (s, v)
@@ -43,6 +46,9 @@ async fn upload_seals_bytes_at_rest(pool: PgPool) {
     assert_eq!(body, PDF);
     assert_eq!(h["cache-control"], "no-store");
     assert_eq!(h["content-disposition"], "attachment");
+    assert_eq!(h["x-content-type-options"], "nosniff");
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE action='org.document.download'").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 1);
     let (_, _, show) = call(&pool, "GET", &format!("/orgs/{org}"), &ck(&o.token), None).await;
     assert_eq!(show["documents"][0]["id"], id);
 }
@@ -55,7 +61,9 @@ async fn rejects_wrong_type_and_oversize(pool: PgPool) {
     let (s, v) = up(&pool, &o.token, org, "text/html", b"<b>x</b>".to_vec()).await;
     assert_eq!((s, ptr(&v)), (StatusCode::UNPROCESSABLE_ENTITY, "/content_type"));
     let (s, v) = up(&pool, &o.token, org, "application/pdf", vec![0; 10 * 1024 * 1024 + 1]).await;
-    assert!(s == StatusCode::PAYLOAD_TOO_LARGE || (s == StatusCode::UNPROCESSABLE_ENTITY && ptr(&v) == "/content_length"), "{s}");
+    assert_eq!((s, ptr(&v)), (StatusCode::UNPROCESSABLE_ENTITY, "/content_length"));
+    let (s, _) = up(&pool, &o.token, org, "application/pdf", vec![0; 10 * 1024 * 1024 + 2]).await;
+    assert_eq!(s, StatusCode::PAYLOAD_TOO_LARGE);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -112,4 +120,33 @@ async fn permit_dates_validated_and_delete_removes(pool: PgPool) {
     let (s, _, _) = call(&pool, "DELETE", &format!("/orgs/{org}/documents/{}", d["id"].as_str().unwrap()), &ck(&o.token), None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(raw_get(&pool, &o.token, org, d["id"].as_str().unwrap()).await.0, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn status_gates_uploads_and_permits(pool: PgPool) {
+    let o = user(&pool, "O").await;
+    let pb = |d: &Value| json!({"permit_no":"P","valid_from":"2026-01-01","valid_to":"2026-12-31","document_id":d});
+    for st in ["pending", "rejected", "verified"] {
+        let org = org(&pool, o.id, st).await;
+        member(&pool, org, o.id, "owner").await;
+        let (s, v) = upk(&pool, &o.token, org, "registration", "application/pdf", PDF.to_vec()).await;
+        assert_eq!((s, v["code"].as_str()), (StatusCode::CONFLICT, Some("ORG_NOT_EDITABLE")), "{st} registration");
+        let (s, v) = upk(&pool, &o.token, org, "permit", "application/pdf", PDF.to_vec()).await;
+        let doc = if st == "verified" {
+            assert_eq!(s, StatusCode::CREATED, "{v}");
+            v["id"].clone()
+        } else {
+            assert_eq!((s, v["code"].as_str()), (StatusCode::CONFLICT, Some("ORG_NOT_EDITABLE")), "{st} permit doc");
+            // 直接塞一份文件，驗證 permit 建立本身也被擋
+            let d: Uuid = sqlx::query_scalar("INSERT INTO org_documents(org_id,kind,object_key,content_type,size_bytes,uploaded_by) VALUES($1,'permit','k','application/pdf',1,$2) RETURNING id")
+                .bind(org).bind(o.id).fetch_one(&pool).await.unwrap();
+            json!(d)
+        };
+        let (s, _, v) = call(&pool, "POST", &format!("/orgs/{org}/permits"), &ck(&o.token), Some(pb(&doc))).await;
+        if st == "verified" {
+            assert_eq!(s, StatusCode::CREATED, "{v}");
+        } else {
+            assert_eq!((s, v["code"].as_str()), (StatusCode::CONFLICT, Some("ORG_NOT_EDITABLE")), "{st} permit");
+        }
+    }
 }

@@ -275,8 +275,12 @@ struct KindQ {
     kind: String,
 }
 
+/// permit 類（文件與許可）已驗證組織也可追加；立案文件只在草稿 / 待補正。
 fn only_editable(status: &str) -> R<()> {
-    if matches!(status, "draft" | "needs_changes") {
+    only_for(status, false)
+}
+fn only_for(status: &str, permit: bool) -> R<()> {
+    if matches!(status, "draft" | "needs_changes") || (permit && status == "verified") {
         Ok(())
     } else {
         Err(AppError::problem(409, "ORG_NOT_EDITABLE", "目前狀態不可修改"))
@@ -296,11 +300,17 @@ async fn upload(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>
     if body.is_empty() || body.len() > MAX_DOC {
         return Err(AppError::invalid("/content_length", "RANGE", "檔案大小須介於 1 byte 與 10 MB"));
     }
+    let permit = q.kind == "permit";
+    let early: String = sqlx::query_scalar("SELECT verification_status FROM organizations WHERE id=$1").bind(id).fetch_one(&st.pool).await?;
+    only_for(&early, permit)?; // 省一次無謂的 S3 寫入；權威判斷在下方鎖內
     crate::ratelimit::check(&st.pool, &format!("org-doc:{}", u.id), 30, 3600).await?;
     let key = format!("org-docs/{id}/{}", Uuid::new_v4());
     crate::uploads::put_object(&key, crate::sealed::seal(&body), "application/octet-stream").await?;
     let r: R<Value> = async {
-        let mut tx = st.pool.begin().await?;
+        let mut tx = crate::begin_contended(&st.pool).await?;
+        let (status, _, _) = lock(&mut tx, id).await?;
+        require_role(&mut *tx, id, u.id, "owner").await?;
+        only_for(&status, permit)?;
         let (doc,): (Uuid,) = sqlx::query_as("INSERT INTO org_documents (org_id, kind, object_key, content_type, size_bytes, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id")
             .bind(id).bind(&q.kind).bind(&key).bind(ct).bind(body.len() as i32).bind(u.id).fetch_one(&mut *tx).await?;
         audit_user(&mut *tx, u.id, "org.document.upload", "org_documents", Some(doc), json!({"org_id": id, "kind": q.kind})).await?;
@@ -331,7 +341,9 @@ async fn download(u: CurrentUser, State(st): State<AppState>, Path((id, doc)): P
         .bind(doc).bind(id).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
     let plain = crate::sealed::open(&crate::uploads::get_object(&key).await?)
         .ok_or_else(|| AppError::problem(500, "INTERNAL_ERROR", "文件無法解密"))?;
-    Ok(([(header::CONTENT_TYPE, ct), (header::CONTENT_DISPOSITION, "attachment".into()), (header::CACHE_CONTROL, "no-store".into())], plain).into_response())
+    audit_user(&st.pool, u.id, "org.document.download", "org_documents", Some(doc), json!({"org_id": id})).await?;
+    Ok(([(header::CONTENT_TYPE, ct), (header::CONTENT_DISPOSITION, "attachment".into()), (header::CACHE_CONTROL, "no-store".into()),
+         (header::X_CONTENT_TYPE_OPTIONS, "nosniff".into())], plain).into_response())
 }
 
 async fn delete_doc(u: CurrentUser, State(st): State<AppState>, Path((id, doc)): Path<(Uuid, Uuid)>) -> R<StatusCode> {
@@ -380,9 +392,11 @@ async fn add_permit(u: CurrentUser, State(st): State<AppState>, Path(id): Path<U
     if b.valid_to < b.valid_from {
         return Err(AppError::invalid("/valid_to", "RANGE", "截止日不可早於起始日"));
     }
+    crate::ratelimit::check(&st.pool, &format!("org-permit:{}", u.id), 20, 3600).await?;
     let mut tx = crate::begin_contended(&st.pool).await?;
-    lock(&mut tx, id).await?; // 與刪文件互斥
+    let (status, _, _) = lock(&mut tx, id).await?; // 與刪文件互斥
     require_role(&mut *tx, id, u.id, "owner").await?;
+    only_for(&status, true)?;
     let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM org_documents WHERE id=$1 AND org_id=$2)").bind(b.document_id).bind(id).fetch_one(&mut *tx).await?;
     if !ok {
         return Err(AppError::invalid("/document_id", "NOT_FOUND", "文件不存在或不屬於此組織"));
