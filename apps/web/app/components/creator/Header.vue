@@ -1,6 +1,8 @@
 <script setup lang="ts">
 defineProps<{ title: string; back?: string }>()
 const { user } = useAuth()
+const { current, orgs } = useOrgMode()
+const orgName = computed(() => orgs.value.find(o => o.id === current.value)?.name)
 const { count, refresh } = useFriendRequests()
 // 進頁、換頁、切回分頁時更新好友申請數（不輪詢）
 const onVisible = () => { if (user.value && document.visibilityState === 'visible') refresh() }
@@ -13,6 +15,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
   <header class="c-head">
     <NuxtLink v-if="back" :to="back" class="c-btn plain" :aria-label="$t('common.back')">‹</NuxtLink>
     <h1>{{ title }}</h1>
+    <span v-if="orgName" class="c-org">{{ $t('org.badge') }}：{{ orgName }}</span>
     <LocaleSwitch /><ThemeToggle />
     <slot />
     <CreatorUserMenu />
@@ -27,3 +30,6 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
     <NuxtLink v-if="user.is_staff" to="/admin">{{ $t('common.admin') }}</NuxtLink>
   </nav>
 </template>
+<style scoped>
+.c-org{padding:2px 8px;background:#c8102e;color:#fff;font-size:12px;font-weight:700;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>

@@ -1,0 +1,20 @@
+{
+  "org": {
+    "seoTitle": "Apply as a nonprofit {'|'} Wishly",
+    "seoDesc": "Platform-verified organizations, supplies shipped straight to collection points, donation receipts available.",
+    "heading": "Relief supplies, sent straight to where they are needed",
+    "p1": "Organizations verified by the platform",
+    "p2": "Supplies shipped directly to collection points",
+    "p3": "Points crowdfunding, purchased by the platform",
+    "p4": "Donation receipts available",
+    "prepTitle": "Have these ready",
+    "prep1": "Registration certificate",
+    "prep2": "Tax ID number",
+    "prep3": "Fundraising permit number",
+    "cta": "Apply as a nonprofit →",
+    "loginHint": "A nonprofit? Apply here",
+    "personal": "Personal",
+    "switchTitle": "Switch identity",
+    "badge": "Organization mode"
+  }
+}

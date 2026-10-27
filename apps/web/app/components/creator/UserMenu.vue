@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const { user, logout } = useAuth()
 const { count } = useFriendRequests()
+const { current, orgs, switchTo } = useOrgMode()
 const open = ref(false)
 const root = ref<HTMLElement>()
 const trigger = ref<HTMLButtonElement>()
@@ -29,6 +30,10 @@ watch(() => useRoute().fullPath, () => { open.value = false })
       <component :is="user.handle ? 'NuxtLink' : 'div'" :to="user.handle ? `/u/${user.handle}` : undefined" class="um-who">
         <b>{{ user.display_name }}</b><small v-if="user.handle">@{{ user.handle }}</small>
       </component>
+      <template v-if="orgs.length">
+        <button type="button" :aria-pressed="current === null" @click="switchTo(null)">{{ $t('org.personal') }}</button>
+        <button v-for="o in orgs" :key="o.id" type="button" :aria-pressed="current === o.id" @click="switchTo(o.id)">{{ o.name }}</button>
+      </template>
       <NuxtLink to="/friends"><span>{{ $t('common.friends') }}<CreatorCountBadge :n="count" /></span></NuxtLink>
       <NuxtLink to="/me/wallet">{{ $t('common.points') }}</NuxtLink>
       <NuxtLink to="/settings">{{ $t('common.settings') }}</NuxtLink>
@@ -50,5 +55,6 @@ watch(() => useRoute().fullPath, () => { open.value = false })
 .um-pop{position:absolute;right:0;top:calc(100% + 7px);min-width:220px;z-index:30;display:flex;flex-direction:column;background:var(--bg,#fff);border:2px solid var(--red);box-shadow:0 6px 20px rgba(0,0,0,.2)}
 .um-pop>a,.um-pop>button,.um-who{display:flex;flex-direction:column;justify-content:center;min-height:44px;padding:0 14px;border:0;background:none;color:var(--fg);font:inherit;font-weight:700;text-align:left;cursor:pointer}
 .um-who{padding:8px 14px;border-bottom:1px solid var(--red)}
+.um-pop>button[aria-pressed=true]{color:var(--red-text);box-shadow:inset 4px 0 var(--red)}
 .um-who small{font-weight:400;opacity:.7}
 </style>
