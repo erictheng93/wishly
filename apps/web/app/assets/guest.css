@@ -18,7 +18,7 @@
 .g-bar>i{display:block;height:100%;background:var(--stripe)}
 .g-num{color:var(--red-text);font-weight:700}
 .g-badge{display:inline-block;font-size:12px;padding:0 8px;line-height:20px;border:1px solid var(--line);color:var(--mute);margin-left:8px;font-weight:700;letter-spacing:.1em;vertical-align:1px}
-.g-badge.critical{color:#fff;border-color:var(--red);background:var(--red)}
+.g-badge.critical{color:var(--accent-fg);border-color:var(--red);background:var(--red)}
 .g-badge.high{color:var(--red-text);border-color:var(--red);background:var(--bad-bg)}
 .g-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);font:inherit;font-size:14px;font-weight:700;letter-spacing:.14em;cursor:pointer;text-decoration:none;box-sizing:border-box;transition:background var(--t) var(--ease),opacity var(--t) var(--ease)}
 .g-btn:active{background:var(--accent-press);border-color:var(--accent-press)}

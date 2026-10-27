@@ -112,10 +112,10 @@ http.createServer(async (req, res) => {
   if ((m = p.match(/^\/public\/wishlists\/([^/]+)$/))) {
     if (m[1] === 'boom') return err(res, 500, 'INTERNAL', '內部錯誤')
     if (m[1] === 'gone') return err(res, 410, 'WISHLIST_REMOVED', '已下架')
-    if (m[1] === 'relief') {
-      const list = reliefItems.map(view)
-      return send(res, 200, { slug: 'relief', type: 'relief', status: 'active', title: '花蓮物資站', description: null, cover_image_url: null, cover_preset: 'gift', event_date: null, id: 'w9', owner: { id: 'u9', display_name: '好幫手協會' }, surprise_mode: false, claimers_visible: false,
-        org: { ...reliefOrg, verified: true }, event: { slug: quake.slug, name: quake.name }, site_address: reliefSites[0].site_address, site_status: 'active',
+    if (m[1] === 'relief' || m[1] === 'relief2') {
+      const site = reliefSites.find(x => x.slug === m[1]), list = reliefItems.map(view)
+      return send(res, 200, { slug: m[1], type: 'relief', status: 'active', title: site.title, description: null, cover_image_url: null, cover_preset: 'gift', event_date: null, id: 'w9', owner: { id: 'u9', display_name: '好幫手協會' }, surprise_mode: false, claimers_visible: false,
+        org: { ...reliefOrg, verified: true }, event: { slug: quake.slug, name: quake.name }, site_address: site.site_address, site_status: 'active',
         completion: { item_count: list.length, fulfilled_count: 0, completion_pct: 20 }, items: list, updated_at: new Date().toISOString() })
     }
     if (!['demo', 'closed', 'sseoff'].includes(m[1])) return err(res, 404, 'NOT_FOUND', '找不到')

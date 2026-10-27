@@ -7,7 +7,9 @@ test('救災公開頁：列表、事件缺口、舊 slug 轉址、分享頁組�
   const ownerId = (await (await owner.api.get('me')).json()).id as string
   const t = uid()
   const orgName = `E2E 公開組織 ${t}`, evName = `E2E 公開地震 ${t}`, title = `E2E 公開據點 ${t}`
-  const orgSlug = `o${t}`, evSlug = `q${t}`, oldSlug = `qo${t}`, wlSlug = `w${t}`
+  // slug 欄位為 char(10)、須正好 10 個英數字：1 字前綴 + 9 字隨機（uid 為 10 hex，取前 9）
+  const sg = (p: string) => p + uid().slice(0, 9)
+  const orgSlug = sg('o'), evSlug = sg('q'), oldSlug = sg('m'), wlSlug = sg('w')
   const orgId = sql(`INSERT INTO organizations (slug, legal_name, display_name, org_type, tax_id, registration_no, authority, rep_name, contact_name, contact_phone_enc, public_email, verification_status, verified_at, created_by)
     VALUES ('${orgSlug}', '${orgName}', '${orgName}', 'association', lpad((floor(random()*1e8))::text, 8, '0'), 'R-1', '內政部', '王', '王', '\\x00', 'o@example.com', 'verified', now(), '${ownerId}') RETURNING id`).split('\n')[0]
   const permitId = sql(`INSERT INTO org_permits (org_id, permit_no, valid_from, valid_to, status) VALUES ('${orgId}', 'P-${t}', current_date - 1, current_date + 90, 'approved') RETURNING id`).split('\n')[0]

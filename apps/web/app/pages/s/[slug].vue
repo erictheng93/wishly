@@ -71,7 +71,7 @@ const isDone = (i: any) => i.funding_mode === 'crowdfund' ? deriveDisplayStatus(
 const sorted = computed(() => [...items.value].sort((a, b) => Number(isDone(a)) - Number(isDone(b))))
 const pct = computed(() => data.value?.completion?.completion_pct ?? 0)
 const siteOff = computed(() => !!data.value?.site_status && data.value.site_status !== 'active') // 救災據點非 active 一律當暫停
-const closed = computed(() => data.value?.status === 'closed' || siteOff.value)
+const closed = computed(() => data.value?.status === 'closed')
 
 // --- 線上狀態 / LINE 引導 ---
 const online = ref(true), mode = ref<LiveMode>('connecting'), lineHint = ref(false)
@@ -210,10 +210,10 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       </p>
       <p v-if="data.org" class="g-mute">
         <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
-        ・{{ $t('guest.relief.event') }}：<NuxtLink v-if="data.event" :to="`/e/${data.event.slug}`">{{ data.event.name }}</NuxtLink>
+        <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="`/e/${data.event.slug}`">{{ data.event.name }}</NuxtLink></template>
       </p>
       <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
-      <div v-if="siteOff" class="g-banner">{{ data.site_status === 'closed' ? $t('guest.relief.closedSite') : $t('guest.relief.paused') }}</div>
+      <div v-if="siteOff && !closed" class="g-banner" role="status">{{ data.site_status === 'closed' ? $t('guest.relief.closedSite') : $t('guest.relief.paused') }}</div>
       <p v-if="data.description">{{ data.description }}</p>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
       <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
@@ -223,7 +223,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
-          :closed="closed" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
+          :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
