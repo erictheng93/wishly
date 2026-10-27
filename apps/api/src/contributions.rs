@@ -201,18 +201,19 @@ async fn create(
     .bind(item_id)
     .fetch_optional(&mut *tx)
     .await?;
-    let locked: Option<Uuid> = match wl {
-        Some(w) => sqlx::query_scalar(
-            "SELECT id FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
+    let locked: Option<(Uuid, Option<String>)> = match wl {
+        Some(w) => sqlx::query_as(
+            "SELECT id, site_status FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
             .bind(w).fetch_optional(&mut *tx).await?,
         None => None,
     };
-    let Some(wl) = locked else {
+    let Some((wl, site)) = locked else {
         tx.rollback().await?;
         return Err(diagnose(&st.pool, item_id, req.points)
             .await?
             .unwrap_or(AppError::NotFound));
     };
+    crate::claims::site_gate(site.as_deref())?;
 
     // ① 錢包 FOR UPDATE；凍結 → 403
     let wallet = points::ensure_wallet(&mut tx, user.id).await?;
@@ -523,12 +524,13 @@ async fn reallocate(
         return Err(not_allowed());
     }
     // 清單共享鎖（條件同 create）→ 錢包 FOR UPDATE → 品項 → 認捐
-    let locked: Option<Uuid> = sqlx::query_scalar(
-        "SELECT id FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
+    let locked: Option<(Uuid, Option<String>)> = sqlx::query_as(
+        "SELECT id, site_status FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
         .bind(wl).fetch_optional(&mut *tx).await?;
-    if locked.is_none() {
+    let Some((_, site)) = locked else {
         return Err(not_allowed());
-    }
+    };
+    crate::claims::site_gate(site.as_deref())?;
     let wstatus: String =
         sqlx::query_scalar("SELECT status::text FROM point_wallets w WHERE w.id = $1 FOR UPDATE")
             .bind(wallet)
