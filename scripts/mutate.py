@@ -35,6 +35,7 @@ CASES = {
     "idempotency-pledge-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_pledge_requests_overlap_and_debit_once"),
     "delete-item-for-update": (API + "wishlists.rs", "item_delete", "SELECT id FROM wishlist_items WHERE id=$1 FOR UPDATE", "SELECT id FROM wishlist_items WHERE id=$1", "concurrency", "force_delete_vs_claim_update_uses_item_then_claim_lock_order"),
     "reallocation-source-first": (API + "contributions.rs", "reallocate", "ORDER BY id FOR UPDATE", "ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END FOR UPDATE", "concurrency", "opposite_reallocations_lock_lowest_item_first_without_deadlock"),
+    "event-merge-lock-order": (API + "relief_events.rs", "merge", "SELECT id, merged_into, moderation_status::text FROM relief_events WHERE id = ANY($1) ORDER BY id FOR UPDATE\")\n        .bind(vec![id, b.into])", "SELECT id, merged_into, moderation_status::text FROM relief_events WHERE id = $1 FOR UPDATE\")\n        .bind(id).fetch_all(&mut *tx).await?;\n    sqlx::query(\"SELECT pg_sleep(0.3)\").execute(&mut *tx).await?;\n    let rows = sqlx::query_as::<_, (Uuid, Option<Uuid>, String)>(\"SELECT id, merged_into, moderation_status::text FROM relief_events WHERE id = ANY($1) ORDER BY id FOR UPDATE\")\n        .bind(vec![id, b.into])", "relief_events", "concurrent_opposite_merges_no_deadlock"),
     "topup-for-update": (API + "topup.rs", "credit", "WHERE id = $1 FOR UPDATE", "WHERE id = $1", "topup", "webhook_blocked_on_row_lock_does_not_credit_twice"),
     "topup-query-skip": (API + "topup.rs", "confirm", "if !sig_ok || !paid {", "if false {", "topup", "query_confirm_mismatch_does_not_credit_and_is_retryable"),
     "topup-query-sig": (API + "topup.rs", "confirm", "let sig_ok = bool::from(given.as_bytes().ct_eq(check_mac(&q, cfg).as_bytes()));", "let sig_ok = given.len() > 0;", "topup", "query_confirm_mismatch_does_not_credit_and_is_retryable"),
@@ -112,6 +113,7 @@ FAILURE_MARKERS = {name: "CDN purge missing for wishlist" for name in CASES if n
 FAILURE_MARKERS.update({
     "ledger-update": "DB must reject SQLSTATE 23001 constraint unnamed",
     "ledger-delete": "DB must reject SQLSTATE 23001 constraint unnamed",
+    "event-merge-lock-order": "opposite event merges caused a PostgreSQL deadlock: pg_stat_database.deadlocks",
     "wallet-for-update": "frozen wallet was debited by the racing pledge",
     "reallocate-wallet-for-update": 'expected 1 blocked statements containing "FROM point_wallets w WHERE w.id"',
     "claim-wishlist-for-share": "claim accepted after archive committed",

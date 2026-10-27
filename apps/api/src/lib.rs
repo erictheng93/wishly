@@ -25,6 +25,7 @@ pub mod points;
 pub mod profiles;
 pub mod public;
 pub mod ratelimit;
+pub mod relief_events;
 pub mod reports;
 pub mod sealed;
 pub mod security;
@@ -74,6 +75,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(orgs::routes())
                 .merge(org_admin::routes())
                 .merge(org_members::routes())
+                .merge(relief_events::routes())
                 .merge(account::routes())
                 .merge(wishlists::routes())
                 .merge(uploads::routes())
