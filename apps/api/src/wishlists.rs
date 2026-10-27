@@ -549,11 +549,15 @@ struct I {
     price_snapshot_amount: Option<i64>,
     expired_at: Option<DateTime<Utc>>,
     order_status: Option<String>,
+    category: Option<String>,
+    urgency: Option<String>,
+    qty_received: i64,
 }
 const ICOLS: &str = "id, wishlist_id, title, description, brand, spec, image_key, image_status::text AS image_status, product_url, unit_price_amount,
   funding_mode::text AS funding_mode, priority::text AS priority, qty_needed, qty_claimed, sort_order, created_at, updated_at,
   target_points, pledged_points, funding_status::text AS funding_status, funding_deadline, fulfillment_type::text AS fulfillment_type,
-  price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status";
+  price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status,
+  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received";
 
 impl I {
     fn json(&self, locked: bool) -> Value {
@@ -562,8 +566,8 @@ impl I {
             "id": self.id, "wishlist_id": self.wishlist_id, "title": self.title, "description": self.description, "brand": self.brand, "spec": self.spec,
             "image_url": self.image_key.as_ref().filter(|_| self.image_status == "ready").map(|k| uploads::S3::get().public_url(k)),
             "image_status": self.image_status, "product_url": self.product_url, "unit_price_amount": self.unit_price_amount,
-            "funding_mode": self.funding_mode, "priority": self.priority, "category": null, "urgency": null,
-            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": 0,
+            "funding_mode": self.funding_mode, "priority": self.priority, "category": self.category, "urgency": self.urgency,
+            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": self.qty_received,
             // 眾籌欄位：驚喜鎖定時 pledged_points / funding_status / display_status / order_status 一律 null（否則可由「已達標」推知有人捐）
             "target_points": self.target_points, "pledged_points": if cf && !locked { Some(self.pledged_points) } else { None },
             "funding_status": self.funding_status.as_ref().filter(|_| !locked),
@@ -1341,6 +1345,26 @@ async fn init_crowdfund(
     Ok(())
 }
 
+/// relief 品項 category / urgency 必填（建立時），其餘清單不接受；在 app 層擋下，避免落到 trigger 回 500。
+fn apply_relief(m: &Map<String, Value>, i: &mut I, relief: bool, create: bool) -> R<()> {
+    const CAT: &[&str] = &["water", "food", "medical", "hygiene", "shelter", "clothing", "baby", "other"];
+    const URG: &[&str] = &["critical", "high", "medium", "low"];
+    for (k, allowed, slot) in [("category", CAT, &mut i.category), ("urgency", URG, &mut i.urgency)] {
+        if !relief {
+            if m.contains_key(k) {
+                return Err(AppError::invalid(&format!("/{k}"), "NOT_APPLICABLE", &format!("只有救災據點的品項可設定 {k}")));
+            }
+        } else if m.get(k).is_some_and(Value::is_null) {
+            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填，不可清空")));
+        } else if let Some(v) = one_of(m, k, allowed)? {
+            *slot = Some(v.into());
+        } else if create {
+            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")));
+        }
+    }
+    Ok(())
+}
+
 async fn item_create(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -1383,8 +1407,12 @@ async fn item_create(
         price_snapshot_amount: None,
         expired_at: None,
         order_status: None,
+        category: None,
+        urgency: None,
+        qty_received: 0,
     };
     apply_item(m, &mut i)?;
+    apply_relief(m, &mut i, w.ty == "relief", true)?;
     // 僅建立時可帶；PATCH 不處理（沿用 apply_item 外的欄位即忽略）
     let catalog_ref = text(m, "catalog_ref", 0, 64)?.flatten();
     if catalog_ref
@@ -1403,13 +1431,13 @@ async fn item_create(
     uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, description, brand, spec, image_key, image_status, product_url, unit_price_amount, priority, qty_needed, sort_order,
-                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref)
+                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref, category, urgency)
          VALUES ($1,$2,$3,$4,$5,$6,$7::image_status,$8,$9,$10::item_priority,$11,
                  (SELECT coalesce(max(sort_order),0)+10 FROM wishlist_items WHERE wishlist_id=$1),
-                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18) RETURNING id")
+                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20) RETURNING id")
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency)
         .fetch_one(&mut *tx).await?;
     tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
@@ -1538,8 +1566,8 @@ async fn item_update(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
-    let event: Option<NaiveDate> =
-        sqlx::query_scalar("SELECT event_date FROM wishlists WHERE id=$1")
+    let (event, ty): (Option<NaiveDate>, String) =
+        sqlx::query_as("SELECT event_date, type::text FROM wishlists WHERE id=$1")
             .bind(i.wishlist_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -1575,6 +1603,7 @@ async fn item_update(
     let seen = visible(&i);
     let frozen = i.funding_mode == "crowdfund" && i.funding_status.as_deref() != Some("open");
     apply_item(m, &mut i)?;
+    apply_relief(m, &mut i, ty == "relief", false)?;
     apply_funding(&mut tx, m, &mut i, event, locked).await?;
     // 契約：眾籌品項 funded 之後唯讀；後台採購單即時讀這些欄位，不可事後改商品。同值重送不算修改。
     if frozen && product(&i) != before {
@@ -1593,11 +1622,11 @@ async fn item_update(
     // qty_needed >= qty_claimed 在同一 UPDATE 內判斷，避免與捐助競爭
     let res = sqlx::query("UPDATE wishlist_items SET content_changed_at = CASE WHEN $19 THEN now() ELSE content_changed_at END, title=$2, description=$3, brand=$4, spec=$5, image_key=$6, image_status=$7::image_status, product_url=$8,
                  unit_price_amount=$9, priority=$10::item_priority, qty_needed=$11, funding_mode=$13::funding_mode, target_points=$14,
-                 funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18
+                 funding_status=$15::funding_status, funding_deadline=$16, fulfillment_type=$17::fulfillment_type, price_snapshot_amount=$18, category=$20, urgency=$21
                  WHERE id=$1 AND qty_claimed <= $11 AND ($12::timestamptz IS NULL OR updated_at=$12)")
         .bind(id).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status).bind(&i.product_url)
         .bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed).bind(exp)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(changed)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(changed).bind(&i.category).bind(&i.urgency)
         .execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         let cur: Option<(DateTime<Utc>, i32)> = sqlx::query_as(

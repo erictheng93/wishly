@@ -156,6 +156,8 @@ struct It {
     funding_status: Option<String>,
     display_status: Option<String>,
     funding_deadline: Option<DateTime<Utc>>,
+    category: Option<String>,
+    urgency: Option<String>,
 }
 
 /// 可被 CDN 快取的路徑：**不讀 cookie**，只會回 public 清單內容；
@@ -247,7 +249,7 @@ async fn render(
     let items: Vec<It> = sqlx::query_as(
         sqlx::AssertSqlSafe(format!("SELECT i.id, i.title, i.brand, i.spec, i.image_key, i.image_status::text AS image_status, i.product_url, i.unit_price_amount,
                 i.priority::text AS priority, i.funding_mode::text AS funding_mode, i.qty_needed, i.qty_claimed,
-                i.target_points, i.pledged_points, i.funding_status::text AS funding_status, ({}) AS display_status, i.funding_deadline
+                i.target_points, i.pledged_points, i.funding_status::text AS funding_status, ({}) AS display_status, i.funding_deadline, i.category, i.urgency
          FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id
          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id", crate::points::DISPLAY_STATUS_SQL)))
         .bind(w.id).fetch_all(&st.pool).await?;
@@ -326,6 +328,7 @@ async fn render(
             "id": i.id, "title": i.title, "brand": i.brand, "spec": i.spec,
             "image_url": image_url(i.image_key.as_deref(), &i.image_status),
             "product_url": i.product_url, "unit_price_amount": i.unit_price_amount, "priority": i.priority,
+            "category": i.category, "urgency": i.urgency,
             "funding_mode": i.funding_mode, "qty_needed": i.qty_needed, "qty_claimed": i.qty_claimed,
             "qty_remaining": i.qty_needed - i.qty_claimed, "is_fully_claimed": if cf { funded } else { i.qty_claimed >= i.qty_needed },
             "target_points": i.target_points, "pledged_points": cf.then_some(i.pledged_points),
