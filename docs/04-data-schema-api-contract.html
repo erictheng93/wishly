@@ -2502,7 +2502,7 @@ Vary: Origin</code></pre>
   "updated_at": "2026-10-08T03:12:45Z"
 }</code></pre><h5>可能錯誤碼</h5><div class="errs"><a href="#err-UNAUTHORIZED"><code>UNAUTHORIZED</code></a> <a href="#err-VALIDATION_FAILED"><code>VALIDATION_FAILED</code></a></div><div class="note">surprise_mode=true 時 event_date 必填且須為未來日期。type=relief 回 VALIDATION_FAILED。回應的 surprise_locked 為衍生欄位（surprise_mode 且 now &lt; unlock_at；unlock_at = event_date 當日 00:00 Asia/Taipei）。可選欄位 claim_ttl_hours（正整數或 null，預設 null）、closes_at（RFC 3339 或 null，預設 null = 不設期限，須為未來時間，否則 422 <code>/closes_at</code>）。<strong>可見性（D51）：</strong><code>visibility</code> 為 friends（預設，所有好友）| selected（摯友）| public | private（見 <a href="#vis-matrix">可見性矩陣</a>）；傳 link / password 或其他值 → 422 <code>/visibility</code>。visibility=selected 的名單另用 <code>PUT /wishlists/{id}/allowed-users</code> 設定。</div></div><div class="ep" id="ep-get-wishlists"><h4><span class="badge m-GET">GET</span><code class="path">/api/v1/wishlists</code><span class="badge p-P0">P0</span></h4><div class="meta">認證：ws_session</div><p>我的清單列表（不含已刪除），依 id 倒序（UUID v7 即建立時間倒序）。</p><h5>Query 參數</h5><pre><code>cursor, limit（預設 20，最大 100）；status（選填，可用逗號列多個，如 <code>draft,active,closed</code>；任一值不合法回 422 <code>/status</code>）；type（選填）</code></pre><h5>Response 200</h5><pre><code>{
   "data": [
-    { "id": "0192f3a0-7c1e-7b2a-9d4e-1a2b3c4d5e01", "type": "personal", "status": "active", "slug": "Ab3dE5gH7k",
+    { "id": "0192f3a0-7c1e-7b2a-9d4e-1a2b3c4d5e01", "type": "personal", "status": "active", "visibility": "friends", "slug": "Ab3dE5gH7k",
       "title": "小米與阿嘉的寶寶迎接清單", "event_date": "2026-12-01",
       "cover_image_url": "https://media.wishly.tw/covers/0192f3a0-aaaa.webp",
       "cover_preset": null,

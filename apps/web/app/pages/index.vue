@@ -1,8 +1,24 @@
 <script setup lang="ts">
-const { user, fetchMe } = useAuth()
+const { user, loaded, fetchMe } = useAuth()
 const { t } = useI18n()
 onMounted(() => fetchMe())
-const cta = computed(() => user.value ? { to: '/dashboard', text: t('me.home.myLists') } : { to: '/login', text: t('me.home.start') })
+// 已登入：Hero 換成歡迎詞＋數字摘要，示意卡換成自己的清單；好友申請數也給頭像紅點用
+const { count: requests, refresh: refreshRequests } = useFriendRequests()
+const { api } = useApi()
+const mine = ref<{ lists: any[], more: boolean } | null>(null)
+const mineErr = ref(false)
+async function loadMine() {
+  mineErr.value = false
+  // shortcut: 只抓前 100 份算份數與已認領，超過顯示「+」；真有人超過再加後端摘要端點
+  try { const r = await api('/wishlists', { query: { limit: 100, status: 'draft,active,closed' }, noRedirect: true }); mine.value = { lists: r.data, more: !!r.next_cursor } }
+  catch { mineErr.value = true }
+}
+watch(() => user.value?.id, (id) => { if (id) { refreshRequests(); loadMine() } else mine.value = null }, { immediate: true })
+const plus = computed(() => mine.value?.more ? '+' : '')
+const stats = computed(() => mine.value && { lists: `${mine.value.lists.length}${plus.value}`, claimed: `${mine.value.lists.reduce((n, w) => n + (w.completion?.fulfilled_count ?? 0), 0)}${plus.value}` })
+const visLabel = (v: string) => VIS_OPTIONS.find(o => o.v === v)?.label ?? ''
+const name = computed(() => user.value?.display_name || user.value?.email || '')
+const cta = computed(() => user.value ? { to: '/dashboard', text: t('me.home.myLists') } : { to: '/register', text: t('me.home.start') })
 
 useSeoMeta({
   title: () => t('me.home.seoTitle'),
@@ -28,14 +44,37 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
           <NuxtLink to="/brands" class="l-nav-link">{{ $t('me.home.brands') }}</NuxtLink>
           <NuxtLink to="/#scenes" class="l-nav-link">{{ $t('me.home.seeDemo') }}</NuxtLink>
           <LocaleSwitch />
-          <NuxtLink :to="cta.to" class="g-btn sm">{{ cta.text }}</NuxtLink>
+          <!-- 登入狀態未確定前先佔位，避免 SSR 的未登入按鈕閃一下又變 -->
+          <span v-if="!loaded" class="l-auth-wait" aria-hidden="true" />
+          <template v-else-if="user">
+            <NuxtLink to="/dashboard" class="g-btn sm l-wide">{{ $t('me.home.myLists') }}</NuxtLink>
+            <CreatorUserMenu />
+          </template>
+          <template v-else>
+            <NuxtLink to="/login" class="g-btn sm ghost">{{ $t('me.home.login') }}</NuxtLink>
+            <NuxtLink to="/register" class="g-btn sm l-wide">{{ $t('me.home.start') }}</NuxtLink>
+          </template>
         </nav>
       </div>
     </header>
 
     <main>
       <section class="l-hero l-in">
-        <div class="l-hero-copy">
+        <div v-if="user" class="l-hero-copy">
+          <p class="l-kicker l-on">{{ $t('me.home.signedIn') }}</p>
+          <h1>{{ $t('me.home.welcome', { name }) }}</h1>
+          <p class="l-lead">{{ $t('me.home.todayLead') }}</p>
+          <div class="l-stats">
+            <NuxtLink to="/dashboard"><b>{{ stats?.lists ?? '–' }}</b>{{ $t('me.home.statLists') }}</NuxtLink>
+            <NuxtLink to="/dashboard"><b>{{ stats?.claimed ?? '–' }}</b>{{ $t('me.home.statClaimed') }}</NuxtLink>
+            <NuxtLink to="/friends"><b>{{ requests }}</b>{{ $t('me.home.statRequests') }}</NuxtLink>
+          </div>
+          <div class="l-cta">
+            <NuxtLink to="/dashboard" class="g-btn">{{ $t('me.home.myLists') }}</NuxtLink>
+            <NuxtLink to="/explore" class="g-btn ghost">{{ $t('me.home.ctaExplore') }}</NuxtLink>
+          </div>
+        </div>
+        <div v-else class="l-hero-copy">
           <p class="l-kicker">{{ $t('me.home.kicker') }}</p>
           <h1>{{ $t('me.home.h1') }}</h1>
           <p class="l-lead">{{ $t('me.home.lead') }}</p>
@@ -47,8 +86,24 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
           </div>
         </div>
 
+        <div v-if="user" class="l-mine">
+          <div class="l-mine-top"><span>{{ $t('me.home.mineTitle', { name }) }}</span><NuxtLink to="/dashboard">{{ $t('me.home.mineAll') }} →</NuxtLink></div>
+          <p v-if="mineErr" class="l-mine-msg" role="alert">{{ $t('me.home.mineErr') }} <button type="button" class="g-btn sm ghost" @click="loadMine">{{ $t('lists.common.retry') }}</button></p>
+          <p v-else-if="!mine" class="l-mine-msg" role="status">{{ $t('lists.common.loading') }}</p>
+          <p v-else-if="!mine.lists.length" class="l-mine-msg">{{ $t('lists.dashboard.empty') }}</p>
+          <ul v-else>
+            <li v-for="w in mine.lists.slice(0, 3)" :key="w.id">
+              <div class="l-mine-r">
+                <NuxtLink :to="`/lists/${w.id}/edit`" class="l-mine-t">{{ w.title }}</NuxtLink>
+                <span class="l-mine-vis">{{ visLabel(w.visibility) }}</span>
+              </div>
+              <div class="g-bar" role="img" :aria-label="`${w.completion?.completion_pct ?? 0}%`"><i :style="{ width: `${w.completion?.completion_pct ?? 0}%` }" /></div>
+            </li>
+          </ul>
+          <NuxtLink to="/lists/new" class="l-mine-new">{{ $t('lists.dashboard.create') }}</NuxtLink>
+        </div>
         <!-- 假卡片：純示意，不取後端資料 -->
-        <div class="l-demo" role="img" :aria-label="$t('me.home.demoAria')">
+        <div v-else class="l-demo" role="img" :aria-label="$t('me.home.demoAria')">
           <div class="g-top l-demo-top"><span>{{ $t('me.home.demoTitle') }}</span><span class="g-mute">{{ $t('me.home.demoCount') }}</span></div>
           <ul>
             <li class="g-card g-item">
@@ -150,11 +205,31 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-in{max-width:1080px;margin:0 auto;padding:0 var(--pad)}
 .l-nav{position:sticky;top:0;z-index:20;background:var(--glass);border-bottom:3px solid var(--red);padding-top:env(safe-area-inset-top)}
 .l-nav .l-in{display:flex;justify-content:space-between;align-items:center;min-height:52px}
-.l-nav nav{display:flex;align-items:center;gap:8px}
+.l-nav .l-in>nav{display:flex;align-items:center;gap:8px}
 .l-logo{color:var(--red-text);letter-spacing:.2em;font-size:16px}
 .l-nav-link{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.1em}
-/* 窄螢幕：頁首只留 Logo、語言切換與 CTA（探索 / 看範例在 Hero 按鈕已有），收緊字距與間距讓 CTA 不折行 */
-@media (max-width:479px){.l-nav-link{display:none}.l-logo{letter-spacing:.08em}.l-nav nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
+/* 已登入：Hero 歡迎詞＋數字摘要、右側自己的清單（取代示意卡） */
+.l-auth-wait{display:inline-block;width:132px;height:44px}
+.l-on::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--red);vertical-align:2px}
+.l-stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:24px;border:1px solid var(--line);text-align:left}
+.l-stats a{display:flex;flex-direction:column;min-height:44px;padding:10px 12px;border-right:1px solid var(--line);color:var(--mute);font-size:13px;letter-spacing:.06em}
+.l-stats a:last-child{border-right:0}
+.l-stats b{font-size:26px;line-height:1.2;color:var(--red-text);letter-spacing:0}
+.l-mine{box-sizing:border-box;max-width:420px;width:100%;margin:0 auto;border:2px solid var(--red);background:var(--bg)}
+.l-mine-top{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:0 16px;background:var(--red);color:#fff;font-weight:800;font-size:15px;letter-spacing:.04em}
+.l-mine-top span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l-mine-top a{flex:none;display:inline-flex;align-items:center;min-height:44px;color:#fff;font-size:13px;font-weight:700}
+.l-mine ul{list-style:none;margin:0;padding:4px 16px}
+.l-mine li{padding:10px 0;border-bottom:1px solid var(--line)}
+.l-mine li:last-child{border-bottom:0}
+.l-mine-r{display:flex;align-items:center;gap:12px}
+.l-mine-t{flex:1;min-width:0;color:var(--fg);font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l-mine .g-bar{margin:6px 0 0}
+.l-mine-vis{flex:none;font-size:12px;padding:0 6px;border:1px solid var(--line);color:var(--mute);letter-spacing:.1em}
+.l-mine-msg{padding:20px 16px;color:var(--mute);text-align:center}
+.l-mine-new{display:flex;justify-content:center;align-items:center;min-height:48px;border-top:1px dashed var(--red);font-weight:700;font-size:14px;letter-spacing:.1em}
+/* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有），收緊字距與間距讓 CTA 不折行 */
+@media (max-width:479px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
 .l h2{font-size:24px;margin:0 0 24px;text-align:center}
 .l h3{font-size:17px;margin:8px 0}
 .l p{margin:0}
@@ -209,7 +284,7 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
   .l-hero{grid-template-columns:1.1fr .9fr;align-items:center;gap:64px}
   .l-hero-copy{text-align:left}
   .l-cta{justify-content:flex-start}
-  .l-demo{margin:0 0 0 auto}
+  .l-demo,.l-mine{margin:0 0 0 auto}
   .l-4{grid-template-columns:repeat(4,1fr)}
 }
 </style>

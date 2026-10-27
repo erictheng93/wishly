@@ -494,7 +494,7 @@ async fn list(
     let data: Vec<Value> = rows.iter().map(|w| {
         let (c, f, q, nd) = stats.iter().find(|s| s.0 == w.id).map(|s| (s.1, s.2, s.3, s.4)).unwrap_or((0, 0, 0, 0));
         let j = w.json();
-        json!({ "id": w.id, "type": w.ty, "status": w.status, "slug": w.slug, "title": w.title, "event_date": w.event_date,
+        json!({ "id": w.id, "type": w.ty, "status": w.status, "visibility": w.visibility, "slug": w.slug, "title": w.title, "event_date": w.event_date,
                 "cover_image_url": j["cover_image_url"], "cover_preset": w.cover_preset, "surprise_locked": w.surprise_locked,
                 "completion": { "item_count": c, "fulfilled_count": f, "completion_pct": completion_pct(q, nd) },
                 "moderation_status": w.moderation_status, "moderation_reason": w.moderation_reason,

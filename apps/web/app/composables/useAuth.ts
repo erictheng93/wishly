@@ -48,5 +48,5 @@ export function useAuth() {
     }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
-  return { oauth, user, fetchMe, logout, login, register, verifyRegister, requestReset, confirmReset }
+  return { oauth, user, loaded, fetchMe, logout, login, register, verifyRegister, requestReset, confirmReset }
 }
