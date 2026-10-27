@@ -2,6 +2,7 @@
 // 探索：所有人的公開清單（訪客可看，SSR；API 回應由 CDN 快取，不帶 cookie）
 const { public: { apiBase } } = useRuntimeConfig()
 const { t } = useI18n()
+const orgsOn = await useOrgsEnabled()
 useSeoMeta({ title: () => t('guest.explore.seoTitle'), description: () => t('guest.explore.seoDesc') })
 // personal 與舊 registry 同為「心願清單」
 const typeLabel = (k: string) => t(k === 'relief' ? 'guest.explore.type.relief' : 'guest.explore.type.wishlist')
@@ -27,7 +28,7 @@ async function more() {
   <GuestTop />
   <main class="g-wrap">
     <h1>{{ $t('guest.explore.heading') }}</h1>
-    <NuxtLink to="/e" class="g-banner x-relief"><b>{{ $t('guest.relief.banner') }}</b>・{{ $t('guest.relief.bannerBody') }}</NuxtLink>
+    <NuxtLink v-if="orgsOn" to="/e" class="g-banner x-relief"><b>{{ $t('guest.relief.banner') }}</b>・{{ $t('guest.relief.bannerBody') }}</NuxtLink>
     <div v-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.explore.empty') }}</div>
     <div v-else class="g-grid">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { t } = useI18n()
+const orgsOn = await useOrgsEnabled()
 useHead({ title: () => t('auth.login.title') })
 const route = useRoute()
 const { user, fetchMe, login, oauth } = useAuth()
@@ -70,6 +71,6 @@ async function social(provider: 'google' | 'line') {
     <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
     <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
     <p class="c-mute">{{ $t('auth.login.note') }}</p>
-    <p class="c-center"><NuxtLink to="/org">{{ $t('org.loginHint') }}</NuxtLink></p>
+    <p v-if="orgsOn" class="c-center"><NuxtLink to="/org">{{ $t('org.loginHint') }}</NuxtLink></p>
   </main>
 </template>

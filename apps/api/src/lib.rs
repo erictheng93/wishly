@@ -95,6 +95,7 @@ pub fn app(state: AppState) -> Router {
             state.clone(),
             read_only,
         ))
+        .layer(axum::middleware::from_fn(orgs_gate))
         .layer(axum::middleware::from_fn(request_lang))
         .layer(cors())
         .layer(axum::middleware::map_response(problem_json))
@@ -215,6 +216,72 @@ async fn request_lang(
         .map(notify::Lang::parse)
         .unwrap_or_default();
     notify::REQUEST_LANG.scope(lang, next.run(req)).await
+}
+
+/// 公益組織 / 救災路由前綴（以路徑段比對，`/api/v1/orgs` 不含 `/api/v1/orgsfoo`）
+const ORGS_PREFIXES: [&str; 8] = [
+    "/api/v1/orgs",
+    "/api/v1/org-invites",
+    "/api/v1/relief-events",
+    "/api/v1/public/relief-events",
+    "/api/v1/public/orgs",
+    "/api/v1/admin/orgs",
+    "/api/v1/admin/permits",
+    "/api/v1/admin/relief-events",
+];
+
+fn is_orgs_path(p: &str) -> bool {
+    ORGS_PREFIXES
+        .iter()
+        .any(|x| p.strip_prefix(x).is_some_and(|r| r.is_empty() || r.starts_with('/')))
+}
+
+/// ORGS_ENABLED 關閉時，公益組織相關路由一律 404（不洩漏功能存在）
+async fn orgs_gate(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if !config::get().orgs_enabled && is_orgs_path(req.uri().path()) {
+        return error::AppError::NotFound.into_response();
+    }
+    next.run(req).await
+}
+
+#[cfg(test)]
+mod orgs_gate_tests {
+    use super::is_orgs_path;
+
+    #[test]
+    fn gated_paths() {
+        for p in [
+            "/api/v1/orgs",
+            "/api/v1/orgs/x/members",
+            "/api/v1/org-invites/t/accept",
+            "/api/v1/relief-events",
+            "/api/v1/public/relief-events/a",
+            "/api/v1/public/orgs/s",
+            "/api/v1/admin/orgs/1",
+            "/api/v1/admin/permits/1",
+            "/api/v1/admin/relief-events/1",
+        ] {
+            assert!(is_orgs_path(p), "{p}");
+        }
+    }
+
+    #[test]
+    fn open_paths() {
+        for p in [
+            "/api/v1/orgsfoo",
+            "/api/v1/organizations-x",
+            "/api/v1/wishlists",
+            "/api/v1/public/wishlists/x",
+            "/api/v1/public/status",
+            "/api/v1/me",
+        ] {
+            assert!(!is_orgs_path(p), "{p}");
+        }
+    }
 }
 
 /// system_flags.read_only = true → 非安全方法回 503 READ_ONLY_MODE（退訂 POST 放行：保護性的使用者操作，且只寫退訂偏好；admin system-flags、登出、登入與兩步驟驗證除外：否則 staff 登出後無法登入來關閉唯讀）

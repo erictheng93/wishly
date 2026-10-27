@@ -33,6 +33,8 @@ pub struct Config {
     pub shipping_key: [u8; 32],
     /// 綠界金流（topup.rs）；None = 儲值功能關閉（POST /wallet/topups 與 webhook 回 503 TOPUP_DISABLED）
     pub ecpay: Option<Ecpay>,
+    /// 公益組織 / 救災功能總開關（ORGS_ENABLED，僅 `true` / `1` 為開）；dev/test 恆開，production 預設關，關閉時相關路由回 404
+    pub orgs_enabled: bool,
 }
 
 /// 綠界 AioCheckOut 設定。三個憑證都有才啟用。
@@ -155,6 +157,7 @@ impl Config {
                 v("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
                 &v("API_BASE_URL", "http://localhost:8080"),
             )),
+            orgs_enabled: true,
         }
     }
 
@@ -193,6 +196,7 @@ impl Config {
             )),
             _ => None,
         };
+        c.orgs_enabled = matches!(var("ORGS_ENABLED").as_deref(), Some("true" | "1"));
         c.otp_pepper = must("OTP_PEPPER")?;
         c.oauth_secret = must("OAUTH_SECRET")?;
         c.unsub_secret = must("UNSUB_SECRET")?;
