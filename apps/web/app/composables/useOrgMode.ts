@@ -10,10 +10,14 @@ export function useOrgMode() {
   const saved = useState<string | null>('org-mode', read)
   const orgs = computed<MeOrg[]>(() => user.value?.orgs ?? [])
   const current = computed(() => (saved.value && orgs.value.some(o => o.id === saved.value) ? saved.value : null))
-  function switchTo(id: string | null) {
+  // 只對齊目前身分、不導頁（進 /orgs/[id] 時用，避免導頁迴圈）
+  function adopt(id: string | null) {
     saved.value = id
     try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY) } catch {}
+  }
+  function switchTo(id: string | null) {
+    adopt(id)
     navigateTo(id ? `/orgs/${id}` : '/dashboard')
   }
-  return { current, orgs, switchTo }
+  return { current, orgs, switchTo, adopt }
 }

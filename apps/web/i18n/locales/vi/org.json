@@ -71,6 +71,49 @@
         "other": "Tổ chức đã đăng ký khác"
       },
       "reapply": "Đăng ký lại"
+    },
+    "console": {
+      "title": "Bảng điều khiển tổ chức",
+      "members": "Thành viên & lời mời",
+      "events": "Sự kiện cứu trợ",
+      "sites": "Điểm tiếp nhận",
+      "newEvent": "Thêm sự kiện",
+      "newSite": "Thêm điểm tiếp nhận",
+      "noEvents": "Chưa có sự kiện",
+      "noSites": "Chưa có điểm tiếp nhận",
+      "edit": "Sửa",
+      "publicPage": "Trang công khai"
+    },
+    "members": {
+      "title": "Thành viên & lời mời",
+      "list": "Thành viên",
+      "disabled": "Đã vô hiệu hóa",
+      "role": "Vai trò",
+      "disable": "Vô hiệu hóa",
+      "enable": "Kích hoạt",
+      "inviteTitle": "Mời thành viên",
+      "handle": "Tên hiển thị (tùy chọn)",
+      "send": "Gửi lời mời",
+      "linkHint": "Đã tạo liên kết mời. Hãy sao chép hoặc chia sẻ mã QR.",
+      "link": "Liên kết mời",
+      "copy": "Sao chép",
+      "copied": "Đã sao chép",
+      "pending": "Lời mời đang chờ",
+      "noPending": "Không có lời mời đang chờ",
+      "cancel": "Hủy lời mời",
+      "disableTitle": "Vô hiệu hóa thành viên",
+      "disableText": "Vô hiệu hóa {name}? Họ sẽ không thể thao tác cho tổ chức này nữa.",
+      "r": {
+        "owner": "Chủ sở hữu",
+        "coordinator": "Điều phối viên",
+        "volunteer": "Tình nguyện viên"
+      }
+    },
+    "invite": {
+      "title": "Tham gia tổ chức",
+      "text": "{org} mời bạn làm {role}",
+      "accept": "Chấp nhận lời mời",
+      "mismatch": "Vui lòng đăng nhập bằng {email}, hoặc nhờ quản trị viên gửi lại lời mời tới email của bạn"
     }
   }
 }
