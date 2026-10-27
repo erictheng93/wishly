@@ -39,13 +39,19 @@ impl FromRequestParts<AppState> for Staff {
     type Rejection = AppError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
         let u = CurrentUser::from_request_parts(parts, st).await?;
-        if !u.is_staff {
-            Err(AppError::problem(403, "STAFF_ONLY", "僅營運人員可使用"))
-        } else if u.mfa_enabled && !u.mfa {
-            Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"))
-        } else {
-            Ok(Staff(u.id))
-        }
+        require_staff(&u)?;
+        Ok(Staff(u.id))
+    }
+}
+
+/// `Staff` 守衛的判斷；已持有 `CurrentUser`、只有部分分支需要 staff 時直接呼叫。
+pub fn require_staff(u: &CurrentUser) -> Result<(), AppError> {
+    if !u.is_staff {
+        Err(AppError::problem(403, "STAFF_ONLY", "僅營運人員可使用"))
+    } else if u.mfa_enabled && !u.mfa {
+        Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"))
+    } else {
+        Ok(())
     }
 }
 
