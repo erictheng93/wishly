@@ -55,9 +55,14 @@ async fn record(
 ) -> Result<Response, AppError> {
     require_role(&st.pool, org, me.id, "volunteer").await?;
     let key = idempotency::key(&headers)?;
-    let req: Req = serde_json::from_slice(&body).map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))?;
+    let req: Req = serde_json::from_slice(&body)
+        .map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))?;
     if !(1..=MAX_QTY).contains(&req.qty) {
-        return Err(AppError::invalid("/qty", "RANGE", "qty 必須介於 1 與 100000"));
+        return Err(AppError::invalid(
+            "/qty",
+            "RANGE",
+            "qty 必須介於 1 與 100000",
+        ));
     }
     let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
     if note.is_some_and(|n| n.chars().count() > 200) {
@@ -67,7 +72,9 @@ async fn record(
     let scope = format!("user:{}:POST /orgs/{org}/receipts", me.id);
     let hash = idempotency::request_hash(&format!("POST /orgs/{org}/receipts"), &body);
     let mut tx = st.pool.begin().await?;
-    if let idempotency::Begin::Replay(s, b) = idempotency::begin(&mut tx, &scope, key, &hash).await? {
+    if let idempotency::Begin::Replay(s, b) =
+        idempotency::begin(&mut tx, &scope, key, &hash).await?
+    {
         return Ok(resp(s as u16, &b, true));
     }
     let site: (Uuid, String) = sqlx::query_as(
@@ -75,13 +82,24 @@ async fn record(
          WHERE i.id = $1 AND i.deleted_at IS NULL AND w.type = 'relief' AND w.org_id = $2 AND w.deleted_at IS NULL")
         .bind(req.item_id).bind(org).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
     if site.1 == "closed" {
-        return Err(AppError::problem(409, "SITE_CLOSED", "此據點已結束，無法再登記實收"));
+        return Err(AppError::problem(
+            409,
+            "SITE_CLOSED",
+            "此據點已結束，無法再登記實收",
+        ));
     }
     let (id, created_at): (Uuid, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
         "INSERT INTO receipts (item_id, wishlist_id, qty, note, recorded_by) VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at")
         .bind(req.item_id).bind(site.0).bind(req.qty).bind(note).bind(me.id).fetch_one(&mut *tx).await?;
-    audit_user(&mut *tx, me.id, "receipt.create", "receipt", Some(id),
-        json!({"org_id": org, "wishlist_id": site.0, "item_id": req.item_id, "qty": req.qty})).await?;
+    audit_user(
+        &mut *tx,
+        me.id,
+        "receipt.create",
+        "receipt",
+        Some(id),
+        json!({"org_id": org, "wishlist_id": site.0, "item_id": req.item_id, "qty": req.qty}),
+    )
+    .await?;
     let out = json!({"id": id, "item_id": req.item_id, "qty": req.qty, "note": note, "created_at": created_at});
     idempotency::finish(&mut tx, &scope, key, 201, &out).await?;
     tx.commit().await?;

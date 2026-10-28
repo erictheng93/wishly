@@ -58,8 +58,15 @@ pub fn tax_id_ok(s: &str) -> bool {
         return false;
     }
     let d: Vec<u32> = s.bytes().map(|b| (b - b'0') as u32).collect();
-    let sum: u32 = d.iter().zip([1, 2, 1, 2, 1, 2, 4, 1]).map(|(a, w)| { let p = a * w; p / 10 + p % 10 }).sum();
-    sum % 5 == 0 || (d[6] == 7 && (sum + 1) % 5 == 0)
+    let sum: u32 = d
+        .iter()
+        .zip([1, 2, 1, 2, 1, 2, 4, 1])
+        .map(|(a, w)| {
+            let p = a * w;
+            p / 10 + p % 10
+        })
+        .sum();
+    sum.is_multiple_of(5) || (d[6] == 7 && (sum + 1).is_multiple_of(5))
 }
 
 #[cfg(test)]

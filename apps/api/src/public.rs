@@ -382,7 +382,10 @@ mod relief {
     use super::*;
     use axum::extract::Query;
 
-    const CACHE: [(header::HeaderName, &str); 1] = [(header::CACHE_CONTROL, "public, s-maxage=10, stale-while-revalidate=60")];
+    const CACHE: [(header::HeaderName, &str); 1] = [(
+        header::CACHE_CONTROL,
+        "public, s-maxage=10, stale-while-revalidate=60",
+    )];
     const EVENTS_PAGE: i64 = 20;
     /// 公開可見的據點：上線、public、據點狀態 active、未下架
     const LIVE_SITE: &str = "w.type = 'relief' AND w.status = 'active' AND w.visibility = 'public' AND w.site_status = 'active'
@@ -390,7 +393,11 @@ mod relief {
         AND EXISTS (SELECT 1 FROM organizations vo WHERE vo.id = w.org_id AND vo.verification_status = 'verified')";
 
     /// relief 清單頁多帶組織 / 事件 / 據點資訊
-    pub async fn extend_site(pool: &sqlx::PgPool, id: Uuid, body: &mut Value) -> Result<(), AppError> {
+    pub async fn extend_site(
+        pool: &sqlx::PgPool,
+        id: Uuid,
+        body: &mut Value,
+    ) -> Result<(), AppError> {
         let v: Value = sqlx::query_scalar(
             "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', o.verification_status = 'verified'),
                     'site_address', w.site_address, 'site_status', w.site_status)
@@ -419,7 +426,10 @@ mod relief {
         page: Option<i64>,
     }
 
-    pub async fn events(State(st): State<AppState>, Query(q): Query<PageQ>) -> Result<Response, AppError> {
+    pub async fn events(
+        State(st): State<AppState>,
+        Query(q): Query<PageQ>,
+    ) -> Result<Response, AppError> {
         let page = q.page.unwrap_or(1).clamp(1, 100);
         let mut rows: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT {j} FROM relief_events WHERE merged_into IS NULL AND moderation_status = 'ok'
@@ -428,10 +438,17 @@ mod relief {
             .bind(EVENTS_PAGE + 1).bind((page - 1) * EVENTS_PAGE).fetch_all(&st.pool).await?;
         let more = rows.len() as i64 > EVENTS_PAGE;
         rows.truncate(EVENTS_PAGE as usize);
-        Ok((CACHE, Json(json!({ "events": rows, "next_page": more.then_some(page + 1) }))).into_response())
+        Ok((
+            CACHE,
+            Json(json!({ "events": rows, "next_page": more.then_some(page + 1) })),
+        )
+            .into_response())
     }
 
-    pub async fn event(State(st): State<AppState>, Path(slug): Path<String>) -> Result<Response, AppError> {
+    pub async fn event(
+        State(st): State<AppState>,
+        Path(slug): Path<String>,
+    ) -> Result<Response, AppError> {
         if !crate::validate::slug_ok(&slug) {
             return Err(AppError::NotFound);
         }
@@ -455,10 +472,19 @@ mod relief {
             return Err(AppError::NotFound);
         }
         if seen.len() > 1 {
-            return Ok((CACHE, Json(json!({ "merged_into": ev.1, "event": null, "sites": [] }))).into_response());
+            return Ok((
+                CACHE,
+                Json(json!({ "merged_into": ev.1, "event": null, "sites": [] })),
+            )
+                .into_response());
         }
-        let event: Value = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT {} FROM relief_events WHERE id = $1", crate::relief_events::J)))
-            .bind(ev.0).fetch_one(&st.pool).await?;
+        let event: Value = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT {} FROM relief_events WHERE id = $1",
+            crate::relief_events::J
+        )))
+        .bind(ev.0)
+        .fetch_one(&st.pool)
+        .await?;
         // 尚未滿足：數量型 qty_claimed < qty_needed；眾籌型只有 open 算（funded / fulfilled 已達標，expired 已結束不再募）
         let sites: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT jsonb_build_object('slug', w.slug, 'title', w.title, 'site_address', w.site_address, 'site_status', w.site_status,
@@ -472,10 +498,17 @@ mod relief {
                 "'{u}', count(i.id) FILTER (WHERE i.urgency = '{u}' AND CASE WHEN i.funding_mode = 'crowdfund' THEN i.funding_status = 'open' ELSE i.qty_claimed < i.qty_needed END)"
             )).join(","))))
             .bind(ev.0).fetch_all(&st.pool).await?;
-        Ok((CACHE, Json(json!({ "event": event, "sites": sites, "merged_into": null }))).into_response())
+        Ok((
+            CACHE,
+            Json(json!({ "event": event, "sites": sites, "merged_into": null })),
+        )
+            .into_response())
     }
 
-    pub async fn org(State(st): State<AppState>, Path(slug): Path<String>) -> Result<Response, AppError> {
+    pub async fn org(
+        State(st): State<AppState>,
+        Path(slug): Path<String>,
+    ) -> Result<Response, AppError> {
         if !crate::validate::slug_ok(&slug) {
             return Err(AppError::NotFound);
         }
@@ -485,7 +518,9 @@ mod relief {
                FROM organizations WHERE slug = $1 AND verification_status = 'verified'")
             .bind(&slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
         let key = v["logo_key"].take();
-        v["logo"] = json!(key.as_str().map(|k| crate::uploads::S3::get().public_url(k)));
+        v["logo"] = json!(key
+            .as_str()
+            .map(|k| crate::uploads::S3::get().public_url(k)));
         v.as_object_mut().map(|o| o.remove("logo_key"));
         let sites: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT jsonb_build_object('slug', w.slug, 'title', w.title, 'site_address', w.site_address, 'site_status', w.site_status,

@@ -24,12 +24,30 @@ pub fn routes() -> Router<AppState> {
 
 /// needs_changes 可標記的欄位：組織可編輯欄位 + 文件 / 許可。
 const FLAGGABLE: &[&str] = &[
-    "legal_name", "display_name", "org_type", "tax_id", "registration_no", "authority", "website", "intro",
-    "logo_key", "rep_name", "contact_name", "contact_title", "contact_phone", "public_email", "public_phone",
-    "documents", "permits",
+    "legal_name",
+    "display_name",
+    "org_type",
+    "tax_id",
+    "registration_no",
+    "authority",
+    "website",
+    "intro",
+    "logo_key",
+    "rep_name",
+    "contact_name",
+    "contact_title",
+    "contact_phone",
+    "public_email",
+    "public_phone",
+    "documents",
+    "permits",
 ];
 
-async fn list(_: Staff, State(st): State<AppState>, Query(q): Query<PageQ>) -> Result<Response, AppError> {
+async fn list(
+    _: Staff,
+    State(st): State<AppState>,
+    Query(q): Query<PageQ>,
+) -> Result<Response, AppError> {
     let lim = limit(&q);
     // 先送的先審；cursor 為上一頁最後一筆 id，以 (submitted_at, id) 接續
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
@@ -41,7 +59,11 @@ async fn list(_: Staff, State(st): State<AppState>, Query(q): Query<PageQ>) -> R
     Ok(page(rows, lim))
 }
 
-async fn detail(_: Staff, State(st): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<Value>, AppError> {
+async fn detail(
+    _: Staff,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, AppError> {
     let row: Option<(Value, Option<Vec<u8>>)> =
         sqlx::query_as("SELECT to_jsonb(o) - 'contact_phone_enc', contact_phone_enc FROM organizations o WHERE id = $1")
             .bind(id).fetch_optional(&st.pool).await?;
@@ -56,7 +78,9 @@ async fn detail(_: Staff, State(st): State<AppState>, Path(id): Path<Uuid>) -> R
                 'disabled_at', m.disabled_at, 'display_name', u.display_name) ORDER BY m.created_at), '[]')
            FROM org_members m JOIN users u ON u.id = m.user_id WHERE m.org_id = $1")
         .bind(id).fetch_one(&st.pool).await?;
-    Ok(Json(json!({ "org": org, "documents": documents, "permits": permits, "members": members })))
+    Ok(Json(
+        json!({ "org": org, "documents": documents, "permits": permits, "members": members }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -66,33 +90,63 @@ struct Review {
     flagged_fields: Option<Vec<String>>,
 }
 
-async fn review(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<Review>) -> Result<Json<Value>, AppError> {
+async fn review(
+    Staff(sid): Staff,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Review>,
+) -> Result<Json<Value>, AppError> {
     let flagged = b.flagged_fields.unwrap_or_default();
-    if b.decision == "needs_changes" && (flagged.is_empty() || flagged.iter().any(|f| !FLAGGABLE.contains(&f.as_str()))) {
-        return Err(AppError::invalid("/flagged_fields", "INVALID", "需至少一個合法欄位"));
+    if b.decision == "needs_changes"
+        && (flagged.is_empty() || flagged.iter().any(|f| !FLAGGABLE.contains(&f.as_str())))
+    {
+        return Err(AppError::invalid(
+            "/flagged_fields",
+            "INVALID",
+            "需至少一個合法欄位",
+        ));
     }
     if !matches!(b.decision.as_str(), "approve" | "needs_changes" | "reject") {
         return Err(AppError::invalid("/decision", "INVALID", "decision 不合法"));
     }
     let mut tx = crate::begin_contended(&st.pool).await?;
     // 鎖組織列：兩位 staff 同時審同一筆時，只有一個轉移會成功
-    let (status, display_name): (String, String) =
-        sqlx::query_as("SELECT verification_status, display_name FROM organizations WHERE id = $1 FOR UPDATE")
-            .bind(id).fetch_optional(&mut *tx).await?
-            .ok_or_else(|| AppError::problem(404, "NOT_FOUND", "組織不存在"))?;
+    let (status, display_name): (String, String) = sqlx::query_as(
+        "SELECT verification_status, display_name FROM organizations WHERE id = $1 FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::problem(404, "NOT_FOUND", "組織不存在"))?;
     let allowed = match b.decision.as_str() {
         "reject" => matches!(status.as_str(), "pending" | "verified"),
         _ => status == "pending",
     };
     if !allowed {
-        return Err(AppError::problem(409, "INVALID_STATE", format!("目前狀態 {status} 不可執行 {}", b.decision)));
+        return Err(AppError::problem(
+            409,
+            "INVALID_STATE",
+            format!("目前狀態 {status} 不可執行 {}", b.decision),
+        ));
     }
-    let new_status = match b.decision.as_str() { "approve" => "verified", "needs_changes" => "needs_changes", _ => "rejected" };
+    let new_status = match b.decision.as_str() {
+        "approve" => "verified",
+        "needs_changes" => "needs_changes",
+        _ => "rejected",
+    };
     if new_status == "verified" {
-        let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM org_permits WHERE org_id = $1 AND status = 'approved')")
-            .bind(id).fetch_one(&mut *tx).await?;
+        let ok: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM org_permits WHERE org_id = $1 AND status = 'approved')",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
         if !ok {
-            return Err(AppError::problem(409, "PERMIT_REQUIRED", "需至少一張已核准的勸募許可"));
+            return Err(AppError::problem(
+                409,
+                "PERMIT_REQUIRED",
+                "需至少一張已核准的勸募許可",
+            ));
         }
     }
     sqlx::query("UPDATE organizations SET verification_status = $2, review_note = $3, flagged_fields = $4,
@@ -105,13 +159,17 @@ async fn review(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uu
     let slugs: Vec<String> = if status == "verified" {
         sqlx::query_scalar("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug")
             .bind(id).fetch_all(&mut *tx).await?
-    } else { vec![] };
+    } else {
+        vec![]
+    };
     // 撤銷時才需要清事件頁與組織頁
     let (ev, org_slug): (Vec<String>, Option<String>) = if status == "verified" {
         (sqlx::query_scalar("SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.org_id = $1")
             .bind(id).fetch_all(&mut *tx).await?,
          sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id = $1").bind(id).fetch_optional(&mut *tx).await?)
-    } else { (vec![], None) };
+    } else {
+        (vec![], None)
+    };
     sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
                  SELECT m.user_id, 'email'::notification_channel, 'org.review',
                         jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'decision', $3::text, 'note', $4::text, 'revoked', $5::bool)
@@ -137,7 +195,12 @@ struct PermitReview {
     note: Option<String>,
 }
 
-async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<PermitReview>) -> Result<Json<Value>, AppError> {
+async fn review_permit(
+    Staff(sid): Staff,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<PermitReview>,
+) -> Result<Json<Value>, AppError> {
     let new_status = match b.decision.as_str() {
         "approve" => "approved",
         "reject" => "rejected",
@@ -146,18 +209,35 @@ async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): 
     let mut tx = crate::begin_contended(&st.pool).await?;
     // 鎖序：組織 → 許可（與組織審核一致）
     let org_id: Uuid = sqlx::query_scalar("SELECT org_id FROM org_permits WHERE id = $1")
-        .bind(id).fetch_optional(&mut *tx).await?
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
         .ok_or_else(|| AppError::problem(404, "NOT_FOUND", "許可不存在"))?;
-    let (display_name, org_slug): (String, String) = sqlx::query_as("SELECT display_name, slug::text FROM organizations WHERE id = $1 FOR UPDATE")
-        .bind(org_id).fetch_one(&mut *tx).await?;
-    let (status, permit_no): (String, String) = sqlx::query_as("SELECT status, permit_no FROM org_permits WHERE id = $1 FOR UPDATE")
-        .bind(id).fetch_one(&mut *tx).await?;
+    let (display_name, org_slug): (String, String) = sqlx::query_as(
+        "SELECT display_name, slug::text FROM organizations WHERE id = $1 FOR UPDATE",
+    )
+    .bind(org_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    let (status, permit_no): (String, String) =
+        sqlx::query_as("SELECT status, permit_no FROM org_permits WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
     // pending 可核准 / 退件；approved 只能撤銷（reject）
     if !(status == "pending" || (status == "approved" && new_status == "rejected")) {
-        return Err(AppError::problem(409, "INVALID_STATE", format!("許可目前狀態 {status} 不可執行 {}", b.decision)));
+        return Err(AppError::problem(
+            409,
+            "INVALID_STATE",
+            format!("許可目前狀態 {status} 不可執行 {}", b.decision),
+        ));
     }
     sqlx::query("UPDATE org_permits SET status = $2, review_note = $3 WHERE id = $1")
-        .bind(id).bind(new_status).bind(&b.note).execute(&mut *tx).await?;
+        .bind(id)
+        .bind(new_status)
+        .bind(&b.note)
+        .execute(&mut *tx)
+        .await?;
     // 撤銷已核准許可：使用此許可的上線據點暫停（不改組織狀態）
     let slugs: Vec<String> = if status == "approved" {
         let slugs = sqlx::query_scalar("UPDATE wishlists SET site_status = 'paused' WHERE permit_id = $1 AND type = 'relief' AND site_status = 'active' RETURNING slug")
@@ -169,12 +249,24 @@ async fn review_permit(Staff(sid): Staff, State(st): State<AppState>, Path(id): 
                       WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
             .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
         slugs
-    } else { vec![] };
-    let ev: Vec<String> = if slugs.is_empty() { vec![] } else {
+    } else {
+        vec![]
+    };
+    let ev: Vec<String> = if slugs.is_empty() {
+        vec![]
+    } else {
         sqlx::query_scalar("SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.permit_id = $1")
             .bind(id).fetch_all(&mut *tx).await?
     };
-    audit(&mut *tx, sid, "permit.review", "org_permits", Some(id), json!({ "decision": b.decision, "from": status, "note": b.note })).await?;
+    audit(
+        &mut *tx,
+        sid,
+        "permit.review",
+        "org_permits",
+        Some(id),
+        json!({ "decision": b.decision, "from": status, "note": b.note }),
+    )
+    .await?;
     tx.commit().await?;
     if !slugs.is_empty() {
         crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());

@@ -290,7 +290,10 @@ async fn delete_me(
         "SELECT org_id FROM org_members WHERE user_id = $1 AND disabled_at IS NULL
          UNION SELECT org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL")
         .bind(id).fetch_all(&mut *tx).await?;
-    sqlx::query("SELECT id FROM organizations WHERE id = ANY($1) ORDER BY id FOR UPDATE").bind(&site_orgs).execute(&mut *tx).await?;
+    sqlx::query("SELECT id FROM organizations WHERE id = ANY($1) ORDER BY id FOR UPDATE")
+        .bind(&site_orgs)
+        .execute(&mut *tx)
+        .await?;
     let mut site_slugs: Vec<String> = sqlx::query_scalar(
         "WITH s AS (SELECT id, org_id FROM wishlists WHERE owner_id = $1 AND org_id IS NOT NULL AND deleted_at IS NULL ORDER BY id FOR UPDATE)
          UPDATE wishlists w SET owner_id = r.uid FROM s
@@ -299,7 +302,12 @@ async fn delete_me(
                           ORDER BY (m.role = 'owner') DESC, m.created_at, m.user_id LIMIT 1) r ON true
           WHERE w.id = s.id RETURNING w.slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
-    sqlx::query("UPDATE org_members SET disabled_at = now() WHERE user_id = $1 AND disabled_at IS NULL").bind(id).execute(&mut *tx).await?;
+    sqlx::query(
+        "UPDATE org_members SET disabled_at = now() WHERE user_id = $1 AND disabled_at IS NULL",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     // 最後一位 owner 離開時，最早加入的有效 coordinator 升為 owner（組織不會變成無 owner；已持有 org 列鎖）
     sqlx::query(
         "UPDATE org_members SET role = 'owner' WHERE (org_id, user_id) IN (
@@ -355,7 +363,8 @@ async fn delete_me(
         .bind(id).fetch_all(&mut *tx).await?;
     let mut graced: Vec<Uuid> = rows.iter().filter(|r| r.2).map(|r| r.0).collect();
     graced.extend(closed.iter().filter(|c| c.2).map(|c| c.0)); // 這次才結束的清單，他人捐助要給結束寬限
-    let (archived, mut slugs): (Vec<Uuid>, Vec<String>) = rows.into_iter().map(|r| (r.0, r.1)).unzip();
+    let (archived, mut slugs): (Vec<Uuid>, Vec<String>) =
+        rows.into_iter().map(|r| (r.0, r.1)).unzip();
     slugs.extend(site_slugs); // 據點換了擁有者 / 已關閉：公開快取副本一併清掉
     crate::wishlists::release_pledged(&mut tx, &archived).await?; // 別人捐在這些清單上、尚未達標的點數退回各自錢包
                                                                   // F-08：取消他人清單上的 reserved 捐助並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。

@@ -289,8 +289,16 @@ async fn create(
 /// 救災據點暫停 / 結束時不接受新認捐（非據點的 site_status 為 NULL）。
 pub(crate) fn site_gate(s: Option<&str>) -> Result<(), AppError> {
     match s {
-        Some("paused") => Err(AppError::problem(409, "SITE_PAUSED", "此據點已暫停，暫不接受認領")),
-        Some("closed") => Err(AppError::problem(409, "SITE_CLOSED", "此據點已結束，不再接受認領")),
+        Some("paused") => Err(AppError::problem(
+            409,
+            "SITE_PAUSED",
+            "此據點已暫停，暫不接受認領",
+        )),
+        Some("closed") => Err(AppError::problem(
+            409,
+            "SITE_CLOSED",
+            "此據點已結束，不再接受認領",
+        )),
         _ => Ok(()),
     }
 }

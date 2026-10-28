@@ -655,7 +655,11 @@ async fn update(
     }
     if let Some(v) = boolean(m, "show_claimer_names")? {
         if relief && v {
-            return Err(AppError::invalid("/show_claimer_names", "NOT_APPLICABLE", "救災據點不顯示捐助者姓名"));
+            return Err(AppError::invalid(
+                "/show_claimer_names",
+                "NOT_APPLICABLE",
+                "救災據點不顯示捐助者姓名",
+            ));
         }
         w.show_claimer_names = v;
     }
@@ -749,8 +753,13 @@ async fn update(
         w.status = new.into();
     }
     // 已上線的據點換許可、或由暫停 / 關閉恢復營運：用 PATCH 後的許可重驗（暫停 / 關閉 / 改其他欄位不重驗，許可到期不該擋住收攤）
-    let resumed = w.site_status.as_deref() == Some("active") && old_site_status.as_deref() != Some("active");
-    if relief && old_status == "active" && w.status == "active" && (w.permit_id != old_permit || resumed) {
+    let resumed =
+        w.site_status.as_deref() == Some("active") && old_site_status.as_deref() != Some("active");
+    if relief
+        && old_status == "active"
+        && w.status == "active"
+        && (w.permit_id != old_permit || resumed)
+    {
         relief_publishable(&mut tx, &w).await?;
     }
     // 重開為 active 時，建立者帳號已刪除 / 停權就改記操作者，否則認捐會因查不到 owner 而 404
@@ -784,7 +793,12 @@ async fn update(
     if relief && m.contains_key("site_address") {
         // 收件地址 = 據點地址：眾籌採購讀 shipping_addresses，兩邊要一致
         sqlx::query("UPDATE shipping_addresses SET address_enc = $2 WHERE wishlist_id = $1")
-            .bind(id).bind(crate::sealed::seal(w.site_address.as_deref().unwrap_or_default().as_bytes())).execute(&mut *tx).await?;
+            .bind(id)
+            .bind(crate::sealed::seal(
+                w.site_address.as_deref().unwrap_or_default().as_bytes(),
+            ))
+            .execute(&mut *tx)
+            .await?;
     }
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;
@@ -802,27 +816,57 @@ async fn update(
         crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
     }
     // 據點的公開頁與所屬事件頁（含換事件前的舊事件）會顯示營運狀態 / 地址
-    if relief && (w.site_status != old_site_status || w.site_address != old_addr || w.event_id != old_event || w.status != old_status) {
+    if relief
+        && (w.site_status != old_site_status
+            || w.site_address != old_addr
+            || w.event_id != old_event
+            || w.status != old_status)
+    {
         crate::cdn::purge_wishlists(vec![w.slug.trim().to_owned()]); // 與上面的 purge 分開寫：mutate.py 的 cdn-private 以原文唯一定位
         let evs: Vec<Uuid> = [w.event_id, old_event].into_iter().flatten().collect();
-        let slugs: Vec<String> = sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)").bind(&evs).fetch_all(&st.pool).await.unwrap_or_default();
+        let slugs: Vec<String> =
+            sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)")
+                .bind(&evs)
+                .fetch_all(&st.pool)
+                .await
+                .unwrap_or_default();
         crate::cdn::purge_events(slugs);
     }
     Ok(Json(load_owned(&st.pool, id, u.id).await?.json()))
 }
 
 /// relief 據點的 PATCH 欄位：type / visibility / org_id 不可改；site_status / site_address / event_id / permit_id 可改（非 relief 不接受）。
-async fn apply_site_fields(tx: &mut crate::points::Tx<'_>, m: &Map<String, Value>, w: &mut W, relief: bool) -> R<()> {
+async fn apply_site_fields(
+    tx: &mut crate::points::Tx<'_>,
+    m: &Map<String, Value>,
+    w: &mut W,
+    relief: bool,
+) -> R<()> {
     const SITE: [&str; 4] = ["site_status", "site_address", "event_id", "permit_id"];
     if !relief {
         return match SITE.iter().find(|k| m.contains_key(**k)) {
-            Some(k) => Err(AppError::invalid(&format!("/{k}"), "NOT_APPLICABLE", "只有救災據點可設定此欄位")),
+            Some(k) => Err(AppError::invalid(
+                &format!("/{k}"),
+                "NOT_APPLICABLE",
+                "只有救災據點可設定此欄位",
+            )),
             None => Ok(()),
         };
     }
-    let fixed = [("type", json!(w.ty)), ("visibility", json!(w.visibility)), ("org_id", json!(w.org_id))];
-    if let Some((k, _)) = fixed.iter().find(|(k, cur)| m.get(*k).is_some_and(|v| v != cur)) {
-        return Err(AppError::invalid(&format!("/{k}"), "IMMUTABLE", "救災據點的此欄位不可修改"));
+    let fixed = [
+        ("type", json!(w.ty)),
+        ("visibility", json!(w.visibility)),
+        ("org_id", json!(w.org_id)),
+    ];
+    if let Some((k, _)) = fixed
+        .iter()
+        .find(|(k, cur)| m.get(*k).is_some_and(|v| v != cur))
+    {
+        return Err(AppError::invalid(
+            &format!("/{k}"),
+            "IMMUTABLE",
+            "救災據點的此欄位不可修改",
+        ));
     }
     let new_status = one_of(m, "site_status", &["active", "paused", "closed"])?;
     // 恢復營運（非 active → active）：事件被下架時不可由組織自行恢復（下架會暫停據點）
@@ -831,27 +875,48 @@ async fn apply_site_fields(tx: &mut crate::points::Tx<'_>, m: &Map<String, Value
         w.site_status = Some(v.into());
     }
     if let Some(v) = text(m, "site_address", 5, 200)? {
-        w.site_address = Some(v.ok_or_else(|| AppError::invalid("/site_address", "REQUIRED", "site_address 不可為空"))?);
+        w.site_address = Some(v.ok_or_else(|| {
+            AppError::invalid("/site_address", "REQUIRED", "site_address 不可為空")
+        })?);
     }
     let uuid = |k: &str| -> R<Option<Uuid>> {
         match m.get(k) {
             None => Ok(None),
-            Some(Value::String(s)) => s.parse().map(Some).map_err(|_| AppError::invalid(&format!("/{k}"), "FORMAT", "須為 UUID")),
-            _ => Err(AppError::invalid(&format!("/{k}"), "TYPE", "須為 UUID 字串")),
+            Some(Value::String(s)) => s
+                .parse()
+                .map(Some)
+                .map_err(|_| AppError::invalid(&format!("/{k}"), "FORMAT", "須為 UUID")),
+            _ => Err(AppError::invalid(
+                &format!("/{k}"),
+                "TYPE",
+                "須為 UUID 字串",
+            )),
         }
     };
     if let Some(p) = uuid("permit_id")? {
-        let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM org_permits WHERE id = $1 AND org_id = $2)")
-            .bind(p).bind(w.org_id).fetch_one(&mut **tx).await?;
+        let ok: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM org_permits WHERE id = $1 AND org_id = $2)",
+        )
+        .bind(p)
+        .bind(w.org_id)
+        .fetch_one(&mut **tx)
+        .await?;
         if !ok {
-            return Err(AppError::invalid("/permit_id", "INVALID", "許可不屬於此組織"));
+            return Err(AppError::invalid(
+                "/permit_id",
+                "INVALID",
+                "許可不屬於此組織",
+            ));
         }
         w.permit_id = Some(p);
     }
     let new_event = uuid("event_id")?;
     if new_event.is_some() || resuming {
         // 鎖序 organizations → relief_events → wishlists（與上線檢查、事件合併一致）
-        sqlx::query("SELECT id FROM organizations WHERE id = $1 FOR SHARE").bind(w.org_id).fetch_optional(&mut **tx).await?;
+        sqlx::query("SELECT id FROM organizations WHERE id = $1 FOR SHARE")
+            .bind(w.org_id)
+            .fetch_optional(&mut **tx)
+            .await?;
         let e = new_event.or(w.event_id).ok_or(AppError::NotFound)?;
         crate::org_sites::lock_event(&mut **tx, e).await?;
         w.event_id = Some(e);
@@ -861,17 +926,30 @@ async fn apply_site_fields(tx: &mut crate::points::Tx<'_>, m: &Map<String, Value
 
 /// 據點上線（含重開）的應用層檢查：組織須 verified（403）、許可須 approved 且今天（台北）在效期內（409）。DB trigger 為安全網。
 async fn relief_publishable(tx: &mut crate::points::Tx<'_>, w: &W) -> R<()> {
-    let verified: bool = sqlx::query_scalar("SELECT verification_status = 'verified' FROM organizations WHERE id = $1 FOR SHARE") // 鎖序 organizations → wishlists：與撤銷驗證互斥
-        .bind(w.org_id).fetch_optional(&mut **tx).await?.unwrap_or(false);
+    let verified: bool = sqlx::query_scalar(
+        "SELECT verification_status = 'verified' FROM organizations WHERE id = $1 FOR SHARE",
+    ) // 鎖序 organizations → wishlists：與撤銷驗證互斥
+    .bind(w.org_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(false);
     if !verified {
-        return Err(AppError::problem(403, "ORG_NOT_VERIFIED", "組織尚未通過審核，據點不能上線。"));
+        return Err(AppError::problem(
+            403,
+            "ORG_NOT_VERIFIED",
+            "組織尚未通過審核，據點不能上線。",
+        ));
     }
     let valid: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM org_permits WHERE id = $1 AND org_id = $2 AND status = 'approved'
                         AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN valid_from AND valid_to)")
         .bind(w.permit_id).bind(w.org_id).fetch_one(&mut **tx).await?;
     if !valid {
-        return Err(AppError::problem(409, "PERMIT_INVALID", "許可未核准或已過期，據點不能上線。"));
+        return Err(AppError::problem(
+            409,
+            "PERMIT_INVALID",
+            "許可未核准或已過期，據點不能上線。",
+        ));
     }
     Ok(())
 }
@@ -1179,7 +1257,11 @@ async fn address_put(
     let m = obj(&b)?;
     let w = load_owned(&st.pool, id, u.id).await?;
     if w.ty == "relief" {
-        return Err(AppError::invalid("/type", "NOT_APPLICABLE", "救災據點的收件地址請改用 PATCH site_address"));
+        return Err(AppError::invalid(
+            "/type",
+            "NOT_APPLICABLE",
+            "救災據點的收件地址請改用 PATCH site_address",
+        ));
     }
     if matches!(w.status.as_str(), "closed" | "archived") {
         return Err(closed());
@@ -1214,7 +1296,13 @@ pub(crate) fn check_phone(phone: &str, pointer: &str) -> R<()> {
     Ok(())
 }
 /// 收件資訊欄位級加密後 upsert（address_put 與據點建立共用，眾籌 capture_and_order 讀同一張表）
-pub(crate) async fn save_address(ex: impl sqlx::PgExecutor<'_>, id: Uuid, name: &str, phone: &str, addr: &str) -> R<()> {
+pub(crate) async fn save_address(
+    ex: impl sqlx::PgExecutor<'_>,
+    id: Uuid,
+    name: &str,
+    phone: &str,
+    addr: &str,
+) -> R<()> {
     sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $3, $4)
                  ON CONFLICT (wishlist_id) DO UPDATE SET recipient_name_enc = EXCLUDED.recipient_name_enc, phone_enc = EXCLUDED.phone_enc, address_enc = EXCLUDED.address_enc")
         .bind(id).bind(crate::sealed::seal(name.as_bytes())).bind(crate::sealed::seal(phone.as_bytes())).bind(crate::sealed::seal(addr.as_bytes()))
@@ -1367,19 +1455,36 @@ async fn init_crowdfund(
 
 /// relief 品項 category / urgency 必填（建立時），其餘清單不接受；在 app 層擋下，避免落到 trigger 回 500。
 fn apply_relief(m: &Map<String, Value>, i: &mut I, relief: bool, create: bool) -> R<()> {
-    const CAT: &[&str] = &["water", "food", "medical", "hygiene", "shelter", "clothing", "baby", "other"];
+    const CAT: &[&str] = &[
+        "water", "food", "medical", "hygiene", "shelter", "clothing", "baby", "other",
+    ];
     const URG: &[&str] = &["critical", "high", "medium", "low"];
-    for (k, allowed, slot) in [("category", CAT, &mut i.category), ("urgency", URG, &mut i.urgency)] {
+    for (k, allowed, slot) in [
+        ("category", CAT, &mut i.category),
+        ("urgency", URG, &mut i.urgency),
+    ] {
         if !relief {
             if m.contains_key(k) {
-                return Err(AppError::invalid(&format!("/{k}"), "NOT_APPLICABLE", &format!("只有救災據點的品項可設定 {k}")));
+                return Err(AppError::invalid(
+                    &format!("/{k}"),
+                    "NOT_APPLICABLE",
+                    &format!("只有救災據點的品項可設定 {k}"),
+                ));
             }
         } else if m.get(k).is_some_and(Value::is_null) {
-            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填，不可清空")));
+            return Err(AppError::invalid(
+                &format!("/{k}"),
+                "REQUIRED",
+                &format!("{k} 必填，不可清空"),
+            ));
         } else if let Some(v) = one_of(m, k, allowed)? {
             *slot = Some(v.into());
         } else if create {
-            return Err(AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")));
+            return Err(AppError::invalid(
+                &format!("/{k}"),
+                "REQUIRED",
+                &format!("{k} 必填"),
+            ));
         }
     }
     Ok(())
@@ -1833,7 +1938,11 @@ async fn allowed_list(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
 /// 據點恆為 public，沒有指定名單
 fn no_relief(w: &W) -> R<()> {
     if w.ty == "relief" {
-        return Err(AppError::invalid("/type", "NOT_APPLICABLE", "救災據點沒有指定名單"));
+        return Err(AppError::invalid(
+            "/type",
+            "NOT_APPLICABLE",
+            "救災據點沒有指定名單",
+        ));
     }
     Ok(())
 }
