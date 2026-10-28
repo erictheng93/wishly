@@ -68,16 +68,23 @@ dialog.c-sheet h2{margin:0 0 16px;font-size:20px;line-height:1.2}
 dialog.c-sheet:focus-visible{outline:0}
 .c-row+.c-bar{margin-top:8px}
 .c-lbl{display:block;font-size:13px;letter-spacing:.08em;color:var(--mute);margin-bottom:6px}
-.c-pw{display:flex;gap:4px;align-items:stretch}.c-pw input{flex:1;min-width:0}
+/* 顯示／隱藏鈕疊在輸入框內右側，密碼欄與其他欄同寬 */
+.c-pw{position:relative}.c-pw input{padding-right:72px}.c-pw .c-btn{position:absolute;top:0;right:0;bottom:0}
 .c-ok{color:var(--fg);border:1px solid var(--red);padding:10px 14px;margin:0 0 16px;font-size:14px}
 /* 登入 / 註冊 / 忘記密碼：表單收成 400px 單欄，平板以上成置中卡片，不隨 --c-w 拉寬 */
 .c-auth{max-width:400px;margin:8px auto 0}
-.c-auth-lead{margin:0 0 20px;line-height:1.6}
+.c-auth-lead{margin:0 0 20px;line-height:1.6;text-wrap:pretty}
 .c-auth-forgot{margin:-16px 0 8px;text-align:right;font-size:13px}
 .c-auth-forgot a,.c-auth-foot a{color:var(--red-text);font-weight:700;min-height:44px;display:inline-flex;align-items:center}
 .c-auth-foot{margin:20px 0 0;text-align:center;font-size:14px;color:var(--mute)}
 .c-or{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--mute);font-size:13px;letter-spacing:.1em}
 .c-or::before,.c-or::after{content:'';flex:1;border-top:1px solid var(--line)}
+/* 手機：卡片撐滿一屏，「還沒有帳號」沉到底部拇指區 */
+@media (max-width:767px){
+  .c-page:has(>.c-auth){display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;padding-bottom:calc(16px + env(safe-area-inset-bottom));box-sizing:border-box}
+  .c-auth{flex:1;display:flex;flex-direction:column;width:100%}
+  .c-auth-foot{margin-top:auto;padding-top:20px}
+}
 @media (min-width:768px){
   .c-auth{margin-top:min(8vh,72px);padding:40px;border:1px solid var(--line);border-top:4px solid var(--red);background:var(--card)}
 }
