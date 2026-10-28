@@ -23,9 +23,10 @@ const gate = ref<any>(null), checking = ref(st.value === 403)
 const restricted = ref(false)
 const hold = (c: number | null) => c === 403 && !gate.value // SSR 的 403 不是最終結果，等 client 重抓
 watch([fetched, error], ([v, e]) => {
-  if (v) { data.value = v; st.value = null } else if (e) { st.value = e.statusCode as number; if ([404, 410].includes(st.value!)) data.value = null; if (st.value === 403) loadClient() }
+  if (v) { data.value = v; st.value = null } else if (e) { st.value = e.statusCode as number; noteUnavailable(st.value); if ([404, 410].includes(st.value!)) data.value = null; if (st.value === 403) loadClient() }
 })
-watch(st, c => { if (c != null) noteUnavailable(c) }, { immediate: true }) // 5xx / 連不到 → 全站繁忙橫幅
+// 5xx / 連不到 → 全站繁忙橫幅。每次失敗都要通知（連續同一個狀態碼不會觸發 st 的 watcher，橫幅到期後就不再出現）
+if (st.value != null) noteUnavailable(st.value)
 async function loadClient() {
   try {
     // 受限清單 / 擁有者：帶憑證打不走 CDN 快取的路徑（公開路徑永遠只回 public 內容）
@@ -34,6 +35,7 @@ async function loadClient() {
     startLive()
   } catch (e: any) {
     st.value = e?.statusCode ?? e?.response?.status ?? 0
+    noteUnavailable(st.value!)
     if (st.value === 403) { gate.value = e.data ?? {}; restricted.value = true; data.value = null }
     else if ([404, 410].includes(st.value!)) data.value = null
   } finally { checking.value = false }
