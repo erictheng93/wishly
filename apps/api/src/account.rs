@@ -267,7 +267,9 @@ async fn delete_me(
         return Err(AppError::problem(
             409,
             "ACCOUNT_HAS_POINTS",
-            format!("帳號還有 {pending} 筆尚未付款的儲值，請完成付款、取消或等待到期處理後再刪除帳號。"),
+            format!(
+                "帳號還有 {pending} 筆尚未付款的儲值，請完成付款、取消或等待到期處理後再刪除帳號。"
+            ),
         ));
     }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL")
