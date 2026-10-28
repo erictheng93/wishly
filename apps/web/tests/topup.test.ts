@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountError, awaitingPaymentInfo, buildBody, emptyForm, formErrors, idemKeys, isCitizenCert, isDonateCode, isMobileBarcode, isTaxId, paymentRows, remaining, retryMinutes, topupError } from '../app/utils/topup'
+import { amountError, awaitingPaymentInfo, buildBody, emptyForm, formErrors, idemKeys, paymentRows, remaining, retryMinutes, topupError } from '../app/utils/topup'
 import { t } from './setup'
 
 describe('amountError', () => {
@@ -8,46 +8,13 @@ describe('amountError', () => {
   it.each(['', 'abc', '1e3', '100.5', '-100', '1,000'])('非整數 %s', v => expect(amountError(v)).toBe('me.topup.err.amountInt'))
 })
 
-describe('載具格式（與後端 parse_invoice 一致）', () => {
-  it('手機條碼：/ + 7 碼大寫英數與 + - .', () => {
-    expect(isMobileBarcode('/ABC1234')).toBe(true)
-    expect(isMobileBarcode('/AB+-.12')).toBe(true)
-    for (const bad of ['ABC12345', '/abc1234', '/ABC123', '/ABC12345', '/AB C123', ''])
-      expect(isMobileBarcode(bad), bad).toBe(false)
-  })
-  it('自然人憑證：2 大寫 + 14 數字', () => {
-    expect(isCitizenCert('AB12345678901234')).toBe(true)
-    for (const bad of ['A112345678901234', 'ab12345678901234', 'AB1234567890123', 'AB123456789012345', 'ABC2345678901234'])
-      expect(isCitizenCert(bad), bad).toBe(false)
-  })
-  it('捐贈碼 3–7 碼數字', () => {
-    for (const ok of ['123', '1234567']) expect(isDonateCode(ok)).toBe(true)
-    for (const bad of ['12', '12345678', '12a', '']) expect(isDonateCode(bad), bad).toBe(false)
-  })
-  it('統編 8 碼數字', () => {
-    expect(isTaxId('12345678')).toBe(true)
-    for (const bad of ['1234567', '123456789', '1234567a', '']) expect(isTaxId(bad), bad).toBe(false)
-  })
-})
-
 describe('formErrors / buildBody', () => {
   const f = (o: object) => ({ ...emptyForm(), amount: '500', ...o })
-  it('預設會員載具、只送 carrier_type', () => {
+  it('固定送會員載具', () => {
     expect(formErrors(f({}))).toEqual({})
+    expect(formErrors(f({ amount: '5' }))).toEqual({ amount: 'me.topup.err.amountRange' })
     expect(buildBody(f({}))).toEqual({ amount: 500, method: 'card', invoice: { carrier_type: 'member' } })
-  })
-  it('逐欄顯示錯誤，只檢查目前載具', () => {
-    expect(formErrors(f({ amount: '5', carrier_type: 'mobile_barcode', carrier_id: 'x' }))).toEqual({ amount: 'me.topup.err.amountRange', carrier_id: 'me.topup.err.mobile' })
-    expect(formErrors(f({ carrier_type: 'donate', carrier_id: 'junk', donate_code: '12' }))).toEqual({ donate_code: 'me.topup.err.donate' })
-    expect(formErrors(f({ carrier_type: 'b2b', buyer_tax_id: '1' }))).toEqual({ buyer_tax_id: 'me.topup.err.taxId' })
-    expect(formErrors(f({ carrier_type: 'citizen_cert', carrier_id: 'AB1' }))).toEqual({ carrier_id: 'me.topup.err.cert' })
-  })
-  it('只送該載具的欄位（切換載具後殘留的欄位不外送）', () => {
-    const b = buildBody(f({ carrier_type: 'b2b', buyer_tax_id: ' 12345678 ', buyer_name: ' 某公司 ', carrier_id: '/ABC1234', donate_code: '123' }))
-    expect(b.invoice).toEqual({ carrier_type: 'b2b', buyer_tax_id: '12345678', buyer_name: '某公司' })
-    expect(buildBody(f({ carrier_type: 'b2b', buyer_tax_id: '12345678' })).invoice).not.toHaveProperty('buyer_name')
-    expect(buildBody(f({ carrier_type: 'donate', donate_code: '168' })).invoice).toEqual({ carrier_type: 'donate', donate_code: '168' })
-    expect(buildBody(f({ carrier_type: 'mobile_barcode', carrier_id: '/ABC1234', method: 'atm' }))).toEqual({ amount: 500, method: 'atm', invoice: { carrier_type: 'mobile_barcode', carrier_id: '/ABC1234' } })
+    expect(buildBody(f({ method: 'atm' })).method).toBe('atm')
   })
 })
 
@@ -89,8 +56,11 @@ describe('topupError', () => {
     expect(r.disabled).toBe(true); expect(r.msg).toBe('儲值功能尚未開放')
   })
   it('422 把 errors[] 的 pointer 對到欄位', () => {
-    const r = run({ code: 'VALIDATION_FAILED', status: 422, errors: [{ pointer: '/invoice/carrier_id', detail: '手機條碼格式錯' }, { pointer: '/other', detail: 'x' }] })
-    expect(r.fields).toEqual({ carrier_id: '手機條碼格式錯' })
+    const r = run({ code: 'VALIDATION_FAILED', status: 422, errors: [{ pointer: '/amount', detail: '金額錯' }, { pointer: '/other', detail: 'x' }] })
+    expect(r.fields).toEqual({ amount: '金額錯' })
+  })
+  it('WALLET_FROZEN 顯示凍結訊息', () => {
+    expect(run({ code: 'WALLET_FROZEN', status: 409 }).msg).toContain('凍結')
   })
   it('網路 / 5xx / 其他', () => {
     expect(run({ code: 'NETWORK', status: 0 }).msg).toContain('連線')

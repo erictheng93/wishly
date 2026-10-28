@@ -525,6 +525,7 @@ async fn invoice_options_are_validated_and_stored(pool: PgPool) {
         (ct.as_str(), st.as_str(), src.as_str(), linked),
         ("member", "pending", "topup", true)
     );
+    // shortcut：電子發票尚未串接，格式正確的非會員載具也回 422 UNSUPPORTED，且不寫入
     for inv in [
         json!({ "carrier_type": "mobile_barcode", "carrier_id": "/ABC1234" }),
         json!({ "carrier_type": "citizen_cert", "carrier_id": "AB12345678901234" }),
@@ -537,16 +538,14 @@ async fn invoice_options_are_validated_and_stored(pool: PgPool) {
             json!({ "amount": 500, "method": "card", "invoice": inv }),
         )
         .await;
-        assert_eq!(s, StatusCode::CREATED, "{inv}: {v}");
+        assert_eq!(
+            (s, v["errors"][0]["code"].as_str()),
+            (StatusCode::UNPROCESSABLE_ENTITY, Some("UNSUPPORTED")),
+            "{inv}"
+        );
     }
     let n = count(&pool, "SELECT count(*) FROM invoices").await;
-    assert_eq!(n, 5);
-    let carrier: String =
-        sqlx::query_scalar("SELECT carrier_id FROM invoices WHERE carrier_type = 'mobile_barcode'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(carrier, "/ABC1234");
+    assert_eq!(n, 1);
     for inv in [
         json!({ "carrier_type": "mobile_barcode" }),
         json!({ "carrier_type": "mobile_barcode", "carrier_id": "ABC1234" }),
@@ -1202,6 +1201,13 @@ async fn payment_info_notice_rules(pool: PgPool) {
             .1,
         "1|OK"
     );
+    // 取號成功碼必須符合付款方式（cvs_code 要 10100073，ATM 的 2 不行）
+    assert_eq!(
+        info_post(&pool, &info_notice(&no, "2", 1500, &extra))
+            .await
+            .1,
+        "1|OK"
+    );
     assert!(topup_of(&pool, &u.token, &id).await["payment_info"].is_null());
 
     // ExpireDate 無法解析 → 退回 topups.expires_at
@@ -1408,3 +1414,89 @@ async fn cors_exposes_retry_after(pool: PgPool) {
         "{exposed}"
     );
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn info_notice_syncs_expires_at_and_atm_rejects_cvs_code(pool: PgPool) {
+    let u = aged_user(&pool, "儲值者").await;
+    let (_, _, v) = order(&pool, &u.token, 1500, "atm").await;
+    let id = v["topup"]["id"].as_str().unwrap().to_string();
+    let no = trade_no(&pool, &id).await;
+    let extra = [
+        ("BankCode", "812"),
+        ("vAccount", "9103522175887271"),
+        ("ExpireDate", "2026/10/22"),
+    ];
+    info_post(&pool, &info_notice(&no, "10100073", 1500, &extra)).await;
+    assert!(topup_of(&pool, &u.token, &id).await["payment_info"].is_null());
+    info_post(&pool, &info_notice(&no, "2", 1500, &extra)).await;
+    let t = topup_of(&pool, &u.token, &id).await;
+    assert_eq!(t["payment_info"]["account"], "9103522175887271");
+    assert_eq!(t["expires_at"], "2026-10-22T15:59:59Z");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn create_rejects_frozen_wallet(pool: PgPool) {
+    let u = aged_user(&pool, "儲值者").await;
+    assert_eq!(
+        order(&pool, &u.token, 500, "atm").await.0,
+        StatusCode::CREATED
+    );
+    sqlx::query("UPDATE point_wallets SET status = 'frozen'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, v) = order(&pool, &u.token, 500, "atm").await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("WALLET_FROZEN"))
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cancel_pending_topup_frees_cap_and_late_payment_still_credits(pool: PgPool) {
+    let a = aged_user(&pool, "甲").await;
+    let b = aged_user(&pool, "乙").await;
+    let (_, _, v) = order(&pool, &a.token, 50_000, "atm").await;
+    let id = v["topup"]["id"].as_str().unwrap().to_string();
+    let no = trade_no(&pool, &id).await;
+    let path = format!("/wallet/topups/{id}/cancel");
+    // 他人 404、本人成功並釋放上限
+    assert_eq!(
+        call(&pool, "POST", &path, &ck(&b.token), None).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (s, h, v) = call(&pool, "POST", &path, &ck(&a.token), None).await;
+    assert_eq!(
+        (s, v["topup"]["status"].as_str()),
+        (StatusCode::OK, Some("failed")),
+        "{v}"
+    );
+    assert_eq!(h.get("cache-control").unwrap(), "private, no-store");
+    // 非 pending → 409
+    let (s, _, v) = call(&pool, "POST", &path, &ck(&a.token), None).await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("INVALID_STATE_TRANSITION"))
+    );
+    assert_eq!(
+        order(&pool, &a.token, 50_000, "atm").await.0,
+        StatusCode::CREATED
+    );
+    // 取消後才收到的成功付款通知仍入帳
+    mock().arm(&no, paid(50_000));
+    assert_eq!(notify(&pool, &no, 50_000).await.2, "1|OK");
+    assert_eq!(status_of(&pool, &no).await, "paid");
+    assert_eq!(balance(&pool, a.id).await, 50_000);
+    assert_points_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn public_status_lists_topup_methods(pool: PgPool) {
+    let (s, _, v) = call(&pool, "GET", "/public/status", &[], None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        v["topup_methods"],
+        json!(["card", "cvs_code", "cvs_barcode", "atm"])
+    );
+}
+// card_enabled=false 的 422 未測：config 是全域單例（config::init），測試內無法變動。

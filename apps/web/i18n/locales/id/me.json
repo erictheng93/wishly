@@ -302,22 +302,6 @@
       },
       "deadlineCard": "Selesaikan pembayaran dalam 30 menit.",
       "deadlineOther": "Batas pembayaran 3 hari.",
-      "invoiceLegend": "Faktur elektronik",
-      "carrierType": "Penyimpanan faktur",
-      "carrier": {
-        "member": "Simpan di akun member (default)",
-        "mobile_barcode": "Barcode ponsel",
-        "citizen_cert": "Sertifikat Digital Warga Taiwan",
-        "donate": "Donasikan faktur",
-        "b2b": "Nomor pajak perusahaan Taiwan (統編)"
-      },
-      "field": {
-        "mobile": "Barcode ponsel",
-        "cert": "Barcode Sertifikat Digital Warga",
-        "donate": "Kode donasi",
-        "taxId": "Nomor pajak perusahaan (統編)",
-        "buyerName": "Nama perusahaan (opsional)"
-      },
       "summary": "Konfirmasi rincian",
       "summaryLine": "Top up NT$ {amount}, masuk {pts} poin (1 poin = NT$ 1)",
       "summaryEmpty": "Ringkasan muncul setelah kamu memasukkan jumlah.",
@@ -377,7 +361,11 @@
       "cardPending": "Pembayaran belum selesai, selesaikan sebelum {time}.",
       "success": "Top up berhasil, {pts} poin sudah masuk, saldo saat ini {bal} poin.",
       "nativeText": "Halaman pembayaran tidak bisa dibuka di dalam aplikasi, selesaikan top up di versi web.",
-      "nativeLink": "Buka versi web untuk top up"
+      "nativeLink": "Buka versi web untuk top up",
+      "invoiceMember": "Faktur elektronik akan diterbitkan ke penyimpanan anggota.",
+      "cardRetry": "Untuk mencoba lagi, batalkan pesanan ini lalu buat pesanan baru.",
+      "cancel": "Batalkan pesanan",
+      "cancelText": "Batalkan top-up yang menunggu pembayaran ini? Jika Anda sudah membayar, dana tetap akan dikreditkan."
     },
     "frozenBanner": "Dompet dibekukan: sementara tidak bisa ikut patungan atau mengajukan pengembalian dana tunai. Hubungi layanan pelanggan.",
     "refund": {

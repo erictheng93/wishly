@@ -20,6 +20,7 @@ async function mockApi(page: Page, o: { list?: (n: number) => Topup[], post?: (n
   const m: Mock = { posts: [], gets: 0 }
   const json = (route: Route, status: number, body: any, headers: Record<string, string> = {}) =>
     route.fulfill({ status, headers: { ...cors, ...headers }, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) })
+  await page.route(/\/api\/v1\/public\/status/, r => json(r, 200, { read_only: false, topup_methods: ['card', 'cvs_code', 'cvs_barcode', 'atm'] }))
   await page.route(/\/api\/v1\/wallet\?/, r => json(r, 200, { wallet: { balance: o.balance ?? 0, held_points: 0, status: 'active' }, data: [], next_cursor: null }))
   await page.route(/\/api\/v1\/wallet\/topups/, async (route) => {
     const req = route.request()
@@ -74,7 +75,7 @@ test('送出中按鈕停用，連點只建一張單', async ({ page }) => {
   expect(m.posts).toHaveLength(1)
 })
 
-test('前端先驗：金額範圍與載具格式逐欄顯示，錯誤時不送出', async ({ page }) => {
+test('前端先驗：金額範圍逐欄顯示，錯誤時不送出', async ({ page }) => {
   const m = await mockApi(page)
   await open(page)
 
@@ -84,27 +85,6 @@ test('前端先驗：金額範圍與載具格式逐欄顯示，錯誤時不送�
   await page.getByLabel('自訂金額').fill('1e3')
   await expect(page.getByRole('alert').filter({ hasText: '請輸入整數金額' })).toBeVisible()
 
-  await page.getByLabel('自訂金額').fill('500')
-  const carrier = page.getByLabel('發票載具')
-  await carrier.selectOption('mobile_barcode')
-  await page.getByRole('textbox', { name: /手機條碼/ }).fill('/abc1234')
-  await pay(page).click()
-  await expect(page.getByRole('alert').filter({ hasText: '手機條碼為 / 加 7 碼大寫英數字' })).toBeVisible()
-
-  await carrier.selectOption('citizen_cert')
-  await page.getByRole('textbox', { name: /自然人憑證條碼/ }).fill('AB123')
-  await pay(page).click()
-  await expect(page.getByRole('alert').filter({ hasText: '2 碼大寫英文加 14 碼數字' })).toBeVisible()
-
-  await carrier.selectOption('donate')
-  await page.getByRole('textbox', { name: /捐贈碼/ }).fill('12')
-  await pay(page).click()
-  await expect(page.getByRole('alert').filter({ hasText: '捐贈碼為 3 至 7 碼數字' })).toBeVisible()
-
-  await carrier.selectOption('b2b')
-  await page.getByRole('textbox', { name: /統一編號/ }).fill('1234567')
-  await pay(page).click()
-  await expect(page.getByRole('alert').filter({ hasText: '統一編號為 8 碼數字' })).toBeVisible()
   expect(m.posts).toHaveLength(0)
 })
 
@@ -129,7 +109,7 @@ test.describe('錯誤碼', () => {
     ['WALLET_CAP_EXCEEDED', problem(409, 'WALLET_CAP_EXCEEDED', 'x'), /超過上限 50,000 點/],
     ['TOPUP_LIMIT_EXCEEDED', problem(409, 'TOPUP_LIMIT_EXCEEDED', 'x', { limit_amount: 3000, remaining_amount: 500 }), /每日儲值上限 NT\$ 3,000.*還能儲值 NT\$ 500/],
     ['RATE_LIMITED', { ...problem(429, 'RATE_LIMITED', 'x'), headers: { 'retry-after': '1800' } }, /約 30 分鐘後再試/],
-    ['VALIDATION_FAILED', problem(422, 'VALIDATION_FAILED', 'x', { errors: [{ pointer: '/invoice/carrier_id', code: 'INVALID', detail: '後端：手機條碼不合' }] }), /內容有誤/],
+    ['VALIDATION_FAILED', problem(422, 'VALIDATION_FAILED', 'x', { errors: [{ pointer: '/amount', code: 'INVALID', detail: '後端：金額不合' }] }), /內容有誤/],
   ]
   for (const [name, res, text] of cases) {
     test(name, async ({ page }) => {
@@ -139,7 +119,7 @@ test.describe('錯誤碼', () => {
       await pay(page).click()
       await expect(page.getByRole('alert').filter({ hasText: text })).toBeVisible()
       await expect(pay(page)).toBeEnabled() // 可修正後重試
-      if (name === 'VALIDATION_FAILED') await expect(page.getByText('後端：手機條碼不合')).toHaveCount(0) // 該欄位未顯示（載具為會員），只有總訊息
+      if (name === 'VALIDATION_FAILED') await expect(page.getByText('後端：金額不合')).toBeVisible() // 逐欄訊息顯示在金額欄
     })
   }
 
@@ -153,11 +133,9 @@ test.describe('錯誤碼', () => {
   })
 
   test('後端 422 逐欄訊息顯示在對應欄位', async ({ page }) => {
-    await mockApi(page, { post: () => problem(422, 'VALIDATION_FAILED', 'x', { errors: [{ pointer: '/invoice/carrier_id', code: 'INVALID', detail: '後端：這組條碼不存在' }] }) })
+    await mockApi(page, { post: () => problem(422, 'VALIDATION_FAILED', 'x', { errors: [{ pointer: '/amount', code: 'INVALID', detail: '後端：這組條碼不存在' }] }) })
     await open(page)
     await page.getByLabel('自訂金額').fill('500')
-    await page.getByLabel('發票載具').selectOption('mobile_barcode')
-    await page.getByRole('textbox', { name: /手機條碼/ }).fill('/ABC1234')
     await pay(page).click()
     await expect(page.getByRole('alert').filter({ hasText: '後端：這組條碼不存在' })).toBeVisible()
   })
@@ -192,6 +170,7 @@ test('儲值紀錄：狀態徽章、超商代碼可複製、條碼三段、ATM �
 
   const bar = cards.nth(1)
   for (const v of ['1311053TW', '3002607000012345', '110512000000500']) await expect(bar.locator('code', { hasText: v })).toBeVisible()
+  await expect(bar.getByRole('img')).toHaveCount(3) // 三段 Code 39 條碼
   await expect(bar.locator('code').first()).toHaveCSS('font-family', /mono|Menlo|Consolas/i)
   const atm = cards.nth(2)
   await expect(atm.getByText('9103522175887271')).toBeVisible()
@@ -255,4 +234,27 @@ test('語系：英文介面的關鍵文案與錯誤訊息', async ({ page, conte
   await expect(page.getByTestId('summary')).toHaveText('Top up NT$ 500, credited as 500 points (1 point = NT$ 1)')
   await page.getByRole('button', { name: 'Continue to payment' }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'New accounts can top up up to NT$ 3,000 per day. You can still add NT$ 500 today.' })).toBeVisible()
+})
+
+test('取消待付款單：確認後 POST cancel 並重讀列表；已付款則 409 後重讀', async ({ page }) => {
+  let status = 'pending'
+  await mockApi(page, { list: () => [topup({ status })] })
+  const cancels: string[] = []
+  await page.route(/\/api\/v1\/wallet\/topups\/tp1\/cancel/, (r) => {
+    cancels.push(r.request().method()); status = 'failed'
+    return r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ topup: topup({ status }) }) })
+  })
+  await open(page)
+  await page.getByTestId('cancel-topup').click()
+  await page.getByRole('button', { name: '取消訂單' }).last().click() // 最後一顆在確認對話框內
+  await expect(page.locator('article[data-status="failed"]')).toBeVisible()
+  expect(cancels).toEqual(['POST'])
+})
+
+test('後端未開放任何儲值方式：顯示尚未開放，不渲染表單', async ({ page }) => {
+  await mockApi(page)
+  await page.route(/\/api\/v1\/public\/status/, r => r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ topup_methods: [] }) }))
+  await open(page)
+  await expect(page.getByText('儲值功能尚未開放')).toBeVisible()
+  await expect(page.getByLabel('自訂金額')).toHaveCount(0)
 })

@@ -19,10 +19,11 @@ async function load(more = false) {
 watch(status, () => load())
 onMounted(() => load())
 
+const owed = (r: any) => r.amount - (r.recovered_points ?? 0) // 未抵銷餘額；confirm / done 文案用這個
 const act = ref<{ row: any, to: DebtTo } | null>(null)
 const note = ref(''), busy = ref(false), aerr = ref('')
 const title = computed(() => (act.value ? t(`admin.walletDebts.action.${act.value.to}`) : ''))
-const text = computed(() => act.value ? t(`admin.walletDebts.confirm.${act.value.to}`, { name: act.value.row.user?.display_name, amount: fmtPts(act.value.row.amount) }) : '')
+const text = computed(() => act.value ? t(`admin.walletDebts.confirm.${act.value.to}`, { name: act.value.row.user?.display_name, amount: fmtPts(owed(act.value.row)) }) : '')
 function open(row: any, to: DebtTo) { act.value = { row, to }; note.value = ''; aerr.value = '' }
 async function submit() {
   const { row, to } = act.value!
@@ -32,7 +33,7 @@ async function submit() {
   try {
     const r = await api(`/admin/wallet-debts/${row.id}`, { method: 'PATCH', body: p.body })
     Object.assign(row, { status: r.status ?? to, note: r.note ?? p.body!.note, resolved_at: r.resolved_at ?? row.resolved_at })
-    msg.value = t(`admin.walletDebts.done.${to}`, { name: row.user?.display_name, amount: fmtPts(row.amount) })
+    msg.value = t(`admin.walletDebts.done.${to}`, { name: row.user?.display_name, amount: fmtPts(owed(row)) })
     act.value = null
   } catch (e: any) {
     if (e.code === 'INVALID_STATE_TRANSITION') { act.value = null; await load(); err.value = t('admin.walletDebts.stale') } // 已被結案：關閉對話框、重讀列表並說明

@@ -302,22 +302,6 @@
       },
       "deadlineCard": "請於 30 分鐘內完成付款。",
       "deadlineOther": "繳費期限 3 天。",
-      "invoiceLegend": "電子發票",
-      "carrierType": "發票載具",
-      "carrier": {
-        "member": "會員載具（預設）",
-        "mobile_barcode": "手機條碼",
-        "citizen_cert": "自然人憑證",
-        "donate": "捐贈發票",
-        "b2b": "公司統編"
-      },
-      "field": {
-        "mobile": "手機條碼",
-        "cert": "自然人憑證條碼",
-        "donate": "捐贈碼",
-        "taxId": "統一編號",
-        "buyerName": "公司抬頭（選填）"
-      },
       "summary": "確認內容",
       "summaryLine": "儲值 NT$ {amount}，入帳 {pts} 點（1 點 = NT$ 1）",
       "summaryEmpty": "輸入金額後顯示摘要。",
@@ -377,7 +361,11 @@
       "cardPending": "尚未完成付款，請於 {time} 前完成。",
       "success": "儲值成功，已入帳 {pts} 點，目前餘額 {bal} 點。",
       "nativeText": "App 內無法開啟付款頁，請至網頁版完成儲值。",
-      "nativeLink": "前往網頁版儲值"
+      "nativeLink": "前往網頁版儲值",
+      "invoiceMember": "電子發票將開立至會員載具。",
+      "cardRetry": "若要重新付款，可先取消此訂單再建立新訂單。",
+      "cancel": "取消訂單",
+      "cancelText": "確定取消這筆待付款的儲值單？若你已經付款，款項仍會入帳。"
     },
     "frozenBanner": "錢包已凍結：暫時無法贊助或申請現金退款，請聯絡客服。",
     "refund": {

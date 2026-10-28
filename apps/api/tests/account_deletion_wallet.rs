@@ -116,7 +116,7 @@ async fn open_debt_or_frozen_wallet_blocks_account_deletion(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn pending_topup_blocks_account_deletion_until_expired(pool: PgPool) {
+async fn pending_topup_blocks_account_deletion_until_not_pending(pool: PgPool) {
     let TestUser { id, token } = user(&pool, "丙").await;
     sqlx::query("INSERT INTO point_wallets (user_id) VALUES ($1)")
         .bind(id)
@@ -132,7 +132,13 @@ async fn pending_topup_blocks_account_deletion_until_expired(pool: PgPool) {
         (StatusCode::CONFLICT, Some("ACCOUNT_HAS_POINTS")),
         "{b}"
     );
+    // 過了我方期限但還是 pending（尚未被 expire_due 翻轉）仍須擋住：可能還能付款
     sqlx::query("UPDATE topups SET expires_at = now() - interval '1 minute'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(delete_me(&pool, &token).await.0, StatusCode::CONFLICT);
+    sqlx::query("UPDATE topups SET status = 'expired'")
         .execute(&pool)
         .await
         .unwrap();

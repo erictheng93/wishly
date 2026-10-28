@@ -9,9 +9,15 @@ const { api } = useApi()
 const WATCH_KEY = 'ws_topup_watch' // 送出後暫存的儲值單 id：從綠界返回時據此輪詢到入帳
 const POLL_MS = 3000, POLL_MAX = 10
 
-const native = isNative(), quick = QUICK_AMOUNTS, methods = TOPUP_METHODS, carriers = TOPUP_CARRIERS
+const native = isNative(), quick = QUICK_AMOUNTS
+const { methods: enabled, ready: statusReady } = useTopupMethods()
+const methods = computed(() => TOPUP_METHODS.filter(m => enabled.value.includes(m)))
 const form = reactive(emptyForm())
 const submitted = ref(false), busy = ref(false), disabled = ref(false)
+// 後端未開放（status 無可用方式或建單回 TOPUP_DISABLED）；狀態取不到視為未開放
+const off = computed(() => disabled.value || (statusReady.value && !methods.value.length))
+const frozen = computed(() => wallet.value?.status === 'frozen')
+watchEffect(() => { if (methods.value.length && !methods.value.includes(form.method)) form.method = methods.value[0]! })
 const err = ref(''), serverFields = ref<Partial<Record<string, string>>>({})
 const pay = ref<{ url: string, fields: Record<string, string> } | null>(null)
 const payForm = ref<HTMLFormElement | null>(null)
@@ -24,7 +30,7 @@ const now = ref(Date.now())
 const copied = ref('')
 
 const clientErrors = computed(() => formErrors(form))
-const fieldErr = (f: 'amount' | 'carrier_id' | 'donate_code' | 'buyer_tax_id') => {
+const fieldErr = (f: 'amount') => {
   if (serverFields.value[f]) return serverFields.value[f]
   const k = clientErrors.value[f]
   // 金額欄一開始是空的，送出前不吵；其餘欄位一樣等到按下送出才顯示
@@ -101,6 +107,17 @@ async function submit() {
   }
 }
 
+const cx = ref<any>(null), cxBusy = ref(false), cxErr = ref('')
+async function cancelTopup() {
+  cxBusy.value = true; cxErr.value = ''
+  try {
+    await api(`/wallet/topups/${cx.value.id}/cancel`, { method: 'POST' })
+    cx.value = null; await refresh()
+  } catch (e: any) {
+    if (e.code === 'INVALID_STATE_TRANSITION') { cx.value = null; await refresh() } // 已不是待付款（剛入帳或逾期）：關閉並重讀
+    else cxErr.value = errMsg(e)
+  } finally { cxBusy.value = false }
+}
 async function copy(v: string) {
   try { await copyText(v); copied.value = v } catch { copied.value = ''; err.value = t('me.topup.copyFail') }
   setTimeout(() => { if (copied.value === v) copied.value = '' }, 2000)
@@ -128,11 +145,12 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
       <p v-if="wallet && wallet.status === 'frozen'" class="c-err" role="alert" data-testid="frozen">{{ $t('me.frozenBanner') }}</p>
       <p v-if="wallet" class="c-mute">{{ $t('me.topup.balance', { pts: fmtPts(wallet.balance) }) }}</p>
 
-      <section v-if="disabled" class="c-card" role="status">
+      <p v-if="!statusReady && !disabled" class="c-mute" role="status">{{ $t('me.loading') }}</p>
+      <section v-else-if="off" class="c-card" role="status">
         <p class="c-m0">{{ $t('me.topup.err.disabled') }}</p>
       </section>
 
-      <form v-else class="c-card" novalidate @submit.prevent="submit">
+      <form v-else-if="!frozen" class="c-card" novalidate @submit.prevent="submit">
         <fieldset class="c-field" :aria-describedby="fieldErr('amount') ? 'tp-amount-err' : undefined">
           <legend class="c-lbl">{{ $t('me.topup.amount') }}</legend>
           <div class="c-row wrap">
@@ -153,32 +171,7 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
           </label>
         </fieldset>
 
-        <fieldset class="c-field">
-          <legend class="c-lbl">{{ $t('me.topup.invoiceLegend') }}</legend>
-          <label class="c-field"><span>{{ $t('me.topup.carrierType') }}</span>
-            <select v-model="form.carrier_type">
-              <option v-for="c in carriers" :key="c" :value="c">{{ $t(`me.topup.carrier.${c}`) }}</option>
-            </select>
-          </label>
-          <label v-if="form.carrier_type === 'mobile_barcode' || form.carrier_type === 'citizen_cert'" class="c-field">
-            <span>{{ $t(form.carrier_type === 'mobile_barcode' ? 'me.topup.field.mobile' : 'me.topup.field.cert') }}</span>
-            <input v-model="form.carrier_id" type="text" autocapitalize="characters" autocomplete="off" :placeholder="form.carrier_type === 'mobile_barcode' ? '/ABC1234' : 'AB12345678901234'" :aria-invalid="!!fieldErr('carrier_id')" :aria-describedby="fieldErr('carrier_id') ? 'tp-cid-err' : undefined">
-            <small v-if="fieldErr('carrier_id')" id="tp-cid-err" class="c-err" role="alert">{{ fieldErr('carrier_id') }}</small>
-          </label>
-          <label v-if="form.carrier_type === 'donate'" class="c-field"><span>{{ $t('me.topup.field.donate') }}</span>
-            <input v-model="form.donate_code" type="text" inputmode="numeric" autocomplete="off" :aria-invalid="!!fieldErr('donate_code')" :aria-describedby="fieldErr('donate_code') ? 'tp-don-err' : undefined">
-            <small v-if="fieldErr('donate_code')" id="tp-don-err" class="c-err" role="alert">{{ fieldErr('donate_code') }}</small>
-          </label>
-          <template v-if="form.carrier_type === 'b2b'">
-            <label class="c-field"><span>{{ $t('me.topup.field.taxId') }}</span>
-              <input v-model="form.buyer_tax_id" type="text" inputmode="numeric" autocomplete="off" :aria-invalid="!!fieldErr('buyer_tax_id')" :aria-describedby="fieldErr('buyer_tax_id') ? 'tp-tax-err' : undefined">
-              <small v-if="fieldErr('buyer_tax_id')" id="tp-tax-err" class="c-err" role="alert">{{ fieldErr('buyer_tax_id') }}</small>
-            </label>
-            <label class="c-field"><span>{{ $t('me.topup.field.buyerName') }}</span>
-              <input v-model="form.buyer_name" type="text" autocomplete="organization">
-            </label>
-          </template>
-        </fieldset>
+        <p class="c-mute c-small">{{ $t('me.topup.invoiceMember') }}</p>
 
         <section class="c-card" aria-labelledby="tp-sum">
           <h2 id="tp-sum" class="c-h2 c-m0">{{ $t('me.topup.summary') }}</h2>
@@ -218,15 +211,18 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
                 <span class="c-mute c-small">{{ $t(`me.topup.pay.${r.key}`) }}</span>
                 <code class="c-grow" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px;word-break:break-all">{{ r.value }}</code>
                 <button type="button" class="c-btn small" @click="copy(r.value)">{{ copied === r.value ? $t('me.topup.copied') : $t('me.topup.copy') }}</button>
+                <Code39Barcode v-if="x.payment_info.type === 'cvs_barcode'" :value="r.value" class="c-mt12" />
               </div>
               <p class="c-small c-mt12">{{ $t('me.topup.expireAt', { time: fmtTime(x.payment_info.expire_at || x.expires_at) }) }}（{{ left(x.payment_info.expire_at || x.expires_at) }}）</p>
             </div>
           </template>
-          <p v-else-if="x.status === 'pending'" class="c-mute c-small c-mt">{{ $t('me.topup.cardPending', { time: fmtTime(x.expires_at) }) }}</p>
+          <p v-else-if="x.status === 'pending'" class="c-mute c-small c-mt">{{ $t('me.topup.cardPending', { time: fmtTime(x.expires_at) }) }}<br>{{ $t('me.topup.cardRetry') }}</p>
+          <button v-if="x.status === 'pending'" type="button" class="c-btn small c-mt" data-testid="cancel-topup" @click="cx = x; cxErr = ''">{{ $t('me.topup.cancel') }}</button>
         </article>
       </div>
       <p v-if="stalled" class="c-mute" role="status">{{ $t('me.topup.stalled') }}</p>
       <button v-if="!loading" class="c-btn block c-mb16" type="button" :disabled="refreshing" @click="manualRefresh">{{ $t('me.topup.refresh') }}</button>
+      <CreatorConfirm :open="!!cx" :title="$t('me.topup.cancel')" :text="$t('me.topup.cancelText')" :ok="$t('me.topup.cancel')" danger :busy="cxBusy" :error="cxErr" @close="cx = null" @ok="cancelTopup" />
     </template>
   </main>
 </template>

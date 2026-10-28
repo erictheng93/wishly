@@ -51,14 +51,28 @@ pub struct Ecpay {
     /// 訂單查詢 API（QueryTradeInfo/V5），入帳前 server-to-server 二次確認
     pub query_url: String,
     pub query_timeout_secs: u64,
+    /// 信用卡儲值開關（ECPAY_CARD_3D_CONFIRMED，僅 `true` / `1` 為開；dev/test 恆開）。
+    /// 綠界預設不強制 3D，D41 要求信用卡儲值一律 3D；特店向綠界申請開通強制 3D 並確認後才設。
+    pub card_enabled: bool,
 }
 
 impl Ecpay {
     /// 未明確設定的網址由 API 對外網址與 AioCheckOut 網址推導。
-    fn from_env(merchant_id: String, hash_key: String, hash_iv: String, api_base: &str) -> Ecpay {
+    fn from_env(
+        merchant_id: String,
+        hash_key: String,
+        hash_iv: String,
+        api_base: &str,
+        dev: bool,
+    ) -> Ecpay {
         let api_base = api_base.trim_end_matches('/');
         let endpoint = var("ECPAY_ENDPOINT").unwrap_or_else(|| ECPAY_STAGE.into());
         Ecpay {
+            card_enabled: dev
+                || matches!(
+                    var("ECPAY_CARD_3D_CONFIRMED").as_deref(),
+                    Some("true" | "1")
+                ),
             merchant_id,
             hash_key,
             hash_iv,
@@ -156,6 +170,7 @@ impl Config {
                 v("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
                 v("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
                 &v("API_BASE_URL", "http://localhost:8080"),
+                true,
             )),
             orgs_enabled: true,
         }
@@ -193,6 +208,7 @@ impl Config {
                 hash_key,
                 hash_iv,
                 &var("API_BASE_URL").unwrap_or_default(),
+                false,
             )),
             _ => None,
         };

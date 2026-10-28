@@ -261,13 +261,13 @@ async fn delete_me(
     }
     // 尚未付款的儲值（ATM / 超商代碼可能隔天才付）入帳後會落在已匿名的帳號上：等付款或到期後再刪
     let pending: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM topups t JOIN point_wallets w ON w.id = t.wallet_id WHERE w.user_id = $1 AND t.status = 'pending' AND t.expires_at > now()")
+        "SELECT count(*) FROM topups t JOIN point_wallets w ON w.id = t.wallet_id WHERE w.user_id = $1 AND t.status = 'pending'")
         .bind(id).fetch_one(&mut *tx).await?;
     if pending > 0 {
         return Err(AppError::problem(
             409,
             "ACCOUNT_HAS_POINTS",
-            format!("帳號還有 {pending} 筆尚未付款的儲值，請完成付款或等待到期後再刪除帳號。"),
+            format!("帳號還有 {pending} 筆尚未付款的儲值，請完成付款、取消或等待到期處理後再刪除帳號。"),
         ));
     }
     sqlx::query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL")
