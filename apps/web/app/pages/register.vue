@@ -45,32 +45,34 @@ async function verify() {
 <template>
   <main class="c-page">
     <CreatorHeader :title="$t('auth.register.title')" back="/login" />
-    <form v-if="step === 'form'" @submit.prevent="send">
-      <label class="c-field"><span>{{ $t('auth.register.displayName') }}</span><input v-model="name" type="text" autocomplete="nickname" maxlength="50" required></label>
-      <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
-      <CreatorPasswordField v-model="password" :label="$t('auth.register.password')" autocomplete="new-password" :hint="$t('auth.register.pwHint')" />
-      <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
-      <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-      <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? $t('auth.register.sending') : $t('auth.register.sendCode') }}</button>
-      <p class="c-center c-mute">{{ $t('auth.register.haveAccount') }}<NuxtLink :to="{ path: '/login', query: route.query.redirect ? { redirect } : {} }">{{ $t('auth.register.login') }}</NuxtLink></p>
-    </form>
-    <template v-if="step === 'form' && !isNative()">
-      <p class="c-center c-mute">{{ $t('auth.register.or') }}</p>
-      <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">{{ $t('auth.register.google') }}</button>
-      <button type="button" class="c-btn block c-mb" @click="oauth('line', redirect)">{{ $t('auth.register.line') }}</button>
-    </template>
-    <template v-if="step === 'otp'">
-      <p>{{ $t('auth.register.codeSent', { email }) }}</p>
-      <CreatorOtpInput ref="otp" v-model="code" @complete="verify" />
-      <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
-      <p v-if="err" class="c-err c-center" role="alert">{{ err }}</p>
-      <NuxtLink v-if="exists" class="c-btn block c-mb" to="/login">{{ $t('auth.register.goLogin') }}</NuxtLink>
-      <button class="c-btn primary block c-mb" :disabled="busy || code.length < 6" @click="verify">{{ busy ? $t('auth.register.verifying') : $t('auth.register.finish') }}</button>
-      <p class="c-center c-mute">
-        <button v-if="wait <= 0" class="c-btn" :disabled="busy" @click="send">{{ $t('auth.register.resend') }}</button>
-        <span v-else>{{ $t('auth.register.resendIn', { n: wait }) }}</span>
-      </p>
-      <button class="c-btn block" @click="step = 'form'; err = ''">{{ $t('auth.register.edit') }}</button>
-    </template>
+    <div class="c-auth">
+      <form v-if="step === 'form'" @submit.prevent="send">
+        <label class="c-field"><span>{{ $t('auth.register.displayName') }}</span><input v-model="name" type="text" autocomplete="nickname" maxlength="50" required></label>
+        <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
+        <CreatorPasswordField v-model="password" :label="$t('auth.register.password')" autocomplete="new-password" :hint="$t('auth.register.pwHint')" />
+        <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
+        <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+        <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.register.sending') : $t('auth.register.sendCode') }}</button>
+      </form>
+      <template v-if="step === 'form' && !isNative()">
+        <p class="c-or">{{ $t('auth.register.or') }}</p>
+        <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">{{ $t('auth.register.google') }}</button>
+        <button type="button" class="c-btn block" @click="oauth('line', redirect)">{{ $t('auth.register.line') }}</button>
+      </template>
+      <p v-if="step === 'form'" class="c-auth-foot">{{ $t('auth.register.haveAccount') }}<NuxtLink :to="{ path: '/login', query: route.query.redirect ? { redirect } : {} }">{{ $t('auth.register.login') }}</NuxtLink></p>
+      <template v-if="step === 'otp'">
+        <p>{{ $t('auth.register.codeSent', { email }) }}</p>
+        <CreatorOtpInput ref="otp" v-model="code" @complete="verify" />
+        <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
+        <p v-if="err" class="c-err c-center" role="alert">{{ err }}</p>
+        <NuxtLink v-if="exists" class="c-btn block c-mb" to="/login">{{ $t('auth.register.goLogin') }}</NuxtLink>
+        <button class="c-btn primary block c-mb" :disabled="busy || code.length < 6" @click="verify">{{ busy ? $t('auth.register.verifying') : $t('auth.register.finish') }}</button>
+        <p class="c-center c-mute">
+          <button v-if="wait <= 0" class="c-btn" :disabled="busy" @click="send">{{ $t('auth.register.resend') }}</button>
+          <span v-else>{{ $t('auth.register.resendIn', { n: wait }) }}</span>
+        </p>
+        <button class="c-btn block" @click="step = 'form'; err = ''">{{ $t('auth.register.edit') }}</button>
+      </template>
+    </div>
   </main>
 </template>

@@ -55,22 +55,22 @@ async function social(provider: 'google' | 'line') {
 <template>
   <main class="c-page">
     <CreatorHeader :title="$t('auth.login.title')" back="/" />
-    <p v-if="okMsg" class="c-ok" role="status">{{ okMsg }}</p>
-    <form @submit.prevent="submit">
-      <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
-      <CreatorPasswordField v-model="password" :label="$t('auth.login.password')" autocomplete="current-password" />
-      <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
-      <p v-if="err || loginError" class="c-err" role="alert">{{ err || loginError }}</p>
-      <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
-    </form>
-    <div class="c-links">
-      <NuxtLink :to="{ path: '/register', query: q }">{{ $t('auth.login.register') }}</NuxtLink>
-      <NuxtLink to="/forgot-password">{{ $t('auth.login.forgot') }}</NuxtLink>
+    <div class="c-auth">
+      <p class="c-mute c-auth-lead">{{ $t('auth.login.note') }}</p>
+      <p v-if="okMsg" class="c-ok" role="status">{{ okMsg }}</p>
+      <form @submit.prevent="submit">
+        <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
+        <CreatorPasswordField v-model="password" :label="$t('auth.login.password')" autocomplete="current-password" />
+        <p class="c-auth-forgot"><NuxtLink to="/forgot-password">{{ $t('auth.login.forgot') }}</NuxtLink></p>
+        <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
+        <p v-if="err || loginError" class="c-err" role="alert">{{ err || loginError }}</p>
+        <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
+      </form>
+      <p class="c-or">{{ $t('auth.login.or') }}</p>
+      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
+      <button type="button" class="c-btn block" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
+      <p class="c-auth-foot">{{ $t('auth.login.noAccount') }}<NuxtLink :to="{ path: '/register', query: q }">{{ $t('auth.login.register') }}</NuxtLink></p>
+      <p v-if="orgsOn" class="c-center c-m0"><NuxtLink to="/org">{{ $t('org.loginHint') }}</NuxtLink></p>
     </div>
-    <p class="c-center c-mute">{{ $t('auth.login.or') }}</p>
-    <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
-    <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
-    <p class="c-mute">{{ $t('auth.login.note') }}</p>
-    <p v-if="orgsOn" class="c-center"><NuxtLink to="/org">{{ $t('org.loginHint') }}</NuxtLink></p>
   </main>
 </template>
