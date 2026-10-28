@@ -42,6 +42,7 @@ useSeoMeta({
 const scenes = computed(() => (['gift', 'birthday', 'wedding'] as const).map(k => ({ k: t(`me.home.scenes.${k}.k`), slug: { gift: 'demogift00', birthday: 'demobirth0', wedding: 'demowedd00' }[k], t: t(`me.home.scenes.${k}.t`), d: t(`me.home.scenes.${k}.d`) })))
 const steps = computed(() => [1, 2, 3].map(i => ({ n: `0${i}`, t: t(`me.home.steps.${i}.t`), d: t(`me.home.steps.${i}.d`) }))) // 語系檔的步驟 key 為 1–3
 const feats = computed(() => [0, 1, 2, 3].map(i => ({ t: t(`me.home.feats.${i}.t`), d: t(`me.home.feats.${i}.d`) })))
+const links = [['/explore', 'explore'], ['/inspire', 'inspire'], ['/brands', 'brands'], ['/#scenes', 'seeDemo']] as const
 const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: t(`me.home.faq.${i}.a`) })))
 </script>
 
@@ -51,10 +52,7 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
       <div class="l-in">
         <b class="l-logo">WISHLY</b>
         <nav>
-          <NuxtLink to="/explore" class="l-nav-link">{{ $t('me.home.explore') }}</NuxtLink>
-          <NuxtLink to="/inspire" class="l-nav-link">{{ $t('me.home.inspire') }}</NuxtLink>
-          <NuxtLink to="/brands" class="l-nav-link">{{ $t('me.home.brands') }}</NuxtLink>
-          <NuxtLink to="/#scenes" class="l-nav-link">{{ $t('me.home.seeDemo') }}</NuxtLink>
+          <NuxtLink v-for="[to, k] in links" :key="to" :to="to" class="l-nav-link">{{ $t(`me.home.${k}`) }}</NuxtLink>
           <LocaleSwitch />
           <!-- 登入狀態未確定前先佔位，避免 SSR 的未登入按鈕閃一下又變；有 ws_hint 時只有晶片要等 -->
           <template v-if="signedIn">
@@ -70,6 +68,10 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
         </nav>
       </div>
     </header>
+    <!-- 窄螢幕的導覽列：頁首放不下時四個入口移到這一列（不 sticky，隨頁面捲走，頁首維持 52px） -->
+    <nav class="l-local">
+      <div><NuxtLink v-for="[to, k] in links" :key="to" :to="to">{{ $t(`me.home.${k}`) }}</NuxtLink></div>
+    </nav>
 
     <main>
       <section class="l-hero l-in">
@@ -247,9 +249,16 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-mine-vis{flex:none;font-size:12px;padding:0 6px;border:1px solid var(--line);color:var(--mute);letter-spacing:.1em}
 .l-mine-msg{padding:20px 16px;color:var(--mute);text-align:center}
 .l-mine-new{display:flex;justify-content:center;align-items:center;min-height:48px;border-top:1px dashed var(--red);font-weight:700;font-size:14px;letter-spacing:.1em}
-/* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有），收緊字距與間距讓 CTA 不折行。
+.l-local{display:none}
+/* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有；四個入口移到 .l-local），收緊字距與間距讓 CTA 不折行。
    完整導覽實測需 ~800px（id 最長、zh-Hant ~580px），斷點留約 100px 給登入後的名稱晶片與字型差異；導覽或文案變長要重量 */
-@media (max-width:899px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-chip-wait{width:72px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
+@media (max-width:899px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-chip-wait{width:72px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}
+  /* 與 Logo 左緣對齊；放不下時橫向捲動，右緣淡出提示還有，末端留白讓最後一項捲到底時不被淡出 */
+  .l-local{display:block;border-bottom:1px solid var(--line);background:var(--bg)}
+  .l-local>div{display:flex;overflow-x:auto;scrollbar-width:none;padding:0 32px 0 var(--pad);-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+  .l-local>div::-webkit-scrollbar{display:none}
+  .l-local a{flex:none;display:inline-flex;align-items:center;min-height:44px;padding:0 12px;color:var(--fg);font-weight:700;font-size:14px;letter-spacing:.08em;white-space:nowrap}
+  .l-local a:first-child{padding-left:0}}
 .l h2{font-size:24px;margin:0 0 24px;text-align:center}
 .l h3{font-size:17px;margin:8px 0}
 .l p{margin:0}
