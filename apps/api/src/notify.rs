@@ -392,7 +392,10 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         );
     }
     if kind == "org.invite" {
-        let (org, url) = (payload["org_display_name"].as_str().unwrap_or(""), payload["url"].as_str().unwrap_or(&app));
+        let (org, url) = (
+            payload["org_display_name"].as_str().unwrap_or(""),
+            payload["url"].as_str().unwrap_or(&app),
+        );
         return (
             l.pick(format!("【Wishly】邀請你加入「{org}」"), format!("[Wishly] You're invited to join \"{org}\""), format!("[Wishly] Bạn được mời tham gia \"{org}\""), format!("[Wishly] Kamu diundang bergabung dengan \"{org}\"")),
             l.pick(
@@ -433,7 +436,10 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
     if kind == "org.permit_revoked" {
         let name = payload["display_name"].as_str().unwrap_or("");
         let no = payload["permit_no"].as_str().unwrap_or("");
-        let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");
+        let note = payload["note"]
+            .as_str()
+            .filter(|n| !n.is_empty())
+            .unwrap_or("-");
         return (
             l.pick(format!("【Wishly】勸募許可 {no} 已撤銷"), format!("[Wishly] Fundraising permit {no} revoked"), format!("[Wishly] Giấy phép gây quỹ {no} đã bị thu hồi"), format!("[Wishly] Izin penggalangan dana {no} dicabut")),
             l.pick(
@@ -460,13 +466,36 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
     }
     if kind == "org.review" {
         let name = payload["display_name"].as_str().unwrap_or("");
-        let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");
+        let note = payload["note"]
+            .as_str()
+            .filter(|n| !n.is_empty())
+            .unwrap_or("-");
         let d = payload["decision"].as_str().unwrap_or("");
         let (zh, en, vi, id) = match d {
-            "verified" => ("已通過審核", "has been approved", "đã được duyệt", "telah disetujui"),
-            "needs_changes" => ("需要補件或修正", "needs changes", "cần bổ sung hoặc chỉnh sửa", "perlu perbaikan"),
-            _ if payload["revoked"].as_bool() == Some(true) => ("驗證已撤銷", "verification has been revoked", "đã bị thu hồi xác minh", "verifikasinya dicabut"),
-            _ => ("未通過審核", "was not approved", "không được duyệt", "tidak disetujui"),
+            "verified" => (
+                "已通過審核",
+                "has been approved",
+                "đã được duyệt",
+                "telah disetujui",
+            ),
+            "needs_changes" => (
+                "需要補件或修正",
+                "needs changes",
+                "cần bổ sung hoặc chỉnh sửa",
+                "perlu perbaikan",
+            ),
+            _ if payload["revoked"].as_bool() == Some(true) => (
+                "驗證已撤銷",
+                "verification has been revoked",
+                "đã bị thu hồi xác minh",
+                "verifikasinya dicabut",
+            ),
+            _ => (
+                "未通過審核",
+                "was not approved",
+                "không được duyệt",
+                "tidak disetujui",
+            ),
         };
         return (
             l.pick(format!("【Wishly】組織「{name}」{zh}"), format!("[Wishly] Organization \"{name}\" {en}"), format!("[Wishly] Tổ chức \"{name}\" {vi}"), format!("[Wishly] Organisasi \"{name}\" {id}")),

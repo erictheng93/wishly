@@ -474,17 +474,35 @@ pub async fn permit(pool: &PgPool, org: Uuid, status: &str, valid_to_offset_days
 }
 pub async fn member(pool: &PgPool, org: Uuid, user: Uuid, role: &str) {
     sqlx::query("INSERT INTO org_members(org_id,user_id,role) VALUES($1,$2,$3::org_role)")
-        .bind(org).bind(user).bind(role).execute(pool).await.unwrap();
+        .bind(org)
+        .bind(user)
+        .bind(role)
+        .execute(pool)
+        .await
+        .unwrap();
 }
 pub async fn event(pool: &PgPool, org: Uuid) -> (Uuid, String) {
     let slug = Uuid::new_v4().simple().to_string()[..10].to_string();
-    let id = sqlx::query_scalar("INSERT INTO relief_events(slug,name,hazard_type,counties,created_by_org)
-        VALUES($1,'測試事件','earthquake',ARRAY['花蓮縣'],$2) RETURNING id")
-        .bind(&slug).bind(org).fetch_one(pool).await.unwrap();
+    let id = sqlx::query_scalar(
+        "INSERT INTO relief_events(slug,name,hazard_type,counties,created_by_org)
+        VALUES($1,'測試事件','earthquake',ARRAY['花蓮縣'],$2) RETURNING id",
+    )
+    .bind(&slug)
+    .bind(org)
+    .fetch_one(pool)
+    .await
+    .unwrap();
     (id, slug)
 }
 /// relief 據點：直接以 SQL 寫入，五個 relief 欄位齊全、visibility=public。
-pub async fn site(pool: &PgPool, org: Uuid, creator: Uuid, event: Uuid, permit: Uuid, status: &str) -> TestList {
+pub async fn site(
+    pool: &PgPool,
+    org: Uuid,
+    creator: Uuid,
+    event: Uuid,
+    permit: Uuid,
+    status: &str,
+) -> TestList {
     let slug = Uuid::new_v4().simple().to_string()[..10].to_string();
     let id = sqlx::query_scalar("INSERT INTO wishlists(owner_id,type,status,slug,title,visibility,org_id,event_id,permit_id,site_address,site_status)
         VALUES($1,'relief',$2::wishlist_status,$3,'據點','public',$4,$5,$6,'花蓮縣某處','active') RETURNING id")

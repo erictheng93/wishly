@@ -698,16 +698,27 @@ pub async fn put_object(key: &str, bytes: Vec<u8>, ct: &str) -> Result<(), AppEr
     if r.status().is_success() {
         Ok(())
     } else {
-        Err(AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))
+        Err(AppError::problem(
+            502,
+            "UPSTREAM_ERROR",
+            "儲存服務暫時無法使用",
+        ))
     }
 }
 
 pub async fn get_object(key: &str) -> Result<Vec<u8>, AppError> {
     let r = s3_req("GET", key, None).await?;
     if !r.status().is_success() {
-        return Err(AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"));
+        return Err(AppError::problem(
+            502,
+            "UPSTREAM_ERROR",
+            "儲存服務暫時無法使用",
+        ));
     }
-    r.bytes().await.map(|b| b.to_vec()).map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))
+    r.bytes()
+        .await
+        .map(|b| b.to_vec())
+        .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))
 }
 
 pub async fn delete_object(key: &str) -> Result<(), AppError> {

@@ -38,22 +38,36 @@ fn ptr(v: &Value) -> &str {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn create_draft_makes_caller_owner(pool: PgPool) {
     let u = user(&pool, "A").await;
-    let (s, v) = create(&pool, &u.token, json!({"legal_name":"某某協會","display_name":"某協會","contact_phone":"0912"})).await;
+    let (s, v) = create(
+        &pool,
+        &u.token,
+        json!({"legal_name":"某某協會","display_name":"某協會","contact_phone":"0912"}),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED);
     assert_eq!(v["role"], "owner");
     assert_eq!(v["contact_phone"], "0912");
     assert!(v.get("contact_phone_enc").is_none());
     let (_, _, me) = call(&pool, "GET", "/me", &ck(&u.token), None).await;
-    assert_eq!(me["orgs"][0], json!({"id":v["id"],"name":"某協會","role":"owner","verification_status":"draft"}));
+    assert_eq!(
+        me["orgs"][0],
+        json!({"id":v["id"],"name":"某協會","role":"owner","verification_status":"draft"})
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn second_draft_conflicts(pool: PgPool) {
     let u = user(&pool, "A").await;
     let b = json!({"legal_name":"甲","display_name":"甲"});
-    assert_eq!(create(&pool, &u.token, b.clone()).await.0, StatusCode::CREATED);
+    assert_eq!(
+        create(&pool, &u.token, b.clone()).await.0,
+        StatusCode::CREATED
+    );
     let (s, v) = create(&pool, &u.token, b).await;
-    assert_eq!((s, v["code"].as_str().unwrap()), (StatusCode::CONFLICT, "ORG_DRAFT_EXISTS"));
+    assert_eq!(
+        (s, v["code"].as_str().unwrap()),
+        (StatusCode::CONFLICT, "ORG_DRAFT_EXISTS")
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -65,9 +79,19 @@ async fn submit_requires_fields_documents_permit(pool: PgPool) {
     let id = oid(&v);
     let (s, e) = submit(&pool, &u.token, id).await;
     assert_eq!((s, ptr(&e)), (StatusCode::UNPROCESSABLE_ENTITY, "/tax_id"));
-    call(&pool, "PATCH", &format!("/orgs/{id}"), &ck(&u.token), Some(json!({"tax_id":"12345675"}))).await;
+    call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{id}"),
+        &ck(&u.token),
+        Some(json!({"tax_id":"12345675"})),
+    )
+    .await;
     let (s, e) = submit(&pool, &u.token, id).await;
-    assert_eq!((s, ptr(&e)), (StatusCode::UNPROCESSABLE_ENTITY, "/documents"));
+    assert_eq!(
+        (s, ptr(&e)),
+        (StatusCode::UNPROCESSABLE_ENTITY, "/documents")
+    );
     add_docs(&pool, id, u.id, true, false).await;
     let (s, e) = submit(&pool, &u.token, id).await;
     assert_eq!((s, ptr(&e)), (StatusCode::UNPROCESSABLE_ENTITY, "/permits"));
@@ -82,13 +106,20 @@ async fn submit_requires_fields_documents_permit(pool: PgPool) {
 async fn tax_id_taken_by_live_org(pool: PgPool) {
     let a = user(&pool, "A").await;
     let o = org(&pool, a.id, "pending").await;
-    sqlx::query("UPDATE organizations SET tax_id='12345675' WHERE id=$1").bind(o).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE organizations SET tax_id='12345675' WHERE id=$1")
+        .bind(o)
+        .execute(&pool)
+        .await
+        .unwrap();
     let b = user(&pool, "B").await;
     let (_, v) = create(&pool, &b.token, full("12345675")).await;
     let id = oid(&v);
     add_docs(&pool, id, b.id, true, true).await;
     let (s, e) = submit(&pool, &b.token, id).await;
-    assert_eq!((s, e["code"].as_str().unwrap()), (StatusCode::CONFLICT, "TAX_ID_TAKEN"));
+    assert_eq!(
+        (s, e["code"].as_str().unwrap()),
+        (StatusCode::CONFLICT, "TAX_ID_TAKEN")
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -96,7 +127,10 @@ async fn invalid_tax_id_checksum(pool: PgPool) {
     let u = user(&pool, "A").await;
     let (s, e) = create(&pool, &u.token, full("12345678")).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!((ptr(&e), e["errors"][0]["code"].as_str().unwrap()), ("/tax_id", "TAX_ID_CHECKSUM"));
+    assert_eq!(
+        (ptr(&e), e["errors"][0]["code"].as_str().unwrap()),
+        ("/tax_id", "TAX_ID_CHECKSUM")
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -104,12 +138,33 @@ async fn needs_changes_only_flagged_fields_editable(pool: PgPool) {
     let u = user(&pool, "A").await;
     let o = org(&pool, u.id, "needs_changes").await;
     member(&pool, o, u.id, "owner").await;
-    sqlx::query("UPDATE organizations SET flagged_fields='{intro}' WHERE id=$1").bind(o).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE organizations SET flagged_fields='{intro}' WHERE id=$1")
+        .bind(o)
+        .execute(&pool)
+        .await
+        .unwrap();
     let uri = format!("/orgs/{o}");
-    let (s, _, _) = call(&pool, "PATCH", &uri, &ck(&u.token), Some(json!({"intro":"新"}))).await;
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&u.token),
+        Some(json!({"intro":"新"})),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _, e) = call(&pool, "PATCH", &uri, &ck(&u.token), Some(json!({"legal_name":"改"}))).await;
-    assert_eq!((s, e["errors"][0]["code"].as_str().unwrap()), (StatusCode::UNPROCESSABLE_ENTITY, "FIELD_LOCKED"));
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&u.token),
+        Some(json!({"legal_name":"改"})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["errors"][0]["code"].as_str().unwrap()),
+        (StatusCode::UNPROCESSABLE_ENTITY, "FIELD_LOCKED")
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -117,12 +172,37 @@ async fn resubmit_blocked_until_resubmit_after(pool: PgPool) {
     let u = user(&pool, "A").await;
     let o = org(&pool, u.id, "rejected").await;
     member(&pool, o, u.id, "owner").await;
-    sqlx::query("UPDATE organizations SET resubmit_after=now()+interval '1 day' WHERE id=$1").bind(o).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE organizations SET resubmit_after=now()+interval '1 day' WHERE id=$1")
+        .bind(o)
+        .execute(&pool)
+        .await
+        .unwrap();
     let uri = format!("/orgs/{o}");
-    let (s, _, e) = call(&pool, "PATCH", &uri, &ck(&u.token), Some(json!({"intro":"x"}))).await;
-    assert_eq!((s, e["code"].as_str().unwrap()), (StatusCode::CONFLICT, "RESUBMIT_TOO_EARLY"));
-    sqlx::query("UPDATE organizations SET resubmit_after=now()-interval '1 day' WHERE id=$1").bind(o).execute(&pool).await.unwrap();
-    let (s, _, v) = call(&pool, "PATCH", &uri, &ck(&u.token), Some(json!({"intro":"x"}))).await;
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&u.token),
+        Some(json!({"intro":"x"})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["code"].as_str().unwrap()),
+        (StatusCode::CONFLICT, "RESUBMIT_TOO_EARLY")
+    );
+    sqlx::query("UPDATE organizations SET resubmit_after=now()-interval '1 day' WHERE id=$1")
+        .bind(o)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&u.token),
+        Some(json!({"intro":"x"})),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["verification_status"], "draft");
 }
@@ -132,7 +212,14 @@ async fn withdraw_returns_to_draft(pool: PgPool) {
     let u = user(&pool, "A").await;
     let o = org(&pool, u.id, "pending").await;
     member(&pool, o, u.id, "owner").await;
-    let (s, _, v) = call(&pool, "POST", &format!("/orgs/{o}/withdraw"), &ck(&u.token), None).await;
+    let (s, _, v) = call(
+        &pool,
+        "POST",
+        &format!("/orgs/{o}/withdraw"),
+        &ck(&u.token),
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["verification_status"], "draft");
 }
@@ -154,8 +241,18 @@ async fn volunteer_cannot_patch(pool: PgPool) {
     member(&pool, o, a.id, "owner").await;
     let v = user(&pool, "V").await;
     member(&pool, o, v.id, "volunteer").await;
-    let (s, _, e) = call(&pool, "PATCH", &format!("/orgs/{o}"), &ck(&v.token), Some(json!({"intro":"x"}))).await;
-    assert_eq!((s, e["code"].as_str().unwrap()), (StatusCode::FORBIDDEN, "ORG_ROLE_REQUIRED"));
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}"),
+        &ck(&v.token),
+        Some(json!({"intro":"x"})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["code"].as_str().unwrap()),
+        (StatusCode::FORBIDDEN, "ORG_ROLE_REQUIRED")
+    );
     // 志工可讀，但看不到聯絡電話
     let (s, _, g) = call(&pool, "GET", &format!("/orgs/{o}"), &ck(&v.token), None).await;
     assert_eq!(s, StatusCode::OK);
@@ -168,9 +265,24 @@ async fn reopen_rejected_collides_with_existing_draft(pool: PgPool) {
     let o = org(&pool, u.id, "rejected").await;
     member(&pool, o, u.id, "owner").await;
     org(&pool, u.id, "draft").await; // 同一人已有另一份草稿
-    let (s, _, e) = call(&pool, "PATCH", &format!("/orgs/{o}"), &ck(&u.token), Some(json!({"intro":"x"}))).await;
-    assert_eq!((s, e["code"].as_str().unwrap()), (StatusCode::CONFLICT, "ORG_DRAFT_EXISTS"));
-    let st: String = sqlx::query_scalar("SELECT verification_status FROM organizations WHERE id=$1").bind(o).fetch_one(&pool).await.unwrap();
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}"),
+        &ck(&u.token),
+        Some(json!({"intro":"x"})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["code"].as_str().unwrap()),
+        (StatusCode::CONFLICT, "ORG_DRAFT_EXISTS")
+    );
+    let st: String =
+        sqlx::query_scalar("SELECT verification_status FROM organizations WHERE id=$1")
+            .bind(o)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(st, "rejected");
 }
 
@@ -182,14 +294,27 @@ async fn patch_waits_on_org_row_lock_then_sees_rejection(pool: PgPool) {
     member(&pool, o, u.id, "owner").await;
     let app = test_app(&pool);
     let mut tx = pool.begin().await.unwrap();
-    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()").fetch_one(&mut *tx).await.unwrap();
-    sqlx::query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE").bind(o).fetch_one(&mut *tx).await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE")
+        .bind(o)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
     sqlx::query("UPDATE organizations SET verification_status='rejected', resubmit_after=now()+interval '30 days' WHERE id=$1")
         .bind(o).execute(&mut *tx).await.unwrap();
     let (a2, uri, tok) = (app.clone(), format!("/orgs/{o}"), u.token.clone());
-    let h = tokio::spawn(async move { call_app(&a2, "PATCH", &uri, &ck(&tok), Some(json!({"intro":"x"}))).await });
+    let h = tokio::spawn(async move {
+        call_app(&a2, "PATCH", &uri, &ck(&tok), Some(json!({"intro":"x"}))).await
+    });
     wait_for_blocked(&pool, pid, 1).await;
     tx.commit().await.unwrap();
     let (s, _, e) = h.await.unwrap();
-    assert_eq!((s, e["code"].as_str().unwrap_or("")), (StatusCode::CONFLICT, "RESUBMIT_TOO_EARLY"), "owner PATCH overwrote the concurrent rejection: {e}");
+    assert_eq!(
+        (s, e["code"].as_str().unwrap_or("")),
+        (StatusCode::CONFLICT, "RESUBMIT_TOO_EARLY"),
+        "owner PATCH overwrote the concurrent rejection: {e}"
+    );
 }

@@ -24,8 +24,28 @@ type R<T> = Result<T, AppError>;
 
 /// 台灣 22 縣市正式名稱（前端同一份清單，順序固定）
 pub const COUNTIES: [&str; 22] = [
-    "臺北市", "新北市", "桃園市", "臺中市", "臺南市", "高雄市", "基隆市", "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣",
-    "南投縣", "雲林縣", "嘉義縣", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣",
+    "臺北市",
+    "新北市",
+    "桃園市",
+    "臺中市",
+    "臺南市",
+    "高雄市",
+    "基隆市",
+    "新竹市",
+    "嘉義市",
+    "新竹縣",
+    "苗栗縣",
+    "彰化縣",
+    "南投縣",
+    "雲林縣",
+    "嘉義縣",
+    "屏東縣",
+    "宜蘭縣",
+    "花蓮縣",
+    "臺東縣",
+    "澎湖縣",
+    "金門縣",
+    "連江縣",
 ];
 
 const HAZARDS: [&str; 5] = ["earthquake", "typhoon", "flood", "fire", "other"];
@@ -45,7 +65,11 @@ pub fn routes() -> Router<AppState> {
 }
 
 fn check_county(c: &str, pointer: &str) -> R<()> {
-    if COUNTIES.contains(&c) { Ok(()) } else { Err(AppError::invalid(pointer, "ENUM", "縣市名稱不正確")) }
+    if COUNTIES.contains(&c) {
+        Ok(())
+    } else {
+        Err(AppError::invalid(pointer, "ENUM", "縣市名稱不正確"))
+    }
 }
 
 fn opt_text(v: &Option<String>, pointer: &str, max: usize) -> R<Option<String>> {
@@ -68,11 +92,25 @@ struct NewEvent {
     description: Option<String>,
 }
 
-async fn create(u: CurrentUser, State(st): State<AppState>, Path(org): Path<Uuid>, Json(b): Json<NewEvent>) -> R<(StatusCode, Json<Value>)> {
+async fn create(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Path(org): Path<Uuid>,
+    Json(b): Json<NewEvent>,
+) -> R<(StatusCode, Json<Value>)> {
     require_role(&st.pool, org, u.id, "coordinator").await?;
-    let verified: bool = sqlx::query_scalar("SELECT verification_status = 'verified' FROM organizations WHERE id=$1").bind(org).fetch_one(&st.pool).await?;
+    let verified: bool = sqlx::query_scalar(
+        "SELECT verification_status = 'verified' FROM organizations WHERE id=$1",
+    )
+    .bind(org)
+    .fetch_one(&st.pool)
+    .await?;
     if !verified {
-        return Err(AppError::problem(403, "ORG_NOT_VERIFIED", "組織通過審核後才能建立災害事件"));
+        return Err(AppError::problem(
+            403,
+            "ORG_NOT_VERIFIED",
+            "組織通過審核後才能建立災害事件",
+        ));
     }
     let name = validate::text(&b.name, "/name", false)?;
     if name.is_empty() || name.chars().count() > 80 {
@@ -95,15 +133,32 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Path(org): Path<Uuid
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *) SELECT {J} FROM e")))
         .bind(new_slug()).bind(&name).bind(&b.hazard_type).bind(&b.counties).bind(&area).bind(b.occurred_on).bind(&desc).bind(org)
         .fetch_one(&mut *tx).await?;
-    let id: Uuid = v["id"].as_str().and_then(|s| s.parse().ok()).ok_or(AppError::NotFound)?;
-    audit_user(&mut *tx, u.id, "relief_event.create", "relief_event", Some(id), json!({"org_id": org})).await?;
+    let id: Uuid = v["id"]
+        .as_str()
+        .and_then(|s| s.parse().ok())
+        .ok_or(AppError::NotFound)?;
+    audit_user(
+        &mut *tx,
+        u.id,
+        "relief_event.create",
+        "relief_event",
+        Some(id),
+        json!({"org_id": org}),
+    )
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(v)))
 }
 
 /// 本組織建立的事件，或有本組織據點的事件；不含已被合併者
-async fn list(u: CurrentUser, State(st): State<AppState>, Path(org): Path<Uuid>) -> R<Json<Vec<Value>>> {
-    member_role(&st.pool, org, u.id).await?.ok_or(AppError::NotFound)?;
+async fn list(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Path(org): Path<Uuid>,
+) -> R<Json<Vec<Value>>> {
+    member_role(&st.pool, org, u.id)
+        .await?
+        .ok_or(AppError::NotFound)?;
     Ok(Json(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT {J} FROM relief_events WHERE merged_into IS NULL AND (created_by_org = $1
            OR EXISTS (SELECT 1 FROM wishlists w WHERE w.event_id = relief_events.id AND w.org_id = $1)) ORDER BY created_at DESC, id")))
@@ -117,7 +172,11 @@ struct SimilarQ {
     date: NaiveDate,
 }
 
-async fn similar(_u: CurrentUser, State(st): State<AppState>, Query(q): Query<SimilarQ>) -> R<Json<Vec<Value>>> {
+async fn similar(
+    _u: CurrentUser,
+    State(st): State<AppState>,
+    Query(q): Query<SimilarQ>,
+) -> R<Json<Vec<Value>>> {
     check_county(&q.county, "/county")?;
     Ok(Json(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT {J} FROM relief_events WHERE $1 = ANY(counties) AND occurred_on BETWEEN $2::date - 7 AND $2::date + 7
@@ -133,7 +192,12 @@ struct Edit {
     area_note: Option<String>,
 }
 
-async fn edit(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<Edit>) -> R<Json<Value>> {
+async fn edit(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Edit>,
+) -> R<Json<Value>> {
     let name = opt_text(&b.name, "/name", 80)?;
     if name.as_deref() == Some("") {
         return Err(AppError::invalid("/name", "LENGTH", "名稱不可為空"));
@@ -146,18 +210,39 @@ async fn edit(u: CurrentUser, State(st): State<AppState>, Path(id): Path<Uuid>, 
             .bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
     // 非建立組織成員也是 403（可附掛據點，但不可改事件）
     match require_role(&mut *tx, owner_org, u.id, "coordinator").await {
-        Err(AppError::NotFound) => return Err(AppError::problem(403, "ORG_ROLE_REQUIRED", "僅建立事件的組織可編輯")),
+        Err(AppError::NotFound) => {
+            return Err(AppError::problem(
+                403,
+                "ORG_ROLE_REQUIRED",
+                "僅建立事件的組織可編輯",
+            ))
+        }
         r => r?,
     };
     if merged.is_some() || mod_status == "hidden" {
-        return Err(AppError::problem(409, "EVENT_NOT_EDITABLE", "已合併或下架的事件不可編輯"));
+        return Err(AppError::problem(
+            409,
+            "EVENT_NOT_EDITABLE",
+            "已合併或下架的事件不可編輯",
+        ));
     }
     let v: Value = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "WITH e AS (UPDATE relief_events SET name=COALESCE($2,name), description=COALESCE($3,description), area_note=COALESCE($4,area_note)
            WHERE id=$1 RETURNING *) SELECT {J} FROM e")))
         .bind(id).bind(&name).bind(&desc).bind(&area).fetch_one(&mut *tx).await?;
-    audit_user(&mut *tx, u.id, "relief_event.edit", "relief_event", Some(id), json!({"org_id": owner_org})).await?;
-    let slugs: Vec<String> = sqlx::query_scalar("SELECT slug FROM wishlists WHERE event_id=$1").bind(id).fetch_all(&mut *tx).await?;
+    audit_user(
+        &mut *tx,
+        u.id,
+        "relief_event.edit",
+        "relief_event",
+        Some(id),
+        json!({"org_id": owner_org}),
+    )
+    .await?;
+    let slugs: Vec<String> = sqlx::query_scalar("SELECT slug FROM wishlists WHERE event_id=$1")
+        .bind(id)
+        .fetch_all(&mut *tx)
+        .await?;
     tx.commit().await?;
     crate::cdn::purge_wishlists(slugs);
     Ok(Json(v))
@@ -168,7 +253,12 @@ struct MergeBody {
     into: Uuid,
 }
 
-async fn merge(Staff(staff): Staff, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<MergeBody>) -> R<Json<Value>> {
+async fn merge(
+    Staff(staff): Staff,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<MergeBody>,
+) -> R<Json<Value>> {
     if b.into == id {
         return Err(AppError::invalid("/into", "SELF", "不可合併到自己"));
     }
@@ -183,11 +273,32 @@ async fn merge(Staff(staff): Staff, State(st): State<AppState>, Path(id): Path<U
         return Err(AppError::invalid("/into", "ALREADY_MERGED", "事件已被合併"));
     }
     if rows.iter().any(|r| r.0 == b.into && r.2 == "hidden") {
-        return Err(AppError::invalid("/into", "EVENT_HIDDEN", "不可合併到已下架的事件"));
+        return Err(AppError::invalid(
+            "/into",
+            "EVENT_HIDDEN",
+            "不可合併到已下架的事件",
+        ));
     }
-    let slugs: Vec<String> = sqlx::query_scalar("UPDATE wishlists SET event_id=$2 WHERE event_id=$1 RETURNING slug").bind(id).bind(b.into).fetch_all(&mut *tx).await?;
-    sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1").bind(id).bind(b.into).execute(&mut *tx).await?;
-    audit(&mut *tx, staff, "relief_event.merge", "relief_event", Some(id), json!({"into": b.into, "sites": slugs.len()})).await?;
+    let slugs: Vec<String> =
+        sqlx::query_scalar("UPDATE wishlists SET event_id=$2 WHERE event_id=$1 RETURNING slug")
+            .bind(id)
+            .bind(b.into)
+            .fetch_all(&mut *tx)
+            .await?;
+    sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1")
+        .bind(id)
+        .bind(b.into)
+        .execute(&mut *tx)
+        .await?;
+    audit(
+        &mut *tx,
+        staff,
+        "relief_event.merge",
+        "relief_event",
+        Some(id),
+        json!({"into": b.into, "sites": slugs.len()}),
+    )
+    .await?;
     let ev = event_slugs(&mut *tx, &[id, b.into]).await?;
     tx.commit().await?;
     crate::cdn::purge_wishlists(slugs);
@@ -202,18 +313,38 @@ struct Moderate {
     moderation_reason: Option<String>,
 }
 
-async fn moderate(Staff(staff): Staff, State(st): State<AppState>, Path(id): Path<Uuid>, Json(b): Json<Moderate>) -> R<Json<Value>> {
+async fn moderate(
+    Staff(staff): Staff,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Moderate>,
+) -> R<Json<Value>> {
     let hide = match b.moderation_status.as_str() {
         "hidden" => true,
         "ok" => false,
-        _ => return Err(AppError::invalid("/moderation_status", "ENUM", "狀態不正確")),
+        _ => {
+            return Err(AppError::invalid(
+                "/moderation_status",
+                "ENUM",
+                "狀態不正確",
+            ))
+        }
     };
-    let reason = opt_text(&b.moderation_reason, "/moderation_reason", 500)?.filter(|s| !s.is_empty());
+    let reason =
+        opt_text(&b.moderation_reason, "/moderation_reason", 500)?.filter(|s| !s.is_empty());
     if hide && reason.is_none() {
-        return Err(AppError::invalid("/moderation_reason", "REQUIRED", "下架須填寫原因"));
+        return Err(AppError::invalid(
+            "/moderation_reason",
+            "REQUIRED",
+            "下架須填寫原因",
+        ));
     }
     let mut tx = st.pool.begin().await?;
-    sqlx::query_scalar::<_, Uuid>("SELECT id FROM relief_events WHERE id=$1 FOR UPDATE").bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM relief_events WHERE id=$1 FOR UPDATE")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE relief_events SET moderation_status=$2::moderation_status, moderation_reason=$3 WHERE id=$1")
         .bind(id).bind(&b.moderation_status).bind(if hide { reason.clone() } else { None }).execute(&mut *tx).await?;
     let slugs: Vec<String> = if hide {
@@ -221,23 +352,41 @@ async fn moderate(Staff(staff): Staff, State(st): State<AppState>, Path(id): Pat
     } else {
         vec![]
     };
-    audit(&mut *tx, staff, "relief_event.moderate", "relief_event", Some(id), json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len()})).await?;
+    audit(
+        &mut *tx,
+        staff,
+        "relief_event.moderate",
+        "relief_event",
+        Some(id),
+        json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len()}),
+    )
+    .await?;
     let ev = event_slugs(&mut *tx, &[id]).await?;
     // 下架暫停了據點，所屬組織頁（只列上線據點）也要清
     let orgs: Vec<String> = if hide {
         sqlx::query_scalar("SELECT DISTINCT o.slug::text FROM organizations o JOIN wishlists w ON w.org_id = o.id WHERE w.event_id = $1 AND w.type = 'relief'")
             .bind(id).fetch_all(&mut *tx).await?
-    } else { vec![] };
+    } else {
+        vec![]
+    };
     tx.commit().await?;
     crate::cdn::purge_wishlists(slugs);
     crate::cdn::purge_events(ev);
     orgs.into_iter().for_each(crate::cdn::purge_org);
-    Ok(Json(json!({"id": id, "moderation_status": b.moderation_status})))
+    Ok(Json(
+        json!({"id": id, "moderation_status": b.moderation_status}),
+    ))
 }
 
 /// 事件公開 URL 要清除的 slug
-pub(crate) async fn event_slugs<'e, E: sqlx::PgExecutor<'e>>(ex: E, ids: &[Uuid]) -> Result<Vec<String>, sqlx::Error> {
-    sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)").bind(ids).fetch_all(ex).await
+pub(crate) async fn event_slugs<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    ids: &[Uuid],
+) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT slug::text FROM relief_events WHERE id = ANY($1)")
+        .bind(ids)
+        .fetch_all(ex)
+        .await
 }
 
 /// 許可過期（台北日期）的上線據點暫停，並通知該許可所屬組織的 owner（每組織每許可一封：只對本次剛暫停的據點發，之後不再命中）。
