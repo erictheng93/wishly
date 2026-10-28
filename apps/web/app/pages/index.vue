@@ -247,8 +247,9 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-mine-vis{flex:none;font-size:12px;padding:0 6px;border:1px solid var(--line);color:var(--mute);letter-spacing:.1em}
 .l-mine-msg{padding:20px 16px;color:var(--mute);text-align:center}
 .l-mine-new{display:flex;justify-content:center;align-items:center;min-height:48px;border-top:1px dashed var(--red);font-weight:700;font-size:14px;letter-spacing:.1em}
-/* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有），收緊字距與間距讓 CTA 不折行 */
-@media (max-width:479px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-chip-wait{width:72px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
+/* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有），收緊字距與間距讓 CTA 不折行。
+   完整導覽實測需 ~800px（id 最長、zh-Hant ~580px），斷點留約 100px 給登入後的名稱晶片與字型差異；導覽或文案變長要重量 */
+@media (max-width:899px){.l-nav-link,.l-wide{display:none}.l-auth-wait{width:60px}.l-chip-wait{width:72px}.l-logo{letter-spacing:.08em}.l-nav .l-in>nav{gap:4px}.l-nav .g-btn{white-space:nowrap;padding-left:12px;padding-right:12px}}
 .l h2{font-size:24px;margin:0 0 24px;text-align:center}
 .l h3{font-size:17px;margin:8px 0}
 .l p{margin:0}
