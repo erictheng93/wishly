@@ -55,7 +55,8 @@
 - [ ] §7.6 `scripts/cdn-canary.mjs` exit 0。
 - [ ] §7.9 檢舉＋Turnstile：偽造 token 得 403。
 - [ ] §7.11 背景工作：建一筆短效期捐助，確認到期自動釋放。
-- [ ] §7.12 Google／LINE OAuth 各登入一次（issue #6）。
+- [x] §7.12 Google／LINE OAuth 各登入一次（2026-10-28 正式環境通過，issue #6 關閉）。
+- [ ] OAuth 其餘情境（原 issue #6）：以已驗證 Email 自動連結既有帳號；`/settings` 綁定／解除並收到安全通知、不可解除最後一種方式；LINE 無 Email 帳號以 OTP 補信箱；停權帳號走 OAuth 回 `/login?error=account_blocked` 並清 `ws_session`；頭像轉存到 R2 可讀、轉存失敗不影響登入；手機瀏覽器跳 LINE App 再返回。
 - [ ] §7.14 重新部署期間進行中請求的失敗數與捐助一致性。
 - [ ] §7.15 手動 kill 容器，確認自動重啟、Tunnel 恢復。
 - [ ] 預設封面分享預覽（PR #36）：部署後拿正式網址貼到 LINE，確認預覽圖會顯示預設封面（`/covers/{id}.png`），而非 `og-default.png`。
