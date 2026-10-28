@@ -33,9 +33,19 @@ async fn status(State(st): State<AppState>) -> Result<Response, AppError> {
             .fetch_optional(&st.pool)
             .await?;
     let read_only = v.and_then(|v| v.as_bool()) == Some(true);
+    let cfg = crate::config::get();
+    // 儲值可用的付款方式（設定是靜態的，可隨 CDN 快取）；未設綠界憑證則為空
+    let topup_methods: Vec<&str> = cfg.ecpay.as_ref().map_or(vec![], |e| {
+        let mut m = vec![];
+        if e.card_enabled {
+            m.push("card");
+        }
+        m.extend(["cvs_code", "cvs_barcode", "atm"]);
+        m
+    });
     Ok((
         [(header::CACHE_CONTROL, "public, max-age=30")],
-        Json(json!({ "read_only": read_only, "orgs_enabled": crate::config::get().orgs_enabled })),
+        Json(json!({ "read_only": read_only, "orgs_enabled": cfg.orgs_enabled, "topup_methods": topup_methods })),
     )
         .into_response())
 }

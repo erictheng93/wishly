@@ -46,6 +46,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/wallet/topups", post(create).get(list))
         .route("/wallet/topups/{id}", get(detail))
+        .route("/wallet/topups/{id}/cancel", post(cancel))
         .route("/webhooks/payments/{provider}", post(webhook))
         .route("/webhooks/payments/{provider}/info", post(webhook_info))
         .route(
@@ -245,6 +246,14 @@ fn parse_invoice(v: Option<&Value>) -> Result<Invoice, AppError> {
         },
         _ => return bad("/invoice/carrier_type", "carrier_type 不支援"),
     }
+    // shortcut: 電子發票尚未串接（invoices 列只會停在 pending），僅收會員載具；串接開立後移除此限制。
+    if inv.carrier_type != "member" {
+        return Err(AppError::invalid(
+            "/invoice/carrier_type",
+            "UNSUPPORTED",
+            "電子發票尚未串接，目前僅支援會員載具",
+        ));
+    }
     Ok(inv)
 }
 
@@ -281,8 +290,9 @@ async fn create(
             )
         })?;
     let method = match b.get("method").and_then(Value::as_str) {
-        Some(m @ ("card" | "cvs_code" | "cvs_barcode" | "atm")) => m,
-        Some("line_pay" | "apple_pay") => {
+        Some(m @ ("cvs_code" | "cvs_barcode" | "atm")) => m,
+        Some(m @ "card") if cfg.card_enabled => m,
+        Some("card" | "line_pay" | "apple_pay") => {
             return Err(AppError::invalid(
                 "/method",
                 "UNSUPPORTED",
@@ -309,6 +319,18 @@ async fn create(
     }
     let wallet = points::ensure_wallet(&mut tx, user.id).await?;
     points::lock_wallets(&mut tx, &[wallet]).await?; // 同使用者的建立請求序列化，上限檢查才不會被併發繞過
+    let frozen: bool =
+        sqlx::query_scalar("SELECT status = 'frozen' FROM point_wallets WHERE id = $1")
+            .bind(wallet)
+            .fetch_one(&mut *tx)
+            .await?;
+    if frozen {
+        return Err(AppError::problem(
+            403,
+            "WALLET_FROZEN",
+            "錢包已凍結，無法儲值，請聯絡客服",
+        ));
+    }
 
     // 每小時建單數
     let (n, oldest): (i64, Option<DateTime<Utc>>) = sqlx::query_as(
@@ -670,8 +692,9 @@ fn parse_expire(s: &str) -> Option<DateTime<Utc>> {
 }
 
 /// 取號成功通知：驗簽 → 核對金額 → 寫入 payment_info（僅 pending；重送覆寫為相同內容無害）→ `1|OK`。
-/// RtnCode 依付款方式不同（ATM=2、CVS / BARCODE=10100073，以官方文件為準），故不比對特定碼：
-/// 只排除 `1`（那是付款通知），其餘以「該付款方式必要的取號欄位是否齊全」判斷，欄位不齊時記 warn 並回 OK（重送也不會補齊）。
+/// RtnCode 依付款方式要求取號成功碼（ATM=2、CVS / BARCODE=10100073，以官方文件為準），其他碼（含付款通知的 `1`）一律不存並回 OK；
+/// 另以「該付款方式必要的取號欄位是否齊全」判斷，欄位不齊時記 warn 並回 OK（重送也不會補齊）。
+/// ExpireDate 可解析時，`topups.expires_at` 同步為繳費期限，錢包上限與逾期釋放才與使用者看到的期限一致。
 async fn webhook_info(
     State(st): State<AppState>,
     Path(provider): Path<String>,
@@ -690,7 +713,12 @@ async fn webhook_info(
     let Some((id, amount, method, status, expires_at)) = row else {
         return Err(AppError::problem(404, "NOT_FOUND", "查無儲值訂單"));
     };
-    if status != "pending" || get("RtnCode") == Some("1") {
+    if status != "pending" {
+        return Ok(ok_text());
+    }
+    let ok_code = if method == "atm" { "2" } else { "10100073" };
+    if get("RtnCode") != Some(ok_code) {
+        tracing::warn!(topup = %id, method, rtn_code = ?get("RtnCode"), "取號通知 RtnCode 非取號成功碼，略過");
         return Ok(ok_text());
     }
     if get("TradeAmt").and_then(|a| a.parse::<i64>().ok()) != Some(amount) {
@@ -708,8 +736,8 @@ async fn webhook_info(
             "通知金額與訂單不符",
         ));
     }
-    let expire_at = get("ExpireDate")
-        .and_then(parse_expire)
+    let parsed = get("ExpireDate").and_then(parse_expire);
+    let expire_at = parsed
         .unwrap_or(expires_at)
         .to_rfc3339_opts(SecondsFormat::Secs, true);
     let info = match method.as_str() {
@@ -733,9 +761,10 @@ async fn webhook_info(
         tracing::warn!(topup = %id, method, "取號通知缺少必要欄位或付款方式不適用，略過");
         return Ok(ok_text());
     };
-    sqlx::query("UPDATE topups SET payment_info = $2, updated_at = now() WHERE id = $1 AND status = 'pending'")
+    sqlx::query("UPDATE topups SET payment_info = $2, expires_at = COALESCE($3, expires_at), updated_at = now() WHERE id = $1 AND status = 'pending'")
         .bind(id)
         .bind(info)
+        .bind(parsed)
         .execute(&st.pool)
         .await?;
     Ok(ok_text())
@@ -804,4 +833,41 @@ async fn detail(
     .await?;
     let row = row.ok_or(AppError::NotFound)?;
     Ok(no_store(json!({ "topup": topup_json(row) })))
+}
+
+/// 取消待付款儲值單（釋放錢包上限）。單一條件式 UPDATE；非本人或不存在 404，非 pending 409。
+/// 取消後若仍收到成功付款通知，`credit` 接受 failed 照常入帳，所以取消不會讓使用者掉錢。不受 ECPAY 開關限制。
+async fn cancel(
+    State(st): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Response, AppError> {
+    let row: Option<TopupRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "UPDATE topups t SET status = 'failed', failure_reason = '使用者取消', updated_at = now()
+           FROM point_wallets w
+          WHERE t.id = $1 AND w.id = t.wallet_id AND w.user_id = $2 AND t.status = 'pending'
+      RETURNING {TOPUP_COLS}"
+    )))
+    .bind(id)
+    .bind(user.id)
+    .fetch_optional(&st.pool)
+    .await?;
+    if let Some(row) = row {
+        return Ok(no_store(json!({ "topup": topup_json(row) })));
+    }
+    let owned: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM topups t JOIN point_wallets w ON w.id = t.wallet_id WHERE t.id = $1 AND w.user_id = $2)",
+    )
+    .bind(id)
+    .bind(user.id)
+    .fetch_one(&st.pool)
+    .await?;
+    if owned {
+        return Err(AppError::problem(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "只有待付款的儲值單可以取消",
+        ));
+    }
+    Err(AppError::NotFound)
 }

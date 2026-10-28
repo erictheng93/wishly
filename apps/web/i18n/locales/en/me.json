@@ -302,22 +302,6 @@
       },
       "deadlineCard": "Complete payment within 30 minutes.",
       "deadlineOther": "Pay within 3 days.",
-      "invoiceLegend": "E-invoice",
-      "carrierType": "Invoice carrier",
-      "carrier": {
-        "member": "Member carrier (default)",
-        "mobile_barcode": "Mobile barcode",
-        "citizen_cert": "Citizen Digital Certificate",
-        "donate": "Donate invoice",
-        "b2b": "Company tax ID"
-      },
-      "field": {
-        "mobile": "Mobile barcode",
-        "cert": "Citizen certificate barcode",
-        "donate": "Donation code",
-        "taxId": "Tax ID number",
-        "buyerName": "Company name (optional)"
-      },
       "summary": "Review",
       "summaryLine": "Top up NT$ {amount}, credited as {pts} points (1 point = NT$ 1)",
       "summaryEmpty": "Enter an amount to see the summary.",
@@ -377,7 +361,11 @@
       "cardPending": "Payment not completed yet. Please finish before {time}.",
       "success": "Top-up successful. {pts} points credited; balance is now {bal} points.",
       "nativeText": "The payment page can't open inside the app. Please complete the top-up on the web version.",
-      "nativeLink": "Top up on the web"
+      "nativeLink": "Top up on the web",
+      "invoiceMember": "The e-invoice will be issued to your member carrier.",
+      "cardRetry": "To retry, cancel this order and create a new one.",
+      "cancel": "Cancel order",
+      "cancelText": "Cancel this pending top-up? If you have already paid, the payment will still be credited."
     },
     "frozenBanner": "Your wallet is frozen: you can't contribute or request a cash refund for now. Please contact support.",
     "refund": {

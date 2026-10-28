@@ -302,22 +302,6 @@
       },
       "deadlineCard": "Vui lòng thanh toán trong 30 phút.",
       "deadlineOther": "Hạn thanh toán 3 ngày.",
-      "invoiceLegend": "Hóa đơn điện tử",
-      "carrierType": "Loại lưu trữ hóa đơn",
-      "carrier": {
-        "member": "Lưu theo tài khoản (mặc định)",
-        "mobile_barcode": "Mã vạch điện thoại",
-        "citizen_cert": "Chứng thư công dân",
-        "donate": "Tặng hóa đơn",
-        "b2b": "Mã số thuế công ty"
-      },
-      "field": {
-        "mobile": "Mã vạch điện thoại",
-        "cert": "Mã vạch chứng thư công dân",
-        "donate": "Mã tặng",
-        "taxId": "Mã số thuế",
-        "buyerName": "Tên công ty (không bắt buộc)"
-      },
       "summary": "Xác nhận",
       "summaryLine": "Nạp NT$ {amount}, nhận {pts} điểm (1 điểm = NT$ 1)",
       "summaryEmpty": "Nhập số tiền để xem tóm tắt.",
@@ -377,7 +361,11 @@
       "cardPending": "Chưa hoàn tất thanh toán. Vui lòng hoàn tất trước {time}.",
       "success": "Nạp điểm thành công. Đã cộng {pts} điểm; số dư hiện tại {bal} điểm.",
       "nativeText": "Không thể mở trang thanh toán trong ứng dụng. Vui lòng nạp điểm trên phiên bản web.",
-      "nativeLink": "Nạp điểm trên web"
+      "nativeLink": "Nạp điểm trên web",
+      "invoiceMember": "Hóa đơn điện tử sẽ được xuất vào kho lưu trữ hóa đơn của thành viên.",
+      "cardRetry": "Để thử lại, hãy hủy đơn này và tạo đơn mới.",
+      "cancel": "Hủy đơn",
+      "cancelText": "Hủy lệnh nạp tiền đang chờ thanh toán này? Nếu bạn đã thanh toán, khoản tiền vẫn sẽ được ghi nhận."
     },
     "frozenBanner": "Ví của bạn đã bị đóng băng: tạm thời không thể tài trợ hoặc yêu cầu hoàn tiền mặt. Vui lòng liên hệ hỗ trợ.",
     "refund": {

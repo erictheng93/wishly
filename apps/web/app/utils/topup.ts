@@ -1,16 +1,14 @@
 // 儲值（/me/topup）的純函式：表單驗證、請求內容、Idempotency-Key 重用、錯誤碼對應、取號資訊格式化。
-// 驗證規則與後端 apps/api/src/topup.rs 的 parse_invoice 一致（契約 POST /wallet/topups）。
+// shortcut: 發票只支援會員載具（後端電子發票尚未串接，其他載具回 422）；開放後再補載具選擇與逐欄驗證（手機條碼 /[A-Z0-9+\-.]{7}、憑證 2 大寫+14 數字、捐贈碼 3–7 數字、統編 8 數字）。
 export const TOPUP_MIN = 100
 export const TOPUP_MAX = 50_000
 export const WALLET_CAP = 50_000
 export const QUICK_AMOUNTS = [500, 1000, 2000, 5000]
 export const TOPUP_METHODS = ['card', 'cvs_code', 'cvs_barcode', 'atm'] as const
-export const TOPUP_CARRIERS = ['member', 'mobile_barcode', 'citizen_cert', 'donate', 'b2b'] as const
 export type Method = typeof TOPUP_METHODS[number]
-export type Carrier = typeof TOPUP_CARRIERS[number]
 
-export interface TopupForm { amount: string, method: Method, carrier_type: Carrier, carrier_id: string, donate_code: string, buyer_tax_id: string, buyer_name: string }
-export const emptyForm = (): TopupForm => ({ amount: '', method: 'card', carrier_type: 'member', carrier_id: '', donate_code: '', buyer_tax_id: '', buyer_name: '' })
+export interface TopupForm { amount: string, method: Method }
+export const emptyForm = (): TopupForm => ({ amount: '', method: 'card' })
 
 /** 回 i18n key（me.topup.err.*），合法回 null；只收整數（不接受 1e3、小數、空白） */
 export function amountError(v: string): string | null {
@@ -19,34 +17,18 @@ export function amountError(v: string): string | null {
   return n >= TOPUP_MIN && n <= TOPUP_MAX ? null : 'me.topup.err.amountRange'
 }
 
-// 手機條碼：/ + 7 碼（大寫英數與 + - .）；自然人憑證：2 大寫 + 14 數字；捐贈碼 3–7 數字；統編 8 數字
-export const isMobileBarcode = (s: string) => /^\/[A-Z0-9+\-.]{7}$/.test(s)
-export const isCitizenCert = (s: string) => /^[A-Z]{2}\d{14}$/.test(s)
-export const isDonateCode = (s: string) => /^\d{3,7}$/.test(s)
-export const isTaxId = (s: string) => /^\d{8}$/.test(s)
-
-type Field = 'amount' | 'carrier_id' | 'donate_code' | 'buyer_tax_id'
-/** 逐欄錯誤：欄位名 → i18n key。只檢查目前載具會送出的欄位 */
+type Field = 'amount'
+/** 逐欄錯誤：欄位名 → i18n key */
 export function formErrors(f: TopupForm): Partial<Record<Field, string>> {
   const e: Partial<Record<Field, string>> = {}
   const a = amountError(f.amount); if (a) e.amount = a
-  if (f.carrier_type === 'mobile_barcode' && !isMobileBarcode(f.carrier_id.trim())) e.carrier_id = 'me.topup.err.mobile'
-  if (f.carrier_type === 'citizen_cert' && !isCitizenCert(f.carrier_id.trim())) e.carrier_id = 'me.topup.err.cert'
-  if (f.carrier_type === 'donate' && !isDonateCode(f.donate_code.trim())) e.donate_code = 'me.topup.err.donate'
-  if (f.carrier_type === 'b2b' && !isTaxId(f.buyer_tax_id.trim())) e.buyer_tax_id = 'me.topup.err.taxId'
   return e
 }
 
 /** 後端 errors[].pointer → 表單欄位 */
-export const POINTER_FIELD: Record<string, Field> = { '/amount': 'amount', '/invoice/carrier_id': 'carrier_id', '/invoice/donate_code': 'donate_code', '/invoice/buyer_tax_id': 'buyer_tax_id' }
+export const POINTER_FIELD: Record<string, Field> = { '/amount': 'amount' }
 
-export function buildBody(f: TopupForm) {
-  const invoice: Record<string, string> = { carrier_type: f.carrier_type }
-  if (f.carrier_type === 'mobile_barcode' || f.carrier_type === 'citizen_cert') invoice.carrier_id = f.carrier_id.trim()
-  if (f.carrier_type === 'donate') invoice.donate_code = f.donate_code.trim()
-  if (f.carrier_type === 'b2b') { invoice.buyer_tax_id = f.buyer_tax_id.trim(); if (f.buyer_name.trim()) invoice.buyer_name = f.buyer_name.trim() }
-  return { amount: Number(f.amount), method: f.method, invoice }
-}
+export const buildBody = (f: TopupForm) => ({ amount: Number(f.amount), method: f.method, invoice: { carrier_type: 'member' } })
 
 /** 「同一份表單內容」→ 同一個 Idempotency-Key：送出的 body 不變就重用，改變才換新；成功後 reset */
 export function idemKeys(gen: () => string = () => crypto.randomUUID()) {
@@ -69,6 +51,7 @@ export function topupError(e: { status?: number, code?: string, detail?: string,
   for (const x of e.errors ?? []) { const f = POINTER_FIELD[x.pointer]; if (f && x.detail) fields[f] = x.detail }
   switch (e.code) {
     case 'TOPUP_DISABLED': return { msg: t('me.topup.err.disabled'), disabled: true, fields }
+    case 'WALLET_FROZEN': return { msg: t('me.frozenBanner'), fields }
     case 'WALLET_CAP_EXCEEDED': return { msg: t('me.topup.err.cap', { cap: fmt(WALLET_CAP) }), fields }
     case 'TOPUP_LIMIT_EXCEEDED': return { msg: t('me.topup.err.limit', { limit: fmt(e.body?.limit_amount ?? 0), remaining: fmt(e.body?.remaining_amount ?? 0) }), fields }
     case 'RATE_LIMITED': { const min = retryMinutes(e.body?.retry_after); return { msg: min ? t('me.topup.err.rate', { min }) : t('me.topup.err.rateNoMin'), fields } }
