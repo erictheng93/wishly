@@ -65,7 +65,7 @@
 - [ ] CORS：允許前端網域對 bucket 的 `PUT`，允許標頭 `Content-Type`（presigned PUT 簽入 content-type 與 content-length）。
 - [ ] **需實測**：R2 對「簽入 `content-length` 的 presigned PUT」的行為（`presign()` 會把 `content-length` 與 `content-type` 簽進 SignedHeaders）；以真實 R2 與瀏覽器上傳一張圖驗證，包含超過 `Content-Length` 宣告大小時被拒絕。
 - [ ] 物件版本與備份：PRD 要求 R2 物件版本保留 30 天——R2 的版本控制／保護機制與設定方式需於後台確認後寫入決策。
-- [ ] 驗證：上傳一張圖，經 `S3_PUBLIC_BASE` 在瀏覽器開得到；確認重新編碼後的檔案不含 EXIF；頭像轉存（issue #6）能寫入。
+- [ ] 驗證：上傳一張圖，經 `S3_PUBLIC_BASE` 在瀏覽器開得到；確認重新編碼後的檔案不含 EXIF；頭像轉存（第三方登入）能寫入。
 
 ### 2.3 VPS 主機
 - [ ] Linode 東京節點；OS 為受支援 LTS；`unattended-upgrades`（或等效）啟用安全更新。
@@ -115,7 +115,7 @@
 | `SHIPPING_ENC_KEY` | base64 的 32 bytes（`openssl rand -base64 32`） | **遺失＝收件資訊全部無法解密；無輪替機制**；見 §6 |
 | `S3_ENDPOINT`、`S3_BUCKET`、`S3_ACCESS_KEY`、`S3_SECRET_KEY`、`S3_PUBLIC_BASE` | 必填 | `S3_REGION` 選填（R2 用 `auto`） |
 | `NATIVE_ORIGINS`、`NATIVE_REDIRECT` | 要出原生殼才設 | 未設只允許 `APP_URL` |
-| `GOOGLE_*`、`LINE_*` | 要啟用第三方登入才設 | redirect URI 為 `https://<API 網域>/api/v1/auth/oauth/{google,line}/callback`，須登錄於供應商後台（issue #6） |
+| `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REDIRECT_URI`；`LINE_CHANNEL_ID`、`LINE_CHANNEL_SECRET`、`LINE_REDIRECT_URI` | 已啟用（2026-10-28） | `*_REDIRECT_URI` 必設（預設是 localhost），值為 `https://api.wishly.tw/api/v1/auth/oauth/{google,line}/callback`，須與 Google Auth Platform 用戶端／LINE Login channel 的 Callback URL 一字不差；兩邊後台須為正式版／Published |
 
 - [ ] 每個值已放入 Dokploy 環境變數，並記錄「誰能讀、如何輪替、Dokploy 設定如何備份」。
 - [ ] production 值與 dev 預設不同，且 staging／production 互不相同。
@@ -173,7 +173,7 @@
 | 7.9 | 檢舉＋Turnstile | 送出檢舉成功；偽造 token 得 403 |
 | 7.10 | SSE 長連線 | `scripts/sse-probe.mjs` 跑 ≥ 40 分鐘，確認越過 30 分鐘上限會重連（完整驗收是 Spike S3：120 分鐘） |
 | 7.11 | 背景工作實際在跑 | 建一筆短效期捐助，確認到期後自動釋放 |
-| 7.12 | OAuth | Google／LINE 實際登入一次（issue #6） |
+| 7.12 | OAuth | Google／LINE 實際登入一次（2026-10-28 正式環境通過） |
 | 7.13 | **備份還原演練** | 還原到暫存實例，跑對帳查詢，記錄實際 RTO |
 | 7.14 | 換版期間的影響 | 在 Dokploy 重新部署時，記錄進行中請求的失敗數；確認客戶端重試後捐助狀態一致 |
 | 7.15 | 重啟自癒 | 手動 kill 容器，確認自動重啟、資料不遺失、Tunnel 恢復 |
