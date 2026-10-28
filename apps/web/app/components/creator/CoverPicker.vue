@@ -6,7 +6,8 @@ const imageKey = defineModel<string | null>('imageKey', { required: true })
 const emit = defineEmits<{ busy: [boolean] }>()
 const reset = ref(0) // 點預設圖時重掛上傳元件，清掉它的預覽
 const uid = useId()
-function choose(id: string) { preset.value = id; imageKey.value = null; reset.value++ }
+// 上傳中被重掛時，舊元件的 busy:false 傳不到這裡，要自己解除，否則父層送出鈕會一直停用
+function choose(id: string) { preset.value = id; imageKey.value = null; reset.value++; emit('busy', false) }
 function uploaded(k: string | null) { imageKey.value = k; if (k) preset.value = null }
 </script>
 <template>
