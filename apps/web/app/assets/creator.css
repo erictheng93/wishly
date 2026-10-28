@@ -69,9 +69,18 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-row+.c-bar{margin-top:8px}
 .c-lbl{display:block;font-size:13px;letter-spacing:.08em;color:var(--mute);margin-bottom:6px}
 .c-pw{display:flex;gap:4px;align-items:stretch}.c-pw input{flex:1;min-width:0}
-.c-links{display:flex;justify-content:space-between;gap:12px;margin:0 0 16px;font-size:14px}
-.c-links a{color:var(--red-text);min-height:44px;display:inline-flex;align-items:center}
 .c-ok{color:var(--fg);border:1px solid var(--red);padding:10px 14px;margin:0 0 16px;font-size:14px}
+/* 登入 / 註冊 / 忘記密碼：表單收成 400px 單欄，平板以上成置中卡片，不隨 --c-w 拉寬 */
+.c-auth{max-width:400px;margin:8px auto 0}
+.c-auth-lead{margin:0 0 20px;line-height:1.6}
+.c-auth-forgot{margin:-16px 0 8px;text-align:right;font-size:13px}
+.c-auth-forgot a,.c-auth-foot a{color:var(--red-text);font-weight:700;min-height:44px;display:inline-flex;align-items:center}
+.c-auth-foot{margin:20px 0 0;text-align:center;font-size:14px;color:var(--mute)}
+.c-or{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--mute);font-size:13px;letter-spacing:.1em}
+.c-or::before,.c-or::after{content:'';flex:1;border-top:1px solid var(--line)}
+@media (min-width:768px){
+  .c-auth{margin-top:min(8vh,72px);padding:40px;border:1px solid var(--line);border-top:4px solid var(--red);background:var(--card)}
+}
 .c-file{position:relative;overflow:hidden}
 .c-file input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
 .c-file:focus-within{outline:2px solid var(--red);outline-offset:2px}
@@ -128,7 +137,7 @@ dialog.c-sheet:focus-visible{outline:0}
   .c-btn.plain:hover,.c-rail a:hover{background:var(--bg-alt)}
   .c-tabs .c-btn.on:hover{background:var(--accent-press)}
   .c-seg label:hover input:not(:checked)+span{background:var(--bg-alt)}
-  .c-links a:hover,.c-card a:not(.c-btn):hover{text-decoration:underline}
+  .c-auth a:not(.c-btn):hover,.c-card a:not(.c-btn):hover{text-decoration:underline}
   .c-card summary:hover{color:var(--red-text)}
 }
 /* 橫放手機等短視窗（高 ≤ 500）：header / 底欄不再固定，把垂直空間還給內容 */
