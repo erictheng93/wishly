@@ -68,7 +68,8 @@ const shareUrl = computed(() => {
   return external.value ? u + (u.includes('?') ? '&' : '?') + 'openExternalBrowser=1' : u
 })
 function openItem(i: any = null, p: ItemPrefill = {}) { editing.value = i; prefill.value = p; sheet.value = true }
-async function saved() { sheet.value = false; await load(true) }
+const tour = useOnboarding()
+async function saved() { sheet.value = false; await load(true); tour.refresh() }
 async function patchList(body: any, ok = t('lists.edit.saved')) {
   msg.value = ''; err.value = ''; stale.value = false
   try { w.value = await api(`/wishlists/${id}`, { method: 'PATCH', body: { ...body, expected_updated_at: w.value?.updated_at } }); msg.value = ok; return true }
@@ -98,7 +99,7 @@ async function saveMeta() {
 }
 async function publish() {
   pubBusy.value = true; pubErrs.value = []
-  if (await patchList({ status: 'active' }, t('lists.edit.published'))) showShare.value = true
+  if (await patchList({ status: 'active' }, t('lists.edit.published'))) { showShare.value = true; tour.refresh() }
   pubBusy.value = false
 }
 async function remove(force = false) {

@@ -622,9 +622,9 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     let (dn, email, avatar, staff, prefs, handle, dcv): (String, Option<String>, Option<String>, bool, Value, Option<String>, String) =
         sqlx::query_as("SELECT display_name, email, avatar_key, is_staff, notification_prefs, handle, default_claim_visibility::text FROM users WHERE id=$1 AND deleted_at IS NULL")
             .bind(id).fetch_optional(pool).await?.ok_or(AppError::Unauthorized)?;
-    let (bio, birthday, bv, locale): (Option<String>, Option<String>, String, String) =
+    let (bio, birthday, bv, locale, onboarding_done): (Option<String>, Option<String>, String, String, bool) =
         sqlx::query_as(
-            "SELECT bio, birthday, birthday_visibility::text, locale FROM users WHERE id=$1",
+            "SELECT bio, birthday, birthday_visibility::text, locale, onboarding_done_at IS NOT NULL FROM users WHERE id=$1",
         )
         .bind(id)
         .fetch_one(pool)
@@ -647,7 +647,7 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
         .into_iter().map(|(i, n, r, v)| json!({"id": i, "name": n, "role": r, "verification_status": v})).collect();
     Ok(
         json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
-               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "locale": locale, "mfa_enabled": mfa_enabled, "has_password": has_password, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
+               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "locale": locale, "mfa_enabled": mfa_enabled, "has_password": has_password, "onboarding_done": onboarding_done, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
                "orgs": orgs }),
     )
 }

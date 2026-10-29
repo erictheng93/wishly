@@ -21,6 +21,9 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await page.getByLabel('第 1 碼').fill('000000')
     await expect(page.getByRole('alert')).toContainText('驗證碼不正確或已過期')
     await page.getByLabel('第 1 碼').fill(await waitForOtp(email, /註冊/))
+    // 新帳號先到新手導覽（D66）；這條旅程自己會走，直接跳過
+    await expect(page).toHaveURL(/\/welcome$/)
+    await page.getByRole('button', { name: '跳過導覽，直接開始' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.getByText('還沒有清單，建立第一份吧')).toBeVisible()
   })

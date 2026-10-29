@@ -30,7 +30,15 @@ async function unarchive(w: any) {
 function toggleArchived() { archived.value = !archived.value; list.value = []; load() }
 const pad = (n: number) => String(n).padStart(2, '0')
 const pctOf = (w: any) => Math.max(0, Math.min(100, Number(w.completion?.completion_pct ?? 0)))
-onMounted(() => load())
+// 新手導覽：剛註冊、什麼都還沒做時先帶去導覽頁（每個分頁工作階段一次，按返回不會一直被拉回去）
+const tour = useOnboarding()
+onMounted(async () => {
+  load()
+  const s = await tour.refresh()
+  let welcomed = false
+  try { welcomed = !!sessionStorage.getItem('ws_tour_welcomed') } catch {}
+  if (tour.active.value && s && s.steps.every(x => !x.done) && !welcomed) navigateTo('/welcome')
+})
 </script>
 <template>
   <main class="c-page">
