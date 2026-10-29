@@ -801,6 +801,7 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
             .fetch_one(&pool)
             .await
             .unwrap();
+    common::wishlist(&pool, other, Default::default()).await; // 有資料：不能被併入
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid) VALUES ($1,'google','occupied-google')").bind(other).execute(&pool).await.unwrap();
     let (state, oc) = start(&app, &session).await;
     let idt = id_token("occupied-google", "occupied@example.com", true, "gid", 3600);
@@ -823,6 +824,92 @@ async fn google_manual_link_binds_session_and_refuses_account_merge(pool: PgPool
     .await
     .unwrap();
     assert_eq!(owner, other);
+    common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn google_link_absorbs_blank_account(pool: PgPool) {
+    let _guard = GOOGLE_TEST_LOCK.lock().await;
+    init_mock();
+    let app = app(AppState { pool: pool.clone() });
+    let common::TestUser { id, token } = common::user(&pool, "原帳號").await;
+    common::wishlist(&pool, id, Default::default()).await;
+    // 不小心用 Google 登入而開出的空帳號（信箱不同，所以沒自動連結）
+    let other: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (display_name,email) VALUES ('g','other@example.com') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'google','blank-google','other@example.com')").bind(other).execute(&pool).await.unwrap();
+    let session = common::ck(&token)[0].1.clone();
+    let (s, h, _) = common::call_app(
+        &app,
+        "GET",
+        "/auth/oauth/google/start?link=true",
+        &[("cookie", session.clone())],
+        None,
+    )
+    .await;
+    assert_eq!(s, 302);
+    let url = reqwest::Url::parse(h[header::LOCATION].to_str().unwrap()).unwrap();
+    let state = url
+        .query_pairs()
+        .find(|(k, _)| k == "state")
+        .unwrap()
+        .1
+        .into_owned();
+    let oc = h[header::SET_COOKIE]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let idt = id_token("blank-google", "other@example.com", true, "gid", 3600);
+    let (_, h, _) = common::call_app(
+        &app,
+        "GET",
+        &format!("/auth/oauth/google/callback?state={state}&code={idt}"),
+        &[("cookie", format!("{oc}; {session}"))],
+        None,
+    )
+    .await;
+    assert!(h[header::LOCATION]
+        .to_str()
+        .unwrap()
+        .ends_with("/settings?linked=google"));
+    let owner: Uuid =
+        sqlx::query_scalar("SELECT user_id FROM auth_identities WHERE provider_uid='blank-google'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(owner, id);
+    let deleted: bool = sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM users WHERE id=$1")
+        .bind(other)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(deleted);
+    // 之後用該 Google 登入，回到原帳號
+    let (s, h) = google_login(
+        &app,
+        &id_token("blank-google", "other@example.com", true, "gid", 3600),
+    )
+    .await;
+    assert_eq!(s, 302, "{h:?}");
+    let cookie = h
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .map(|v| v.to_str().unwrap())
+        .find(|v| v.starts_with("ws_session="))
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let (_, _, me) = common::call_app(&app, "GET", "/me", &[("cookie", cookie)], None).await;
+    assert_eq!(me["id"], id.to_string());
     common::assert_all_reconciled(&pool).await;
 }
 

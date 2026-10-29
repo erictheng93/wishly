@@ -246,6 +246,7 @@ async fn email_link_refuses_existing_account(pool: PgPool) {
         id: other,
         token: _,
     } = provider_user(&pool, "google").await;
+    common::wishlist(&pool, other, Default::default()).await; // 有資料：不能被併入
     sqlx::query("UPDATE users SET email='taken@example.com' WHERE id=$1")
         .bind(other)
         .execute(&pool)
@@ -466,6 +467,7 @@ async fn email_link_checks_email_on_other_provider_identity(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
+    common::wishlist(&pool, other, Default::default()).await; // 有資料：不能被併入
     sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'google','alternate-google','alternate@example.com')").bind(other).execute(&pool).await.unwrap();
     let common::TestUser { id: _, token } = provider_user(&pool, "line").await;
     assert_eq!(
@@ -801,4 +803,174 @@ async fn self_unlink_revokes_other_sessions_only_on_success(pool: PgPool) {
         200
     );
     common::assert_all_reconciled(&pool).await;
+}
+
+async fn link_email(pool: &PgPool, token: &str, email: &str) -> (StatusCode, Value) {
+    let (s, _, _) = common::call(
+        pool,
+        "POST",
+        "/me/identities/email/request",
+        &common::ck(token),
+        Some(json!({ "email": email })),
+    )
+    .await;
+    assert_eq!(s, 202);
+    sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE email=$2")
+        .bind(code_hash("123456", "dev-pepper"))
+        .bind(email)
+        .execute(pool)
+        .await
+        .unwrap();
+    let (s, _, b) = common::call(
+        pool,
+        "POST",
+        "/me/identities/email/verify",
+        &common::ck(token),
+        Some(json!({ "email": email, "code": "123456" })),
+    )
+    .await;
+    (s, b)
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn blank_account_detection_counts_any_user_data(pool: PgPool) {
+    let blank = |id: Uuid| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, bool>("SELECT user_is_blank($1)")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    let a = common::user(&pool, "a").await.id;
+    assert!(blank(a).await, "只有登入方式與 session");
+    let mut tx = pool.begin().await.unwrap();
+    wishly_api::points::ensure_wallet(&mut tx, a).await.unwrap();
+    tx.commit().await.unwrap();
+    assert!(blank(a).await, "空錢包不算資料");
+    let b = common::user(&pool, "b").await.id;
+    common::grant(&pool, b, 5).await;
+    assert!(!blank(b).await, "錢包有點數");
+    let c = common::user(&pool, "c").await.id;
+    common::wishlist(&pool, c, Default::default()).await;
+    assert!(!blank(c).await, "有清單");
+    let d = common::user(&pool, "d").await.id;
+    common::befriend(&pool, a, d).await;
+    assert!(!blank(d).await && !blank(a).await, "有好友");
+    let e = common::staff(&pool, "e").await.id;
+    assert!(!blank(e).await, "staff");
+    let f = common::user(&pool, "f").await.id;
+    sqlx::query("UPDATE users SET blocked_at=now() WHERE id=$1")
+        .bind(f)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(!blank(f).await, "停權帳號不可藉合併消失");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn email_link_absorbs_blank_account_and_keeps_its_password(pool: PgPool) {
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
+    let common::TestUser {
+        id: other,
+        token: other_token,
+    } = common::user(&pool, "誤開的帳號").await;
+    sqlx::query("UPDATE users SET email='mine@example.com' WHERE id=$1")
+        .bind(other)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email,password_hash) VALUES ($1,'email','mine@example.com','mine@example.com','argon-hash')")
+        .bind(other).execute(&pool).await.unwrap();
+    let (s, me) = link_email(&pool, &token, "mine@example.com").await;
+    assert_eq!(s, StatusCode::OK, "{me}");
+    assert_eq!(me["email"], "mine@example.com");
+    let (owner, pw): (Uuid, Option<String>) = sqlx::query_as(
+        "SELECT user_id, password_hash FROM auth_identities WHERE provider='email' AND provider_uid='mine@example.com'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (owner, pw.as_deref()),
+        (id, Some("argon-hash")),
+        "identity 連同密碼搬到本人"
+    );
+    let (deleted, email): (bool, Option<String>) =
+        sqlx::query_as("SELECT deleted_at IS NOT NULL, email FROM users WHERE id=$1")
+            .bind(other)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((deleted, email), (true, None));
+    let (s, _, _) = common::call(&pool, "GET", "/me", &common::ck(&other_token), None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED, "被併入帳號的 session 失效");
+    let audited: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM audit_logs WHERE action='account.absorb' AND actor_id=$1 AND entity_id=$2)")
+        .bind(id).bind(other).fetch_one(&pool).await.unwrap();
+    assert!(audited);
+    common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn email_link_absorbs_blank_account_matched_by_provider_email(pool: PgPool) {
+    // 誤用不同 Google 帳號登入：該帳號只有 Google，信箱與要綁的 Email 相同
+    let common::TestUser { id, token } = provider_user(&pool, "line").await;
+    let common::TestUser { id: other, .. } = provider_user(&pool, "google").await;
+    sqlx::query("UPDATE auth_identities SET email='g@example.com' WHERE user_id=$1")
+        .bind(other)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, me) = link_email(&pool, &token, "g@example.com").await;
+    assert_eq!(s, StatusCode::OK, "{me}");
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_identities WHERE user_id=$1")
+        .bind(other)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(left, 0, "被併入帳號的其他登入方式一併移除");
+    let owner: Uuid = sqlx::query_scalar(
+        "SELECT user_id FROM auth_identities WHERE provider='email' AND provider_uid='g@example.com'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(owner, id);
+    common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn absorb_does_not_wait_for_a_locked_account(pool: PgPool) {
+    let common::TestUser { token, .. } = provider_user(&pool, "line").await;
+    let common::TestUser { id: other, .. } = common::user(&pool, "誤開的帳號").await;
+    sqlx::query("UPDATE users SET email='busy@example.com' WHERE id=$1")
+        .bind(other)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut holder = pool.begin().await.unwrap();
+    sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
+        .bind(other)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    let (s, b) = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        link_email(&pool, &token, "busy@example.com"),
+    )
+    .await
+    .expect("不可等待對方的列鎖");
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("IDENTITY_BUSY"))
+    );
+    holder.rollback().await.unwrap();
+    let deleted: bool = sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM users WHERE id=$1")
+        .bind(other)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!deleted);
 }
