@@ -28,6 +28,9 @@
       "busyTitle": "Sistem sibuk",
       "busyDesc": "Sedang banyak pengguna. Tunggu beberapa detik lalu muat ulang.",
       "reload": "Muat ulang"
-    }
+    },
+    "support": "Hubungi dukungan: ",
+    "supportSubject": "Dukungan Wishly",
+    "supportBody": "ID akun: {id}\n\nJelaskan masalahnya:\n"
   }
 }

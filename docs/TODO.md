@@ -35,6 +35,7 @@
 - [ ] **機密外洩防線（本 repo 為公開）**：GitHub secret scanning 與 push protection 已開（2026-10-17 以 `gh api` 確認），但它們只認已知服務商的 token 格式，**認不出十六進位密鑰、`postgres://` 連線字串、Turnstile secret**。補上通用掃描：CI 加 `gitleaks`（或 `trufflehog`）掃 PR 與 push，並建議本機 pre-commit 掃 staged 檔。同時固定提交習慣：只用 `git add <指定檔案>`，不用 `git add .`／`-A`。
 - [ ] **瀏覽器自動化工具的輸出不得含機密**：操作含機密的頁面（Dokploy 環境變數、Cloudflare Token 頁、GitHub PAT 頁）時，不存快照，只用 `eval` 取鍵名／行數；工具的暫存目錄（`.playwright-cli/`）已加進 `.gitignore`，但這只防誤提交，不防機密進入對話上下文。
 - [ ] **`/readyz` 對外封鎖**（它查 DB，目前公網可達並回 200）：Cloudflare WAF 規則只放行帶 `X-Monitor-Key` 的請求，做法見 `docs/deploy-runbook.md`「外部監控」。`/healthz` 可開放。
+- [ ] **開通客服信箱 `support@wishly.tw`**（前端頁尾、條款、隱私、凍結／下架提示都連到它，見 `NUXT_PUBLIC_SUPPORT_EMAIL`）：用 Cloudflare Email Routing 轉寄到常用信箱，寄一封測試信確認收得到，並指定誰定期回覆。未開通前寄信會退信，比沒有連結更糟。
 - [ ] Dokploy 管理員啟用 **2FA**；確認管理介面（3000）只透過 SSH 通道進入。
 - [ ] **SSH 22 加固**：限來源 IP、僅金鑰登入、關閉密碼登入、fail2ban。注意**不要動外層防火牆既有規則**（Docker 已發布 80/443/3000，靠它擋住）。
 - [ ] 確認 80／443／3000 不可從公網直連（目前只驗證了 8080，見驗證紀錄 §5.3）。

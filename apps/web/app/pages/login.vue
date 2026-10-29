@@ -64,7 +64,7 @@ async function social(provider: 'google' | 'line') {
         <CreatorPasswordField v-model="password" :label="$t('auth.login.password')" autocomplete="current-password" />
         <p class="c-auth-forgot"><NuxtLink to="/forgot-password">{{ $t('auth.login.forgot') }}</NuxtLink></p>
         <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
-        <p v-if="err || loginError" class="c-err" role="alert">{{ err || loginError }}</p>
+        <p v-if="err || loginError" class="c-err" role="alert">{{ err || loginError }} <SupportLink /></p>
         <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
       </form>
       <p class="c-or">{{ $t('auth.login.or') }}</p>

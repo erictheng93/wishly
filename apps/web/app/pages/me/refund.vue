@@ -61,7 +61,7 @@ async function submit() {
     </div>
 
     <template v-if="wallet">
-      <p v-if="frozen" class="c-err" role="alert" data-testid="frozen">{{ $t('me.refund.err.frozen') }}</p>
+      <p v-if="frozen" class="c-err" role="alert" data-testid="frozen">{{ $t('me.refund.err.frozen') }} <SupportLink /></p>
 
       <section class="x-ink">
         <div class="x-tag" aria-hidden="true"><span><b>CASH REFUND</b></span><span>PT → NT$</span></div>

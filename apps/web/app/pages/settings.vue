@@ -167,6 +167,7 @@ async function remove() {
         <h2 class="c-h2">{{ $t('settings.profile') }}</h2>
         <p class="c-mute">{{ user.email || $t('settings.noEmail') }}</p>
         <p class="c-mute">{{ $t('settings.accountId') }}<code>{{ user.id }}</code> <button type="button" class="c-btn" @click="copyId">{{ idCopied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
+        <p class="c-mute">{{ $t('common.support') }}<SupportLink /></p>
         <form @submit.prevent="saveName">
           <label class="c-field"><span>{{ $t('settings.displayName') }}</span><input v-model="name" maxlength="40" required></label>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>

@@ -14,7 +14,9 @@
       "s4h": "4. Limitation of liability",
       "s4p": "The service is provided as is, and we do not guarantee uninterrupted operation. The platform is not liable for disputes arising from list content, third-party product links or transactions between the parties, but will cooperate in handling content that breaks the rules.",
       "s5h": "5. Changes to the terms",
-      "s5p": "Changes to the terms are posted on this page. Continuing to use the service means you agree to them."
+      "s5p": "Changes to the terms are posted on this page. Continuing to use the service means you agree to them.",
+      "s6h": "6. Contact us",
+      "s6p": "For questions or appeals about the service, your account, points or a takedown, email us and include your account ID (copy it from Settings):"
     },
     "privacy": {
       "title": "Privacy Policy",
@@ -31,7 +33,9 @@
       "reportH": "Reports",
       "reportP": "Reports are reviewed manually and the list owner is not told who reported. To prevent abuse we use Cloudflare Turnstile and rate-limit by IP.",
       "loginH": "Sign-in security",
-      "loginP": "To prevent brute-force attacks, when a sign-in fails we record the email and IP address used. This is used for temporary lockouts and human verification, and in aggregate for operational monitoring; records are deleted automatically after 365 days."
+      "loginP": "To prevent brute-force attacks, when a sign-in fails we record the email and IP address used. This is used for temporary lockouts and human verification, and in aggregate for operational monitoring; records are deleted automatically after 365 days.",
+      "contactH": "Contact",
+      "contactP": "To access, correct or delete your personal data, or for questions about this policy, email:"
     }
   }
 }
