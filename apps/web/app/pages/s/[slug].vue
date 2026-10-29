@@ -153,6 +153,7 @@ function onDone(r: any) {
   items.value = items.value.map(i => i.id === r.item.id ? { ...i, ...r.item, is_fully_claimed: r.item.qty_remaining <= 0, progress_percent: Math.min(100, Math.round(r.item.qty_claimed / r.item.qty_needed * 100)) } : i)
   done.value = { ...r, title: sheetItem.value.title }
   sheetItem.value = null; reload()
+  useOnboarding().refresh() // 新手導覽：捐助完成，進到最後一步
 }
 // --- 點數贊助（需登入：未登入導到登入頁，登入後回到本頁）---
 const fundId = ref<string | null>(null), funded = ref<any>(null)
@@ -166,6 +167,7 @@ function onFunded(r: any) {
   items.value = items.value.map(i => i.id === r.item.id ? { ...i, ...r.item } : i)
   funded.value = { ...r, title: fundItem.value?.title }
   fundId.value = null; refresh()
+  useOnboarding().refresh() // 點數認捐也算完成「捐助」
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
 function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }

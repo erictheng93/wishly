@@ -53,8 +53,9 @@ const must = async (r: import('@playwright/test').APIResponse, what: string) => 
 }
 
 export type User = { email: string; password: string; name: string; api: APIRequestContext }
-/** 以 API 註冊（OTP 從 Mailpit 取）並登入；回傳帶 session cookie 的 request context */
-export async function registerUser(opts: { name?: string; tag?: string } = {}): Promise<User> {
+/** 以 API 註冊（OTP 從 Mailpit 取）並登入；回傳帶 session cookie 的 request context。
+ * 預設跳過新手導覽（D66），免得導覽條與 /welcome 導頁干擾其他流程；測導覽本身時傳 onboarding: true */
+export async function registerUser(opts: { name?: string; tag?: string; onboarding?: boolean } = {}): Promise<User> {
   const email = newEmail(opts.tag), name = opts.name ?? `創建者${uid().slice(0, 4)}`
   const api = await apiCtx()
   resetOtpLimits()
@@ -62,6 +63,7 @@ export async function registerUser(opts: { name?: string; tag?: string } = {}): 
   const { challenge_id } = await r.json()
   const code = await waitForOtp(email)
   await must(await api.post('auth/register/verify', { data: { email, code, challenge_id } }), '驗證註冊')
+  if (!opts.onboarding) await must(await api.patch('me/onboarding', { data: { done: true } }), '跳過新手導覽')
   return { email, password: PASSWORD, name, api }
 }
 

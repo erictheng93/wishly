@@ -1,0 +1,77 @@
+{
+  "onboarding": {
+    "skip": "Lewati panduan",
+    "guide": {
+      "aria": "Panduan memulai",
+      "tag": "Panduan {n} / {total}",
+      "overview": "Ringkasan panduan",
+      "friendsLink": "Atau lihat daftar teman →"
+    },
+    "steps": {
+      "profile": {
+        "title": "Lengkapi profil",
+        "body": "Atur nama pengguna, bio singkat, atau tanggal lahir supaya teman bisa menemukanmu dan tahu hadiah yang cocok.",
+        "here": "Isi minimal satu: nama pengguna, bio, atau tanggal lahir.",
+        "cta": "Isi profil"
+      },
+      "wishlist": {
+        "title": "Buat daftar keinginan pertama",
+        "body": "Buat daftar untuk ulang tahun, pernikahan, kelahiran bayi, atau momen spesial lainnya.",
+        "here": "Beri nama (misalnya \"Ulang tahun ke-30\") dan pilih sampul. Visibilitas bawaan hanya teman; tanggal dan aturan bisa diubah nanti. Lalu ketuk \"Buat dan tambah barang\" di bawah.",
+        "cta": "Buat daftar"
+      },
+      "item": {
+        "title": "Tambahkan barang yang kamu mau",
+        "body": "Daftarmu sudah jadi. Sekarang masukkan barang yang ingin kamu terima.",
+        "here": "Ketuk \"＋ Tambah barang\". Tempel tautan produk untuk mengisi nama dan gambar otomatis, lalu isi jumlah dan catatan.",
+        "cta": "Tambah barang"
+      },
+      "publish": {
+        "title": "Publikasikan dan jadi penerima",
+        "body": "Draf hanya terlihat olehmu. Publikasikan agar tautannya bisa dibagikan ke keluarga dan teman.",
+        "here": "Kalau barangnya sudah pas, ketuk \"Publikasikan dan bagikan\" lalu tempel tautannya di LINE atau grup. Kamu akan diberi tahu saat teman mengambil hadiah, jadi tidak ada hadiah ganda.",
+        "cta": "Publikasikan"
+      },
+      "give": {
+        "title": "Beri hadiah dan jadi pemberi",
+        "body": "Coba peran sebaliknya: pilih barang di daftar orang lain dan ambil untuk dihadiahkan.",
+        "here": "Buka daftar orang lain dan ketuk \"Aku yang kasih\" pada barang yang ingin kamu berikan. Setelah itu beli dan kembali untuk menandainya, supaya mereka tahu hadiah sedang dikirim.",
+        "cta": "Jelajahi daftar"
+      }
+    },
+    "done": {
+      "title": "Panduan selesai!",
+      "body": "Kamu sudah tahu cara membuat keinginan dan memberi hadiah. Panduan bisa diulang kapan saja di Pengaturan.",
+      "finish": "Selesaikan panduan"
+    },
+    "welcome": {
+      "pageTitle": "Selamat datang di Wishly",
+      "hello": "Selamat datang, {name}!",
+      "lead": "Wishly mengubah hadiah yang kamu inginkan jadi satu daftar yang dibagikan lewat tautan. Saat teman mengambil hadiah, daftar langsung diperbarui sehingga tidak ada yang dobel. Ikuti 5 langkah berikut, dari membuat keinginan sampai memberi hadiah.",
+      "roleReceiver": "Penerima",
+      "roleReceiverBody": "Buat dan publikasikan daftar agar orang tahu apa yang kamu inginkan.",
+      "roleGiver": "Pemberi",
+      "roleGiverBody": "Ambil hadiah dari daftar orang lain dan berikan yang benar-benar mereka mau.",
+      "roleDone": "Tercapai",
+      "stepDone": "Selesai",
+      "stepNow": "Sekarang",
+      "stepTodo": "Belum",
+      "profileHint": "Isi minimal satu dari nama pengguna, bio, atau tanggal lahir; bisa diubah nanti di Pengaturan.",
+      "profileNeedOne": "Isi minimal satu dari nama pengguna, bio, atau tanggal lahir",
+      "profileSave": "Simpan dan buat daftar",
+      "profileSaving": "Menyimpan…",
+      "skipLead": "Sudah paham cara pakainya?",
+      "skipBtn": "Lewati panduan",
+      "closedTitle": "Panduan ditutup",
+      "closedBody": "Kamu sudah menyelesaikan atau melewati panduan memulai. Kamu bisa mengulanginya.",
+      "restart": "Ulangi panduan",
+      "toDashboard": "Ke daftar saya",
+      "loadFailed": "Gagal memuat panduan."
+    },
+    "settings": {
+      "title": "Panduan memulai",
+      "hint": "Ulangi lagi: profil → buat daftar → tambah barang → publikasikan → beri hadiah.",
+      "restart": "Ulangi panduan"
+    }
+  }
+}

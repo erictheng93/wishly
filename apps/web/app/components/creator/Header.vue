@@ -24,6 +24,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
   </header>
   <!-- 頁面標題移出 sticky 頁首：編輯式大標，頁首只留品牌與動作 -->
   <div class="c-title"><small>{{ kicker }}</small><h1>{{ title }}</h1></div>
+  <OnboardingGuide />
   <!-- 桌面（≥1280）側欄：取代各頁重複的導覽按鈕 -->
   <nav v-if="user" class="c-rail" :aria-label="$t('common.mainMenu')">
     <NuxtLink to="/dashboard">{{ $t('common.myLists') }}</NuxtLink>

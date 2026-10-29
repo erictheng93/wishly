@@ -18,6 +18,7 @@ pub mod idempotency;
 pub mod identities;
 pub mod inspire;
 pub mod notify;
+pub mod onboarding;
 pub mod orders;
 pub mod org_admin;
 pub mod org_members;
@@ -90,7 +91,8 @@ pub fn app(state: AppState) -> Router {
                 .merge(friends::routes())
                 .merge(inspire::routes())
                 .merge(catalog::routes())
-                .merge(profiles::routes()),
+                .merge(profiles::routes())
+                .merge(onboarding::routes()),
         )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),

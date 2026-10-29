@@ -137,6 +137,12 @@ async function saveSocial() {
 }
 async function copyId() { try { await copyText(user.value!.id); idCopied.value = true } catch { msg.value = t('settings.social.copyFail') } }
 async function copyUrl() { try { await copyText(profileUrl.value); copied.value = true } catch { hErr.value = t('settings.social.copyFail') } }
+// 新手導覽：重新開始後帶到導覽頁
+const tourBusy = ref(false), tourErr = ref('')
+async function restartTour() {
+  tourBusy.value = true; tourErr.value = ''
+  try { await useOnboarding().finish(false); await navigateTo('/welcome') } catch (e) { tourErr.value = errMsg(e) } finally { tourBusy.value = false }
+}
 async function exportData() {
   exporting.value = true; exportErr.value = ''
   try {
@@ -253,6 +259,12 @@ async function remove() {
         <h2 class="c-h2">{{ $t('settings.notify.title') }}</h2>
         <label class="c-switch"><input type="checkbox" :checked="user?.notification_prefs?.email_birthdays !== false" :disabled="nBusy" @change="setBirthdayMail(($event.target as HTMLInputElement).checked)"><span>{{ $t('settings.notify.birthdays') }}<br><small class="c-mute">{{ $t('settings.notify.birthdaysHint') }}</small></span></label>
         <p v-if="nErr" class="c-err" role="alert">{{ nErr }}</p>
+      </section>
+      <section class="c-card">
+        <h2 class="c-h2">{{ $t('onboarding.settings.title') }}</h2>
+        <p class="c-mute">{{ $t('onboarding.settings.hint') }}</p>
+        <p v-if="tourErr" class="c-err" role="alert">{{ tourErr }}</p>
+        <button type="button" class="c-btn" :disabled="tourBusy" @click="restartTour">{{ $t('onboarding.settings.restart') }}</button>
       </section>
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.export.title') }}</h2>

@@ -1,0 +1,77 @@
+{
+  "onboarding": {
+    "skip": "Skip tour",
+    "guide": {
+      "aria": "Getting started",
+      "tag": "Getting started {n} / {total}",
+      "overview": "Tour overview",
+      "friendsLink": "Or browse your friends' lists →"
+    },
+    "steps": {
+      "profile": {
+        "title": "Complete your profile",
+        "body": "Set a handle, a short bio or your birthday so friends can find you and know what to give you.",
+        "here": "Fill in at least one: handle, bio or birthday.",
+        "cta": "Fill in profile"
+      },
+      "wishlist": {
+        "title": "Create your first wishlist",
+        "body": "Make a wishlist for a birthday, wedding, new baby or any moment worth celebrating.",
+        "here": "Give it a name (e.g. \"My 30th birthday\") and pick a cover. Visibility defaults to friends only; dates and rules can be changed later. Then tap \"Create and add items\" at the bottom.",
+        "cta": "Create a wishlist"
+      },
+      "item": {
+        "title": "Add the things you want",
+        "body": "Your list is ready. Now add the things you'd love to receive.",
+        "here": "Tap \"+ Add item\". Paste a product link to fill in the name and image automatically, then set the quantity and notes.",
+        "cta": "Go add items"
+      },
+      "publish": {
+        "title": "Publish and become a recipient",
+        "body": "Drafts are only visible to you. Publish the list to share its link with family and friends.",
+        "here": "When your items look good, tap \"Publish and share\" and paste the link into LINE or a group chat. You'll be notified when friends claim gifts, so nobody gives the same thing twice.",
+        "cta": "Go publish"
+      },
+      "give": {
+        "title": "Give a gift and become a giver",
+        "body": "Now try the other side: pick an item on someone else's list and claim it.",
+        "here": "Open someone else's list and tap \"I'll give this\" on an item. After claiming, buy it and come back to mark it, so they know it's on the way.",
+        "cta": "Explore lists"
+      }
+    },
+    "done": {
+      "title": "You're all set!",
+      "body": "You know how to make a wish and how to give one. You can restart the tour any time in Settings.",
+      "finish": "Finish tour"
+    },
+    "welcome": {
+      "pageTitle": "Welcome to Wishly",
+      "hello": "Welcome, {name}!",
+      "lead": "Wishly turns the gifts you want into a list you share by link. When friends claim a gift, the list updates instantly, so no one doubles up. Follow these 5 steps to go from making a wish to giving one.",
+      "roleReceiver": "Recipient",
+      "roleReceiverBody": "Create and publish a wishlist so people know what you'd like.",
+      "roleGiver": "Giver",
+      "roleGiverBody": "Claim a gift on someone else's list and give exactly what they want.",
+      "roleDone": "Done",
+      "stepDone": "Done",
+      "stepNow": "Now",
+      "stepTodo": "To do",
+      "profileHint": "Fill in at least one of handle, bio or birthday. You can change them later in Settings.",
+      "profileNeedOne": "Please fill in at least one of handle, bio or birthday",
+      "profileSave": "Save and create a list",
+      "profileSaving": "Saving…",
+      "skipLead": "Already know your way around?",
+      "skipBtn": "Skip the tour",
+      "closedTitle": "Tour closed",
+      "closedBody": "You've finished or skipped the getting-started tour. You can restart it to go through it again.",
+      "restart": "Restart tour",
+      "toDashboard": "Go to my lists",
+      "loadFailed": "Couldn't load the tour."
+    },
+    "settings": {
+      "title": "Getting started tour",
+      "hint": "Walk through it again: profile → create a list → add items → publish → give.",
+      "restart": "Restart tour"
+    }
+  }
+}

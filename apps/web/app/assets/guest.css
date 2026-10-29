@@ -1,5 +1,8 @@
 /* 訪客端（g- 前綴，款式二紅白實驗室・精製版）：token 見 tokens.css */
 .g-wrap{max-width:var(--g-w);margin:0 auto;padding:0 20px 72px}
+/* 新手導覽條（OnboardingGuide）：與內文同欄寬；沒有導覽時不占位 */
+.g-tour{max-width:var(--g-w);margin:16px auto 0;padding:0 20px}
+.g-tour:empty{display:none}
 /* 頂欄：與創建者端同一條薄條＋頂端紅線 */
 .g-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;min-height:56px;padding:env(safe-area-inset-top) 20px 0;-webkit-backdrop-filter:saturate(1.6) blur(14px);backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid transparent;border-image:var(--bar-bg) fill 0/0/0 100vmax;white-space:nowrap}
 .g-top a{display:inline-flex;align-items:center;min-height:44px;color:var(--fg)}

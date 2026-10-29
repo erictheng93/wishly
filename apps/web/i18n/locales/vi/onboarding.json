@@ -1,0 +1,77 @@
+{
+  "onboarding": {
+    "skip": "Bỏ qua hướng dẫn",
+    "guide": {
+      "aria": "Hướng dẫn bắt đầu",
+      "tag": "Hướng dẫn {n} / {total}",
+      "overview": "Tổng quan hướng dẫn",
+      "friendsLink": "Hoặc xem danh sách của bạn bè →"
+    },
+    "steps": {
+      "profile": {
+        "title": "Hoàn thiện hồ sơ",
+        "body": "Đặt mã tài khoản, lời giới thiệu hoặc ngày sinh để bạn bè tìm thấy bạn và biết nên tặng gì.",
+        "here": "Điền ít nhất một mục: mã tài khoản, lời giới thiệu hoặc ngày sinh.",
+        "cta": "Điền hồ sơ"
+      },
+      "wishlist": {
+        "title": "Tạo danh sách mong muốn đầu tiên",
+        "body": "Tạo một danh sách cho sinh nhật, đám cưới, em bé mới chào đời hay bất kỳ dịp đáng nhớ nào.",
+        "here": "Đặt tên (ví dụ \"Sinh nhật 30 tuổi\") và chọn ảnh bìa. Mặc định chỉ bạn bè mới xem được; ngày và quy tắc có thể đổi sau. Điền xong bấm \"Tạo và thêm món quà\" ở cuối trang.",
+        "cta": "Tạo danh sách"
+      },
+      "item": {
+        "title": "Thêm món bạn muốn",
+        "body": "Danh sách đã sẵn sàng, giờ hãy thêm những món bạn muốn nhận.",
+        "here": "Bấm \"+ Thêm món quà\". Dán liên kết sản phẩm để tự điền tên và hình, rồi nhập số lượng và ghi chú.",
+        "cta": "Đi thêm món quà"
+      },
+      "publish": {
+        "title": "Đăng danh sách, trở thành người nhận",
+        "body": "Bản nháp chỉ mình bạn thấy; hãy đăng để chia sẻ liên kết cho người thân và bạn bè.",
+        "here": "Khi đã ưng các món, bấm \"Đăng và chia sẻ\" rồi dán liên kết vào LINE hoặc nhóm chat. Bạn sẽ được báo khi bạn bè nhận tặng, không lo trùng quà.",
+        "cta": "Đi đăng danh sách"
+      },
+      "give": {
+        "title": "Tặng một món quà, trở thành người tặng",
+        "body": "Thử vai trò còn lại: chọn một món trong danh sách của người khác và nhận tặng.",
+        "here": "Mở danh sách của người khác và bấm \"Tôi sẽ tặng\" ở món bạn muốn tặng. Sau khi nhận tặng, hãy mua và quay lại đánh dấu để họ biết quà đang đến.",
+        "cta": "Khám phá danh sách"
+      }
+    },
+    "done": {
+      "title": "Hoàn tất hướng dẫn!",
+      "body": "Bạn đã biết cách ước và cách tặng. Có thể bắt đầu lại hướng dẫn bất cứ lúc nào trong Cài đặt.",
+      "finish": "Kết thúc hướng dẫn"
+    },
+    "welcome": {
+      "pageTitle": "Chào mừng đến với Wishly",
+      "hello": "Chào mừng, {name}!",
+      "lead": "Wishly giúp bạn gom những món quà mong muốn thành một danh sách và chia sẻ bằng liên kết. Khi bạn bè nhận tặng, danh sách cập nhật ngay nên không bị trùng quà. Làm theo 5 bước dưới đây, từ ước đến tặng.",
+      "roleReceiver": "Người nhận",
+      "roleReceiverBody": "Tạo và đăng danh sách để mọi người biết bạn muốn gì.",
+      "roleGiver": "Người tặng",
+      "roleGiverBody": "Nhận tặng một món trong danh sách của người khác, tặng đúng thứ họ cần.",
+      "roleDone": "Đã đạt",
+      "stepDone": "Xong",
+      "stepNow": "Hiện tại",
+      "stepTodo": "Chưa làm",
+      "profileHint": "Điền ít nhất một trong mã tài khoản, lời giới thiệu hoặc ngày sinh; có thể sửa sau trong Cài đặt.",
+      "profileNeedOne": "Vui lòng điền ít nhất một trong mã tài khoản, lời giới thiệu hoặc ngày sinh",
+      "profileSave": "Lưu và tạo danh sách",
+      "profileSaving": "Đang lưu…",
+      "skipLead": "Đã biết cách dùng?",
+      "skipBtn": "Bỏ qua hướng dẫn",
+      "closedTitle": "Đã đóng hướng dẫn",
+      "closedBody": "Bạn đã hoàn tất hoặc bỏ qua hướng dẫn bắt đầu. Có thể bắt đầu lại để xem lần nữa.",
+      "restart": "Bắt đầu lại hướng dẫn",
+      "toDashboard": "Đến danh sách của tôi",
+      "loadFailed": "Không tải được hướng dẫn."
+    },
+    "settings": {
+      "title": "Hướng dẫn bắt đầu",
+      "hint": "Đi lại từ đầu: hồ sơ → tạo danh sách → thêm món → đăng → tặng quà.",
+      "restart": "Bắt đầu lại hướng dẫn"
+    }
+  }
+}
