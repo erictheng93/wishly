@@ -179,3 +179,51 @@ async fn org_sites_do_not_count_and_login_required(pool: PgPool) {
     let b = current(&pool, &me.token).await;
     assert_eq!(steps(&b)[1], ("wishlist".to_string(), false));
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn archived_lists_send_the_user_back_to_create_one(pool: PgPool) {
+    let me = user(&pool, "封存").await;
+    sqlx::query("UPDATE users SET bio = 'hi' WHERE id = $1")
+        .bind(me.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // 空草稿封存後，導覽不能停在「加品項」卻沒有清單可去
+    let wl = wishlist(
+        &pool,
+        me.id,
+        ListOpts {
+            status: Some("archived"),
+            ..Default::default()
+        },
+    )
+    .await;
+    item(&pool, wl.id, "封存的品項", 1).await;
+    let b = current(&pool, &me.token).await;
+    assert_eq!(b["current"], "wishlist");
+    assert!(b["wishlist_id"].is_null());
+
+    // 「發佈」優先帶到已有品項的草稿，而不是較新的空草稿
+    let ready = wishlist(
+        &pool,
+        me.id,
+        ListOpts {
+            status: Some("draft"),
+            ..Default::default()
+        },
+    )
+    .await;
+    item(&pool, ready.id, "咖啡豆", 1).await;
+    wishlist(
+        &pool,
+        me.id,
+        ListOpts {
+            status: Some("draft"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let b = current(&pool, &me.token).await;
+    assert_eq!(b["current"], "publish");
+    assert_eq!(b["wishlist_id"], ready.id.to_string());
+}

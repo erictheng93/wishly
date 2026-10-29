@@ -17,11 +17,11 @@ afterEach(() => { vi.unstubAllGlobals(); vi.resetAllMocks() })
 
 const state = (current: string | null, extra: any = {}) => ({ done: false, current, wishlist_id: null, steps: [], ...extra })
 
-it('每一步帶到對的頁面；加品項 / 發佈沒有清單時回清單列表', () => {
+it('每一步帶到對的頁面；加品項 / 發佈沒有可用清單時去建一份', () => {
   expect(tourTarget('profile')).toBe('/welcome')
   expect(tourTarget('wishlist')).toBe('/lists/new')
   expect(tourTarget('item', 'w1')).toBe('/lists/w1/edit')
-  expect(tourTarget('publish', null)).toBe('/dashboard')
+  expect(tourTarget('publish', null)).toBe('/lists/new')
   expect(tourTarget('give')).toBe('/explore')
 })
 

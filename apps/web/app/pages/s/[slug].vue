@@ -167,6 +167,7 @@ function onFunded(r: any) {
   items.value = items.value.map(i => i.id === r.item.id ? { ...i, ...r.item } : i)
   funded.value = { ...r, title: fundItem.value?.title }
   fundId.value = null; refresh()
+  useOnboarding().refresh() // 點數認捐也算完成「捐助」
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
 function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }

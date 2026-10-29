@@ -5,12 +5,12 @@ export interface TourState { done: boolean; current: TourStep | null; wishlist_i
 
 export const TOUR_STEPS: TourStep[] = ['profile', 'wishlist', 'item', 'publish', 'give']
 
-/** 目前步驟要去的頁面；加品項 / 發佈帶到最近一份清單，沒有就回清單列表 */
+/** 目前步驟要去的頁面；加品項 / 發佈帶到後端挑的清單，沒有可用的清單就去建一份 */
 export function tourTarget(step: TourStep | null, wishlistId?: string | null): string {
   switch (step) {
     case 'profile': return '/welcome'
     case 'wishlist': return '/lists/new'
-    case 'item': case 'publish': return wishlistId ? `/lists/${wishlistId}/edit` : '/dashboard'
+    case 'item': case 'publish': return wishlistId ? `/lists/${wishlistId}/edit` : '/lists/new'
     case 'give': return '/explore'
     default: return '/welcome'
   }

@@ -18,17 +18,21 @@ async fn status(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value
 }
 
 async fn load(pool: &sqlx::PgPool, uid: Uuid) -> Result<Value, AppError> {
-    // 個人清單才算（組織據點不是「我的心願」）；已刪除的不算，已封存仍算走過
+    // 個人清單才算（組織據點不是「我的心願」）；已刪除、已封存的不算（封存的清單不能再加品項或發佈，
+    // 全部封存就從「建立清單」重來，導覽才不會指向動不了的清單）
     let (done, profile, wishlist, item, publish, give, list_id): (bool, bool, bool, bool, bool, bool, Option<Uuid>) = sqlx::query_as(
-        "SELECT u.onboarding_done_at IS NOT NULL,
+        "WITH mine AS (
+           SELECT w.id, w.status, w.created_at,
+                  EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL) AS has_items
+             FROM wishlists w WHERE w.owner_id = $1 AND w.org_id IS NULL AND w.deleted_at IS NULL AND w.status <> 'archived')
+         SELECT u.onboarding_done_at IS NOT NULL,
                 u.handle IS NOT NULL OR u.bio IS NOT NULL OR u.birthday IS NOT NULL,
-                EXISTS (SELECT 1 FROM wishlists w WHERE w.owner_id = u.id AND w.org_id IS NULL AND w.deleted_at IS NULL),
-                EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
-                         WHERE w.owner_id = u.id AND w.org_id IS NULL AND w.deleted_at IS NULL AND i.deleted_at IS NULL),
-                EXISTS (SELECT 1 FROM wishlists w WHERE w.owner_id = u.id AND w.org_id IS NULL AND w.deleted_at IS NULL AND w.status <> 'draft'),
+                EXISTS (SELECT 1 FROM mine),
+                EXISTS (SELECT 1 FROM mine WHERE has_items),
+                EXISTS (SELECT 1 FROM mine WHERE status <> 'draft'),
                 EXISTS (SELECT 1 FROM claims c WHERE c.user_id = u.id) OR EXISTS (SELECT 1 FROM contributions c WHERE c.user_id = u.id),
-                (SELECT w.id FROM wishlists w WHERE w.owner_id = u.id AND w.org_id IS NULL AND w.deleted_at IS NULL AND w.status <> 'archived'
-                  ORDER BY w.created_at DESC LIMIT 1)
+                -- 「加品項 / 發佈」要帶去的清單：優先已有品項的草稿（可直接發佈），其次最近建立的一份
+                (SELECT id FROM mine ORDER BY (status = 'draft' AND has_items) DESC, created_at DESC LIMIT 1)
            FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL",
     )
     .bind(uid)
@@ -40,7 +44,6 @@ async fn load(pool: &sqlx::PgPool, uid: Uuid) -> Result<Value, AppError> {
         "done": done,
         "steps": STEPS.iter().zip(flags).map(|(k, v)| json!({ "key": k, "done": v })).collect::<Vec<_>>(),
         "current": STEPS.iter().zip(flags).find(|(_, v)| !v).map(|(k, _)| *k),
-        // 「加品項 / 發佈」要帶去的清單：最近建立、未封存的一份
         "wishlist_id": list_id,
     }))
 }
