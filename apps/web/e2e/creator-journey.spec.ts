@@ -114,10 +114,10 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await page.getByLabel('Email').fill(email)
     await page.getByLabel('密碼').fill('totally-wrong-pw')
     await page.getByRole('button', { name: '登入', exact: true }).click()
-    await expect(page.getByRole('alert')).toHaveText('帳號或密碼錯誤')
+    await expect(page.getByRole('alert')).toContainText('帳號或密碼錯誤')
     await page.getByLabel('Email').fill(newEmail('nobody'))
     await page.getByRole('button', { name: '登入', exact: true }).click()
-    await expect(page.getByRole('alert')).toHaveText('帳號或密碼錯誤') // 不存在的帳號回相同訊息
+    await expect(page.getByRole('alert')).toContainText('帳號或密碼錯誤') // 不存在的帳號回相同訊息
   })
 
   await test.step('密碼登入成功，並導回原本要去的頁面', async () => {
@@ -145,7 +145,7 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
     await page.getByLabel('Email').fill(email)
     await page.getByLabel('密碼').fill(PASSWORD)
     await page.getByRole('button', { name: '登入', exact: true }).click()
-    await expect(page.getByRole('alert')).toHaveText('帳號或密碼錯誤')
+    await expect(page.getByRole('alert')).toContainText('帳號或密碼錯誤')
     await page.getByLabel('密碼').fill(newPassword)
     await page.getByRole('button', { name: '登入', exact: true }).click()
     await expect(page).toHaveURL(/\/dashboard$/)

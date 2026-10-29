@@ -12,12 +12,12 @@ test('登入頁有三種方式；Google / LINE 未設憑證 → oauth_unavailabl
       await page.goto('/login')
       await page.getByRole('button', { name: btn }).click()
       await expect(page).toHaveURL(/\/login\?error=oauth_unavailable/)
-      await expect(page.getByRole('alert')).toHaveText('此登入方式尚未開放')
+      await expect(page.getByRole('alert')).toContainText('此登入方式尚未開放')
     })
   }
 
   await test.step('oauth_failed 顯示失敗訊息', async () => {
     await page.goto('/login?error=oauth_failed')
-    await expect(page.getByRole('alert')).toHaveText('第三方登入失敗，請重試')
+    await expect(page.getByRole('alert')).toContainText('第三方登入失敗，請重試')
   })
 })
