@@ -190,6 +190,35 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
                 continue;
             };
             payload["from_name"] = Value::String(from_name);
+        } else if kind == "birthday.friend" {
+            // 寄前重驗（D65）：清單仍開著生日通知且仍看得到、壽星生日仍公開給好友、收件人仍是好友（selected 仍在名單）且沒關通知
+            let row: Option<(String, String)> = sqlx::query_as(
+                "SELECT o.display_name, w.slug::text FROM wishlists w
+                   JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
+                                AND o.birthday IS NOT NULL AND o.birthday_visibility::text <> 'private'
+                   JOIN users r ON r.id = $2 AND r.deleted_at IS NULL AND r.blocked_at IS NULL
+                                AND COALESCE(r.notification_prefs->>'email_birthdays', 'true') <> 'false'
+                  WHERE w.id = ($1->>'wishlist_id')::uuid AND w.owner_id = ($1->>'owner_id')::uuid
+                    AND w.birthday_notify AND w.deleted_at IS NULL AND w.status = 'active' AND w.moderation_status = 'ok'
+                    AND w.visibility::text <> 'private'
+                    AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(r.id, o.id) AND f.user_b = GREATEST(r.id, o.id))
+                    AND (w.visibility::text <> 'selected' OR EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = r.id))")
+                .bind(&payload).bind(uid).fetch_optional(pool).await?;
+            let Some((owner_name, slug)) = row else {
+                sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'birthday list no longer visible' WHERE id = $1").bind(id).execute(pool).await?;
+                continue;
+            };
+            payload["owner_name"] = owner_name.into();
+            payload["slug"] = slug.into();
+        } else if kind == "birthday.nudge" {
+            let ok: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND birthday IS NOT NULL AND birthday_visibility::text <> 'private'
+                                  AND COALESCE(notification_prefs->>'email_birthdays', 'true') <> 'false')")
+                .bind(uid).fetch_one(pool).await?;
+            if !ok {
+                sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'birthday nudge no longer wanted' WHERE id = $1").bind(id).execute(pool).await?;
+                continue;
+            }
         } else if kind == "claim.item_changed" {
             // 延後 10 分鐘寄：這段期間取消 / 撤回 / 轉投 / 品項被刪的就不寄
             let still: bool = sqlx::query_scalar(
@@ -260,6 +289,14 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
                 "{}/api/v1/unsubscribe?token={}",
                 api.trim_end_matches('/'),
                 crate::account::unsub_token('g', g)
+            )
+            .into();
+        }
+        if let (Some(u), "birthday.friend" | "birthday.nudge") = (uid, kind.as_str()) {
+            payload["unsubscribe_url"] = format!(
+                "{}/api/v1/unsubscribe?token={}",
+                api.trim_end_matches('/'),
+                crate::account::unsub_token('b', u)
             )
             .into();
         }
@@ -708,6 +745,30 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("The event day for your list \"{title}\" is coming up.\n{base}/dashboard\n"),
                 format!("Ngày sự kiện của danh sách \"{title}\" sắp đến.\n{base}/dashboard\n"),
                 format!("Hari acara wishlist \"{title}\" milikmu sudah dekat.\n{base}/dashboard\n"),
+            ),
+        ),
+        "birthday.friend" => {
+            // 驚喜模式：只提生日與清單，不含任何認捐 / 捐助資訊
+            let who = payload["owner_name"].as_str().unwrap_or("");
+            let slug = payload["slug"].as_str().unwrap_or("");
+            let (m, d) = payload["birthday"].as_str().and_then(|b| b.split_once('-')).map(|(m, d)| (m.trim_start_matches('0'), d.trim_start_matches('0'))).unwrap_or(("", ""));
+            (
+                l.pick(format!("【Wishly】{who} 的生日快到了"), format!("[Wishly] {who}'s birthday is coming up"), format!("[Wishly] Sắp đến sinh nhật của {who}"), format!("[Wishly] Ulang tahun {who} sudah dekat")),
+                l.pick(
+                    format!("{who} 的生日是 {m} 月 {d} 日，快到了！\n看看生日清單《{title}》：{base}/s/{slug}\n"),
+                    format!("{who}'s birthday is on {m}/{d} and it's coming up!\nTake a look at their birthday list \"{title}\": {base}/s/{slug}\n"),
+                    format!("Sinh nhật của {who} vào ngày {d}/{m}, sắp đến rồi!\nXem danh sách sinh nhật \"{title}\" của họ: {base}/s/{slug}\n"),
+                    format!("Ulang tahun {who} jatuh pada {d}/{m}, sebentar lagi!\nLihat wishlist ulang tahunnya \"{title}\": {base}/s/{slug}\n"),
+                ),
+            )
+        }
+        "birthday.nudge" => (
+            l.pick("【Wishly】你的生日快到了".into(), "[Wishly] Your birthday is coming up".into(), "[Wishly] Sắp đến sinh nhật của bạn".into(), "[Wishly] Ulang tahunmu sudah dekat".into()),
+            l.pick(
+                format!("你的生日快到了，開一份生日清單並通知朋友吧。\n{base}/lists/new\n"),
+                format!("Your birthday is coming up. Create a birthday list and let your friends know.\n{base}/lists/new\n"),
+                format!("Sinh nhật của bạn sắp đến. Hãy tạo danh sách sinh nhật và báo cho bạn bè nhé.\n{base}/lists/new\n"),
+                format!("Ulang tahunmu sudah dekat. Buat wishlist ulang tahun dan beri tahu teman-temanmu.\n{base}/lists/new\n"),
             ),
         ),
         _ => (l.pick("【Wishly】通知".into(), "[Wishly] Notification".into(), "[Wishly] Thông báo".into(), "[Wishly] Pemberitahuan".into()), format!("{base}\n")),

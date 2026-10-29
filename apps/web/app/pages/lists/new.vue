@@ -4,7 +4,7 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('lists.new.pageTitle') })
 const { api } = useApi()
-const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 as number | null })
+const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 as number | null, birthday_notify: false })
 const allowed = ref<string[]>([])
 const cover = ref<string | null>(null), coverPreset = ref<string | null>(DEFAULT_COVER)
 const upBusy = ref(false), busy = ref(false), err = ref(''), dateErr = ref('')
@@ -17,7 +17,7 @@ async function submit() {
   if (f.closes_at && f.closes_at <= toLocalInput(new Date().toISOString())) { dateErr.value = t('lists.new.errClose'); return }
   busy.value = true
   try {
-    const body: any = { type: f.type, title: f.title.trim(), description: f.description || null, event_date: f.event_date || null, closes_at: fromLocalInput(f.closes_at), visibility: f.visibility, surprise_mode: f.surprise_mode, show_claimer_names: f.show_claimer_names, claim_ttl_hours: f.claim_ttl_hours }
+    const body: any = { type: f.type, title: f.title.trim(), description: f.description || null, event_date: f.event_date || null, closes_at: fromLocalInput(f.closes_at), visibility: f.visibility, surprise_mode: f.surprise_mode, show_claimer_names: f.show_claimer_names, claim_ttl_hours: f.claim_ttl_hours, birthday_notify: f.birthday_notify }
     // 封面互斥：上傳照片就清 preset，選預設圖就清 key
     if (cover.value) Object.assign(body, { cover_image_key: cover.value, cover_preset: null })
     else Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
@@ -57,6 +57,7 @@ async function submit() {
       </div></section>
       <section class="ln-sec" data-n="05 / ACCESS"><div class="ln-body">
       <CreatorVisibilityPicker v-model:visibility="f.visibility" v-model:users="allowed" />
+      <CreatorBirthdayNotify v-model="f.birthday_notify" :visibility="f.visibility" />
       </div></section>
       <div class="ln-go">
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>

@@ -112,6 +112,11 @@
       "relogin": "重新登入"
     },
     "terms": "服務條款",
-    "privacy": "隱私權政策"
+    "privacy": "隱私權政策",
+    "notify": {
+      "title": "通知",
+      "birthdays": "生日通知信",
+      "birthdaysHint": "好友生日提醒，以及自己生日前提醒你開清單。"
+    }
   }
 }

@@ -167,6 +167,20 @@
         "friends": "Friends",
         "private": "Private"
       }
+    },
+    "bday": {
+      "label": "Notify friends who can see this list 7 days before my birthday",
+      "who": {
+        "friends": "All your friends will be notified.",
+        "selected": "Only the close friends you selected for this list will be notified."
+      },
+      "block": {
+        "required": "Add your birthday in Settings to turn this on.",
+        "private": "Your birthday is visible to \"only me\". Change it in Settings first.",
+        "listPrivate": "A private list notifies no one. Choose another visibility first."
+      },
+      "goSettings": "Go to Settings",
+      "single": "Only one list can have this on at a time; turning it on here turns it off for your other lists."
     }
   }
 }

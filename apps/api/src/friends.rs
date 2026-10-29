@@ -460,7 +460,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
 }
 
 /// 距離下一個 MM-DD 的天數（今天為 0）；非閏年的 02-29 以 02-28 計
-fn days_until(today: chrono::NaiveDate, mmdd: &str) -> Option<i64> {
+pub(crate) fn days_until(today: chrono::NaiveDate, mmdd: &str) -> Option<i64> {
     use chrono::Datelike;
     let (m, d) = mmdd.split_once('-')?;
     let (m, d): (u32, u32) = (m.parse().ok()?, d.parse().ok()?);
@@ -494,5 +494,7 @@ mod tests {
         assert_eq!(days_until(d(2027, 2, 1), "02-29"), Some(27));
         assert_eq!(days_until(d(2028, 2, 1), "02-29"), Some(28));
         assert_eq!(days_until(d(2026, 1, 1), "bad"), None);
+        assert_eq!(days_until(d(2027, 2, 28), "02-29"), Some(0)); // 非閏年 2/29 以 2/28 計
+        assert_eq!(days_until(d(2027, 3, 1), "02-29"), Some(365));
     }
 }

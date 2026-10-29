@@ -147,7 +147,11 @@
       "handle_FORMAT": "Use 3–30 lowercase letters, numbers, or underscores.",
       "TAX_ID_CHECKSUM": "The tax ID check digit is wrong. Please check it.",
       "FIELD_LOCKED": "This field cannot be changed right now.",
-      "EVENT_HIDDEN": "You cannot pick a hidden event."
+      "EVENT_HIDDEN": "You cannot pick a hidden event.",
+      "birthday_notify_BIRTHDAY_REQUIRED": "Add your birthday in Settings first.",
+      "birthday_notify_BIRTHDAY_PRIVATE": "Your birthday is visible to \"only me\", so birthday notifications can't be turned on.",
+      "birthday_notify_LIST_PRIVATE": "Private lists can't send birthday notifications.",
+      "birthday_notify_NOT_PERSONAL": "Organization and relief-site lists can't send birthday notifications."
     }
   }
 }

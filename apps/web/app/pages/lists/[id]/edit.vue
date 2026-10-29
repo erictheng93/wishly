@@ -16,7 +16,7 @@ const canNativeShare = ref(false), invite = ref<any>(null), inviteOn = ref(false
 const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
-const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 })
+const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168, birthday_notify: false })
 const allowed = ref<string[]>([])
 const rcptKey = ref('')
 const relief = computed(() => w.value?.type === 'relief')
@@ -42,7 +42,7 @@ async function load(quiet = false) {
   try {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
-    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours })
+    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours, birthday_notify: !!r.wishlist.birthday_notify })
     coverPreset.value = r.wishlist.cover_preset ?? null; coverKey.value = null
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
@@ -85,6 +85,7 @@ async function patchList(body: any, ok = t('lists.edit.saved')) {
 async function saveMeta() {
   const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), claim_ttl_hours: meta.claim_ttl_hours }
   if (!relief.value) body.show_claimer_names = meta.show_claimer_names
+  if (!relief.value && !w.value?.org_id && meta.birthday_notify !== !!w.value?.birthday_notify) body.birthday_notify = meta.birthday_notify
   if (!relief.value) body.visibility = meta.visibility // 救災據點的可見性由後端固定
   // 封面互斥；沒動就不送
   if (coverKey.value) Object.assign(body, { cover_image_key: coverKey.value, cover_preset: null })
@@ -212,6 +213,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
           <label v-if="!relief" class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
           <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" v-model:users="allowed" />
+          <CreatorBirthdayNotify v-if="!relief && !w.org_id" v-model="meta.birthday_notify" :visibility="meta.visibility" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
           <button class="c-btn block" :disabled="coverBusy">{{ $t('lists.edit.saveSettings') }}</button>

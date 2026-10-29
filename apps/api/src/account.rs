@@ -29,7 +29,7 @@ fn mac(msg: &str) -> Hmac<Sha256> {
     m
 }
 
-/// kind: 'u'（建立者）| 'g'（訪客）；有效一年
+/// kind: 'u'（建立者）| 'g'（訪客）| 'b'（生日通知）；有效一年
 pub fn unsub_token(kind: char, id: Uuid) -> String {
     let msg = format!(
         "{kind}:{id}:{}",
@@ -52,7 +52,7 @@ fn verify(token: &str) -> Option<(char, Uuid)> {
         it.next()?.parse().ok()?,
         it.next()?.parse::<i64>().ok()?,
     );
-    (exp > chrono::Utc::now().timestamp() && matches!(k, 'u' | 'g')).then_some((k, id))
+    (exp > chrono::Utc::now().timestamp() && matches!(k, 'u' | 'g' | 'b')).then_some((k, id))
 }
 
 #[derive(Deserialize)]
@@ -92,7 +92,10 @@ async fn unsubscribe(
         ));
     };
     let mut tx = st.pool.begin().await?;
-    if k == 'u' {
+    if k == 'b' {
+        sqlx::query("UPDATE users SET notification_prefs = jsonb_set(COALESCE(notification_prefs, '{}'::jsonb), '{email_birthdays}', 'false'::jsonb) WHERE id = $1 AND deleted_at IS NULL").bind(id).execute(&mut *tx).await?;
+        sqlx::query("UPDATE notifications SET status = 'cancelled' WHERE user_id = $1 AND status = 'pending' AND kind IN ('birthday.friend', 'birthday.nudge')").bind(id).execute(&mut *tx).await?;
+    } else if k == 'u' {
         sqlx::query("UPDATE users SET notification_prefs = jsonb_set(COALESCE(notification_prefs, '{}'::jsonb), '{email_claims}', 'false'::jsonb) WHERE id = $1 AND deleted_at IS NULL").bind(id).execute(&mut *tx).await?;
         sqlx::query("UPDATE notifications SET status = 'cancelled' WHERE user_id = $1 AND status = 'pending' AND kind IN ('claim.created', 'claim.digest')").bind(id).execute(&mut *tx).await?;
     } else {
