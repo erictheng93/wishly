@@ -147,7 +147,11 @@
       "handle_FORMAT": "ID akun harus 3–30 karakter huruf kecil, angka, atau garis bawah",
       "TAX_ID_CHECKSUM": "Digit pemeriksa nomor pajak salah. Silakan periksa kembali.",
       "FIELD_LOCKED": "Kolom ini tidak dapat diubah saat ini.",
-      "EVENT_HIDDEN": "Peristiwa yang disembunyikan tidak dapat dipilih."
+      "EVENT_HIDDEN": "Peristiwa yang disembunyikan tidak dapat dipilih.",
+      "birthday_notify_BIRTHDAY_REQUIRED": "Isi tanggal lahir di Pengaturan dulu.",
+      "birthday_notify_BIRTHDAY_PRIVATE": "Ulang tahun Anda hanya terlihat oleh Anda, jadi notifikasi ulang tahun tidak bisa diaktifkan.",
+      "birthday_notify_LIST_PRIVATE": "Daftar pribadi tidak dapat mengirim notifikasi ulang tahun.",
+      "birthday_notify_NOT_PERSONAL": "Daftar organisasi dan titik bantuan tidak dapat mengirim notifikasi ulang tahun."
     }
   }
 }

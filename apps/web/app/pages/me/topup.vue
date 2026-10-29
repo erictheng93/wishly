@@ -143,7 +143,7 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
       <div aria-live="polite">
         <p v-if="success" class="c-ok" role="status">{{ success }}</p>
       </div>
-      <p v-if="wallet && wallet.status === 'frozen'" class="c-err" role="alert" data-testid="frozen">{{ $t('me.frozenBanner') }}</p>
+      <p v-if="wallet && wallet.status === 'frozen'" class="c-err" role="alert" data-testid="frozen">{{ $t('me.frozenBanner') }} <SupportLink /></p>
       <p v-if="wallet" class="c-mute tp-bal">{{ $t('me.topup.balance', { pts: fmtPts(wallet.balance) }) }}</p>
 
       <p v-if="!statusReady && !disabled" class="c-mute" role="status">{{ $t('me.loading') }}</p>

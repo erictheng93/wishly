@@ -28,7 +28,9 @@ export default defineNuxtConfig({
       // 建置時寫入：Pages 執行期沒有這個變數（wrangler.jsonc 刻意不放 vars），只靠 NUXT_PUBLIC_* 執行期覆寫會是空字串
       turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ?? '',
       // 原生殼沒有「網站網域」可用 location.origin，分享連結以此為準
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://wishly.tw' },
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://wishly.tw',
+      // 客服信箱（「請聯絡客服」的去處）；建置時寫入，理由同上
+      supportEmail: process.env.NUXT_PUBLIC_SUPPORT_EMAIL ?? 'support@wishly.tw' },
   },
   // 創建者頁面靠 cookie 驗證，只在 client 渲染；/s/** 維持 SSR（OG 預覽）
   routeRules: {

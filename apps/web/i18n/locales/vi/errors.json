@@ -147,7 +147,11 @@
       "handle_FORMAT": "Dùng 3–30 chữ cái thường, chữ số hoặc dấu gạch dưới.",
       "TAX_ID_CHECKSUM": "Chữ số kiểm tra của mã số thuế không đúng. Vui lòng kiểm tra lại.",
       "FIELD_LOCKED": "Hiện không thể sửa trường này.",
-      "EVENT_HIDDEN": "Không thể chọn sự kiện đã bị ẩn."
+      "EVENT_HIDDEN": "Không thể chọn sự kiện đã bị ẩn.",
+      "birthday_notify_BIRTHDAY_REQUIRED": "Hãy nhập ngày sinh trong Cài đặt trước.",
+      "birthday_notify_BIRTHDAY_PRIVATE": "Ngày sinh của bạn chỉ hiển thị cho mình bạn nên không thể bật thông báo sinh nhật.",
+      "birthday_notify_LIST_PRIVATE": "Danh sách riêng tư không thể gửi thông báo sinh nhật.",
+      "birthday_notify_NOT_PERSONAL": "Danh sách của tổ chức và điểm cứu trợ không thể gửi thông báo sinh nhật."
     }
   }
 }

@@ -112,6 +112,11 @@
       "relogin": "Đăng nhập lại"
     },
     "terms": "Điều khoản dịch vụ",
-    "privacy": "Chính sách quyền riêng tư"
+    "privacy": "Chính sách quyền riêng tư",
+    "notify": {
+      "title": "Thông báo",
+      "birthdays": "Email sinh nhật",
+      "birthdaysHint": "Nhắc sinh nhật bạn bè và nhắc bạn tạo danh sách trước sinh nhật của mình."
+    }
   }
 }

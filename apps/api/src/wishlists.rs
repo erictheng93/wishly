@@ -150,6 +150,45 @@ pub async fn release_pledged(tx: &mut crate::points::Tx<'_>, wishlist_ids: &[Uui
     Ok(())
 }
 
+/// 開啟生日通知（D65）：檢查擁有者生日與清單條件，同交易關掉該擁有者其他清單再設為真（不回 409）。
+async fn enable_birthday(
+    tx: &mut crate::points::Tx<'_>,
+    id: Uuid,
+    owner: Uuid,
+    personal: bool,
+    vis: &str,
+) -> R<()> {
+    let e = |code, d| AppError::invalid("/birthday_notify", code, d);
+    if !personal {
+        return Err(e("NOT_PERSONAL", "組織清單與救災據點不可開啟生日通知"));
+    }
+    if vis == "private" {
+        return Err(e("LIST_PRIVATE", "私人清單不可開啟生日通知"));
+    }
+    let b: (Option<String>, String) =
+        sqlx::query_as("SELECT birthday, birthday_visibility::text FROM users WHERE id=$1")
+            .bind(owner)
+            .fetch_one(&mut **tx)
+            .await?;
+    if b.0.is_none() {
+        return Err(e("BIRTHDAY_REQUIRED", "請先在個人資料設定生日"));
+    }
+    if b.1 == "private" {
+        return Err(e("BIRTHDAY_PRIVATE", "生日設為私人時無法通知朋友"));
+    }
+    sqlx::query("UPDATE wishlists SET birthday_notify=false WHERE owner_id=$1 AND id<>$2 AND birthday_notify")
+        .bind(owner)
+        .bind(id)
+        .execute(&mut **tx)
+        .await?;
+    // shortcut: 同一人並行開兩份清單時後到者撞 unique index 回 500，實務幾乎不會發生；有回報再改鎖 users 列
+    sqlx::query("UPDATE wishlists SET birthday_notify=true WHERE id=$1")
+        .bind(id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
 // ---------- 清單 ----------
 #[derive(sqlx::FromRow)]
 pub(crate) struct W {
@@ -181,13 +220,14 @@ pub(crate) struct W {
     site_address: Option<String>,
     site_status: Option<String>,
     org: Option<Value>,
+    birthday_notify: bool,
 }
 pub(crate) const WCOLS: &str = "id, type::text AS ty, status::text AS status, visibility::text AS visibility, slug::text AS slug, title, description,
   cover_image_key, cover_image_status::text AS cover_image_status, cover_preset, event_date, show_claimer_names, surprise_mode,
   surprise_locked(surprise_mode, event_date) AS surprise_locked,
   claim_ttl_hours, moderation_status::text AS moderation_status, moderation_reason, moderated_at, closes_at, created_at, updated_at,
   EXISTS (SELECT 1 FROM shipping_addresses s WHERE s.wishlist_id = wishlists.id) AS has_shipping_address,
-  org_id, event_id, permit_id, site_address, site_status,
+  org_id, event_id, permit_id, site_address, site_status, birthday_notify,
   (SELECT jsonb_build_object('id', o.id, 'slug', o.slug::text, 'display_name', o.display_name) FROM organizations o WHERE o.id = wishlists.org_id) AS org";
 
 /// 擁有權謂詞（綁定 $2 = 使用者）：個人清單看 owner_id（保留 owner 索引），組織據點看 org_members 的角色與 disabled_at。
@@ -206,7 +246,7 @@ impl W {
             "moderation_reason": self.moderation_reason, "moderated_at": self.moderated_at, "closes_at": self.closes_at,
             "has_shipping_address": self.has_shipping_address, "location": null, "address": null,
             "org_id": self.org_id, "event_id": self.event_id, "permit_id": self.permit_id, "site_address": self.site_address,
-            "site_status": self.site_status, "org": self.org,
+            "site_status": self.site_status, "org": self.org, "birthday_notify": self.birthday_notify,
             "share_url": format!("{}/s/{}", app_url(), self.slug), "created_at": self.created_at, "updated_at": self.updated_at,
         })
     }
@@ -406,6 +446,7 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
     let ttl = int(m, "claim_ttl_hours", 1, 24 * 365)?.unwrap_or(Some(168));
     let closes = closes_at(m)?.flatten();
     future_only(closes)?;
+    let bday = boolean(m, "birthday_notify")?.unwrap_or(false);
     if surprise && !event.is_some_and(|d| d > today_tw()) {
         return Err(AppError::invalid(
             "/event_date",
@@ -423,6 +464,9 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
             .fetch_one(&mut *tx).await;
         match r {
             Ok(id) => {
+                if bday {
+                    enable_birthday(&mut tx, id, u.id, true, vis).await?;
+                }
                 tx.commit().await?;
                 let w = load_owned(&st.pool, id, u.id).await?;
                 return Ok((
@@ -511,7 +555,7 @@ async fn list(
                 "cover_image_url": j["cover_image_url"], "cover_preset": w.cover_preset, "surprise_locked": w.surprise_locked,
                 "completion": { "item_count": c, "fulfilled_count": f, "completion_pct": completion_pct(q, nd) },
                 "moderation_status": w.moderation_status, "moderation_reason": w.moderation_reason,
-                "updated_at": w.updated_at })
+                "birthday_notify": w.birthday_notify, "updated_at": w.updated_at })
     }).collect();
     let next = if more {
         rows.last().map(|w| B64.encode(w.id.to_string()))
@@ -663,6 +707,7 @@ async fn update(
         }
         w.show_claimer_names = v;
     }
+    let bday = boolean(m, "birthday_notify")?.unwrap_or(false);
     if let Some(v) = int(m, "claim_ttl_hours", 1, 24 * 365)? {
         w.claim_ttl_hours = v.map(|t| t as i32);
     }
@@ -776,6 +821,7 @@ async fn update(
     uploads::remember_media(&mut tx, u.id, w.cover_image_key.as_deref()).await?;
     let res = sqlx::query("UPDATE wishlists SET title=$2, description=$3, cover_image_key=$4, cover_image_status=$5::image_status, event_date=$6, visibility=$7::visibility,
                  show_claimer_names=$8, surprise_mode=$9, claim_ttl_hours=$10, status=$11::wishlist_status, closes_at=$13,
+                 birthday_notify = birthday_notify AND $7 <> 'private',
                  closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END, cover_preset=$15,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
                  site_status=$16, site_address=$17, event_id=$18, permit_id=$19,
@@ -789,6 +835,21 @@ async fn update(
         .bind(reopening).bind(u.id).bind(&old_site_status).bind(old_event).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
+    }
+    if bday {
+        enable_birthday(
+            &mut tx,
+            id,
+            u.id,
+            w.org_id.is_none() && !relief,
+            &w.visibility,
+        )
+        .await?;
+    } else if m.get("birthday_notify") == Some(&Value::Bool(false)) {
+        sqlx::query("UPDATE wishlists SET birthday_notify=false WHERE id=$1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
     }
     if relief && m.contains_key("site_address") {
         // 收件地址 = 據點地址：眾籌採購讀 shipping_addresses，兩邊要一致

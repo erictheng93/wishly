@@ -49,7 +49,7 @@ for (const [error, message] of [
 ]) {
   test(`OAuth 登入錯誤顯示原因：${error}`, async ({ page }) => {
     await page.goto(`/login?error=${error}`)
-    await expect(page.getByRole('alert')).toHaveText(message!)
+    await expect(page.getByRole('alert')).toContainText(message!)
     if (error === 'account_blocked') await page.screenshot({ path: '/tmp/wishly-account-blocked.png', fullPage: true })
   })
 }
@@ -62,7 +62,7 @@ for (const path of ['/settings', '/admin']) {
     sql(`UPDATE users SET blocked_at=now() WHERE id='${id}'`)
     await page.goto(path)
     await expect(page).toHaveURL(/\/login\?.*error=account_blocked/)
-    await expect(page.getByRole('alert')).toHaveText('帳號已停權，請聯絡客服')
+    await expect(page.getByRole('alert')).toContainText('帳號已停權，請聯絡客服')
     await user.api.dispose()
   })
 }
@@ -76,6 +76,6 @@ test('已登入帳號停權後 API 請求清除登入並顯示原因', async ({ 
   sql(`UPDATE users SET blocked_at=now() WHERE id='${id}'`)
   await page.locator('form').filter({ has: page.getByLabel('顯示名稱') }).getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page).toHaveURL(/\/login\?.*error=account_blocked/)
-  await expect(page.getByRole('alert')).toHaveText('帳號已停權，請聯絡客服')
+  await expect(page.getByRole('alert')).toContainText('帳號已停權，請聯絡客服')
   await user.api.dispose()
 })
