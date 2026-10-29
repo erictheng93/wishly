@@ -413,6 +413,20 @@ async fn lock_user(
     Ok(())
 }
 
+/// 不等待的 lock_user：已持有其他列鎖時用，拿不到就由呼叫者回「稍後再試」。
+pub(crate) async fn try_lock_user(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user: Uuid,
+) -> Result<bool, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT pg_try_advisory_xact_lock($1, hashtext($2))")
+            .bind(MEDIA_USER_LOCK)
+            .bind(user.to_string())
+            .fetch_one(&mut **tx)
+            .await?,
+    )
+}
+
 pub(crate) async fn media_tx(
     pool: &sqlx::PgPool,
     user: Uuid,

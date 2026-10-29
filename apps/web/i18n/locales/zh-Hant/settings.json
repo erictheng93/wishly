@@ -3,6 +3,7 @@
     "title": "帳號設定",
     "profile": "我的資料",
     "noEmail": "尚未綁定 Email",
+    "accountId": "帳號 ID（聯絡客服時請提供）：",
     "displayName": "顯示名稱",
     "saved": "已儲存",
     "save": "儲存",
@@ -30,7 +31,7 @@
       "err": {
         "oauth_failed": "綁定失敗，請重新操作並確認登入帳號",
         "oauth_unavailable": "此登入方式尚未開放",
-        "identity_in_use": "此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。",
+        "identity_in_use": "此登入方式或 Email 已屬於另一個有資料的帳號，無法自動合併。請使用原帳號登入，或聯絡客服並提供兩邊的帳號 ID",
         "provider_already_linked": "已綁定此登入方式，請先解除後再更換"
       },
       "linkedMsg": "已綁定 {label}",

@@ -33,6 +33,7 @@ CASES = {
     "wallet-for-update": (API + "contributions.rs", "create", "SELECT status::text FROM point_wallets WHERE id = $1 FOR UPDATE", "SELECT status::text FROM point_wallets WHERE id = $1", "concurrency", "wallet_freeze_vs_pledge_checks_status_under_lock"),
     "reallocate-wallet-for-update": (API + "contributions.rs", "reallocate", "SELECT status::text FROM point_wallets w WHERE w.id = $1 FOR UPDATE", "SELECT status::text FROM point_wallets w WHERE w.id = $1", "concurrency", "wallet_freeze_vs_reallocate_checks_status_under_lock"),
     "claim-wishlist-for-share": (API + "claims.rs", "create", "SELECT site_status FROM wishlists WHERE id = $1 FOR SHARE", "SELECT site_status FROM wishlists WHERE id = $1", "concurrency", "archive_vs_waiting_claim_cannot_accept_after_archive_commit"),
+    "absorb-skip-locked": (API + "identities.rs", "lock_blank", "SELECT id FROM users WHERE id=$1 FOR UPDATE SKIP LOCKED", "SELECT id FROM users WHERE id=$1 FOR UPDATE", "identities", "absorb_does_not_wait_for_a_locked_account"),
     "idempotency-claim-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_claim_requests_overlap_and_claim_once"),
     "idempotency-pledge-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_pledge_requests_overlap_and_debit_once"),
     "delete-item-for-update": (API + "wishlists.rs", "item_delete", "SELECT id FROM wishlist_items WHERE id=$1 FOR UPDATE", "SELECT id FROM wishlist_items WHERE id=$1", "concurrency", "force_delete_vs_claim_update_uses_item_then_claim_lock_order"),
@@ -120,6 +121,7 @@ for name, function, condition in [
 
 FAILURE_MARKERS = {name: "CDN purge missing for wishlist" for name in CASES if name.startswith("cdn-")}
 FAILURE_MARKERS.update({
+    "absorb-skip-locked": "不可等待對方的列鎖",
     "ledger-update": "DB must reject SQLSTATE 23001 constraint unnamed",
     "ledger-delete": "DB must reject SQLSTATE 23001 constraint unnamed",
     "event-merge-lock-order": "opposite event merges caused a PostgreSQL deadlock: pg_stat_database.deadlocks",

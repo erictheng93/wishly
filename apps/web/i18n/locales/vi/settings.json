@@ -3,6 +3,7 @@
     "title": "Cài đặt tài khoản",
     "profile": "Thông tin của tôi",
     "noEmail": "Chưa liên kết Email",
+    "accountId": "ID tài khoản (cung cấp khi liên hệ hỗ trợ): ",
     "displayName": "Tên hiển thị",
     "saved": "Đã lưu",
     "save": "Lưu",
@@ -30,7 +31,7 @@
       "err": {
         "oauth_failed": "Liên kết thất bại. Vui lòng thử lại và kiểm tra tài khoản đang đăng nhập.",
         "oauth_unavailable": "Phương thức đăng nhập này chưa được mở.",
-        "identity_in_use": "Phương thức đăng nhập hoặc Email này đã thuộc về một tài khoản khác nên không thể liên kết trực tiếp. Vui lòng đăng nhập bằng tài khoản gốc.",
+        "identity_in_use": "Phương thức đăng nhập hoặc email này thuộc tài khoản khác đã có dữ liệu nên không thể tự động gộp. Hãy đăng nhập bằng tài khoản đó hoặc liên hệ hỗ trợ kèm ID của cả hai tài khoản.",
         "provider_already_linked": "Phương thức đăng nhập này đã được liên kết. Hãy hủy liên kết trước khi đổi."
       },
       "linkedMsg": "Đã liên kết {label}",

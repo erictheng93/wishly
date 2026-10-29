@@ -3,6 +3,7 @@
     "title": "Pengaturan akun",
     "profile": "Data saya",
     "noEmail": "Email belum ditautkan",
+    "accountId": "ID akun (berikan saat menghubungi layanan pelanggan): ",
     "displayName": "Nama tampilan",
     "saved": "Tersimpan",
     "save": "Simpan",
@@ -30,7 +31,7 @@
       "err": {
         "oauth_failed": "Gagal menautkan, ulangi dan pastikan akun yang dipakai untuk masuk",
         "oauth_unavailable": "Cara masuk ini belum dibuka",
-        "identity_in_use": "Cara masuk atau Email ini sudah milik akun lain, tidak bisa langsung ditautkan. Masuk dengan akun aslinya.",
+        "identity_in_use": "Cara masuk atau Email ini milik akun lain yang sudah berisi data sehingga tidak bisa digabung otomatis. Masuk dengan akun itu atau hubungi layanan pelanggan dengan kedua ID akun.",
         "provider_already_linked": "Cara masuk ini sudah tertaut, putuskan dulu sebelum menggantinya"
       },
       "linkedMsg": "{label} tertaut",
