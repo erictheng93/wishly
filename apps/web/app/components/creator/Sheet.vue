@@ -17,3 +17,8 @@ watch(() => props.open, (v) => {
     </template>
   </dialog>
 </template>
+<style>
+dialog.c-sheet h2{padding-bottom:14px;border-bottom:1px solid var(--ink-line);letter-spacing:-.01em}
+dialog.c-sheet h2::before{content:"";display:inline-block;width:8px;height:8px;margin-right:10px;background:var(--red);vertical-align:3px}
+dialog.c-sheet .c-row:last-child{margin-top:8px}
+</style>

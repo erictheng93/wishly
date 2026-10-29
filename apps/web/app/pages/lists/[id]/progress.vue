@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('lists.progress.pageTitle') })
@@ -77,8 +78,9 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
     <p v-if="loading" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load">{{ $t('lists.common.retry') }}</button></p>
     <template v-if="d">
-      <section class="c-card c-center">
-        <div class="c-big">{{ pct }}%</div>
+      <section class="x-ink pg-hero">
+        <div class="x-tag" aria-hidden="true"><span><i class="x-dot" />{{ status === 'live' ? 'LIVE' : 'SNAPSHOT' }}</span><span>OVERALL</span></div>
+        <div class="c-big x-num">{{ pct }}<small>%</small></div>
         <div class="c-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100" :aria-label="$t('lists.progress.overall')"><i :style="{ width: pct + '%' }" /></div>
         <p class="c-mute">{{ $t('lists.progress.complete', { done: d.totals.fulfilled_count, total: d.totals.item_count }) }}{{ $t('lists.progress.qtyPart', { claimed: d.totals.qty_claimed, needed: d.totals.qty_needed }) }}</p>
         <p v-if="!locked && d.totals.target_points" class="c-mute">{{ $t('lists.progress.pointsLine', { pledged: fmtPts(d.totals.pledged_points), target: fmtPts(d.totals.target_points), n: d.totals.funded_item_count ?? 0 }, d.totals.funded_item_count ?? 0) }}</p>
@@ -92,12 +94,13 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
         <p v-else>{{ $t('lists.progress.countdown', { days, hms, at: new Date(d.unlock_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }, days) }}</p>
       </section>
 
-      <p v-if="!d.totals.item_count" class="c-center c-mute">{{ $t('lists.progress.noItems') }}</p>
-      <p v-else-if="!locked && !d.totals.qty_claimed && !d.totals.pledged_points" class="c-center c-mute">{{ $t('lists.progress.nobody') }}</p>
+      <p v-if="!d.totals.item_count" class="x-empty">{{ $t('lists.progress.noItems') }}</p>
+      <p v-else-if="!locked && !d.totals.qty_claimed && !d.totals.pledged_points" class="x-empty">{{ $t('lists.progress.nobody') }}</p>
       <p v-if="claimErr" class="c-err" role="alert">{{ claimErr }}</p>
 
-      <h2 class="c-h2">{{ $t('lists.progress.itemsTitle') }}</h2>
-      <article v-for="i in d.items" :key="i.item_id" class="c-card">
+      <h2 class="c-h2 x-h" data-n="ITEMS">{{ $t('lists.progress.itemsTitle') }}</h2>
+      <article v-for="(i, n) in d.items" :key="i.item_id" class="c-card pg-item">
+        <span class="pg-n" aria-hidden="true">{{ String(Number(n) + 1).padStart(2, '0') }}</span>
         <template v-if="i.funding_mode === 'crowdfund'">
           <div class="c-row"><strong class="c-grow">{{ i.title }}</strong>
             <span v-if="i.pledged_points === null" class="c-mute">{{ $t('lists.progress.hiddenProgress') }}</span>
@@ -163,3 +166,15 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
     </template>
   </main>
 </template>
+<style scoped>
+.pg-hero .x-num small{font-size:.4em;letter-spacing:0;margin-left:4px;color:var(--red)}
+.pg-hero .c-bar{height:12px;background:repeating-linear-gradient(-45deg,color-mix(in srgb,var(--xi-fg) 38%,transparent) 0 1px,transparent 1px 7px),color-mix(in srgb,var(--xi-fg) 14%,transparent)}
+.pg-hero .c-mute{margin:10px 0 0;font:600 12px/1.6 var(--mono);letter-spacing:.03em}
+.pg-hero .c-bar+.c-mute{margin-top:14px}
+.pg-item{padding:18px 16px 16px;margin-bottom:12px}
+.pg-n{position:absolute;top:0;right:0;padding:6px 10px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute);background:var(--bg-alt)}
+.pg-item>.c-row:first-of-type{padding-right:44px}
+.pg-item>.c-row>strong{font-size:17px;line-height:1.3}
+.pg-item .c-bar{height:10px;margin:12px 0 8px}
+.pg-item .c-list>li{padding:12px 0;border-top:1px solid var(--line)}
+</style>

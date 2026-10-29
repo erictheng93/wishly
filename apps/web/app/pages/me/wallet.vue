@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('me.wallet.title') })
@@ -20,6 +21,8 @@ async function load() {
   err.value = ''
   try { await Promise.all([loadWallet(), loadContribs()]) } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
 }
+// 純展示：凍結／贊助中點數佔（可用＋贊助中）的比例，畫在刻度尺上
+const heldPct = computed(() => { const h = Number(wallet.value?.held_points) || 0, b = Number(wallet.value?.balance) || 0; return h + b > 0 ? Math.round(h / (h + b) * 100) : 0 })
 onMounted(load)
 const more = (f: () => Promise<void>) => f().catch((e) => { err.value = errMsg(e) })
 
@@ -77,24 +80,26 @@ async function reallocate() {
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load">{{ $t('me.retry') }}</button></p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <template v-if="wallet">
-      <section class="c-card c-center">
-        <div class="c-big">{{ fmtPts(wallet.balance) }}</div>
-        <p class="c-mute c-m0">{{ $t('me.wallet.available') }}<span v-if="wallet.status === 'frozen'" class="c-badge frozen">{{ $t('me.wallet.frozen') }}</span></p>
-        <p class="c-mute">{{ $t('me.wallet.held', { pts: fmtPts(wallet.held_points) }) }}</p>
+      <section class="x-ink w-hero">
+        <div class="x-tag" aria-hidden="true"><span><b>POINT WALLET</b></span><span>1 PT = NT$1</span></div>
+        <strong class="c-big x-num">{{ fmtPts(wallet.balance) }}</strong>
+        <p class="x-cap">{{ $t('me.wallet.available') }}<span v-if="wallet.status === 'frozen'" class="c-badge frozen">{{ $t('me.wallet.frozen') }}</span></p>
+        <div class="x-ruler" aria-hidden="true"><i :style="{ width: Math.max(heldPct, 2) + '%' }" /></div>
+        <p class="c-mute w-held">{{ $t('me.wallet.held', { pts: fmtPts(wallet.held_points) }) }}</p>
         <p v-if="wallet.status === 'frozen'" class="c-err" role="alert">{{ $t('me.wallet.frozenWarn') }}</p>
-        <p class="c-mute c-small">{{ $t('me.wallet.issuedByPlatform') }}</p>
-        <button v-if="wallet.status === 'frozen'" type="button" class="c-btn primary" disabled>{{ $t('me.wallet.topup') }}</button>
-        <NuxtLink v-else to="/me/topup" class="c-btn primary">{{ $t('me.wallet.topup') }}</NuxtLink>
-        <div class="c-mt">
-          <NuxtLink v-if="Number(wallet.cash_refundable_balance) > 0 && wallet.status !== 'frozen'" to="/me/refund" class="c-btn primary" data-testid="refund-entry">{{ $t('me.wallet.refund') }}</NuxtLink>
-          <p v-else class="c-mute c-small c-m0" data-testid="refund-none">{{ $t(wallet.status === 'frozen' ? 'me.wallet.refundFrozen' : 'me.wallet.refundNone') }}</p>
-          <p v-if="Number(wallet.cash_refundable_balance) > 0" class="c-mute c-small c-m0">{{ $t('me.wallet.refundable', { pts: fmtPts(wallet.cash_refundable_balance) }) }}</p>
+        <div class="c-row wrap w-act">
+          <button v-if="wallet.status === 'frozen'" type="button" class="c-btn primary" disabled>{{ $t('me.wallet.topup') }}</button>
+          <NuxtLink v-else to="/me/topup" class="c-btn primary">{{ $t('me.wallet.topup') }}</NuxtLink>
+          <NuxtLink v-if="Number(wallet.cash_refundable_balance) > 0 && wallet.status !== 'frozen'" to="/me/refund" class="c-btn" data-testid="refund-entry">{{ $t('me.wallet.refund') }}</NuxtLink>
         </div>
+        <p v-if="!(Number(wallet.cash_refundable_balance) > 0 && wallet.status !== 'frozen')" class="c-mute c-small c-m0" data-testid="refund-none">{{ $t(wallet.status === 'frozen' ? 'me.wallet.refundFrozen' : 'me.wallet.refundNone') }}</p>
+        <p v-if="Number(wallet.cash_refundable_balance) > 0" class="c-mute c-small c-m0">{{ $t('me.wallet.refundable', { pts: fmtPts(wallet.cash_refundable_balance) }) }}</p>
+        <p class="c-mute c-small w-plat">{{ $t('me.wallet.issuedByPlatform') }}</p>
       </section>
 
-      <h2 class="c-h2">{{ $t('me.wallet.myPledges') }}</h2>
-      <p v-if="!contribs.length" class="c-center c-mute">{{ $t('me.wallet.noPledges') }}</p>
-      <article v-for="r in contribs" :key="r.contribution.id" class="c-card">
+      <h2 class="c-h2 x-h" data-n="01">{{ $t('me.wallet.myPledges') }}</h2>
+      <p v-if="!contribs.length" class="x-empty">{{ $t('me.wallet.noPledges') }}</p>
+      <article v-for="r in contribs" :key="r.contribution.id" class="c-card w-pledge">
         <div class="c-row">
           <img v-if="r.item.image_url" class="c-thumb" :src="r.item.image_url" alt="">
           <div v-else class="c-thumb">{{ $t('me.wallet.noImg') }}</div>
@@ -108,7 +113,7 @@ async function reallocate() {
         <div v-if="r.contribution.message" class="c-mute">{{ $t('me.wallet.quoted', { msg: r.contribution.message }) }}{{ r.contribution.is_anonymous ? $t('me.wallet.anon') : '' }}</div>
         <div class="c-mute c-small">{{ $t('me.wallet.pledgedAt', { time: fmtTime(r.contribution.created_at) }) }}<template v-if="r.contribution.captured_at">{{ $t('me.wallet.reachedAt', { time: fmtTime(r.contribution.captured_at) }) }}</template></div>
         <div v-if="r.contribution.refunded_points" class="c-mute c-small">{{ $t('me.wallet.refunded', { pts: fmtPts(r.contribution.refunded_points) }) }}</div>
-        <label class="c-field c-mt"><span>{{ $t('me.whoSees') }}</span>
+        <label class="c-field c-mt w-vis"><span>{{ $t('me.whoSees') }}</span>
           <select :value="r.contribution.visibility" :disabled="visBusy" @change="setVis(r, $event)">
             <option value="public">{{ $t('me.vis.public') }}</option><option value="friends">{{ $t('me.vis.friends') }}</option><option value="private">{{ $t('me.vis.private') }}</option>
           </select>
@@ -122,14 +127,14 @@ async function reallocate() {
       </article>
       <button v-if="cCursor" class="c-btn block c-mb16" @click="more(() => loadContribs(true))">{{ $t('me.wallet.loadMore') }}</button>
 
-      <h2 class="c-h2">{{ $t('me.wallet.ledger') }}</h2>
-      <p v-if="!ledger.length" class="c-center c-mute">{{ $t('me.wallet.noLedger') }}</p>
-      <section v-else class="c-card">
-        <ul class="c-list">
-          <li v-for="e in ledger" :key="e.id" class="c-row wrap">
-            <span class="c-grow"><strong>{{ label(LEDGER_TYPE, e.entry_type) }}</strong><span v-if="e.note" class="c-mute">　{{ e.note }}</span>
+      <h2 class="c-h2 x-h" data-n="02">{{ $t('me.wallet.ledger') }}</h2>
+      <p v-if="!ledger.length" class="x-empty">{{ $t('me.wallet.noLedger') }}</p>
+      <section v-else class="w-ledger">
+        <ul class="x-rows">
+          <li v-for="e in ledger" :key="e.id" class="w-led">
+            <span class="w-led-t"><strong>{{ label(LEDGER_TYPE, e.entry_type) }}</strong><span v-if="e.note" class="c-mute">　{{ e.note }}</span>
               <span class="c-mute c-small" style="display:block">{{ $t('me.wallet.ledgerMeta', { time: fmtTime(e.created_at), bal: fmtPts(e.balance_after) }) }}</span></span>
-            <b :class="e.delta >= 0 ? 'c-pos' : 'c-neg'">{{ e.delta > 0 ? '+' : '' }}{{ fmtPts(e.delta) }}</b>
+            <b class="w-delta" :class="e.delta >= 0 ? 'c-pos' : 'c-neg'">{{ e.delta > 0 ? '+' : '' }}{{ fmtPts(e.delta) }}</b>
           </li>
         </ul>
         <button v-if="lCursor" class="c-btn block c-mt" @click="more(() => loadWallet(true))">{{ $t('me.wallet.loadMore') }}</button>
@@ -144,3 +149,20 @@ async function reallocate() {
     </CreatorConfirm>
   </main>
 </template>
+<style scoped>
+.w-hero .c-badge{margin-left:10px;vertical-align:2px}
+.w-held{margin:0 0 4px;font:600 12px/1.5 var(--mono);letter-spacing:.04em}
+.w-act{margin:18px 0 14px}
+.w-act .c-btn{flex:1 1 160px}
+.w-plat{margin:12px 0 0!important;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--xi-fg) 22%,transparent)}
+.w-pledge{padding:16px}
+.w-pledge .c-thumb{width:72px;height:72px}
+.w-pledge .c-row:first-child strong{font-size:17px;line-height:1.3}
+.w-vis{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:0}
+.w-vis>span{margin:0}
+.w-vis select{width:auto;min-width:160px}
+.w-led{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center;animation:rise .45s var(--ease) both}
+.w-led-t strong{font-size:15px}
+.w-delta{font:800 22px/1 var(--mono);letter-spacing:-.02em;text-align:right}
+@media (max-width:767px){.w-pledge .c-thumb{width:60px;height:60px}}
+</style>

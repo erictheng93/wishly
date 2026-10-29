@@ -58,7 +58,7 @@ const wipe = () => {
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <h1>{{ $t('me.claims.title') }}</h1>
+    <div class="cl-head"><small aria-hidden="true">WISHLY / CLAIMS</small><h1>{{ $t('me.claims.title') }}</h1></div>
     <div v-if="recoverFailed" class="g-banner err" role="alert">{{ $t('me.claims.recoverFailed') }}</div>
     <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
     <p v-if="state === 'loading'" class="g-mute">{{ $t('me.loading') }}</p>
@@ -72,8 +72,8 @@ const wipe = () => {
         <template v-if="!editing"><b>{{ guest.display_name }}</b>{{ guest.is_user ? $t('me.claims.signedIn') : $t('me.claims.thisDevice') }}<button v-if="!guest.is_user" class="g-link" @click="editing = true">{{ $t('me.claims.editNick') }}</button></template>
         <form v-else class="g-inline" @submit.prevent="saveNick"><input v-model="nick" maxlength="30" required :aria-label="$t('me.claims.nick')"><button class="g-btn sm">{{ $t('me.claims.save') }}</button></form>
       </div>
-      <section v-for="g in groups" :key="g.w.slug">
-        <h2 class="g-h2"><NuxtLink :to="`/s/${g.w.slug}`">{{ g.w.title }}</NuxtLink></h2>
+      <section v-for="(g, gi) in groups" :key="g.w.slug" class="cl-group">
+        <h2 class="g-h2 cl-h2" :data-n="String(gi + 1).padStart(2, '0')"><NuxtLink :to="`/s/${g.w.slug}`">{{ g.w.title }}</NuxtLink></h2>
         <div v-for="r in g.list" :key="r.claim.id" class="g-card g-item">
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
@@ -100,3 +100,16 @@ const wipe = () => {
     </template>
   </main>
 </template>
+<style scoped>
+.cl-head{margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
+.cl-head small{display:block;margin-bottom:6px;font:600 11px/1 var(--mono);letter-spacing:.16em;color:var(--red-text)}
+.cl-head h1{margin:0}
+.cl-group{margin-top:36px}
+.cl-h2{display:flex;align-items:baseline;gap:12px;margin:0 0 6px;padding-bottom:10px;border-bottom:1px solid var(--ink-line);font-size:20px}
+.cl-h2::before{content:attr(data-n);font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text)}
+.cl-h2 a{display:inline-flex;align-items:center;min-height:44px}
+.cl-group .g-item{margin:0;border-width:0 0 1px;border-color:var(--line);padding:16px 0}
+.cl-group .g-thumb{width:80px;height:80px}
+.cl-group .g-item:hover{box-shadow:none;transform:none}
+@media (max-width:767px){.cl-head{margin-top:20px}}
+</style>

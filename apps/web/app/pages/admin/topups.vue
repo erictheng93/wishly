@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 儲值單與拒付爭議：paid →（標記爭議）disputed →（勝訴）paid |（敗訴，扣回）charged_back。
 // POST /admin/topups/{id}/dispute 需 Idempotency-Key：開啟確認時產生，失敗重試沿用（網路中斷）或換新（後端已回應）。
 import { TOPUP_FILTERS, disputeActions, disputeBody, disputeOutcome, listRows, type DisputeAction } from '~/utils/walletOps'

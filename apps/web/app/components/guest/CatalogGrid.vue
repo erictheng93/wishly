@@ -55,10 +55,13 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
 </script>
 
 <template>
-  <div class="g-grid">
-    <article v-for="p in products" :key="p.ref" class="g-card">
-      <img v-if="p.image_url" class="x-img" :src="p.image_url" alt="" loading="lazy">
-      <div v-else class="x-img x-ph" aria-hidden="true">{{ (p.brand?.name || p.title).slice(0, 1) }}</div>
+  <div class="g-grid x-grid">
+    <article v-for="(p, i) in products" :key="p.ref" class="g-card x-card">
+      <div class="x-cv">
+        <img v-if="p.image_url" class="x-img" :src="p.image_url" alt="" loading="lazy">
+        <div v-else class="x-img x-ph" aria-hidden="true">{{ (p.brand?.name || p.title).slice(0, 1) }}</div>
+        <span class="x-no" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span>
+      </div>
       <p v-if="p.brand" class="g-mute"><NuxtLink :to="`/brands/${p.brand.slug}`">{{ p.brand.name }}</NuxtLink></p>
       <strong class="x-title">{{ p.title }}</strong>
       <p v-if="p.spec" class="g-mute">{{ p.spec }}</p>
@@ -119,14 +122,24 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
 </template>
 
 <style scoped>
-.x-img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;margin-bottom:8px}
-.x-ph{display:flex;align-items:center;justify-content:center;background:var(--bg-alt);border:1px solid var(--line);color:var(--red-text);font-size:48px;font-weight:700}
-.x-title{display:block;font-size:17px;overflow-wrap:anywhere}
-.x-price{font-weight:700;color:var(--red-text);margin:4px 0}
-.x-act{display:grid;gap:8px;margin-top:12px}
+.x-card{display:flex;flex-direction:column;padding:0}
+.x-card>:not(.x-cv){margin-left:16px;margin-right:16px}
+.x-card>.g-mute{font-size:12px}
+.x-card>p.g-mute:first-of-type{font:700 11px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.x-cv{position:relative;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.x-no{position:absolute;left:0;top:0;padding:0 8px;background:var(--fg);color:var(--bg);font:700 11px/24px var(--mono);letter-spacing:.14em}
+.x-img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}
+.x-ph{display:flex;align-items:center;justify-content:center;background:var(--hatch),var(--bg-alt);color:var(--red-text);font-size:64px;font-weight:900;letter-spacing:-.04em}
+.x-title{display:block;font-size:18px;line-height:1.35;font-weight:800;overflow-wrap:anywhere;margin:2px 16px}
+.x-price{font:800 20px var(--mono);letter-spacing:-.02em;color:var(--fg);margin:6px 16px 4px;font-variant-numeric:tabular-nums}
+.x-price::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;background:var(--red)}
+.x-act{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto!important;padding:16px 0}
+.x-act>:first-child{grid-column:1/-1}
+.x-act .g-btn{padding:0 8px;font-size:14px}
 .x-lists{display:grid;gap:8px;margin-top:12px}
 .x-lists .g-btn{justify-content:flex-start;text-align:left}
 .x-wishes{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
 .x-wish{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);padding:8px 12px}
 .x-cancel{margin-top:12px}
+@media (min-width:768px){.x-grid{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}}
 </style>

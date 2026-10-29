@@ -25,3 +25,28 @@ onBeforeUnmount(() => { el.value?.close(); if (opener?.isConnected) opener.focus
     <slot />
   </dialog>
 </template>
+
+<style>
+dialog.g-dialog .g-sheet{border-top:2px solid var(--ink-line);box-shadow:inset 0 3px 0 var(--red)}
+dialog.g-dialog .g-sheet>.g-item{align-items:center;padding-bottom:16px;margin-bottom:4px;border-bottom:1px solid var(--ink-line);animation:none}
+dialog.g-dialog .g-sheet>.g-item .g-title{font-size:20px;letter-spacing:-.01em}
+dialog.g-dialog .g-sheet .g-thumb{width:64px;height:64px}
+dialog.g-dialog .g-sheet h1{font-weight:900;letter-spacing:-.02em}
+dialog.g-dialog .g-sheet .g-banner{box-shadow:inset 3px 0 var(--red)}
+dialog.g-dialog .g-sheet.center{padding-top:40px}
+dialog.g-dialog .g-sheet.center h1::before{content:"OK" / "";display:block;width:max-content;margin:0 auto 14px;padding:3px 10px;border:1px solid currentColor;font:700 11px var(--mono);letter-spacing:.2em}
+dialog.g-dialog .g-sheet .g-step{width:100%;margin:16px 0;justify-content:space-between}
+dialog.g-dialog .g-sheet .g-step b{flex:1;font-size:40px}
+dialog.g-dialog .g-sheet .g-btn.block,dialog.g-dialog .g-sheet .g-btn{margin-top:6px}
+dialog.g-dialog .g-sheet .g-link{margin-top:2px}
+dialog.g-dialog .g-sheet .g-chips .g-btn{margin-top:0}
+dialog.g-dialog .g-sheet input[type=checkbox],dialog.g-dialog .g-sheet input[type=radio]{width:20px;height:20px;flex:none}
+dialog.g-dialog .g-sheet fieldset legend{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+dialog.g-dialog .g-sheet label.g-radio{margin:14px 0 4px!important;padding:0 12px;border:1px solid var(--line);background:var(--bg-alt);cursor:pointer}
+dialog.g-dialog .g-sheet fieldset label.g-radio{margin:0!important;border-width:0 0 1px;background:transparent;padding:0 2px}
+dialog.g-dialog .g-sheet select{width:100%;min-height:48px;background:var(--bg-alt)}
+@media (max-width:767px){
+  dialog.g-dialog .g-sheet{border-top-width:0}
+  dialog.g-dialog .g-sheet::before{content:"";display:block;width:40px;height:4px;background:var(--line);margin:-14px auto 16px}
+}
+</style>

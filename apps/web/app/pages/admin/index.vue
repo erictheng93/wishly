@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 definePageMeta({ middleware: 'staff' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('admin.index.title') })
@@ -114,8 +115,8 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
     <section class="c-card" :aria-label="$t('admin.index.statsLabel')">
       <div class="c-row c-mb"><h2 class="c-h2 c-grow c-m0">{{ $t('admin.index.overview') }}</h2><button class="c-btn small" :disabled="statsBusy" @click="loadStats">{{ statsBusy ? $t('admin.index.refreshing') : $t('admin.index.refreshStats') }}</button></div>
       <p v-if="statsErr" class="c-err" role="alert">{{ statsErr }}</p>
-      <dl class="admin-stats">
-        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`">{{ stats?.[key] ?? '–' }}</dd></div>
+      <dl class="admin-stats k-kpis">
+        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0 }">{{ stats?.[key] ?? '–' }}</dd></div>
       </dl>
       <details v-if="stats"><summary>{{ $t('admin.index.detailsSummary') }}</summary>
         <div v-for="(name, key) in { claims_by_status: $t('admin.index.claimsByStatus'), notifications_by_status: $t('admin.index.notificationsByStatus'), audit_last_7d: $t('admin.index.auditLast7d') }" :key="key" class="c-mt">
@@ -124,7 +125,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
         </div>
       </details>
     </section>
-    <div class="c-row wrap c-mb">
+    <nav class="k-nav" aria-label="Admin">
       <NuxtLink to="/admin/orders" class="c-btn c-grow">{{ $t('admin.index.nav.orders') }}</NuxtLink>
       <NuxtLink to="/admin/wallets" class="c-btn c-grow">{{ $t('admin.index.nav.wallets') }}</NuxtLink>
       <NuxtLink to="/admin/cash-refunds" class="c-btn c-grow">{{ $t('admin.index.nav.cashRefunds') }}</NuxtLink>
@@ -135,7 +136,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <NuxtLink to="/admin/relief-events" class="c-btn c-grow">{{ $t('admin.index.nav.events') }}</NuxtLink>
       <NuxtLink to="/admin/audit" class="c-btn c-grow">{{ $t('admin.index.nav.audit') }}</NuxtLink>
       <NuxtLink to="/admin/analytics" class="c-btn c-grow">{{ $t('admin.index.nav.analytics') }}</NuxtLink>
-    </div>
+    </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">
       <button v-for="t in [['reports', $t('admin.index.tabs.reports')], ['lists', $t('admin.index.tabs.lists')], ['users', $t('admin.index.tabs.users')], ['flags', $t('admin.index.tabs.flags')]]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>
     </nav>
@@ -219,9 +220,15 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
 </template>
 
 <style scoped>
-.admin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin:0 0 16px}
-.admin-stats dt{font-size:13px;color:var(--mute)}
-.admin-stats dd{margin:4px 0 0;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.admin-stats{margin:0 0 20px}
 .admin-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-.admin-id{overflow-wrap:anywhere}
+.admin-id{overflow-wrap:anywhere;font:500 12px var(--mono)}
+/* 功能索引：編號磚，紅色只在 hover / 目前位置 */
+.k-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 24px;border-top:1px solid var(--ink-line);border-left:1px solid var(--line);counter-reset:kn}
+.k-nav .c-btn{counter-increment:kn;justify-content:flex-start;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:0 14px;gap:12px;font-size:14px;letter-spacing:.03em;white-space:normal;text-align:left;background:var(--card);position:relative}
+.k-nav .c-btn::before{content:counter(kn,decimal-leading-zero) / "";font:600 11px var(--mono);color:var(--red-text);letter-spacing:.08em;flex:none}
+.k-nav .c-btn::after{content:"\2192" / "";margin-left:auto;font-family:var(--mono);color:var(--mute);transition:transform var(--t) var(--ease)}
+@media (min-width:768px){.k-nav{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (hover:hover) and (pointer:fine){.k-nav .c-btn:hover::after{transform:translateX(4px);color:inherit}.k-nav .c-btn:hover::before{color:inherit}}
 </style>
+

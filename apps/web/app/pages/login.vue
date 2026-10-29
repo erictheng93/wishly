@@ -56,6 +56,7 @@ async function social(provider: 'google' | 'line') {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.login.title')" back="/" />
     <div class="c-auth">
+      <CreatorAuthTag left="No.001" right="Member access" />
       <p class="c-mute c-auth-lead">{{ $t('auth.login.note') }}</p>
       <p v-if="okMsg" class="c-ok" role="status">{{ okMsg }}</p>
       <form @submit.prevent="submit">

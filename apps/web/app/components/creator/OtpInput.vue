@@ -26,6 +26,11 @@ defineExpose({ focus: () => cells.value[0]?.focus() })
 </script>
 <template>
   <div class="c-otp" role="group" :aria-label="$t('creator.otp.group')">
-    <input v-for="i in 6" :key="i" :ref="(el) => (cells[i - 1] = el as HTMLInputElement)" :value="digit(i - 1)" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :aria-label="$t('creator.otp.cell', { n: i })" @input="onInput(i - 1, $event)" @keydown="onKey(i - 1, $event)">
+    <input v-for="i in 6" :key="i" :ref="(el) => (cells[i - 1] = el as HTMLInputElement)" :value="digit(i - 1)" :class="{ filled: !!digit(i - 1) }" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :aria-label="$t('creator.otp.cell', { n: i })" @input="onInput(i - 1, $event)" @keydown="onKey(i - 1, $event)">
   </div>
 </template>
+<style>
+.c-otp input{transition:border-color var(--t) var(--ease),background var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease)}
+.c-otp input.filled{background:var(--card);border-color:var(--ink-line);box-shadow:inset 0 -3px 0 var(--red)}
+@media (max-width:379px){.c-otp{gap:6px}.c-otp input{width:42px;height:54px}}
+</style>

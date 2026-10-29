@@ -68,3 +68,8 @@ function pick(ev: Event) {
     <p class="c-mute">{{ $t('creator.image.hint') }}</p>
   </div>
 </template>
+<style scoped>
+.c-thumb{width:72px;height:72px}
+div.c-thumb:not(img){border:1px dashed var(--mute);background:var(--hatch),var(--bg-alt);font:600 10px/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.c-file{align-self:flex-start}
+</style>

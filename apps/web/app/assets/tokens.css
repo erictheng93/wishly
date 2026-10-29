@@ -1,40 +1,50 @@
-/* 共用設計 token（款式二：紅白實驗室）：訪客端 g- 與創建者端 c- 皆由此取值。無外部字型、無圓角、無陰影。 */
+/* 共用設計 token（款式二：紅白實驗室・精製版）：訪客端 g- 與創建者端 c- 皆由此取值。
+   原則：紅色只當訊號（主要動作、進度、目前位置），結構交給墨色細線與字級；無外部字型、無圓角、無柔和陰影。 */
 :root{
-  --font:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;
+  --font:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace; /* 標籤、編號、數字：實驗室標本籤的語氣 */
   --red:#c8102e;--red-dark:#a30d25;
-  --bg:#fff;--bg-alt:#f4f4f4;--card:#fff;--fg:#1a1a1a;--mute:#666;--line:#d8d8d8;--fill:#f4f4f4;
-  --red-text:var(--red);--accent:var(--red);--accent-press:var(--red-dark);--accent-fg:#fff;--link:var(--red-text);
-  --ok:#1b7a3a;--bad:#c8102e;--bad-bg:#fbe9ec;--ok-bg:#e8f5ee;--glass:#fff;--scrim:rgba(0,0,0,.5);
-  --stripe:repeating-linear-gradient(45deg,var(--red) 0 8px,var(--red-dark) 8px 16px);
-  --ease:cubic-bezier(.25,.1,.25,1);--t:.2s;color-scheme:light dark;
+  --bg:#fff;--bg-alt:#f5f5f3;--card:#fff;--fg:#111;--mute:#6b6b6b;--line:#e4e4e2;--ink-line:#111;--fill:#f5f5f3;
+  --red-text:var(--red);--accent:var(--red);--accent-press:var(--red-dark);--accent-fg:#fff;--link:var(--fg);
+  --ok:#17703a;--bad:#c8102e;--bad-bg:#fcecef;--ok-bg:#e9f5ee;--glass:rgba(255,255,255,.88);--scrim:rgba(17,17,17,.56);
+  --stripe:repeating-linear-gradient(-45deg,var(--red) 0 6px,var(--red-dark) 6px 12px);
+  --hatch:repeating-linear-gradient(-45deg,var(--line) 0 1px,transparent 1px 7px); /* 未達成的空槽：細斜線 */
+  --ease:cubic-bezier(.2,.7,.1,1);--t:.24s;color-scheme:light dark;
+  --bar-bg:linear-gradient(var(--red) 0 3px,var(--glass) 3px calc(100% - 1px),var(--line) calc(100% - 1px)); /* 頁首：頂端紅線＋毛玻璃＋底線 */
   --c-w:480px;--g-w:560px; /* 內容欄寬：手機 → 平板 → 桌面，c- 創建者 / g- 訪客共用斷點 */
-  --head-h:calc(55px + env(safe-area-inset-top)); /* .c-head：52 + 3px 邊框 + 安全區；sticky 側欄 / rail 以此定位（≥1100 header 不換行，高度固定） */
+  --head-h:calc(57px + env(safe-area-inset-top)); /* .c-head：56 + 1px 底線 + 安全區；sticky 側欄 / rail 以此定位 */
 }
 @media (min-width:768px){:root{--c-w:720px;--g-w:720px}}
-@media (min-width:1100px){:root{--c-w:1000px;--g-w:880px}}
+@media (min-width:1100px){:root{--c-w:1000px;--g-w:960px}}
 /* 深色：預設跟隨系統；<html data-theme> 由 useTheme / 內嵌腳本設定，手動選擇優先 */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --red:#e5334f;--red-dark:#b82840;--red-text:#f0566e;
-  --bg:#0e0e0e;--bg-alt:#242424;--card:#181818;--fg:#f2f2f2;--mute:#a8a8a8;--line:#333;--fill:#242424;
-  --accent:#d92b47;--accent-press:#b82840;--accent-fg:#fff;--ok:#4cc474;--bad:#ff5a73;--bad-bg:#2c1218;--ok-bg:#12261a;--glass:#0e0e0e;--scrim:rgba(0,0,0,.7);
+  --bg:#0d0d0d;--bg-alt:#1c1c1b;--card:#141414;--fg:#f2f2f0;--mute:#9d9d9a;--line:#2c2c2a;--ink-line:#f2f2f0;--fill:#1c1c1b;
+  --accent:#d92b47;--accent-press:#b82840;--accent-fg:#fff;--ok:#4cc474;--bad:#ff5a73;--bad-bg:#2c1218;--ok-bg:#12261a;--glass:rgba(13,13,13,.86);--scrim:rgba(0,0,0,.72);
 }}
 :root[data-theme="dark"]{
   --red:#e5334f;--red-dark:#b82840;--red-text:#f0566e;
-  --bg:#0e0e0e;--bg-alt:#242424;--card:#181818;--fg:#f2f2f2;--mute:#a8a8a8;--line:#333;--fill:#242424;
-  --accent:#d92b47;--accent-press:#b82840;--accent-fg:#fff;--ok:#4cc474;--bad:#ff5a73;--bad-bg:#2c1218;--ok-bg:#12261a;--glass:#0e0e0e;--scrim:rgba(0,0,0,.7);
+  --bg:#0d0d0d;--bg-alt:#1c1c1b;--card:#141414;--fg:#f2f2f0;--mute:#9d9d9a;--line:#2c2c2a;--ink-line:#f2f2f0;--fill:#1c1c1b;
+  --accent:#d92b47;--accent-press:#b82840;--accent-fg:#fff;--ok:#4cc474;--bad:#ff5a73;--bad-bg:#2c1218;--ok-bg:#12261a;--glass:rgba(13,13,13,.86);--scrim:rgba(0,0,0,.72);
 }
 :root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
 *{-webkit-tap-highlight-color:transparent;border-radius:0}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left);background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--font);letter-spacing:.02em;-webkit-font-smoothing:antialiased}
-h1{font-size:30px;line-height:1.2;font-weight:800;letter-spacing:.01em;margin:8px 0}
-h2{font-weight:800;letter-spacing:.02em}
+html{-webkit-text-size-adjust:100%;text-rendering:optimizeLegibility}
+body{margin:0;padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left);background:var(--bg);color:var(--fg);font:400 16px/1.6 var(--font);letter-spacing:.01em;-webkit-font-smoothing:antialiased;font-feature-settings:"palt" 1}
+h1{font-size:32px;line-height:1.15;font-weight:800;letter-spacing:-.01em;margin:8px 0;text-wrap:balance}
+h2{font-weight:800;letter-spacing:0;line-height:1.25;text-wrap:balance}
+p{text-wrap:pretty}
 a{color:var(--link);text-decoration:none}
-:focus-visible{outline:2px solid var(--red);outline-offset:2px}
-@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+::selection{background:var(--red);color:#fff}
+:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+/* 數字一律等寬，進度與金額跳動時不位移 */
+b,strong,.c-big,.g-num,.c-dl dd,td{font-variant-numeric:tabular-nums}
+@keyframes rise{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+@keyframes fill{from{transform:scaleX(0)}to{transform:none}}
+@keyframes march{to{background-position:24px 0}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 /* App 模式（已安裝 PWA / Tauri，無瀏覽器返回與重整）：去掉橡皮筋、操作列不可選取；內容文字仍可選取複製 */
 html[data-app]{overscroll-behavior:none}
 html[data-app] :is(.c-head,.g-top,.c-rail,.c-bottom,.c-fab,.c-btn,.g-btn,.c-tabs){-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}

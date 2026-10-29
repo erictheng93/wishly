@@ -101,16 +101,17 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 </script>
 
 <template>
-  <main class="c-page">
+  <main class="c-page ap">
     <CreatorHeader :title="$t('org.apply.title')" back="/org" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="loading" class="c-mute">{{ $t('org.apply.loading') }}</p>
 
     <template v-else-if="wizard">
       <p v-if="status === 'needs_changes'" class="c-card" role="status"><strong>{{ $t('org.apply.needsChanges') }}</strong><br>{{ org.review_note }}</p>
-      <p class="c-mute">{{ $t('org.apply.stepOf', { n: step }) }}　{{ [1, 2, 3, 4].map(n => $t(`org.apply.s${n}`)).join(' / ') }}</p>
+      <div class="ap-steps" aria-hidden="true"><i v-for="n in 4" :key="n" :class="{ on: n <= step, cur: n === step }"><b>{{ String(n).padStart(2, '0') }}</b></i></div>
+      <p class="c-mute ap-stepof">{{ $t('org.apply.stepOf', { n: step }) }}　{{ [1, 2, 3, 4].map(n => $t(`org.apply.s${n}`)).join(' / ') }}</p>
 
-      <section v-for="(fs, i) in STEPS" v-show="step === i + 1" :key="i" class="c-card">
+      <section v-for="(fs, i) in STEPS" v-show="step === i + 1" :key="i" class="c-card ap-sec">
         <h2 class="c-h2">{{ $t(`org.apply.s${i + 1}`) }}</h2>
         <label v-for="f in fs" :key="f" class="c-field">
           <span>{{ $t(`org.apply.f.${f}`) }}<template v-if="!REQUIRED.has(f)">（{{ $t('org.apply.optional') }}）</template></span>
@@ -125,37 +126,37 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
         </label>
       </section>
 
-      <section v-show="step === 3" class="c-card">
+      <section v-show="step === 3" class="c-card ap-s3">
         <h2 class="c-h2">{{ $t('org.apply.s3') }}</h2>
         <p class="c-mute">{{ $t('org.apply.fileHint') }}</p>
         <h3>{{ $t('org.apply.regDoc') }}</h3>
         <ul><li v-for="d in docs('registration')" :key="d.id">{{ d.content_type }} · {{ Math.ceil(d.size_bytes / 1024) }} KB
           <button type="button" class="c-btn" @click="delDoc(d.id)">{{ $t('org.apply.remove') }}</button></li></ul>
-        <input type="file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="onFile('registration', $event)">
+        <input class="ap-file" type="file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="onFile('registration', $event)">
         <h3>{{ $t('org.apply.permitDoc') }}</h3>
         <ul><li v-for="p in permits" :key="p.id">{{ p.permit_no }}　{{ p.valid_from }} ~ {{ p.valid_to }}</li></ul>
         <label class="c-field"><span>{{ $t('org.apply.permitNo') }}</span><input v-model="permit.permit_no"></label>
         <label class="c-field"><span>{{ $t('org.apply.validFrom') }}</span><input v-model="permit.valid_from" type="date"></label>
         <label class="c-field"><span>{{ $t('org.apply.validTo') }}</span><input v-model="permit.valid_to" type="date"></label>
-        <input type="file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="onFile('permit', $event)">
+        <input class="ap-file" type="file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="onFile('permit', $event)">
         <button type="button" class="c-btn" :disabled="busy || !permit.permit_no || !permit.valid_from || !permit.valid_to || !permitFile" @click="addPermit">{{ $t('org.apply.addPermit') }}</button>
       </section>
 
-      <section v-show="step === 4" class="c-card">
+      <section v-show="step === 4" class="c-card ap-s4">
         <h2 class="c-h2">{{ $t('org.apply.s4') }}</h2>
-        <dl><template v-for="f in FIELDS" :key="f"><template v-if="form[f]"><dt class="c-mute">{{ $t(`org.apply.f.${f}`) }}</dt><dd>{{ form[f] }}</dd></template></template></dl>
-        <label><input v-model="agree" type="checkbox"> {{ $t('org.apply.agree') }}</label>
+        <dl class="c-dl"><template v-for="f in FIELDS" :key="f"><template v-if="form[f]"><dt class="c-mute">{{ $t(`org.apply.f.${f}`) }}</dt><dd>{{ form[f] }}</dd></template></template></dl>
+        <label class="c-switch"><input v-model="agree" type="checkbox"> {{ $t('org.apply.agree') }}</label>
         <p class="c-mute">{{ $t('org.apply.reviewEta') }}</p>
-        <button type="button" class="c-btn" :disabled="busy || !agree" @click="submit">{{ $t('org.apply.submit') }}</button>
+        <button type="button" class="c-btn primary" :disabled="busy || !agree" @click="submit">{{ $t('org.apply.submit') }}</button>
       </section>
 
-      <div class="c-row">
+      <div class="c-row ap-nav">
         <button v-if="step > 1" type="button" class="c-btn" @click="step--">{{ $t('org.apply.prev') }}</button>
-        <button v-if="step < 4" type="button" class="c-btn" :disabled="busy || (step < 3 && !stepOk)" @click="step === 1 ? next() : step++">{{ $t('org.apply.next') }}</button>
+        <button v-if="step < 4" type="button" class="c-btn primary" :disabled="busy || (step < 3 && !stepOk)" @click="step === 1 ? next() : step++">{{ $t('org.apply.next') }}</button>
       </div>
     </template>
 
-    <section v-else class="c-card" role="status">
+    <section v-else class="c-card ap-state" role="status">
       <h2 class="c-h2">{{ org.display_name }}</h2>
       <template v-if="status === 'pending'">
         <p>{{ $t('org.apply.pending') }}</p>
@@ -174,3 +175,33 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
     </section>
   </main>
 </template>
+
+<style scoped>
+.ap-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}
+.ap-steps i{display:block;height:8px;background:var(--hatch),var(--bg-alt);position:relative}
+.ap-steps i.on{background:var(--stripe)}
+.ap-steps i b{position:absolute;top:14px;left:0;font:600 11px var(--mono);letter-spacing:.1em;color:var(--mute)}
+.ap-steps i.cur b{color:var(--red-text)}
+.ap-stepof{margin:34px 0 18px;font:500 12px/1.6 var(--mono);letter-spacing:.06em}
+.ap-sec,.ap-s3,.ap-s4{padding:24px clamp(18px,3vw,32px) 12px;border-top:2px solid var(--ink-line)}
+.ap-sec{display:grid;grid-template-columns:1fr;gap:0 24px}
+.ap-sec>h2,.ap-s3>h2,.ap-s4>h2{grid-column:1/-1;font-size:22px;margin-bottom:22px}
+@media (min-width:768px){.ap-sec{grid-template-columns:1fr 1fr}.ap-sec>label:has(textarea){grid-column:1/-1}}
+.ap-sec textarea{resize:vertical;min-height:112px}
+.ap-s3 h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.ap-s3 ul{list-style:none;padding:0;margin:0 0 12px}
+.ap-s3 li{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;border-bottom:1px dotted var(--line);font:500 13px var(--mono)}
+.ap-file{display:block;width:100%;box-sizing:border-box;padding:18px 16px;margin:0 0 16px;border:1px dashed var(--ink-line);background:var(--hatch),var(--bg-alt);color:var(--mute);font:500 12px var(--mono);cursor:pointer;min-height:64px}
+.ap-file::file-selector-button{margin-right:14px;min-height:40px;padding:0 16px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:700 13px var(--font);letter-spacing:.06em;cursor:pointer}
+.ap-s3>.c-btn{margin-bottom:12px}
+.ap-s4 dl.c-dl{margin:0 0 20px}
+.ap-s4 dd{font-family:var(--mono);font-size:13px;overflow-wrap:anywhere;margin:0;border-bottom:1px dotted var(--line);padding-bottom:6px}
+.ap-s4 dt{border-bottom:1px dotted var(--line);padding-bottom:6px}
+.ap-nav{justify-content:space-between;margin-top:8px}
+.ap-nav .c-btn{min-width:120px}
+.ap-nav .c-btn.primary:only-child,.ap-nav .c-btn.primary:last-child{margin-left:auto}
+.ap-state{padding:28px clamp(18px,3vw,32px);border-top:2px solid var(--ink-line)}
+.ap-state>h2{font-size:clamp(24px,4vw,34px);letter-spacing:-.02em}
+.ap-state>p{font-size:17px;max-width:34em}
+.ap-state .c-btn{margin-top:8px}
+</style>

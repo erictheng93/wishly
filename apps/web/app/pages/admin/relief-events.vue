@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 救災事件管理（極簡）：沒有 admin 列表端點，列表用公開 GET /public/relief-events；可合併到另一事件、隱藏 / 取消隱藏
 definePageMeta({ middleware: 'staff' })
 const { t } = useI18n()

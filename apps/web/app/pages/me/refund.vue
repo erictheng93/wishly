@@ -2,6 +2,7 @@
 // 申請現金退款：點數先扣、營運審核後退款、被拒絕則退回點數。只有儲值購買的點數可退（cash_refundable_balance）。
 import { idemKeys } from '~/utils/topup'
 import { REFUND_MAX, buildRefundBody, isFrozen, pendingRefunds, refundAmountError, refundError, refundStatusKey } from '~/utils/refund'
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('me.refund.title') })
@@ -62,10 +63,11 @@ async function submit() {
     <template v-if="wallet">
       <p v-if="frozen" class="c-err" role="alert" data-testid="frozen">{{ $t('me.refund.err.frozen') }}</p>
 
-      <section class="c-card c-center">
-        <div class="c-big" data-testid="refundable">{{ fmtPts(refundable) }}</div>
-        <p class="c-mute c-m0">{{ $t('me.refund.refundable') }}</p>
-        <p class="c-mute c-small">{{ $t('me.refund.onlyTopup') }}</p>
+      <section class="x-ink">
+        <div class="x-tag" aria-hidden="true"><span><b>CASH REFUND</b></span><span>PT → NT$</span></div>
+        <div class="c-big x-num" data-testid="refundable">{{ fmtPts(refundable) }}</div>
+        <p class="x-cap">{{ $t('me.refund.refundable') }}</p>
+        <p class="c-mute c-small c-m0 rf-note">{{ $t('me.refund.onlyTopup') }}</p>
       </section>
 
       <p v-if="pending" class="c-ok" role="status" data-testid="pending">{{ $t('me.refund.pending', { n: pending }) }}</p>
@@ -75,7 +77,7 @@ async function submit() {
           <p class="c-m0">{{ $t('me.refund.none') }}</p>
         </section>
 
-        <form v-else class="c-card" novalidate @submit.prevent="submit">
+        <form v-else class="c-card rf-form" novalidate @submit.prevent="submit">
           <div class="c-field">
             <label class="c-lbl" for="rf-amount">{{ $t('me.refund.amount') }}</label>
             <div class="c-row">
@@ -102,8 +104,8 @@ async function submit() {
       <p v-else-if="err" class="c-err" role="alert">{{ err }}</p>
     </template>
 
-    <h2 class="c-h2">{{ $t('me.refund.history') }}</h2>
-    <p v-if="!loading && !requests.length && !listErr" class="c-center c-mute">{{ $t('me.refund.empty') }}</p>
+    <h2 class="c-h2 x-h" data-n="01">{{ $t('me.refund.history') }}</h2>
+    <p v-if="!loading && !requests.length && !listErr" class="x-empty">{{ $t('me.refund.empty') }}</p>
     <div aria-live="polite">
       <article v-for="x in requests" :key="x.id" class="c-card" :data-status="x.status">
         <div class="c-row wrap">
@@ -120,3 +122,10 @@ async function submit() {
     </div>
   </main>
 </template>
+<style scoped>
+.rf-note{margin-top:14px!important;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--xi-fg) 22%,transparent)}
+.rf-form{margin-top:20px;padding:20px}
+.rf-form .c-card{background:var(--bg-alt)}
+.rf-form .c-row{align-items:stretch}
+.rf-form input{font:700 20px var(--mono)}
+</style>

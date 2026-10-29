@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 definePageMeta({ middleware: 'staff' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.analytics.title') })
@@ -58,7 +59,7 @@ const profile = computed(() => {
 <template>
   <main class="c-page c-admin">
     <CreatorHeader :title="$t('admin.analytics.title')" back="/admin" />
-    <div class="c-row wrap c-mb">
+    <div class="c-row wrap c-mb an-range">
       <div class="c-row c-grow" role="group" :aria-label="$t('admin.analytics.rangeLabel')">
         <button v-for="n in RANGES" :key="n" class="c-btn c-grow" :class="{ on: days === n }" :aria-pressed="days === n" :disabled="busy" @click="days = n">{{ $t('admin.analytics.days', { n }) }}</button>
       </div>
@@ -70,8 +71,8 @@ const profile = computed(() => {
 
     <template v-if="data">
       <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
-      <section class="c-card" :aria-label="$t('admin.analytics.overview')">
-        <dl class="an-tiles">
+      <section class="c-card an-kpi-card" :aria-label="$t('admin.analytics.overview')">
+        <dl class="an-tiles k-kpis">
           <div v-for="t in TILES" :key="t[0]"><dt>{{ t[0] }}</dt><dd>{{ fmtCount(t[1]) }}</dd></div>
         </dl>
       </section>
@@ -82,7 +83,8 @@ const profile = computed(() => {
           <figure v-for="c in charts" :key="c.k" class="an-fig">
             <figcaption><strong>{{ c.name }}</strong><span class="c-mute">{{ c.k === 'active_users' ? $t('admin.analytics.avg', { n: c.avg }) : $t('admin.analytics.sum', { n: fmtCount(c.sum) }) }}・{{ $t('admin.analytics.peak', { n: c.max === 1 && !c.sum ? 0 : c.max }) }}</span></figcaption>
             <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="an-svg" role="img" :aria-label="$t('admin.analytics.chartAria', { name: c.name, value: c.k === 'active_users' ? $t('admin.analytics.avg', { n: c.avg }) : $t('admin.analytics.sum', { n: c.sum }) })">
-              <line x1="0" :x2="W" :y1="H - 1" :y2="H - 1" class="an-axis" />
+              <line v-for="g in [H * .25, H * .5, H * .75]" :key="g" x1="0" :x2="W" :y1="g" :y2="g" class="an-grid" vector-effect="non-scaling-stroke" />
+              <line x1="0" :x2="W" :y1="H - 1" :y2="H - 1" class="an-axis" vector-effect="non-scaling-stroke" />
               <polygon :points="c.area" class="an-area" />
               <polyline :points="c.pts" class="an-line" vector-effect="non-scaling-stroke" />
               <rect v-for="(r, i) in data.daily" :key="r.date" :x="Number(i) * c.step" y="0" :width="c.step" :height="H" fill="transparent"><title>{{ r.date }}：{{ r[c.k] }}</title></rect>
@@ -115,7 +117,7 @@ const profile = computed(() => {
 
       <section class="c-card" :aria-label="$t('admin.analytics.claimsTrust')">
         <h2 class="c-h2">{{ $t('admin.analytics.claimsTrust') }}</h2>
-        <dl class="an-tiles">
+        <dl class="an-tiles k-kpis">
           <div><dt>{{ $t('admin.analytics.reports') }}</dt><dd>{{ fmtCount(data.trust.reports) }}</dd></div>
           <div><dt>{{ $t('admin.analytics.loginFailures') }}</dt><dd>{{ fmtCount(data.trust.login_failures) }}</dd></div>
         </dl>
@@ -138,7 +140,7 @@ const profile = computed(() => {
           <span class="an-track"><span class="an-bar" :style="{ width: (data.profile.users ? p[1] / data.profile.users * 100 : 0) + '%' }" /></span>
           <span class="an-v">{{ pct(p[1], data.profile.users) }}<small class="c-mute"> {{ fmtCount(p[1]) }}</small></span>
         </div>
-        <dl class="an-tiles c-mt"><div><dt>{{ $t('admin.analytics.upcoming') }}</dt><dd>{{ fmtCount(data.profile.upcoming_birthdays_30d) }}</dd></div></dl>
+        <dl class="an-tiles k-kpis c-mt"><div><dt>{{ $t('admin.analytics.upcoming') }}</dt><dd>{{ fmtCount(data.profile.upcoming_birthdays_30d) }}</dd></div></dl>
         <h3 class="an-h3">{{ $t('admin.analytics.birthdayMonth') }}</h3>
         <div class="an-cols" role="img" :aria-label="$t('admin.analytics.monthAria')">
           <div v-for="m in months" :key="m.key" class="an-col" :title="$t('admin.analytics.monthTitle', { month: m.label, n: fmtCount(m.v) })">
@@ -170,30 +172,37 @@ const profile = computed(() => {
   </main>
 </template>
 <style scoped>
-.an-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin:0}
-.an-tiles dt{font-size:13px;color:var(--mute)}
-.an-tiles dd{margin:4px 0 0;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
-.an-multi{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
-.an-fig{margin:0}
-.an-fig figcaption{display:flex;justify-content:space-between;gap:8px;font-size:13px;flex-wrap:wrap}
-.an-svg{width:100%;height:56px;display:block;margin-top:4px}
-.an-axis{stroke:var(--line);stroke-width:1}
-.an-area{fill:var(--red);opacity:.12}
-.an-line{fill:none;stroke:var(--red);stroke-width:2;stroke-linejoin:round}
-.an-dates{display:flex;justify-content:space-between;font-size:12px}
-.an-h3{font-size:14px;margin:16px 0 4px}
-.an-row{display:grid;grid-template-columns:minmax(72px,110px) 1fr minmax(72px,auto);gap:8px;align-items:center;margin:4px 0}
+.an-tiles{margin:0;grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
+.an-range .c-btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:800}
+.an-range .c-btn.on::before{content:"";width:6px;height:6px;background:var(--red)}
+.an-kpi-card{padding:0!important;border-top:2px solid var(--ink-line)}
+.an-kpi-card .k-kpis{border-top:0;border-left:0}
+.an-multi{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.an-fig{margin:0;padding:14px 16px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.an-fig figcaption{display:flex;flex-direction:column;gap:2px;font-size:14px}
+.an-fig figcaption .c-mute{font:500 11px/1.5 var(--mono);letter-spacing:.04em}
+.an-svg{width:100%;height:72px;display:block;margin-top:10px}
+.an-axis{stroke:var(--ink-line);stroke-width:1}
+.an-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3}
+.an-area{fill:var(--red);opacity:.1}
+.an-line{fill:none;stroke:var(--red);stroke-width:1.5;stroke-linejoin:round}
+.an-dates{display:flex;justify-content:space-between;font:500 10.5px var(--mono);letter-spacing:.04em;margin-top:4px}
+.an-h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.an-row{display:grid;grid-template-columns:minmax(72px,120px) 1fr minmax(96px,auto);gap:12px;align-items:center;margin:0;padding:6px 0;border-bottom:1px dotted var(--line)}
 .an-l{font-size:14px;overflow-wrap:anywhere}
-.an-v{font-size:14px;font-variant-numeric:tabular-nums;text-align:right}
-.an-track{display:block;height:12px;background:var(--fill)}
-.an-bar{display:block;height:100%;background:var(--red);min-width:2px}
+.an-v{font:700 14px var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.an-v small{display:inline-block;min-width:3.6em;margin-left:8px;font:500 11px var(--mono)}
+.an-track{display:block;height:8px;background:var(--hatch),var(--bg-alt)}
+.an-bar{display:block;height:100%;background:var(--red);min-width:2px;transform-origin:left;animation:fill .9s var(--ease) both}
 .an-bar.sup,.an-cbar.sup{width:14px;min-width:14px;background:repeating-linear-gradient(45deg,var(--mute) 0 2px,transparent 2px 5px)}
 .an-cols{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end}
-.an-col{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-variant-numeric:tabular-nums}
-.an-ctrack{display:flex;align-items:flex-end;width:100%;height:80px;background:var(--fill)}
+.an-col{display:flex;flex-direction:column;align-items:center;gap:4px;font:500 11px var(--mono);font-variant-numeric:tabular-nums}
+.an-ctrack{display:flex;align-items:flex-end;width:100%;height:96px;background:var(--hatch),var(--bg-alt)}
 .an-cbar{display:block;width:100%;background:var(--red)}
 .an-cbar.sup{height:14px!important;width:100%}
-.an-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
-.an-table th,.an-table td{text-align:right;padding:2px 6px;border-bottom:1px solid var(--line)}
+.an-table{width:100%;border-collapse:collapse;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:8px}
+.an-table th,.an-table td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line)}
 .an-table th:first-child,.an-table td:first-child{text-align:left}
+@media (max-width:520px){.an-row{grid-template-columns:minmax(64px,92px) 1fr auto;gap:8px}.an-cols{gap:2px}}
 </style>
+

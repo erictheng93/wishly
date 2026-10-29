@@ -13,7 +13,9 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.v
 
 <template>
   <GuestTop />
-  <main class="g-wrap g-center" style="padding-inline:16px">
+  <main class="g-wrap er-page">
+    <p class="er-code" aria-hidden="true">{{ code }}</p>
+    <div class="er-body">
     <template v-if="missing">
       <h1>{{ $t('auth.error.notFoundTitle') }}</h1>
       <p class="g-mute">{{ $t('auth.error.notFoundDesc') }}</p>
@@ -28,5 +30,17 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.v
       <p class="g-mute">{{ $t('auth.error.serverDesc') }}</p>
     </template>
     <button class="g-btn" @click="clearError({ redirect: '/' })">{{ $t('auth.error.home') }}</button>
+    </div>
   </main>
 </template>
+
+<style>
+/* 不用 scoped：SSR 的 <h1> 不能帶 data-v 屬性（e2e 以原始 HTML 驗證繁中錯誤頁） */
+.er-page{padding-top:32px;padding-bottom:96px}
+.er-code{font:900 clamp(120px,34vw,320px)/.85 var(--font);letter-spacing:-.06em;color:var(--fg);margin:16px 0 0;font-variant-numeric:tabular-nums}
+.er-code::after{content:"";display:block;width:min(240px,50%);height:18px;margin-top:20px;background:var(--stripe);background-size:17px 17px}
+.er-body{margin-top:32px;padding-top:20px;border-top:2px solid var(--ink-line);max-width:34em}
+.er-body h1{margin:0 0 12px;font-size:clamp(26px,5vw,40px);font-weight:900;letter-spacing:-.03em}
+.er-body p{margin:0 0 24px}
+.er-body .g-btn{margin-right:8px}
+</style>

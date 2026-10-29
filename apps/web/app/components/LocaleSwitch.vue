@@ -13,5 +13,5 @@ const list = computed(() => locales.value.map(l => (typeof l === 'string' ? { co
   </select>
 </template>
 <style scoped>
-.locale-switch{field-sizing:content;min-height:44px;border:0;background:none;color:var(--red-text);font:inherit;font-size:14px;cursor:pointer}
+.locale-switch{field-sizing:content;min-height:44px;border:0;background:none;color:var(--fg);font:600 12px var(--mono);letter-spacing:.06em;cursor:pointer}
 </style>

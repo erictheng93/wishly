@@ -44,17 +44,25 @@ watch(() => useRoute().fullPath, () => { open.value = false })
 </template>
 <style scoped>
 .um{position:relative}
-/* 身分晶片：頭像＋名字的紅框按鈕，一眼看出已登入 */
-.um-btn{display:inline-flex;align-items:center;height:44px;padding:0 10px 0 0;border:2px solid var(--red);background:none;color:var(--fg);font:inherit;font-weight:700;font-size:14px;cursor:pointer}
-.um-av{position:relative;flex:none;display:grid;place-items:center;width:40px;height:40px;color:var(--red-text);font-size:15px}
-.um-av::before{content:"";position:absolute;inset:6px;border:2px solid var(--red);border-radius:50%;pointer-events:none}
+/* 身分晶片：低調墨線——方形首字、細線框，與頁首其他無框按鈕同一語氣；有待辦才出現紅點 */
+.um-btn{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 8px 0 6px;border:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;font-weight:700;font-size:13px;letter-spacing:.02em;cursor:pointer;transition:border-color var(--t) var(--ease),background var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+.um-btn[aria-expanded=true]{border-color:var(--ink-line);background:var(--bg-alt)}
+.um-av{position:relative;flex:none;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:700 13px/1 var(--mono)}
 .um-name{max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.um-caret{margin-left:6px;color:var(--red-text);font-size:11px}
-@media (max-width:479px){.um-name{max-width:3em}.um-caret{display:none}}
-.um-dot{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:var(--red);border:2px solid var(--bg,#fff)}
-.um-pop{position:absolute;right:0;top:calc(100% + 7px);min-width:220px;z-index:30;display:flex;flex-direction:column;background:var(--bg,#fff);border:2px solid var(--red);box-shadow:0 6px 20px rgba(0,0,0,.2)}
-.um-pop>a,.um-pop>button,.um-who{display:flex;flex-direction:column;justify-content:center;min-height:44px;padding:0 14px;border:0;background:none;color:var(--fg);font:inherit;font-weight:700;text-align:left;cursor:pointer}
-.um-who{padding:8px 14px;border-bottom:1px solid var(--red)}
-.um-pop>button[aria-pressed=true]{color:var(--red-text);box-shadow:inset 4px 0 var(--red)}
-.um-who small{font-weight:400;opacity:.7}
+.um-caret{color:var(--mute);font-size:10px;transition:transform var(--t) var(--ease)}
+.um-btn[aria-expanded=true] .um-caret{transform:rotate(180deg)}
+@media (max-width:479px){.um-name{max-width:3em}.um-caret{display:none}.c-head .um .um-btn{padding:0 7px}}
+.um-dot{position:absolute;top:-4px;right:-4px;width:9px;height:9px;background:var(--red);border:2px solid var(--bg,#fff);box-sizing:content-box}
+.um-pop{position:absolute;right:0;top:calc(100% + 8px);min-width:224px;z-index:30;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--ink-line);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line);animation:rise .22s var(--ease)}
+.um-pop>a,.um-pop>button,.um-who{display:flex;flex-direction:column;justify-content:center;min-height:44px;padding:0 16px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-size:14px;font-weight:700;text-align:left;cursor:pointer;transition:background var(--t) var(--ease),padding var(--t) var(--ease)}
+.um-pop>a>span{display:inline-flex;align-items:center}
+.um-who{padding:10px 16px;border-top:0;border-bottom:1px solid var(--ink-line);background:var(--bg-alt)}
+.um-who b{font-size:15px}
+.um-pop>button[aria-pressed=true]{color:var(--red-text);box-shadow:inset 3px 0 var(--red)}
+.um-pop>button:last-child{color:var(--mute);font-weight:600}
+.um-who small{font:500 11px/1.4 var(--mono);letter-spacing:.06em;color:var(--mute)}
+@media (hover:hover) and (pointer:fine){
+  .um-btn:hover{border-color:var(--ink-line)}
+  .um-pop>a:hover,.um-pop>button:hover{background:var(--bg-alt);padding-left:20px}
+}
 </style>

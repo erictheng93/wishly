@@ -38,6 +38,7 @@ test('現金退款：預設只看待審核，可依狀態篩選；處理中 → 
   const m = await mockRefunds(page, [refund('r1', 'requested'), refund('r2', 'processing', { amount: 800, user: user(2) }), refund('r3', 'completed', { completed_at: iso() }), refund('r4', 'rejected', { reject_reason: '資料不符' })])
   await page.goto('/admin/cash-refunds'); await hydrated(page)
 
+  await expect.poll(() => m.list.length).toBeGreaterThan(0)
   expect(m.list[0].url.searchParams.get('status')).toBe('requested')
   const cards = page.locator('article[data-status]')
   await expect(cards).toHaveCount(1)
@@ -137,6 +138,7 @@ test('欠款：預設 open；結案（已追回 / 核銷）備註必填並送 st
   })
   await page.goto('/admin/wallet-debts'); await hydrated(page)
 
+  await expect.poll(() => list.length).toBeGreaterThan(0) // 列表在 onMounted 才請求，hydrated 後不一定已送出
   expect(list[0].url.searchParams.get('status')).toBe('open')
   const cards = page.locator('article[data-status]')
   await expect(cards).toHaveCount(2)
@@ -203,6 +205,7 @@ test('爭議：預設看爭議中；顯示使用者與錢包凍結；勝訴 / �
   })
   await page.goto('/admin/topups'); await hydrated(page)
 
+  await expect.poll(() => m.list.length).toBeGreaterThan(0)
   expect(m.list[0].url.searchParams.get('status')).toBe('disputed')
   const cards = page.locator('article[data-status]')
   await expect(cards).toHaveCount(2)

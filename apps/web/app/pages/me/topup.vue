@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 儲值：建單後以隱藏 <form method=post> 導向綠界付款頁（不可用 fetch）；紀錄列表含超商代碼 / 條碼 / ATM 取號資訊
 import { TOPUP_METHODS } from '~/utils/topup' // 自動匯入掃描漏掉這個常數
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('me.topup.title') })
@@ -143,18 +144,18 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
         <p v-if="success" class="c-ok" role="status">{{ success }}</p>
       </div>
       <p v-if="wallet && wallet.status === 'frozen'" class="c-err" role="alert" data-testid="frozen">{{ $t('me.frozenBanner') }}</p>
-      <p v-if="wallet" class="c-mute">{{ $t('me.topup.balance', { pts: fmtPts(wallet.balance) }) }}</p>
+      <p v-if="wallet" class="c-mute tp-bal">{{ $t('me.topup.balance', { pts: fmtPts(wallet.balance) }) }}</p>
 
       <p v-if="!statusReady && !disabled" class="c-mute" role="status">{{ $t('me.loading') }}</p>
       <section v-else-if="off" class="c-card" role="status">
         <p class="c-m0">{{ $t('me.topup.err.disabled') }}</p>
       </section>
 
-      <form v-else-if="!frozen" class="c-card" novalidate @submit.prevent="submit">
+      <form v-else-if="!frozen" class="c-card tp-form" novalidate @submit.prevent="submit">
         <fieldset class="c-field" :aria-describedby="fieldErr('amount') ? 'tp-amount-err' : undefined">
           <legend class="c-lbl">{{ $t('me.topup.amount') }}</legend>
-          <div class="c-row wrap">
-            <button v-for="n in quick" :key="n" type="button" class="c-btn c-grow" :class="{ primary: picked(n) }" :aria-pressed="picked(n)" @click="form.amount = String(n)">{{ fmtPts(n) }}</button>
+          <div class="tp-quick">
+            <button v-for="n in quick" :key="n" type="button" class="c-btn tp-q" :class="{ primary: picked(n) }" :aria-pressed="picked(n)" @click="form.amount = String(n)">{{ fmtPts(n) }}</button>
           </div>
           <label class="c-field c-mt"><span>{{ $t('me.topup.customAmount') }}</span>
             <input v-model="form.amount" type="text" inputmode="numeric" autocomplete="off" :placeholder="$t('me.topup.amountHint')" :aria-invalid="!!fieldErr('amount')">
@@ -164,8 +165,8 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
 
         <fieldset class="c-field">
           <legend class="c-lbl">{{ $t('me.topup.methodLegend') }}</legend>
-          <label v-for="m in methods" :key="m" class="c-row c-mt12" style="align-items:flex-start;gap:8px">
-            <input v-model="form.method" type="radio" name="method" :value="m" style="width:auto;min-height:0;margin-top:4px">
+          <label v-for="m in methods" :key="m" class="tp-method">
+            <input v-model="form.method" type="radio" name="method" :value="m">
             <span class="c-grow"><strong>{{ $t(`me.topup.method.${m}`) }}</strong>
               <span class="c-mute c-small" style="display:block">{{ $t(`me.topup.methodDesc.${m}`) }}　{{ methodDeadline(m) }}</span></span>
           </label>
@@ -173,7 +174,7 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
 
         <p class="c-mute c-small">{{ $t('me.topup.invoiceMember') }}</p>
 
-        <section class="c-card" aria-labelledby="tp-sum">
+        <section class="c-card tp-sum" aria-labelledby="tp-sum">
           <h2 id="tp-sum" class="c-h2 c-m0">{{ $t('me.topup.summary') }}</h2>
           <p v-if="amountNum" data-testid="summary">{{ $t('me.topup.summaryLine', { amount: fmtPts(amountNum), pts: fmtPts(amountNum) }) }}</p>
           <p v-else class="c-mute">{{ $t('me.topup.summaryEmpty') }}</p>
@@ -192,10 +193,10 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
         <input v-for="(v, k) in pay.fields" :key="k" type="hidden" :name="String(k)" :value="v">
       </form>
 
-      <h2 class="c-h2">{{ $t('me.topup.history') }}</h2>
+      <h2 class="c-h2 x-h" data-n="01">{{ $t('me.topup.history') }}</h2>
       <p v-if="loading" class="c-mute" role="status">{{ $t('me.loading') }}</p>
       <p v-if="listErr" class="c-err" role="alert">{{ listErr }} <button class="c-btn" @click="manualRefresh">{{ $t('me.retry') }}</button></p>
-      <p v-if="!loading && !topups.length && !listErr" class="c-center c-mute">{{ $t('me.topup.empty') }}</p>
+      <p v-if="!loading && !topups.length && !listErr" class="x-empty">{{ $t('me.topup.empty') }}</p>
       <div aria-live="polite">
         <article v-for="x in topups" :key="x.id" class="c-card" :data-status="x.status">
           <div class="c-row wrap">
@@ -226,3 +227,19 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
     </template>
   </main>
 </template>
+<style scoped>
+.tp-bal{font:600 13px var(--mono);letter-spacing:.04em;margin:0 0 16px}
+.tp-form{padding:20px}
+.tp-form fieldset.c-field{border:0;padding:0;margin:0 0 24px;min-width:0}
+.tp-form legend{padding:0;margin-bottom:10px}
+.tp-form .c-mt{margin-top:16px}
+.tp-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.tp-form .tp-q{min-height:64px;font:800 22px var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tp-form .c-btn.primary.tp-q{box-shadow:4px 4px 0 var(--fg)}
+.tp-method{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:44px;margin:0 0 8px;padding:14px;border:1px solid var(--line);cursor:pointer;transition:border-color var(--t) var(--ease),background var(--t) var(--ease)}
+.tp-method input{flex:none;width:20px;height:20px;min-height:0;margin:2px 0 0;accent-color:var(--red)}
+.tp-method:has(input:checked){border-color:var(--ink-line);background:var(--bg-alt);box-shadow:inset 3px 0 var(--red)}
+.tp-method:has(input:focus-visible){outline:2px solid var(--red);outline-offset:2px}
+.tp-sum{background:var(--bg-alt);border-style:dashed}
+.tp-sum p[data-testid]{font:700 18px var(--mono)}
+</style>

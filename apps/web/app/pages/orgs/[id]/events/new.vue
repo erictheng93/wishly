@@ -36,16 +36,16 @@ async function submit() {
 <template>
   <main class="c-page">
     <CreatorHeader :title="$t('org.relief.evNewTitle')" :back="`/orgs/${id}`" />
-    <div class="c-card">
-      <div class="c-row wrap">
-        <label class="c-field c-grow"><span>{{ $t('org.relief.evCounties') }}</span>
+    <div class="c-card fm">
+      <div class="fm-grid">
+        <label class="c-field"><span>{{ $t('org.relief.evCounties') }}</span>
           <select v-model="f.county" name="county"><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="c in COUNTIES" :key="c" :value="c">{{ c }}</option></select>
         </label>
-        <label class="c-field c-grow"><span>{{ $t('org.relief.evDate') }}</span><input v-model="f.occurred_on" type="date" name="occurred_on"></label>
+        <label class="c-field"><span>{{ $t('org.relief.evDate') }}</span><input v-model="f.occurred_on" type="date" name="occurred_on"></label>
       </div>
     </div>
 
-    <section v-if="similar.length && !dismissed" class="c-card">
+    <section v-if="similar.length && !dismissed" class="c-card fm-sim">
       <h2 class="c-h2">{{ $t('org.relief.similarTitle') }}</h2>
       <p class="c-mute">{{ $t('org.relief.similarHint') }}</p>
       <article v-for="e in similar" :key="e.id" class="c-card">
@@ -56,7 +56,7 @@ async function submit() {
       <button type="button" class="c-btn block" @click="dismissed = true">{{ $t('org.relief.noneOfThese') }}</button>
     </section>
 
-    <form v-if="showForm && f.county && f.occurred_on" class="c-card" @submit.prevent="submit">
+    <form v-if="showForm && f.county && f.occurred_on" class="c-card fm" @submit.prevent="submit">
       <label class="c-field"><span>{{ $t('org.relief.evName') }}</span><input v-model="f.name" name="name" maxlength="100" required></label>
       <label class="c-field"><span>{{ $t('org.relief.evHazard') }}</span>
         <select v-model="f.hazard_type" name="hazard_type"><option v-for="h in HAZARDS" :key="h" :value="h">{{ $t(`org.relief.hazard.${h}`) }}</option></select>
@@ -71,3 +71,21 @@ async function submit() {
     </form>
   </main>
 </template>
+
+<style scoped>
+.fm{padding:24px clamp(18px,3vw,32px) 12px;border-top:2px solid var(--ink-line);margin-bottom:20px}
+.fm-grid{display:grid;grid-template-columns:1fr;gap:0 24px}
+.fm-grid>.c-field:has(textarea),.fm-grid>fieldset,.fm-grid>.fm-wide{grid-column:1/-1}
+@media (min-width:768px){.fm-grid{grid-template-columns:1fr 1fr}}
+.fm textarea{resize:vertical;min-height:96px}
+.fm fieldset{border:1px solid var(--line);padding:12px 16px 4px;margin:0 0 18px;min-width:0}
+.fm fieldset legend{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:0 6px}
+.fm fieldset .c-switch{display:inline-flex;width:calc(50% - 6px);min-width:120px;margin:0}
+.fm .c-field>a{display:inline-flex;margin-top:6px;font-size:14px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:4px}
+.fm>.c-btn.block{margin:6px 0 12px}
+.fm-sim{padding:0;border-top:2px solid var(--ink-line);margin-bottom:20px}
+.fm-sim>*{margin-left:18px;margin-right:18px}
+.fm-sim>.c-h2{margin:0 0 14px;padding:14px 18px;background:var(--bg-alt);border-bottom:1px solid var(--line)}
+.fm-sim>.c-btn{margin-bottom:18px;width:calc(100% - 36px)}
+.fm-sim article.c-card{margin-bottom:12px}
+</style>

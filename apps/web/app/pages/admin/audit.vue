@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 definePageMeta({ middleware: 'staff' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('admin.audit.title') })

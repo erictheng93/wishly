@@ -10,5 +10,6 @@ const view = computed(() => ({ auto: ['‚óê', t('common.theme.auto')], light: ['‚
   </button>
 </template>
 <style scoped>
-.theme-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:0;background:none;color:var(--red-text);font:inherit;font-size:18px;cursor:pointer}
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:0;background:none;color:var(--fg);font:inherit;font-size:17px;cursor:pointer;transition:transform .4s var(--ease)}
+.theme-toggle:hover{transform:rotate(45deg)}
 </style>

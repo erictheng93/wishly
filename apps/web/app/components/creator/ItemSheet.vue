@@ -82,8 +82,10 @@ async function save() {
         <p v-if="fundLocked" class="c-mute">{{ $t('creator.itemSheet.fundLocked') }}</p>
       </template>
       <template v-else>
+        <div class="is-pair">
         <label class="c-field"><span>{{ $t('creator.itemSheet.qty') }}{{ item?.qty_claimed ? $t('creator.itemSheet.claimedSuffix', { n: item.qty_claimed }) : '' }}</span><input v-model="f.qty_needed" type="number" inputmode="numeric" :min="item?.qty_claimed || 1" max="99"></label>
         <label class="c-field"><span>{{ $t('creator.itemSheet.unitPrice') }}</span><input v-model="f.unit_price_amount" type="number" inputmode="numeric" min="0"></label>
+        </div>
       </template>
       <div class="c-field"><span>{{ $t('creator.itemSheet.priority') }}</span>
         <div class="c-seg"><label v-for="p in [['high', $t('creator.itemSheet.high')], ['medium', $t('creator.itemSheet.medium')], ['low', $t('creator.itemSheet.low')]]" :key="p[0]"><input v-model="f.priority" type="radio" :value="p[0]"><span>{{ p[1] }}</span></label></div>
@@ -96,3 +98,6 @@ async function save() {
     </form>
   </CreatorSheet>
 </template>
+<style scoped>
+.is-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+</style>

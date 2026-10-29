@@ -29,9 +29,9 @@ async function submit() {
 onMounted(() => { if (enabled.value) nextTick(() => otp.value?.focus()) })
 </script>
 <template>
-  <main class="c-page">
+  <main class="c-page mf">
     <CreatorHeader :title="$t('admin.mfa.title')" back="/dashboard" />
-    <section class="c-card">
+    <section class="c-card mf-card">
       <template v-if="enabled">
         <p>{{ $t('admin.mfa.enabledPrompt') }}</p>
       </template>
@@ -56,5 +56,8 @@ onMounted(() => { if (enabled.value) nextTick(() => otp.value?.focus()) })
   </main>
 </template>
 <style scoped>
-.mfa-secret { font-family: ui-monospace, monospace; word-break: break-all; text-align: center; }
+.mfa-secret { font-family: var(--mono); word-break: break-all; text-align: center; padding: 10px; border: 1px dashed var(--ink-line); background: var(--bg-alt); letter-spacing: .12em; font-size: 13px; }
+.mf-card{max-width:520px;margin:12px auto 0;padding:32px clamp(20px,5vw,40px);border:1px solid var(--ink-line);border-top:3px solid var(--red);box-shadow:8px 8px 0 var(--bg-alt),8px 8px 0 1px var(--line)}
+.mf-card::before{content:"STAFF / 2FA" / "";display:block;margin-bottom:16px;font:600 11px var(--mono);letter-spacing:.18em;color:var(--mute)}
+.mf-card>p:first-of-type{font-size:17px;font-weight:700;line-height:1.6}
 </style>

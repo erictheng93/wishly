@@ -1,0 +1,73 @@
+/* 營運後台「實驗室控制台」共用樣式（僅 admin/* 頁面以 <style src> 引入；不動共用 creator.css）
+   記錄卡 = 帶索引編號的台帳列；表單篩選 = 整齊的工具列；KPI = 大數字＋等寬標籤。 */
+.c-admin{counter-reset:k}
+.c-admin .c-title{margin-bottom:20px}
+
+/* ── 台帳記錄卡 ───────────────────────── */
+.c-admin article.c-card{counter-increment:k;padding:0;border:1px solid var(--line);border-top:2px solid var(--ink-line);margin:0 0 14px;overflow:hidden}
+.c-admin article.c-card>*{margin-left:18px;margin-right:18px}
+.c-admin article.c-card>*+*{margin-top:8px;margin-bottom:0}
+.c-admin article.c-card>:first-child{margin:0;padding:11px 18px;background:var(--bg-alt);border-bottom:1px solid var(--line);min-height:48px;box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.c-admin article.c-card>:first-child::before{content:counter(k,decimal-leading-zero) / "";flex:none;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text);padding-right:10px;margin-right:2px;border-right:1px solid var(--line)}
+@supports not (content:"" / ""){.c-admin article.c-card>:first-child::before{content:counter(k,decimal-leading-zero)}}
+.c-admin article.c-card>:first-child strong{font-size:16px}
+.c-admin article.c-card>:nth-child(2){margin-top:14px}
+.c-admin article.c-card>:last-child{margin-bottom:18px}
+.c-admin article.c-card>:first-child:last-child{margin-bottom:0}
+.c-admin article.c-card.bad{box-shadow:none;background:var(--card);border-top-color:var(--bad)}
+.c-admin article.c-card.bad>:first-child{background:var(--bad-bg)}
+/* 動作列：細線隔開，貼底成列 */
+.c-admin article.c-card>.c-row.wrap:last-child:not(:first-child){padding-top:14px;border-top:1px solid var(--line);margin-top:14px}
+.c-admin article.c-card .c-btn.small{min-height:44px}
+.c-admin article.c-card>.c-dl{margin-top:10px;margin-bottom:0}
+.c-admin article.c-card p{margin-top:8px;margin-bottom:0}
+.c-admin article.c-card .c-sub .c-dl{margin:10px 0 0}
+/* 欄位對：窄螢幕單對，平板以上兩對並排 */
+.c-admin .c-dl{grid-template-columns:max-content minmax(0,1fr);gap:8px 20px;font-size:14px;align-items:baseline}
+.c-admin .c-dl dd{font-family:var(--mono);font-size:13px;letter-spacing:.01em;line-height:1.7;border-bottom:1px dotted var(--line);padding-bottom:6px}
+.c-admin .c-dl dt{border-bottom:1px dotted var(--line);padding-bottom:6px}
+@media (min-width:900px){
+  .c-admin article.c-card>.c-dl{grid-template-columns:max-content minmax(0,1fr) max-content minmax(0,1fr)}
+}
+.c-admin .c-sub{margin-left:18px;margin-right:18px;border-top:1px solid var(--line);padding-top:12px}
+.c-admin code{font:500 12px var(--mono);background:var(--bg-alt);padding:1px 6px;border:1px solid var(--line)}
+.c-admin article.c-card>.c-mute{font-size:13px}
+.c-admin article.c-card a:not(.c-btn){text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
+
+/* ── 篩選工具列 ───────────────────────── */
+.c-admin .c-field select,.c-admin select.c-input{-webkit-appearance:none;appearance:none;padding-right:40px;background-color:var(--bg-alt);background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 21px) 52%,calc(100% - 16px) 52%;background-size:5px 5px;background-repeat:no-repeat;cursor:pointer}
+.c-admin .c-field select:focus{background-color:var(--card)}
+.c-admin .c-field.c-narrow{max-width:280px}
+.c-admin .c-filters,.c-admin .audit-filters,.c-admin .admin-filters{padding:16px 16px 0;border:1px solid var(--line);background:var(--card);margin:0 0 16px;position:relative}
+.c-admin .c-filters::before,.c-admin .admin-filters::before,.c-admin .audit-filters::before{content:"FILTER" / "";position:absolute;top:-7px;left:12px;padding:0 6px;background:var(--bg);font:600 10px/14px var(--mono);letter-spacing:.2em;color:var(--mute)}
+.c-admin form.c-row{margin-bottom:12px}
+.c-admin form.c-row .c-input{min-width:0}
+
+/* ── 狀態訊息 ─────────────────────────── */
+.c-admin .c-err{border:1px solid var(--bad);background:var(--bad-bg);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.c-admin .c-ok{margin:0 0 14px}
+.c-admin p.c-center.c-mute{padding:36px 16px;border:1px dashed var(--line);background:var(--hatch);font:500 12px/1.6 var(--mono);letter-spacing:.08em}
+.c-admin p.c-mute[role=status]{font:500 12px var(--mono);letter-spacing:.1em}
+.c-admin .c-btn.block{margin-top:6px}
+
+/* ── 分頁：等寬 ─────────────────────── */
+.c-admin .c-tabs .c-btn{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.c-admin .c-tabs .c-btn.on{font-weight:700}
+
+/* ── 徽章：後台狀態一致 ───────────────── */
+.c-admin .c-badge{text-transform:uppercase;font-size:10.5px;letter-spacing:.1em}
+.c-admin .c-badge.pending,.c-admin .c-badge.needs_changes,.c-admin .c-badge.open{color:var(--fg);border-color:var(--ink-line)}
+.c-admin .c-badge.verified,.c-admin .c-badge.approved,.c-admin .c-badge.actioned,.c-admin .c-badge.recovered,.c-admin .c-badge.won{color:var(--ok);border-color:currentColor}
+.c-admin .c-badge.written_off,.c-admin .c-badge.revoked,.c-admin .c-badge.lost,.c-admin .c-badge.chargeback{color:var(--bad);border-color:currentColor}
+
+/* ── KPI 磚（index / analytics 共用 class） ─ */
+.k-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));margin:0;border-top:1px solid var(--ink-line);border-left:1px solid var(--line)}
+.k-kpis>div{padding:14px 16px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.k-kpis dt{font:600 10.5px/1.4 var(--mono)!important;letter-spacing:.12em!important;text-transform:uppercase;color:var(--mute)!important;margin:0}
+.k-kpis dd{margin:8px 0 0!important;font-size:clamp(30px,4.4vw,44px)!important;font-weight:900!important;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
+.k-kpis dd.hot{color:var(--red-text)}
+
+/* 展開的詳情（組織審核）：小節標題＋巢狀許可卡 */
+.c-admin article h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.c-admin article .c-card{margin:8px 0;padding:14px;border-left:3px solid var(--ink-line)}
+.c-admin>.c-btn.block{margin-bottom:16px}

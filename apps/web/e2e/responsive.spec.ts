@@ -15,10 +15,11 @@ for (const [name, vp] of Object.entries(SIZES)) {
     const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     const cols = (sel: string) => page.locator(sel).first().evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)
 
+    // 頁面標題在 sticky 頁首下方的 .c-title（頁首只放品牌與動作）
     await test.step('dashboard：標題不被擠成一字寬、無溢出', async () => {
       await page.goto('/dashboard')
-      await expect(page.locator('.c-head h1')).toBeVisible()
-      expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(60)
+      await expect(page.locator('.c-title h1')).toBeVisible()
+      expect((await page.locator('.c-title h1').boundingBox())!.width).toBeGreaterThan(60)
       expect(await noOverflow()).toBe(true)
       expect(await page.locator('.c-rail').isVisible()).toBe(vp.width >= 1280)
       expect((await page.locator('.c-head').boundingBox())!.height).toBeLessThan(70) // header 不換行
@@ -27,8 +28,8 @@ for (const [name, vp] of Object.entries(SIZES)) {
     })
     await test.step('edit：標題寬度、雙欄、無溢出', async () => {
       await page.goto(`/lists/${list.id}/edit`)
-      await expect(page.locator('.c-head h1')).toBeVisible()
-      expect((await page.locator('.c-head h1').boundingBox())!.width).toBeGreaterThan(60)
+      await expect(page.locator('.c-title h1')).toBeVisible()
+      expect((await page.locator('.c-title h1').boundingBox())!.width).toBeGreaterThan(60)
       expect(await noOverflow()).toBe(true)
       const split = await cols('.c-split')
       expect(split).toBe(vp.width >= 1100 ? 2 : 1)
@@ -99,7 +100,7 @@ test('橫放手機（844×390）：header / 底欄不固定、無溢出', async 
   await loginBrowser(context, owner)
   const pos = (sel: string) => page.locator(sel).first().evaluate(el => getComputedStyle(el).position)
   await page.goto(`/lists/${list.id}/edit`)
-  await expect(page.locator('.c-head h1')).toBeVisible()
+  await expect(page.locator('.c-title h1')).toBeVisible()
   expect(await pos('.c-head')).toBe('static')
   expect(await pos('.c-bottom')).toBe('static')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)

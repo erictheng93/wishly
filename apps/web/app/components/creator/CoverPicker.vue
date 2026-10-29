@@ -25,11 +25,15 @@ function uploaded(k: string | null) { imageKey.value = k; if (k) preset.value = 
 </template>
 <style scoped>
 .cp{border:0;padding:0;margin:0 0 16px;min-width:0}
-.cp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 12px}
-.cp-opt{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;cursor:pointer;border:2px solid var(--line);padding:4px}
+.cp legend{padding:0;font:600 11px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.cp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 14px}
+.cp-opt{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:6px;font:600 11px/1.3 var(--mono);letter-spacing:.04em;cursor:pointer;border:1px solid var(--line);padding:4px 4px 8px;text-align:center;color:var(--mute);transition:border-color var(--t) var(--ease),transform var(--t) var(--ease)}
 .cp-opt input{position:absolute;opacity:0;width:1px;height:1px}
-.cp-opt img{width:100%;height:auto;aspect-ratio:1;display:block}
-.cp-opt:has(input:checked){border-color:var(--red);box-shadow:inset 0 0 0 2px var(--red)}
-.cp-opt:has(input:checked) span{color:var(--red-text);font-weight:700}
+.cp-opt img{width:100%;height:auto;aspect-ratio:1;display:block;background:var(--bg-alt)}
+.cp-opt:has(input:checked){border-color:var(--ink-line);box-shadow:4px 4px 0 var(--bg-alt),4px 4px 0 1px var(--ink-line);transform:translate(-2px,-2px);color:var(--fg)}
+.cp-opt:has(input:checked)::after{content:"";position:absolute;top:0;right:0;width:12px;height:12px;background:var(--red)}
+.cp-opt:has(input:checked) span{font-weight:700}
 .cp-opt:has(input:focus-visible){outline:2px solid var(--red);outline-offset:2px}
+@media (hover:hover) and (pointer:fine){.cp-opt:hover{border-color:var(--ink-line)}}
+@media (max-width:479px){.cp-grid{gap:6px}.cp-opt{font-size:10px;letter-spacing:0}}
 </style>
