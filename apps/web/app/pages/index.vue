@@ -366,7 +366,7 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
 .l-faq details{border-bottom:1px solid var(--line)}
 .l-faq summary{display:flex;align-items:center;justify-content:space-between;gap:16px;font-weight:800;font-size:18px;min-height:64px;list-style:none;cursor:pointer}
 .l-faq summary::-webkit-details-marker{display:none}
-.l-faq summary::after{content:"+";flex:none;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--ink-line);font:700 18px var(--mono);transition:transform var(--t) var(--ease),background var(--t) var(--ease),color var(--t) var(--ease)}
+.l-faq summary::after{content:"+" / "";flex:none;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--ink-line);font:700 18px var(--mono);transition:transform var(--t) var(--ease),background var(--t) var(--ease),color var(--t) var(--ease)}
 .l-faq details[open] summary::after{transform:rotate(45deg);background:var(--red);border-color:var(--red);color:var(--accent-fg)}
 .l-faq details p{color:var(--mute);padding-bottom:20px;line-height:1.8;max-width:38em}
 /* 跑馬燈 */

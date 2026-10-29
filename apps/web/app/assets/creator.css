@@ -137,8 +137,8 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-head .c-brand~.um{margin-left:0}
 /* 手機頁首擠：身分晶片只留頭像，名字在桌面與首頁才顯示 */
 @media (max-width:479px){.c-head .um-name,.c-head .um-caret{display:none}.c-head .um .um-btn{padding:0}
-  /* 窄手機：字標收成紅方塊、頁首不換行，頭像晶片才不會掉到第二列 */
-  .c-head{flex-wrap:nowrap;gap:2px}.c-head>*{flex:none}.c-brand{font-size:0;gap:0;padding-right:0}.c-brand::before{width:16px;height:16px}}
+  /* 窄手機：字標收成紅方塊省空間，多數頁首一列放得下；動作多的頁（編輯頁）仍可換行，不得橫向溢出 */
+  .c-head{gap:2px}.c-brand{font-size:0;gap:0;padding-right:0;margin-right:0}.c-head .c-brand~.um{margin-left:auto}.c-brand::before{width:16px;height:16px}}
 @media (max-width:359px){.c-head .c-btn{padding:0 6px;letter-spacing:0;font-size:13px;min-width:0}.c-brand{font-size:0;gap:0}.c-brand::before{width:14px;height:14px}}
 /* 進場：卡片依序浮起（前 8 張） */
 .c-grid>.c-card,.c-page>.c-card,.c-list>li{animation:rise .5s var(--ease) both}
@@ -164,9 +164,9 @@ dialog.c-sheet:focus-visible{outline:0}
 @media (min-width:1280px){
   :root{--c-w:900px}
   .c-rail{display:flex;flex-direction:column;position:fixed;top:calc(var(--head-h) + 28px);left:max(16px,calc(50% - var(--c-w) / 2 - 212px));width:176px;z-index:5;counter-reset:rail}
-  .c-rail::before{content:"MENU";font:600 11px var(--mono);letter-spacing:.2em;color:var(--mute);padding:0 0 10px 14px;border-bottom:1px solid var(--ink-line)}
+  .c-rail::before{content:"MENU" / "";font:600 11px var(--mono);letter-spacing:.2em;color:var(--mute);padding:0 0 10px 14px;border-bottom:1px solid var(--ink-line)}
   .c-rail a{position:relative;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;color:var(--fg);font-weight:700;font-size:15px;border-bottom:1px solid var(--line);counter-increment:rail;transition:color var(--t) var(--ease),padding var(--t) var(--ease)}
-  .c-rail a::before{content:counter(rail,decimal-leading-zero);font:500 11px var(--mono);color:var(--mute);letter-spacing:.06em}
+  .c-rail a::before{content:counter(rail,decimal-leading-zero) / "";font:500 11px var(--mono);color:var(--mute);letter-spacing:.06em}
   .c-rail a.router-link-active{color:var(--red-text);box-shadow:inset 3px 0 var(--red)}
   .c-rail a.router-link-active::before{color:var(--red-text)}
   .c-btn.c-nav-dup,a.c-btn.c-nav-dup{display:none} /* 需高於 a.c-btn 的 display */

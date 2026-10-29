@@ -276,7 +276,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 .ed-side{padding:0 18px}
 .ed-side>summary{justify-content:space-between;font-size:15px;letter-spacing:.02em;list-style:none}
 .ed-side>summary::-webkit-details-marker{display:none}
-.ed-side>summary::after{content:"+";font:500 22px/1 var(--mono);color:var(--red-text);transition:transform var(--t) var(--ease)}
+.ed-side>summary::after{content:"+" / "";font:500 22px/1 var(--mono);color:var(--red-text);transition:transform var(--t) var(--ease)}
 .ed-side[open]>summary::after{transform:rotate(45deg)}
 .ed-side[open]{border-color:var(--ink-line);padding-bottom:18px}
 .ed-side[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}

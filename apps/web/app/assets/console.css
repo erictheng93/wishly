@@ -39,7 +39,7 @@
 .c-admin .c-field select:focus{background-color:var(--card)}
 .c-admin .c-field.c-narrow{max-width:280px}
 .c-admin .c-filters,.c-admin .audit-filters,.c-admin .admin-filters{padding:16px 16px 0;border:1px solid var(--line);background:var(--card);margin:0 0 16px;position:relative}
-.c-admin .c-filters::before,.c-admin .admin-filters::before,.c-admin .audit-filters::before{content:"FILTER";position:absolute;top:-7px;left:12px;padding:0 6px;background:var(--bg);font:600 10px/14px var(--mono);letter-spacing:.2em;color:var(--mute)}
+.c-admin .c-filters::before,.c-admin .admin-filters::before,.c-admin .audit-filters::before{content:"FILTER" / "";position:absolute;top:-7px;left:12px;padding:0 6px;background:var(--bg);font:600 10px/14px var(--mono);letter-spacing:.2em;color:var(--mute)}
 .c-admin form.c-row{margin-bottom:12px}
 .c-admin form.c-row .c-input{min-width:0}
 

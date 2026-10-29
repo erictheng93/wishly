@@ -39,6 +39,6 @@ async function accept() {
 
 <style scoped>
 .oi-card{max-width:520px;margin:24px auto 0;padding:36px clamp(20px,5vw,40px) 32px;border:1px solid var(--ink-line);border-top:3px solid var(--red);box-shadow:8px 8px 0 var(--bg-alt),8px 8px 0 1px var(--line);position:relative;animation:rise .5s var(--ease) both}
-.oi-card::before{content:"INVITATION / MEMBER";display:block;margin-bottom:18px;font:600 11px var(--mono);letter-spacing:.18em;color:var(--mute)}
+.oi-card::before{content:"INVITATION / MEMBER" / "";display:block;margin-bottom:18px;font:600 11px var(--mono);letter-spacing:.18em;color:var(--mute)}
 .oi-text{font-size:clamp(20px,3vw,24px);font-weight:800;line-height:1.4;letter-spacing:-.01em;margin:0 0 28px;text-wrap:balance}
 </style>

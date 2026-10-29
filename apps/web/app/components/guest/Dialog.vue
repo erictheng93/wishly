@@ -34,7 +34,7 @@ dialog.g-dialog .g-sheet .g-thumb{width:64px;height:64px}
 dialog.g-dialog .g-sheet h1{font-weight:900;letter-spacing:-.02em}
 dialog.g-dialog .g-sheet .g-banner{box-shadow:inset 3px 0 var(--red)}
 dialog.g-dialog .g-sheet.center{padding-top:40px}
-dialog.g-dialog .g-sheet.center h1::before{content:"OK";display:block;width:max-content;margin:0 auto 14px;padding:3px 10px;border:1px solid currentColor;font:700 11px var(--mono);letter-spacing:.2em}
+dialog.g-dialog .g-sheet.center h1::before{content:"OK" / "";display:block;width:max-content;margin:0 auto 14px;padding:3px 10px;border:1px solid currentColor;font:700 11px var(--mono);letter-spacing:.2em}
 dialog.g-dialog .g-sheet .g-step{width:100%;margin:16px 0;justify-content:space-between}
 dialog.g-dialog .g-sheet .g-step b{flex:1;font-size:40px}
 dialog.g-dialog .g-sheet .g-btn.block,dialog.g-dialog .g-sheet .g-btn{margin-top:6px}

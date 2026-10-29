@@ -226,8 +226,8 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
 /* 功能索引：編號磚，紅色只在 hover / 目前位置 */
 .k-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 24px;border-top:1px solid var(--ink-line);border-left:1px solid var(--line);counter-reset:kn}
 .k-nav .c-btn{counter-increment:kn;justify-content:flex-start;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:0 14px;gap:12px;font-size:14px;letter-spacing:.03em;white-space:normal;text-align:left;background:var(--card);position:relative}
-.k-nav .c-btn::before{content:counter(kn,decimal-leading-zero);font:600 11px var(--mono);color:var(--red-text);letter-spacing:.08em;flex:none}
-.k-nav .c-btn::after{content:"\2192";margin-left:auto;font-family:var(--mono);color:var(--mute);transition:transform var(--t) var(--ease)}
+.k-nav .c-btn::before{content:counter(kn,decimal-leading-zero) / "";font:600 11px var(--mono);color:var(--red-text);letter-spacing:.08em;flex:none}
+.k-nav .c-btn::after{content:"\2192" / "";margin-left:auto;font-family:var(--mono);color:var(--mute);transition:transform var(--t) var(--ease)}
 @media (min-width:768px){.k-nav{grid-template-columns:repeat(5,minmax(0,1fr))}}
 @media (hover:hover) and (pointer:fine){.k-nav .c-btn:hover::after{transform:translateX(4px);color:inherit}.k-nav .c-btn:hover::before{color:inherit}}
 </style>

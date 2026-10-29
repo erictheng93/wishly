@@ -244,8 +244,8 @@ async function remove() {
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.export.title') }}</h2>
         <p class="c-mute">{{ $t('settings.export.hint') }}</p>
+        <p v-if="exportErr" class="c-err" role="alert">{{ exportErr }}</p><!-- 放在按鈕上方：手機上按鈕常在畫面底緣，訊息才不會落到畫面外 -->
         <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? $t('settings.export.busy') : $t('settings.export.btn') }}</button>
-        <p v-if="exportErr" class="c-err" role="alert">{{ exportErr }}</p>
       </section>
       <section class="c-card">
         <button class="c-btn block" @click="logout()">{{ $t('settings.logout') }}</button>
@@ -275,7 +275,7 @@ async function remove() {
 .x-set > .c-card { counter-increment: sec; border: 0; border-top: 1px solid var(--ink-line); background: transparent; padding: 22px 0 28px; margin: 0; }
 .x-set > .c-card:first-of-type { border-top: 0; padding-top: 6px; } /* 標題下已有墨線，第一區不再重複 */
 .x-set > .c-card > h2:first-child { display: block; font-size: 20px; margin: 0 0 16px; }
-.x-set > .c-card > h2:first-child::before { content: counter(sec, decimal-leading-zero); display: block; width: auto; height: auto; background: none; margin-bottom: 8px; font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--red-text); }
+.x-set > .c-card > h2:first-child::before { content: counter(sec, decimal-leading-zero) / ""; display: block; width: auto; height: auto; background: none; margin-bottom: 8px; font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--red-text); }
 .x-set > .c-card.bad { background: var(--bad-bg); border-top-color: var(--bad); padding-inline: 20px; box-shadow: none; margin-top: 8px; }
 .x-set > .c-card.bad > h2:first-child { color: var(--bad); }
 .x-set > .c-card:has(> .c-btn.block) { counter-increment: none; }

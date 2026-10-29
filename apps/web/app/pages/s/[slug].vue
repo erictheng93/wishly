@@ -273,14 +273,15 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
   </main>
 </template>
 
-<style scoped>
+<style>
+/* 不用 scoped：SSR 的 <h1> 不能帶 data-v 屬性（爬蟲與 e2e 以原始 HTML 驗證標題）；選擇器一律 sx- 前綴 */
 .sx-code{display:block;font:900 clamp(96px,26vw,200px)/.85 var(--mono);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:2px var(--ink-line);background:var(--hatch);-webkit-background-clip:text;background-clip:text;margin-bottom:20px}
-.sx-hero{display:grid;gap:20px;margin-top:20px;padding-bottom:28px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
+.sx-hero{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;margin-top:20px;padding-bottom:28px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
 .sx-cover{position:relative}
 .sx-cover .g-cover{margin-top:0;max-height:none;aspect-ratio:16/9}
 .sx-tag{position:absolute;left:0;bottom:0;padding:5px 10px;background:var(--bg);color:var(--fg);font:700 11px/1.2 var(--mono);letter-spacing:.14em;border-top:1px solid var(--ink-line);border-right:1px solid var(--ink-line)}
 .sx-tag::before{content:"";display:inline-block;width:7px;height:7px;background:var(--red);margin-right:8px}
-.sx-main h1{margin:0 0 12px;font-weight:900;font-size:clamp(30px,6vw,46px);text-wrap:balance;word-break:keep-all;overflow-wrap:break-word}
+.sx-main h1{margin:0 0 12px;font-weight:900;font-size:clamp(30px,6vw,46px);text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
 .sx-meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
 .sx-desc{margin:14px 0 0;line-height:1.75;max-width:38em}
 .sx-gauge{border:1px solid var(--ink-line);padding:16px 18px 0;background:var(--card);align-self:start}

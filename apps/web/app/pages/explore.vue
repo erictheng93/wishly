@@ -59,7 +59,7 @@ async function more() {
 .x-idx+h1{margin-top:20px;font-size:clamp(40px,8vw,84px);letter-spacing:-.04em;font-weight:900}
 .x-relief{display:flex;align-items:center;gap:8px;min-height:56px;margin:20px 0 28px;color:var(--fg);text-decoration:none;box-shadow:none;border:1px solid var(--ink-line);background:var(--hatch),var(--card)}
 .x-relief::before{content:"";flex:none;width:10px;height:10px;background:var(--red)}
-.x-relief::after{content:"→";margin-left:auto;font-weight:700;color:var(--red-text)}
+.x-relief::after{content:"→" / "";margin-left:auto;font-weight:700;color:var(--red-text)}
 .x-relief:hover{background:var(--bg-alt)}
 .x-card{display:flex;flex-direction:column;padding:0}
 .x-card>:not(.x-cv){margin-left:16px;margin-right:16px}

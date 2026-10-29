@@ -57,7 +57,7 @@ async function saveReceipt() {
 .rc-site{display:flex;align-items:center;gap:12px;margin:0 0 20px;font:500 13px var(--mono)}
 .rc-list{list-style:none;padding:0;margin:0!important;display:block;counter-reset:rc;border-top:2px solid var(--ink-line)}
 .rc-list li.c-card{counter-increment:rc;display:grid;grid-template-columns:auto 1fr auto;gap:2px 16px;align-items:center;margin:0;padding:16px 4px 16px 0;border:0;border-bottom:1px solid var(--line);animation:rise .5s var(--ease) both}
-.rc-list li.c-card::before{content:counter(rc,decimal-leading-zero);grid-row:1/4;font:700 22px var(--mono);color:var(--red-text);letter-spacing:-.04em;min-width:1.8em;padding-left:2px}
+.rc-list li.c-card::before{content:counter(rc,decimal-leading-zero) / "";grid-row:1/4;font:700 22px var(--mono);color:var(--red-text);letter-spacing:-.04em;min-width:1.8em;padding-left:2px}
 .rc-list li>strong{grid-column:2;font-size:17px}
 .rc-list li>.c-mute{grid-column:2;font:500 12px/1.5 var(--mono);letter-spacing:.03em}
 .rc-list li>.c-btn{grid-column:3;grid-row:1/4}
