@@ -28,6 +28,8 @@
       "optional": "optional",
       "taxBad": "Invalid tax ID format",
       "fileHint": "PDF/JPG/PNG, up to 10MB each, visible to reviewers only",
+      "chooseFile": "Choose file",
+      "noFile": "No file selected",
       "fileBig": "File exceeds 10MB",
       "fileType": "Only PDF, JPG or PNG",
       "regDoc": "Registration certificate (required)",

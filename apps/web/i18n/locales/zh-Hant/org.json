@@ -28,6 +28,8 @@
       "optional": "選填",
       "taxBad": "統一編號格式不正確",
       "fileHint": "PDF／JPG／PNG，每檔 10MB 以內，僅審核員可見",
+      "chooseFile": "選擇檔案",
+      "noFile": "尚未選擇檔案",
       "fileBig": "檔案超過 10MB",
       "fileType": "僅接受 PDF、JPG、PNG",
       "regDoc": "立案證書（必）",
