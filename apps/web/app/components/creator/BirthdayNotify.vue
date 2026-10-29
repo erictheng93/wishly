@@ -12,9 +12,9 @@ watch(block, b => { if (b) on.value = false }, { immediate: true }) // 不能開
       <input v-model="on" type="checkbox" :disabled="!!block">
       <span>{{ $t('creator.bday.label') }}<br>
         <small class="c-mute">{{ block ? $t(`creator.bday.block.${block}`) : $t(`creator.bday.who.${visibility === 'selected' ? 'selected' : 'friends'}`) }}</small>
-        <template v-if="block && block !== 'listPrivate'"><br><NuxtLink to="/settings">{{ $t('creator.bday.goSettings') }}</NuxtLink></template>
       </span>
     </label>
+    <p v-if="block && block !== 'listPrivate'" class="c-mute c-m0"><small><NuxtLink to="/settings">{{ $t('creator.bday.goSettings') }}</NuxtLink></small></p>
     <p class="c-mute c-m0"><small>{{ $t('creator.bday.single') }}</small></p>
   </div>
 </template>
