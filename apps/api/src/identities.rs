@@ -1,4 +1,4 @@
-//! 手動連結登入方式；絕不搬移既有帳號的資料。所有增刪都鎖 users 列。
+//! 手動連結登入方式；絕不搬移既有帳號的資料（撞到空帳號時併入後刪除，見 absorb）。所有增刪都鎖 users 列。
 use crate::{
     auth,
     error::AppError,
@@ -27,7 +27,7 @@ pub(crate) fn in_use() -> AppError {
     AppError::problem(
         409,
         "IDENTITY_IN_USE",
-        "此登入方式或 Email 已屬於另一個帳號，無法直接綁定。請使用原帳號登入。",
+        "此登入方式或 Email 已屬於另一個有資料的帳號，無法自動合併。請使用原帳號登入，或聯絡客服並提供兩邊的帳號 ID。",
     )
 }
 
@@ -132,15 +132,27 @@ pub(crate) async fn link(
     .bind(uid)
     .fetch_optional(&mut *tx)
     .await?;
-    if let Some(owner) = owner {
-        return if owner == id { Ok(()) } else { Err(in_use()) };
+    if owner == Some(id) {
+        return Ok(());
     }
-    if let Some(e) = email {
-        let occupied: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 AND id<>$2) OR EXISTS(SELECT 1 FROM auth_identities WHERE email=$1 AND user_id<>$2)")
-            .bind(e).bind(id).fetch_one(&mut *tx).await?;
-        if occupied {
-            return Err(in_use());
-        }
+    let others: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT user_id FROM auth_identities WHERE provider=$1::auth_provider AND provider_uid=$2
+         UNION SELECT id FROM users WHERE email=$3 AND id<>$4
+         UNION SELECT user_id FROM auth_identities WHERE email=$3 AND user_id<>$4",
+    )
+    .bind(provider)
+    .bind(uid)
+    .bind(email)
+    .bind(id)
+    .fetch_all(&mut *tx)
+    .await?;
+    let other = match others[..] {
+        [] => None,
+        [other] => Some(other),
+        _ => return Err(in_use()),
+    };
+    if let Some(other) = other {
+        lock_blank(&mut tx, other, provider, uid, email).await?;
     }
     let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_identities WHERE user_id=$1 AND provider=$2::auth_provider)")
         .bind(id).bind(provider).fetch_one(&mut *tx).await?;
@@ -155,8 +167,14 @@ pub(crate) async fn link(
     if provider == "email" && contact.as_deref().is_some_and(|c| Some(c) != email) {
         return Err(email_mismatch());
     }
-    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,$2::auth_provider,$3,$4)")
-        .bind(id).bind(provider).bind(uid).bind(email).execute(&mut *tx).await?;
+    let (media, moved) = match other {
+        Some(other) => absorb(&mut tx, id, other, provider, uid).await?,
+        None => (vec![], false),
+    };
+    if !moved {
+        sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,$2::auth_provider,$3,$4)")
+            .bind(id).bind(provider).bind(uid).bind(email).execute(&mut *tx).await?;
+    }
     sqlx::query("UPDATE users SET email=coalesce(email,$2) WHERE id=$1")
         .bind(id)
         .bind(email)
@@ -165,7 +183,108 @@ pub(crate) async fn link(
     let to = contact.as_deref().or(email);
     notify(&mut tx, id, "auth.identity_linked", provider, to).await?;
     tx.commit().await?;
+    crate::uploads::delete_objects(pool.clone(), media); // COMMIT 後才刪
     Ok(())
+}
+
+/// 綁定撞到另一個帳號：鎖住它並確認仍衝突且為「空帳號」（只有登入方式，見 user_is_blank），否則 IDENTITY_IN_USE。
+/// 已持有本人 users 列：對方的鎖一律不等（try / SKIP LOCKED），避免兩個帳號互相吸收時鎖死。
+async fn lock_blank(
+    tx: &mut Transaction<'_, Postgres>,
+    other: Uuid,
+    provider: &str,
+    uid: &str,
+    email: Option<&str>,
+) -> Result<(), AppError> {
+    let busy = || AppError::problem(409, "IDENTITY_BUSY", "另一個帳號正在處理中，請稍後再試。");
+    if !crate::uploads::try_lock_user(tx, other).await? {
+        return Err(busy());
+    }
+    let locked: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE id=$1 FOR UPDATE SKIP LOCKED")
+            .bind(other)
+            .fetch_optional(&mut **tx)
+            .await?;
+    // 衝突是在鎖住對方前讀到的：對方可能剛解除那個登入方式，重新核對
+    let still: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_identities WHERE user_id=$1 AND ((provider=$2::auth_provider AND provider_uid=$3) OR email=$4)) OR EXISTS(SELECT 1 FROM users WHERE id=$1 AND email=$4)")
+        .bind(other).bind(provider).bind(uid).bind(email).fetch_one(&mut **tx).await?;
+    if locked.is_none() || !still {
+        return Err(busy());
+    }
+    let blank: bool = sqlx::query_scalar("SELECT user_is_blank($1)")
+        .bind(other)
+        .fetch_one(&mut **tx)
+        .await?;
+    if !blank {
+        return Err(in_use());
+    }
+    Ok(())
+}
+
+/// 刪掉 lock_blank 鎖住的空帳號，並把這次綁定的 identity 搬過來（保留密碼）；不搬任何資料。
+/// 回傳待刪的媒體與 identity 是否已搬移。
+async fn absorb(
+    tx: &mut Transaction<'_, Postgres>,
+    into: Uuid,
+    other: Uuid,
+    provider: &str,
+    uid: &str,
+) -> Result<(Vec<String>, bool), AppError> {
+    sqlx::query("UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL")
+        .bind(other)
+        .execute(&mut **tx)
+        .await?;
+    for sql in [
+        "DELETE FROM user_activity_days WHERE user_id=$1",
+        "DELETE FROM native_auth_codes WHERE user_id=$1",
+        "DELETE FROM otp_challenges WHERE link_user_id=$1",
+        "UPDATE notifications SET status='cancelled' WHERE user_id=$1 AND status='pending'",
+        "UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')",
+    ] {
+        sqlx::query(sql).bind(other).execute(&mut **tx).await?;
+    }
+    sqlx::query("DELETE FROM auth_identities WHERE user_id=$1 AND NOT (provider=$2::auth_provider AND provider_uid=$3)")
+        .bind(other).bind(provider).bind(uid).execute(&mut **tx).await?;
+    let moved = sqlx::query("UPDATE auth_identities SET user_id=$2 WHERE user_id=$1")
+        .bind(other)
+        .bind(into)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected()
+        > 0;
+    // 空帳號只可能有頭像（OAuth 轉存）；與刪帳號相同，同交易要求退役、COMMIT 後才刪物件。
+    let media: Vec<String> = sqlx::query_scalar(
+        "SELECT object_key FROM user_media WHERE user_id=$1
+         UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL",
+    )
+    .bind(other)
+    .fetch_all(&mut **tx)
+    .await?;
+    let media: Vec<String> = media
+        .into_iter()
+        .filter(|k| crate::uploads::avatar_url(Some(k)).is_some())
+        .collect();
+    for key in &media {
+        sqlx::query(
+            "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+        )
+        .bind(other)
+        .bind(key)
+        .execute(&mut **tx)
+        .await?;
+    }
+    crate::uploads::request_retire(tx, &media).await?;
+    // 先清掉 email（UNIQUE），呼叫者才能把同一信箱寫到本人帳號
+    sqlx::query(
+        "UPDATE users SET display_name='已刪除的使用者', email=NULL, avatar_key=NULL, bio=NULL, birthday=NULL, notification_prefs='{}'::jsonb,
+                deleted_at=now(), anonymized_at=now() WHERE id=$1",
+    )
+    .bind(other)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('user', $1, 'account.absorb', 'users', $2, jsonb_build_object('provider', $3::text))")
+        .bind(into).bind(other).bind(provider).execute(&mut **tx).await?;
+    Ok((media, moved))
 }
 
 #[derive(Deserialize)]

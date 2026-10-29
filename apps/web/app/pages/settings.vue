@@ -16,7 +16,7 @@ const removingLabel = computed(() => providers.find(p => p.provider === removing
 let linkTimer: ReturnType<typeof setInterval> | undefined
 onBeforeUnmount(() => clearInterval(linkTimer))
 const name = ref(''), msg = ref(''), err = ref('')
-const handle = ref(''), dcv = ref('friends'), hMsg = ref(''), hErr = ref(''), copied = ref(false)
+const handle = ref(''), dcv = ref('friends'), hMsg = ref(''), hErr = ref(''), copied = ref(false), idCopied = ref(false)
 const profileUrl = computed(() => user.value?.handle ? `${siteOrigin()}/u/${user.value.handle}` : '')
 const hBad = computed(() => !!handle.value && !isValidHandle(handle.value))
 const bio = ref(''), bMonth = ref(''), bDay = ref(''), bVis = ref('friends')
@@ -130,6 +130,7 @@ async function saveSocial() {
     hMsg.value = t('settings.saved')
   } catch (e: any) { hErr.value = apiErrMsg(e) }
 }
+async function copyId() { try { await copyText(user.value!.id); idCopied.value = true } catch { msg.value = t('settings.social.copyFail') } }
 async function copyUrl() { try { await copyText(profileUrl.value); copied.value = true } catch { hErr.value = t('settings.social.copyFail') } }
 async function exportData() {
   exporting.value = true; exportErr.value = ''
@@ -160,6 +161,7 @@ async function remove() {
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.profile') }}</h2>
         <p class="c-mute">{{ user.email || $t('settings.noEmail') }}</p>
+        <p class="c-mute">{{ $t('settings.accountId') }}<code>{{ user.id }}</code> <button type="button" class="c-btn" @click="copyId">{{ idCopied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
         <form @submit.prevent="saveName">
           <label class="c-field"><span>{{ $t('settings.displayName') }}</span><input v-model="name" maxlength="40" required></label>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>

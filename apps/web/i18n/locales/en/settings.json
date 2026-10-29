@@ -3,6 +3,7 @@
     "title": "Account settings",
     "profile": "My details",
     "noEmail": "No email linked yet",
+    "accountId": "Account ID (share this when contacting support): ",
     "displayName": "Display name",
     "saved": "Saved",
     "save": "Save",
@@ -30,7 +31,7 @@
       "err": {
         "oauth_failed": "Linking failed. Please try again and check which account you are signing in with.",
         "oauth_unavailable": "This sign-in method is not available yet.",
-        "identity_in_use": "This sign-in method or email already belongs to another account and can't be linked directly. Please sign in with the original account.",
+        "identity_in_use": "This sign-in method or email belongs to another account that has data, so it can't be merged automatically. Sign in with that account or contact support with both account IDs.",
         "provider_already_linked": "This sign-in method is already linked. Unlink it first to change it."
       },
       "linkedMsg": "{label} linked",
