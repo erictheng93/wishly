@@ -26,6 +26,15 @@ button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 <p>連線後會自動重試。你也可以隨時手動重新整理。</p>
 <button type="button" onclick="location.reload()">重新整理</button>
 </main>
-<script>addEventListener('online',()=>location.reload())</script>
+<script>
+// online 事件只代表網卡恢復，不代表真的連得上（Service Worker 的網路也可能晚一步恢復）：
+// 先試抓本頁網址，抓得到才重新整理；失敗就退避重試，直到成功或再次離線。直接 reload 會在恢復瞬間又落回離線頁，之後不再有 online 事件而卡住。
+let wait=500,timer=0
+function retry(){clearTimeout(timer);if(!navigator.onLine)return
+  fetch(location.href,{cache:'no-store'}).then(()=>location.reload(),()=>{timer=setTimeout(retry,wait);wait=Math.min(wait*2,30000)})}
+addEventListener('online',()=>{wait=500;retry()})
+// 本頁是在「瀏覽器認為在線」時顯示的（伺服器暫時連不上等），也要自己重試；直接開 /offline 時不重試，否則會不斷重新整理
+if(navigator.onLine&&location.pathname!=='/offline')timer=setTimeout(retry,wait)
+</script>
 </body>
 </html>

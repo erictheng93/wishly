@@ -1,7 +1,7 @@
 // Wishly 極小 service worker。內容是即時資料，所以刻意保守：只快取不可變的靜態檔。
 // 換版：改 CACHE_VERSION 即可。不呼叫 skipWaiting/clients.claim：新版 SW 等所有分頁關閉後才接管，
 // 避免舊頁面（舊 HTML 引用舊雜湊資產）在中途被新版 SW 接手而版本錯亂；/_nuxt/* 帶雜湊且 cache-first 本身不會錯配。
-const CACHE_VERSION = 'v1'
+const CACHE_VERSION = 'v2' // v2：離線頁改為確認連得上才重新整理
 const CACHE = `wishly-static-${CACHE_VERSION}`
 const OFFLINE = '/offline'
 
