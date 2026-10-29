@@ -19,6 +19,8 @@ useSeoMeta({ title: () => t('legal.terms.title') })
     <p>{{ $t('legal.terms.s4p') }}</p>
     <h2>{{ $t('legal.terms.s5h') }}</h2>
     <p>{{ $t('legal.terms.s5p') }}</p>
+    <h2>{{ $t('legal.terms.s6h') }}</h2>
+    <p>{{ $t('legal.terms.s6p') }} <SupportLink /></p>
   </main>
 </template>
 <style scoped>

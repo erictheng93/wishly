@@ -28,6 +28,9 @@
       "busyTitle": "系統繁忙",
       "busyDesc": "目前使用的人比較多，請稍候幾秒再重新整理。",
       "reload": "重新整理"
-    }
+    },
+    "support": "聯絡客服：",
+    "supportSubject": "Wishly 客服",
+    "supportBody": "帳號 ID：{id}\n\n問題描述：\n"
   }
 }

@@ -70,6 +70,7 @@ onMounted(() => load())
       </div>
       <div v-if="w.moderation_status === 'hidden'" class="c-err" role="alert">
         {{ $t('lists.dashboard.hidden', { reason: w.moderation_reason ? $t('lists.common.reasonSuffix', { reason: w.moderation_reason }) : '' }) }}
+        <SupportLink :topic="w.title" />
       </div>
       <div class="c-row dsh-act">
         <NuxtLink :to="`/lists/${w.id}/progress`" class="c-btn c-grow">{{ $t('lists.common.progress') }}</NuxtLink>

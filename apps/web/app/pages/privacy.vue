@@ -24,6 +24,8 @@ useSeoMeta({ title: () => t('legal.privacy.title') })
     <p>{{ $t('legal.privacy.reportP') }}</p>
     <h2>{{ $t('legal.privacy.loginH') }}</h2>
     <p>{{ $t('legal.privacy.loginP') }}</p>
+    <h2 id="contact">{{ $t('legal.privacy.contactH') }}</h2>
+    <p>{{ $t('legal.privacy.contactP') }} <SupportLink /></p>
   </main>
 </template>
 <style scoped>

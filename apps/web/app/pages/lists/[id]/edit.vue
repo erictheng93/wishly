@@ -155,7 +155,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     <p v-if="loading" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ stale ? $t('lists.common.reload') : $t('lists.common.retry') }}</button></p>
     <template v-if="w">
-      <div v-if="hidden" class="c-card bad c-err" role="alert">{{ $t('lists.edit.hidden', { reason: w.moderation_reason ? $t('lists.common.reasonSuffix', { reason: w.moderation_reason }) : '' }) }}</div>
+      <div v-if="hidden" class="c-card bad c-err" role="alert">{{ $t('lists.edit.hidden', { reason: w.moderation_reason ? $t('lists.common.reasonSuffix', { reason: w.moderation_reason }) : '' }) }} <SupportLink :topic="w.title" /></div>
       <p v-if="closed" class="c-mute">{{ $t('lists.edit.closedMsg', { state: w.status === 'closed' ? $t('lists.edit.stateClosed') : $t('lists.edit.stateArchived') }) }} <button v-if="w.status === 'archived'" class="c-btn" @click="patchList({ status: 'closed' })">{{ $t('lists.edit.unarchive') }}</button></p>
       <ul v-if="pubErrs.length" class="c-err"><li v-for="x in pubErrs" :key="x">{{ x }}</li></ul>
 

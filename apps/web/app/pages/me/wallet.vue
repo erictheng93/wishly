@@ -86,7 +86,7 @@ async function reallocate() {
         <p class="x-cap">{{ $t('me.wallet.available') }}<span v-if="wallet.status === 'frozen'" class="c-badge frozen">{{ $t('me.wallet.frozen') }}</span></p>
         <div class="x-ruler" aria-hidden="true"><i :style="{ width: Math.max(heldPct, 2) + '%' }" /></div>
         <p class="c-mute w-held">{{ $t('me.wallet.held', { pts: fmtPts(wallet.held_points) }) }}</p>
-        <p v-if="wallet.status === 'frozen'" class="c-err" role="alert">{{ $t('me.wallet.frozenWarn') }}</p>
+        <p v-if="wallet.status === 'frozen'" class="c-err" role="alert">{{ $t('me.wallet.frozenWarn') }} <SupportLink /></p>
         <div class="c-row wrap w-act">
           <button v-if="wallet.status === 'frozen'" type="button" class="c-btn primary" disabled>{{ $t('me.wallet.topup') }}</button>
           <NuxtLink v-else to="/me/topup" class="c-btn primary">{{ $t('me.wallet.topup') }}</NuxtLink>

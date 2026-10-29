@@ -28,6 +28,9 @@
       "busyTitle": "Hệ thống đang bận",
       "busyDesc": "Hiện có nhiều người truy cập. Vui lòng đợi vài giây rồi tải lại.",
       "reload": "Tải lại"
-    }
+    },
+    "support": "Liên hệ hỗ trợ: ",
+    "supportSubject": "Hỗ trợ Wishly",
+    "supportBody": "ID tài khoản: {id}\n\nMô tả vấn đề:\n"
   }
 }

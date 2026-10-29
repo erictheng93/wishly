@@ -14,7 +14,9 @@
       "s4h": "4. Batasan tanggung jawab",
       "s4p": "Layanan disediakan apa adanya dan kami tidak menjamin layanan tidak akan terganggu. Platform tidak bertanggung jawab memberi ganti rugi atas sengketa yang timbul dari isi wishlist, tautan produk pihak ketiga, atau transaksi kedua pihak, tetapi kami akan membantu menangani konten yang melanggar.",
       "s5h": "5. Perubahan ketentuan",
-      "s5p": "Perubahan ketentuan akan diumumkan di halaman ini, dan dengan tetap menggunakan layanan, kamu dianggap menyetujuinya."
+      "s5p": "Perubahan ketentuan akan diumumkan di halaman ini, dan dengan tetap menggunakan layanan, kamu dianggap menyetujuinya.",
+      "s6h": "6. Hubungi kami",
+      "s6p": "Untuk pertanyaan atau banding terkait layanan, akun, poin, atau penurunan konten, kirim email dan sertakan ID akun (salin dari Pengaturan):"
     },
     "privacy": {
       "title": "Kebijakan Privasi",
@@ -31,7 +33,9 @@
       "reportH": "Laporan",
       "reportP": "Laporan ditinjau secara manual dan identitas pelapor tidak diberitahukan kepada pemilik; untuk mencegah penyalahgunaan, kami memakai Cloudflare Turnstile dan pembatasan laju berdasarkan IP.",
       "loginH": "Keamanan masuk",
-      "loginP": "Untuk mencegah serangan tebak kata sandi, saat masuk gagal kami mencatat Email dan alamat IP yang dipakai, untuk penguncian sementara dan memicu verifikasi manusia, serta dipakai secara statistik untuk memantau keanehan operasional; catatan disimpan 365 hari lalu dihapus otomatis."
+      "loginP": "Untuk mencegah serangan tebak kata sandi, saat masuk gagal kami mencatat Email dan alamat IP yang dipakai, untuk penguncian sementara dan memicu verifikasi manusia, serta dipakai secara statistik untuk memantau keanehan operasional; catatan disimpan 365 hari lalu dihapus otomatis.",
+      "contactH": "Kontak",
+      "contactP": "Untuk melihat, memperbaiki, atau menghapus data pribadi, atau bertanya tentang kebijakan ini, kirim email ke:"
     }
   }
 }

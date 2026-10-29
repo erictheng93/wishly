@@ -28,6 +28,9 @@
       "busyTitle": "We're a bit busy",
       "busyDesc": "Lots of people are here right now. Please wait a few seconds and reload.",
       "reload": "Reload"
-    }
+    },
+    "support": "Contact support: ",
+    "supportSubject": "Wishly support",
+    "supportBody": "Account ID: {id}\n\nDescribe the issue:\n"
   }
 }

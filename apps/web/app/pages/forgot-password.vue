@@ -46,7 +46,7 @@ async function confirm() {
       <form v-if="step === 'email'" @submit.prevent="send">
         <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
         <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
-        <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+        <p v-if="err" class="c-err" role="alert">{{ err }} <SupportLink /></p>
         <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.forgot.sending') : $t('auth.forgot.sendCode') }}</button>
       </form>
       <form v-else @submit.prevent="confirm">
@@ -55,7 +55,7 @@ async function confirm() {
         <CreatorOtpInput ref="otp" v-model="code" />
         <CreatorPasswordField v-model="password" :label="$t('auth.forgot.newPassword')" autocomplete="new-password" :hint="$t('auth.forgot.pwHint')" />
         <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
-        <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+        <p v-if="err" class="c-err" role="alert">{{ err }} <SupportLink /></p>
         <button class="c-btn primary block c-mb" :disabled="busy">{{ busy ? $t('auth.forgot.resetting') : $t('auth.forgot.reset') }}</button>
         <p class="c-center c-mute">
           <button v-if="wait <= 0" type="button" class="c-btn" :disabled="busy" @click="send">{{ $t('auth.forgot.resend') }}</button>

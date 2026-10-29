@@ -248,7 +248,7 @@ const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: 
     <footer class="l-foot">
       <div class="l-in l-foot-row">
         <span>© 2026 Eric Vrataski · Wishly</span>
-        <span><NuxtLink to="/terms">{{ $t('me.home.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('me.home.privacy') }}</NuxtLink></span>
+        <span><NuxtLink to="/terms">{{ $t('me.home.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('me.home.privacy') }}</NuxtLink>・<SupportLink /></span>
       </div>
       <div class="l-word" aria-hidden="true">WISHLY</div>
     </footer>

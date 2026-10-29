@@ -14,7 +14,9 @@
       "s4h": "4. Giới hạn trách nhiệm",
       "s4p": "Dịch vụ được cung cấp theo hiện trạng và chúng tôi không đảm bảo hoạt động không gián đoạn. Nền tảng không chịu trách nhiệm bồi thường cho tranh chấp phát sinh từ nội dung danh sách, liên kết sản phẩm của bên thứ ba hoặc giao dịch giữa hai bên, nhưng sẽ phối hợp xử lý nội dung vi phạm.",
       "s5h": "5. Thay đổi điều khoản",
-      "s5p": "Điều khoản sau khi sửa đổi sẽ được đăng trên trang này, việc tiếp tục sử dụng được xem là đồng ý."
+      "s5p": "Điều khoản sau khi sửa đổi sẽ được đăng trên trang này, việc tiếp tục sử dụng được xem là đồng ý.",
+      "s6h": "6. Liên hệ",
+      "s6p": "Nếu có thắc mắc hoặc muốn khiếu nại về dịch vụ, tài khoản, điểm hoặc việc gỡ nội dung, hãy gửi email kèm ID tài khoản (sao chép trong Cài đặt):"
     },
     "privacy": {
       "title": "Chính sách quyền riêng tư",
@@ -31,7 +33,9 @@
       "reportH": "Báo cáo",
       "reportP": "Báo cáo được xem xét thủ công và người tạo sẽ không biết ai là người báo cáo; để chống lạm dụng, chúng tôi dùng Cloudflare Turnstile và giới hạn tần suất theo IP.",
       "loginH": "Bảo mật đăng nhập",
-      "loginP": "Để ngăn tấn công dò mật khẩu, khi đăng nhập thất bại chúng tôi ghi lại Email và địa chỉ IP đã dùng, nhằm tạm khóa và kích hoạt xác minh chống bot, đồng thời dùng ở dạng thống kê để theo dõi bất thường; bản ghi tự động xóa sau 365 ngày."
+      "loginP": "Để ngăn tấn công dò mật khẩu, khi đăng nhập thất bại chúng tôi ghi lại Email và địa chỉ IP đã dùng, nhằm tạm khóa và kích hoạt xác minh chống bot, đồng thời dùng ở dạng thống kê để theo dõi bất thường; bản ghi tự động xóa sau 365 ngày.",
+      "contactH": "Liên hệ",
+      "contactP": "Để tra cứu, chỉnh sửa hoặc xóa dữ liệu cá nhân, hoặc có thắc mắc về chính sách này, hãy gửi email tới:"
     }
   }
 }

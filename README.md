@@ -140,6 +140,7 @@ npx playwright show-report                                      # 開啟上次�
 - **洩漏時**：攻擊者必須同時拿到金鑰和資料庫才能讀到地址。若確認金鑰外洩，請先實作輪替再重新加密，並評估是否需要通知受影響的使用者。
 - **也用於兩步驟驗證**：營運人員的 TOTP 密鑰（`users.totp_secret`）同樣以此金鑰加密。金鑰遺失時，已啟用的人無法通過驗證、也進不了後台，須由另一位營運人員在後台「使用者」重設兩步驟驗證；若沒有其他營運人員，直接在資料庫執行 `UPDATE users SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE id='<uuid>';`。
 - 前端：`NUXT_PUBLIC_API_BASE`（預設 `http://localhost:8080`）；`NUXT_PUBLIC_TURNSTILE_SITE_KEY`（檢舉用 Cloudflare Turnstile；未設定時檢舉送 `dev-bypass`，僅限本機 mock；**正式部署必填**，`npm run deploy` 缺少它會直接中止，`deploy:demo` 不受影響）
+- 前端：`NUXT_PUBLIC_SUPPORT_EMAIL`（客服信箱，建置時寫入，預設 `support@wishly.tw`）；顯示在頁尾、條款、隱私權政策、設定頁，以及停權、錢包凍結、清單下架等「請聯絡客服」提示旁（`components/SupportLink.vue`，已登入時信件內文自動帶帳號 ID）
 
 ## 部署
 
