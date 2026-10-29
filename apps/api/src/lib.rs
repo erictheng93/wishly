@@ -3,6 +3,7 @@ pub mod account;
 pub mod admin;
 pub mod auth;
 pub mod auth_ext;
+pub mod birthday;
 pub mod catalog;
 pub mod cdn;
 pub mod claims;

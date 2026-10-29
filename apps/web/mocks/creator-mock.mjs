@@ -35,10 +35,10 @@ const completion = (w) => {
 const maskItem = (i, w) => (pub(w).surprise_locked ? { ...i, qty_claimed: null } : i)
 
 function seed() {
-  const u = { id: uid(), display_name: 'demo', email: 'demo@example.com', avatar_url: null, is_staff: false, notification_prefs: { email_claims: true }, identities: [{ provider: 'email' }], orgs: [] }
+  const u = { id: uid(), display_name: 'demo', email: 'demo@example.com', avatar_url: null, is_staff: false, notification_prefs: { email_claims: true, email_birthdays: true }, identities: [{ provider: 'email' }], orgs: [] }
   users.set(u.email, u)
   const mk = (title, extra = {}) => {
-    const w = { id: uid(), type: 'registry', status: 'active', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title, description: null, cover_image_url: null, cover_preset: null, cover_image_status: 'none', event_date: null, show_claimer_names: false, surprise_mode: false, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: u, created_at: now(), updated_at: now(), ...extra }
+    const w = { id: uid(), type: 'registry', status: 'active', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title, description: null, cover_image_url: null, cover_preset: null, birthday_notify: false, cover_image_status: 'none', event_date: null, show_claimer_names: false, surprise_mode: false, claim_ttl_hours: null, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: u, created_at: now(), updated_at: now(), ...extra }
     lists.set(w.id, w)
     itemsBy.set(w.id, [])
     return w
@@ -118,7 +118,7 @@ http.createServer(async (req, res) => {
     if (body.code !== '123456' || !pd) return problem(res, 400, 'OTP_INVALID', '驗證碼錯誤或已過期，請重新取得。')
     if (pws.has(e)) return problem(res, 409, 'EMAIL_EXISTS', '此 Email 已註冊，請直接登入或使用忘記密碼。')
     pending.delete(e)
-    const u = users.get(e) || { id: uid(), display_name: pd.name, email: e, avatar_url: null, is_staff: e.includes('staff'), notification_prefs: { email_claims: true }, identities: [{ provider: 'email' }], orgs: [] }
+    const u = users.get(e) || { id: uid(), display_name: pd.name, email: e, avatar_url: null, is_staff: e.includes('staff'), notification_prefs: { email_claims: true, email_birthdays: true }, identities: [{ provider: 'email' }], orgs: [] }
     users.set(e, u); pws.set(e, pd.pw)
     return startSession(u, true)
   }
@@ -139,7 +139,7 @@ http.createServer(async (req, res) => {
   if (p === '/auth/otp/verify' && m === 'POST') {
     if (body.code !== '123456') return problem(res, 401, 'OTP_INVALID', '驗證碼不正確')
     let u = users.get(body.email), isNew = false
-    if (!u) { isNew = true; u = { id: uid(), display_name: body.email.split('@')[0], email: body.email, avatar_url: null, is_staff: body.email.includes('staff'), notification_prefs: { email_claims: true }, identities: [{ provider: 'email' }], orgs: [] }; users.set(body.email, u) }
+    if (!u) { isNew = true; u = { id: uid(), display_name: body.email.split('@')[0], email: body.email, avatar_url: null, is_staff: body.email.includes('staff'), notification_prefs: { email_claims: true, email_birthdays: true }, identities: [{ provider: 'email' }], orgs: [] }; users.set(body.email, u) }
     const t = uid(); sessions.set(t, u)
     return send(res, 200, { user: { id: u.id, display_name: u.display_name, email: u.email, avatar_url: null }, is_new_user: isNew }, { 'set-cookie': `ws_session=${t}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax` })
   }
@@ -152,7 +152,7 @@ http.createServer(async (req, res) => {
     if (m === 'GET') return send(res, 200, me)
     if (m === 'PATCH') {
       if (body.display_name) me.display_name = body.display_name
-      if (body.notification_prefs) { if (Object.keys(body.notification_prefs).some((k) => k !== 'email_claims')) return problem(res, 422, 'VALIDATION_FAILED', '未知的偏好'); Object.assign(me.notification_prefs, body.notification_prefs) }
+      if (body.notification_prefs) { if (Object.keys(body.notification_prefs).some((k) => !['email_claims', 'email_birthdays'].includes(k))) return problem(res, 422, 'VALIDATION_FAILED', '未知的偏好'); Object.assign(me.notification_prefs, body.notification_prefs) }
       return send(res, 200, me)
     }
     if (m === 'DELETE') {
@@ -169,7 +169,7 @@ http.createServer(async (req, res) => {
     if (!authed()) return
     if (!body.title?.trim()) return problem(res, 422, 'VALIDATION_FAILED', '請求內容有 1 個欄位不正確。', { errors: [{ pointer: '/title', code: 'REQUIRED', detail: '請輸入清單名稱' }] })
     if (body.surprise_mode && (!body.event_date || Date.parse(body.event_date) <= Date.now())) return problem(res, 422, 'VALIDATION_FAILED', '活動日需為未來日期', { errors: [{ pointer: '/event_date', code: 'RANGE', detail: '驚喜模式需設定未來的活動日' }] })
-    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_preset: body.cover_preset ?? null, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: 'claim_ttl_hours' in body ? body.claim_ttl_hours : 168, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
+    const w = { id: uid(), type: body.type, status: 'draft', visibility: 'public', slug: Math.random().toString(36).slice(2, 12), title: body.title, description: body.description ?? null, cover_image_url: body.cover_image_key ? `${ORIGIN}/favicon.ico` : null, cover_preset: body.cover_preset ?? null, birthday_notify: !!body.birthday_notify, cover_image_status: 'none', event_date: body.event_date ?? null, show_claimer_names: !!body.show_claimer_names, surprise_mode: !!body.surprise_mode, claim_ttl_hours: 'claim_ttl_hours' in body ? body.claim_ttl_hours : 168, moderation_status: 'ok', moderation_reason: null, moderated_at: null, has_shipping_address: false, org_id: null, owner: me, created_at: now(), updated_at: now() }
     lists.set(w.id, w); itemsBy.set(w.id, [])
     return send(res, 201, pub(w))
   }
@@ -190,7 +190,7 @@ http.createServer(async (req, res) => {
         if (!myItems(w).length) errors.push({ pointer: '/items', code: 'REQUIRED', detail: '至少需要 1 個品項' })
         if (errors.length) return problem(res, 409, 'WISHLIST_NOT_PUBLISHABLE', '清單尚不符合發佈條件。', { errors })
       }
-      for (const k of ['title', 'description', 'event_date', 'visibility', 'status', 'show_claimer_names', 'surprise_mode', 'cover_image_key', 'cover_preset']) if (k in body) w[k] = body[k]
+      for (const k of ['title', 'description', 'event_date', 'visibility', 'status', 'show_claimer_names', 'surprise_mode', 'cover_image_key', 'cover_preset', 'birthday_notify']) if (k in body) w[k] = body[k]
       if ('cover_image_key' in body) w.cover_image_url = body.cover_image_key ? `${ORIGIN}/favicon.ico` : null
       w.updated_at = now(); broadcast(w, 'wishlist.updated', { status: w.status, title: w.title, completion: completion(w), updated_at: w.updated_at })
       return send(res, 200, pub(w))

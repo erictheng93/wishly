@@ -167,6 +167,20 @@
         "friends": "Teman",
         "private": "Pribadi"
       }
+    },
+    "bday": {
+      "label": "Beri tahu teman yang bisa melihat daftar ini 7 hari sebelum ulang tahun saya",
+      "who": {
+        "friends": "Semua teman Anda akan diberi tahu.",
+        "selected": "Hanya teman dekat yang Anda pilih untuk daftar ini yang diberi tahu."
+      },
+      "block": {
+        "required": "Isi tanggal lahir di Pengaturan untuk mengaktifkan ini.",
+        "private": "Ulang tahun Anda hanya terlihat oleh Anda. Ubah dulu di Pengaturan.",
+        "listPrivate": "Daftar pribadi tidak memberi tahu siapa pun. Pilih visibilitas lain dulu."
+      },
+      "goSettings": "Ke Pengaturan",
+      "single": "Hanya satu daftar yang bisa aktif sekaligus; mengaktifkan ini akan menonaktifkan daftar lain."
     }
   }
 }

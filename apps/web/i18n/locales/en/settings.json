@@ -112,6 +112,11 @@
       "relogin": "Sign in again"
     },
     "terms": "Terms of Service",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "notify": {
+      "title": "Notifications",
+      "birthdays": "Birthday emails",
+      "birthdaysHint": "Friends' birthday reminders, and a reminder before your own birthday to set up a list."
+    }
   }
 }

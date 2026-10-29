@@ -713,13 +713,16 @@ async fn patch_me(
     }
     if let Some(prefs) = p.notification_prefs {
         let ok = prefs.as_object().is_some_and(|o| {
-            !o.is_empty() && o.iter().all(|(k, v)| k == "email_claims" && v.is_boolean())
+            !o.is_empty()
+                && o.iter().all(|(k, v)| {
+                    matches!(k.as_str(), "email_claims" | "email_birthdays") && v.is_boolean()
+                })
         });
         if !ok {
             return Err(AppError::invalid(
                 "/notification_prefs",
                 "FORMAT",
-                "僅支援布林值的 email_claims",
+                "僅支援布林值的 email_claims / email_birthdays",
             ));
         }
         sqlx::query("UPDATE users SET notification_prefs = notification_prefs || $2 WHERE id=$1")
@@ -776,7 +779,7 @@ async fn patch_me(
             .execute(&st.pool)
             .await?;
     }
-    if let Some(b) = p.birthday {
+    if let Some(b) = p.birthday.clone() {
         // 用閏年 2000 驗證，允許 02-29；格式須剛好 MM-DD
         if b.as_deref().is_some_and(|b| {
             b.len() != 5
@@ -801,6 +804,23 @@ async fn patch_me(
             .bind(v)
             .execute(&st.pool)
             .await?;
+    }
+    // 生日清空或設為私人：關掉所有清單的生日通知，並取消尚未寄出的朋友通知（D65）
+    if matches!(p.birthday, Some(None)) || p.birthday_visibility.as_deref() == Some("private") {
+        let mut tx = st.pool.begin().await?;
+        let gone: bool = sqlx::query_scalar("SELECT birthday IS NULL OR birthday_visibility::text = 'private' FROM users WHERE id=$1")
+            .bind(u.id).fetch_one(&mut *tx).await?;
+        if gone {
+            sqlx::query(
+                "UPDATE wishlists SET birthday_notify=false WHERE owner_id=$1 AND birthday_notify",
+            )
+            .bind(u.id)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("UPDATE notifications SET status='cancelled' WHERE status='pending' AND kind='birthday.friend' AND payload->>'owner_id' = $1::text")
+                .bind(u.id).execute(&mut *tx).await?;
+        }
+        tx.commit().await?;
     }
     if let Some(v) = &p.locale {
         if !["zh-TW", "en", "vi", "id"].contains(&v.as_str()) {

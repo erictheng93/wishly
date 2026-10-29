@@ -96,6 +96,9 @@ pub fn spawn_cleanup(pool: PgPool) {
                 tracing::error!(error=?e, "tick_funding");
             }
             if n.is_multiple_of(12) {
+                if let Err(e) = crate::birthday::birthday_tick(&pool).await {
+                    tracing::error!(error=%e, "birthday_tick");
+                }
                 if let Err(e) = cleanup(&pool).await {
                     tracing::error!(error=%e, "cleanup");
                 }

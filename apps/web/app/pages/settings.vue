@@ -117,6 +117,11 @@ async function saveName() {
   try { user.value = await api('/me', { method: 'PATCH', body: { display_name: name.value.trim() } }); msg.value = t('settings.saved') }
   catch (e) { err.value = errMsg(e) }
 }
+const nBusy = ref(false), nErr = ref('')
+async function setBirthdayMail(on: boolean) {
+  nBusy.value = true; nErr.value = ''
+  try { user.value = await api('/me', { method: 'PATCH', body: { notification_prefs: { email_birthdays: on } } }) } catch (e: any) { nErr.value = apiErrMsg(e) } finally { nBusy.value = false }
+}
 async function saveSocial() {
   hMsg.value = hErr.value = ''
   if (hBad.value) { hErr.value = t('settings.social.handleBadErr'); return }
@@ -242,6 +247,11 @@ async function remove() {
           <p v-if="hMsg" class="c-ok" role="status">{{ hMsg }}</p>
           <button class="c-btn" :disabled="hBad">{{ $t('settings.save') }}</button>
         </form>
+      </section>
+      <section class="c-card">
+        <h2 class="c-h2">{{ $t('settings.notify.title') }}</h2>
+        <label class="c-switch"><input type="checkbox" :checked="user?.notification_prefs?.email_birthdays !== false" :disabled="nBusy" @change="setBirthdayMail(($event.target as HTMLInputElement).checked)"><span>{{ $t('settings.notify.birthdays') }}<br><small class="c-mute">{{ $t('settings.notify.birthdaysHint') }}</small></span></label>
+        <p v-if="nErr" class="c-err" role="alert">{{ nErr }}</p>
       </section>
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.export.title') }}</h2>

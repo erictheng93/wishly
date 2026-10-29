@@ -147,7 +147,11 @@
       "handle_FORMAT": "帳號代號需為 3–30 碼小寫英數或底線",
       "TAX_ID_CHECKSUM": "統一編號檢查碼錯誤，請確認後再輸入",
       "FIELD_LOCKED": "此欄位目前不可修改",
-      "EVENT_HIDDEN": "不可選擇已下架的事件"
+      "EVENT_HIDDEN": "不可選擇已下架的事件",
+      "birthday_notify_BIRTHDAY_REQUIRED": "請先在設定填寫生日。",
+      "birthday_notify_BIRTHDAY_PRIVATE": "你的生日可見度為「只有自己」，無法開啟生日通知。",
+      "birthday_notify_LIST_PRIVATE": "私人清單無法開啟生日通知。",
+      "birthday_notify_NOT_PERSONAL": "組織與救災據點清單無法開啟生日通知。"
     }
   }
 }
