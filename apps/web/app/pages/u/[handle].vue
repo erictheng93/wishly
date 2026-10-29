@@ -39,7 +39,9 @@ const accept = () => run(async () => {
     <div v-else-if="state === 'gone'" class="c-center"><p>{{ $t('me.profile.gone') }}</p></div>
     <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></div>
     <template v-else>
-      <section class="c-card">
+      <section class="pf-hero">
+        <span class="pf-kick" aria-hidden="true">PROFILE / @{{ p.user.handle }}</span>
+        <div class="pf-av" aria-hidden="true">{{ (p.user.display_name || '?').slice(0, 1) }}</div>
         <h2 class="c-h2">{{ p.user.display_name }}</h2>
         <p class="c-mute">@{{ p.user.handle }}<template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
         <p v-if="p.user.bio" style="white-space:pre-line">{{ p.user.bio }}</p>
@@ -53,9 +55,9 @@ const accept = () => run(async () => {
       </section>
 
       <section>
-        <h2 class="c-h2">{{ $t('me.profile.lists') }}</h2>
+        <h2 class="c-h2 pf-sec"><span aria-hidden="true">01</span>{{ $t('me.profile.lists') }}</h2>
         <p v-if="!p.wishlists.length" class="c-mute">{{ $t('me.profile.noLists') }}</p>
-        <article v-for="w in p.wishlists" :key="w.slug" class="c-card">
+        <article v-for="w in p.wishlists" :key="w.slug" class="c-card pf-card">
           <div class="c-row">
             <img class="c-thumb" :src="coverSrc(w)" alt="">
             <div class="c-grow">
@@ -72,9 +74,9 @@ const accept = () => run(async () => {
       </section>
 
       <section>
-        <h2 class="c-h2">{{ $t('me.profile.donations') }}</h2>
+        <h2 class="c-h2 pf-sec"><span aria-hidden="true">02</span>{{ $t('me.profile.donations') }}</h2>
         <p v-if="!p.donations.length" class="c-mute">{{ $t('me.profile.noDonations') }}</p>
-        <article v-for="(d, i) in p.donations" :key="i" class="c-card">
+        <article v-for="(d, i) in p.donations" :key="i" class="c-card pf-card">
           <strong>{{ d.item_title }}{{ d.kind === 'pledge' ? $t('me.profile.pledgePts', { pts: d.points }) : $t('me.profile.qty', { qty: d.qty }) }}</strong>
           <span class="c-badge">{{ statusLabel(d.status) }}</span>
           <div class="c-mute">
@@ -87,3 +89,17 @@ const accept = () => run(async () => {
     </template>
   </main>
 </template>
+
+<style scoped>
+.pf-kick{display:block;margin:0 0 8px;font:700 11px var(--mono);letter-spacing:.16em;color:var(--mute)}
+.pf-kick::before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:8px}
+.pf-hero{border:1px solid var(--ink-line);border-top:3px solid var(--red);padding:24px 20px;margin:16px 0 8px;display:grid;gap:10px;justify-items:start;background:var(--card)}
+.pf-hero .c-h2{font-size:clamp(28px,6vw,40px);font-weight:900;letter-spacing:-.02em;margin:0;line-height:1.1}
+.pf-hero p{margin:0}
+.pf-hero .c-h2::before{display:none}
+.pf-av{width:64px;height:64px;display:grid;place-items:center;background:var(--fg);color:var(--bg);font:900 28px var(--font)}
+.pf-sec{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:32px 0 12px;padding-top:12px;border-top:1px solid var(--ink-line)}
+.pf-sec span{color:var(--red-text);margin-right:8px}
+.pf-card{border-top:2px solid var(--ink-line)!important;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+@media (hover:hover){.pf-card:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line)}}
+</style>

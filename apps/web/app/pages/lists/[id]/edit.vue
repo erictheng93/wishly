@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('lists.edit.pageTitle') })
@@ -158,9 +159,10 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <ul v-if="pubErrs.length" class="c-err"><li v-for="x in pubErrs" :key="x">{{ x }}</li></ul>
 
       <div class="c-split"><div>
-      <p v-if="!items.length && !loading" class="c-center c-mute">{{ $t('lists.edit.noItems') }}</p>
+      <p v-if="!items.length && !loading" class="x-empty">{{ $t('lists.edit.noItems') }}</p>
       <div class="c-grid">
-      <article v-for="(i, k) in items" :key="i.id" class="c-card">
+      <article v-for="(i, k) in items" :key="i.id" class="c-card ed-item">
+        <span class="ed-n" aria-hidden="true">{{ String(k + 1).padStart(2, '0') }}</span>
         <div class="c-row">
           <img v-if="i.image_url" class="c-thumb" :src="i.image_url" alt="">
           <div v-else class="c-thumb">{{ i.image_status === 'pending' ? $t('lists.edit.processing') : $t('creator.image.none') }}</div>
@@ -173,7 +175,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
             <div v-if="i.image_status === 'rejected'" class="c-err">{{ $t('lists.edit.imgRejected') }}</div>
           </div>
         </div>
-        <div v-if="!closed" class="c-row wrap c-mt">
+        <div v-if="!closed" class="c-row wrap c-mt ed-act">
           <button class="c-btn" :disabled="k === 0" :aria-label="$t('lists.edit.up')" @click="move(k, -1)">↑</button>
           <button class="c-btn" :disabled="k === items.length - 1" :aria-label="$t('lists.edit.down')" @click="move(k, 1)">↓</button>
           <button class="c-btn c-grow" @click="openItem(i)">{{ $t('lists.common.edit') }}</button>
@@ -182,7 +184,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         </div>
       </article>
       </div>
-      <button v-if="!closed" class="c-btn block c-mb16" @click="openItem()">{{ $t('lists.edit.addItem') }}</button>
+      <button v-if="!closed" class="c-btn block c-mb16 ed-add" @click="openItem()">{{ $t('lists.edit.addItem') }}</button>
       </div>
       <aside>
 
@@ -193,13 +195,13 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <select name="site_status" :value="w.site_status" @change="patchList({ site_status: ($event.target as HTMLSelectElement).value })"><option v-for="s in ['active', 'paused', 'closed']" :key="s" :value="s">{{ $t(`org.relief.siteStatus.${s}`) }}</option></select>
         </label>
       </section>
-      <details v-if="!relief" ref="addrEl" class="c-card" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
+      <details v-if="!relief" ref="addrEl" class="c-card ed-side" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
         <summary>{{ $t('lists.edit.shipSummary') }}<span v-if="w.has_shipping_address" class="c-badge active">{{ $t('lists.edit.filled') }}</span></summary>
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
 
       <!-- 封存後只能取消封存（後端拒絕其他修改），不顯示設定與分享 -->
-      <details v-if="w.status !== 'archived'" class="c-card">
+      <details v-if="w.status !== 'archived'" class="c-card ed-side">
         <summary>{{ $t('lists.edit.settings') }}</summary>
         <form class="c-mt12" @submit.prevent="saveMeta">
           <label class="c-field"><span>{{ $t('lists.edit.name') }}</span><input v-model="meta.title" maxlength="100" required></label>
@@ -264,3 +266,19 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     </CreatorSheet>
   </main>
 </template>
+<style scoped>
+.ed-item{padding:16px 16px 14px 16px}
+.ed-n{position:absolute;top:0;right:0;padding:6px 10px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute);background:var(--bg-alt)}
+.ed-item .c-thumb{width:72px;height:72px}
+.ed-item .c-grow strong{font-size:17px;line-height:1.3;display:block;padding-right:36px}
+.ed-act{padding-top:12px;border-top:1px dashed var(--line);margin-top:14px}
+.ed-add{margin-top:16px;border-style:dashed;min-height:52px;background:var(--bg-alt)}
+.ed-side{padding:0 18px}
+.ed-side>summary{justify-content:space-between;font-size:15px;letter-spacing:.02em;list-style:none}
+.ed-side>summary::-webkit-details-marker{display:none}
+.ed-side>summary::after{content:"+";font:500 22px/1 var(--mono);color:var(--red-text);transition:transform var(--t) var(--ease)}
+.ed-side[open]>summary::after{transform:rotate(45deg)}
+.ed-side[open]{border-color:var(--ink-line);padding-bottom:18px}
+.ed-side[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
+@media (max-width:767px){.ed-item .c-thumb{width:60px;height:60px}}
+</style>

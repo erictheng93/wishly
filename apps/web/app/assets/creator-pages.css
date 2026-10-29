@@ -1,0 +1,37 @@
+/* 創建者與帳號頁的共用精製層（x- 前綴）：由各頁 import，不改動共用 creator.css。
+   語彙：墨色區塊、等寬索引籤、編輯式區塊標題、儀表數字、標本籤 */
+/* 區塊標題：索引編號＋標題＋墨色底線（取代紅方塊） */
+.c-page .x-h{display:flex;align-items:baseline;gap:12px;margin:44px 0 16px;padding:0 0 10px;border-bottom:1px solid var(--ink-line);font-size:20px;line-height:1.2;letter-spacing:-.005em}
+.c-page .x-h::before{content:attr(data-n);flex:none;width:auto;height:auto;background:none;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text)}
+/* 等寬小標籤列：兩端對齊、細底線 */
+.x-tag{display:flex;align-items:center;justify-content:space-between;gap:12px;font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.x-tag b{color:var(--fg);font-weight:600}
+.x-tag .x-dot{display:inline-block;width:6px;height:6px;background:var(--red);margin-right:8px;vertical-align:1px}
+/* 墨色儀表區塊：反白底＋細斜線肌理，大數字 */
+.x-ink{position:relative;--xi-bg:var(--fg);--xi-fg:var(--bg);background:var(--xi-bg);color:var(--xi-fg);padding:20px 20px 24px;margin:0 0 8px;overflow:hidden;animation:rise .5s var(--ease) both}
+.x-ink::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(-45deg,transparent 0 10px,color-mix(in srgb,var(--xi-fg) 7%,transparent) 10px 11px);pointer-events:none}
+.x-ink>*{position:relative;z-index:1}
+.x-ink .x-tag{color:color-mix(in srgb,var(--xi-fg) 60%,transparent);padding-bottom:14px;border-bottom:1px solid color-mix(in srgb,var(--xi-fg) 22%,transparent)}
+.x-ink .x-tag b{color:var(--xi-fg)}
+.x-ink .x-num{display:block;margin:22px 0 14px;font:900 clamp(60px,15vw,120px)/.92 var(--font);letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:var(--xi-fg);overflow-wrap:normal}
+.x-ink .x-cap{margin:0;font-size:14px;color:color-mix(in srgb,var(--xi-fg) 72%,transparent)}
+.x-ink .c-mute,.x-ink .c-small{color:color-mix(in srgb,var(--xi-fg) 62%,transparent)}
+.x-ink .c-err{color:var(--bad)}
+/* 刻度尺：以 repeating 漸層畫刻度，紅色段落表示比例 */
+.x-ruler{position:relative;height:18px;margin:18px 0 8px;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--xi-fg) 45%,transparent) 0 1px,transparent 1px 8px) bottom/100% 8px no-repeat,repeating-linear-gradient(90deg,color-mix(in srgb,var(--xi-fg) 80%,transparent) 0 1px,transparent 1px 40px) bottom/100% 14px no-repeat}
+.x-ruler>i{position:absolute;left:0;bottom:0;height:5px;background:var(--stripe);transform-origin:left;animation:fill 1s var(--ease) both .2s}
+/* 墨色區塊上的按鈕 */
+.x-ink .c-btn:not(.primary){background:transparent;color:var(--xi-fg);border-color:color-mix(in srgb,var(--xi-fg) 55%,transparent)}
+.x-ink .c-btn.primary{border-color:var(--accent)}
+@media (hover:hover) and (pointer:fine){
+  .x-ink .c-btn:not(.primary):not([disabled]):hover{background:var(--xi-fg);color:var(--xi-bg);border-color:var(--xi-fg)}
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .x-ink{--xi-bg:var(--bg-alt);--xi-fg:var(--fg);border:1px solid var(--ink-line)}}
+:root[data-theme="dark"] .x-ink{--xi-bg:var(--bg-alt);--xi-fg:var(--fg);border:1px solid var(--ink-line)}
+/* 列表（帳本等）：細線分隔、等寬數字 */
+.x-rows{margin:0;padding:0;list-style:none;border-top:1px solid var(--ink-line)}
+.x-rows>li{padding:14px 0;border-bottom:1px solid var(--line)}
+/* 標本頁籤：圖片 + 索引 */
+.x-idx{font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute)}
+.x-empty{position:relative;display:grid;justify-items:center;gap:6px;padding:40px 20px;text-align:center;border:1px dashed var(--line);background:var(--hatch);color:var(--mute)}
+.x-h+.x-rows,.x-h+section>.x-rows{border-top:0}

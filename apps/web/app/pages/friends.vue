@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('common.friends') })
@@ -89,7 +90,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
       </div>
 
       <section class="fr-feed" :aria-labelledby="'fr-feed-h'">
-        <h2 id="fr-feed-h" class="c-h2">{{ $t('me.friends.feedTitle') }}</h2>
+        <h2 id="fr-feed-h" class="c-h2 x-h" data-n="FEED">{{ $t('me.friends.feedTitle') }}</h2>
         <p v-if="feedErr" class="c-err" role="alert">{{ feedErr }}</p>
         <p v-else-if="!feed" class="c-mute" role="status">{{ $t('me.loading') }}</p>
         <div v-else-if="!data.friends.length" class="c-mask">
@@ -190,11 +191,15 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 /* 手機：邀請 / 生日 → 動態 → 加好友與名單；桌面 ≥1100：動態在左，其餘疊在右欄 */
 .fr{display:flex;flex-direction:column}
 .fr-feed{margin-bottom:12px}
+.fr-feed .x-h{margin-top:0}
+.fr-top .c-h2,.fr-side .c-h2{font-size:15px;font-family:var(--font)}
+.fr-side .c-card>form .c-btn,.fr-side .c-card>.c-btn{margin-right:8px}
 .fr-who{align-items:flex-start}
 .fr-who strong{margin-inline-end:.25em}
-.fr-ava{flex:none;display:grid;place-items:center;width:40px;height:40px;background:var(--bg-alt);border:1px solid var(--line);font-weight:800}
-.fr-date{flex:none;display:grid;place-items:center;min-width:52px;height:40px;border:1px solid var(--red);color:var(--red-text);font-weight:800;font-variant-numeric:tabular-nums}
-.c-card a.fr-item{display:flex;gap:12px;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--line);border-left:4px solid var(--red)}
+.fr-ava{flex:none;display:grid;place-items:center;width:40px;height:40px;background:var(--fg);color:var(--bg);font:800 15px var(--mono)}
+.fr-date{flex:none;display:grid;place-items:center;min-width:56px;height:40px;border:1px solid var(--ink-line);font:800 14px var(--mono);font-variant-numeric:tabular-nums;box-shadow:inset 0 -3px 0 var(--red)}
+.c-card a.fr-item{display:flex;gap:12px;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--line);background:var(--bg-alt);transition:border-color var(--t) var(--ease),transform var(--t) var(--ease)}
+.c-card a.fr-item:hover{border-color:var(--ink-line);transform:translateX(3px)}
 .fr-item strong,.fr-item .c-mute{display:block}
 .fr-side .c-card{scroll-margin-top:calc(var(--head-h) + 12px)}
 .fr-hot{color:var(--red-text);border-color:var(--red)}

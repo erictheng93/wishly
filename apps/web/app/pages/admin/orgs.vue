@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 公益組織與勸募許可審核：組織 pending → 核准 / 補件 / 退件；已通過者退件即撤銷（據點下架，二次確認）；許可可核准 / 退件，已核准者退件即撤銷（據點暫停）
 definePageMeta({ middleware: 'staff' })
 const { t } = useI18n()

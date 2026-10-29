@@ -23,14 +23,14 @@ async function saveReceipt() {
 </script>
 
 <template>
-  <main class="c-page">
+  <main class="c-page rc">
     <CreatorHeader :title="data?.site?.title || $t('org.console.receipts')" :back="`/orgs/${org}`" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="loading" class="c-mute" role="status">{{ $t('org.apply.loading') }}</p>
     <template v-else-if="data">
-      <p class="c-mute"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" />　{{ data.site.site_address }}</p>
+      <p class="c-mute rc-site"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" />　{{ data.site.site_address }}</p>
       <p v-if="!data.items.length" class="c-mute">{{ $t('org.relief.receiptsNone') }}</p>
-      <ul class="c-list">
+      <ul class="c-list rc-list">
         <li v-for="i in data.items" :key="i.item_id" class="c-card">
           <strong>{{ i.title }}</strong>
           <span class="c-mute">{{ $t(`org.relief.category.${i.category}`) }}・{{ $t(`org.relief.urgency.${i.urgency}`) }}</span>
@@ -54,6 +54,12 @@ async function saveReceipt() {
 </template>
 
 <style scoped>
-.c-list{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:12px}
-.c-list li{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.rc-site{display:flex;align-items:center;gap:12px;margin:0 0 20px;font:500 13px var(--mono)}
+.rc-list{list-style:none;padding:0;margin:0!important;display:block;counter-reset:rc;border-top:2px solid var(--ink-line)}
+.rc-list li.c-card{counter-increment:rc;display:grid;grid-template-columns:auto 1fr auto;gap:2px 16px;align-items:center;margin:0;padding:16px 4px 16px 0;border:0;border-bottom:1px solid var(--line);animation:rise .5s var(--ease) both}
+.rc-list li.c-card::before{content:counter(rc,decimal-leading-zero);grid-row:1/4;font:700 22px var(--mono);color:var(--red-text);letter-spacing:-.04em;min-width:1.8em;padding-left:2px}
+.rc-list li>strong{grid-column:2;font-size:17px}
+.rc-list li>.c-mute{grid-column:2;font:500 12px/1.5 var(--mono);letter-spacing:.03em}
+.rc-list li>.c-btn{grid-column:3;grid-row:1/4}
+@media (max-width:520px){.rc-list li>.c-btn{grid-column:2;grid-row:auto;justify-self:start;margin-top:8px}}
 </style>

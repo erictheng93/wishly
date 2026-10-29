@@ -30,5 +30,8 @@ function toggle(id: string, on: boolean) { users.value = on ? [...users.value, i
   </div>
 </template>
 <style scoped>
-.c-vis{border:0;padding:0;margin:0 0 16px}
+.c-vis{border:0;padding:0;margin:0 0 16px;min-width:0}
+.c-vis .c-switch{align-items:flex-start;padding:10px 0;margin:0;border-bottom:1px solid var(--line)}
+.c-vis .c-switch:has(input:checked) span{font-weight:700}
+.c-vis input{margin-top:3px;accent-color:var(--red)}
 </style>

@@ -46,6 +46,7 @@ async function verify() {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.register.title')" back="/login" />
     <div class="c-auth">
+      <CreatorAuthTag left="No.002" right="Register" :step="step === 'form' ? 1 : 2" :of="2" />
       <form v-if="step === 'form'" @submit.prevent="send">
         <label class="c-field"><span>{{ $t('auth.register.displayName') }}</span><input v-model="name" type="text" autocomplete="nickname" maxlength="50" required></label>
         <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>

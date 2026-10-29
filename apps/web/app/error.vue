@@ -13,7 +13,9 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.v
 
 <template>
   <GuestTop />
-  <main class="g-wrap g-center" style="padding-inline:16px">
+  <main class="g-wrap x-err">
+    <p class="x-code" aria-hidden="true">{{ code }}</p>
+    <div class="x-body">
     <template v-if="missing">
       <h1>{{ $t('auth.error.notFoundTitle') }}</h1>
       <p class="g-mute">{{ $t('auth.error.notFoundDesc') }}</p>
@@ -28,5 +30,16 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.v
       <p class="g-mute">{{ $t('auth.error.serverDesc') }}</p>
     </template>
     <button class="g-btn" @click="clearError({ redirect: '/' })">{{ $t('auth.error.home') }}</button>
+    </div>
   </main>
 </template>
+
+<style scoped>
+.x-err{padding-top:32px;padding-bottom:96px}
+.x-code{font:900 clamp(120px,34vw,320px)/.85 var(--font);letter-spacing:-.06em;color:var(--fg);margin:16px 0 0;font-variant-numeric:tabular-nums}
+.x-code::after{content:"";display:block;width:min(240px,50%);height:18px;margin-top:20px;background:var(--stripe);background-size:17px 17px}
+.x-body{margin-top:32px;padding-top:20px;border-top:2px solid var(--ink-line);max-width:34em}
+.x-body h1{margin:0 0 12px;font-size:clamp(26px,5vw,40px);font-weight:900;letter-spacing:-.03em}
+.x-body p{margin:0 0 24px}
+.x-body .g-btn{margin-right:8px}
+</style>

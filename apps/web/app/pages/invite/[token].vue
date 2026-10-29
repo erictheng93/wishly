@@ -24,7 +24,8 @@ async function accept() {
     <p v-if="state === 'loading'" class="c-mute" role="status">{{ $t('auth.invite.loading') }}</p>
     <div v-else-if="state === 'gone'" class="c-center"><p>{{ $t('auth.invite.gone') }}</p><p class="c-mute">{{ $t('auth.invite.goneHint') }}</p></div>
     <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">{{ $t('auth.invite.loadFail') }}</p></div>
-    <section v-else class="c-card">
+    <section v-else class="pf-hero">
+      <span class="pf-kick" aria-hidden="true">INVITE / FRIEND</span>
       <h2 class="c-h2">{{ list ? $t('auth.invite.invitesList', { name: inviter.display_name, title: list.title }) : $t('auth.invite.invites', { name: inviter.display_name }) }}</h2>
       <p v-if="inviter.handle" class="c-mute">@{{ inviter.handle }}</p>
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
@@ -33,3 +34,17 @@ async function accept() {
     </section>
   </main>
 </template>
+
+<style scoped>
+.pf-kick{display:block;margin:0 0 8px;font:700 11px var(--mono);letter-spacing:.16em;color:var(--mute)}
+.pf-kick::before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:8px}
+.pf-hero{border:1px solid var(--ink-line);border-top:3px solid var(--red);padding:24px 20px;margin:16px 0 8px;display:grid;gap:10px;justify-items:start;background:var(--card)}
+.pf-hero .c-h2{font-size:clamp(28px,6vw,40px);font-weight:900;letter-spacing:-.02em;margin:0;line-height:1.1}
+.pf-hero p{margin:0}
+.pf-hero .c-h2::before{display:none}
+.pf-av{width:64px;height:64px;display:grid;place-items:center;background:var(--fg);color:var(--bg);font:900 28px var(--font)}
+.pf-sec{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:32px 0 12px;padding-top:12px;border-top:1px solid var(--ink-line)}
+.pf-sec span{color:var(--red-text);margin-right:8px}
+.pf-card{border-top:2px solid var(--ink-line)!important;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+@media (hover:hover){.pf-card:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line)}}
+</style>

@@ -42,6 +42,7 @@ async function confirm() {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.forgot.title')" back="/login" />
     <div class="c-auth">
+      <CreatorAuthTag left="No.003" right="Recover" :step="step === 'email' ? 1 : 2" :of="2" />
       <form v-if="step === 'email'" @submit.prevent="send">
         <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
         <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('settings.title') })
@@ -152,7 +153,7 @@ async function remove() {
 }
 </script>
 <template>
-  <main class="c-page">
+  <main class="c-page x-set">
     <CreatorHeader :title="$t('settings.title')" back="/dashboard" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <template v-if="user">
@@ -267,5 +268,26 @@ async function remove() {
 
 <style scoped>
 .identity-list { list-style: none; padding: 0; margin: 0 0 1rem; }
-.identity-list li { padding-block: .5rem; }
+.identity-list li { padding-block: .5rem; border-bottom: 1px solid var(--line); }
+.identity-list li:last-child { border-bottom: 0; }
+/* 編輯式設定頁：無框區塊，墨色頂線；桌面為「標題欄 ／ 內容欄」兩欄 */
+.x-set { counter-reset: sec; }
+.x-set > .c-card { counter-increment: sec; border: 0; border-top: 1px solid var(--ink-line); background: transparent; padding: 22px 0 28px; margin: 0; }
+.x-set > .c-card:first-of-type { border-top: 0; padding-top: 6px; } /* 標題下已有墨線，第一區不再重複 */
+.x-set > .c-card > h2:first-child { display: block; font-size: 20px; margin: 0 0 16px; }
+.x-set > .c-card > h2:first-child::before { content: counter(sec, decimal-leading-zero); display: block; width: auto; height: auto; background: none; margin-bottom: 8px; font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--red-text); }
+.x-set > .c-card.bad { background: var(--bad-bg); border-top-color: var(--bad); padding-inline: 20px; box-shadow: none; margin-top: 8px; }
+.x-set > .c-card.bad > h2:first-child { color: var(--bad); }
+.x-set > .c-card:has(> .c-btn.block) { counter-increment: none; }
+.x-set > .c-card > p.c-mute:first-of-type { margin-top: 0; }
+@media (min-width: 768px) {
+  .x-set > .c-card { display: grid; grid-template-columns: 200px minmax(0, 1fr); column-gap: 40px; align-items: start; }
+  .x-set > .c-card > h2:first-child { grid-column: 1; grid-row: 1 / span 30; margin: 0; }
+  .x-set > .c-card > :not(h2:first-child) { grid-column: 2; }
+  .x-set > .c-card > .c-btn:not(.block) { justify-self: start; }
+  .x-set > .c-card:not(:has(> h2)) { display: block; }
+  .x-set > .c-card.bad { padding-inline: 24px; }
+}
+.x-set .c-field input, .x-set .c-field select, .x-set .c-field textarea { max-width: 480px; }
+
 </style>

@@ -20,11 +20,13 @@ async function more() {
 <template>
   <GuestTop />
   <main class="g-wrap">
+    <span class="x-kicker" aria-hidden="true">RELIEF / EVENTS</span>
     <h1>{{ $t('guest.relief.heading') }}</h1>
     <div v-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.relief.empty') }}</div>
     <div v-else class="g-grid">
-      <article v-for="e in list" :key="e.slug" class="g-card">
+      <article v-for="(e, n) in list" :key="e.slug" class="g-card">
+        <span class="x-no" aria-hidden="true">No.{{ String(n + 1).padStart(2, '0') }}</span>
         <NuxtLink :to="`/e/${e.slug}`" class="x-title">{{ e.name }}</NuxtLink>
         <p class="g-mute">
           {{ $t('org.relief.hazard.' + e.hazard_type) }}・{{ e.counties.join('、') }}<template v-if="e.occurred_on">・{{ e.occurred_on }}</template>
@@ -39,5 +41,16 @@ async function more() {
 </template>
 
 <style scoped>
-.x-title{display:block;font-weight:700;font-size:18px;color:var(--fg);text-decoration:none;overflow-wrap:anywhere;padding:8px 0}
+.x-kicker{display:block;margin:28px 0 0;font:700 11px var(--mono);letter-spacing:.16em;color:var(--mute)}
+.x-kicker::before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:8px}
+.x-kicker+h1{margin-top:8px}
+.g-grid .g-card{border-top:2px solid var(--ink-line);padding:14px 16px 16px;display:flex;flex-direction:column;animation:rise .5s var(--ease) both}
+.x-no{font:700 11px var(--mono);letter-spacing:.14em;color:var(--mute)}
+.x-title{display:block;font-weight:800;font-size:19px;line-height:1.35;letter-spacing:-.01em;color:var(--fg);text-decoration:none;overflow-wrap:anywhere;padding:6px 0 4px;background:linear-gradient(var(--red),var(--red)) 0 100%/0 2px no-repeat;transition:background-size var(--t) var(--ease)}
+.x-title:hover{background-size:100% 2px}
+.x-crit{margin-left:0}
+.x-head{display:flex;gap:16px;align-items:center;margin:8px 0 20px;padding-bottom:20px;border-bottom:1px solid var(--ink-line)}
+.x-head h1{margin:0 0 6px}
+.x-logo{flex:none;width:80px;height:80px;object-fit:contain;border:1px solid var(--line);padding:6px;background:var(--card)}
+h2.x-h2{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:28px 0 14px;padding-top:12px;border-top:1px solid var(--ink-line)}
 </style>

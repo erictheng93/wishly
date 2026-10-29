@@ -20,6 +20,7 @@ const { products, next, error: pErr, refresh: pRefresh, more, busy, moreErr } = 
     <div v-if="notFound" class="g-center"><h1>{{ $t('guest.brands.notFound') }}</h1><NuxtLink to="/brands">{{ $t('guest.brands.back') }}</NuxtLink></div>
     <div v-else-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="brand">
+      <p class="x-idx" aria-hidden="true"><span>INDEX / 031</span><span>BRAND FILE</span></p>
       <header class="x-head">
         <img v-if="brand.logo_url" class="x-logo" :src="brand.logo_url" alt="" loading="lazy">
         <div v-else class="x-logo x-ph" aria-hidden="true">{{ brand.name.slice(0, 1) }}</div>
@@ -41,8 +42,12 @@ const { products, next, error: pErr, refresh: pRefresh, more, busy, moreErr } = 
 </template>
 
 <style scoped>
-.x-head{display:flex;gap:16px;align-items:center;margin:8px 0 16px}
-.x-head h1{margin:0 0 4px}
-.x-logo{flex:none;width:72px;height:72px;object-fit:contain}
-.x-ph{display:flex;align-items:center;justify-content:center;background:var(--bg-alt);border:1px solid var(--line);color:var(--red-text);font-size:32px;font-weight:700}
+.x-idx{display:flex;justify-content:space-between;gap:16px;margin:28px 0 0;padding-bottom:12px;border-bottom:1px solid var(--ink-line);font:600 11px/1.4 var(--mono);letter-spacing:.16em;color:var(--mute)}
+.x-idx span:first-child{color:var(--red-text)}
+.x-head{display:flex;gap:20px;align-items:center;margin:20px 0 32px;padding-bottom:24px;border-bottom:1px solid var(--line)}
+.x-head h1{margin:0 0 6px;font-size:clamp(34px,7vw,64px);font-weight:900;letter-spacing:-.04em}
+.x-head a{display:inline-flex;align-items:center;min-height:44px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:5px}
+.x-logo{flex:none;width:96px;height:96px;object-fit:contain;border:1px solid var(--ink-line);background:#fff;padding:8px;box-sizing:border-box}
+.x-ph{display:flex;align-items:center;justify-content:center;background:var(--hatch),var(--bg-alt);color:var(--red-text);font-size:44px;font-weight:900}
+@media (max-width:520px){.x-head{flex-direction:column;align-items:flex-start}}
 </style>

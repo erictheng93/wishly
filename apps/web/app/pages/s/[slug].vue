@@ -183,7 +183,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="gone" class="g-center"><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-if="gone" class="g-center"><span class="sx-code" aria-hidden="true">410</span><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
     <div v-else-if="forbidden" class="g-center">
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
@@ -198,33 +198,45 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
     <div v-else-if="failed && !data" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
-    <div v-else-if="!data" class="g-center"><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-else-if="!data" class="g-center"><span class="sx-code" aria-hidden="true">404</span><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
     <template v-else>
       <div class="g-banner g-nojs">{{ $t('guest.slug.noJs') }}</div>
       <div v-if="!online" class="g-banner">{{ $t('guest.slug.offline') }}</div>
       <div v-if="lineHint" class="g-banner">{{ $t('guest.slug.lineHint') }}<button class="g-link" @click="dismissHint">{{ $t('guest.slug.gotIt') }}</button></div>
       <div v-if="data.status === 'closed'" class="g-banner">{{ $t('guest.slug.closed') }}</div>
       <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
-      <img :src="coverSrc(data)" alt="" class="g-cover">
-      <h1>{{ data.title }}</h1>
-      <p class="g-mute">
-        <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
-      </p>
-      <p v-if="data.org" class="g-mute">
-        <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
-        <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="`/e/${data.event.slug}`">{{ data.event.name }}</NuxtLink></template>
-      </p>
-      <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
+      <section class="sx-hero">
+        <div class="sx-cover"><img :src="coverSrc(data)" alt="" class="g-cover"><span class="sx-tag" aria-hidden="true">WISHLIST / {{ data.status === 'closed' ? 'CLOSED' : 'OPEN' }}</span></div>
+        <div class="sx-main">
+          <h1>{{ data.title }}</h1>
+          <p class="g-mute sx-meta">
+            <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
+          </p>
+          <p v-if="data.org" class="g-mute">
+            <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
+            <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="`/e/${data.event.slug}`">{{ data.event.name }}</NuxtLink></template>
+          </p>
+          <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
+          <p v-if="data.description" class="sx-desc">{{ data.description }}</p>
+        </div>
+        <aside class="sx-gauge">
+          <div class="sx-big" aria-hidden="true"><b>{{ pct }}</b><span>%</span></div>
+          <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
+          <div class="g-mute sx-cap">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
+          <dl class="sx-stats" aria-hidden="true">
+            <div><dt>ITEMS</dt><dd>{{ String(data.completion.item_count).padStart(2, '0') }}</dd></div>
+            <div><dt>DONE</dt><dd>{{ String(data.completion.fulfilled_count).padStart(2, '0') }}</dd></div>
+            <div><dt>OPEN</dt><dd>{{ String(Math.max(0, data.completion.item_count - data.completion.fulfilled_count)).padStart(2, '0') }}</dd></div>
+          </dl>
+        </aside>
+      </section>
       <div v-if="siteOff && !closed" class="g-banner" role="status">{{ data.site_status === 'closed' ? $t('guest.relief.closedSite') : $t('guest.relief.paused') }}</div>
-      <p v-if="data.description">{{ data.description }}</p>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
       <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
-      <div class="g-mute">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
-      <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
       <p v-if="!items.length" class="g-center g-mute">{{ $t('guest.slug.empty') }}</p>
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
-        <GuestItemCard v-for="it in sorted" :key="it.id" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
+        <GuestItemCard v-for="(it, n) in sorted" :key="it.id" :index="n + 1" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
           :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
       </ul>
       <div class="g-foot">
@@ -260,3 +272,32 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <div v-if="toast" class="g-banner g-toast" role="status" @click="toast = ''">{{ toast }}</div>
   </main>
 </template>
+
+<style scoped>
+.sx-code{display:block;font:900 clamp(96px,26vw,200px)/.85 var(--mono);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:2px var(--ink-line);background:var(--hatch);-webkit-background-clip:text;background-clip:text;margin-bottom:20px}
+.sx-hero{display:grid;gap:20px;margin-top:20px;padding-bottom:28px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
+.sx-cover{position:relative}
+.sx-cover .g-cover{margin-top:0;max-height:none;aspect-ratio:16/9}
+.sx-tag{position:absolute;left:0;bottom:0;padding:5px 10px;background:var(--bg);color:var(--fg);font:700 11px/1.2 var(--mono);letter-spacing:.14em;border-top:1px solid var(--ink-line);border-right:1px solid var(--ink-line)}
+.sx-tag::before{content:"";display:inline-block;width:7px;height:7px;background:var(--red);margin-right:8px}
+.sx-main h1{margin:0 0 12px;font-weight:900;font-size:clamp(30px,6vw,46px);text-wrap:balance;word-break:keep-all;overflow-wrap:break-word}
+.sx-meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
+.sx-desc{margin:14px 0 0;line-height:1.75;max-width:38em}
+.sx-gauge{border:1px solid var(--ink-line);padding:16px 18px 0;background:var(--card);align-self:start}
+.sx-big{display:flex;align-items:baseline;gap:4px;line-height:.9;color:var(--fg)}
+.sx-big b{font:900 clamp(72px,18vw,120px)/.9 var(--font);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.sx-big span{font:800 28px var(--mono);color:var(--red-text)}
+.sx-gauge .g-bar{height:12px;margin:14px 0 10px}
+.sx-cap{font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+.sx-stats{display:grid;grid-template-columns:repeat(3,1fr);margin:14px -18px 0;border-top:1px solid var(--ink-line)}
+.sx-stats div{padding:10px 18px;border-left:1px solid var(--line)}
+.sx-stats div:first-child{border-left:0}
+.sx-stats dt{font:600 10px var(--mono);letter-spacing:.16em;color:var(--mute)}
+.sx-stats dd{margin:2px 0 0;font:800 24px var(--mono);font-variant-numeric:tabular-nums}
+@media (min-width:900px){
+  .sx-hero{grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"cover cover" "main gauge";gap:28px}
+  .sx-cover{grid-area:cover}.sx-main{grid-area:main}.sx-gauge{grid-area:gauge}
+  .sx-cover .g-cover{aspect-ratio:21/8}
+}
+@media (max-width:899px){.sx-main{order:1}.sx-gauge{order:2}}
+</style>

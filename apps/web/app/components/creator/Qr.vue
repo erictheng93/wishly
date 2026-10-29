@@ -18,5 +18,7 @@ function save() {
 </template>
 <style scoped>
 .c-qr{display:flex;flex-direction:column;align-items:center;gap:8px;margin:12px 0}
-.c-qr :deep(svg){width:100%;height:100%;display:block;background:#fff;border:1px solid var(--line)}
+.c-qr :deep(svg){width:100%;height:100%;display:block;background:#fff;border:1px solid var(--line);padding:6px;box-sizing:border-box}
+.c-qr>div[role=img]{position:relative;padding:8px;border:1px solid var(--ink-line);box-sizing:content-box;box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line);margin-bottom:6px}
+.c-qr>div[role=img]::before{content:"";position:absolute;top:-5px;left:-5px;width:12px;height:12px;border-top:2px solid var(--red);border-left:2px solid var(--red)}
 </style>
