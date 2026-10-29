@@ -28,6 +28,8 @@
       "optional": "tùy chọn",
       "taxBad": "Mã số thuế không hợp lệ",
       "fileHint": "PDF/JPG/PNG, tối đa 10MB mỗi tệp, chỉ người duyệt xem được",
+      "chooseFile": "Chọn tệp",
+      "noFile": "Chưa chọn tệp",
       "fileBig": "Tệp vượt quá 10MB",
       "fileType": "Chỉ nhận PDF, JPG, PNG",
       "regDoc": "Giấy chứng nhận đăng ký (bắt buộc)",

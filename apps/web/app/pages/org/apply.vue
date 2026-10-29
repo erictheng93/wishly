@@ -15,6 +15,7 @@ const permits = ref<any[]>([])
 const permit = reactive({ permit_no: '', valid_from: '', valid_to: '' })
 const permitFile = ref<File | null>(null)
 const permitKey = ref(0) // 新增許可後換 key，清掉檔案欄上殘留的檔名
+const regName = ref('') // 立案證書上傳中顯示檔名；上傳完成即清空（檔案改列在清單上）
 const taxErr = ref('')
 const FIELDS = ['legal_name', 'display_name', 'org_type', 'tax_id', 'registration_no', 'authority', 'website', 'intro',
   'rep_name', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone']
@@ -82,7 +83,8 @@ const onFile = (kind: 'registration' | 'permit', e: Event) => {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (kind === 'permit') { permitFile.value = file ?? null; return }
-  run(async () => { await upload(kind, file); await reload() }).finally(() => { input.value = '' })
+  regName.value = file?.name ?? ''
+  run(async () => { await upload(kind, file); await reload() }).finally(() => { input.value = ''; regName.value = '' })
 }
 const delDoc = (id: string) => run(async () => { await api(`/orgs/${org.value.id}/documents/${id}`, { method: 'DELETE' }); await reload() })
 const addPermit = () => run(async () => {
@@ -133,7 +135,10 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
         <h3 id="ap-reg">{{ $t('org.apply.regDoc') }}</h3>
         <ul><li v-for="d in docs('registration')" :key="d.id">{{ d.content_type }} · {{ Math.ceil(d.size_bytes / 1024) }} KB
           <button type="button" class="c-btn" @click="delDoc(d.id)">{{ $t('org.apply.remove') }}</button></li></ul>
-        <input class="ap-file" type="file" accept="application/pdf,image/jpeg,image/png" aria-labelledby="ap-reg" :disabled="busy" @change="onFile('registration', $event)">
+        <label class="ap-file" :class="{ off: busy }">
+          <input type="file" accept="application/pdf,image/jpeg,image/png" aria-labelledby="ap-reg" :disabled="busy" @change="onFile('registration', $event)">
+          <span class="ap-file-btn" aria-hidden="true">{{ $t('org.apply.chooseFile') }}</span><span class="ap-file-name" aria-hidden="true">{{ regName || $t('org.apply.noFile') }}</span>
+        </label>
         <h3 id="ap-permit">{{ $t('org.apply.permitDoc') }}</h3>
         <ul><li v-for="p in permits" :key="p.id">{{ p.permit_no }}　{{ p.valid_from }} ~ {{ p.valid_to }}</li></ul>
         <div class="ap-permit">
@@ -141,7 +146,10 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
           <label class="c-field"><span>{{ $t('org.apply.validFrom') }}</span><input v-model="permit.valid_from" type="date"></label>
           <label class="c-field"><span>{{ $t('org.apply.validTo') }}</span><input v-model="permit.valid_to" type="date"></label>
         </div>
-        <input :key="permitKey" class="ap-file" type="file" accept="application/pdf,image/jpeg,image/png" aria-labelledby="ap-permit" :disabled="busy" @change="onFile('permit', $event)">
+        <label :key="permitKey" class="ap-file" :class="{ off: busy }">
+          <input type="file" accept="application/pdf,image/jpeg,image/png" aria-labelledby="ap-permit" :disabled="busy" @change="onFile('permit', $event)">
+          <span class="ap-file-btn" aria-hidden="true">{{ $t('org.apply.chooseFile') }}</span><span class="ap-file-name" :class="{ on: permitFile }" aria-hidden="true">{{ permitFile?.name || $t('org.apply.noFile') }}</span>
+        </label>
         <button type="button" class="c-btn" :disabled="busy || !permit.permit_no || !permit.valid_from || !permit.valid_to || !permitFile" @click="addPermit">{{ $t('org.apply.addPermit') }}</button>
       </section>
 
@@ -202,8 +210,14 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 .ap-s3 h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .ap-s3 ul{list-style:none;padding:0;margin:0 0 12px}
 .ap-s3 li{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;border-bottom:1px dotted var(--line);font:500 13px var(--mono)}
-.ap-file{display:block;width:100%;box-sizing:border-box;padding:18px 16px;margin:0 0 16px;border:1px dashed var(--ink-line);background:var(--hatch),var(--bg-alt);color:var(--mute);font:500 12px var(--mono);cursor:pointer;min-height:64px}
-.ap-file::file-selector-button{margin-right:14px;min-height:40px;padding:0 16px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:700 13px var(--font);letter-spacing:.06em;cursor:pointer}
+.ap-file{position:relative;display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box;padding:12px 16px;margin:0 0 16px;border:1px dashed var(--ink-line);background:var(--hatch),var(--bg-alt);color:var(--mute);font:500 12px var(--mono);cursor:pointer;min-height:64px}
+.ap-file input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.ap-file:focus-within{outline:2px solid var(--red);outline-offset:2px}
+.ap-file.off{opacity:.5;cursor:progress}
+.ap-file-btn{flex:none;display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:700 13px var(--font);letter-spacing:.06em}
+.ap-file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ap-file-name.on{color:var(--fg)}
+@media (hover:hover) and (pointer:fine){.ap-file:not(.off):hover .ap-file-btn{background:var(--fg);color:var(--bg)}}
 .ap-s3>.c-btn{margin-bottom:12px}
 @media (min-width:768px){.ap-permit{display:grid;grid-template-columns:2fr 1fr 1fr;gap:0 16px}}
 .ap-s4 dl.c-dl{margin:0 0 20px}

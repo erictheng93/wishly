@@ -35,7 +35,7 @@
 .c-btn[disabled]{opacity:.35;cursor:not-allowed}
 .c-btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .c-field{display:block;margin:0 0 18px}
-.c-field>span,.c-lbl{display:block;font:600 11px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
+.c-field>span,.c-lbl{display:block;font:600 11px/1.4 var(--mono);letter-spacing:.12em;color:var(--mute);margin-bottom:8px}
 .c-field input,.c-field select,.c-field textarea,.c-input{width:100%;box-sizing:border-box;min-height:48px;padding:12px 14px;border:1px solid var(--line);border-bottom-color:var(--ink-line);background:var(--bg-alt);color:var(--fg);font:inherit;transition:border-color var(--t) var(--ease),background var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .c-field input:focus,.c-field select:focus,.c-field textarea:focus,.c-input:focus,.c-otp input:focus{outline:0;border-color:var(--red);background-color:var(--card);box-shadow:0 0 0 1px var(--red),4px 4px 0 var(--bad-bg)}
 .c-field select,select.c-input{appearance:none;padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat}
@@ -124,7 +124,7 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-badge.failed,.c-badge.expired,.c-badge.frozen,.c-badge.refunded,.c-badge.disputed,.c-badge.charged_back{color:var(--bad);border-color:currentColor}
 .c-badge.paid,.c-badge.completed,.c-badge.settled{color:var(--ok);border-color:currentColor}
 .c-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:10px 0;font-size:14px}
-.c-dl dt{color:var(--mute);font:600 11px/1.9 var(--mono);letter-spacing:.1em;text-transform:uppercase}.c-dl dd{margin:0}
+.c-dl dt{color:var(--mute);font:600 11px/1.9 var(--mono);letter-spacing:.1em}.c-dl dd{margin:0}
 .c-sub{border-top:1px dashed var(--line);margin-top:14px;padding-top:10px}
 .c-sub .c-list>li{padding:10px 0;border-bottom:1px solid var(--line)}
 .c-pos{color:var(--ok)}.c-neg{color:var(--bad)}

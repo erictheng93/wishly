@@ -28,6 +28,8 @@
       "optional": "opsional",
       "taxBad": "Format NPWP tidak valid",
       "fileHint": "PDF/JPG/PNG, maks. 10MB per berkas, hanya terlihat oleh peninjau",
+      "chooseFile": "Pilih berkas",
+      "noFile": "Belum ada berkas dipilih",
       "fileBig": "Berkas melebihi 10MB",
       "fileType": "Hanya PDF, JPG, atau PNG",
       "regDoc": "Sertifikat pendaftaran (wajib)",
