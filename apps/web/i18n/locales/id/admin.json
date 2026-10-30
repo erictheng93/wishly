@@ -480,6 +480,7 @@
     },
     "orgs": {
       "title": "Org and permit review",
+      "pendingPermits": "{n} izin menunggu",
       "statusLabel": "Status",
       "all": "All",
       "retry": "Retry",
@@ -491,6 +492,7 @@
       "submittedAt": "Submitted",
       "detailLoading": "Loading details…",
       "status": {
+        "pending_permits": "Izin menunggu tinjauan",
         "pending": "Pending",
         "needs_changes": "Needs changes",
         "verified": "Verified",

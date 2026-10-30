@@ -85,7 +85,19 @@
       "noSites": "Belum ada lokasi",
       "edit": "Ubah",
       "publicPage": "Halaman publik",
-      "receipts": "Penerimaan"
+      "receipts": "Penerimaan",
+      "permits": "Izin penggalangan",
+      "permitsNone": "Tidak ada izin yang disetujui dan masih berlaku: lokasi tidak bisa dibuat atau dilanjutkan",
+      "permitExpired": "Kedaluwarsa",
+      "permitSaved": "Terkirim. Setelah disetujui bisa dipakai untuk lokasi",
+      "permitSt": {
+        "pending": "Ditinjau",
+        "approved": "Disetujui",
+        "rejected": "Ditolak"
+      },
+      "permitNote": "Catatan peninjauan: {note}",
+      "permitApply": "Gunakan untuk {n} lokasi dengan izin tidak berlaku",
+      "permitApplied": "{n} lokasi dialihkan ke izin ini. Lanjutkan lokasi yang dijeda dari halaman edit."
     },
     "members": {
       "title": "Anggota & undangan",
@@ -167,7 +179,7 @@
       "stNewEvent": "Tidak ada? Buat peristiwa baru",
       "stPermit": "Izin penggalangan",
       "stPermitPick": "Pilih izin",
-      "stNoPermit": "Tidak ada izin penggalangan yang berlaku. Lengkapi dokumen organisasi dulu",
+      "stNoPermit": "Tidak ada izin penggalangan yang berlaku. Tambahkan dulu di konsol organisasi",
       "stTitle": "Nama lokasi",
       "stDesc": "Deskripsi (opsional)",
       "stAddr": "Alamat penerimaan",
@@ -191,7 +203,11 @@
       "receiptTotal": "Total diterima {n}",
       "receiptBy": "{name}  {time}",
       "receiptsNone": "Lokasi ini belum memiliki barang",
-      "receiptNeeded": "Dibutuhkan {n}"
+      "receiptNeeded": "Dibutuhkan {n}",
+      "stNoPermitLink": "Ke izin penggalangan",
+      "permitLabel": "Izin penggalangan",
+      "permitExpiredOpt": "kedaluwarsa",
+      "permitResumeHint": "Ganti ke izin yang berlaku agar lokasi yang dijeda bisa dilanjutkan"
     }
   }
 }

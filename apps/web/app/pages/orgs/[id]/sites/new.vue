@@ -39,7 +39,7 @@ async function submit() {
       </label>
       <label class="c-field"><span>{{ $t('org.relief.stPermit') }}</span>
         <select v-model="f.permit_id" name="permit_id" required><option value="" disabled>{{ $t('org.relief.stPermitPick') }}</option><option v-for="p in permits" :key="p.id" :value="p.id">{{ p.permit_no }} · {{ p.valid_from }} - {{ p.valid_to }}</option></select>
-        <small v-if="!permits.length" class="c-err">{{ $t('org.relief.stNoPermit') }}</small>
+        <small v-if="!permits.length" class="c-err">{{ $t('org.relief.stNoPermit') }} <NuxtLink :to="`/orgs/${id}#permits`">{{ $t('org.relief.stNoPermitLink') }}</NuxtLink></small>
       </label>
       <label class="c-field"><span>{{ $t('org.relief.stTitle') }}</span><input v-model="f.title" name="title" maxlength="100" required></label>
       <label class="c-field"><span>{{ $t('org.relief.stDesc') }}</span><textarea v-model="f.description" rows="2" /></label>

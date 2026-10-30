@@ -416,6 +416,30 @@ pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Erro
     Ok(n)
 }
 
+/// 許可到期前 14 / 7 天（台北日期）提醒 owner：只對仍有未結束據點使用、且組織沒有更晚到期的已核准許可的情況發。
+/// 以 reminded_days 條件式 UPDATE 認領門檻（同一語句寫通知），重跑 / 多實例不重發。
+pub async fn permit_reminder_tick(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
+    let r = sqlx::query(
+        "WITH c AS (UPDATE org_permits pm
+                       SET reminded_days = CASE WHEN pm.valid_to - t.today <= 7 THEN 7 ELSE 14 END
+                      FROM organizations o, (SELECT (now() AT TIME ZONE 'Asia/Taipei')::date AS today) t
+                     WHERE o.id = pm.org_id AND o.verification_status = 'verified'
+                       AND pm.status = 'approved' AND pm.valid_to BETWEEN t.today AND t.today + 14
+                       AND (pm.reminded_days IS NULL OR pm.reminded_days > CASE WHEN pm.valid_to - t.today <= 7 THEN 7 ELSE 14 END)
+                       AND EXISTS (SELECT 1 FROM wishlists w WHERE w.permit_id = pm.id AND w.type = 'relief'
+                                    AND w.status <> 'closed' AND w.deleted_at IS NULL)
+                       AND NOT EXISTS (SELECT 1 FROM org_permits n WHERE n.org_id = pm.org_id AND n.status = 'approved' AND n.valid_to > pm.valid_to)
+                 RETURNING pm.id, pm.org_id, pm.permit_no, pm.valid_to, pm.reminded_days, o.display_name)
+         INSERT INTO notifications (user_id, channel, kind, payload)
+         SELECT m.user_id, 'email'::notification_channel, 'org.permit_expiring',
+                jsonb_build_object('org_id', c.org_id, 'display_name', c.display_name, 'permit_no', c.permit_no,
+                                   'valid_to', c.valid_to, 'days', c.reminded_days)
+           FROM c JOIN org_members m ON m.org_id = c.org_id AND m.role = 'owner' AND m.disabled_at IS NULL
+           JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL")
+        .execute(pool).await?;
+    Ok(r.rows_affected())
+}
+
 /// 每小時檢查一次許可到期
 pub fn spawn_permit_expiry(pool: sqlx::PgPool) {
     tokio::spawn(async move {
@@ -424,6 +448,9 @@ pub fn spawn_permit_expiry(pool: sqlx::PgPool) {
             t.tick().await;
             if let Err(e) = permit_expiry_tick(&pool).await {
                 tracing::error!(error = %e, "permit_expiry_tick");
+            }
+            if let Err(e) = permit_reminder_tick(&pool).await {
+                tracing::error!(error = %e, "permit_reminder_tick");
             }
         }
     });

@@ -1506,3 +1506,67 @@ async fn site_patch_purges_site_and_events(pool: PgPool) {
     cdn.wait_for_url(&common::cdn::event_url(&ev1_slug)).await;
     cdn.wait_for_url(&common::cdn::event_url(&ev2_slug)).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn apply_permit_rebinds_only_open_sites_with_invalid_permits(pool: PgPool) {
+    let (_, wid, f) = expired_active_site(&pool).await;
+    let tk = ck(&f.coord.token);
+    // 已關閉的據點、以及綁著有效許可的據點都不動
+    let valid = permit(&pool, f.org, "approved", 30).await;
+    let (_, v) = create_site(
+        &pool,
+        &f,
+        &f.coord.token,
+        with(&f, "permit_id", json!(valid)),
+    )
+    .await;
+    let keep = id(&v);
+    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
+    let closed = id(&v);
+    sqlx::query("UPDATE wishlists SET status='closed' WHERE id=$1")
+        .bind(closed)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let apply = |p: Uuid, tok: Hdr| {
+        let (pool, org) = (pool.clone(), f.org);
+        async move {
+            call(
+                &pool,
+                "POST",
+                &format!("/orgs/{org}/permits/{p}/apply"),
+                &tok,
+                None,
+            )
+            .await
+        }
+    };
+    let pending = permit(&pool, f.org, "pending", 30).await;
+    let (s, _, e) = apply(pending, tk.clone()).await;
+    assert_eq!(
+        (s, e["code"].as_str().unwrap_or("")),
+        (StatusCode::CONFLICT, "PERMIT_INVALID")
+    );
+    let vol = user(&pool, "vol").await;
+    member(&pool, f.org, vol.id, "volunteer").await;
+    let fresh = permit(&pool, f.org, "approved", 60).await;
+    let (s, _, _) = apply(fresh, ck(&vol.token)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _, e) = apply(fresh, tk.clone()).await;
+    assert_eq!((s, e["updated"].as_i64()), (StatusCode::OK, Some(1)), "{e}");
+    let bound = |w: Uuid| {
+        sqlx::query_scalar::<_, Uuid>("SELECT permit_id FROM wishlists WHERE id=$1")
+            .bind(w)
+            .fetch_one(&pool)
+    };
+    assert_eq!(
+        (
+            bound(wid).await.unwrap(),
+            bound(keep).await.unwrap(),
+            bound(closed).await.unwrap()
+        ),
+        (fresh, valid, f.permit)
+    );
+    let (s, _, e) = apply(fresh, tk).await; // 重按沒有可換的
+    assert_eq!((s, e["updated"].as_i64()), (StatusCode::OK, Some(0)));
+}

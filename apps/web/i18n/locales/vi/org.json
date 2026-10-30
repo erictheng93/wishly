@@ -85,7 +85,19 @@
       "noSites": "Chưa có điểm tiếp nhận",
       "edit": "Sửa",
       "publicPage": "Trang công khai",
-      "receipts": "Ghi nhận nhận hàng"
+      "receipts": "Ghi nhận nhận hàng",
+      "permits": "Giấy phép quyên góp",
+      "permitsNone": "Không có giấy phép đã duyệt còn hiệu lực: không thể tạo hoặc mở lại điểm cứu trợ",
+      "permitExpired": "Hết hạn",
+      "permitSaved": "Đã gửi. Sau khi được duyệt có thể dùng cho điểm cứu trợ",
+      "permitSt": {
+        "pending": "Đang xét duyệt",
+        "approved": "Đã duyệt",
+        "rejected": "Không đạt"
+      },
+      "permitNote": "Ghi chú xét duyệt: {note}",
+      "permitApply": "Dùng cho {n} điểm có giấy phép không hợp lệ",
+      "permitApplied": "Đã chuyển {n} điểm sang giấy phép này. Hãy mở lại các điểm đang tạm dừng trong trang chỉnh sửa."
     },
     "members": {
       "title": "Thành viên & lời mời",
@@ -167,7 +179,7 @@
       "stNewEvent": "Không thấy? Tạo sự kiện mới",
       "stPermit": "Giấy phép quyên góp",
       "stPermitPick": "Chọn giấy phép",
-      "stNoPermit": "Không có giấy phép quyên góp còn hiệu lực. Vui lòng bổ sung hồ sơ tổ chức",
+      "stNoPermit": "Không có giấy phép quyên góp còn hiệu lực. Hãy thêm trong trang quản trị tổ chức trước",
       "stTitle": "Tên điểm nhận",
       "stDesc": "Mô tả (tùy chọn)",
       "stAddr": "Địa chỉ nhận hàng",
@@ -191,7 +203,11 @@
       "receiptTotal": "Tổng đã nhận {n}",
       "receiptBy": "{name}  {time}",
       "receiptsNone": "Điểm này chưa có mặt hàng",
-      "receiptNeeded": "Cần {n}"
+      "receiptNeeded": "Cần {n}",
+      "stNoPermitLink": "Đến mục giấy phép quyên góp",
+      "permitLabel": "Giấy phép quyên góp",
+      "permitExpiredOpt": "hết hạn",
+      "permitResumeHint": "Chọn giấy phép còn hiệu lực để mở lại điểm đang tạm dừng"
     }
   }
 }
