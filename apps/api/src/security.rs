@@ -20,6 +20,7 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/mfa/totp/setup", post(totp_setup))
         .route("/auth/mfa/totp/enable", post(totp_enable))
         .route("/auth/mfa/verify", post(mfa_verify))
+        .route("/auth/mfa/recovery-codes", post(regenerate_recovery))
         .route("/me/sessions", get(list_sessions).delete(revoke_others))
         .route("/me/sessions/{id}", delete(revoke_session))
         .route("/me/password", post(change_password))
@@ -206,26 +207,111 @@ struct CodeReq {
     code: String,
 }
 
+/// 備用碼張數；格式 xxxx-xxxx（base32 小寫，40 bits）
+const RECOVERY_CODES: usize = 10;
+
+fn recovery_code() -> String {
+    let mut b = [0u8; 5];
+    rand::thread_rng().fill_bytes(&mut b);
+    let s = base32(&b).to_lowercase();
+    format!("{}-{}", &s[..4], &s[4..8])
+}
+
+/// 輸入的備用碼正規化後雜湊：忽略大小寫、空白與連字號
+fn recovery_hash(code: &str) -> Vec<u8> {
+    let c: String = code
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+    crate::session::hash_token(&c)
+}
+
+/// 啟用成功後一次性回傳備用碼（之後無法再查看）
 async fn totp_enable(
     u: CurrentUser,
     State(st): State<AppState>,
     Peer(ip): Peer,
     Json(r): Json<CodeReq>,
-) -> Result<StatusCode, AppError> {
+) -> Result<Json<Value>, AppError> {
     staff_only(&u)?;
     accept_code(&st, u.id, &r.code, true).await?;
+    let codes = new_recovery_codes(&st, u.id).await?;
     mark_session(&st, &u, &ip, "auth.mfa_enabled").await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(json!({ "recovery_codes": codes })))
 }
 
+/// 換一組新的備用碼（舊碼全部失效）
+async fn new_recovery_codes(st: &AppState, uid: Uuid) -> Result<Vec<String>, AppError> {
+    let codes: Vec<String> = (0..RECOVERY_CODES).map(|_| recovery_code()).collect();
+    let hashes: Vec<Vec<u8>> = codes.iter().map(|c| recovery_hash(c)).collect();
+    let mut tx = st.pool.begin().await?;
+    sqlx::query("DELETE FROM totp_recovery_codes WHERE user_id=$1")
+        .bind(uid)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "INSERT INTO totp_recovery_codes (user_id, code_hash) SELECT $1, unnest($2::bytea[])",
+    )
+    .bind(uid)
+    .bind(&hashes)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(codes)
+}
+
+/// 已啟用且此 session 已驗證的營運人員重新產生備用碼（啟用時沒拿到、或用掉 / 外洩時）
+async fn regenerate_recovery(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Peer(ip): Peer,
+) -> Result<Json<Value>, AppError> {
+    staff_only(&u)?;
+    if !u.mfa_enabled || !u.mfa {
+        return Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"));
+    }
+    let codes = new_recovery_codes(&st, u.id).await?;
+    audit(
+        &st.pool,
+        u.id,
+        "auth.mfa_recovery_regenerated",
+        "users",
+        u.id,
+        inet(&ip).as_deref(),
+        json!({}),
+    )
+    .await?;
+    Ok(Json(json!({ "recovery_codes": codes })))
+}
+
+/// 6 位數字走 TOTP；其他視為備用碼（條件式 UPDATE 標記已用，同一碼不能用兩次）
 async fn mfa_verify(
     u: CurrentUser,
     State(st): State<AppState>,
     Peer(ip): Peer,
     Json(r): Json<CodeReq>,
 ) -> Result<StatusCode, AppError> {
-    accept_code(&st, u.id, &r.code, false).await?;
-    mark_session(&st, &u, &ip, "auth.mfa_verified").await?;
+    let code = r.code.trim();
+    if code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit()) {
+        accept_code(&st, u.id, code, false).await?;
+        mark_session(&st, &u, &ip, "auth.mfa_verified").await?;
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    crate::ratelimit::check(&st.pool, &format!("mfa:{}", u.id), 5, 300).await?;
+    let n = sqlx::query(
+        "UPDATE totp_recovery_codes c SET used_at=now() FROM users u
+          WHERE c.user_id=$1 AND c.code_hash=$2 AND c.used_at IS NULL AND u.id=c.user_id AND u.totp_enabled_at IS NOT NULL",
+    )
+    .bind(u.id)
+    .bind(recovery_hash(code))
+    .execute(&st.pool)
+    .await?
+    .rows_affected();
+    if n != 1 {
+        return Err(code_invalid());
+    }
+    mark_session(&st, &u, &ip, "auth.mfa_recovery_used").await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

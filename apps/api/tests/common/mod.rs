@@ -40,7 +40,17 @@ pub struct TestUser {
 pub async fn user(pool: &PgPool, name: &str) -> TestUser {
     create_user(pool, name, false).await
 }
+/// 營運人員；session 視為已通過 MFA（後台全面強制 MFA）。要測未驗證的情況用 `staff_unverified`。
 pub async fn staff(pool: &PgPool, name: &str) -> TestUser {
+    let s = create_user(pool, name, true).await;
+    sqlx::query("UPDATE sessions SET mfa_at=now() WHERE user_id=$1")
+        .bind(s.id)
+        .execute(pool)
+        .await
+        .unwrap();
+    s
+}
+pub async fn staff_unverified(pool: &PgPool, name: &str) -> TestUser {
     create_user(pool, name, true).await
 }
 pub async fn befriend(pool: &PgPool, a: Uuid, b: Uuid) {

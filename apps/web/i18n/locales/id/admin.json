@@ -2,8 +2,6 @@
   "admin": {
     "index": {
       "title": "Panel admin operasional",
-      "mfaHint": "Disarankan mengaktifkan verifikasi dua langkah: panel admin bisa membekukan akun dan memberi poin, jadi dampaknya besar jika akun dibobol.",
-      "mfaSetup": "Atur sekarang",
       "statsLabel": "Statistik operasional",
       "overview": "Ringkasan operasional",
       "refreshStats": "Perbarui statistik",
@@ -117,7 +115,11 @@
         "auditNote": "Semua tindakan operasional dicatat di catatan audit.",
         "confirmTitle": "Ganti mode hanya-baca",
         "confirmOff": "Yakin menonaktifkan mode hanya-baca?",
-        "confirmOn": "Mode hanya-baca memengaruhi penulisan di seluruh situs. Yakin mengaktifkan?"
+        "confirmOn": "Mode hanya-baca memengaruhi penulisan di seluruh situs. Yakin mengaktifkan?",
+        "mfa": "Wajibkan verifikasi dua langkah",
+        "mfaHint": "Kalau aktif, semua staf harus menyiapkan dan lolos verifikasi dua langkah sebelum memakai konsol. Hanya bisa diaktifkan setelah minimal 2 staf menyiapkannya. Saat ini: {state}",
+        "confirmMfaOn": "Staf yang belum menyiapkan verifikasi dua langkah harus menyiapkannya dulu sebelum memakai konsol. Aktifkan?",
+        "confirmMfaOff": "Staf tanpa verifikasi dua langkah bisa memakai konsol lagi (yang sudah menyiapkan tetap harus verifikasi). Nonaktifkan?"
       },
       "mod": {
         "hideTitle": "Turunkan wishlist",
@@ -133,7 +135,10 @@
         "reason": "Alasan tindakan",
         "recoverySent": "Permintaan pengiriman email verifikasi pemulihan sudah dibuat, minta pengguna menyelesaikan reset di halaman Lupa kata sandi",
         "done": "Selesai: {title}"
-      }
+      },
+      "staffMfaLow": "Staf yang sudah menyiapkan verifikasi dua langkah kurang dari 2. Kalau ada yang kehilangan autentikator dan kode pemulihan, tidak ada yang bisa mengatur ulang. Minta satu staf lagi menyelesaikan penyiapan.",
+      "mfaHint": "Disarankan mengaktifkan verifikasi dua langkah: panel admin bisa membekukan akun dan memberi poin, jadi dampaknya besar jika akun dibobol.",
+      "mfaSetup": "Atur sekarang"
     },
     "audit": {
       "title": "Catatan audit",
@@ -160,7 +165,7 @@
       "title": "Verifikasi dua langkah",
       "enabledPrompt": "Masukkan kode 6 digit yang ditampilkan aplikasi autentikator.",
       "intro": "Setelah diaktifkan, setiap kali masuk ke panel admin kamu harus memasukkan kode 6 digit dari aplikasi autentikator (Google Authenticator, 1Password, dll.).",
-      "lostPhone": "Jika ponsel hilang, minta staf operasional lain mereset-nya lewat \"Pengguna\" di panel admin.",
+      "lostPhone": "Kalau ponsel hilang, masuk dengan kode pemulihan. Kalau kode itu juga hilang, minta staf lain mengatur ulang di menu Pengguna pada konsol.",
       "start": "Mulai atur",
       "preparing": "Menyiapkan…",
       "step1": "1. Pindai QR code dengan aplikasi autentikator, atau masukkan kunci secara manual:",
@@ -169,6 +174,15 @@
       "verifying": "Memverifikasi…",
       "verify": "Verifikasi",
       "enable": "Aktifkan",
+      "codesTitle": "Verifikasi dua langkah aktif. Simpan kode pemulihan berikut:",
+      "codesHint": "Tiap kode hanya bisa dipakai sekali dan bisa menggantikan kode verifikasi kalau ponsel hilang. Kode hanya ditampilkan kali ini, jadi simpan di pengelola kata sandi atau tempat aman.",
+      "codesSaved": "Sudah saya simpan, lanjut",
+      "recoveryPrompt": "Masukkan kode pemulihan yang belum dipakai.",
+      "recoveryLabel": "Kode pemulihan",
+      "useRecovery": "Tidak pegang ponsel? Pakai kode pemulihan",
+      "useApp": "Pakai aplikasi autentikator",
+      "regen": "Buat kode pemulihan baru",
+      "regenHint": "Semua kode pemulihan lama tidak berlaku lagi.",
       "skip": "Lewati dulu, kembali ke panel admin"
     },
     "wallets": {

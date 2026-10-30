@@ -655,6 +655,7 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
 async fn me(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, AppError> {
     let mut v = user_json(&st.pool, u.id).await?;
     v["mfa_verified"] = json!(u.mfa); // 只有 GET /me 知道目前 session
+    v["mfa_required"] = json!(u.mfa_required);
     Ok(Json(v))
 }
 

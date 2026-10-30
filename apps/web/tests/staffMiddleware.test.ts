@@ -35,9 +35,15 @@ it('signed-out user is sent to login with redirect back', async () => {
   expect(await mw(to, { path: '/' })).toEqual({ nav: { path: '/login', query: { redirect: '/admin/analytics' } } })
 })
 
-it('staff passes; unverified MFA goes to /admin/mfa', async () => {
-  fetchMe.mockResolvedValue({ is_staff: true, mfa_enabled: false })
+it('staff passes; unverified MFA, or not set up while enforcement is on, goes to /admin/mfa', async () => {
+  const mfa = { nav: { path: '/admin/mfa', query: { redirect: '/admin/analytics' } } }
+  fetchMe.mockResolvedValue({ is_staff: true, mfa_enabled: false, mfa_verified: false, mfa_required: false })
   expect(await mw(to, { path: '/login' })).toBeUndefined()
+  fetchMe.mockResolvedValue({ is_staff: true, mfa_enabled: true, mfa_verified: true })
+  expect(await mw(to, { path: '/login' })).toBeUndefined()
+  fetchMe.mockResolvedValue({ is_staff: true, mfa_enabled: false, mfa_verified: false, mfa_required: true })
+  expect(await mw(to, { path: '/login' })).toEqual(mfa)
   fetchMe.mockResolvedValue({ is_staff: true, mfa_enabled: true, mfa_verified: false })
-  expect(await mw(to, { path: '/login' })).toEqual({ nav: { path: '/admin/mfa', query: { redirect: '/admin/analytics' } } })
+  expect(await mw(to, { path: '/login' })).toEqual(mfa)
+  expect(await mw({ path: '/admin/mfa', fullPath: '/admin/mfa' }, { path: '/login' })).toBeUndefined()
 })

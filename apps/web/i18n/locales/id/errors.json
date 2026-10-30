@@ -61,6 +61,8 @@
     "MFA_CODE_INVALID": "Kode verifikasi salah atau sudah dipakai, tunggu kode berikutnya",
     "MFA_NOT_SET_UP": "Atur ulang verifikasi dua langkah, hubungi staf operasional lain jika perlu",
     "MFA_REQUIRED": "Selesaikan verifikasi dua langkah dulu",
+    "MFA_RESET_SELF": "Kamu tidak bisa mengatur ulang verifikasi dua langkah sendiri. Minta staf lain.",
+    "STAFF_MFA_TOO_FEW": "Minimal 2 staf harus menyiapkan verifikasi dua langkah sebelum bisa diwajibkan.",
     "METHOD_NOT_ALLOWED": "Metode permintaan ini tidak didukung",
     "NATIVE_CODE_INVALID": "Tautan verifikasi tidak valid atau sudah kedaluwarsa, ulangi tindakan",
     "NATIVE_ONLY": "Gunakan aplikasi Wishly untuk melakukan ini",

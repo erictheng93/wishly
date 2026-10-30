@@ -36,19 +36,33 @@ async fn audit_count(pool: &PgPool, uid: Uuid, action: &str) -> i64 {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn staff_totp_soft_then_enforced(pool: PgPool) {
-    let s = common::staff(&pool, "ops").await;
+    let s = common::staff_unverified(&pool, "ops").await;
     let u = common::user(&pool, "u").await;
-    // 未啟用：照常進後台，/me 顯示未啟用
+    // 強制開關預設關：未啟用照常進後台
     assert_eq!(
         call(&pool, "GET", "/admin/stats", &ck(&s.token), None)
             .await
             .0,
         200
     );
+    // 開關打開後（#99），未啟用也不能進後台，/me 顯示未啟用且須設定
+    sqlx::query("UPDATE system_flags SET value='true' WHERE key='staff_mfa_required'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let r = call(&pool, "GET", "/admin/stats", &ck(&s.token), None).await;
+    assert_eq!(
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (403, Some("MFA_REQUIRED"))
+    );
     let me = call(&pool, "GET", "/me", &ck(&s.token), None).await.2;
     assert_eq!(
-        (me["mfa_enabled"].as_bool(), me["mfa_verified"].as_bool()),
-        (Some(false), Some(false))
+        (
+            me["mfa_enabled"].as_bool(),
+            me["mfa_verified"].as_bool(),
+            me["mfa_required"].as_bool()
+        ),
+        (Some(false), Some(false), Some(true))
     );
     // 一般使用者不能設定
     let r = call(&pool, "POST", "/auth/mfa/totp/setup", &ck(&u.token), None).await;
@@ -84,7 +98,7 @@ async fn staff_totp_soft_then_enforced(pool: PgPool) {
         Some(json!({"code": hotp(&k, step)})),
     )
     .await;
-    assert_eq!(r.0, 204, "{:?}", r.2);
+    assert_eq!(r.0, 200, "{:?}", r.2);
     assert_eq!(audit_count(&pool, s.id, "auth.mfa_enabled").await, 1);
     // 已啟用後不可重新 setup
     assert_eq!(
@@ -132,7 +146,20 @@ async fn staff_totp_soft_then_enforced(pool: PgPool) {
     );
     assert_eq!(audit_count(&pool, s.id, "auth.mfa_verified").await, 1);
 
-    // 另一位營運人員重設：清除密鑰並撤銷 session
+    // 不能重設自己
+    let r = call(
+        &pool,
+        "DELETE",
+        &format!("/admin/users/{}/mfa", s.id),
+        &ck(&t2),
+        Some(json!({"reason":"self"})),
+    )
+    .await;
+    assert_eq!(
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (409, Some("MFA_RESET_SELF"))
+    );
+    // 另一位營運人員重設：清除密鑰、撤銷 session、寄安全通知給當事人
     let s2 = common::staff(&pool, "ops2").await;
     let r = call(
         &pool,
@@ -144,11 +171,20 @@ async fn staff_totp_soft_then_enforced(pool: PgPool) {
     .await;
     assert_eq!(r.0, 204, "{:?}", r.2);
     assert_eq!(call(&pool, "GET", "/me", &ck(&t2), None).await.0, 401);
+    let notified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM notifications WHERE user_id=$1 AND kind='auth.mfa_reset'",
+    )
+    .bind(s.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(notified, 1);
     let t3 = common::session(&pool, s.id).await;
+    let r = call(&pool, "GET", "/admin/stats", &ck(&t3), None).await;
     assert_eq!(
-        call(&pool, "GET", "/admin/stats", &ck(&t3), None).await.0,
-        200,
-        "重設後回到未啟用"
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (403, Some("MFA_REQUIRED")),
+        "開關開啟時，重設後要重新設定才能進後台"
     );
 }
 
@@ -433,5 +469,151 @@ async fn staff_mfa_expires_after_12_hours(pool: PgPool) {
     assert_eq!(
         call(&pool, "GET", "/me", &ck(&t), None).await.2["mfa_verified"],
         false
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn recovery_codes_unlock_once_and_reset_clears_them(pool: PgPool) {
+    let s = common::staff_unverified(&pool, "ops").await;
+    call(&pool, "POST", "/auth/mfa/totp/setup", &ck(&s.token), None).await;
+    let k = secret(&pool, s.id).await;
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/totp/enable",
+        &ck(&s.token),
+        Some(json!({"code": hotp(&k, now_step())})),
+    )
+    .await;
+    assert_eq!(r.0, 200, "{:?}", r.2);
+    let codes: Vec<String> = serde_json::from_value(r.2["recovery_codes"].clone()).unwrap();
+    assert_eq!(codes.len(), 10);
+    // 新 session 用備用碼解鎖（大小寫、連字號不拘）；同一碼不能再用
+    let t2 = common::session(&pool, s.id).await;
+    let typed = codes[0].replace('-', "").to_uppercase();
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/verify",
+        &ck(&t2),
+        Some(json!({"code": typed})),
+    )
+    .await;
+    assert_eq!(r.0, 204, "{:?}", r.2);
+    assert_eq!(
+        call(&pool, "GET", "/admin/stats", &ck(&t2), None).await.0,
+        200
+    );
+    assert_eq!(audit_count(&pool, s.id, "auth.mfa_recovery_used").await, 1);
+    let t3 = common::session(&pool, s.id).await;
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/verify",
+        &ck(&t3),
+        Some(json!({"code": codes[0]})),
+    )
+    .await;
+    assert_eq!(r.2["code"], "MFA_CODE_INVALID");
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/verify",
+        &ck(&t3),
+        Some(json!({"code": "zzzz-zzzz"})),
+    )
+    .await;
+    assert_eq!(r.2["code"], "MFA_CODE_INVALID");
+    // 另一位營運人員重設後，舊備用碼全部失效
+    let s2 = common::staff(&pool, "ops2").await;
+    let r = call(
+        &pool,
+        "DELETE",
+        &format!("/admin/users/{}/mfa", s.id),
+        &ck(&s2.token),
+        Some(json!({"reason":"lost phone"})),
+    )
+    .await;
+    assert_eq!(r.0, 204, "{:?}", r.2);
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM totp_recovery_codes WHERE user_id=$1")
+        .bind(s.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(left, 0);
+    // stats 帶出已設定 MFA 的營運人員數（s 已被重設 → 0）
+    let st = call(&pool, "GET", "/admin/stats", &ck(&s2.token), None)
+        .await
+        .2;
+    assert_eq!(st["staff_mfa"], 0);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn enforcement_flag_needs_two_ready_staff_and_regenerate_needs_verified_session(
+    pool: PgPool,
+) {
+    let a = common::staff(&pool, "a").await;
+    let put = |tok: String, v: bool| {
+        let pool = pool.clone();
+        async move {
+            call(
+                &pool,
+                "PUT",
+                "/admin/system-flags/staff_mfa_required",
+                &ck(&tok),
+                Some(json!({"value": v})),
+            )
+            .await
+        }
+    };
+    // 沒人設定 TOTP：開不了；關閉永遠可以
+    let r = put(a.token.clone(), true).await;
+    assert_eq!(
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (409, Some("STAFF_MFA_TOO_FEW"))
+    );
+    assert_eq!(put(a.token.clone(), false).await.0, 200);
+    // 2 位已設定、且本 session 已驗證 → 可以開
+    let b = common::staff(&pool, "b").await;
+    sqlx::query("UPDATE users SET totp_secret='\\x00', totp_enabled_at=now() WHERE id = ANY($1)")
+        .bind(vec![a.id, b.id])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let unverified = common::session(&pool, a.id).await;
+    let r = put(unverified.clone(), true).await;
+    assert_eq!(
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (403, Some("MFA_REQUIRED"))
+    );
+    let r = put(a.token.clone(), true).await;
+    assert_eq!(r.0, 200, "{:?}", r.2);
+    // 重新產生備用碼：未驗證的 session 不行；已驗證的拿到 10 組新碼並寫稽核
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/recovery-codes",
+        &ck(&unverified),
+        None,
+    )
+    .await;
+    assert_eq!(r.2["code"], "MFA_REQUIRED");
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/recovery-codes",
+        &ck(&a.token),
+        None,
+    )
+    .await;
+    assert_eq!(
+        r.2["recovery_codes"].as_array().map(Vec::len),
+        Some(10),
+        "{:?}",
+        r.2
+    );
+    assert_eq!(
+        audit_count(&pool, a.id, "auth.mfa_recovery_regenerated").await,
+        1
     );
 }

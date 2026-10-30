@@ -61,6 +61,8 @@
     "MFA_CODE_INVALID": "驗證碼錯誤或已使用過，請等下一組",
     "MFA_NOT_SET_UP": "請重新設定兩步驟驗證，必要時聯絡其他營運人員",
     "MFA_REQUIRED": "請先完成兩步驟驗證",
+    "MFA_RESET_SELF": "不能重設自己的兩步驟驗證，請找另一位營運人員",
+    "STAFF_MFA_TOO_FEW": "至少 2 位營運人員設定好兩步驟驗證後，才能開啟強制",
     "METHOD_NOT_ALLOWED": "不支援此請求方法",
     "NATIVE_CODE_INVALID": "驗證連結無效或已過期，請重新操作",
     "NATIVE_ONLY": "請使用 Wishly 應用程式執行此操作",

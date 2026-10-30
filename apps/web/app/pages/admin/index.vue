@@ -94,15 +94,26 @@ async function doUser() {
   } catch (e) { userErr.value = errMsg(e) } finally { userBusy.value = false }
 }
 // 系統旗標
-const readOnly = ref<boolean | null>(null), flagAsk = ref(false), flagBusy = ref(false)
+type FlagKey = 'read_only' | 'staff_mfa_required'
+const flags = reactive<Record<FlagKey, boolean | null>>({ read_only: null, staff_mfa_required: null })
+const flagAsk = ref<FlagKey | null>(null), flagBusy = ref(false)
+const flagState = (k: FlagKey) => t(`admin.index.flags.${flags[k] === null ? 'unknown' : flags[k] ? 'on' : 'off'}`)
+const flagConfirm = computed(() => flagAsk.value === 'staff_mfa_required'
+  ? t(flags.staff_mfa_required ? 'admin.index.flags.confirmMfaOff' : 'admin.index.flags.confirmMfaOn')
+  : t(flags.read_only ? 'admin.index.flags.confirmOff' : 'admin.index.flags.confirmOn'))
 async function setFlag() {
+  const k = flagAsk.value
+  if (!k) return
   flagBusy.value = true; err.value = ''
-  try { const r = await api('/admin/system-flags/read_only', { method: 'PUT', body: { value: !readOnly.value } }); readOnly.value = r.value; flagAsk.value = false }
-  catch (e) { err.value = errMsg(e) } finally { flagBusy.value = false }
+  try { const r = await api(`/admin/system-flags/${k}`, { method: 'PUT', body: { value: !flags[k] } }); flags[k] = r.value; flagAsk.value = null; if (k === 'staff_mfa_required') await useAuth().fetchMe(true) }
+  catch (e) { err.value = errMsg(e); flagAsk.value = null } finally { flagBusy.value = false }
 }
 async function loadFlags() {
   err.value = ''
-  try { readOnly.value = !!(await api('/admin/system-flags')).data.find((f: any) => f.key === 'read_only')?.value } catch (e) { readOnly.value = null; err.value = errMsg(e) }
+  try {
+    const data = (await api('/admin/system-flags')).data
+    for (const k of ['read_only', 'staff_mfa_required'] as FlagKey[]) flags[k] = !!data.find((f: any) => f.key === k)?.value
+  } catch (e) { flags.read_only = flags.staff_mfa_required = null; err.value = errMsg(e) }
 }
 watch(rStatus, () => loadReports())
 watch(tab, t => { if (t === 'flags') loadFlags() })
@@ -112,6 +123,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
   <main class="c-page c-admin">
     <CreatorHeader :title="$t('admin.index.title')" back="/dashboard"><span class="c-badge">STAFF</span></CreatorHeader>
     <p v-if="me && !me.mfa_enabled" class="c-card" role="status">{{ $t('admin.index.mfaHint') }}<NuxtLink to="/admin/mfa">{{ $t('admin.index.mfaSetup') }}</NuxtLink></p>
+    <p v-if="stats && Number(stats.staff_mfa) < 2" class="c-card c-err" role="status" data-testid="staff-mfa-low">{{ $t('admin.index.staffMfaLow') }}</p>
     <section class="c-card" :aria-label="$t('admin.index.statsLabel')">
       <div class="c-row c-mb"><h2 class="c-h2 c-grow c-m0">{{ $t('admin.index.overview') }}</h2><button class="c-btn small" :disabled="statsBusy" @click="loadStats">{{ statsBusy ? $t('admin.index.refreshing') : $t('admin.index.refreshStats') }}</button></div>
       <p v-if="statsErr" class="c-err" role="alert">{{ statsErr }}</p>
@@ -205,7 +217,8 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
     </section>
 
     <section v-if="tab === 'flags'" class="c-card">
-      <label class="c-switch"><input type="checkbox" :checked="!!readOnly" :disabled="readOnly === null || flagBusy" @click.prevent="flagAsk = true"><span>{{ $t('admin.index.flags.readOnly') }}<br><small class="c-mute">{{ $t('admin.index.flags.hint', { state: readOnly === null ? $t('admin.index.flags.unknown') : readOnly ? $t('admin.index.flags.on') : $t('admin.index.flags.off') }) }}</small></span></label>
+      <label class="c-switch"><input type="checkbox" name="read_only" :checked="!!flags.read_only" :disabled="flags.read_only === null || flagBusy" @click.prevent="flagAsk = 'read_only'"><span>{{ $t('admin.index.flags.readOnly') }}<br><small class="c-mute">{{ $t('admin.index.flags.hint', { state: flagState('read_only') }) }}</small></span></label>
+      <label class="c-switch"><input type="checkbox" name="staff_mfa_required" :checked="!!flags.staff_mfa_required" :disabled="flags.staff_mfa_required === null || flagBusy" @click.prevent="flagAsk = 'staff_mfa_required'"><span>{{ $t('admin.index.flags.mfa') }}<br><small class="c-mute">{{ $t('admin.index.flags.mfaHint', { state: flagState('staff_mfa_required') }) }}</small></span></label>
       <p class="c-mute">{{ $t('admin.index.flags.auditNote') }}</p>
     </section>
 
@@ -215,7 +228,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
     <CreatorConfirm :open="!!userAct" :title="userAct?.title || ''" :text="$t('admin.index.userAct.text', { name: userAct?.user.display_name })" :ok="$t('admin.index.userAct.ok')" danger :busy="userBusy" :disabled="!userReason.trim()" :error="userErr" @close="!userBusy && (userAct = null)" @ok="doUser">
       <label class="c-field"><span>{{ $t('admin.index.userAct.reason') }}</span><input v-model="userReason" maxlength="200" :disabled="userBusy" required></label>
     </CreatorConfirm>
-    <CreatorConfirm :open="flagAsk" :title="$t('admin.index.flags.confirmTitle')" :text="readOnly ? $t('admin.index.flags.confirmOff') : $t('admin.index.flags.confirmOn')" :busy="flagBusy" danger @close="flagAsk = false" @ok="setFlag" />
+    <CreatorConfirm :open="!!flagAsk" :title="$t('admin.index.flags.confirmTitle')" :text="flagConfirm" :busy="flagBusy" danger @close="flagAsk = null" @ok="setFlag" />
   </main>
 </template>
 

@@ -233,7 +233,10 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
         }
         let security = matches!(
             kind.as_str(),
-            "auth.identity_linked" | "auth.identity_unlinked" | "auth.password_changed"
+            "auth.identity_linked"
+                | "auth.identity_unlinked"
+                | "auth.password_changed"
+                | "auth.mfa_reset"
         );
         let to: Option<String> = if channel != "email" {
             None
@@ -425,6 +428,17 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("The password for your account's email login was just changed, and your other devices have been signed out.\nIf this wasn't you, reset it right away with \"Forgot password\".\nAccount settings: {app}/settings\nThis is an account security notice."),
                 format!("Mật khẩu đăng nhập bằng email của tài khoản bạn vừa được thay đổi, các thiết bị khác đã bị đăng xuất.\nNếu không phải bạn thực hiện, hãy đặt lại ngay bằng \"Quên mật khẩu\".\nCài đặt tài khoản: {app}/settings\nĐây là thông báo bảo mật tài khoản."),
                 format!("Kata sandi login email akun kamu baru saja diubah, dan perangkat lain sudah dikeluarkan.\nKalau bukan kamu yang melakukannya, segera atur ulang lewat \"Lupa kata sandi\".\nPengaturan akun: {app}/settings\nIni adalah pemberitahuan keamanan akun."),
+            ),
+        );
+    }
+    if kind == "auth.mfa_reset" {
+        return (
+            l.pick("【Wishly】兩步驟驗證已被重設".into(), "[Wishly] Your two-step verification was reset".into(), "[Wishly] Xác minh hai bước của bạn đã bị đặt lại".into(), "[Wishly] Verifikasi dua langkah kamu diatur ulang".into()),
+            l.pick(
+                format!("另一位營運人員剛剛重設了你的兩步驟驗證，你的所有裝置都已登出；下次進後台要重新設定驗證器。\n若你沒有提出這個要求，請立即聯絡其他營運人員並檢查稽核紀錄。\n後台：{app}/admin\n這是帳號安全通知。"),
+                format!("Another staff member just reset your two-step verification, and all your devices have been signed out. You'll set up an authenticator again next time you open the console.\nIf you didn't ask for this, contact other staff right away and check the audit log.\nConsole: {app}/admin\nThis is an account security notice."),
+                format!("Một nhân viên vận hành khác vừa đặt lại xác minh hai bước của bạn, mọi thiết bị đã bị đăng xuất. Lần tới vào trang quản trị bạn cần thiết lập lại ứng dụng xác thực.\nNếu bạn không yêu cầu việc này, hãy liên hệ ngay nhân viên khác và kiểm tra nhật ký kiểm toán.\nTrang quản trị: {app}/admin\nĐây là thông báo bảo mật tài khoản."),
+                format!("Staf lain baru saja mengatur ulang verifikasi dua langkah kamu, dan semua perangkat kamu sudah dikeluarkan. Saat membuka konsol berikutnya, kamu perlu menyiapkan aplikasi autentikator lagi.\nKalau kamu tidak memintanya, segera hubungi staf lain dan periksa log audit.\nKonsol: {app}/admin\nIni adalah pemberitahuan keamanan akun."),
             ),
         );
     }
