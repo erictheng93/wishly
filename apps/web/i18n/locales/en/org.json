@@ -83,7 +83,19 @@
       "noSites": "No sites yet",
       "edit": "Edit",
       "publicPage": "Public page",
-      "receipts": "Receipts"
+      "receipts": "Receipts",
+      "permits": "Fundraising permits",
+      "permitsNone": "No approved, unexpired permit: sites cannot be created or resumed",
+      "permitExpired": "Expired",
+      "permitSaved": "Submitted. Once approved it can be used for sites",
+      "permitSt": {
+        "pending": "In review",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "permitNote": "Review note: {note}",
+      "permitApply": "Use for {n} site(s) with an invalid permit",
+      "permitApplied": "Switched {n} site(s) to this permit. Resume paused sites from their edit page."
     },
     "members": {
       "title": "Members & invites",
@@ -165,7 +177,7 @@
       "stNewEvent": "Not listed? Create a new event",
       "stPermit": "Fundraising permit",
       "stPermitPick": "Select a permit",
-      "stNoPermit": "No valid fundraising permit. Please update your organization documents first",
+      "stNoPermit": "No valid fundraising permit. Please add one in the organization console first",
       "stTitle": "Site name",
       "stDesc": "Description (optional)",
       "stAddr": "Drop-off address",
@@ -189,7 +201,11 @@
       "receiptTotal": "Total received {n}",
       "receiptBy": "{name}  {time}",
       "receiptsNone": "This site has no items yet",
-      "receiptNeeded": "Needed {n}"
+      "receiptNeeded": "Needed {n}",
+      "stNoPermitLink": "Go to fundraising permits",
+      "permitLabel": "Fundraising permit",
+      "permitExpiredOpt": "expired",
+      "permitResumeHint": "Switch to a valid permit to resume a paused site"
     }
   }
 }

@@ -9,13 +9,50 @@ const { orgs, current, adopt } = useOrgMode()
 const role = computed(() => orgs.value.find(o => o.id === id)?.role)
 const canEdit = computed(() => role.value === 'owner' || role.value === 'coordinator')
 const org = ref<any>(null), sites = ref<any[]>([]), events = ref<any[]>([])
-const loading = ref(true), err = ref('')
+const loading = ref(true), err = ref(''), msg = ref(''), busy = ref(false)
+const permits = ref<any[]>([])
+const permit = reactive({ permit_no: '', valid_from: '', valid_to: '' })
+const permitFile = ref<File | null>(null)
+const today = taipeiToday()
+const expired = (p: any) => p.valid_to < today
+const usable = (p: any) => p.status === 'approved' && p.valid_from <= today && !expired(p)
+const hasValid = computed(() => permits.value.some(usable))
+// 未關閉、但綁著失效許可的據點：可一鍵換成有效許可
+const stale = computed(() => sites.value.filter(s => s.status !== 'closed' && !usable(permits.value.find(p => p.id === s.permit_id) ?? {})))
+const loadPermits = async () => { permits.value = await api(`/orgs/${id}/permits`) }
 if (current.value !== id) adopt(id)
 onMounted(async () => {
   try {
     ;[org.value, sites.value, events.value] = await Promise.all([api(`/orgs/${id}`), api(`/orgs/${id}/sites`), api(`/orgs/${id}/events`)])
+    await loadPermits()
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
+  if (location.hash === '#permits') nextTick(() => document.getElementById('permits')?.scrollIntoView()) // 區塊載入後才渲染，瀏覽器原生錨點跳不到
 })
+// 與 org/apply.vue 的 upload / addPermit 相同；已上線組織刪文件會 409，故清理失敗要吞掉
+async function upload(file: File) {
+  if (file.size > 10 * 1024 * 1024) throw new Error(t('org.apply.fileBig'))
+  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error(t('org.apply.fileType'))
+  return await api<any>(`/orgs/${id}/documents`, { method: 'POST', query: { kind: 'permit' }, body: file, headers: { 'Content-Type': file.type } })
+}
+async function addPermit() {
+  err.value = msg.value = ''; busy.value = true
+  try {
+    const d = await upload(permitFile.value!)
+    try { await api(`/orgs/${id}/permits`, { method: 'POST', body: { ...permit, document_id: d.id } }) } catch (e) {
+      await api(`/orgs/${id}/documents/${d.id}`, { method: 'DELETE' }).catch(() => {})
+      throw e
+    }
+    Object.assign(permit, { permit_no: '', valid_from: '', valid_to: '' }); permitFile.value = null
+    await loadPermits(); msg.value = t('org.console.permitSaved')
+  } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
+}
+async function applyPermit(pid: string) {
+  err.value = msg.value = ''; busy.value = true
+  try {
+    const r = await api<any>(`/orgs/${id}/permits/${pid}/apply`, { method: 'POST' })
+    sites.value = await api(`/orgs/${id}/sites`); msg.value = t('org.console.permitApplied', { n: r.updated })
+  } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
+}
 </script>
 
 <template>
@@ -57,11 +94,36 @@ onMounted(async () => {
           </li>
         </ul>
       </section>
+
+      <section id="permits" class="c-card oh-sec">
+        <h2 class="c-h2">{{ $t('org.console.permits') }}<b class="oh-count" aria-hidden="true">{{ String(permits.length).padStart(2, '0') }}</b></h2>
+        <p v-if="!hasValid" class="c-mute">{{ $t('org.console.permitsNone') }}</p>
+        <ul class="c-list oh-list">
+          <li v-for="p in permits" :key="p.id">
+            <strong>{{ p.permit_no }}</strong>
+            <span><span :class="['c-badge', p.status]">{{ $t(`org.console.permitSt.${p.status}`) }}</span> <span v-if="p.status === 'approved' && expired(p)" class="c-badge">{{ $t('org.console.permitExpired') }}</span></span>
+            <span class="c-mute">{{ p.valid_from }} ~ {{ p.valid_to }}</span>
+            <span v-if="p.review_note" class="c-mute">{{ $t('org.console.permitNote', { note: p.review_note }) }}</span>
+            <button v-if="canEdit && usable(p) && stale.length" type="button" class="c-btn oh-apply" :disabled="busy" @click="applyPermit(p.id)">{{ $t('org.console.permitApply', { n: stale.length }) }}</button>
+          </li>
+        </ul>
+        <p v-if="msg" class="c-ok oh-msg" role="status">{{ msg }}</p>
+        <form v-if="role === 'owner' && org.verification_status === 'verified'" class="oh-form" @submit.prevent="addPermit">
+          <label class="c-field"><span>{{ $t('org.apply.permitNo') }}</span><input v-model="permit.permit_no" name="permit_no" required></label>
+          <label class="c-field"><span>{{ $t('org.apply.validFrom') }}</span><input v-model="permit.valid_from" name="valid_from" type="date" required></label>
+          <label class="c-field"><span>{{ $t('org.apply.validTo') }}</span><input v-model="permit.valid_to" name="valid_to" type="date" required></label>
+          <label class="c-field"><span>{{ $t('org.apply.permitDoc') }}</span><input type="file" name="permit_file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="permitFile = ($event.target as HTMLInputElement).files?.[0] ?? null"></label>
+          <button class="c-btn primary" :disabled="busy || !permit.permit_no || !permit.valid_from || !permit.valid_to || !permitFile">{{ $t('org.apply.addPermit') }}</button>
+        </form>
+      </section>
     </template>
   </main>
 </template>
 
 <style scoped>
+.oh-form{margin-top:16px;margin-bottom:18px}
+.oh-list li>.oh-apply{grid-column:1/-1;justify-self:start}
+.oh-msg{margin-top:12px}
 .oh-nav{margin-bottom:16px}
 .oh-sec{padding:0;border-top:2px solid var(--ink-line);margin-bottom:24px}
 .oh-sec>*{margin-left:18px;margin-right:18px}

@@ -34,6 +34,15 @@ async function saveReceipt() {
     rcpt.value = null; await load(true)
   } catch (e: any) { rcptErr.value = errMsg(e); if (e.code !== 'NETWORK') rcptKey.value = crypto.randomUUID() } finally { rcptBusy.value = false }
 }
+const permits = ref<any[]>([])
+const permitOpts = computed(() => {
+  const today = taipeiToday()
+  return permits.value.filter(p => p.id === w.value?.permit_id || (p.status === 'approved' && p.valid_from <= today && p.valid_to >= today))
+})
+async function loadPermits() {
+  if (!relief.value) return
+  try { permits.value = await api(`/orgs/${w.value.org_id}/permits`) } catch { /* 許可清單失敗不擋編輯 */ }
+}
 const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null), coverBusy = ref(false)
 let poll: any
 
@@ -47,7 +56,7 @@ async function load(quiet = false) {
     if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
-  loadReceipts()
+  loadReceipts(); if (!permits.value.length) loadPermits()
   clearTimeout(poll)
   if (items.value.some(i => i.image_status === 'pending')) poll = setTimeout(() => load(true), 4000) // 圖片處理中輪詢
 }
@@ -192,6 +201,10 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <section v-if="relief" class="c-card">
         <h2 class="c-h2">{{ $t('org.relief.site') }}</h2>
         <p class="c-mute">{{ $t('org.relief.siteAddr') }}</p><p><a :href="mapsUrl(w.site_address)" target="_blank" rel="noopener">{{ w.site_address }}</a></p>
+        <label class="c-field"><span>{{ $t('org.relief.permitLabel') }}</span>
+          <select name="permit_id" :value="w.permit_id" @change="patchList({ permit_id: ($event.target as HTMLSelectElement).value })"><option v-for="p in permitOpts" :key="p.id" :value="p.id">{{ p.permit_no }} · {{ p.valid_from }} - {{ p.valid_to }}{{ p.valid_to < taipeiToday() ? ` (${$t('org.relief.permitExpiredOpt')})` : '' }}</option></select>
+          <small class="c-mute">{{ $t('org.relief.permitResumeHint') }}</small>
+        </label>
         <label class="c-field"><span>{{ $t('org.relief.siteStatusLabel') }}</span>
           <select name="site_status" :value="w.site_status" @change="patchList({ site_status: ($event.target as HTMLSelectElement).value })"><option v-for="s in ['active', 'paused', 'closed']" :key="s" :value="s">{{ $t(`org.relief.siteStatus.${s}`) }}</option></select>
         </label>

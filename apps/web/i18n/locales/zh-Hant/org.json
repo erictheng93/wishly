@@ -83,7 +83,19 @@
       "noSites": "尚無據點",
       "edit": "編輯",
       "publicPage": "公開頁",
-      "receipts": "實收登記"
+      "receipts": "實收登記",
+      "permits": "勸募許可",
+      "permitsNone": "目前沒有已核准且未到期的許可，無法建立或恢復據點",
+      "permitExpired": "已到期",
+      "permitSaved": "已送審，審核通過後即可用於據點",
+      "permitSt": {
+        "pending": "審核中",
+        "approved": "已核准",
+        "rejected": "未通過"
+      },
+      "permitNote": "審核意見：{note}",
+      "permitApply": "換用到 {n} 個失效據點",
+      "permitApplied": "已將 {n} 個據點換成此許可；已暫停的據點請到編輯頁恢復營運"
     },
     "members": {
       "title": "成員與邀請",
@@ -165,7 +177,7 @@
       "stNewEvent": "找不到？建立新事件",
       "stPermit": "勸募許可",
       "stPermitPick": "請選擇許可",
-      "stNoPermit": "沒有有效的勸募許可，請先到組織資料補件",
+      "stNoPermit": "沒有有效的勸募許可，請先到組織後台新增",
       "stTitle": "據點名稱",
       "stDesc": "說明（選填）",
       "stAddr": "收件地址",
@@ -189,7 +201,11 @@
       "receiptTotal": "累計實收 {n}",
       "receiptBy": "{name}　{time}",
       "receiptsNone": "此據點還沒有品項",
-      "receiptNeeded": "需求 {n}"
+      "receiptNeeded": "需求 {n}",
+      "stNoPermitLink": "前往勸募許可",
+      "permitLabel": "勸募許可",
+      "permitExpiredOpt": "已到期",
+      "permitResumeHint": "改選有效的許可後，已暫停的據點即可恢復營運"
     }
   }
 }
