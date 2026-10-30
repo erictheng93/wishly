@@ -19,8 +19,8 @@ useSeoMeta({
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="notFound" class="g-center"><h1>{{ $t('guest.relief.orgNotFound') }}</h1><NuxtLink to="/e">{{ $t('guest.relief.back') }}</NuxtLink></div>
-    <div v-else-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
+    <div v-if="notFound" class="c-nf"><h1>{{ $t('guest.relief.orgNotFound') }}</h1><NuxtLink to="/e">{{ $t('guest.relief.back') }}</NuxtLink></div>
+    <div v-else-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="org">
       <header class="x-head">
         <img v-if="org.logo" class="x-logo" :src="org.logo" alt="" loading="lazy">
@@ -29,9 +29,9 @@ useSeoMeta({
           <h1>{{ org.display_name }}<span class="g-badge">{{ $t('guest.relief.verified') }}</span></h1>
           <p v-if="org.intro">{{ org.intro }}</p>
           <p class="g-mute">
-            <a v-if="org.website" :href="org.website" target="_blank" rel="noopener nofollow">{{ $t('guest.relief.website') }}</a>
-            <template v-if="org.public_email"> ・ <a :href="`mailto:${org.public_email}`">{{ org.public_email }}</a></template>
-            <template v-if="org.public_phone"> ・ <a :href="`tel:${org.public_phone}`">{{ org.public_phone }}</a></template>
+            <a v-if="org.website" class="x-nw" :href="org.website" target="_blank" rel="noopener nofollow">{{ $t('guest.relief.website') }}</a>
+            <template v-if="org.public_email"> ・ <a class="x-nw" :href="`mailto:${org.public_email}`">{{ org.public_email }}</a></template>
+            <template v-if="org.public_phone"> ・ <a class="x-nw" :href="`tel:${org.public_phone}`">{{ org.public_phone }}</a></template>
           </p>
         </div>
       </header>
@@ -61,5 +61,7 @@ useSeoMeta({
 .x-head{display:flex;gap:16px;align-items:center;margin:8px 0 20px;padding-bottom:20px;border-bottom:1px solid var(--ink-line)}
 .x-head h1{margin:0 0 6px}
 .x-logo{flex:none;width:80px;height:80px;object-fit:contain;border:1px solid var(--line);padding:6px;background:var(--card)}
+.x-nw{white-space:nowrap}
+.x-head+h2.x-h2{border-top:0;padding-top:0;margin-top:24px}
 h2.x-h2{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:28px 0 14px;padding-top:12px;border-top:1px solid var(--ink-line)}
 </style>

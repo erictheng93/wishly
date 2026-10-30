@@ -248,8 +248,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" :relief="relief" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
     <CreatorSheet :open="!!rcpt" :title="$t('org.relief.receiptTitle')" @close="rcpt = null">
       <form v-if="rcpt" @submit.prevent="saveReceipt">
-        <p><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
-        <ul class="c-mute"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
+        <p class="rc-head"><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
+        <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
         <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>
@@ -297,4 +297,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 .ed-side[open]{border-color:var(--ink-line);padding-bottom:18px}
 .ed-side[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
 @media (max-width:767px){.ed-item .c-thumb{width:60px;height:60px}}
+.rc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--ink-line)}
+.rc-hist{list-style:none;padding:0;margin:0 0 18px;font:500 12px/1.5 var(--mono)}
+.rc-hist li{padding:8px 0;border-bottom:1px dotted var(--line);overflow-wrap:anywhere}
+.rc-hist li:last-child{border-bottom:0}
 </style>

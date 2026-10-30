@@ -107,12 +107,12 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
   <main class="c-page ap">
     <CreatorHeader :title="$t('org.apply.title')" back="/org" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <p v-if="loading" class="c-mute">{{ $t('org.apply.loading') }}</p>
+    <div v-if="loading" class="ap-loading" role="status"><i aria-hidden="true" /><span>{{ $t('org.apply.loading') }}</span></div>
 
     <template v-else-if="wizard">
-      <p v-if="status === 'needs_changes'" class="c-card" role="status"><strong>{{ $t('org.apply.needsChanges') }}</strong><br>{{ org.review_note }}</p>
+      <p v-if="status === 'needs_changes'" class="c-card ap-note" role="status"><strong>{{ $t('org.apply.needsChanges') }}</strong><br>{{ org.review_note }}</p>
       <div class="ap-steps" aria-hidden="true"><i v-for="n in 4" :key="n" :class="{ on: n <= step, cur: n === step }"><b>{{ String(n).padStart(2, '0') }}</b></i></div>
-      <p class="c-mute ap-stepof">{{ $t('org.apply.stepOf', { n: step }) }}<span v-for="n in 4" :key="n" :class="{ cur: n === step }" :aria-current="n === step ? 'step' : undefined">{{ $t(`org.apply.s${n}`) }}</span></p>
+      <p class="c-mute ap-stepof"><em class="ap-of">{{ $t('org.apply.stepOf', { n: step }) }}</em><span v-for="n in 4" :key="n" :class="{ cur: n === step }" :aria-current="n === step ? 'step' : undefined">{{ $t(`org.apply.s${n}`) }}</span></p>
 
       <section v-for="(fs, i) in STEPS" v-show="step === i + 1" :key="i" class="c-card ap-sec">
         <h2 class="c-h2">{{ $t(`org.apply.s${i + 1}`) }}</h2>
@@ -171,7 +171,8 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
       </div>
     </template>
 
-    <section v-else class="c-card ap-state" role="status">
+    <section v-else class="c-card ap-state" :class="`is-${status}`" role="status">
+      <span class="ap-st-tag" aria-hidden="true"><i />{{ String(status).toUpperCase() }}</span>
       <h2 class="c-h2">{{ org.display_name }}</h2>
       <template v-if="status === 'pending'">
         <p>{{ $t('org.apply.pending') }}</p>
@@ -197,10 +198,22 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 .ap-steps i.on{background:var(--stripe)}
 .ap-steps i b{position:absolute;top:14px;left:0;font:600 11px var(--mono);letter-spacing:.1em;color:var(--mute)}
 .ap-steps i.cur b{color:var(--red-text)}
-.ap-stepof{margin:34px 0 18px;font:500 12px/1.6 var(--mono);letter-spacing:.06em}
+.ap-stepof{display:flex;flex-wrap:wrap;align-items:baseline;margin:34px 0 18px;font:500 12px/1.8 var(--mono);letter-spacing:.06em}
 .ap-stepof span{white-space:nowrap}
-.ap-stepof span::before{content:"/" / "";margin:0 8px;color:var(--line)}
-.ap-stepof span:first-of-type::before{content:"";margin:0 0 0 12px}
+.ap-stepof span:not(:last-child)::after{content:"/" / "";margin:0 8px;color:var(--line)}
+.ap-of{flex:0 0 100%;font-style:normal}
+.ap-note{padding:16px 18px;border-color:var(--ink-line);box-shadow:inset 4px 0 var(--red);line-height:1.65}
+.ap-note br{display:none}
+.ap-note strong{display:block;margin-bottom:4px;font-size:15px}
+.ap-loading{display:grid;gap:14px;padding:28px 0;font:600 12px var(--mono);letter-spacing:.14em;color:var(--mute)}
+.ap-loading i{display:block;height:8px;max-width:240px;background:var(--stripe);background-size:28px 28px;animation:none}
+.ap-st-tag{display:flex;align-items:center;gap:8px;margin:0 0 14px;font:700 11px var(--mono);letter-spacing:.18em;color:var(--mute)}
+.ap-st-tag i{width:8px;height:8px;background:var(--mute)}
+.is-pending .ap-st-tag,.is-rejected .ap-st-tag{color:var(--red-text)}
+.is-pending .ap-st-tag i,.is-rejected .ap-st-tag i{background:var(--red)}
+.is-verified .ap-st-tag{color:var(--ok)}
+.is-verified .ap-st-tag i{background:var(--ok)}
+.ap-state.is-pending::after{content:"";display:block;height:6px;margin-top:22px;background:var(--stripe)}
 .ap-stepof span.cur{color:var(--fg);font-weight:700}
 .ap-sec,.ap-s3,.ap-s4{padding:24px clamp(18px,3vw,32px) 12px;border-top:2px solid var(--ink-line)}
 .ap-sec{display:grid;grid-template-columns:1fr;gap:0 24px}
@@ -232,5 +245,6 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 .ap-state{padding:28px clamp(18px,3vw,32px);border-top:2px solid var(--ink-line)}
 .ap-state>h2{font-size:clamp(24px,4vw,34px);letter-spacing:-.02em}
 .ap-state>p{font-size:17px;max-width:34em}
-.ap-state .c-btn{margin-top:8px}
+.ap-state .c-btn{margin-top:8px;min-height:48px}
+.ap-nav .c-btn,.ap-s3 .c-btn{min-height:48px}
 </style>

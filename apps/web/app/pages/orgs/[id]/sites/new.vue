@@ -48,7 +48,7 @@ async function submit() {
       <label class="c-field"><span>{{ $t('org.relief.stPhone') }}</span><input v-model="f.recipient_phone" name="recipient_phone" type="tel" maxlength="30" required></label>
       <label class="c-field"><span>{{ $t('org.relief.stTtl') }}</span><input v-model.number="f.claim_ttl_hours" type="number" inputmode="numeric" min="1" max="720"></label>
       </div>
-      <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+      <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
       <button class="c-btn primary block" :disabled="busy">{{ $t('org.relief.stSubmit') }}</button>
     </form>
   </main>

@@ -22,8 +22,8 @@ async function accept() {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.invite.title')" back="/dashboard" />
     <p v-if="state === 'loading'" class="c-mute" role="status">{{ $t('auth.invite.loading') }}</p>
-    <div v-else-if="state === 'gone'" class="c-center"><p>{{ $t('auth.invite.gone') }}</p><p class="c-mute">{{ $t('auth.invite.goneHint') }}</p></div>
-    <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">{{ $t('auth.invite.loadFail') }}</p></div>
+    <section v-else-if="state === 'gone'" class="c-gone"><span class="pf-kick" aria-hidden="true">INVITE / 404</span><p class="c-gone-t">{{ $t('auth.invite.gone') }}</p><p class="c-mute">{{ $t('auth.invite.goneHint') }}</p></section>
+    <section v-else-if="state === 'error'" class="c-gone err"><span class="pf-kick" aria-hidden="true">INVITE / ERR</span><p class="c-err c-gone-t" role="alert">{{ $t('auth.invite.loadFail') }}</p></section>
     <section v-else class="pf-hero">
       <span class="pf-kick" aria-hidden="true">INVITE / FRIEND</span>
       <h2 class="c-h2">{{ list ? $t('auth.invite.invitesList', { name: inviter.display_name, title: list.title }) : $t('auth.invite.invites', { name: inviter.display_name }) }}</h2>
