@@ -61,9 +61,9 @@ const wipe = () => {
     <div class="cl-head"><small aria-hidden="true">WISHLY / CLAIMS</small><h1>{{ $t('me.claims.title') }}</h1></div>
     <div v-if="recoverFailed" class="g-banner err" role="alert">{{ $t('me.claims.recoverFailed') }}</div>
     <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
-    <p v-if="state === 'loading'" class="g-mute">{{ $t('me.loading') }}</p>
-    <div v-else-if="state === 'error'" class="g-center"><p>{{ $t('me.claims.loadFailed') }}</p><button class="g-btn" @click="load">{{ $t('me.retry') }}</button></div>
-    <div v-else-if="state === 'empty'" class="g-center">
+    <p v-if="state === 'loading'" class="g-mute cl-loading" role="status">{{ $t('me.loading') }}</p>
+    <div v-else-if="state === 'error'" class="g-center cl-state bad"><p>{{ $t('me.claims.loadFailed') }}</p><button class="g-btn" @click="load">{{ $t('me.retry') }}</button></div>
+    <div v-else-if="state === 'empty'" class="g-center cl-state">
       <p>{{ $t('me.claims.empty1') }}</p>
       <p class="g-mute">{{ $t('me.claims.empty2') }}</p>
     </div>
@@ -104,6 +104,10 @@ const wipe = () => {
 .cl-head{margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
 .cl-head small{display:block;margin-bottom:6px;font:600 11px/1 var(--mono);letter-spacing:.16em;color:var(--red-text)}
 .cl-head h1{margin:0}
+.cl-state{display:grid;justify-items:center;gap:10px;margin:8px 0 0;padding:44px 20px;text-align:center;border:1px dashed var(--line);background:var(--hatch)}
+.cl-state p{margin:0;max-width:34em;line-height:1.7;text-wrap:balance}
+.cl-state.bad{border:1px solid var(--line);border-left:3px solid var(--bad);background:var(--bad-bg)}
+.cl-loading{display:flex;align-items:center;min-height:72px;margin:0;padding:0 16px;border:1px solid var(--line);border-left:3px solid var(--ink-line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
 .cl-group{margin-top:36px}
 .cl-h2{display:flex;align-items:baseline;gap:12px;margin:0 0 6px;padding-bottom:10px;border-bottom:1px solid var(--ink-line);font-size:20px}
 .cl-h2::before{content:attr(data-n);font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text)}

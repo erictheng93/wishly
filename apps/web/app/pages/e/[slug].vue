@@ -23,8 +23,8 @@ useSeoMeta({
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="notFound" class="g-center"><h1>{{ $t('guest.relief.eventNotFound') }}</h1><NuxtLink to="/e">{{ $t('guest.relief.back') }}</NuxtLink></div>
-    <div v-else-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
+    <div v-if="notFound" class="c-nf"><h1>{{ $t('guest.relief.eventNotFound') }}</h1><NuxtLink to="/e">{{ $t('guest.relief.back') }}</NuxtLink></div>
+    <div v-else-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="ev">
       <span class="x-kicker" aria-hidden="true">RELIEF / EVENT</span>
       <h1>{{ ev.name }}</h1>

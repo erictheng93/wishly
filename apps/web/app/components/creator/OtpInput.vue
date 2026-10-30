@@ -32,5 +32,5 @@ defineExpose({ focus: () => cells.value[0]?.focus() })
 <style>
 .c-otp input{transition:border-color var(--t) var(--ease),background var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease)}
 .c-otp input.filled{background:var(--card);border-color:var(--ink-line);box-shadow:inset 0 -3px 0 var(--red)}
-@media (max-width:379px){.c-otp{gap:6px}.c-otp input{width:42px;height:54px}}
+@media (max-width:379px){.c-otp input{height:54px}}
 </style>

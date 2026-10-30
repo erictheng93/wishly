@@ -172,7 +172,7 @@ async function remove() {
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.profile') }}</h2>
         <p class="c-mute">{{ user.email || $t('settings.noEmail') }}</p>
-        <p class="c-mute">{{ $t('settings.accountId') }}<code>{{ user.id }}</code> <button type="button" class="c-btn" @click="copyId">{{ idCopied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
+        <p class="c-mute st-kv"><span>{{ $t('settings.accountId') }}</span><code>{{ user.id }}</code> <button type="button" class="c-btn" @click="copyId">{{ idCopied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
         <p class="c-mute">{{ $t('common.support') }}<SupportLink /></p>
         <form @submit.prevent="saveName">
           <label class="c-field"><span>{{ $t('settings.displayName') }}</span><input v-model="name" maxlength="40" required></label>
@@ -236,7 +236,7 @@ async function remove() {
         <form @submit.prevent="saveSocial">
           <label class="c-field"><span>{{ $t('settings.social.handle') }}</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" :placeholder="$t('settings.social.handlePh')"></label>
           <p v-if="hBad" class="c-err" role="alert">{{ $t('settings.social.handleBadHint') }}</p>
-          <p v-if="profileUrl" class="c-mute">{{ $t('settings.social.yourPage') }}<NuxtLink :to="`/u/${user.handle}`">{{ profileUrl }}</NuxtLink> <button type="button" class="c-btn" @click="copyUrl">{{ copied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
+          <p v-if="profileUrl" class="c-mute st-kv"><span>{{ $t('settings.social.yourPage') }}</span><NuxtLink :to="`/u/${user.handle}`">{{ profileUrl }}</NuxtLink> <button type="button" class="c-btn" @click="copyUrl">{{ copied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
           <label class="c-field"><span>{{ $t('settings.social.bio') }}</span><textarea v-model="bio" maxlength="160" rows="3" /></label>
           <div class="c-field" role="group" aria-labelledby="bday-label"><span id="bday-label">{{ $t('settings.social.birthday') }}</span>
             <div class="c-row">
@@ -292,6 +292,9 @@ async function remove() {
 </template>
 
 <style scoped>
+.st-kv{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px}
+.st-kv>span{flex:0 0 100%;font:600 11px/1.6 var(--mono);letter-spacing:.1em}
+.st-kv>code,.st-kv>a{flex:1 1 12em;min-width:0;overflow-wrap:anywhere;font:500 13px/1.5 var(--mono);color:var(--fg)}
 .identity-list { list-style: none; padding: 0; margin: 0 0 1rem; }
 .identity-list li { padding-block: .5rem; border-bottom: 1px solid var(--line); }
 .identity-list li:last-child { border-bottom: 0; }

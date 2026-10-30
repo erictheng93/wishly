@@ -22,7 +22,7 @@ async function more() {
   <main class="g-wrap">
     <span class="x-kicker" aria-hidden="true">RELIEF / EVENTS</span>
     <h1>{{ $t('guest.relief.heading') }}</h1>
-    <div v-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
+    <div v-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.relief.empty') }}</div>
     <div v-else class="g-grid">
       <article v-for="(e, n) in list" :key="e.slug" class="g-card">

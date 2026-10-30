@@ -36,8 +36,8 @@ const accept = () => run(async () => {
   <main class="c-page">
     <CreatorHeader :title="p ? p.user.display_name : $t('me.profile.page')" back="/friends" />
     <p v-if="state === 'loading'" class="c-mute" role="status">{{ $t('me.loading') }}</p>
-    <div v-else-if="state === 'gone'" class="c-center"><p>{{ $t('me.profile.gone') }}</p></div>
-    <div v-else-if="state === 'error'" class="c-center"><p class="c-err" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></div>
+    <section v-else-if="state === 'gone'" class="c-gone"><span class="pf-kick" aria-hidden="true">PROFILE / 404</span><p class="c-gone-t">{{ $t('me.profile.gone') }}</p></section>
+    <section v-else-if="state === 'error'" class="c-gone err"><span class="pf-kick" aria-hidden="true">PROFILE / ERR</span><p class="c-err c-gone-t" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></section>
     <template v-else>
       <section class="pf-hero">
         <span class="pf-kick" aria-hidden="true">PROFILE / @{{ p.user.handle }}</span>

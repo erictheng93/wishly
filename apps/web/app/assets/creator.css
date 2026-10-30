@@ -80,8 +80,8 @@ dialog.c-sheet h2{margin:0 0 18px;font-size:22px;line-height:1.2}
 .c-tabs{display:flex;gap:0;margin:0 0 20px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
 .c-tabs .c-btn{border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;color:var(--mute);font-size:14px;padding:0 14px}
 .c-tabs .c-btn.on{border-bottom-color:var(--red);background:transparent;color:var(--fg)}
-.c-otp{display:flex;gap:8px;justify-content:center;margin:0 0 18px}
-.c-otp input{width:48px;height:60px;text-align:center;font:800 26px var(--mono);border:1px solid var(--line);border-bottom:2px solid var(--ink-line);background:var(--bg-alt);color:var(--fg)}
+.c-otp{display:flex;gap:6px;justify-content:center;margin:0 0 18px}
+.c-otp input{flex:1 1 0;min-width:0;max-width:56px;box-sizing:border-box;padding:0;height:60px;text-align:center;font:800 26px var(--mono);border:1px solid var(--line);border-bottom:2px solid var(--ink-line);background:var(--bg-alt);color:var(--fg)}
 .c-center{text-align:center}
 .c-hero{padding:64px 0 24px;text-align:center}
 .c-page h1{margin:0}
@@ -102,6 +102,25 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-auth-forgot{margin:-10px 0 8px;text-align:right;font-size:13px}
 .c-auth-forgot a,.c-auth-foot a{color:var(--red-text);font-weight:700;min-height:44px;display:inline-flex;align-items:center}
 .c-auth-foot{margin:24px 0 0;text-align:center;font-size:14px;color:var(--mute)}
+/* 登入／註冊／忘記密碼 */
+/* 表單／操作錯誤框：左紅條、淡紅底，不再是貼著按鈕的裸紅字 */
+.c-errbox,.c-auth p.c-err[role=alert]{margin:16px 0;padding:12px 16px;border:1px solid var(--line);box-shadow:inset 3px 0 var(--bad);background:var(--bad-bg);font-size:14px;line-height:1.6;text-align:left;overflow-wrap:anywhere}
+.c-auth p.c-err[role=alert]{margin:4px 0 14px}
+.c-auth>p:not([class]){margin:0 0 20px;font-size:14px;line-height:1.7;color:var(--mute);text-wrap:pretty}
+.c-auth .c-center.c-m0 a{font-size:14px;font-weight:700;color:var(--red-text)}
+/* 失效連結／查無此人：斜線底虛線卡，載入失敗改左紅條 */
+.c-gone{display:grid;gap:10px;justify-items:start;margin:16px 0 8px;padding:28px 20px;border:1px dashed var(--ink-line);background:var(--hatch),var(--card)}
+.c-gone p{margin:0}
+.c-gone-t{font-size:clamp(20px,4.6vw,26px);font-weight:900;line-height:1.25;letter-spacing:-.01em}
+.c-gone.err{border-style:solid;border-left:3px solid var(--bad);background:var(--bad-bg)}
+/* 公開頁（組織／救災事件）的找不到與載入失敗：靠左大標＋等寬籤，返回鈕 48px */
+.c-nf{display:flex;flex-direction:column;align-items:flex-start;gap:14px;max-width:34em;padding:clamp(40px,10vw,96px) 0}
+.c-nf:not(.err)::before{content:"404 / NOT FOUND" / "";padding-left:16px;font:700 11px var(--mono);letter-spacing:.18em;color:var(--red-text);background:linear-gradient(var(--red),var(--red)) 0 50%/8px 8px no-repeat}
+.c-nf h1{margin:0;font-size:clamp(28px,5vw,44px);letter-spacing:-.02em}
+.c-nf.err{padding:clamp(32px,8vw,72px) 0}
+.c-nf.err h1{font-size:clamp(24px,4vw,36px)}
+.c-nf a{display:inline-flex;align-items:center;min-height:48px;padding:0 22px;border:1px solid var(--ink-line);font-weight:700;color:var(--fg);text-decoration:none;transition:background var(--t) var(--ease),color var(--t) var(--ease)}
+.c-nf a:hover,.c-nf a:focus-visible{background:var(--fg);color:var(--bg)}
 .c-or{display:flex;align-items:center;gap:12px;margin:22px 0;color:var(--mute);font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase}
 .c-or::before,.c-or::after{content:'';flex:1;border-top:1px solid var(--line)}
 /* 手機：卡片撐滿一屏，「還沒有帳號」沉到底部拇指區 */
@@ -208,3 +227,16 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-page table{width:100%;border-collapse:collapse;font-size:14px}
 .c-page th{text-align:left;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:10px 8px;border-bottom:1px solid var(--ink-line)}
 .c-page td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+/* 頁面層級錯誤橫幅（載入失敗＋重試）：墨線框＋左側紅條，文字與按鈕分列，窄螢幕按鈕不擠在字尾 */
+.c-page>p.c-err[role=alert]{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:0 0 16px;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--bad);background:var(--bad-bg);line-height:1.6}
+.c-page>p.c-err[role=alert]>.c-btn{margin-left:auto}
+@media (max-width:479px){.c-page>p.c-err[role=alert]>.c-btn{width:100%;margin-left:0}}
+/* 頁面層級載入列：斜線底＋等寬字，取代孤零零的一行灰字 */
+.c-page>p.c-mute[role=status]{display:flex;align-items:center;gap:10px;min-height:72px;margin:0 0 16px;padding:0 16px;border:1px solid var(--line);border-left:3px solid var(--ink-line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
+/* 窄手機：頁首狀態徽章與動作鈕再收緊，英文等較長字串也維持單列 */
+@media (max-width:479px){
+  .c-head{gap:0}.c-head .c-brand{margin-right:0}.c-head .c-brand::before{margin-right:6px}
+  .c-head .c-badge{padding:0 6px;gap:4px;font-size:10px;letter-spacing:.02em}.c-head .c-badge::before{display:none}
+  .c-head .c-btn{min-width:0;padding:0 8px;letter-spacing:0}.c-head .c-btn.c-back{padding:0 6px}
+  .c-head .locale-switch{font-size:11px;letter-spacing:0;margin:0}.c-head .um .um-btn{min-width:44px}
+}

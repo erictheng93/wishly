@@ -47,7 +47,8 @@
 .c-admin .c-err{border:1px solid var(--bad);background:var(--bad-bg);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
 .c-admin .c-ok{margin:0 0 14px}
 .c-admin p.c-center.c-mute{padding:36px 16px;border:1px dashed var(--line);background:var(--hatch);font:500 12px/1.6 var(--mono);letter-spacing:.08em}
-.c-admin p.c-mute[role=status]{font:500 12px var(--mono);letter-spacing:.1em}
+.c-admin p.c-mute[role=status]{font:500 12px/1.6 var(--mono);letter-spacing:.1em;display:flex;align-items:center;justify-content:center;gap:10px;min-height:96px;padding:20px 16px;border:1px dashed var(--line);background:var(--hatch);color:var(--mute);text-align:center}
+.c-admin p.c-mute[role=status]::before{content:"" / "";width:8px;height:8px;background:var(--red);flex:none}
 .c-admin .c-btn.block{margin-top:6px}
 
 /* ── 分頁：等寬 ─────────────────────── */
@@ -71,3 +72,21 @@
 .c-admin article h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .c-admin article .c-card{margin:8px 0;padding:14px;border-left:3px solid var(--ink-line)}
 .c-admin>.c-btn.block{margin-bottom:16px}
+
+/* ── 稽核：精修層 ─────────────────────── */
+/* 卡片標題列：名稱優先佔一行，徽章／時間不夠寬時整組換行，不把名稱擠成單字斷行 */
+.c-admin article.c-card>:first-child strong{flex:1 1 11em;min-width:0;overflow-wrap:anywhere}
+.c-admin article.c-card>:first-child .c-badge{white-space:nowrap;flex:none}
+.c-admin article.c-card>:first-child time{flex:none;margin-left:auto;font:500 12px var(--mono);letter-spacing:.02em}
+/* 展開摘要（稽核 diff）：可點區 ≥44px、等寬小標籤 */
+.c-admin article details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);border-top:1px solid var(--line)}
+.c-admin article details>summary:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.c-admin article details[open]>summary{color:var(--fg)}
+/* 兩步驟驗證提示：訊息與動作成列，連結有足夠點擊區 */
+.c-admin>p.c-card[role=status]{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--red);line-height:1.7;font-size:14px}
+.c-admin>p.c-card[role=status] a{display:inline-flex;align-items:center;min-height:44px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
+/* 系統旗標開關：核取方塊對齊首行文字 */
+.c-admin .c-switch{align-items:flex-start;gap:14px;padding:6px 0;margin:0 0 12px}
+.c-admin .c-switch input{flex:none;margin:2px 0 0}
+.c-admin .c-switch span{flex:1;min-width:0;line-height:1.6}
+.c-admin .c-switch small{display:block;margin-top:4px;line-height:1.6}

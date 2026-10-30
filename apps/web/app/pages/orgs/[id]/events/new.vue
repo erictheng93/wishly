@@ -66,7 +66,7 @@ async function submit() {
       </fieldset>
       <label class="c-field"><span>{{ $t('org.relief.evArea') }}</span><input v-model="f.area_note" maxlength="200"></label>
       <label class="c-field"><span>{{ $t('org.relief.evDesc') }}</span><textarea v-model="f.description" rows="3" /></label>
-      <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+      <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
       <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('org.relief.evSubmitting') : $t('org.relief.evSubmit') }}</button>
     </form>
   </main>

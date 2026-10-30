@@ -58,8 +58,8 @@ async function applyPermit(pid: string) {
 <template>
   <main class="c-page oh">
     <CreatorHeader :title="org?.display_name || $t('org.console.title')" />
-    <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <p v-if="loading" class="c-mute" role="status">{{ $t('org.apply.loading') }}</p>
+    <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
+    <p v-if="loading" class="c-mute oe-load" role="status">{{ $t('org.apply.loading') }}</p>
     <template v-else-if="org">
       <nav class="c-row oh-nav">
         <NuxtLink v-if="role === 'owner'" :to="`/orgs/${id}/members`" class="c-btn">{{ $t('org.console.members') }}</NuxtLink>
@@ -112,7 +112,7 @@ async function applyPermit(pid: string) {
           <label class="c-field"><span>{{ $t('org.apply.permitNo') }}</span><input v-model="permit.permit_no" name="permit_no" required></label>
           <label class="c-field"><span>{{ $t('org.apply.validFrom') }}</span><input v-model="permit.valid_from" name="valid_from" type="date" required></label>
           <label class="c-field"><span>{{ $t('org.apply.validTo') }}</span><input v-model="permit.valid_to" name="valid_to" type="date" required></label>
-          <label class="c-field"><span>{{ $t('org.apply.permitDoc') }}</span><input type="file" name="permit_file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="permitFile = ($event.target as HTMLInputElement).files?.[0] ?? null"></label>
+          <label class="c-field"><span>{{ $t('org.apply.permitDoc') }}</span><span class="oh-file" :class="{ off: busy }"><input type="file" name="permit_file" accept="application/pdf,image/jpeg,image/png" :disabled="busy" @change="permitFile = ($event.target as HTMLInputElement).files?.[0] ?? null"><span class="oh-file-btn" aria-hidden="true">{{ $t('org.apply.chooseFile') }}</span><span class="oh-file-name" :class="{ on: permitFile }" aria-hidden="true">{{ permitFile?.name || $t('org.apply.noFile') }}</span></span></label>
           <button class="c-btn primary" :disabled="busy || !permit.permit_no || !permit.valid_from || !permit.valid_to || !permitFile">{{ $t('org.apply.addPermit') }}</button>
         </form>
       </section>
@@ -121,10 +121,23 @@ async function applyPermit(pid: string) {
 </template>
 
 <style scoped>
-.oh-form{margin-top:16px;margin-bottom:18px}
+.oh-form{margin-top:8px;margin-bottom:18px;padding-top:20px;border-top:1px dashed var(--ink-line)}
+.oh-file{margin-bottom:0;letter-spacing:0;position:relative;display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;min-height:64px;padding:12px 16px;border:1px dashed var(--ink-line);background:var(--hatch),var(--bg-alt);color:var(--mute);font:500 12px var(--mono);cursor:pointer}
+.oh-file input{position:absolute;inset:0;width:100%;height:100%;min-height:0;opacity:0;cursor:pointer;padding:0;border:0}
+.oh-file:focus-within{outline:2px solid var(--red);outline-offset:2px}
+.oh-file.off{opacity:.5;cursor:progress}
+.oh-file-btn{flex:none;display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:700 13px var(--font);letter-spacing:.06em}
+.oh-file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oh-file-name.on{color:var(--fg)}
+.oh-form>.c-btn{min-height:48px}
+.oh-list .c-badge.approved{color:var(--ok);border-color:currentColor}
+.oh-list .c-badge.pending{color:var(--red-text);border-color:currentColor}
+.oe-load{padding:28px 0;font:600 12px var(--mono);letter-spacing:.14em}
+
 .oh-list li>.oh-apply{grid-column:1/-1;justify-self:start}
 .oh-msg{margin-top:12px}
 .oh-nav{margin-bottom:16px}
+.oh-nav .c-btn{min-height:48px}
 .oh-sec{padding:0;border-top:2px solid var(--ink-line);margin-bottom:24px}
 .oh-sec>*{margin-left:18px;margin-right:18px}
 .oh-sec>.c-h2{margin:0;padding:14px 18px;background:var(--bg-alt);border-bottom:1px solid var(--line)}
@@ -138,7 +151,7 @@ async function applyPermit(pid: string) {
 .oh-list li>.c-mute{grid-column:1/-1;font:500 12px/1.5 var(--mono);letter-spacing:.03em}
 .oh-list li>.c-badge{grid-column:2;justify-self:start}
 .oh-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;margin-top:2px}
-.oh-acts a{padding:0 12px 0 0;margin-right:12px;border-right:1px solid var(--line);font-size:14px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:4px}
+.oh-acts a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px 0 0;margin-right:12px;border-right:1px solid var(--line);font-size:14px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:4px}
 .oh-acts a:last-child{border-right:0}
 @media (min-width:768px){
   .oh-list li{grid-template-columns:auto auto 1fr}

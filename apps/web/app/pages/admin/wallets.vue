@@ -76,7 +76,7 @@ async function setStatus() {
 
     <button v-if="cursor" class="c-btn block" :disabled="busy" @click="search(true)">{{ $t('admin.wallets.loadMore') }}</button>
     <CreatorSheet :open="!!target" :title="$t('admin.wallets.grant')" @close="target = null">
-      <p>{{ $t('admin.wallets.target') }}<strong>{{ target?.display_name }}</strong>（{{ target?.email }}）　{{ $t('admin.wallets.currentBalance', { balance: fmtPts(target?.balance) }) }}</p>
+      <p>{{ $t('admin.wallets.target') }}<strong>{{ target?.display_name }}</strong>（{{ target?.email }}）<span class="wl-bal">{{ $t('admin.wallets.currentBalance', { balance: fmtPts(target?.balance) }) }}</span></p>
       <form @submit.prevent="confirmGrant">
         <label class="c-field"><span>{{ $t('admin.wallets.pointsLabel') }}</span><input v-model="g.points" type="number" inputmode="numeric" step="1" required></label>
         <label class="c-field"><span>{{ $t('admin.wallets.reasonLabel') }}</span><input v-model="g.reason" maxlength="200" required></label>
@@ -94,3 +94,6 @@ async function setStatus() {
     </CreatorConfirm>
   </main>
 </template>
+<style scoped>
+.wl-bal{display:block;margin-top:4px;font:500 13px var(--mono);color:var(--mute)}
+</style>
