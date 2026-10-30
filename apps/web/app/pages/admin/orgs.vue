@@ -8,10 +8,11 @@ const { api } = useApi()
 const STATUSES = ['pending', 'pending_permits', 'needs_changes', 'verified', 'rejected']
 // 可標記補件的欄位（後端 FLAGGABLE）；標籤沿用申請表 org.apply.f.*，其餘三項用 admin.orgs.flag.*
 const FLAGS = ['legal_name', 'display_name', 'org_type', 'tax_id', 'registration_no', 'authority', 'website', 'intro', 'logo_key', 'rep_name', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone', 'documents', 'permits']
+const show = (f: string, v: any) => v == null || v === '' ? '—' : f === 'org_type' ? t(`org.apply.type.${v}`, String(v)) : v
 const flagLabel = (f: string) => t(['logo_key', 'documents', 'permits'].includes(f) ? `admin.orgs.flag.${f}` : `org.apply.f.${f}`)
 const status = ref('pending')
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
-const err = ref(''), msg = ref('')
+const err = ref(''), msg = ref(''), dErr = ref('') // dErr：展開的詳情內的錯誤（下載、載入詳情），顯示在卡片內而非頁首
 
 async function load(more = false) {
   loading.value = true; err.value = ''
@@ -27,15 +28,15 @@ onMounted(() => load())
 const openId = ref<string | null>(null), detail = ref<any>(null), dLoading = ref(false)
 async function toggle(o: any) {
   if (openId.value === o.id) { openId.value = null; return }
-  openId.value = o.id; detail.value = null; await reloadDetail()
+  openId.value = o.id; detail.value = null; dErr.value = ''; await reloadDetail()
 }
 async function reloadDetail() {
-  dLoading.value = true; err.value = ''
+  dLoading.value = true; dErr.value = ''
   try { detail.value = await api(`/admin/orgs/${openId.value}`) }
-  catch (e) { err.value = errMsg(e) } finally { dLoading.value = false }
+  catch (e) { dErr.value = errMsg(e) } finally { dLoading.value = false }
 }
 async function download(orgId: string, d: any) {
-  err.value = ''
+  dErr.value = ''
   try {
     const blob = await api<Blob>(`/orgs/${orgId}/documents/${d.id}`, { responseType: 'blob' })
     const a = document.createElement('a')
@@ -43,7 +44,7 @@ async function download(orgId: string, d: any) {
     a.download = `${d.kind}-${d.id}.${d.content_type === 'application/pdf' ? 'pdf' : d.content_type === 'image/png' ? 'png' : 'jpg'}`
     document.body.appendChild(a); a.click(); a.remove()
     setTimeout(() => URL.revokeObjectURL(a.href), 0)
-  } catch (e) { err.value = errMsg(e) }
+  } catch (e) { dErr.value = errMsg(e) }
 }
 
 // 審核動作：kind=org 或 permit；revoke 為已通過 / 已核准者的退件
@@ -99,10 +100,12 @@ async function submit() {
 
       <div v-if="openId === o.id" class="c-mt">
         <p v-if="dLoading && detail?.org.id !== o.id" class="c-mute" role="status">{{ $t('admin.orgs.detailLoading') }}</p>
+        <p v-else-if="dErr && detail?.org.id !== o.id" class="c-err" role="alert">{{ dErr }} <button class="c-btn" @click="reloadDetail">{{ $t('admin.orgs.retry') }}</button></p>
         <template v-else-if="detail?.org.id === o.id">
-          <dl class="c-dl">
+          <p v-if="dErr" class="c-err" role="alert">{{ dErr }}</p>
+          <dl class="c-dl ao-dl">
             <template v-for="f in FLAGS.filter(f => f !== 'documents' && f !== 'permits' && f !== 'logo_key')" :key="f">
-              <dt>{{ flagLabel(f) }}</dt><dd>{{ detail.org[f] ?? '' }}</dd>
+              <dt>{{ flagLabel(f) }}</dt><dd>{{ show(f, detail.org[f]) }}</dd>
             </template>
             <template v-if="detail.org.review_note"><dt>{{ $t('admin.orgs.reviewNote') }}</dt><dd>{{ detail.org.review_note }}</dd></template>
           </dl>
@@ -126,7 +129,7 @@ async function submit() {
           </div>
 
           <h3>{{ $t('admin.orgs.members') }}</h3>
-          <div v-for="m in detail.members" :key="m.user_id" class="c-mute">{{ m.display_name }} · {{ m.role }}</div>
+          <div v-for="m in detail.members" :key="m.user_id" class="c-mute">{{ m.display_name }} · {{ $t(`org.members.r.${m.role}`, m.role) }}</div>
 
           <div v-if="['pending', 'verified'].includes(detail.org.verification_status)" class="c-row wrap c-mt">
             <template v-if="detail.org.verification_status === 'pending'">
@@ -142,7 +145,7 @@ async function submit() {
 
     <CreatorConfirm :open="!!act" :title="title" :text="text" :ok="title" :danger="act?.decision === 'reject'" :busy="busy" :error="aerr" @close="act = null" @ok="submit">
       <template v-if="act && !(act.revoke && act.kind === 'org' && act.step === 2)">
-        <fieldset v-if="act.decision === 'needs_changes'" class="c-field">
+        <fieldset v-if="act.decision === 'needs_changes'" class="c-field ao-flags">
           <legend>{{ $t('admin.orgs.flagLabel') }}</legend>
           <label v-for="f in FLAGS" :key="f" class="c-row"><input v-model="flagged" type="checkbox" :value="f" :name="`flag-${f}`"><span>{{ flagLabel(f) }}</span></label>
         </fieldset>
@@ -151,3 +154,9 @@ async function submit() {
     </CreatorConfirm>
   </main>
 </template>
+<style scoped>
+/* 補件欄位：桌面兩欄 */
+@media (min-width:768px){.ao-flags{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}.ao-flags>legend{grid-column:1/-1}}
+/* 手機：詳情標籤在上、值在下，網址與長名稱不被窄欄斷成一字一行 */
+@media (max-width:767px){.ao-dl{grid-template-columns:1fr;gap:0}.ao-dl dt{padding-top:10px}.ao-dl dd{padding-bottom:10px;border-bottom:1px dotted var(--line)}}
+</style>

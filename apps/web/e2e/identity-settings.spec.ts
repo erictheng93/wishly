@@ -73,6 +73,8 @@ test('已登入帳號停權後 API 請求清除登入並顯示原因', async ({ 
   await context.addCookies((await user.api.storageState()).cookies)
   await page.goto('/settings')
   await expect(page.getByLabel('顯示名稱')).toBeVisible()
+  // 頁首的新手導覽載入後也會打 API；等它先完成再停權，否則它可能搶先撞到停權並導走，「儲存」就點不到
+  await page.waitForLoadState('networkidle')
   sql(`UPDATE users SET blocked_at=now() WHERE id='${id}'`)
   await page.locator('form').filter({ has: page.getByLabel('顯示名稱') }).getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page).toHaveURL(/\/login\?.*error=account_blocked/)
