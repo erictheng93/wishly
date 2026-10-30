@@ -2,8 +2,6 @@
   "admin": {
     "index": {
       "title": "Bảng điều khiển vận hành",
-      "mfaHint": "Nên bật xác minh hai bước: quản trị có thể khóa tài khoản và cấp điểm, tài khoản bị chiếm đoạt sẽ gây hậu quả lớn.",
-      "mfaSetup": "Thiết lập ngay",
       "statsLabel": "Thống kê vận hành",
       "overview": "Tổng quan",
       "refreshStats": "Cập nhật số liệu",
@@ -117,7 +115,11 @@
         "auditNote": "Mọi thao tác vận hành đều được ghi vào nhật ký kiểm toán.",
         "confirmTitle": "Chuyển chế độ chỉ đọc",
         "confirmOff": "Tắt chế độ chỉ đọc?",
-        "confirmOn": "Chế độ chỉ đọc sẽ chặn ghi trên toàn trang. Bật?"
+        "confirmOn": "Chế độ chỉ đọc sẽ chặn ghi trên toàn trang. Bật?",
+        "mfa": "Bắt buộc xác minh hai bước",
+        "mfaHint": "Khi bật, mọi nhân viên phải thiết lập và qua xác minh hai bước trước khi dùng trang quản trị. Chỉ bật được khi có ít nhất 2 nhân viên đã thiết lập. Hiện tại: {state}",
+        "confirmMfaOn": "Nhân viên chưa thiết lập xác minh hai bước sẽ phải thiết lập trước khi dùng trang quản trị. Bật?",
+        "confirmMfaOff": "Nhân viên chưa thiết lập xác minh hai bước sẽ lại dùng được trang quản trị (người đã thiết lập vẫn phải xác minh). Tắt?"
       },
       "mod": {
         "hideTitle": "Gỡ danh sách",
@@ -133,7 +135,10 @@
         "reason": "Lý do thao tác",
         "recoverySent": "Đã yêu cầu gửi email khôi phục; hãy nhờ người dùng hoàn tất đặt lại ở trang quên mật khẩu",
         "done": "Đã xong: {title}"
-      }
+      },
+      "staffMfaLow": "Có ít hơn 2 nhân viên đã thiết lập xác minh hai bước. Nếu ai đó mất ứng dụng xác thực và mã dự phòng, sẽ không ai đặt lại được. Hãy nhờ thêm một nhân viên hoàn tất thiết lập.",
+      "mfaHint": "Nên bật xác minh hai bước: quản trị có thể khóa tài khoản và cấp điểm, tài khoản bị chiếm đoạt sẽ gây hậu quả lớn.",
+      "mfaSetup": "Thiết lập ngay"
     },
     "audit": {
       "title": "Nhật ký kiểm toán",
@@ -160,7 +165,7 @@
       "title": "Xác minh hai bước",
       "enabledPrompt": "Nhập mã 6 chữ số hiển thị trong ứng dụng xác thực.",
       "intro": "Sau khi bật, mỗi lần đăng nhập trang quản trị bạn phải nhập mã 6 chữ số từ ứng dụng xác thực (Google Authenticator, 1Password, v.v.).",
-      "lostPhone": "Nếu mất điện thoại, nhân viên khác có thể đặt lại cho bạn tại mục Người dùng trong trang quản trị.",
+      "lostPhone": "Nếu mất điện thoại, hãy đăng nhập bằng mã dự phòng. Nếu mất cả mã dự phòng, nhờ nhân viên khác đặt lại trong mục Người dùng của trang quản trị.",
       "start": "Bắt đầu thiết lập",
       "preparing": "Đang chuẩn bị…",
       "step1": "1. Quét mã QR bằng ứng dụng xác thực, hoặc nhập khóa thủ công:",
@@ -169,6 +174,15 @@
       "verifying": "Đang xác minh…",
       "verify": "Xác minh",
       "enable": "Bật",
+      "codesTitle": "Đã bật xác minh hai bước. Hãy lưu các mã dự phòng sau:",
+      "codesHint": "Mỗi mã chỉ dùng được một lần và có thể thay mã xác minh khi bạn mất điện thoại. Mã chỉ hiển thị lần này, hãy lưu vào trình quản lý mật khẩu hoặc nơi an toàn.",
+      "codesSaved": "Tôi đã lưu, tiếp tục",
+      "recoveryPrompt": "Nhập một mã dự phòng chưa dùng.",
+      "recoveryLabel": "Mã dự phòng",
+      "useRecovery": "Không có điện thoại? Dùng mã dự phòng",
+      "useApp": "Dùng ứng dụng xác thực",
+      "regen": "Tạo mã dự phòng mới",
+      "regenHint": "Toàn bộ mã dự phòng cũ sẽ hết hiệu lực.",
       "skip": "Bỏ qua, quay lại trang quản trị"
     },
     "wallets": {

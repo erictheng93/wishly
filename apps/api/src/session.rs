@@ -44,6 +44,8 @@ pub struct CurrentUser {
     pub mfa: bool,
     /// 帳號已啟用 TOTP
     pub mfa_enabled: bool,
+    /// system_flags.staff_mfa_required：未啟用 TOTP 的營運人員也須先設定
+    pub mfa_required: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -55,6 +57,7 @@ struct SessionRow {
     session_id: Uuid,
     mfa: bool,
     mfa_enabled: bool,
+    mfa_required: bool,
     stale: bool,
 }
 
@@ -65,6 +68,7 @@ impl FromRequestParts<AppState> for CurrentUser {
         let row: Option<SessionRow> = sqlx::query_as(
             "SELECT u.id, u.is_staff, u.blocked_at IS NOT NULL AS blocked, s.revoked_at IS NULL AS live, s.id AS session_id,
                     COALESCE(s.mfa_at > now() - interval '12 hours', false) AS mfa, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
+                    u.is_staff AND COALESCE((SELECT value = 'true'::jsonb FROM system_flags WHERE key = 'staff_mfa_required'), false) AS mfa_required,
                     (s.last_seen_at < now() - interval '5 minutes' OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)) AS stale
              FROM sessions s JOIN users u ON u.id = s.user_id
              WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL")
@@ -102,6 +106,7 @@ impl FromRequestParts<AppState> for CurrentUser {
                     session_id: r.session_id,
                     mfa: r.mfa,
                     mfa_enabled: r.mfa_enabled,
+                    mfa_required: r.mfa_required,
                 })
             }
             _ => Err(AppError::Unauthorized),

@@ -7,6 +7,6 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     if (from.path === '/login' || from.path === '/register') return navigateTo('/dashboard', { replace: true })
     return abortNavigation(createError({ statusCode: 403, statusMessage: useNuxtApp().$i18n.t('auth.api.staffOnly') }))
   }
-  // 已啟用兩步驟驗證：此 session 須先驗證；未啟用者由後台首頁提示（軟性引導）
-  if (u.mfa_enabled && !u.mfa_verified && to.path !== '/admin/mfa') return navigateTo({ path: '/admin/mfa', query: { redirect: to.fullPath } })
+  // 已啟用者此 session 須先驗證；開了強制旗標（#99）時未設定者也要先到 /admin/mfa 設定，否則由後台首頁提示
+  if (!u.mfa_verified && (u.mfa_enabled || u.mfa_required) && to.path !== '/admin/mfa') return navigateTo({ path: '/admin/mfa', query: { redirect: to.fullPath } })
 })

@@ -61,6 +61,8 @@
     "MFA_CODE_INVALID": "The verification code is incorrect or already used. Wait for the next code.",
     "MFA_NOT_SET_UP": "Set up two-step verification again. Contact another staff member if needed.",
     "MFA_REQUIRED": "Please complete two-step verification first.",
+    "MFA_RESET_SELF": "You can't reset your own two-step verification. Ask another staff member.",
+    "STAFF_MFA_TOO_FEW": "At least 2 staff members need two-step verification set up before you can require it.",
     "METHOD_NOT_ALLOWED": "This request method is not supported.",
     "NATIVE_CODE_INVALID": "This sign-in or linking code is invalid or expired. Please start again.",
     "NATIVE_ONLY": "Please use the Wishly app for this action.",

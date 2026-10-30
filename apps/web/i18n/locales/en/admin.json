@@ -2,8 +2,6 @@
   "admin": {
     "index": {
       "title": "Operations console",
-      "mfaHint": "Enable two-step verification: staff can block users and grant points, so a compromised account is costly.",
-      "mfaSetup": "Set up now",
       "statsLabel": "Operations stats",
       "overview": "Overview",
       "refreshStats": "Refresh stats",
@@ -117,7 +115,11 @@
         "auditNote": "All staff actions are written to the audit log.",
         "confirmTitle": "Toggle read-only mode",
         "confirmOff": "Turn off read-only mode?",
-        "confirmOn": "Read-only mode blocks writes site-wide. Turn it on?"
+        "confirmOn": "Read-only mode blocks writes site-wide. Turn it on?",
+        "mfa": "Require two-step verification",
+        "mfaHint": "When on, every staff member must set up and pass two-step verification before using the console. It can only be turned on once at least 2 staff members have set it up. Currently: {state}",
+        "confirmMfaOn": "Staff who haven't set up two-step verification will have to do so before using the console. Turn it on?",
+        "confirmMfaOff": "Staff without two-step verification will be able to use the console again (those who set it up still verify). Turn it off?"
       },
       "mod": {
         "hideTitle": "Hide list",
@@ -133,7 +135,10 @@
         "reason": "Reason",
         "recoverySent": "Recovery email requested; ask the user to finish the reset on the forgot-password page",
         "done": "Done: {title}"
-      }
+      },
+      "staffMfaLow": "Fewer than 2 staff members have two-step verification set up. If someone loses their authenticator and recovery codes, nobody can reset it. Have another staff member finish setup.",
+      "mfaHint": "Enable two-step verification: staff can block users and grant points, so a compromised account is costly.",
+      "mfaSetup": "Set up now"
     },
     "audit": {
       "title": "Audit log",
@@ -160,7 +165,7 @@
       "title": "Two-step verification",
       "enabledPrompt": "Enter the 6-digit code shown in your authenticator app.",
       "intro": "Once enabled, every console sign-in requires the 6-digit code from your authenticator app (Google Authenticator, 1Password, etc.).",
-      "lostPhone": "If you lose your phone, another staff member can reset it for you under Users in the console.",
+      "lostPhone": "If you lose your phone, sign in with a recovery code. If those are lost too, ask another staff member to reset it under Users in the console.",
       "start": "Start setup",
       "preparing": "Preparing…",
       "step1": "1. Scan the QR code with your authenticator app, or enter the key manually:",
@@ -169,6 +174,15 @@
       "verifying": "Verifying…",
       "verify": "Verify",
       "enable": "Enable",
+      "codesTitle": "Two-step verification is on. Save these recovery codes:",
+      "codesHint": "Each code works once and can stand in for a verification code if you lose your phone. They're shown only this once, so store them in a password manager or another safe place.",
+      "codesSaved": "I've saved them, continue",
+      "recoveryPrompt": "Enter a recovery code you haven't used yet.",
+      "recoveryLabel": "Recovery code",
+      "useRecovery": "Don't have your phone? Use a recovery code",
+      "useApp": "Use the authenticator app",
+      "regen": "Generate new recovery codes",
+      "regenHint": "All your old recovery codes will stop working.",
       "skip": "Skip for now, back to console"
     },
     "wallets": {

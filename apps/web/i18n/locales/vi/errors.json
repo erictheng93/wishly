@@ -61,6 +61,8 @@
     "MFA_CODE_INVALID": "Mã xác minh sai hoặc đã được sử dụng. Vui lòng đợi mã tiếp theo.",
     "MFA_NOT_SET_UP": "Hãy thiết lập lại xác minh hai bước. Liên hệ nhân viên quản trị khác nếu cần.",
     "MFA_REQUIRED": "Vui lòng hoàn tất xác minh hai bước trước.",
+    "MFA_RESET_SELF": "Bạn không thể tự đặt lại xác minh hai bước của mình. Hãy nhờ một nhân viên khác.",
+    "STAFF_MFA_TOO_FEW": "Cần ít nhất 2 nhân viên thiết lập xác minh hai bước thì mới bật bắt buộc được.",
     "METHOD_NOT_ALLOWED": "Phương thức yêu cầu này không được hỗ trợ.",
     "NATIVE_CODE_INVALID": "Mã đăng nhập hoặc liên kết không hợp lệ hoặc đã hết hạn. Vui lòng thực hiện lại.",
     "NATIVE_ONLY": "Vui lòng dùng ứng dụng Wishly để thực hiện thao tác này.",

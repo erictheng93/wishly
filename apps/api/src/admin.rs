@@ -31,9 +31,8 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/analytics", get(analytics))
 }
 
-/// 已登入且 is_staff；已啟用 TOTP 者此 session 須在 12 小時內通過驗證。否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。
-/// 驗證 12 小時後失效須重驗（session.rs）。
-/// ponytail: 未啟用 TOTP 仍可進後台（前端軟性引導）；要全面強制時改成 `!u.mfa` 即可。
+/// 已登入且 is_staff；已啟用 TOTP、或 system_flags.staff_mfa_required 開啟（#99，預設關）時，此 session 須在 12 小時內通過驗證。
+/// 否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。驗證 12 小時後失效須重驗（session.rs）。
 pub struct Staff(pub Uuid);
 
 impl FromRequestParts<AppState> for Staff {
@@ -49,7 +48,7 @@ impl FromRequestParts<AppState> for Staff {
 pub fn require_staff(u: &CurrentUser) -> Result<(), AppError> {
     if !u.is_staff {
         Err(AppError::problem(403, "STAFF_ONLY", "僅營運人員可使用"))
-    } else if u.mfa_enabled && !u.mfa {
+    } else if !u.mfa && (u.mfa_enabled || u.mfa_required) {
         Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"))
     } else {
         Ok(())
@@ -364,11 +363,24 @@ async fn reset_mfa(
     Json(b): Json<Value>,
 ) -> Result<StatusCode, AppError> {
     let reason = operation_reason(&b)?;
+    if id == sid {
+        // 自己重設等於繞過第二因素；遺失驗證器要找另一位營運人員
+        return Err(AppError::problem(
+            409,
+            "MFA_RESET_SELF",
+            "不能重設自己的兩步驟驗證",
+        ));
+    }
     let mut tx = staff_transaction(&st.pool, sid).await?;
-    sqlx::query("UPDATE users SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE id=$1 AND deleted_at IS NULL")
-        .bind(id).execute(&mut *tx).await?
-        .rows_affected().eq(&1).then_some(()).ok_or(AppError::NotFound)?;
+    let email: Option<String> = sqlx::query_scalar("UPDATE users SET totp_secret=NULL, totp_enabled_at=NULL, totp_last_step=NULL WHERE id=$1 AND deleted_at IS NULL RETURNING email")
+        .bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    sqlx::query("DELETE FROM totp_recovery_codes WHERE user_id=$1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     revoke_sessions(&mut tx, id).await?;
+    // 通知當事人，被盜用的帳號替他人關掉第二因素時當事人能立刻發現
+    crate::identities::notify(&mut tx, id, "auth.mfa_reset", "totp", email.as_deref()).await?;
     audit(
         &mut *tx,
         sid,
@@ -488,14 +500,16 @@ async fn list_flags(State(st): State<AppState>, _s: Staff) -> Result<Json<Value>
     ))
 }
 
-/// 白名單 key：目前僅 read_only（boolean）。READ_ONLY_MODE 的 503 攔截不在本模組。
+/// 白名單 key：read_only、staff_mfa_required（boolean）。READ_ONLY_MODE 的 503 攔截不在本模組。
 async fn set_flag(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    u: CurrentUser,
     Path(key): Path<String>,
     Json(b): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
-    if key != "read_only" {
+    require_staff(&u)?;
+    let sid = u.id;
+    if key != "read_only" && key != "staff_mfa_required" {
         return Err(AppError::NotFound);
     }
     let v = b
@@ -503,6 +517,21 @@ async fn set_flag(
         .filter(|v| v.is_boolean())
         .cloned()
         .ok_or_else(|| AppError::invalid("/value", "INVALID", "value 必須為 boolean"))?;
+    if key == "staff_mfa_required" && v == json!(true) {
+        // 開啟前確認不會把人鎖在外面：自己此 session 已驗證，且至少 2 位營運人員已設定（有人遺失驗證器時還有人能重設）
+        if !u.mfa {
+            return Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"));
+        }
+        let ready: i64 = sqlx::query_scalar("SELECT count(*) FROM users WHERE is_staff AND totp_enabled_at IS NOT NULL AND deleted_at IS NULL AND blocked_at IS NULL")
+            .fetch_one(&st.pool).await?;
+        if ready < 2 {
+            return Err(AppError::problem(
+                409,
+                "STAFF_MFA_TOO_FEW",
+                "至少 2 位營運人員設定兩步驟驗證後才能開啟強制",
+            ));
+        }
+    }
     let mut tx = st.pool.begin().await?;
     let (updated_at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "INSERT INTO system_flags (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value RETURNING updated_at")
@@ -533,6 +562,7 @@ pub async fn stats_json(pool: &PgPool) -> Result<Value, sqlx::Error> {
            'hidden_wishlists', (SELECT count(*) FROM wishlists WHERE moderation_status = 'hidden'),
            'claims_by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM claims GROUP BY 1) t),
            'open_reports', (SELECT count(*) FROM content_reports WHERE status = 'open'),
+           'staff_mfa', (SELECT count(*) FROM users WHERE is_staff AND totp_enabled_at IS NOT NULL AND deleted_at IS NULL AND blocked_at IS NULL),
            'notifications_by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM notifications GROUP BY 1) t),
            'audit_last_7d', (SELECT COALESCE(jsonb_object_agg(a, n), '{}') FROM (SELECT action a, count(*) n FROM audit_logs WHERE created_at > now() - interval '7 days' GROUP BY 1) t),
            'flags', (SELECT COALESCE(jsonb_object_agg(key, value), '{}') FROM system_flags))")
