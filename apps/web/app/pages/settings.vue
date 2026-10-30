@@ -203,7 +203,7 @@ async function remove() {
           <button v-else class="c-btn primary block" :disabled="identityBusy">{{ identityBusy ? $t('settings.login.sending') : $t('settings.login.sendCode') }}</button>
         </form>
         <p v-if="user.email && !user.has_password" class="c-mute"><NuxtLink to="/forgot-password">{{ $t('settings.login.setPw') }}</NuxtLink>{{ $t('settings.login.setPwNote') }}</p>
-        <p v-else class="c-mute">{{ $t('settings.login.noEmailWarn') }}</p>
+        <p v-else-if="!user.email" class="c-mute">{{ $t('settings.login.noEmailWarn') }}</p>
         <p v-if="identityErr && !removingProvider" class="c-err" role="alert">{{ identityErr }}</p>
         <p v-if="identityMsg" class="c-ok" role="status">{{ identityMsg }}</p>
       </section>
