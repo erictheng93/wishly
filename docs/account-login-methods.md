@@ -1,6 +1,7 @@
 # 登入方式與 Email 政策
 
-- 設定頁可新增或解除 Email、Google、LINE。Google／LINE 在原生殼仍不提供 OAuth 入口，請使用網頁版。
+- 設定頁可新增或解除 Email、Google、LINE。原生殼的 Google／LINE 走系統瀏覽器 + deep link（登入 `native_exchange`、綁定 `link-ticket` → `link-confirm`）。
+- 網頁登入頁只有「Email + 密碼」與 Google／LINE，`/auth/otp/*` 沒有前端入口。綁定 Email 只驗證信箱、不設密碼，LINE／Google 開戶的使用者要先在設定頁走「設定 Email 登入密碼」（或忘記密碼），之後才能用 Email 登入。
 - 手動 OAuth 綁定須保留發起的同一個 session；state 簽章包含供應商、帳號、session、用途及 10 分鐘期限。Email 綁定 OTP 同樣限定帳號、session 與用途，不能拿來登入、註冊或重設密碼。
 - 綁定的 provider identity 或已驗證 Email 屬於另一個**空帳號**（SQL 函式 `user_is_blank`：沒有任何指向 users 的外鍵資料，只允許登入方式、session、通知、活動日、頭像與零餘額且無帳本的錢包；staff、停權帳號不算空）時，該帳號會被併入：這次綁定的 identity 連同密碼搬到目前帳號，其餘 identity 移除、session 撤銷、帳號軟刪除並匿名化、頭像退役，稽核紀錄 `account.absorb`（`actor_id` 為保留帳號、`entity_id` 為被併入帳號）。常見情境是先用 Email 註冊、之後誤按 LINE 登入開出新帳號，再到 `/settings` 綁定 LINE。
 - 另一個帳號有資料，或衝突涉及兩個以上帳號，仍回 `409 IDENTITY_IN_USE`。不合併兩個都有資料的帳號，也不搬移清單、捐助、點數與訂單，由客服個案處理（使用者可在 `/settings` 複製帳號 ID）。對方帳號正被其他操作鎖住時回 `409 IDENTITY_BUSY`（不等待，避免互相吸收時鎖死）。
