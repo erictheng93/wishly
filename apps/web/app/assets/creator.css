@@ -40,6 +40,13 @@
 .c-field input:focus,.c-field select:focus,.c-field textarea:focus,.c-input:focus,.c-otp input:focus{outline:0;border-color:var(--red);background-color:var(--card);box-shadow:0 0 0 1px var(--red),4px 4px 0 var(--bad-bg)}
 .c-field select,select.c-input{appearance:none;padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat}
 .c-field ::placeholder,.c-input::placeholder{color:var(--mute);opacity:.7}
+/* 欄位群組（fieldset.c-field）內的勾選框／單選鈕：不吃上面文字欄的滿寬、高度與底色，否則會被撐成大方塊、標籤被擠到右側 */
+.c-field input:is([type=checkbox],[type=radio]){flex:none;width:20px;height:20px;min-height:0;margin:0;padding:0;border:0;background:none;box-shadow:none;accent-color:var(--red)}
+.c-field input:is([type=checkbox],[type=radio]):focus{box-shadow:none;outline:0}
+.c-field input:is([type=checkbox],[type=radio]):focus-visible{outline:2px solid var(--red);outline-offset:2px}
+fieldset.c-field{border:0;padding:0;min-width:0}
+fieldset.c-field>legend{padding:0;margin-bottom:8px;font:600 11px/1.4 var(--mono);letter-spacing:.12em;color:var(--mute)}
+fieldset.c-field>label.c-row{min-height:44px;gap:12px;cursor:pointer}
 /* 分段選擇：墨線框，選中為實心墨色＋紅色指示點 */
 .c-seg{display:flex;gap:0;margin:0 0 18px;border:1px solid var(--ink-line)}
 .c-seg label{flex:1;position:relative}
