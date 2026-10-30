@@ -345,3 +345,37 @@ fn org_review_copy() {
         assert!(s.contains(en) && b.contains("/org/apply"), "{s}");
     }
 }
+
+/// 已通過的組織送了新許可 → pending_permits 偽狀態列得出來，每列帶待審數量；cursor 分頁照常。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn list_pending_permits_filter(pool: PgPool) {
+    let TestUser { id: owner, .. } = user(&pool, "owner").await;
+    let TestUser { token: st, .. } = staff(&pool, "staff").await;
+    let o = common::org(&pool, owner, "verified").await;
+    common::permit(&pool, o, "approved", 30).await;
+    let (_, _, b) = call(
+        &pool,
+        "GET",
+        "/admin/orgs?status=pending_permits",
+        &ck(&st),
+        None,
+    )
+    .await;
+    assert_eq!(b["data"].as_array().map(Vec::len), Some(0), "{b}");
+    common::permit(&pool, o, "pending", 90).await;
+    common::permit(&pool, o, "pending", 120).await;
+    let (s, _, b) = call(
+        &pool,
+        "GET",
+        "/admin/orgs?status=pending_permits&limit=1",
+        &ck(&st),
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["data"].as_array().map(Vec::len), Some(1), "{b}");
+    assert_eq!(b["data"][0]["pending_permits"], 2, "{b}");
+    assert!(b["next_cursor"].is_null(), "{b}");
+    let (_, _, b) = call(&pool, "GET", "/admin/orgs?status=verified", &ck(&st), None).await;
+    assert_eq!(b["data"][0]["pending_permits"], 2, "{b}");
+}

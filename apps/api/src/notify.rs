@@ -477,27 +477,53 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             .as_str()
             .filter(|n| !n.is_empty())
             .unwrap_or("-");
+        let url = format!(
+            "{app}/orgs/{}#permits",
+            payload["org_id"].as_str().unwrap_or("")
+        );
         return (
             l.pick(format!("【Wishly】勸募許可 {no} 已撤銷"), format!("[Wishly] Fundraising permit {no} revoked"), format!("[Wishly] Giấy phép gây quỹ {no} đã bị thu hồi"), format!("[Wishly] Izin penggalangan dana {no} dicabut")),
             l.pick(
-                format!("組織「{name}」的勸募許可 {no} 已被撤銷，使用此許可的救災據點已暫停。\n備註：{note}\n組織頁面：{app}/org/apply\n"),
-                format!("The fundraising permit {no} of \"{name}\" has been revoked, and relief sites using it are paused.\nNote: {note}\nOrganization page: {app}/org/apply\n"),
-                format!("Giấy phép gây quỹ {no} của \"{name}\" đã bị thu hồi, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nGhi chú: {note}\nTrang tổ chức: {app}/org/apply\n"),
-                format!("Izin penggalangan dana {no} milik \"{name}\" dicabut, dan lokasi bantuan yang memakainya dijeda.\nCatatan: {note}\nHalaman organisasi: {app}/org/apply\n"),
+                format!("組織「{name}」的勸募許可 {no} 已被撤銷，使用此許可的救災據點已暫停。\n請到組織後台的勸募許可區上傳新許可送審，通過後在據點編輯頁換用新許可再恢復。\n備註：{note}\n勸募許可區：{url}\n"),
+                format!("The fundraising permit {no} of \"{name}\" has been revoked, and relief sites using it are paused.\nIn your organization dashboard, upload a new permit in the Fundraising permits section; once approved, switch your sites to the new permit on each site's edit page and resume them.\nNote: {note}\nPermits section: {url}\n"),
+                format!("Giấy phép gây quỹ {no} của \"{name}\" đã bị thu hồi, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nTrong trang quản trị tổ chức, hãy tải lên giấy phép mới ở mục Giấy phép gây quỹ; sau khi được duyệt, đổi các điểm sang giấy phép mới ở trang chỉnh sửa điểm rồi mở lại.\nGhi chú: {note}\nMục giấy phép: {url}\n"),
+                format!("Izin penggalangan dana {no} milik \"{name}\" dicabut, dan lokasi bantuan yang memakainya dijeda.\nDi dasbor organisasi, unggah izin baru di bagian Izin penggalangan dana; setelah disetujui, ganti izin lokasi di halaman edit lokasi lalu lanjutkan.\nCatatan: {note}\nBagian izin: {url}\n"),
             ),
         );
     }
     if kind == "org.permit_expired" {
         let name = payload["display_name"].as_str().unwrap_or("");
         let no = payload["permit_no"].as_str().unwrap_or("");
-        let url = format!("{app}/orgs/{}", payload["org_id"].as_str().unwrap_or(""));
+        let url = format!(
+            "{app}/orgs/{}#permits",
+            payload["org_id"].as_str().unwrap_or("")
+        );
         return (
             l.pick(format!("【Wishly】勸募許可 {no} 已到期"), format!("[Wishly] Fundraising permit {no} expired"), format!("[Wishly] Giấy phép gây quỹ {no} đã hết hạn"), format!("[Wishly] Izin penggalangan dana {no} kedaluwarsa")),
             l.pick(
-                format!("組織「{name}」的勸募許可 {no} 已到期，使用此許可的救災據點已暫停。\n請上傳新的許可並送審後再恢復據點。\n組織頁面：{url}\n"),
-                format!("The fundraising permit {no} of \"{name}\" has expired, and relief sites using it are paused.\nSubmit a new permit for review, then resume your sites.\nOrganization page: {url}\n"),
-                format!("Giấy phép gây quỹ {no} của \"{name}\" đã hết hạn, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nHãy gửi giấy phép mới để xét duyệt rồi mở lại các điểm.\nTrang tổ chức: {url}\n"),
-                format!("Izin penggalangan dana {no} milik \"{name}\" kedaluwarsa, dan lokasi bantuan yang memakainya dijeda.\nAjukan izin baru untuk ditinjau, lalu lanjutkan lokasi.\nHalaman organisasi: {url}\n"),
+                format!("組織「{name}」的勸募許可 {no} 已到期，使用此許可的救災據點已暫停。\n請到組織後台的勸募許可區上傳新許可送審，通過後在據點編輯頁換用新許可再恢復。\n勸募許可區：{url}\n"),
+                format!("The fundraising permit {no} of \"{name}\" has expired, and relief sites using it are paused.\nIn your organization dashboard, upload a new permit in the Fundraising permits section; once approved, switch your sites to the new permit on each site's edit page and resume them.\nPermits section: {url}\n"),
+                format!("Giấy phép gây quỹ {no} của \"{name}\" đã hết hạn, các điểm cứu trợ dùng giấy phép này đã tạm dừng.\nTrong trang quản trị tổ chức, hãy tải lên giấy phép mới ở mục Giấy phép gây quỹ; sau khi được duyệt, đổi các điểm sang giấy phép mới ở trang chỉnh sửa điểm rồi mở lại.\nMục giấy phép: {url}\n"),
+                format!("Izin penggalangan dana {no} milik \"{name}\" kedaluwarsa, dan lokasi bantuan yang memakainya dijeda.\nDi dasbor organisasi, unggah izin baru di bagian Izin penggalangan dana; setelah disetujui, ganti izin lokasi di halaman edit lokasi lalu lanjutkan.\nBagian izin: {url}\n"),
+            ),
+        );
+    }
+    if kind == "org.permit_expiring" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let no = payload["permit_no"].as_str().unwrap_or("");
+        let to = payload["valid_to"].as_str().unwrap_or("");
+        let days = payload["days"].as_i64().unwrap_or(0);
+        let url = format!(
+            "{app}/orgs/{}#permits",
+            payload["org_id"].as_str().unwrap_or("")
+        );
+        return (
+            l.pick(format!("【Wishly】勸募許可 {no} 將於 {days} 天內到期"), format!("[Wishly] Fundraising permit {no} expires within {days} days"), format!("[Wishly] Giấy phép gây quỹ {no} sẽ hết hạn trong {days} ngày"), format!("[Wishly] Izin penggalangan dana {no} kedaluwarsa dalam {days} hari")),
+            l.pick(
+                format!("組織「{name}」的勸募許可 {no} 將於 {to} 到期，到期後使用此許可的救災據點會自動暫停。\n請到組織後台的勸募許可區上傳新許可送審，通過後在據點編輯頁換用新許可。\n勸募許可區：{url}\n"),
+                format!("The fundraising permit {no} of \"{name}\" expires on {to}; relief sites using it will be paused automatically.\nIn your organization dashboard, upload a new permit in the Fundraising permits section; once approved, switch your sites to it on each site's edit page.\nPermits section: {url}\n"),
+                format!("Giấy phép gây quỹ {no} của \"{name}\" sẽ hết hạn vào {to}; các điểm cứu trợ dùng giấy phép này sẽ tự động tạm dừng.\nTrong trang quản trị tổ chức, hãy tải lên giấy phép mới ở mục Giấy phép gây quỹ; sau khi được duyệt, đổi các điểm sang giấy phép mới ở trang chỉnh sửa điểm.\nMục giấy phép: {url}\n"),
+                format!("Izin penggalangan dana {no} milik \"{name}\" kedaluwarsa pada {to}; lokasi bantuan yang memakainya akan dijeda otomatis.\nDi dasbor organisasi, unggah izin baru di bagian Izin penggalangan dana; setelah disetujui, ganti izin lokasi di halaman edit lokasi.\nBagian izin: {url}\n"),
             ),
         );
     }

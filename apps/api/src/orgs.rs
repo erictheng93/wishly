@@ -34,6 +34,7 @@ pub fn routes() -> Router<AppState> {
             get(download).delete(delete_doc),
         )
         .route("/orgs/{id}/permits", get(list_permits).post(add_permit))
+        .route("/orgs/{id}/permits/{pid}/apply", post(apply_permit))
 }
 
 /// 未停用成員的角色；非成員 → None
@@ -701,4 +702,46 @@ async fn add_permit(
     .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(v)))
+}
+
+/// 把仍綁著失效許可（未核准 / 已過期）、未關閉的據點一次換成這張有效許可；不改 site_status，恢復營運由使用者自己按。
+async fn apply_permit(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Path((id, pid)): Path<(Uuid, Uuid)>,
+) -> R<Json<Value>> {
+    let mut tx = crate::begin_contended(&st.pool).await?;
+    lock(&mut tx, id).await?; // 許可審核也先鎖組織列，所以交易內讀到的許可狀態不會被並行撤銷；之後才動 wishlists
+    require_role(&mut *tx, id, u.id, "coordinator").await?;
+    let valid: bool = sqlx::query_scalar(
+        "SELECT status = 'approved' AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN valid_from AND valid_to
+           FROM org_permits WHERE id=$1 AND org_id=$2")
+        .bind(pid).bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    if !valid {
+        return Err(AppError::problem(
+            409,
+            "PERMIT_INVALID",
+            "許可未核准或已過期",
+        ));
+    }
+    let ids: Vec<Uuid> = sqlx::query_scalar(
+        "UPDATE wishlists w SET permit_id=$2 FROM org_permits old
+          WHERE old.id = w.permit_id AND w.org_id=$1 AND w.type='relief' AND w.status <> 'closed' AND w.deleted_at IS NULL
+            AND w.permit_id <> $2
+            AND (old.status <> 'approved' OR (now() AT TIME ZONE 'Asia/Taipei')::date > old.valid_to)
+          RETURNING w.id")
+        .bind(id).bind(pid).fetch_all(&mut *tx).await?;
+    if !ids.is_empty() {
+        audit_user(
+            &mut *tx,
+            u.id,
+            "org.permit.apply",
+            "org_permits",
+            Some(pid),
+            json!({"org_id": id, "wishlist_ids": ids}),
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(json!({"updated": ids.len()})))
 }

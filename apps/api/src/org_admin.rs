@@ -50,9 +50,15 @@ async fn list(
 ) -> Result<Response, AppError> {
     let lim = limit(&q);
     // 先送的先審；cursor 為上一頁最後一筆 id，以 (submitted_at, id) 接續
+    // status=pending_permits 為偽狀態：已通過、且有待審許可的組織；每列帶 pending_permits 數量
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
-        "SELECT o.id, to_jsonb(o) - 'contact_phone_enc' FROM organizations o
-          WHERE o.verification_status <> 'draft' AND ($1::text IS NULL OR o.verification_status = $1)
+        "SELECT o.id, to_jsonb(o) - 'contact_phone_enc'
+                || jsonb_build_object('pending_permits', (SELECT count(*) FROM org_permits p WHERE p.org_id = o.id AND p.status = 'pending'))
+           FROM organizations o
+          WHERE o.verification_status <> 'draft'
+            AND ($1::text IS NULL OR CASE WHEN $1 = 'pending_permits'
+                   THEN o.verification_status = 'verified' AND EXISTS (SELECT 1 FROM org_permits p WHERE p.org_id = o.id AND p.status = 'pending')
+                   ELSE o.verification_status = $1 END)
             AND ($2::uuid IS NULL OR (o.submitted_at, o.id) > (SELECT submitted_at, id FROM organizations WHERE id = $2))
           ORDER BY o.submitted_at ASC, o.id LIMIT $3")
         .bind(&q.status).bind(q.cursor).bind(lim + 1).fetch_all(&st.pool).await?;

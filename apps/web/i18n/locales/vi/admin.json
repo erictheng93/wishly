@@ -480,6 +480,7 @@
     },
     "orgs": {
       "title": "Org and permit review",
+      "pendingPermits": "{n} giấy phép chờ duyệt",
       "statusLabel": "Status",
       "all": "All",
       "retry": "Retry",
@@ -491,6 +492,7 @@
       "submittedAt": "Submitted",
       "detailLoading": "Loading details…",
       "status": {
+        "pending_permits": "Giấy phép chờ duyệt",
         "pending": "Pending",
         "needs_changes": "Needs changes",
         "verified": "Verified",

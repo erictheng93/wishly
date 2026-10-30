@@ -480,6 +480,7 @@
     },
     "orgs": {
       "title": "組織與許可審核",
+      "pendingPermits": "{n} 張許可待審",
       "statusLabel": "狀態",
       "all": "全部",
       "retry": "重試",
@@ -491,6 +492,7 @@
       "submittedAt": "送出時間",
       "detailLoading": "載入詳情…",
       "status": {
+        "pending_permits": "待審許可",
         "pending": "待審核",
         "needs_changes": "需補件",
         "verified": "已通過",

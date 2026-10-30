@@ -303,6 +303,94 @@ async fn permit_expiry_pauses_sites_and_purges(pool: PgPool) {
     assert_eq!(n, 1);
 }
 
+async fn reminders(pool: &PgPool, u: Uuid) -> Vec<i64> {
+    sqlx::query_scalar("SELECT (payload->>'days')::bigint FROM notifications WHERE kind='org.permit_expiring' AND user_id=$1 ORDER BY id")
+        .bind(u).fetch_all(pool).await.unwrap()
+}
+
+/// 到期前 14 / 7 天各提醒一次；重跑不重發；到期天數離 14 天以外不發。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn permit_reminders_once_per_threshold(pool: PgPool) {
+    let (u, _, p, _, _) = setup(&pool).await; // 30 天後到期
+    let tick = || wishly_api::relief_events::permit_reminder_tick(&pool);
+    assert_eq!(tick().await.unwrap(), 0);
+    let set = |d: i32| {
+        sqlx::query("UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date+$2 WHERE id=$1").bind(p).bind(d).execute(&pool)
+    };
+    set(14).await.unwrap();
+    assert_eq!(tick().await.unwrap(), 1);
+    assert_eq!(tick().await.unwrap(), 0);
+    set(10).await.unwrap();
+    assert_eq!(tick().await.unwrap(), 0);
+    set(7).await.unwrap();
+    assert_eq!(tick().await.unwrap(), 1);
+    assert_eq!(tick().await.unwrap(), 0);
+    set(1).await.unwrap();
+    assert_eq!(tick().await.unwrap(), 0);
+    assert_eq!(reminders(&pool, u.id).await, vec![14, 7]);
+}
+
+/// 已有更晚到期的核准許可（已換新）或只剩已結束據點 → 不提醒。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn permit_reminders_skip_renewed_or_closed(pool: PgPool) {
+    let (u, o, p, _, s) = setup(&pool).await;
+    sqlx::query(
+        "UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date+5 WHERE id=$1",
+    )
+    .bind(p)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let newer = permit(&pool, o, "approved", 60).await;
+    assert_eq!(
+        wishly_api::relief_events::permit_reminder_tick(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    sqlx::query("UPDATE org_permits SET status='rejected' WHERE id=$1")
+        .bind(newer)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE wishlists SET status='closed' WHERE id=$1")
+        .bind(s.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        wishly_api::relief_events::permit_reminder_tick(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    sqlx::query("UPDATE wishlists SET status='active' WHERE id=$1")
+        .bind(s.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        wishly_api::relief_events::permit_reminder_tick(&pool)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(reminders(&pool, u.id).await, vec![7]);
+}
+
+#[test]
+fn permit_expiring_copy() {
+    use wishly_api::notify::{render_lang, Lang};
+    let p = json!({"org_id":"abc","display_name":"某會","permit_no":"P-9","valid_to":"2026-12-01","days":7});
+    for lang in [Lang::Zh, Lang::En, Lang::Vi, Lang::Id] {
+        let (subj, body) = render_lang(lang, "org.permit_expiring", "", &p);
+        assert!(
+            subj.contains("P-9") && subj.contains('7') && body.contains("/orgs/abc#permits"),
+            "{subj} {body}"
+        );
+    }
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn unverified_org_or_draft_site_not_public(pool: PgPool) {
     let (u, o, p, e, s) = setup(&pool).await;
@@ -357,7 +445,7 @@ fn permit_expired_copy() {
     ] {
         let (subj, body) = render_lang(lang, "org.permit_expired", "", &p);
         assert!(
-            subj.contains(needle) && subj.contains("P-9") && body.contains("/orgs/abc"),
+            subj.contains(needle) && subj.contains("P-9") && body.contains("/orgs/abc#permits"),
             "{subj} {body}"
         );
     }

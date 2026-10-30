@@ -5,7 +5,7 @@ definePageMeta({ middleware: 'staff' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.orgs.title') })
 const { api } = useApi()
-const STATUSES = ['pending', 'needs_changes', 'verified', 'rejected']
+const STATUSES = ['pending', 'pending_permits', 'needs_changes', 'verified', 'rejected']
 // 可標記補件的欄位（後端 FLAGGABLE）；標籤沿用申請表 org.apply.f.*，其餘三項用 admin.orgs.flag.*
 const FLAGS = ['legal_name', 'display_name', 'org_type', 'tax_id', 'registration_no', 'authority', 'website', 'intro', 'logo_key', 'rep_name', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone', 'documents', 'permits']
 const flagLabel = (f: string) => t(['logo_key', 'documents', 'permits'].includes(f) ? `admin.orgs.flag.${f}` : `org.apply.f.${f}`)
@@ -93,7 +93,7 @@ async function submit() {
     <p v-if="loading && !rows.length" class="c-mute" role="status">{{ $t('admin.orgs.loading') }}</p>
     <p v-else-if="!rows.length && !err" class="c-center c-mute">{{ $t('admin.orgs.empty') }}</p>
     <article v-for="o in rows" :key="o.id" class="c-card" :data-org="o.id">
-      <div class="c-row"><strong class="c-grow">{{ o.display_name }}</strong><span class="c-badge" :class="o.verification_status">{{ $t(`admin.orgs.status.${o.verification_status}`, o.verification_status) }}</span></div>
+      <div class="c-row"><strong class="c-grow">{{ o.display_name }}</strong><span v-if="o.pending_permits" class="c-badge pending">{{ $t('admin.orgs.pendingPermits', { n: o.pending_permits }) }}</span><span class="c-badge" :class="o.verification_status">{{ $t(`admin.orgs.status.${o.verification_status}`, o.verification_status) }}</span></div>
       <div class="c-mute">{{ o.legal_name }} · {{ $t('admin.orgs.submittedAt') }} {{ fmtTime(o.submitted_at) }}</div>
       <button class="c-btn c-mt" @click="toggle(o)">{{ openId === o.id ? $t('admin.orgs.close') : $t('admin.orgs.view') }}</button>
 
