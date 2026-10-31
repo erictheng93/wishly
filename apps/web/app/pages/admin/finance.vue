@@ -26,7 +26,6 @@ const setTab = (k: FinanceTab) => router.replace({ query: { tab: k } })
     <FinancePayers v-else-if="tab === 'payers'" :days="days" />
     <FinanceChannels v-else-if="tab === 'channels'" :days="days" />
     <FinanceRisk v-else-if="tab === 'risk'" :days="days" />
-    <!-- 交易明細分頁尚未實作 -->
-    <p v-else class="c-card c-mute">{{ $t('admin.finance.soon') }}</p>
+    <FinanceTransactions v-else />
   </main>
 </template>

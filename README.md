@@ -59,7 +59,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 ## 營運後台
 
-`/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄；`/admin/cash-refunds` 為現金退款審核、`/admin/wallet-debts` 為拒付欠款結案、`/admin/topups` 為儲值單的拒付爭議處理（標記爭議 / 勝訴 / 敗訴扣回）。使用者端現金退款在 `/me/refund`（由 `/me/wallet` 進入，只有儲值購買的點數可退）。
+`/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄；`/admin/cash-refunds` 為現金退款審核、`/admin/wallet-debts` 為拒付欠款結案、`/admin/finance` 為金流後台（總覽、交易明細、付費用戶、渠道、風險與負債；儲值單的拒付爭議處理在交易明細分頁，舊路徑 `/admin/topups` 會導向）。使用者端現金退款在 `/me/refund`（由 `/me/wallet` 進入，只有儲值購買的點數可退）。
 
 - 第一位 staff 需由資料庫設定 `users.is_staff = true`；之後可在後台設為／取消 staff。最後一位有效 staff 不可被停權、降權或自行刪帳號。
 - 停權、staff 變更與營運解除綁定會撤銷現有登入；解鎖後需重新登入。停權保留清單、捐助與帳務紀錄，不會自動下架清單。

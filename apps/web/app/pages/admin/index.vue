@@ -142,7 +142,6 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <NuxtLink to="/admin/wallets" class="c-btn c-grow">{{ $t('admin.index.nav.wallets') }}</NuxtLink>
       <NuxtLink to="/admin/cash-refunds" class="c-btn c-grow">{{ $t('admin.index.nav.cashRefunds') }}</NuxtLink>
       <NuxtLink to="/admin/wallet-debts" class="c-btn c-grow">{{ $t('admin.index.nav.walletDebts') }}</NuxtLink>
-      <NuxtLink to="/admin/topups" class="c-btn c-grow">{{ $t('admin.index.nav.topups') }}</NuxtLink>
       <NuxtLink to="/admin/catalog" class="c-btn c-grow">{{ $t('admin.index.nav.catalog') }}</NuxtLink>
       <NuxtLink to="/admin/orgs" class="c-btn c-grow">{{ $t('admin.index.nav.orgs') }}</NuxtLink>
       <NuxtLink to="/admin/relief-events" class="c-btn c-grow">{{ $t('admin.index.nav.events') }}</NuxtLink>

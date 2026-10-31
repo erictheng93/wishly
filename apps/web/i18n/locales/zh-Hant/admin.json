@@ -26,7 +26,6 @@
         "analytics": "數據分析",
         "cashRefunds": "現金退款",
         "walletDebts": "拒付欠款",
-        "topups": "儲值與爭議",
         "catalog": "精選商品與品牌",
         "orgs": "組織與許可審核",
         "events": "救災事件管理",
@@ -413,6 +412,11 @@
       "stale": "這筆欠款已被結案，已重新載入列表。"
     },
     "topups": {
+      "methodLabel": "渠道",
+      "searchLabel": "搜尋用戶",
+      "searchHint": "名稱或 email，按 Enter 搜尋",
+      "userFilter": "用戶：{name}",
+      "clearUser": "顯示全部用戶",
       "title": "儲值與拒付爭議",
       "intro": "信用卡拒付時，標記爭議會凍結錢包；勝訴恢復、敗訴會扣回該筆儲值批次剩餘點數，不足部分記為欠款。",
       "statusLabel": "狀態",
@@ -596,7 +600,6 @@
       "rangeLabel": "時間區間",
       "today": "今日",
       "days": "{n} 天",
-      "soon": "此分頁尚未開放。",
       "money": "NT$ {n}",
       "retry": "重試",
       "loading": "載入中…",

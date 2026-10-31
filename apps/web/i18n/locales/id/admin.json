@@ -26,7 +26,6 @@
         "analytics": "Analitik data",
         "cashRefunds": "Pengembalian dana tunai",
         "walletDebts": "Tunggakan chargeback",
-        "topups": "Top up dan sengketa",
         "catalog": "Produk pilihan dan merek",
         "orgs": "Org and permit review",
         "events": "Disaster events",
@@ -413,6 +412,11 @@
       "stale": "Tunggakan ini sudah ditutup, daftar sudah dimuat ulang."
     },
     "topups": {
+      "methodLabel": "Saluran",
+      "searchLabel": "Cari pengguna",
+      "searchHint": "Nama atau email, tekan Enter",
+      "userFilter": "Pengguna: {name}",
+      "clearUser": "Tampilkan semua pengguna",
       "title": "Top up dan sengketa chargeback",
       "intro": "Saat terjadi chargeback kartu kredit, menandai sengketa akan membekukan dompet; jika menang, dipulihkan, jika kalah, sisa poin pada batch top up tersebut ditarik kembali dan kekurangannya dicatat sebagai tunggakan.",
       "statusLabel": "Status",
@@ -596,7 +600,6 @@
       "rangeLabel": "Rentang",
       "today": "Hari ini",
       "days": "{n} hari",
-      "soon": "Tab ini belum tersedia.",
       "money": "NT$ {n}",
       "retry": "Coba lagi",
       "loading": "Memuat…",

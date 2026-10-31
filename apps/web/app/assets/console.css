@@ -63,7 +63,7 @@
 /* ── KPI 磚（index / analytics 共用 class） ─ */
 .k-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));margin:0;border-top:1px solid var(--ink-line);border-left:1px solid var(--line)}
 .k-kpis>div{padding:14px 16px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
-.k-kpis dt{font:600 10.5px/1.4 var(--mono)!important;letter-spacing:.12em!important;text-transform:uppercase;color:var(--mute)!important;margin:0}
+.k-kpis dt{font:600 11px/1.4 var(--mono)!important;letter-spacing:.12em!important;text-transform:uppercase;color:var(--mute)!important;margin:0}
 .k-kpis dd{margin:8px 0 0!important;font-size:clamp(30px,4.4vw,44px)!important;font-weight:900!important;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
 .k-kpis dd.hot{color:var(--red-text)}
 

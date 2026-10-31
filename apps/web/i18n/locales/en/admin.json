@@ -26,7 +26,6 @@
         "analytics": "Analytics",
         "cashRefunds": "Cash refunds",
         "walletDebts": "Chargeback debts",
-        "topups": "Top-ups and disputes",
         "catalog": "Brands & products",
         "orgs": "Org and permit review",
         "events": "Disaster events",
@@ -413,6 +412,11 @@
       "stale": "This debt was already closed. The list was reloaded."
     },
     "topups": {
+      "methodLabel": "Channel",
+      "searchLabel": "Search user",
+      "searchHint": "Name or email, press Enter",
+      "userFilter": "User: {name}",
+      "clearUser": "Show all users",
       "title": "Top-ups and chargeback disputes",
       "intro": "On a card chargeback, marking a dispute freezes the wallet. Winning restores it; losing claws back what is left of that top-up lot and records the rest as debt.",
       "statusLabel": "Status",
@@ -596,7 +600,6 @@
       "rangeLabel": "Range",
       "today": "Today",
       "days": "{n} d",
-      "soon": "This tab is not available yet.",
       "money": "NT$ {n}",
       "retry": "Retry",
       "loading": "Loading…",
