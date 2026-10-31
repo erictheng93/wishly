@@ -303,8 +303,13 @@ async fn reject_pending_permit_notifies_owner(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(note, "字號不清楚");
-    let reviewed: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='org.permit_reviewed' AND user_id=$1")
-        .bind(owner).fetch_one(&pool).await.unwrap();
+    let reviewed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM notifications WHERE kind='org.permit_reviewed' AND user_id=$1",
+    )
+    .bind(owner)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(reviewed, 0, "退件只寄 org.permit_rejected 一封");
     let (subj, body) = wishly_api::notify::render_lang(
         wishly_api::notify::Lang::Zh,

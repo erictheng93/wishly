@@ -94,7 +94,11 @@ async fn unsubscribe(
     let mut tx = st.pool.begin().await?;
     // 會員只設偏好：pending 的信不用取消，worker 寄前會依偏好靜音（站內信保留）
     if k == 'b' || k == 'c' {
-        let key = if k == 'b' { "email_social" } else { "email_gifts" };
+        let key = if k == 'b' {
+            "email_social"
+        } else {
+            "email_gifts"
+        };
         sqlx::query("UPDATE users SET notification_prefs = jsonb_set(COALESCE(notification_prefs, '{}'::jsonb), ARRAY[$2], 'false'::jsonb) WHERE id = $1 AND deleted_at IS NULL").bind(id).bind(key).execute(&mut *tx).await?;
     } else {
         sqlx::query("UPDATE guests SET email = NULL WHERE id = $1")
