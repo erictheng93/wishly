@@ -112,7 +112,7 @@
       "inviteTitle": "Invite a member",
       "handle": "Handle (optional)",
       "send": "Send invite",
-      "linkHint": "Invite link created. Copy it or share the QR code.",
+      "linkHint": "An invite email is on its way. You can also copy the link or share the QR code.",
       "link": "Invite link",
       "copy": "Copy",
       "copied": "Copied",

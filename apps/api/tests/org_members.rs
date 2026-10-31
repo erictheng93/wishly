@@ -319,3 +319,44 @@ async fn only_owner_manages_members(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn invite_unregistered_email_is_mailed(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    let (s, v) = invite(&pool, o, &a.token, "New.Volunteer@x.com", "volunteer").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (uid, to): (Option<Uuid>, Option<String>) =
+        sqlx::query_as("SELECT user_id, payload->>'to' FROM notifications WHERE kind='org.invite'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((uid, to.as_deref()), (None, Some("new.volunteer@x.com")));
+    assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 1);
+    let (status, err): (String, Option<String>) = sqlx::query_as(
+        "SELECT status::text, last_error FROM notifications WHERE kind='org.invite'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((status.as_str(), err), ("sent", None));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn invite_is_rate_limited_per_inviter(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    for i in 0..30 {
+        let (s, v) = invite(&pool, o, &a.token, &format!("v{i}@x.com"), "volunteer").await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let (s, v) = invite(&pool, o, &a.token, "v30@x.com", "volunteer").await;
+    assert_eq!(s, StatusCode::TOO_MANY_REQUESTS, "{v}");
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM org_invites")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 30);
+}

@@ -250,7 +250,7 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
                 .await?
                 .flatten()
         } else {
-            None
+            payload.get("to").and_then(Value::as_str).map(String::from)
         };
         let Some(to) = to else {
             sqlx::query("UPDATE notifications SET status = 'cancelled', last_error = 'no email recipient' WHERE id = $1").bind(id).execute(pool).await?;
@@ -450,10 +450,10 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         return (
             l.pick(format!("【Wishly】邀請你加入「{org}」"), format!("[Wishly] You're invited to join \"{org}\""), format!("[Wishly] Bạn được mời tham gia \"{org}\""), format!("[Wishly] Kamu diundang bergabung dengan \"{org}\"")),
             l.pick(
-                format!("「{org}」邀請你加入組織。\n請用此 Email 登入後接受邀請（7 天內有效）：{url}\n"),
-                format!("\"{org}\" has invited you to join the organization.\nSign in with this email and accept within 7 days: {url}\n"),
-                format!("\"{org}\" mời bạn tham gia tổ chức.\nHãy đăng nhập bằng email này và chấp nhận trong 7 ngày: {url}\n"),
-                format!("\"{org}\" mengundangmu bergabung dengan organisasi.\nMasuk dengan email ini dan terima dalam 7 hari: {url}\n"),
+                format!("「{org}」邀請你加入組織。\n請用此 Email 登入或註冊後接受邀請（7 天內有效）：{url}\n"),
+                format!("\"{org}\" has invited you to join the organization.\nSign in or sign up with this email and accept within 7 days: {url}\n"),
+                format!("\"{org}\" mời bạn tham gia tổ chức.\nHãy đăng nhập hoặc đăng ký bằng email này và chấp nhận trong 7 ngày: {url}\n"),
+                format!("\"{org}\" mengundangmu bergabung dengan organisasi.\nMasuk atau daftar dengan email ini dan terima dalam 7 hari: {url}\n"),
             ),
         );
     }
