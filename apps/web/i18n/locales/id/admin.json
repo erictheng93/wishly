@@ -29,7 +29,8 @@
         "topups": "Top up dan sengketa",
         "catalog": "Produk pilihan dan merek",
         "orgs": "Org and permit review",
-        "events": "Disaster events"
+        "events": "Disaster events",
+        "finance": "Keuangan"
       },
       "tabsLabel": "Fitur panel admin",
       "tabs": {
@@ -581,6 +582,52 @@
       "targetNotFound": "Event not found: enter an id, or a slug from the loaded list",
       "done": "Done",
       "selfMerge": "Cannot merge an event into itself"
+    },
+    "finance": {
+      "title": "Keuangan",
+      "tabsLabel": "Tab keuangan",
+      "tabs": {
+        "overview": "Ringkasan",
+        "transactions": "Transaksi",
+        "payers": "Pembayar",
+        "channels": "Kanal",
+        "risk": "Risiko & kewajiban"
+      },
+      "rangeLabel": "Rentang",
+      "today": "Hari ini",
+      "days": "{n} hari",
+      "soon": "Tab ini belum tersedia.",
+      "money": "NT$ {n}",
+      "retry": "Coba lagi",
+      "loading": "Memuat…",
+      "range": "Rentang: {from} – {to} ({days} hari)",
+      "todo": {
+        "title": "Perlu ditangani",
+        "note": "Kondisi saat ini; tidak terpengaruh rentang waktu. Klik untuk menangani.",
+        "disputed": "Sengketa",
+        "cashRefunds": "Refund tertunda",
+        "debts": "Utang belum lunas",
+        "pending": "Menunggu pembayaran"
+      },
+      "kpi": {
+        "title": "Angka utama",
+        "vsPrev": "{pct} dibanding periode sebelumnya",
+        "noPrev": "Tidak ada data periode sebelumnya",
+        "gross": "Pendapatan top-up",
+        "payers": "Pengguna berbayar",
+        "firstTime": "Pembayar pertama kali",
+        "avg": "Rata-rata per orang",
+        "grossDef": "Total top-up yang pemberitahuan pembayarannya diterima dalam rentang, termasuk yang kemudian disengketakan atau chargeback; pemberian poin manual tidak dihitung.",
+        "payersDef": "Jumlah dompet unik yang melakukan top-up dalam rentang.",
+        "firstTimeDef": "Pengguna berbayar yang pembayaran pertamanya jatuh dalam rentang.",
+        "avgDef": "Pendapatan top-up ÷ pengguna berbayar."
+      },
+      "daily": {
+        "title": "Pendapatan harian",
+        "note": "Berdasarkan tanggal pemberitahuan pembayaran diterima (waktu Taipei); bisa berbeda sehari dari ECPay di batas hari.",
+        "empty": "Tidak ada top-up pada rentang ini.",
+        "aria": "Grafik garis pendapatan top-up harian"
+      }
     }
   }
 }

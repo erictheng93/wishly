@@ -29,7 +29,8 @@
         "topups": "Top-ups and disputes",
         "catalog": "Brands & products",
         "orgs": "Org and permit review",
-        "events": "Disaster events"
+        "events": "Disaster events",
+        "finance": "Finance"
       },
       "tabsLabel": "Console sections",
       "tabs": {
@@ -581,6 +582,52 @@
       "targetNotFound": "Event not found: enter an id, or a slug from the loaded list",
       "done": "Done",
       "selfMerge": "Cannot merge an event into itself"
+    },
+    "finance": {
+      "title": "Finance",
+      "tabsLabel": "Finance tabs",
+      "tabs": {
+        "overview": "Overview",
+        "transactions": "Transactions",
+        "payers": "Payers",
+        "channels": "Channels",
+        "risk": "Risk & liabilities"
+      },
+      "rangeLabel": "Range",
+      "today": "Today",
+      "days": "{n} d",
+      "soon": "This tab is not available yet.",
+      "money": "NT$ {n}",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "range": "Range: {from} – {to} ({days} days)",
+      "todo": {
+        "title": "To do",
+        "note": "Current state; not affected by the range. Click to handle.",
+        "disputed": "Disputed",
+        "cashRefunds": "Pending refunds",
+        "debts": "Open debts",
+        "pending": "Awaiting payment"
+      },
+      "kpi": {
+        "title": "Key figures",
+        "vsPrev": "{pct} vs previous period",
+        "noPrev": "No previous data",
+        "gross": "Top-up revenue",
+        "payers": "Paying users",
+        "firstTime": "First-time payers",
+        "avg": "Per payer",
+        "grossDef": "Sum of top-ups whose payment notice arrived in the range, including ones later disputed or charged back; manual point grants excluded.",
+        "payersDef": "Distinct wallets that topped up in the range.",
+        "firstTimeDef": "Paying users whose first-ever payment falls in the range.",
+        "avgDef": "Top-up revenue ÷ paying users."
+      },
+      "daily": {
+        "title": "Daily revenue",
+        "note": "By the date the payment notice arrived (Taipei time); may differ by a day from ECPay at day boundaries.",
+        "empty": "No top-ups in this range.",
+        "aria": "Line chart of daily top-up revenue"
+      }
     }
   }
 }

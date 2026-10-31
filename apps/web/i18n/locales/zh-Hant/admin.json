@@ -29,7 +29,8 @@
         "topups": "儲值與爭議",
         "catalog": "精選商品與品牌",
         "orgs": "組織與許可審核",
-        "events": "救災事件管理"
+        "events": "救災事件管理",
+        "finance": "金流後台"
       },
       "tabsLabel": "後台功能",
       "tabs": {
@@ -581,6 +582,52 @@
       "targetNotFound": "找不到該事件，請輸入 id 或已載入列表中的 slug",
       "done": "已處理",
       "selfMerge": "不能合併到自己"
+    },
+    "finance": {
+      "title": "金流後台",
+      "tabsLabel": "金流分頁",
+      "tabs": {
+        "overview": "總覽",
+        "transactions": "交易明細",
+        "payers": "付費用戶",
+        "channels": "渠道",
+        "risk": "風險與負債"
+      },
+      "rangeLabel": "時間區間",
+      "today": "今日",
+      "days": "{n} 天",
+      "soon": "此分頁尚未開放。",
+      "money": "NT$ {n}",
+      "retry": "重試",
+      "loading": "載入中…",
+      "range": "區間：{from} – {to}（{days} 天）",
+      "todo": {
+        "title": "待處理",
+        "note": "目前狀態，不隨時間區間變動。點擊前往處理。",
+        "disputed": "爭議中",
+        "cashRefunds": "待處理退款",
+        "debts": "未結欠款",
+        "pending": "等待繳費"
+      },
+      "kpi": {
+        "title": "核心數字",
+        "vsPrev": "較前期 {pct}",
+        "noPrev": "前期無資料",
+        "gross": "儲值實收",
+        "payers": "付費用戶",
+        "firstTime": "首次付費",
+        "avg": "平均每人",
+        "grossDef": "區間內收到付款通知的儲值金額加總，含後來變成爭議或拒付的，不含人工發放點數。",
+        "payersDef": "區間內有儲值的不重複錢包數。",
+        "firstTimeDef": "付費用戶中，歷史上第一筆付款落在區間內者。",
+        "avgDef": "儲值實收 ÷ 付費用戶。"
+      },
+      "daily": {
+        "title": "每日實收",
+        "note": "以收到付款通知的日期（台北時間）計，與綠界後台跨日邊界可能差一天。",
+        "empty": "此區間沒有儲值。",
+        "aria": "每日儲值實收折線圖"
+      }
     }
   }
 }

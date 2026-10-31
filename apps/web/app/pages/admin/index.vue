@@ -147,6 +147,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <NuxtLink to="/admin/orgs" class="c-btn c-grow">{{ $t('admin.index.nav.orgs') }}</NuxtLink>
       <NuxtLink to="/admin/relief-events" class="c-btn c-grow">{{ $t('admin.index.nav.events') }}</NuxtLink>
       <NuxtLink to="/admin/audit" class="c-btn c-grow">{{ $t('admin.index.nav.audit') }}</NuxtLink>
+      <NuxtLink to="/admin/finance" class="c-btn c-grow">{{ $t('admin.index.nav.finance') }}</NuxtLink>
       <NuxtLink to="/admin/analytics" class="c-btn c-grow">{{ $t('admin.index.nav.analytics') }}</NuxtLink>
     </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">

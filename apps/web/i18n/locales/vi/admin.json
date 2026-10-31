@@ -29,7 +29,8 @@
         "topups": "Nạp điểm và tranh chấp",
         "catalog": "Thương hiệu & sản phẩm",
         "orgs": "Org and permit review",
-        "events": "Disaster events"
+        "events": "Disaster events",
+        "finance": "Tài chính"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
@@ -581,6 +582,52 @@
       "targetNotFound": "Event not found: enter an id, or a slug from the loaded list",
       "done": "Done",
       "selfMerge": "Cannot merge an event into itself"
+    },
+    "finance": {
+      "title": "Tài chính",
+      "tabsLabel": "Các tab tài chính",
+      "tabs": {
+        "overview": "Tổng quan",
+        "transactions": "Giao dịch",
+        "payers": "Người trả tiền",
+        "channels": "Kênh",
+        "risk": "Rủi ro & nợ"
+      },
+      "rangeLabel": "Khoảng thời gian",
+      "today": "Hôm nay",
+      "days": "{n} ngày",
+      "soon": "Tab này chưa khả dụng.",
+      "money": "NT$ {n}",
+      "retry": "Thử lại",
+      "loading": "Đang tải…",
+      "range": "Khoảng: {from} – {to} ({days} ngày)",
+      "todo": {
+        "title": "Cần xử lý",
+        "note": "Trạng thái hiện tại, không đổi theo khoảng thời gian. Nhấn để xử lý.",
+        "disputed": "Đang tranh chấp",
+        "cashRefunds": "Hoàn tiền chờ xử lý",
+        "debts": "Khoản nợ chưa tất toán",
+        "pending": "Chờ thanh toán"
+      },
+      "kpi": {
+        "title": "Số liệu chính",
+        "vsPrev": "{pct} so với kỳ trước",
+        "noPrev": "Không có dữ liệu kỳ trước",
+        "gross": "Doanh thu nạp tiền",
+        "payers": "Người dùng trả tiền",
+        "firstTime": "Trả tiền lần đầu",
+        "avg": "Trung bình mỗi người",
+        "grossDef": "Tổng số tiền nạp có thông báo thanh toán nhận được trong khoảng, gồm cả khoản sau đó bị tranh chấp hoặc chargeback; không gồm điểm cấp thủ công.",
+        "payersDef": "Số ví khác nhau có nạp tiền trong khoảng.",
+        "firstTimeDef": "Người dùng trả tiền có khoản thanh toán đầu tiên rơi vào khoảng này.",
+        "avgDef": "Doanh thu nạp tiền ÷ người dùng trả tiền."
+      },
+      "daily": {
+        "title": "Doanh thu theo ngày",
+        "note": "Tính theo ngày nhận thông báo thanh toán (giờ Đài Bắc); có thể lệch một ngày so với ECPay ở ranh giới ngày.",
+        "empty": "Không có khoản nạp nào trong khoảng này.",
+        "aria": "Biểu đồ đường doanh thu nạp tiền theo ngày"
+      }
     }
   }
 }
