@@ -105,8 +105,12 @@ async fn account_delete_anonymizes(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(pend, 0);
-    let (subs,): (i64,) = sqlx::query_as("SELECT count(*) FROM push_subscriptions WHERE user_id = $1")
-        .bind(uid).fetch_one(&pool).await.unwrap();
+    let (subs,): (i64,) =
+        sqlx::query_as("SELECT count(*) FROM push_subscriptions WHERE user_id = $1")
+            .bind(uid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(subs, 0, "刪帳號後不可再推播到舊裝置");
     // session 失效
     assert_eq!(
