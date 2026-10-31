@@ -74,7 +74,8 @@ fn geo(headers: &HeaderMap, trusted: bool) -> (Option<String>, Option<String>) {
 
 /// 限流 key：IPv6 取 /64（單一用戶端通常握有整個 /64，逐位址計數形同沒限流）
 fn ip_key(ip: std::net::IpAddr) -> String {
-    match ip {
+    // IPv4-mapped（雙堆疊 socket）要先還原，否則所有 IPv4 訪客會共用同一個 /64 鍵
+    match ip.to_canonical() {
         std::net::IpAddr::V4(v) => v.to_string(),
         std::net::IpAddr::V6(v) => format!("{:x}/64", u128::from(v) >> 64),
     }
@@ -191,5 +192,6 @@ mod tests {
         let b: std::net::IpAddr = "2001:db8:1:2:ffff::9".parse().unwrap();
         assert_eq!(ip_key(a), ip_key(b));
         assert_eq!(ip_key("1.2.3.4".parse().unwrap()), "1.2.3.4");
+        assert_eq!(ip_key("::ffff:1.2.3.4".parse().unwrap()), "1.2.3.4");
     }
 }
