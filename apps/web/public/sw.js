@@ -1,9 +1,13 @@
 // Wishly 極小 service worker。內容是即時資料，所以刻意保守：只快取不可變的靜態檔。
 // 換版：改 CACHE_VERSION 即可。不呼叫 skipWaiting/clients.claim：新版 SW 等所有分頁關閉後才接管，
 // 避免舊頁面（舊 HTML 引用舊雜湊資產）在中途被新版 SW 接手而版本錯亂；/_nuxt/* 帶雜湊且 cache-first 本身不會錯配。
-const CACHE_VERSION = 'v2' // v2：離線頁改為確認連得上才重新整理
+const CACHE_VERSION = 'v3' // v3：/_nuxt/* 加上數量上限（v2：離線頁改為確認連得上才重新整理）
 const CACHE = `wishly-static-${CACHE_VERSION}`
 const OFFLINE = '/offline'
+// /_nuxt/* 檔名帶雜湊，每次部署都換一批，只增不減會把舊版資產留到 SW 版本改變為止。
+// 目前一次建置約 145 個檔（含延遲載入 chunk），上限取約兩倍（300）：能容納新舊兩版，超過就刪最舊的。
+// 只修剪 /_nuxt/；/offline 與 /icons/* 不在此列。
+const MAX_NUXT = 300
 
 // 預先快取離線頁與圖示（install 失敗則整個 SW 不安裝，不會留下半套）
 self.addEventListener('install', e => {
@@ -32,7 +36,15 @@ self.addEventListener('fetch', e => {
   // /_nuxt/builds/* 是 meta（非雜湊、會變），排除
   if ((url.pathname.startsWith('/_nuxt/') && !url.pathname.startsWith('/_nuxt/builds/')) || url.pathname.startsWith('/icons/')) {
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => {
-      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)) }
+      if (res.ok) {
+        const copy = res.clone()
+        // Cache.keys() 依插入順序，前面的最舊；修剪失敗只吞掉，不影響回應
+        e.waitUntil(caches.open(CACHE).then(async c => {
+          await c.put(req, copy)
+          const old = (await c.keys()).filter(r => new URL(r.url).pathname.startsWith('/_nuxt/'))
+          await Promise.all(old.slice(0, Math.max(0, old.length - MAX_NUXT)).map(r => c.delete(r)))
+        }).catch(() => {}))
+      }
       return res
     })))
   }
