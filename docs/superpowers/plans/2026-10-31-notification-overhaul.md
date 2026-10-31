@@ -46,7 +46,7 @@
 | `wallet.chargeback` | 持有者 | `amount`, `debt` | 銀行爭議扣回 N 點；欠款 M 點 |
 | `wishlist.moderated` | 擁有者 | `hidden`, `reason` | 清單已下架（附原因）/ 已恢復 |
 | `account.suspended` / `account.restored` | 當事人 | | 帳號停權 / 恢復 |
-| `org.permit_reviewed` | 組織 owner | `org_id`, `display_name`, `permit_no`, `approved`, `note` | 勸募許可核准 / 退件 |
+| `org.permit_reviewed` | 組織 owner | `org_id`, `display_name`, `permit_no`, `note` | 勸募許可核准（退件沿用 #103 的 `org.permit_rejected`） |
 | `org.event_hidden` | 組織 owner | `org_id`, `display_name`, `event_title`, `reason` | 事件下架，所屬據點已暫停 |
 | `auth.mfa_enabled` / `auth.recovery_regenerated` | 當事人 | `to`, `provider: "totp"` | 帳號安全通知（比照 `auth.password_changed`，走 `identities::notify`） |
 | `staff.digest` | 所有 staff | `reports`, `refunds`, `orgs`, `permits`, `orders`, `failed` | 每日營運待辦彙總，連 `/admin` |

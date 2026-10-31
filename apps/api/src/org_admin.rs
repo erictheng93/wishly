@@ -271,10 +271,10 @@ async fn review_permit(
         }
         vec![]
     };
-    if status == "pending" {
-        let approved = new_status == "approved";
+    // 退件走 org.permit_rejected；這裡只補核准
+    if status == "pending" && new_status == "approved" {
         crate::notify::enqueue_org_owners(&mut *tx, org_id, "org.permit_reviewed",
-            json!({"org_id": org_id, "display_name": display_name, "permit_no": permit_no, "approved": approved, "note": b.note})).await?;
+            json!({"org_id": org_id, "display_name": display_name, "permit_no": permit_no, "note": b.note})).await?;
     }
     let ev: Vec<String> = if slugs.is_empty() {
         vec![]

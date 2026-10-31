@@ -281,7 +281,7 @@ pub const KINDS: &[&str] = &[
     "auth.password_changed", "auth.mfa_reset", "auth.identity_linked", "auth.identity_unlinked",
     "auth.mfa_enabled", "auth.recovery_regenerated",
     "org.invite", "org.permit_revoked", "org.permit_expired", "org.permit_expiring", "org.review",
-    "org.permit_reviewed", "org.event_hidden",
+    "org.permit_rejected", "org.permit_reviewed", "org.event_hidden",
     "crowdfund.funded", "order.shipped", "order.delivered", "order.failed", "order.partial_refund",
     "funding.expired", "funding.released", "item.removed",
     "claim.confirmation", "claim.item_removed", "claim.item_changed", "claim.purchase_reminder",
@@ -314,7 +314,7 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
         "auth.password_changed" | "auth.identity_linked" | "auth.identity_unlinked" | "auth.mfa_enabled"
         | "auth.recovery_regenerated" | "account.suspended" | "account.restored" => "/settings".into(),
         "auth.mfa_reset" | "staff.digest" => "/admin".into(),
-        "org.permit_revoked" | "org.permit_expired" | "org.permit_expiring" | "org.permit_reviewed" => {
+        "org.permit_revoked" | "org.permit_rejected" | "org.permit_expired" | "org.permit_expiring" | "org.permit_reviewed" => {
             format!("/orgs/{org}#permits")
         }
         "org.event_hidden" => format!("/orgs/{org}"),
@@ -1190,12 +1190,7 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             let no = payload["permit_no"].as_str().unwrap_or("");
             let note = payload["note"].as_str().filter(|n| !n.is_empty()).unwrap_or("-");
             let url = format!("{base}/orgs/{}#permits", payload["org_id"].as_str().unwrap_or(""));
-            let ok = payload["approved"].as_bool().unwrap_or(false);
-            let (z, e, v, i) = if ok {
-                ("已核准", "approved", "đã được duyệt", "disetujui")
-            } else {
-                ("未通過審核", "not approved", "không được duyệt", "tidak disetujui")
-            };
+            let (z, e, v, i) = ("已核准", "approved", "đã được duyệt", "disetujui");
             (
                 l.pick(format!("【Wishly】勸募許可 {no} {z}"), format!("[Wishly] Fundraising permit {no} {e}"), format!("[Wishly] Giấy phép gây quỹ {no} {v}"), format!("[Wishly] Izin penggalangan dana {no} {i}")),
                 l.pick(
