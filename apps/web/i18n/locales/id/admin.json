@@ -138,7 +138,9 @@
       },
       "staffMfaLow": "Staf yang sudah menyiapkan verifikasi dua langkah kurang dari 2. Kalau ada yang kehilangan autentikator dan kode pemulihan, tidak ada yang bisa mengatur ulang. Minta satu staf lagi menyelesaikan penyiapan.",
       "mfaHint": "Disarankan mengaktifkan verifikasi dua langkah: panel admin bisa membekukan akun dan memberi poin, jadi dampaknya besar jika akun dibobol.",
-      "mfaSetup": "Atur sekarang"
+      "mfaSetup": "Atur sekarang",
+      "requeue": "Antrekan ulang notifikasi gagal",
+      "requeued": "{n} diantrekan ulang"
     },
     "audit": {
       "title": "Catatan audit",

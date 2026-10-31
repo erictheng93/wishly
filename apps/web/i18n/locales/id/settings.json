@@ -114,9 +114,13 @@
     "terms": "Ketentuan layanan",
     "privacy": "Kebijakan privasi",
     "notify": {
-      "title": "Notifikasi",
-      "birthdays": "Email ulang tahun",
-      "birthdaysHint": "Pengingat ulang tahun teman, dan pengingat sebelum ulang tahun Anda untuk menyiapkan daftar."
+      "title": "Email notifikasi",
+      "account": "Akun dan keamanan",
+      "accountHint": "Pemberitahuan penting soal akun, dompet, dan pesanan. Selalu aktif.",
+      "gifts": "Progres hadiah",
+      "giftsHint": "Ada yang memberi, item tercapai, dikirim, atau tiba.",
+      "social": "Sosial dan ulang tahun",
+      "socialHint": "Aktivitas teman, pengingat ulang tahun teman, dan pengingat sebelum ulang tahun Anda untuk menyiapkan daftar."
     }
   }
 }

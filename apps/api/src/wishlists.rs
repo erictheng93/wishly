@@ -864,6 +864,10 @@ async fn update(
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;
     }
+    // 據點由營運中變為暫停 / 結束：通知進行中的捐助者
+    if relief && old_site_status.as_deref() == Some("active") && w.site_status.as_deref() != Some("active") {
+        crate::notify::enqueue_site_paused(&mut *tx, &[id]).await?;
+    }
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線立即重驗可見性 / 狀態
     if was_active && matches!(w.status.as_str(), "closed" | "archived") {
         crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）

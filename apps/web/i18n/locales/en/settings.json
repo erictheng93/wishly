@@ -114,9 +114,13 @@
     "terms": "Terms of Service",
     "privacy": "Privacy Policy",
     "notify": {
-      "title": "Notifications",
-      "birthdays": "Birthday emails",
-      "birthdaysHint": "Friends' birthday reminders, and a reminder before your own birthday to set up a list."
+      "title": "Email notifications",
+      "account": "Account and security",
+      "accountHint": "Important notices about your account, wallet and orders. Always on.",
+      "gifts": "Gift progress",
+      "giftsHint": "Someone is giving, items funded, shipped or delivered.",
+      "social": "Social and birthdays",
+      "socialHint": "Friend activity, friends' birthday reminders, and a reminder before your own birthday to set up a list."
     }
   }
 }

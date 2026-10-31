@@ -20,7 +20,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
     <span v-if="orgName" class="c-org"><span class="c-org-k">{{ $t('org.badge') }}：</span>{{ orgName }}</span>
     <LocaleSwitch /><ThemeToggle />
     <slot />
-    <CreatorUserMenu />
+    <CreatorBell /><CreatorUserMenu />
   </header>
   <!-- 頁面標題移出 sticky 頁首：編輯式大標，頁首只留品牌與動作 -->
   <div class="c-title"><small>{{ kicker }}</small><h1>{{ title }}</h1></div>

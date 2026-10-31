@@ -329,6 +329,9 @@ async fn update_user(
     } else {
         vec![]
     };
+    if new_blocked != blocked {
+        crate::notify::enqueue(&mut *tx, id, if new_blocked { "account.suspended" } else { "account.restored" }, json!({})).await?;
+    }
     audit(&mut *tx, sid, "user.update", "users", Some(id), json!({"reason":reason,"before":{"is_staff":staff,"blocked":blocked},"after":{"is_staff":new_staff,"blocked":new_blocked}})).await?;
     tx.commit().await?;
     if !purge.is_empty() {

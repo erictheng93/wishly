@@ -114,9 +114,13 @@
     "terms": "服務條款",
     "privacy": "隱私權政策",
     "notify": {
-      "title": "通知",
-      "birthdays": "生日通知信",
-      "birthdaysHint": "好友生日提醒，以及自己生日前提醒你開清單。"
+      "title": "通知信",
+      "account": "帳務與安全",
+      "accountHint": "帳號安全、錢包、訂單等重要通知，固定開啟。",
+      "gifts": "送禮進度",
+      "giftsHint": "有人要送禮、品項達標、出貨與送達等進度。",
+      "social": "社交與生日",
+      "socialHint": "好友動態，以及好友生日提醒、自己生日前提醒你開清單。"
     }
   }
 }

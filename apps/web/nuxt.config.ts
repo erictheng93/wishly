@@ -34,7 +34,7 @@ export default defineNuxtConfig({
   },
   // 創建者頁面靠 cookie 驗證，只在 client 渲染；/s/** 維持 SSR（OG 預覽）
   routeRules: {
-    ...Object.fromEntries(['/dashboard/**', '/lists/**', '/me/wallet', '/me/topup', '/me/refund', '/me/claims', '/settings', '/welcome', '/friends', '/invite/**', '/u/**', '/admin/**', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite/**', '/orgs/**'].map(r => [r, { ssr: false }])),
+    ...Object.fromEntries(['/dashboard/**', '/lists/**', '/me/wallet', '/me/topup', '/me/refund', '/me/claims', '/me/notifications', '/settings', '/welcome', '/friends', '/invite/**', '/u/**', '/admin/**', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite/**', '/orgs/**'].map(r => [r, { ssr: false }])),
     // 個人頁一律 noindex（F22）；client 渲染的空殼沒有 robots meta，改用回應標頭
     '/u/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // 測試用：NUXT_API_PROXY=<後端網址> 時，同網域的 /api/v1/** 代理到該後端（只有 npm run deploy:preview 會設）。

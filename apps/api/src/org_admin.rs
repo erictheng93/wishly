@@ -163,8 +163,10 @@ async fn review(
         .execute(&mut *tx).await?;
     // 撤銷：已上線的救災據點降為草稿（觸發器只擋 status='active'，降級不受限）
     let slugs: Vec<String> = if status == "verified" {
-        sqlx::query_scalar("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug")
-            .bind(id).fetch_all(&mut *tx).await?
+        let down: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug, id")
+            .bind(id).fetch_all(&mut *tx).await?;
+        crate::notify::enqueue_site_paused(&mut *tx, &down.iter().map(|p| p.1).collect::<Vec<_>>()).await?;
+        down.into_iter().map(|p| p.0).collect()
     } else {
         vec![]
     };
@@ -246,8 +248,10 @@ async fn review_permit(
         .await?;
     // 撤銷已核准許可：使用此許可的上線據點暫停（不改組織狀態）
     let slugs: Vec<String> = if status == "approved" {
-        let slugs = sqlx::query_scalar("UPDATE wishlists SET site_status = 'paused' WHERE permit_id = $1 AND type = 'relief' AND site_status = 'active' RETURNING slug")
+        let paused: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET site_status = 'paused' WHERE permit_id = $1 AND type = 'relief' AND site_status = 'active' RETURNING slug, id")
             .bind(id).fetch_all(&mut *tx).await?;
+        let slugs: Vec<String> = paused.iter().map(|p| p.0.clone()).collect();
+        crate::notify::enqueue_site_paused(&mut *tx, &paused.iter().map(|p| p.1).collect::<Vec<_>>()).await?;
         sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
                      SELECT m.user_id, 'email'::notification_channel, 'org.permit_revoked',
                             jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
@@ -258,6 +262,11 @@ async fn review_permit(
     } else {
         vec![]
     };
+    if status == "pending" {
+        let approved = new_status == "approved";
+        crate::notify::enqueue_org_owners(&mut *tx, org_id, "org.permit_reviewed",
+            json!({"org_id": org_id, "display_name": display_name, "permit_no": permit_no, "approved": approved, "note": b.note})).await?;
+    }
     let ev: Vec<String> = if slugs.is_empty() {
         vec![]
     } else {

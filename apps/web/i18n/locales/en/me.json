@@ -154,7 +154,7 @@
       "ackItemChange": "Got it",
       "past": "Past records ({n})",
       "wipe": "Delete my nickname and contact info",
-      "confirmCancelPurchased": "The list owner will be notified. Cancel this gift?",
+      "confirmCancelPurchased": "The list owner will be notified (not during a surprise). Cancel this gift?",
       "confirmCancel": "Cancel giving this gift?",
       "confirmWipe": "Delete your nickname and contact info? Your gift records are kept as \"Deleted guest\", and this device will no longer be able to manage them.",
       "deadline": "Please mark as purchased before {date}",
@@ -413,6 +413,13 @@
         "server": "We can't process this right now. Please try again later.",
         "generic": "The request failed. Please try again later."
       }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "readAll": "Mark all as read",
+      "empty": "No notifications yet",
+      "unread": "Unread",
+      "loadMore": "Load more"
     }
   }
 }
