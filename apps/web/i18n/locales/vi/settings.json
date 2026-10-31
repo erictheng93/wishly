@@ -117,6 +117,14 @@
       "title": "Thông báo",
       "birthdays": "Email sinh nhật",
       "birthdaysHint": "Nhắc sinh nhật bạn bè và nhắc bạn tạo danh sách trước sinh nhật của mình."
+    },
+    "push": {
+      "title": "Thông báo đẩy",
+      "label": "Nhận thông báo đẩy trên thiết bị này",
+      "hint": "Khi có thông báo mới, ngoài email, thông báo cũng được đẩy đến thiết bị này. Thông báo đẩy chỉ hiện tiêu đề, không có nội dung email.",
+      "denied": "Trình duyệt đang chặn thông báo. Hãy vào cài đặt trang web, đặt Thông báo thành Cho phép cho trang này rồi quay lại bật.",
+      "install": "Trên iPhone / iPad, hãy thêm Wishly vào Màn hình chính và mở từ đó để bật thông báo đẩy (nút Chia sẻ của Safari, rồi Thêm vào Màn hình chính).",
+      "failed": "Không thể bật thông báo đẩy. Vui lòng thử lại sau."
     }
   }
 }

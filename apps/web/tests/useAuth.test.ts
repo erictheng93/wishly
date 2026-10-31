@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useAuth } from '../app/composables/useAuth'
 
 const states = new Map<string, ReturnType<typeof ref>>()
-const api = vi.fn(), token = vi.fn(), navigate = vi.fn()
+const api = vi.fn(), token = vi.fn(), navigate = vi.fn(), dropPush = vi.fn()
 beforeEach(() => {
   states.clear()
   vi.stubGlobal('useState', (key: string, init: () => any) => {
@@ -13,6 +13,7 @@ beforeEach(() => {
   vi.stubGlobal('useApi', () => ({ api, base: '/api/v1' }))
   vi.stubGlobal('setNativeToken', token)
   vi.stubGlobal('navigateTo', navigate)
+  vi.stubGlobal('dropPush', dropPush)
   vi.stubGlobal('useCookie', (key: string) => {
     if (!states.has(`cookie:${key}`)) states.set(`cookie:${key}`, ref(null))
     return states.get(`cookie:${key}`)

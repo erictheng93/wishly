@@ -260,6 +260,7 @@ async function remove() {
         <label class="c-switch"><input type="checkbox" :checked="user?.notification_prefs?.email_birthdays !== false" :disabled="nBusy" @change="setBirthdayMail(($event.target as HTMLInputElement).checked)"><span>{{ $t('settings.notify.birthdays') }}<br><small class="c-mute">{{ $t('settings.notify.birthdaysHint') }}</small></span></label>
         <p v-if="nErr" class="c-err" role="alert">{{ nErr }}</p>
       </section>
+      <CreatorPushToggle />
       <section class="c-card">
         <h2 class="c-h2">{{ $t('onboarding.settings.title') }}</h2>
         <p class="c-mute">{{ $t('onboarding.settings.hint') }}</p>

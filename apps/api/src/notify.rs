@@ -333,6 +333,9 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
         match sent {
             Ok(()) => {
                 sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = NULL WHERE id = $1").bind(id).execute(pool).await?;
+                if let Some(u) = uid {
+                    crate::push::deliver(pool, u, &kind, &subject).await;
+                }
             }
             Err(e) => {
                 let st = if attempts >= MAX_ATTEMPTS {

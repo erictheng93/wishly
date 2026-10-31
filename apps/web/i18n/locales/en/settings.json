@@ -117,6 +117,14 @@
       "title": "Notifications",
       "birthdays": "Birthday emails",
       "birthdaysHint": "Friends' birthday reminders, and a reminder before your own birthday to set up a list."
+    },
+    "push": {
+      "title": "Push notifications",
+      "label": "Receive push on this device",
+      "hint": "New notifications are also pushed to this device, not just emailed. Push shows only a title, never the email content.",
+      "denied": "Notifications are blocked in your browser. Open the site settings, set Notifications to Allow for this site, then come back and turn this on.",
+      "install": "On iPhone / iPad, add Wishly to your Home Screen and open it from there to turn on push (Safari Share button, then Add to Home Screen).",
+      "failed": "Couldn't turn on push. Please try again later."
     }
   }
 }
