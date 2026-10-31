@@ -123,6 +123,9 @@ const profile = computed(() => {
         <dl class="an-tiles k-kpis">
           <div><dt>{{ $t('admin.analytics.reports') }}</dt><dd>{{ fmtCount(data.trust.reports) }}</dd></div>
           <div><dt>{{ $t('admin.analytics.loginFailures') }}</dt><dd>{{ fmtCount(data.trust.login_failures) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.pwaPrompted') }}</dt><dd>{{ fmtCount(data.pwa.prompted) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.pwaInstalled') }}</dt><dd>{{ fmtCount(data.pwa.installed) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.pwaRate') }}</dt><dd>{{ data.pwa.prompted ? `${Math.round(data.pwa.installed / data.pwa.prompted * 100)}%` : '—' }}</dd></div>
         </dl>
         <template v-for="g in groups.slice(0, 2)" :key="g[0]">
           <h3 class="an-h3">{{ g[0] }}</h3>

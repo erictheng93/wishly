@@ -316,6 +316,9 @@
       "claimsTrust": "Tặng quà và độ tin cậy",
       "reports": "Báo cáo (khoảng)",
       "loginFailures": "Đăng nhập thất bại (khoảng)",
+      "pwaPrompted": "Gợi ý cài đặt đã hiển thị (khoảng)",
+      "pwaInstalled": "Lượt cài PWA (khoảng)",
+      "pwaRate": "Tỷ lệ cài đặt PWA",
       "group": {
         "claimStatus": "Trạng thái tặng quà",
         "reportReason": "Lý do báo cáo",

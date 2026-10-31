@@ -316,6 +316,9 @@
       "claimsTrust": "Hadiah dan kepercayaan",
       "reports": "Laporan (rentang)",
       "loginFailures": "Gagal masuk (rentang)",
+      "pwaPrompted": "Petunjuk pemasangan ditampilkan (rentang)",
+      "pwaInstalled": "Pemasangan PWA (rentang)",
+      "pwaRate": "Rasio pemasangan PWA",
       "group": {
         "claimStatus": "Status hadiah",
         "reportReason": "Alasan laporan",

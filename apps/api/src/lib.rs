@@ -31,6 +31,8 @@ pub mod orgs;
 pub mod points;
 pub mod profiles;
 pub mod public;
+pub mod push;
+pub mod pwa_events;
 pub mod ratelimit;
 pub mod relief_events;
 pub mod reports;
@@ -99,7 +101,9 @@ pub fn app(state: AppState) -> Router {
                 .merge(catalog::routes())
                 .merge(profiles::routes())
                 .merge(inbox::routes())
-                .merge(onboarding::routes()),
+                .merge(onboarding::routes())
+                .merge(pwa_events::routes())
+                .merge(push::routes()),
         )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),

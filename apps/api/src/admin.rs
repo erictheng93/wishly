@@ -700,6 +700,9 @@ async fn analytics(
            'claims', jsonb_build_object(
              'by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM rc GROUP BY 1) t)),
            'visits', jsonb_build_object('views', (SELECT count(*) FROM sv), 'visitors', (SELECT count(DISTINCT vk) FROM sv)),
+           'pwa', jsonb_build_object(
+             'prompted', (SELECT count(*) FROM pwa_events WHERE event = 'pwa_install_prompted' AND created_at >= (SELECT t FROM lo)),
+             'installed', (SELECT count(*) FROM pwa_events WHERE event = 'pwa_installed' AND created_at >= (SELECT t FROM lo))),
            'trust', jsonb_build_object(
              'reports', (SELECT count(*) FROM content_reports WHERE created_at >= (SELECT t FROM lo)),
              'reports_by_reason', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT reason::text s, count(*) n FROM content_reports WHERE created_at >= (SELECT t FROM lo) GROUP BY 1) t),

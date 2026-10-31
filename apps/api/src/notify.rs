@@ -506,7 +506,7 @@ async fn set_status(pool: &PgPool, id: Uuid, status: &str, err: &str) -> Result<
 }
 
 /// 處理一批到期通知；回傳領取筆數。順序固定：
-/// 領取（租約 6 分鐘）→ 收件人 → 寄前重驗 → 驚喜把關 → 合併 → render → 寫站內信 + 發訊號 → email 偏好靜音 → 安靜時段延後 email → 寄送 / 退避。
+/// 領取（租約 6 分鐘）→ 收件人 → 寄前重驗 → 驚喜把關 → 合併 → render → 寫站內信 + 發訊號 → 延後 email 與推播（安靜時段、合併窗口）→ 排推播 → email 偏好靜音 → 寄送 / 退避。
 /// 站內信不受安靜時段影響；安靜時段只延後 email。
 pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     tick_at(pool, chrono::Utc::now()).await
@@ -530,13 +530,18 @@ pub async fn tick_at(
     let n = rows.len();
     let mut bundled = std::collections::HashSet::new();
     // DB 階段（含站內信）先對整批做完，再併發寄信
-    let mut out = Vec::new();
+    let (mut out, mut pushes) = (Vec::new(), Vec::new());
     for row in rows {
         if bundled.contains(&row.0) {
             continue;
         }
-        out.extend(handle(pool, now, row, &mut bundled).await?);
+        out.extend(handle(pool, now, row, &mut bundled, &mut pushes).await?);
     }
+    tokio::join!(send_all(pool, out), push_all(pool, pushes));
+    Ok(n)
+}
+
+async fn send_all(pool: &PgPool, out: Vec<Outbound>) {
     futures_util::StreamExt::for_each_concurrent(
         futures_util::stream::iter(out),
         SEND_CONCURRENCY,
@@ -547,7 +552,17 @@ pub async fn tick_at(
         },
     )
     .await;
-    Ok(n)
+}
+
+async fn push_all(pool: &PgPool, pushes: Vec<(Uuid, String, String)>) {
+    futures_util::StreamExt::for_each_concurrent(
+        futures_util::stream::iter(pushes),
+        SEND_CONCURRENCY,
+        |(u, title, path)| async move {
+            crate::push::deliver(pool, u, &title, &path).await;
+        },
+    )
+    .await;
 }
 
 async fn handle(
@@ -555,6 +570,7 @@ async fn handle(
     now: chrono::DateTime<chrono::Utc>,
     (id, uid, gid, channel, kind, mut payload, attempts, has_inbox): PendingNotification,
     bundled: &mut std::collections::HashSet<Uuid>,
+    pushes: &mut Vec<(Uuid, String, String)>,
 ) -> Result<Option<Outbound>, sqlx::Error> {
     macro_rules! done {
         ($st:expr, $err:expr) => {{
@@ -819,11 +835,11 @@ async fn handle(
     };
     let (subject, body) = render_lang(lang, &kind, &title, &payload);
     // 7. 站內信（不受安靜時段影響）：領取時已有就凍結不動；Account 類不看偏好
+    let inbox_title = subject
+        .strip_prefix("【Wishly】")
+        .or_else(|| subject.strip_prefix("[Wishly] "))
+        .unwrap_or(&subject);
     if let (Some(u), true, false) = (uid, inbox_on, has_inbox) {
-        let inbox_title = subject
-            .strip_prefix("【Wishly】")
-            .or_else(|| subject.strip_prefix("[Wishly] "))
-            .unwrap_or(&subject);
         sqlx::query("UPDATE notifications SET inbox_at = now(), inbox_title = $2, inbox_link = $3, inbox_body = $4, inbox_category = $5 WHERE id = $1 AND inbox_at IS NULL")
             .bind(id).bind(inbox_title).bind(inbox_link(&kind, &payload)).bind(inbox_body(&body)).bind(cat.as_str())
             .execute(pool).await?;
@@ -832,13 +848,7 @@ async fn handle(
     if in_app_only {
         done!("cancelled", "in-app only");
     }
-    // 偏好：關閉的類別只靜音 email
-    if let Some((_, gifts, social, ..)) = &user {
-        if (cat == Category::Gifts && !gifts) || (cat == Category::Social && !social) {
-            done!("cancelled", "muted");
-        }
-    }
-    // email 延後（安靜時段到 09:00、連續操作的合併窗口），不算一次嘗試
+    // email 與推播延後（安靜時段到 09:00、連續操作的合併窗口），不算一次嘗試
     if let Some(at) = hold {
         sqlx::query(
             "UPDATE notifications SET scheduled_at = $2, attempts = attempts - 1 WHERE id = $1",
@@ -848,6 +858,16 @@ async fn handle(
         .execute(pool)
         .await?;
         return Ok(None);
+    }
+    // 推播：時機與合併都跟 email 一樣，但不受 email 開關影響；關了站內就不推。attempts 為 1 才推，email 重試不重複推
+    if let (Some(u), true, 1) = (uid, inbox_on, attempts) {
+        pushes.push((u, inbox_title.to_string(), inbox_link(&kind, &payload)));
+    }
+    // 偏好：關閉的類別只靜音 email
+    if let Some((_, gifts, social, ..)) = &user {
+        if (cat == Category::Gifts && !gifts) || (cat == Category::Social && !social) {
+            done!("cancelled", "muted");
+        }
     }
     // 8. 寄送
     let security = matches!(

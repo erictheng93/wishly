@@ -1,0 +1,53 @@
+{
+  "id": "/",
+  "name": "Wishly Wishlist",
+  "short_name": "Wishly",
+  "description": "Create a wishlist and share it by link. Friends can browse without an account and sign in to chip in, so no gift is bought twice.",
+  "lang": "en",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#c8102e",
+  "categories": [
+    "lifestyle",
+    "shopping"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "My wishlists",
+      "short_name": "Lists",
+      "url": "/dashboard?source=shortcut"
+    },
+    {
+      "name": "Create a wishlist",
+      "short_name": "Create",
+      "url": "/lists/new?source=shortcut"
+    }
+  ]
+}

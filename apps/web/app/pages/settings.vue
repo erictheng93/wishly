@@ -264,6 +264,7 @@ async function remove() {
         </div>
         <p v-if="nErr" class="c-err" role="alert">{{ nErr }}</p>
       </section>
+      <CreatorPushToggle />
       <section class="c-card">
         <h2 class="c-h2">{{ $t('onboarding.settings.title') }}</h2>
         <p class="c-mute">{{ $t('onboarding.settings.hint') }}</p>

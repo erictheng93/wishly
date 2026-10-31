@@ -316,6 +316,9 @@
       "claimsTrust": "Gifts and trust",
       "reports": "Reports (range)",
       "loginFailures": "Login failures (range)",
+      "pwaPrompted": "Install hints shown (range)",
+      "pwaInstalled": "PWA installs (range)",
+      "pwaRate": "PWA install rate",
       "group": {
         "claimStatus": "Gift status",
         "reportReason": "Report reason",
