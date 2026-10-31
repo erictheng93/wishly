@@ -70,7 +70,7 @@ const profile = computed(() => {
     <p v-if="!data && busy" class="c-mute">{{ $t('admin.analytics.loading') }}</p>
 
     <template v-if="data">
-      <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+      <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
       <section class="c-card an-kpi-card" :aria-label="$t('admin.analytics.overview')">
         <dl class="an-tiles k-kpis">
           <div v-for="t in TILES" :key="t[0]"><dt>{{ t[0] }}</dt><dd>{{ fmtCount(t[1]) }}</dd></div>

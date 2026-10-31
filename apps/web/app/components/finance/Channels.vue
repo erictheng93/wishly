@@ -26,7 +26,7 @@ const label = (m: string) => methodLabel(m, t, te)
     <p v-else-if="!data" class="c-mute">{{ $t('admin.finance.loading') }}</p>
     <section v-else class="c-card" :aria-label="$t('admin.finance.channels.title')">
       <h2 class="c-h2">{{ $t('admin.finance.channels.title') }}</h2>
-      <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+      <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
       <p class="c-mute">{{ $t('admin.finance.channels.note') }}</p>
       <p v-if="!data.channels?.length" class="c-mute">{{ $t('admin.finance.channels.empty') }}</p>
       <div v-else class="fin-scroll">

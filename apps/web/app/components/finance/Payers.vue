@@ -41,7 +41,7 @@ const BUCKETS = computed(() => {
     <template v-if="data">
       <section class="c-card" :aria-label="$t('admin.finance.payers.title')">
         <h2 class="c-h2">{{ $t('admin.finance.payers.title') }}</h2>
-        <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+        <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
         <p v-if="!data.payers" class="c-mute">{{ $t('admin.finance.payers.empty') }}</p>
         <dl v-else class="k-kpis">
           <div v-for="k in KPIS" :key="k[0]" :title="$t(`admin.finance.payers.${k[0]}Def`)">

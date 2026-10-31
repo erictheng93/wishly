@@ -281,7 +281,7 @@
       "refreshing": "Refreshing…",
       "privacy": "Groups under 5 people show as <5 to prevent re-identification. Dates use Taipei time; staff and deleted accounts are excluded.",
       "loading": "Loading…",
-      "range": "Range: {from} – {to} ({days} days)",
+      "range": "Range: {from} – {to} ({days} day | {days} days)",
       "overview": "Overview",
       "tile": {
         "users": "Users",
@@ -603,7 +603,7 @@
       "money": "NT$ {n}",
       "retry": "Retry",
       "loading": "Loading…",
-      "range": "Range: {from} – {to} ({days} days)",
+      "range": "Range: {from} – {to} ({days} day | {days} days)",
       "todo": {
         "title": "To do",
         "note": "Current state; not affected by the range. Click to handle.",

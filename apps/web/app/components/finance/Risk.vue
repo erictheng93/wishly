@@ -53,7 +53,7 @@ const OPEN = computed(() => {
 
       <section class="c-card" :aria-label="$t('admin.finance.risk.loss')">
         <h2 class="c-h2">{{ $t('admin.finance.risk.loss') }}</h2>
-        <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+        <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
         <dl class="k-kpis">
           <div :title="$t('admin.finance.risk.lossRateDef')">
             <dt>{{ $t('admin.finance.risk.lossRate') }}</dt>

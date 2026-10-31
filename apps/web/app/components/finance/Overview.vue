@@ -73,7 +73,7 @@ const chart = computed(() => {
 
       <section class="c-card" :aria-label="$t('admin.finance.kpi.title')">
         <h2 class="c-h2">{{ $t('admin.finance.kpi.title') }}</h2>
-        <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+        <p class="c-mute">{{ $t('admin.finance.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
         <dl class="k-kpis">
           <div v-for="k in KPIS" :key="k.key" :title="$t(`admin.finance.kpi.${k.key}Def`)">
             <dt>{{ $t(`admin.finance.kpi.${k.key}`) }}</dt>
@@ -104,12 +104,13 @@ const chart = computed(() => {
   </div>
 </template>
 <style scoped>
-.fin-todo{display:block;padding:14px 16px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:inherit;text-decoration:none;min-width:0}
+/* .c-card a:not(.c-btn) 會把連結變成 inline-flex 橫排，這裡用更高的特異性改回直排 */
+.c-card a.fin-todo:not(.c-btn){display:block;min-height:0;padding:14px 16px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:inherit;text-decoration:none;min-width:0}
 .fin-todo:hover,.fin-todo:focus-visible{background:var(--bg-alt)}
 .fin-todo dl{margin:0}
 .fin-todo small{display:block}
 .fin-one{font:900 28px/1.2 var(--mono);margin:8px 0 0}
-.fin-todo dt{font:600 11px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0}
+.fin-todo dt{font:600 11px/1.4 var(--mono);letter-spacing:.06em!important;overflow-wrap:normal;word-break:normal;text-transform:uppercase;color:var(--mute);margin:0}
 .fin-todo dd{margin:8px 0 4px;font-size:clamp(30px,4.4vw,44px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
 .fin-todo dd.hot{color:var(--red-text)}
 .fin-cmp,.fin-def{display:block;margin-top:6px;font:500 11px/1.5 var(--mono)}
