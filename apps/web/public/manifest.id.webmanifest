@@ -1,0 +1,53 @@
+{
+  "id": "/",
+  "name": "Wishly Daftar Keinginan",
+  "short_name": "Wishly",
+  "description": "Buat daftar keinginan dan bagikan lewat tautan. Teman bisa melihat tanpa akun dan masuk untuk ikut menyumbang, sehingga tidak ada hadiah yang dibeli dua kali.",
+  "lang": "id",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#c8102e",
+  "categories": [
+    "lifestyle",
+    "shopping"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Daftar saya",
+      "short_name": "Daftar",
+      "url": "/dashboard?source=shortcut"
+    },
+    {
+      "name": "Buat daftar",
+      "short_name": "Buat",
+      "url": "/lists/new?source=shortcut"
+    }
+  ]
+}

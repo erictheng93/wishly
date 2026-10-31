@@ -672,6 +672,9 @@ async fn analytics(
              'by_actor', jsonb_build_object(
                'guest', (SELECT count(*) FROM rc WHERE guest_id IS NOT NULL),
                'user', (SELECT count(*) FROM rc WHERE user_id IS NOT NULL))),
+           'pwa', jsonb_build_object(
+             'prompted', (SELECT count(*) FROM pwa_events WHERE event = 'pwa_install_prompted' AND created_at >= (SELECT t FROM lo)),
+             'installed', (SELECT count(*) FROM pwa_events WHERE event = 'pwa_installed' AND created_at >= (SELECT t FROM lo))),
            'trust', jsonb_build_object(
              'reports', (SELECT count(*) FROM content_reports WHERE created_at >= (SELECT t FROM lo)),
              'reports_by_reason', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT reason::text s, count(*) n FROM content_reports WHERE created_at >= (SELECT t FROM lo) GROUP BY 1) t),

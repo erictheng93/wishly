@@ -14,6 +14,8 @@ async fn account_delete_anonymizes(pool: PgPool) {
         token: tok,
     } = user(&pool, "小米").await;
     let (wid, slug, item) = claimed_wishlist(&pool, uid, false, 30, 2, 1).await;
+    sqlx::query("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES ($1, 'https://fcm.googleapis.com/x', 'k', 'a')")
+        .bind(uid).execute(&pool).await.unwrap();
     // 此使用者在別人清單上的捐助
     let TestUser {
         id: other,
@@ -103,6 +105,13 @@ async fn account_delete_anonymizes(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(pend, 0);
+    let (subs,): (i64,) =
+        sqlx::query_as("SELECT count(*) FROM push_subscriptions WHERE user_id = $1")
+            .bind(uid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(subs, 0, "刪帳號後不可再推播到舊裝置");
     // session 失效
     assert_eq!(
         call(&pool, "GET", "/admin/stats", &ck(&tok), None).await.0,

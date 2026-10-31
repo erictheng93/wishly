@@ -314,6 +314,9 @@
       "claimsTrust": "送禮與信任",
       "reports": "檢舉（區間）",
       "loginFailures": "登入失敗（區間）",
+      "pwaPrompted": "安裝提示顯示（區間）",
+      "pwaInstalled": "已安裝 PWA（區間）",
+      "pwaRate": "PWA 安裝率",
       "group": {
         "claimStatus": "送禮狀態",
         "claimActor": "送禮者類型",

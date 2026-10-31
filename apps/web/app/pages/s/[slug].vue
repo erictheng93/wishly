@@ -182,6 +182,7 @@ async function sendFriendRequest() {
   try { await authApi('/friends/requests', { method: 'POST', body: { to: gate.value.owner.id } }); friendReq.value = 'sent' }
   catch (e) { friendErr.value = errMsg(e); friendReq.value = 'idle' }
 }
+const { context: pwaCtx, dismiss: pwaDismiss, install: pwaInstall } = usePwaContext()
 function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = false }
 </script>
 
@@ -261,6 +262,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p>{{ $t('guest.slug.fundedLine', { title: funded.title, pts: fmtPts(funded.contribution.points) }) }}</p>
       <div v-if="funded.funded" class="g-banner ok">{{ $t('guest.slug.fundedGoal') }}</div>
       <p v-if="funded.wallet" class="g-mute">{{ $t('guest.slug.walletLeft', { n: fmtPts(funded.wallet.balance) }) }}</p>
+      <GuestInstallHint v-if="pwaCtx" :context="pwaCtx" source="fund" @dismiss="pwaDismiss" @install="pwaInstall" />
       <NuxtLink class="g-btn block" to="/me/wallet">{{ $t('guest.slug.viewWallet') }}</NuxtLink>
       <button class="g-link" @click="funded = null">{{ $t('guest.slug.backToList') }}</button>
     </div></GuestDialog>
@@ -272,6 +274,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p v-if="done.claim.expires_at" class="js-done-deadline">{{ $t('guest.slug.doneDeadline', { date: fmtTime(done.claim.expires_at) }) }}</p>
       <div class="g-banner ok">{{ $t('guest.slug.doneHint') }}</div>
       <div v-if="isLineBrowser()" class="g-banner">{{ $t('guest.slug.lineBrowser') }}</div>
+      <GuestInstallHint v-if="pwaCtx" :context="pwaCtx" source="claim" @dismiss="pwaDismiss" @install="pwaInstall" />
       <NuxtLink class="g-btn block" to="/me/claims">{{ $t('guest.slug.viewMyClaims') }}</NuxtLink>
       <button class="g-link" @click="done = null">{{ $t('guest.slug.backToList') }}</button>
     </div></GuestDialog>

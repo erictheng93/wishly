@@ -123,6 +123,14 @@
       "socialHint": "Aktivitas teman, pengingat ulang tahun teman, dan pengingat sebelum ulang tahun Anda untuk menyiapkan daftar.",
       "inbox": "Dalam aplikasi",
       "email": "Email"
+    },
+    "push": {
+      "title": "Notifikasi push",
+      "label": "Terima push di perangkat ini",
+      "hint": "Notifikasi penting sampai ke perangkat ini meski Wishly tidak dibuka. Push hanya menampilkan judul.",
+      "denied": "Notifikasi diblokir di browser Anda. Buka pengaturan situs, ubah Notifikasi menjadi Izinkan untuk situs ini, lalu kembali dan aktifkan.",
+      "install": "Di iPhone / iPad, tambahkan Wishly ke Layar Utama lalu buka dari sana untuk mengaktifkan push (tombol Bagikan Safari, lalu Tambah ke Layar Utama).",
+      "failed": "Tidak dapat mengaktifkan push. Coba lagi nanti."
     }
   }
 }

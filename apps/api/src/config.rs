@@ -35,6 +35,10 @@ pub struct Config {
     pub ecpay: Option<Ecpay>,
     /// 公益組織 / 救災功能總開關（ORGS_ENABLED，僅 `true` / `1` 為開）；dev/test 恆開，production 預設關，關閉時相關路由回 404
     pub orgs_enabled: bool,
+    /// Web Push（push.rs）：VAPID_PRIVATE_KEY + VAPID_SUBJECT 都設才啟用；None = 推播關閉（不影響啟動）
+    pub vapid: Option<crate::push::Vapid>,
+    /// 僅測試程式會設為 true（放行本機 mock endpoint）；任何環境變數都不會設它
+    pub push_allow_loopback: bool,
 }
 
 /// 綠界 AioCheckOut 設定。三個憑證都有才啟用。
@@ -173,6 +177,8 @@ impl Config {
                 true,
             )),
             orgs_enabled: true,
+            vapid: None,
+            push_allow_loopback: false,
         }
     }
 
@@ -182,6 +188,7 @@ impl Config {
 
     pub fn try_from_env() -> Result<Config, String> {
         let mut c = Config::dev();
+        c.vapid = crate::push::Vapid::from_env(var("VAPID_PRIVATE_KEY"), var("VAPID_SUBJECT"))?;
         match var("APP_ENV").as_deref() {
             Some("dev") | Some("test") => return Ok(c),
             Some("production") | Some("prod") | None => {}

@@ -123,6 +123,14 @@
       "socialHint": "Friend activity, friends' birthday reminders, and a reminder before your own birthday to set up a list.",
       "inbox": "In-app",
       "email": "Email"
+    },
+    "push": {
+      "title": "Push notifications",
+      "label": "Receive push on this device",
+      "hint": "Important notifications reach this device even when Wishly isn't open. Push shows only a title.",
+      "denied": "Notifications are blocked in your browser. Open the site settings, set Notifications to Allow for this site, then come back and turn this on.",
+      "install": "On iPhone / iPad, add Wishly to your Home Screen and open it from there to turn on push (Safari Share button, then Add to Home Screen).",
+      "failed": "Couldn't turn on push. Please try again later."
     }
   }
 }

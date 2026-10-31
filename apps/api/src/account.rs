@@ -280,6 +280,10 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    sqlx::query("DELETE FROM push_subscriptions WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM user_activity_days WHERE user_id = $1")
         .bind(id)
         .execute(&mut *tx)
