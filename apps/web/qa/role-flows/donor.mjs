@@ -5,6 +5,7 @@
 import { createHmac } from 'node:crypto'
 import { expect } from '@playwright/test'
 import { API, Blocked, closeBrowser, Gap, MAILPIT, PASSWORD, getBrowser, listMail, otpFrom, pwRequest, randomUUID, recorder, registerApi, resetOtpLimits, sleep, sql, q, uid, waitForMail, WEB } from './lib.mjs'
+import { shortenInboxStream } from '../inbox-stream.mjs'
 import { ecpayPaid } from './ecpay-sim.mjs'
 
 expect.configure({ timeout: 10000 })
@@ -26,6 +27,7 @@ const uidOf = email => sql(`SELECT id FROM users WHERE email='${q(email)}'`)
 async function ctxPage({ mobile = false, ua, js = true, user } = {}) {
   const b = await getBrowser()
   const ctx = await b.newContext({ baseURL: WEB, locale: 'zh-TW', timezoneId: 'Asia/Taipei', viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 860 }, isMobile: mobile, hasTouch: mobile, userAgent: ua, javaScriptEnabled: js })
+  await shortenInboxStream(ctx)
   if (user) await ctx.addCookies((await user.api.storageState()).cookies.map(c => ({ ...c, domain: 'localhost' })))
   const page = await ctx.newPage()
   page.problems = []
@@ -1130,7 +1132,7 @@ await run.step('D-72', '退訂連結 /unsubscribe：二步確認（開頁不退�
   const after = sql(`SELECT notification_prefs FROM users WHERE id='${id}'`)
   note(`平台外：以開發機密 dev-unsub-secret 簽出「生日通知(b)」退訂 token（真實信件由 notify.rs 產生）；notification_prefs ${before} → ${after}`)
   note('頁面文案：' + (await p.locator('.x-n-body').innerText()).replace(/\s+/g, ' '))
-  if (/email_birthdays.*false/.test(after)) throw new Gap('退訂的是「生日通知」(kind b)，但頁面標題寫「確定要退訂送禮通知？」、完成後寫「之後不會再寄『有人來送』的通知信」，文案與實際效果不符')
+  if (/email_social.*false/.test(after)) throw new Gap('退訂的是「生日通知」(kind b)，但頁面標題寫「確定要退訂送禮通知？」、完成後寫「之後不會再寄『有人來送』的通知信」，文案與實際效果不符')
   await p.goto('/unsubscribe?token=garbage'); await hyd(p)
   await p.getByRole('button', { name: '確定退訂' }).click()
   await expect(p.getByRole('heading', { name: '連結已失效' })).toBeVisible()
