@@ -114,9 +114,13 @@
     "terms": "Điều khoản dịch vụ",
     "privacy": "Chính sách quyền riêng tư",
     "notify": {
-      "title": "Thông báo",
-      "birthdays": "Email sinh nhật",
-      "birthdaysHint": "Nhắc sinh nhật bạn bè và nhắc bạn tạo danh sách trước sinh nhật của mình."
+      "title": "Email thông báo",
+      "account": "Tài khoản và bảo mật",
+      "accountHint": "Thông báo quan trọng về tài khoản, ví và đơn hàng. Luôn bật.",
+      "gifts": "Tiến độ tặng quà",
+      "giftsHint": "Có người tặng, món đạt mục tiêu, đã gửi hoặc đã giao.",
+      "social": "Bạn bè và sinh nhật",
+      "socialHint": "Hoạt động của bạn bè, nhắc sinh nhật bạn bè và nhắc bạn tạo danh sách trước sinh nhật của mình."
     }
   }
 }

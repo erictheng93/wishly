@@ -31,6 +31,8 @@
     },
     "support": "Contact support: ",
     "supportSubject": "Wishly support",
-    "supportBody": "Account ID: {id}\n\nDescribe the issue:\n"
+    "supportBody": "Account ID: {id}\n\nDescribe the issue:\n",
+    "notifications": "Notifications",
+    "unreadCount": "{n} unread"
   }
 }

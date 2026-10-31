@@ -138,7 +138,9 @@
       },
       "staffMfaLow": "Fewer than 2 staff members have two-step verification set up. If someone loses their authenticator and recovery codes, nobody can reset it. Have another staff member finish setup.",
       "mfaHint": "Enable two-step verification: staff can block users and grant points, so a compromised account is costly.",
-      "mfaSetup": "Set up now"
+      "mfaSetup": "Set up now",
+      "requeue": "Requeue failed notifications",
+      "requeued": "Requeued {n}"
     },
     "audit": {
       "title": "Audit log",

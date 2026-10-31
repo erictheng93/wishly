@@ -154,7 +154,7 @@
       "ackItemChange": "Đã hiểu",
       "past": "Lịch sử ({n})",
       "wipe": "Xóa biệt danh và thông tin liên hệ của tôi",
-      "confirmCancelPurchased": "Người tạo sẽ nhận được thông báo. Bạn chắc chắn muốn hủy lượt đăng ký tặng này?",
+      "confirmCancelPurchased": "Người tạo sẽ nhận được thông báo (trừ khi đang là bất ngờ). Bạn chắc chắn muốn hủy lượt đăng ký tặng này?",
       "confirmCancel": "Bạn chắc chắn muốn hủy lượt đăng ký tặng này?",
       "confirmWipe": "Xóa biệt danh và thông tin liên hệ của bạn? Lịch sử tặng quà sẽ được giữ lại dưới tên \"Khách đã xóa\", và thiết bị này sẽ không thể quản lý nữa.",
       "deadline": "Vui lòng đánh dấu đã mua trước {date}",
@@ -413,6 +413,13 @@
         "server": "Hệ thống tạm thời không xử lý được. Vui lòng thử lại sau.",
         "generic": "Gửi yêu cầu thất bại. Vui lòng thử lại sau."
       }
+    },
+    "notifications": {
+      "title": "Trung tâm thông báo",
+      "readAll": "Đánh dấu tất cả đã đọc",
+      "empty": "Chưa có thông báo",
+      "unread": "Chưa đọc",
+      "loadMore": "Tải thêm"
     }
   }
 }

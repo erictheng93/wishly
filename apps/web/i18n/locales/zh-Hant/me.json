@@ -154,7 +154,7 @@
       "ackItemChange": "知道了",
       "past": "過去的紀錄（{n}）",
       "wipe": "刪除我的暱稱與聯絡方式",
-      "confirmCancelPurchased": "建立者會收到通知，確定不送了嗎？",
+      "confirmCancelPurchased": "建立者會收到通知（驚喜期間不會）。確定不送了嗎？",
       "confirmCancel": "確定不送這份禮物了嗎？",
       "confirmWipe": "確定刪除你的暱稱與聯絡方式？送禮紀錄會保留為「已刪除的訪客」，且此裝置之後無法再管理。",
       "deadline": "請在 {date} 前標記已購買",
@@ -413,6 +413,13 @@
         "server": "系統暫時無法處理，請稍後再試。",
         "generic": "申請失敗，請稍後再試。"
       }
+    },
+    "notifications": {
+      "title": "通知中心",
+      "readAll": "全部標為已讀",
+      "empty": "目前沒有通知",
+      "unread": "未讀",
+      "loadMore": "載入更多"
     }
   }
 }
