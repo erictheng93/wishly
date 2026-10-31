@@ -11,6 +11,7 @@ pub mod config;
 pub mod contributions;
 pub mod dashboard;
 pub mod error;
+pub mod finance;
 pub mod friends;
 pub mod guest;
 pub mod health;
@@ -72,6 +73,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(contributions::routes())
                 .merge(wallet::routes())
                 .merge(wallet_ops::routes())
+                .merge(finance::routes())
                 .merge(dashboard::routes())
                 .merge(reports::routes())
                 .merge(admin::routes())
