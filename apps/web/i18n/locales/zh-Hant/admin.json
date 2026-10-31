@@ -627,6 +627,79 @@
         "note": "以收到付款通知的日期（台北時間）計，與綠界後台跨日邊界可能差一天。",
         "empty": "此區間沒有儲值。",
         "aria": "每日儲值實收折線圖"
+      },
+      "payers": {
+        "title": "付費用戶",
+        "empty": "此區間沒有付費用戶。",
+        "payers": "付費用戶",
+        "firstTime": "首次付費",
+        "repeat": "回購率",
+        "avg": "平均每人",
+        "payersDef": "區間內有儲值的不重複錢包數。",
+        "firstTimeDef": "歷史上第一筆付款落在區間內者。",
+        "repeatDef": "付費用戶中，歷史累計付款 2 次以上者的比例。",
+        "avgDef": "儲值實收 ÷ 付費用戶。",
+        "buckets": "金額級距",
+        "bucketsNote": "以區間內每位用戶的累計儲值分組，長條為人數。",
+        "bucket": {
+          "lt500": "< 500",
+          "500_999": "500–999",
+          "1000_2999": "1,000–2,999",
+          "3000_9999": "3,000–9,999",
+          "gte10000": "≥ 10,000"
+        },
+        "top": "儲值金額前 20 名",
+        "topNote": "點用戶名稱查看其交易明細。",
+        "user": "用戶",
+        "amount": "累計金額",
+        "count": "筆數",
+        "first": "首次付款",
+        "last": "最後付款"
+      },
+      "channels": {
+        "title": "渠道比較",
+        "note": "成功率 = 已建立且非等待中的訂單裡，實際付款的比例。LINE Pay、Apple Pay 目前未開放，有資料才顯示。",
+        "empty": "沒有渠道資料。",
+        "method": "渠道",
+        "gross": "實收",
+        "count": "筆數",
+        "avg": "平均金額",
+        "success": "成功率",
+        "payers": "付費人數"
+      },
+      "risk": {
+        "liability": "點數負債",
+        "liabilityNote": "目前狀態，不隨時間區間變動。負債 = 未使用點數 + 認捐中（認捐時已自餘額扣除，不重複）。",
+        "liab": {
+          "total": "負債總額",
+          "unused": "未使用點數",
+          "refundable": "可退現金",
+          "non_refundable": "不可退現金",
+          "pledged": "認捐中"
+        },
+        "loss": "退款與拒付",
+        "lossRate": "損失率",
+        "lossRateDef": "（退款 + 拒付）÷ 儲值實收。",
+        "refunds": "已完成退款",
+        "chargebacks": "拒付",
+        "cnt": "{n} 筆",
+        "disputed": "爭議中",
+        "disputedNote": "目前狀態，最多列出 50 筆。",
+        "disputedEmpty": "目前沒有爭議中的儲值。",
+        "user": "用戶",
+        "amount": "金額",
+        "paidAt": "付款日",
+        "handle": "處理",
+        "open": "待處理與其他",
+        "cashRefunds": "待處理現金退款",
+        "debts": "未結欠款",
+        "invoices": "待開立發票",
+        "invoicesNote": "電子發票尚未串接，此數字會持續累積。",
+        "frozen": "凍結錢包",
+        "go": {
+          "cashRefunds": "前往現金退款",
+          "debts": "前往欠款"
+        }
       }
     }
   }

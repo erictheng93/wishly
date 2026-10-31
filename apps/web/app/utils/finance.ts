@@ -12,3 +12,6 @@ export const delta = (cur: number, prev: number): number | null => prev === 0 ? 
 
 /** 平均每人；沒有付費用戶回 null */
 export const perPayer = (gross: number, payers: number): number | null => payers === 0 ? null : gross / payers
+
+/** 0–1 比率轉百分比字串；null 顯示 – */
+export const fmtRate = (r: number | null | undefined): string => r == null ? '–' : `${(r * 100).toFixed(1)}%`

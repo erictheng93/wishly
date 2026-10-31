@@ -88,3 +88,11 @@
 .an-track{display:block;height:8px;background:var(--hatch),var(--bg-alt)}
 .an-bar{display:block;height:100%;background:var(--red);min-width:2px;transform-origin:left;animation:fill .9s var(--ease) both}
 @media (max-width:520px){.an-row{grid-template-columns:minmax(64px,92px) 1fr auto;gap:8px}}
+
+/* 金流後台表格：外層橫向捲動，手機不撐破版面 */
+.fin-scroll{overflow-x:auto}
+.fin-table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.fin-table th,.fin-table td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.fin-table th:first-child,.fin-table td:first-child{text-align:left}
+.fin-table th{font-weight:600;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.fin-table a{color:inherit;text-decoration:underline}
