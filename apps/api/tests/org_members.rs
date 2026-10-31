@@ -360,3 +360,27 @@ async fn invite_is_rate_limited_per_inviter(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 30);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn invite_inbox_link_opens_the_invite(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let b = user(&pool, "B").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    sqlx::query("UPDATE users SET email='b@x.com' WHERE id=$1")
+        .bind(b.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, v) = invite(&pool, o, &a.token, "b@x.com", "volunteer").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    wishly_api::notify::tick(&pool).await.unwrap();
+    let link: String = sqlx::query_scalar(
+        "SELECT inbox_link FROM notifications WHERE user_id=$1 AND kind='org.invite'",
+    )
+    .bind(b.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(link, format!("/org/invite/{}", token_of(&v)));
+}
