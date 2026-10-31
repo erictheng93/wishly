@@ -1116,6 +1116,103 @@ async fn admin_topup_list_filters_and_paginates(pool: PgPool) {
     );
 }
 
+async fn topup_get(pool: &PgPool, token: &str, q: &str) -> (StatusCode, Value) {
+    let (s, _, b) = call(pool, "GET", &format!("/admin/topups{q}"), &ck(token), None).await;
+    (s, b)
+}
+
+fn topup_ids(b: &Value) -> Vec<String> {
+    b["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn topups_filter_by_method_and_user(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let a = common::user(&pool, "甲").await;
+    let b = common::user(&pool, "乙").await;
+    let ta = topup_credit(&pool, a.id, 100).await;
+    let tb = topup_credit(&pool, b.id, 100).await;
+    sqlx::query("UPDATE topups SET method='line_pay' WHERE id=$1")
+        .bind(tb)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, r) = topup_get(&pool, &staff.token, "?method=line_pay").await;
+    assert_eq!(topup_ids(&r), [tb.to_string()]);
+    let (_, r) = topup_get(&pool, &staff.token, "?method=card").await;
+    assert_eq!(topup_ids(&r), [ta.to_string()]);
+    let (_, r) = topup_get(&pool, &staff.token, &format!("?user_id={}", b.id)).await;
+    assert_eq!(topup_ids(&r), [tb.to_string()]);
+    let (_, r) = topup_get(&pool, &staff.token, "?q=%20").await;
+    assert_eq!(topup_ids(&r).len(), 2, "空白 q 視為不篩選");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn topups_q_is_literal(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let a = common::user(&pool, "甲").await;
+    topup_credit(&pool, a.id, 100).await;
+    let (_, r) = topup_get(&pool, &staff.token, "?q=%25").await;
+    assert!(topup_ids(&r).is_empty(), "q=% 不可當萬用字元");
+    let (_, r) = topup_get(&pool, &staff.token, "?q=%E7%94%B2").await;
+    assert_eq!(topup_ids(&r).len(), 1);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn topups_q_cursor_paginates(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let mut want = vec![];
+    for n in ["命中一", "命中二", "命中三"] {
+        let u = common::user(&pool, n).await;
+        want.push(topup_credit(&pool, u.id, 100).await.to_string());
+    }
+    let other = common::user(&pool, "路人").await;
+    topup_credit(&pool, other.id, 100).await;
+    let q = "%E5%91%BD%E4%B8%AD";
+    let mut got = vec![];
+    let mut cur = String::new();
+    loop {
+        let (_, r) = topup_get(&pool, &staff.token, &format!("?q={q}&limit=1{cur}")).await;
+        got.extend(topup_ids(&r));
+        match r["next_cursor"].as_str() {
+            Some(c) => cur = format!("&cursor={c}"),
+            None => break,
+        }
+    }
+    got.sort();
+    want.sort();
+    assert_eq!(got, want);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn topups_deleted_user_still_listed(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let a = common::user(&pool, "甲").await;
+    let t = topup_credit(&pool, a.id, 100).await;
+    sqlx::query("UPDATE users SET display_name='已刪除的使用者', email=NULL WHERE id=$1")
+        .bind(a.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, r) = topup_get(&pool, &staff.token, &format!("?user_id={}", a.id)).await;
+    assert_eq!(topup_ids(&r), [t.to_string()]);
+    // email 為 NULL 時姓名仍要能命中
+    let (_, r) = topup_get(&pool, &staff.token, "?q=%E5%B7%B2%E5%88%AA%E9%99%A4").await;
+    assert_eq!(topup_ids(&r), [t.to_string()]);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn topups_bad_method_422(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let (s, _) = topup_get(&pool, &staff.token, "?method=bogus").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn my_cash_refund_list_is_own_newest_first_and_hides_internals(pool: PgPool) {
     let staff = common::staff(&pool, "營運").await;
@@ -1290,4 +1387,35 @@ async fn dispute_webhook_is_a_documented_501_placeholder(pool: PgPool) {
             Some("DISPUTE_WEBHOOK_NOT_AVAILABLE")
         )
     );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn dispute_transitions_touch_updated_at(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let TestUser { id: a, .. } = common::user(&pool, "甲").await;
+    let topup = topup_credit(&pool, a, 100).await;
+    for action in ["open", "won", "open", "lost"] {
+        sqlx::query("UPDATE topups SET updated_at = now() - interval '1 day' WHERE id = $1")
+            .bind(topup)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (s, _, b) = dispute(
+            &pool,
+            &staff.token,
+            topup,
+            Uuid::new_v4(),
+            json!({ "action": action }),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{action}: {b}");
+        let fresh: bool = sqlx::query_scalar(
+            "SELECT updated_at > now() - interval '1 minute' FROM topups WHERE id = $1",
+        )
+        .bind(topup)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(fresh, "{action} 應更新 updated_at");
+    }
 }

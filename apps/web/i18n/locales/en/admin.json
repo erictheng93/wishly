@@ -26,10 +26,10 @@
         "analytics": "Analytics",
         "cashRefunds": "Cash refunds",
         "walletDebts": "Chargeback debts",
-        "topups": "Top-ups and disputes",
         "catalog": "Brands & products",
         "orgs": "Org and permit review",
-        "events": "Disaster events"
+        "events": "Disaster events",
+        "finance": "Finance"
       },
       "tabsLabel": "Console sections",
       "tabs": {
@@ -281,7 +281,7 @@
       "refreshing": "Refreshing…",
       "privacy": "Groups under 5 people show as <5 to prevent re-identification. Dates use Taipei time; staff and deleted accounts are excluded.",
       "loading": "Loading…",
-      "range": "Range: {from} – {to} ({days} days)",
+      "range": "Range: {from} – {to} ({days} day) | Range: {from} – {to} ({days} days)",
       "overview": "Overview",
       "tile": {
         "users": "Users",
@@ -412,6 +412,11 @@
       "stale": "This debt was already closed. The list was reloaded."
     },
     "topups": {
+      "methodLabel": "Channel",
+      "searchLabel": "Search user",
+      "searchHint": "Name or email, press Enter",
+      "userFilter": "User: {name}",
+      "clearUser": "Show all users",
       "title": "Top-ups and chargeback disputes",
       "intro": "On a card chargeback, marking a dispute freezes the wallet. Winning restores it; losing claws back what is left of that top-up lot and records the rest as debt.",
       "statusLabel": "Status",
@@ -582,6 +587,128 @@
       "done": "Done",
       "selfMerge": "Cannot merge an event into itself",
       "reasonRequired": "Please enter a reason for hiding"
+    },
+    "finance": {
+      "title": "Finance",
+      "tabsLabel": "Finance tabs",
+      "tabs": {
+        "overview": "Overview",
+        "transactions": "Transactions",
+        "payers": "Payers",
+        "channels": "Channels",
+        "risk": "Risk & liabilities"
+      },
+      "rangeLabel": "Range",
+      "today": "Today",
+      "days": "{n} d",
+      "money": "NT$ {n}",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "range": "Range: {from} – {to} ({days} day) | Range: {from} – {to} ({days} days)",
+      "todo": {
+        "title": "To do",
+        "note": "Current state; not affected by the range. Click to handle.",
+        "disputed": "Disputed",
+        "cashRefunds": "Pending refunds",
+        "debts": "Open debts",
+        "pending": "Awaiting payment"
+      },
+      "kpi": {
+        "title": "Key figures",
+        "vsPrev": "{pct} vs previous period",
+        "noPrev": "No previous data",
+        "gross": "Top-up revenue",
+        "payers": "Paying users",
+        "firstTime": "First-time payers",
+        "avg": "Per payer",
+        "grossDef": "Sum of top-ups whose payment notice arrived in the range, including ones later disputed or charged back; manual point grants excluded.",
+        "payersDef": "Distinct wallets that topped up in the range.",
+        "firstTimeDef": "Paying users whose first-ever payment falls in the range.",
+        "avgDef": "Top-up revenue ÷ paying users."
+      },
+      "daily": {
+        "title": "Daily revenue",
+        "note": "By the date the payment notice arrived (Taipei time); may differ by a day from ECPay at day boundaries.",
+        "empty": "No top-ups in this range.",
+        "aria": "Line chart of daily top-up revenue"
+      },
+      "payers": {
+        "title": "Payers",
+        "empty": "No payers in this range.",
+        "payers": "Payers",
+        "firstTime": "First-time",
+        "repeat": "Repeat rate",
+        "avg": "Avg per payer",
+        "payersDef": "Distinct wallets that topped up in the range.",
+        "firstTimeDef": "Payers whose first-ever payment falls in the range.",
+        "repeatDef": "Share of payers with 2 or more payments in total.",
+        "avgDef": "Top-up revenue ÷ payers.",
+        "buckets": "Amount tiers",
+        "bucketsNote": "Grouped by each user's total top-ups in the range; bars show user counts.",
+        "bucket": {
+          "lt500": "< 500",
+          "500_999": "500–999",
+          "1000_2999": "1,000–2,999",
+          "3000_9999": "3,000–9,999",
+          "gte10000": "≥ 10,000"
+        },
+        "top": "Top 20 by top-up amount",
+        "topNote": "Select a user to see their transactions.",
+        "user": "User",
+        "amount": "Total",
+        "count": "Count",
+        "first": "First paid",
+        "last": "Last paid"
+      },
+      "channels": {
+        "title": "Channel comparison",
+        "note": "Success rate = paid orders ÷ non-pending orders created. LINE Pay and Apple Pay are not open yet and only appear when there is data.",
+        "empty": "No channel data.",
+        "method": "Channel",
+        "gross": "Revenue",
+        "count": "Count",
+        "avg": "Avg amount",
+        "success": "Success rate",
+        "payers": "Payers"
+      },
+      "risk": {
+        "liability": "Points liability",
+        "liabilityNote": "Current state, not tied to the range. Liability = unused points + pledged (already deducted from balance, no double counting). Open cash refunds are not in this total: points are debited when a refund is requested, so they are listed separately under \"Pending and other\" below.",
+        "liab": {
+          "total": "Total liability",
+          "unused": "Unused points",
+          "refundable": "Cash-refundable",
+          "non_refundable": "Not cash-refundable",
+          "pledged": "Pledged"
+        },
+        "loss": "Refunds and chargebacks",
+        "lossRate": "Loss rate",
+        "lossRateDef": "(Refunds + chargebacks) ÷ top-up revenue.",
+        "refunds": "Completed refunds",
+        "chargebacks": "Chargebacks",
+        "cnt": "{n} items",
+        "disputed": "Disputed",
+        "disputedNote": "Current state, up to 50 listed.",
+        "disputedEmpty": "No disputed top-ups right now.",
+        "user": "User",
+        "amount": "Amount",
+        "paidAt": "Paid on",
+        "handle": "Handle",
+        "open": "Pending and other",
+        "cashRefunds": "Pending cash refunds",
+        "debts": "Open debts",
+        "invoices": "Invoices to issue",
+        "invoicesNote": "E-invoicing is not connected yet; this number keeps growing.",
+        "frozen": "Frozen wallets",
+        "go": {
+          "cashRefunds": "Go to cash refunds",
+          "debts": "Go to debts"
+        }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
+      }
     }
   }
 }

@@ -21,6 +21,7 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -357,7 +358,7 @@ pub async fn dispute_open(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
     if status != "paid" {
         return Ok(false);
     }
-    sqlx::query("UPDATE topups SET status = 'disputed' WHERE id = $1")
+    sqlx::query("UPDATE topups SET status = 'disputed', updated_at = now() WHERE id = $1")
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
@@ -375,7 +376,7 @@ pub async fn dispute_won(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
     if status != "disputed" {
         return Ok(false);
     }
-    sqlx::query("UPDATE topups SET status = 'paid' WHERE id = $1")
+    sqlx::query("UPDATE topups SET status = 'paid', updated_at = now() WHERE id = $1")
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
@@ -404,7 +405,7 @@ pub async fn charge_back(tx: &mut Tx<'_>, topup_id: Uuid) -> R<ChargedBack> {
     if status != "paid" && status != "disputed" {
         return Ok(ChargedBack::Ignored);
     }
-    sqlx::query("UPDATE topups SET status = 'charged_back' WHERE id = $1")
+    sqlx::query("UPDATE topups SET status = 'charged_back', updated_at = now() WHERE id = $1")
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
@@ -462,12 +463,37 @@ pub async fn charge_back(tx: &mut Tx<'_>, topup_id: Uuid) -> R<ChargedBack> {
     Ok(ChargedBack::Applied { recovered, debt })
 }
 
-/// GET /admin/topups?status=&limit=&cursor=：營運找儲值單 / 看爭議中清單。最新在前（uuid v7），cursor 為上一頁最後一筆 id。
+#[derive(Deserialize)]
+struct TopupQ {
+    cursor: Option<Uuid>,
+    limit: Option<i64>,
+    status: Option<String>,
+    method: Option<String>,
+    q: Option<String>,
+    user_id: Option<Uuid>,
+}
+
+/// GET /admin/topups?status=&method=&q=&user_id=&limit=&cursor=：營運找儲值單 / 看爭議中清單。最新在前（uuid v7），cursor 為上一頁最後一筆 id。
+/// q 不分大小寫比對姓名 / email 子字串（用 position 而非 LIKE，避免 % _ 被當萬用字元）；空白視為不篩選。
 async fn topup_list(
     State(st): State<AppState>,
     Staff(_): Staff,
-    Query(q): Query<PageQ>,
+    Query(q): Query<TopupQ>,
 ) -> R<Response> {
+    if q.method.as_deref().is_some_and(|m| {
+        ![
+            "card",
+            "line_pay",
+            "apple_pay",
+            "cvs_code",
+            "cvs_barcode",
+            "atm",
+        ]
+        .contains(&m)
+    }) {
+        return Err(AppError::invalid("/method", "ENUM", "method 不正確"));
+    }
+    let kw = q.q.as_deref().map(str::trim).filter(|s| !s.is_empty());
     if q.status.as_deref().is_some_and(|s| {
         ![
             "pending",
@@ -490,8 +516,11 @@ async fn topup_list(
                 'wallet', jsonb_build_object('id', w.id, 'status', w.status))
            FROM topups t JOIN point_wallets w ON w.id = t.wallet_id JOIN users u ON u.id = w.user_id
           WHERE ($1::text IS NULL OR t.status::text = $1) AND ($2::uuid IS NULL OR t.id < $2)
+            AND ($4::text IS NULL OR t.method::text = $4) AND ($5::uuid IS NULL OR u.id = $5)
+            AND ($6::text IS NULL OR position(lower($6) IN lower(u.display_name)) > 0
+                 OR COALESCE(position(lower($6) IN lower(u.email)) > 0, false))
           ORDER BY t.id DESC LIMIT $3")
-        .bind(&q.status).bind(q.cursor).bind(lim + 1).fetch_all(&st.pool).await?;
+        .bind(&q.status).bind(q.cursor).bind(lim + 1).bind(&q.method).bind(q.user_id).bind(kw).fetch_all(&st.pool).await?;
     Ok(page(rows, lim))
 }
 
