@@ -17,7 +17,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
   <header class="c-head">
     <NuxtLink v-if="back" :to="back" class="c-btn plain c-back" :aria-label="$t('common.back')">‹</NuxtLink>
     <NuxtLink to="/" class="c-brand">Wishly</NuxtLink>
-    <span v-if="orgName" class="c-org">{{ $t('org.badge') }}：{{ orgName }}</span>
+    <span v-if="orgName" class="c-org"><span class="c-org-k">{{ $t('org.badge') }}：</span>{{ orgName }}</span>
     <LocaleSwitch /><ThemeToggle />
     <slot />
     <CreatorUserMenu />
@@ -36,7 +36,9 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
   </nav>
 </template>
 <style scoped>
-.c-org{padding:0 8px;line-height:22px;background:var(--fg);color:var(--bg);font:600 11px/22px var(--mono);letter-spacing:.06em;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-org{padding:0 8px;line-height:22px;background:var(--fg);color:var(--bg);font:600 11px/22px var(--mono);letter-spacing:.06em;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;min-width:0}
+/* 窄手機：只留組織名（前綴「組織模式：」改為視覺隱藏，螢幕閱讀器仍讀得到），頁首維持一列 */
+@media (max-width:479px){.c-org{max-width:6.5em}.c-org-k{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
 </style>
 <style>
 .c-back{font-size:24px;margin-left:-10px}

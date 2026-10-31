@@ -57,7 +57,8 @@ test('會員認捐旅程：SSR meta → 捐助 → 重新整理 → 我的捐助
     await expect(page).toHaveURL(/\/me\/claims$/)
     await expect(page.getByRole('link', { name: '小愛的待產清單' })).toBeVisible()
     await expect(page.getByText('奶瓶組 × 2')).toBeVisible()
-    await expect(page.getByText(member.name)).toBeVisible()
+    // 頁首帳號選單也會出現名字，只看內文
+    await expect(page.getByRole('main').getByText(member.name)).toBeVisible()
   })
 
   await test.step('回清單修改數量為 1', async () => {

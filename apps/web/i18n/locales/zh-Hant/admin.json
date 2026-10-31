@@ -585,7 +585,8 @@
       "reasonLabel": "原因",
       "targetNotFound": "找不到該事件，請輸入 id 或已載入列表中的 slug",
       "done": "已處理",
-      "selfMerge": "不能合併到自己"
+      "selfMerge": "不能合併到自己",
+      "reasonRequired": "請填寫下架原因"
     },
     "finance": {
       "title": "金流後台",

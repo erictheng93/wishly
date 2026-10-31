@@ -39,7 +39,7 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
 <template>
   <main class="c-page m-page">
     <CreatorHeader :title="$t('org.members.title')" :back="`/orgs/${id}`" />
-    <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+    <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
 
     <section class="c-card f-sec">
       <h2 class="c-h2">{{ $t('org.members.list') }}</h2>
@@ -98,7 +98,7 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
 .f-sec>.c-h2{margin:0 0 18px;padding:14px 18px;background:var(--bg-alt);border-bottom:1px solid var(--line)}
 .f-sec>.c-h2~*:last-child{margin-bottom:18px}
 .m-list{list-style:none;padding:0;margin:0 18px!important;display:block}
-.m-list select{min-height:44px;box-sizing:border-box;font:inherit;font-size:14px;padding:0 10px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg)}
+.m-list select{appearance:none;padding-right:34px!important;background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px;background-repeat:no-repeat;min-height:44px;box-sizing:border-box;font:inherit;font-size:14px;padding:0 10px;border:1px solid var(--ink-line);background-color:var(--card);color:var(--fg)}
 .m-list li{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);min-height:56px}
 .m-list li:last-child{border-bottom:0}
 .m-list li>strong{font-size:16px}
@@ -106,7 +106,10 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
 .m-list li>select{min-width:130px;margin-left:auto}
 .m-list li>select~.c-btn,.m-list li>span:not(.c-mute)~.c-btn,.m-list li>.c-btn{margin-left:auto}
 .m-list li>select+.c-btn{margin-left:0}
-.m-list li>span:not(.c-mute){font:600 11px/22px var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:0 8px;border:1px solid var(--ink-line);margin-left:auto}
+.m-list li>span:not(.c-mute){font:600 11px/22px var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:0 8px;border:1px solid var(--ink-line);margin-left:0}
+.m-list li>strong{overflow-wrap:anywhere;min-width:0}
+.m-list li>.c-btn{min-height:44px}
+.m-list li>strong+span:not(.c-mute)+.c-btn{margin-left:auto}
 .m-form{display:grid;grid-template-columns:1fr;gap:0 20px}
 .m-form>.c-btn{justify-self:start}
 @media (min-width:768px){.m-form{grid-template-columns:2fr 1fr 1fr}.m-form>.c-btn{grid-column:1/-1}}

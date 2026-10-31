@@ -585,7 +585,8 @@
       "reasonLabel": "Reason",
       "targetNotFound": "Event not found: enter an id, or a slug from the loaded list",
       "done": "Done",
-      "selfMerge": "Cannot merge an event into itself"
+      "selfMerge": "Cannot merge an event into itself",
+      "reasonRequired": "Please enter a reason for hiding"
     },
     "finance": {
       "title": "Finance",

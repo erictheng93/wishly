@@ -170,7 +170,10 @@ function onFunded(r: any) {
   useOnboarding().refresh() // 點數認捐也算完成「捐助」
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
-function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }
+function onStale(rem: number) {
+  items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i)
+  if (rem <= 0 && !sheetMine.value) toast.value = t('guest.claim.soldOut') // sheet 1.2 秒後自動關閉，結果留在頁面上
+}
 // Q9：非好友看到好友限定清單時，直接用擁有者 ID 送好友邀請（擁有者不一定有 handle / 個人頁）
 const { api: authApi } = useApi()
 const friendReq = ref<'idle' | 'busy' | 'sent'>('idle'), friendErr = ref('')
@@ -188,6 +191,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
     <div v-if="gone" class="g-center"><span class="sx-code" aria-hidden="true">410</span><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
     <div v-else-if="forbidden" class="g-center">
+        <span class="sx-code" aria-hidden="true">403</span>
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
         <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
         <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.slug.loginToView') }}</NuxtLink>
@@ -199,7 +203,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         </template>
       <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
-    <div v-else-if="failed && !data" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
+    <div v-else-if="failed && !data" class="g-center"><span class="sx-code" aria-hidden="true">ERR</span><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!data" class="g-center"><span class="sx-code" aria-hidden="true">404</span><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
     <template v-else>
       <div class="g-banner g-nojs">{{ $t('guest.slug.noJs') }}</div>
@@ -212,7 +216,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <div class="sx-main">
           <h1>{{ data.title }}</h1>
           <p class="g-mute sx-meta">
-            <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
+            <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
           </p>
           <p v-if="data.org" class="g-mute">
             <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
@@ -235,7 +239,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <div v-if="siteOff && !closed" class="g-banner" role="status">{{ data.site_status === 'closed' ? $t('guest.relief.closedSite') : $t('guest.relief.paused') }}</div>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
       <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
-      <p v-if="!items.length" class="g-center g-mute">{{ $t('guest.slug.empty') }}</p>
+      <p v-if="!items.length" class="sx-empty g-mute">{{ $t('guest.slug.empty') }}</p>
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <GuestItemCard v-for="(it, n) in sorted" :key="it.id" :index="n + 1" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
@@ -278,6 +282,8 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 <style>
 /* 不用 scoped：SSR 的 <h1> 不能帶 data-v 屬性（爬蟲與 e2e 以原始 HTML 驗證標題）；選擇器一律 sx- 前綴 */
 .sx-code{display:block;font:900 clamp(96px,26vw,200px)/.85 var(--mono);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:2px var(--ink-line);background:var(--hatch);-webkit-background-clip:text;background-clip:text;margin-bottom:20px}
+.sx-empty{margin:28px 0;padding:40px 20px;text-align:center;border:1px dashed var(--ink-line);background:var(--hatch),var(--card);font:500 13px/1.7 var(--mono);letter-spacing:.06em}
+.g-center .sx-code{margin-inline:auto;font-size:clamp(80px,22vw,160px)}
 .sx-hero{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;margin-top:20px;padding-bottom:28px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
 .sx-cover{position:relative}
 .sx-cover .g-cover{margin-top:0;max-height:none;aspect-ratio:16/9}

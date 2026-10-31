@@ -42,8 +42,10 @@ dialog.g-dialog .g-sheet .g-link{margin-top:2px}
 dialog.g-dialog .g-sheet .g-chips .g-btn{margin-top:0}
 dialog.g-dialog .g-sheet input[type=checkbox],dialog.g-dialog .g-sheet input[type=radio]{width:20px;height:20px;flex:none}
 dialog.g-dialog .g-sheet fieldset legend{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
-dialog.g-dialog .g-sheet label.g-radio{margin:14px 0 4px!important;padding:0 12px;border:1px solid var(--line);background:var(--bg-alt);cursor:pointer}
-dialog.g-dialog .g-sheet fieldset label.g-radio{margin:0!important;border-width:0 0 1px;background:transparent;padding:0 2px}
+dialog.g-dialog .g-sheet label.g-radio{display:flex;align-items:flex-start;gap:12px;margin:14px 0 4px!important;padding:12px 14px;box-sizing:border-box;min-height:48px;font-size:14px!important;line-height:1.5;border:1px solid var(--line);background:var(--bg-alt);cursor:pointer}
+dialog.g-dialog .g-sheet fieldset label.g-radio{align-items:center;margin:0!important;border-width:0 0 1px;background:transparent;padding:0 2px;font-size:inherit!important;line-height:inherit}
+dialog.g-dialog .g-sheet label.g-radio input{margin-top:1px}
+dialog.g-dialog .g-sheet fieldset label.g-radio input{margin-top:0}
 dialog.g-dialog .g-sheet select{width:100%;min-height:48px;background:var(--bg-alt)}
 @media (max-width:767px){
   dialog.g-dialog .g-sheet{border-top-width:0}

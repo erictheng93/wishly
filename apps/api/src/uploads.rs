@@ -591,6 +591,19 @@ pub fn delete_objects(pool: sqlx::PgPool, keys: Vec<String>) {
     });
 }
 
+/// 退役要求已在呼叫端的交易內提交（例如刪帳號）時用：只在背景處理待辦，失敗依 1s、4s、16s 重試，之後交給週期 worker。
+/// 不再重寫要求：drain 判定「仍被引用」而撤銷後，重寫會把要求又掛回去，留下一筆要等下一輪才清掉的待辦。
+pub fn drain_soon(pool: sqlx::PgPool) {
+    tokio::spawn(async move {
+        for wait in [0u64, 1, 4, 16] {
+            tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+            if drain_media(&pool).await {
+                break;
+            }
+        }
+    });
+}
+
 /// 標記要求退役；刪帳號在自己的交易內呼叫，與刪除同時提交。
 /// 持物件鎖到提交：否則 retire_media 可能在本交易提交前判定「仍被引用」、提交後才撤銷，把這筆要求抹掉而漏刪。
 /// 依 key 排序上鎖，避免兩個交易互鎖。

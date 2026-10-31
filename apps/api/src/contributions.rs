@@ -203,7 +203,7 @@ async fn create(
     .await?;
     let locked: Option<(Uuid, Option<String>)> = match wl {
         Some(w) => sqlx::query_as(
-            "SELECT id, site_status FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
+            sqlx::AssertSqlSafe(format!("SELECT w.id, {} FROM wishlists w WHERE w.id = $1 AND w.status = 'active' AND (w.closes_at IS NULL OR w.closes_at > now()) AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.visibility <> 'private' FOR SHARE", crate::claims::SITE_STATUS_SQL)))
             .bind(w).fetch_optional(&mut *tx).await?,
         None => None,
     };
@@ -525,7 +525,7 @@ async fn reallocate(
     }
     // 清單共享鎖（條件同 create）→ 錢包 FOR UPDATE → 品項 → 認捐
     let locked: Option<(Uuid, Option<String>)> = sqlx::query_as(
-        "SELECT id, site_status FROM wishlists WHERE id = $1 AND status = 'active' AND (closes_at IS NULL OR closes_at > now()) AND deleted_at IS NULL AND moderation_status = 'ok' AND visibility <> 'private' FOR SHARE")
+        sqlx::AssertSqlSafe(format!("SELECT w.id, {} FROM wishlists w WHERE w.id = $1 AND w.status = 'active' AND (w.closes_at IS NULL OR w.closes_at > now()) AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.visibility <> 'private' FOR SHARE", crate::claims::SITE_STATUS_SQL)))
         .bind(wl).fetch_optional(&mut *tx).await?;
     let Some((_, site)) = locked else {
         return Err(not_allowed());

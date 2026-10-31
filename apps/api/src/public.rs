@@ -387,10 +387,11 @@ mod relief {
         "public, s-maxage=10, stale-while-revalidate=60",
     )];
     const EVENTS_PAGE: i64 = 20;
-    /// 公開可見的據點：上線、public、據點狀態 active、未下架
+    /// 公開可見的據點：上線、public、據點狀態 active、未下架、許可未過期（不等每小時 tick 暫停）
     const LIVE_SITE: &str = "w.type = 'relief' AND w.status = 'active' AND w.visibility = 'public' AND w.site_status = 'active'
         AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
-        AND EXISTS (SELECT 1 FROM organizations vo WHERE vo.id = w.org_id AND vo.verification_status = 'verified')";
+        AND EXISTS (SELECT 1 FROM organizations vo WHERE vo.id = w.org_id AND vo.verification_status = 'verified')
+        AND NOT EXISTS (SELECT 1 FROM org_permits vp WHERE vp.id = w.permit_id AND (now() AT TIME ZONE 'Asia/Taipei')::date > vp.valid_to)";
 
     /// relief 清單頁多帶組織 / 事件 / 據點資訊
     pub async fn extend_site(

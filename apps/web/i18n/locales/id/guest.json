@@ -137,7 +137,10 @@
       "askTitle": "Yakin berhenti berlangganan notifikasi hadiah?",
       "askBody": "Setelah berhenti berlangganan, kamu tidak akan diberi tahu lewat email saat ada yang mau kasih hadiah dari wishlist-mu.",
       "processing": "Memproses…",
-      "confirm": "Ya, berhenti berlangganan"
+      "confirm": "Ya, berhenti berlangganan",
+      "askTitleBirthday": "Berhenti menerima pengingat ulang tahun?",
+      "askBodyBirthday": "Kamu tidak akan menerima email saat ulang tahun teman sudah dekat.",
+      "doneBodyBirthday": "Kamu tidak akan lagi menerima pengingat ulang tahun teman. Untuk mengaktifkannya lagi, masuk lalu buka Pengaturan."
     },
     "slug": {
       "demoBirthday": "Ulang tahun",

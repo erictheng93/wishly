@@ -25,10 +25,10 @@ async function saveReceipt() {
 <template>
   <main class="c-page rc">
     <CreatorHeader :title="data?.site?.title || $t('org.console.receipts')" :back="`/orgs/${org}`" />
-    <p v-if="err" class="c-err" role="alert">{{ err }}</p>
+    <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
     <p v-if="loading" class="c-mute" role="status">{{ $t('org.apply.loading') }}</p>
     <template v-else-if="data">
-      <p class="c-mute rc-site"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" />　{{ data.site.site_address }}</p>
+      <p class="c-mute rc-site"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" :label="$t(`org.relief.siteStatus.${data.site.site_status}`)" />　{{ data.site.site_address }}</p>
       <p v-if="!data.items.length" class="c-mute">{{ $t('org.relief.receiptsNone') }}</p>
       <ul class="c-list rc-list">
         <li v-for="i in data.items" :key="i.item_id" class="c-card">
@@ -46,7 +46,7 @@ async function saveReceipt() {
         <ul class="c-mute"><li v-for="(e, k) in rcpt.entries" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
-        <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>
+        <p v-if="rcptErr" class="c-err c-errbox" role="alert">{{ rcptErr }}</p>
         <button class="c-btn primary block" :disabled="rcptBusy">{{ $t('org.relief.receiptSave') }}</button>
       </form>
     </CreatorSheet>

@@ -115,9 +115,11 @@ async function remove(force = false) {
   delBusy.value = true; delErr.value = ''
   try { await api(`/items/${del.value.id}`, { method: 'DELETE', query: force ? { force: true } : {} }); del.value = null; await load(true) }
   catch (e: any) {
-    if (e.code === 'ITEM_HAS_CLAIMS' && !force) delErr.value = t('lists.edit.errHasClaims')
+    // 眾籌品項已達標（點數已扣款、進入採購）時 force 也刪不掉：顯示後端原因，不提供「一併刪除」
+    const funded = del.value.funding_mode === 'crowdfund' && del.value.funding_status && del.value.funding_status !== 'open'
+    if (e.code === 'ITEM_HAS_CLAIMS' && !force && !funded) delErr.value = t('lists.edit.errHasClaims')
     else delErr.value = errMsg(e)
-    if (e.code === 'ITEM_HAS_CLAIMS') del.value.force = true
+    if (e.code === 'ITEM_HAS_CLAIMS' && !funded) del.value.force = true
   } finally { delBusy.value = false }
 }
 // 連按排序時依序送出：並行的請求可能晚到先寫，後端留下的順序會與畫面不同
@@ -181,7 +183,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
             <strong>{{ i.title }}</strong>
             <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">{{ $t('lists.edit.crowdLine', { pledged: fmtPts(i.pledged_points), target: fmtPts(i.target_points) }) }}<template v-if="i.funding_deadline">{{ $t('lists.edit.until', { time: fmtTime(i.funding_deadline) }) }}</template>{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
             <div v-else class="c-mute">{{ $t('lists.edit.qtyLine', { n: i.qty_needed }) }}{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
-            <div v-if="relief" class="c-mute">{{ $t(`org.relief.category.${i.category}`) }} · {{ $t(`org.relief.urgency.${i.urgency}`) }} · {{ $t('org.relief.received', { n: i.qty_received ?? 0 }) }}</div>
+            <div v-if="relief" class="c-mute">{{ $t(`org.relief.category.${i.category}`) }} · {{ $t(`org.relief.urgency.${i.urgency}`) }} <template v-if="i.funding_mode !== 'crowdfund'"> · {{ $t('org.relief.claimed', { n: i.qty_claimed ?? 0 }) }}</template> · {{ $t('org.relief.received', { n: i.qty_received ?? 0 }) }}</div>
             <CreatorStatusBadge v-if="i.image_status === 'pending' || i.image_status === 'rejected'" :v="i.image_status" />
             <div v-if="i.image_status === 'rejected'" class="c-err">{{ $t('lists.edit.imgRejected') }}</div>
           </div>
@@ -248,8 +250,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" :relief="relief" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
     <CreatorSheet :open="!!rcpt" :title="$t('org.relief.receiptTitle')" @close="rcpt = null">
       <form v-if="rcpt" @submit.prevent="saveReceipt">
-        <p><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
-        <ul class="c-mute"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
+        <p class="rc-head"><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
+        <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
         <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>
@@ -297,4 +299,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 .ed-side[open]{border-color:var(--ink-line);padding-bottom:18px}
 .ed-side[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
 @media (max-width:767px){.ed-item .c-thumb{width:60px;height:60px}}
+.rc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--ink-line)}
+.rc-hist{list-style:none;padding:0;margin:0 0 18px;font:500 12px/1.5 var(--mono)}
+.rc-hist li{padding:8px 0;border-bottom:1px dotted var(--line);overflow-wrap:anywhere}
+.rc-hist li:last-child{border-bottom:0}
 </style>
