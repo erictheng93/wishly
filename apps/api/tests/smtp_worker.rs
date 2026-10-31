@@ -99,7 +99,10 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .unwrap();
     let text = body["Text"].as_str().unwrap();
     assert!(text.contains("自動結束"));
-    assert!(!text.contains("/unsubscribe?token="), "wishlist.closing 是 Account 類，不附退訂連結");
+    assert!(
+        !text.contains("/unsubscribe?token="),
+        "wishlist.closing 是 Account 類，不附退訂連結"
+    );
     assert!(!text.contains("Secret Gift") && !text.contains("Secret Owner"));
     let payload: Value = sqlx::query_scalar("SELECT payload FROM notifications WHERE user_id=$1")
         .bind(owner)

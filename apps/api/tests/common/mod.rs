@@ -523,5 +523,9 @@ pub async fn site(
 
 /// 台北時間中午 12:00 的 UTC 時刻：避開安靜時段，worker 測試用（`notify::tick_at`）。
 pub fn noon() -> chrono::DateTime<chrono::Utc> {
-    chrono::Utc::now().date_naive().and_hms_opt(4, 0, 0).unwrap().and_utc()
+    chrono::Utc::now()
+        .date_naive()
+        .and_hms_opt(4, 0, 0)
+        .unwrap()
+        .and_utc()
 }

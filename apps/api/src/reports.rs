@@ -317,7 +317,13 @@ async fn moderate(
         ));
     };
     // 只有實際改變才走到這裡（上面的條件式 UPDATE 已排除重送）
-    crate::notify::enqueue_owner(&mut *tx, id, "wishlist.moderated", json!({"hidden": hidden, "reason": reason})).await?;
+    crate::notify::enqueue_owner(
+        &mut *tx,
+        id,
+        "wishlist.moderated",
+        json!({"hidden": hidden, "reason": reason}),
+    )
+    .await?;
     audit(
         &mut *tx,
         sid,
