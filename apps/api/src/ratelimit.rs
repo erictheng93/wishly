@@ -103,7 +103,13 @@ pub fn spawn_cleanup(pool: PgPool) {
                 let (public, public_rejected) = crate::dashboard::sse_stats();
                 let (inbox, inbox_rejected) = crate::inbox::stream_stats();
                 if public_rejected + inbox_rejected > 0 {
-                    tracing::warn!(public, public_rejected, inbox, inbox_rejected, "sse connections rejected");
+                    tracing::warn!(
+                        public,
+                        public_rejected,
+                        inbox,
+                        inbox_rejected,
+                        "sse connections rejected"
+                    );
                 } else {
                     tracing::info!(public, inbox, "sse connections");
                 }

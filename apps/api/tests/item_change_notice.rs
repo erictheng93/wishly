@@ -265,7 +265,9 @@ async fn cancelled_claimant_notice_is_cancelled_at_send_time(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(
         notif_status(&pool, it, Some(gone_uid)).await,
         ("cancelled".into(), Some("no longer supporting item".into()))

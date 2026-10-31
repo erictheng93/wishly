@@ -287,19 +287,21 @@
       "overview": "Tổng quan",
       "tile": {
         "users": "Người dùng",
-        "guests": "Khách",
         "wishlists": "Danh sách",
         "friendships": "Quan hệ bạn bè",
         "d1": "Hoạt động hôm nay",
         "d7": "Hoạt động 7 ngày",
-        "d30": "Hoạt động 30 ngày"
+        "d30": "Hoạt động 30 ngày",
+        "visitors": "Khách truy cập",
+        "views": "Lượt xem (khoảng)"
       },
       "metric": {
         "activeUsers": "Người dùng hoạt động",
         "signups": "Đăng ký",
         "wishlists": "Danh sách mới",
         "claims": "Lượt tặng quà",
-        "newGuests": "Khách mới"
+        "visitors": "Khách truy cập",
+        "views": "Lượt xem"
       },
       "dailyTrend": "Xu hướng theo ngày",
       "avg": "TB {n}",
@@ -316,13 +318,15 @@
       "loginFailures": "Đăng nhập thất bại (khoảng)",
       "group": {
         "claimStatus": "Trạng thái tặng quà",
-        "claimActor": "Loại người tặng",
         "reportReason": "Lý do báo cáo",
         "provider": "Nguồn đăng nhập",
         "locale": "Ngôn ngữ",
         "wishlistType": "Loại danh sách",
         "wishlistVisibility": "Chế độ hiển thị danh sách",
-        "birthdayVisibility": "Chế độ hiển thị sinh nhật"
+        "birthdayVisibility": "Chế độ hiển thị sinh nhật",
+        "viewDevice": "Thiết bị xem",
+        "viewCountry": "Quốc gia xem",
+        "viewReferrer": "Nguồn giới thiệu"
       },
       "noData": "Không có dữ liệu",
       "profile": "Mức hoàn thiện hồ sơ",

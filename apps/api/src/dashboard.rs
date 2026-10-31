@@ -137,11 +137,16 @@ async fn snapshot_shared(
 
 /// (連線中, 自上次呼叫以來被拒絕)
 pub fn sse_stats() -> (usize, u64) {
-    (MAX_SSE_TOTAL - SSE_TOTAL.available_permits(), SSE_REJECTED.swap(0, Ordering::Relaxed))
+    (
+        MAX_SSE_TOTAL - SSE_TOTAL.available_permits(),
+        SSE_REJECTED.swap(0, Ordering::Relaxed),
+    )
 }
 
 /// 站內通知串流訂閱匯流排（收到的 id 是 user_id）。
-pub(crate) async fn subscribe(pool: &PgPool) -> Result<broadcast::Receiver<(Uuid, u64)>, sqlx::Error> {
+pub(crate) async fn subscribe(
+    pool: &PgPool,
+) -> Result<broadcast::Receiver<(Uuid, u64)>, sqlx::Error> {
     Ok(bus(pool).await?.subscribe())
 }
 

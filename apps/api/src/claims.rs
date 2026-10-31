@@ -695,14 +695,20 @@ async fn apply(
                 crate::notify::enqueue(&mut *tx, uid, "claim.cancelled_by_owner", payload).await?;
             } else if let Some(gid) = guest_id {
                 // 舊訪客：比照品項刪除的寫法，只通知有 email 的訪客
-                sqlx::query("INSERT INTO notifications (guest_id, channel, kind, payload)
+                sqlx::query(
+                    "INSERT INTO notifications (guest_id, channel, kind, payload)
                              SELECT id, 'email', 'claim.cancelled_by_owner', $2 FROM guests
-                              WHERE id = $1 AND email IS NOT NULL AND deleted_at IS NULL")
-                    .bind(gid).bind(payload).execute(&mut *tx).await?;
+                              WHERE id = $1 AND email IS NOT NULL AND deleted_at IS NULL",
+                )
+                .bind(gid)
+                .bind(payload)
+                .execute(&mut *tx)
+                .await?;
             }
         } else if cur == "purchased" {
             // 驚喜鎖定期間由 worker 把關；從 reserved 取消不通知
-            crate::notify::enqueue_owner(&mut *tx, wid, "claim.cancelled_by_donor", payload).await?;
+            crate::notify::enqueue_owner(&mut *tx, wid, "claim.cancelled_by_donor", payload)
+                .await?;
         }
     }
     crate::dashboard::notify(&mut *tx, wid).await?;

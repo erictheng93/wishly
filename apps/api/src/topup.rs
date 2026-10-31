@@ -88,7 +88,10 @@ pub async fn expire_due(pool: &PgPool) -> Result<u64, AppError> {
         if !*has_info {
             continue; // 沒取號就放棄的訂單不打擾使用者
         }
-        let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut *tx).await?;
+        let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1")
+            .bind(wallet)
+            .fetch_one(&mut *tx)
+            .await?;
         crate::notify::enqueue(&mut *tx, uid, "topup.expired", json!({ "amount": amount })).await?;
     }
     tx.commit().await?;
@@ -670,7 +673,10 @@ async fn credit(pool: &PgPool, id: Uuid, txn: &str) -> Result<(), AppError> {
         },
     )
     .await?;
-    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut *tx).await?;
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1")
+        .bind(wallet)
+        .fetch_one(&mut *tx)
+        .await?;
     crate::notify::enqueue(&mut *tx, uid, "topup.credited", json!({ "amount": amount })).await?;
     tx.commit().await?;
     Ok(())

@@ -865,7 +865,10 @@ async fn update(
         release_pledged(&mut tx, &[id]).await?;
     }
     // 據點由營運中變為暫停 / 結束：通知進行中的捐助者
-    if relief && old_site_status.as_deref() == Some("active") && w.site_status.as_deref() != Some("active") {
+    if relief
+        && old_site_status.as_deref() == Some("active")
+        && w.site_status.as_deref() != Some("active")
+    {
         crate::notify::enqueue_site_paused(&mut *tx, &[id]).await?;
     }
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線立即重驗可見性 / 狀態
@@ -1943,7 +1946,13 @@ async fn item_delete(
             .bind(&guests).bind(wid).execute(&mut *tx).await?;
         // 會員一律進站內信（email 與否由 worker 判斷）
         for uid in &users {
-            crate::notify::enqueue(&mut *tx, *uid, "claim.item_removed", json!({"wishlist_id": wid, "item_id": id})).await?;
+            crate::notify::enqueue(
+                &mut *tx,
+                *uid,
+                "claim.item_removed",
+                json!({"wishlist_id": wid, "item_id": id}),
+            )
+            .await?;
         }
     }
     sqlx::query("UPDATE wishlist_items SET deleted_at=now(),

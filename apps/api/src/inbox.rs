@@ -35,16 +35,27 @@ impl StreamSlot {
             STREAMS_REJECTED.fetch_add(1, Ordering::Relaxed);
             e
         };
-        let permit = STREAMS_TOTAL
-            .try_acquire()
-            .map_err(|_| reject(AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試")))?;
+        let permit = STREAMS_TOTAL.try_acquire().map_err(|_| {
+            reject(AppError::problem(
+                503,
+                "SSE_CAPACITY",
+                "即時更新連線已滿，請稍後再試",
+            ))
+        })?;
         let mut m = STREAMS_PER_USER.lock().unwrap();
         let n = m.get_or_insert_with(HashMap::new).entry(uid).or_insert(0);
         if *n >= MAX_STREAMS_PER_USER {
-            return Err(reject(AppError::problem(429, "RATE_LIMITED", "即時更新連線過多")));
+            return Err(reject(AppError::problem(
+                429,
+                "RATE_LIMITED",
+                "即時更新連線過多",
+            )));
         }
         *n += 1;
-        Ok(StreamSlot { _permit: permit, uid })
+        Ok(StreamSlot {
+            _permit: permit,
+            uid,
+        })
     }
 }
 
@@ -64,7 +75,10 @@ impl Drop for StreamSlot {
 
 /// (連線中, 自上次呼叫以來被拒絕)
 pub fn stream_stats() -> (usize, u64) {
-    (MAX_STREAMS_TOTAL - STREAMS_TOTAL.available_permits(), STREAMS_REJECTED.swap(0, Ordering::Relaxed))
+    (
+        MAX_STREAMS_TOTAL - STREAMS_TOTAL.available_permits(),
+        STREAMS_REJECTED.swap(0, Ordering::Relaxed),
+    )
 }
 
 pub fn routes() -> Router<AppState> {
@@ -88,15 +102,27 @@ async fn unread(pool: &sqlx::PgPool, uid: Uuid) -> Result<i64, AppError> {
         .bind(uid).fetch_one(pool).await?)
 }
 
-async fn list(State(st): State<AppState>, u: CurrentUser, Query(q): Query<ListQ>) -> Result<Json<Value>, AppError> {
+async fn list(
+    State(st): State<AppState>,
+    u: CurrentUser,
+    Query(q): Query<ListQ>,
+) -> Result<Json<Value>, AppError> {
     let limit = q.limit.unwrap_or(20);
     if !(1..=50).contains(&limit) {
         return Err(AppError::invalid("/limit", "RANGE", "limit 須為 1–50"));
     }
-    if q.category.as_deref().is_some_and(|c| !matches!(c, "account" | "gifts" | "social")) {
-        return Err(AppError::invalid("/category", "FORMAT", "category 須為 account / gifts / social"));
+    if q.category
+        .as_deref()
+        .is_some_and(|c| !matches!(c, "account" | "gifts" | "social"))
+    {
+        return Err(AppError::invalid(
+            "/category",
+            "FORMAT",
+            "category 須為 account / gifts / social",
+        ));
     }
     // 多取一筆判斷有沒有下一頁；游標是上一頁最後一筆的 id（依 inbox_at DESC, id DESC）
+    #[allow(clippy::type_complexity)]
     let rows: Vec<(Uuid, String, Option<String>, Option<String>, Option<String>, Option<String>, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>)> = sqlx::query_as(
         "SELECT n.id, n.kind, n.inbox_title, n.inbox_link, n.inbox_body, n.inbox_category, n.inbox_at, n.read_at FROM notifications n
           WHERE n.user_id = $1 AND n.inbox_at IS NOT NULL
@@ -108,15 +134,25 @@ async fn list(State(st): State<AppState>, u: CurrentUser, Query(q): Query<ListQ>
     let items: Vec<Value> = rows.iter().take(limit as usize)
         .map(|(id, kind, title, link, body, category, at, read)| json!({ "id": id, "kind": kind, "title": title, "link": link, "body": body, "category": category, "created_at": at, "read_at": read }))
         .collect();
-    let next_cursor = if more { items.last().map(|i| i["id"].clone()) } else { None };
-    Ok(Json(json!({ "items": items, "next_cursor": next_cursor, "unread": unread(&st.pool, u.id).await? })))
+    let next_cursor = if more {
+        items.last().map(|i| i["id"].clone())
+    } else {
+        None
+    };
+    Ok(Json(
+        json!({ "items": items, "next_cursor": next_cursor, "unread": unread(&st.pool, u.id).await? }),
+    ))
 }
 
 async fn unread_count(State(st): State<AppState>, u: CurrentUser) -> Result<Json<Value>, AppError> {
     Ok(Json(json!({ "unread": unread(&st.pool, u.id).await? })))
 }
 
-async fn read_one(State(st): State<AppState>, u: CurrentUser, Path(id): Path<Uuid>) -> Result<StatusCode, AppError> {
+async fn read_one(
+    State(st): State<AppState>,
+    u: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
     // 已讀過的保留原時間；非本人（或不在站內信）一律 404
     let found: Option<Uuid> = sqlx::query_scalar(
         "UPDATE notifications SET read_at = COALESCE(read_at, now()) WHERE id = $1 AND user_id = $2 AND inbox_at IS NOT NULL RETURNING id")
@@ -175,7 +211,9 @@ mod tests {
     #[test]
     fn stream_slots_are_per_user_and_released_on_drop() {
         let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
-        let held: Vec<_> = (0..MAX_STREAMS_PER_USER).map(|_| StreamSlot::acquire(a).ok().unwrap()).collect();
+        let held: Vec<_> = (0..MAX_STREAMS_PER_USER)
+            .map(|_| StreamSlot::acquire(a).ok().unwrap())
+            .collect();
         assert!(StreamSlot::acquire(a).is_err(), "超過每人上限");
         let other = StreamSlot::acquire(b);
         assert!(other.is_ok(), "同 IP 的其他使用者不受影響");

@@ -20,7 +20,7 @@ export function barRows(obj: Record<string, Count> | undefined, labels: Record<s
   const known = ents.reduce((s, [, v]) => s + (v ?? 0), 0)
   const max = Math.max(0, ...ents.map(([, v]) => v ?? 0))
   if (sort) ents.sort((a, b) => (b[1] ?? -1) - (a[1] ?? -1))
-  return ents.map(([key, v]) => ({ key, label: labels[key] ?? key, v, share: pct(v, known), w: v && max ? v / max * 100 : 0 }))
+  return ents.map(([key, v]) => ({ key, label: Object.hasOwn(labels, key) ? labels[key]! : key, v, share: pct(v, known), w: v && max ? v / max * 100 : 0 }))
 }
 
 export interface FunnelStep { key: string; label: string; v: number; step: string; w: number }
@@ -53,10 +53,11 @@ export function retentionRows(r: Record<string, { cohort?: number; retained?: nu
 const grp = (g: string, ks: string[]) => Object.fromEntries(ks.map(k => [k, t(`creator.analytics.${g}.${k}`)]))
 export const L = {
   get claimStatus() { return grp('claimStatus', ['reserved', 'purchased', 'delivered', 'cancelled', 'expired']) },
-  get actor() { return grp('actor', ['guest', 'user']) },
+  get device() { return grp('device', ['mobile', 'tablet', 'desktop']) },
+  get viewOther() { return grp('viewOther', ['direct', 'unknown']) },
   get reason() { return grp('reason', ['scam', 'inappropriate', 'copyright', 'personal_info', 'other']) },
   provider: { email: 'Email', line: 'LINE', google: 'Google' },
   get wishlistType() { return grp('wishlistType', ['personal', 'registry', 'relief']) },
-  get wishlistVisibility() { return grp('wishlistVisibility', ['link', 'private', 'public']) },
+  get wishlistVisibility() { return grp('wishlistVisibility', ['public', 'friends', 'selected', 'private']) },
   get shareLevel() { return grp('shareLevel', ['public', 'friends', 'private']) },
 } as Record<string, Record<string, string>>

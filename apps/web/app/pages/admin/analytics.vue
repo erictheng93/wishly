@@ -19,11 +19,11 @@ onMounted(load)
 const TILES = computed(() => {
   const d = data.value
   return d ? [
-    [t('admin.analytics.tile.users'), d.totals.users], [t('admin.analytics.tile.guests'), d.totals.guests], [t('admin.analytics.tile.wishlists'), d.totals.wishlists], [t('admin.analytics.tile.friendships'), d.totals.friendships],
+    [t('admin.analytics.tile.users'), d.totals.users], [t('admin.analytics.tile.visitors'), d.totals.visitors], [t('admin.analytics.tile.views'), d.visits.views], [t('admin.analytics.tile.wishlists'), d.totals.wishlists], [t('admin.analytics.tile.friendships'), d.totals.friendships],
     [t('admin.analytics.tile.d1'), d.active.d1], [t('admin.analytics.tile.d7'), d.active.d7], [t('admin.analytics.tile.d30'), d.active.d30],
   ] as [string, number][] : []
 })
-const METRICS = computed(() => [['active_users', t('admin.analytics.metric.activeUsers')], ['signups', t('admin.analytics.metric.signups')], ['wishlists', t('admin.analytics.metric.wishlists')], ['claims', t('admin.analytics.metric.claims')], ['new_guests', t('admin.analytics.metric.newGuests')]] as [string, string][])
+const METRICS = computed(() => [['active_users', t('admin.analytics.metric.activeUsers')], ['signups', t('admin.analytics.metric.signups')], ['wishlists', t('admin.analytics.metric.wishlists')], ['claims', t('admin.analytics.metric.claims')], ['visitors', t('admin.analytics.metric.visitors')], ['views', t('admin.analytics.metric.views')]] as [string, string][])
 const W = 200, H = 48
 // 折線座標；單日區間（理論上不會）避免除以 0
 function chart(key: string) {
@@ -41,11 +41,14 @@ const groups = computed(() => {
   const d = data.value
   if (!d) return []
   return [
-    [t('admin.analytics.group.claimStatus'), barRows(d.claims.by_status, L.claimStatus)], [t('admin.analytics.group.claimActor'), barRows(d.claims.by_actor, L.actor)],
+    [t('admin.analytics.group.claimStatus'), barRows(d.claims.by_status, L.claimStatus)],
     [t('admin.analytics.group.reportReason'), barRows(d.trust.reports_by_reason, L.reason)],
     [t('admin.analytics.group.provider'), barRows(d.distribution.provider, L.provider)], [t('admin.analytics.group.locale'), barRows(d.distribution.locale)],
     [t('admin.analytics.group.wishlistType'), barRows(d.distribution.wishlist_type, L.wishlistType)], [t('admin.analytics.group.wishlistVisibility'), barRows(d.distribution.wishlist_visibility, L.wishlistVisibility)],
     [t('admin.analytics.group.birthdayVisibility'), barRows(d.distribution.birthday_visibility, L.shareLevel)],
+    [t('admin.analytics.group.viewDevice'), barRows(d.distribution.view_device, L.device)],
+    [t('admin.analytics.group.viewCountry'), barRows(d.distribution.view_country, L.viewOther)],
+    [t('admin.analytics.group.viewReferrer'), barRows(d.distribution.view_referrer, L.viewOther)],
   ] as [string, BarRow[]][]
 })
 const months = computed(() => barRows(data.value?.birthday_month, Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(i + 1).padStart(2, '0'), `${i + 1}`])), false)
@@ -121,7 +124,7 @@ const profile = computed(() => {
           <div><dt>{{ $t('admin.analytics.reports') }}</dt><dd>{{ fmtCount(data.trust.reports) }}</dd></div>
           <div><dt>{{ $t('admin.analytics.loginFailures') }}</dt><dd>{{ fmtCount(data.trust.login_failures) }}</dd></div>
         </dl>
-        <template v-for="g in groups.slice(0, 3)" :key="g[0]">
+        <template v-for="g in groups.slice(0, 2)" :key="g[0]">
           <h3 class="an-h3">{{ g[0] }}</h3>
           <p v-if="!g[1].length" class="c-mute">{{ $t('admin.analytics.noData') }}</p>
           <div v-for="r in g[1]" :key="r.key" class="an-row">
@@ -153,7 +156,7 @@ const profile = computed(() => {
 
       <section class="c-card" :aria-label="$t('admin.analytics.distribution')">
         <h2 class="c-h2">{{ $t('admin.analytics.distribution') }}</h2>
-        <template v-for="g in groups.slice(3)" :key="g[0]">
+        <template v-for="g in groups.slice(2)" :key="g[0]">
           <h3 class="an-h3">{{ g[0] }}</h3>
           <p v-if="!g[1].length" class="c-mute">{{ $t('admin.analytics.noData') }}</p>
           <div v-for="r in g[1]" :key="r.key" class="an-row">

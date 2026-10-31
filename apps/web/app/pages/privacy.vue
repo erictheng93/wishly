@@ -18,6 +18,8 @@ useSeoMeta({ title: () => t('legal.privacy.title') })
     </ul>
     <h2>{{ $t('legal.privacy.deviceH') }}</h2>
     <p>{{ $t('legal.privacy.deviceP') }}</p>
+    <h2>{{ $t('legal.privacy.viewH') }}</h2>
+    <p>{{ $t('legal.privacy.viewP') }}</p>
     <h2>{{ $t('legal.privacy.rightsH') }}</h2>
     <p>{{ $t('legal.privacy.rightsP') }}</p>
     <h2>{{ $t('legal.privacy.reportH') }}</h2>

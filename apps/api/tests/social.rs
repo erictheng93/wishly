@@ -1644,7 +1644,9 @@ async fn friend_request_count_and_email_notification(pool: PgPool) {
     )
     .await;
     assert_eq!(st, StatusCode::NO_CONTENT);
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     let status: String = sqlx::query_scalar(
         "SELECT status::text FROM notifications WHERE user_id=$1 AND kind='friend.request'",
     )
