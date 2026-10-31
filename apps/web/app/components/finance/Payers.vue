@@ -11,7 +11,7 @@ async function load() {
   try {
     const r = await api('/admin/finance/payers', { query: { days: props.days } })
     if (my === seq) data.value = r
-  } catch (e) { if (my === seq) err.value = errMsg(e) }
+  } catch (e) { if (my === seq) { err.value = errMsg(e); data.value = null } } // 失敗時不留舊區間的數字
   finally { if (my === seq) busy.value = false }
 }
 watch(() => props.days, load)
@@ -35,7 +35,7 @@ const BUCKETS = computed(() => {
 })
 </script>
 <template>
-  <div>
+  <div :aria-busy="busy" :class="{ 'fin-busy': busy }">
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn small" :disabled="busy" @click="load">{{ $t('admin.finance.retry') }}</button></p>
     <p v-else-if="!data" class="c-mute">{{ $t('admin.finance.loading') }}</p>
     <template v-if="data">
@@ -46,7 +46,7 @@ const BUCKETS = computed(() => {
         <dl v-else class="k-kpis">
           <div v-for="k in KPIS" :key="k[0]" :title="$t(`admin.finance.payers.${k[0]}Def`)">
             <dt>{{ $t(`admin.finance.payers.${k[0]}`) }}</dt>
-            <dd>{{ k[1] }}</dd>
+            <dd :class="{ money: k[0] === 'avg' }">{{ k[1] }}</dd>
             <small class="c-mute">{{ $t(`admin.finance.payers.${k[0]}Def`) }}</small>
           </div>
         </dl>
@@ -73,7 +73,7 @@ const BUCKETS = computed(() => {
             </tr></thead>
             <tbody>
               <tr v-for="r in data.top" :key="r.user.id">
-                <td><NuxtLink :to="`/admin/finance?tab=transactions&user_id=${r.user.id}`">{{ r.user.display_name }}</NuxtLink><small v-if="r.user.email" class="c-mute"> {{ r.user.email }}</small></td>
+                <td><NuxtLink :to="`/admin/finance?tab=transactions&user_id=${r.user.id}`">{{ r.user.display_name }}</NuxtLink><small v-if="r.user.email" class="c-mute">{{ r.user.email }}</small></td>
                 <td>{{ money(r.amount) }}</td><td>{{ fmtCount(r.count) }}</td><td>{{ fmtDay(r.first_paid_at) }}</td><td>{{ fmtDay(r.last_paid_at) }}</td>
               </tr>
             </tbody>

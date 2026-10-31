@@ -71,21 +71,21 @@ async function submit() {
 <template>
   <div>
     <p class="c-mute c-small">{{ $t('admin.topups.intro') }}</p>
-    <div class="c-row wrap c-mb">
-      <label class="c-field c-narrow"><span>{{ $t('admin.topups.statusLabel') }}</span>
+    <div class="fin-filters">
+      <label class="c-field"><span>{{ $t('admin.topups.statusLabel') }}</span>
         <select :value="status" @change="setQuery('status', ($event.target as HTMLSelectElement).value)">
           <option value="">{{ $t('admin.topups.all') }}</option>
           <option v-for="s in STATUSES" :key="s" :value="s">{{ $t(`admin.topups.status.${s}`) }}</option>
         </select>
       </label>
-      <label class="c-field c-narrow"><span>{{ $t('admin.topups.methodLabel') }}</span>
+      <label class="c-field"><span>{{ $t('admin.topups.methodLabel') }}</span>
         <select :value="method" @change="setQuery('method', ($event.target as HTMLSelectElement).value)">
           <option value="">{{ $t('admin.topups.all') }}</option>
           <option v-for="m in METHODS" :key="m" :value="m">{{ methodLabel(m, $t, te) }}</option>
         </select>
       </label>
-      <form class="c-field c-grow" role="search" @submit.prevent="submitQ">
-        <label><span>{{ $t('admin.topups.searchLabel') }}</span>
+      <form class="fin-search" role="search" @submit.prevent="submitQ">
+        <label class="c-field"><span>{{ $t('admin.topups.searchLabel') }}</span>
           <input v-model="qInput" type="search" :placeholder="$t('admin.topups.searchHint')" maxlength="100">
         </label>
       </form>

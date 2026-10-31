@@ -98,3 +98,22 @@ test('API 失敗時顯示錯誤與重試', async ({ page }) => {
   await expect(page.getByRole('region', { name: '核心數字' })).toContainText('NT$ 12,000')
   expect(calls.length).toBeGreaterThan(before)
 })
+
+test('後台首頁有金流後台入口，可導向', async ({ page }) => {
+  await asStaff(page)
+  await mock(page, /\/api\/v1\/admin\/finance\/overview(\?|$)/, () => ok(overview(30)))
+  await page.goto('/admin'); await hydrated(page)
+  await page.getByRole('link', { name: '金流後台', exact: true }).click()
+  await expect(page).toHaveURL(/\/admin\/finance$/)
+})
+
+test('待處理的現金退款連結帶 status=all，退款頁以全部查詢', async ({ page }) => {
+  await asStaff(page)
+  await mock(page, /\/api\/v1\/admin\/finance\/overview(\?|$)/, () => ok(overview(30)))
+  const calls = await mock(page, /\/api\/v1\/admin\/cash-refunds(\?|$)/, () => ok({ data: [], next_cursor: null }))
+  await page.goto('/admin/finance'); await hydrated(page)
+  await page.getByRole('region', { name: '待處理' }).getByRole('link', { name: /待處理退款/ }).click()
+  await expect(page).toHaveURL(/\/admin\/cash-refunds\?status=all$/)
+  await expect.poll(() => calls.length).toBeGreaterThan(0)
+  expect(calls[0].url.searchParams.get('status')).toBeNull()
+})

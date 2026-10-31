@@ -51,7 +51,7 @@
 .c-admin .c-btn.block{margin-top:6px}
 
 /* ── 分頁：等寬 ─────────────────────── */
-.c-admin .c-tabs .c-btn{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.c-admin .c-tabs .c-btn{flex:0 0 auto;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 .c-admin .c-tabs .c-btn.on{font-weight:700}
 
 /* ── 徽章：後台狀態一致 ───────────────── */
@@ -66,6 +66,8 @@
 .k-kpis dt{font:600 11px/1.4 var(--mono)!important;letter-spacing:.12em!important;text-transform:uppercase;color:var(--mute)!important;margin:0}
 .k-kpis dd{margin:8px 0 0!important;font-size:clamp(30px,4.4vw,44px)!important;font-weight:900!important;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
 .k-kpis dd.hot{color:var(--red-text)}
+/* 金額：單行不換行，字級隨格寬縮 */
+.k-kpis dd.money{font-size:clamp(20px,2.6vw,30px)!important;white-space:nowrap;letter-spacing:-.04em}
 
 /* 展開的詳情（組織審核）：小節標題＋巢狀許可卡 */
 .c-admin article h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
@@ -94,5 +96,12 @@
 .fin-table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .fin-table th,.fin-table td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
 .fin-table th:first-child,.fin-table td:first-child{text-align:left}
-.fin-table th{font-weight:600;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.fin-table th{font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
 .fin-table a{color:inherit;text-decoration:underline}
+.fin-table td{vertical-align:top}
+.fin-table td small{display:block;margin-top:2px;font-size:11px;white-space:normal;overflow-wrap:anywhere}
+.fin-busy{opacity:.5;transition:opacity .15s}
+.fin-filters{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;margin-bottom:8px}
+.fin-filters .c-field{max-width:none}
+.fin-search{grid-column:1/-1}
+@media (max-width:600px){.fin-filters{grid-template-columns:1fr}}

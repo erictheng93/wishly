@@ -494,3 +494,77 @@ async fn risk_frozen_and_invoices(pool: PgPool) {
         (Some(1), Some(100))
     );
 }
+
+fn sum(b: &Value, key: &str, field: &str) -> i64 {
+    b[key]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r[field].as_i64().unwrap())
+        .sum()
+}
+
+/// 四支端點對同一批資料的實收必須一致（paid、disputed、charged_back 都算，人工發放不算）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn gross_agrees_across_endpoints(pool: PgPool) {
+    let a = user(&pool, "甲").await;
+    let b = user(&pool, "乙").await;
+    grant(&pool, a.id, 500).await;
+    topup_credit(&pool, a.id, 100).await;
+    let d = topup_credit(&pool, b.id, 200).await;
+    let c = topup_credit(&pool, b.id, 400).await;
+    set_status(&pool, d, "disputed").await;
+    set_status(&pool, c, "charged_back").await;
+    let ov = get(&pool, "overview", 7).await;
+    let ch = get(&pool, "channels", 7).await;
+    let pa = get(&pool, "payers", 7).await;
+    assert_eq!(ov["kpis"]["cur"]["gross"], 700);
+    assert_eq!(sum(&ov, "daily", "gross"), 700);
+    assert_eq!(sum(&ch, "channels", "gross"), 700);
+    assert_eq!(pa["gross"], 700);
+    assert_eq!(sum(&pa, "buckets", "amount"), 700);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn all_endpoints_require_staff(pool: PgPool) {
+    let u = user(&pool, "一般").await;
+    for ep in ["overview", "payers", "channels", "risk"] {
+        let path = format!("/admin/finance/{ep}?days=7");
+        let (st, ..) = call(&pool, "GET", &path, &ck(&u.token), None).await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{ep}");
+        let (st, ..) = call(&pool, "GET", &path, &[], None).await;
+        assert_eq!(st, StatusCode::UNAUTHORIZED, "{ep} 未登入");
+    }
+}
+
+/// 走真的 wallet_ops：爭議勝訴的單只算一次實收、不進拒付；敗訴的單算實收也算拒付。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn dispute_win_counts_once_and_not_as_chargeback(pool: PgPool) {
+    let u = user(&pool, "甲").await;
+    let won = topup_credit(&pool, u.id, 300).await;
+    let lost = topup_credit(&pool, u.id, 100).await;
+    let mut tx = pool.begin().await.unwrap();
+    assert!(wishly_api::wallet_ops::dispute_open(&mut tx, won)
+        .await
+        .unwrap());
+    assert!(wishly_api::wallet_ops::dispute_won(&mut tx, won)
+        .await
+        .unwrap());
+    wishly_api::wallet_ops::dispute_open(&mut tx, lost)
+        .await
+        .unwrap();
+    wishly_api::wallet_ops::charge_back(&mut tx, lost)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let ov = get(&pool, "overview", 7).await;
+    assert_eq!(ov["kpis"]["cur"]["gross"], 400);
+    let rk = get(&pool, "risk", 7).await;
+    assert_eq!(
+        (
+            rk["chargebacks"]["count"].as_i64(),
+            rk["chargebacks"]["amount"].as_i64()
+        ),
+        (Some(1), Some(100))
+    );
+}

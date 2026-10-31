@@ -11,7 +11,7 @@ async function load() {
   try {
     const r = await api('/admin/finance/risk', { query: { days: props.days } })
     if (my === seq) data.value = r
-  } catch (e) { if (my === seq) err.value = errMsg(e) }
+  } catch (e) { if (my === seq) { err.value = errMsg(e); data.value = null } } // 失敗時不留舊區間的數字
   finally { if (my === seq) busy.value = false }
 }
 watch(() => props.days, load)
@@ -29,14 +29,14 @@ const OPEN = computed(() => {
   const d = data.value
   if (!d) return []
   return [
-    { k: 'cashRefunds', to: '/admin/cash-refunds', ...d.cash_refunds_open },
+    { k: 'cashRefunds', to: '/admin/cash-refunds?status=all', ...d.cash_refunds_open },
     { k: 'debts', to: '/admin/wallet-debts', ...d.debts_open },
     { k: 'invoices', to: '', ...d.invoices_pending },
   ]
 })
 </script>
 <template>
-  <div>
+  <div :aria-busy="busy" :class="{ 'fin-busy': busy }">
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn small" :disabled="busy" @click="load">{{ $t('admin.finance.retry') }}</button></p>
     <p v-else-if="!data" class="c-mute">{{ $t('admin.finance.loading') }}</p>
     <template v-if="data">
@@ -46,7 +46,7 @@ const OPEN = computed(() => {
         <dl class="k-kpis">
           <div v-for="x in LIAB" :key="x[0]">
             <dt>{{ $t(`admin.finance.risk.liab.${x[0]}`) }}</dt>
-            <dd>{{ money(x[1]) }}</dd>
+            <dd class="money">{{ money(x[1]) }}</dd>
           </div>
         </dl>
       </section>
@@ -62,12 +62,12 @@ const OPEN = computed(() => {
           </div>
           <div>
             <dt>{{ $t('admin.finance.risk.refunds') }}</dt>
-            <dd>{{ money(data.refunds.amount) }}</dd>
+            <dd class="money">{{ money(data.refunds.amount) }}</dd>
             <small class="c-mute">{{ $t('admin.finance.risk.cnt', { n: fmtCount(data.refunds.count) }) }}</small>
           </div>
           <div>
             <dt>{{ $t('admin.finance.risk.chargebacks') }}</dt>
-            <dd>{{ money(data.chargebacks.amount) }}</dd>
+            <dd class="money">{{ money(data.chargebacks.amount) }}</dd>
             <small class="c-mute">{{ $t('admin.finance.risk.cnt', { n: fmtCount(data.chargebacks.count) }) }}</small>
           </div>
         </dl>

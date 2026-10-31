@@ -672,7 +672,7 @@
       },
       "risk": {
         "liability": "Kewajiban poin",
-        "liabilityNote": "Kondisi saat ini, tidak mengikuti rentang waktu. Kewajiban = poin belum terpakai + ikrar (sudah dipotong dari saldo, tidak dihitung ganda).",
+        "liabilityNote": "Kondisi saat ini, tidak mengikuti rentang waktu. Kewajiban = poin belum terpakai + ikrar (sudah dipotong dari saldo, tidak dihitung ganda). Pengembalian dana tunai yang sedang berjalan tidak termasuk dalam total ini: poin sudah dipotong saat permintaan diajukan, jadi dicantumkan terpisah di bagian bawah.",
         "liab": {
           "total": "Total kewajiban",
           "unused": "Poin belum terpakai",

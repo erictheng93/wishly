@@ -672,7 +672,7 @@
       },
       "risk": {
         "liability": "Nợ điểm",
-        "liabilityNote": "Trạng thái hiện tại, không theo khoảng thời gian. Nợ = điểm chưa dùng + đang cam kết (đã trừ khỏi số dư, không tính trùng).",
+        "liabilityNote": "Trạng thái hiện tại, không theo khoảng thời gian. Nợ = điểm chưa dùng + đang cam kết (đã trừ khỏi số dư, không tính trùng). Các yêu cầu hoàn tiền mặt đang xử lý không nằm trong tổng này: điểm đã bị trừ khi yêu cầu hoàn tiền, nên được liệt kê riêng ở mục phía dưới.",
         "liab": {
           "total": "Tổng nợ",
           "unused": "Điểm chưa dùng",

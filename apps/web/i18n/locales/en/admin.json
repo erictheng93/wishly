@@ -672,7 +672,7 @@
       },
       "risk": {
         "liability": "Points liability",
-        "liabilityNote": "Current state, not tied to the range. Liability = unused points + pledged (already deducted from balance, no double counting).",
+        "liabilityNote": "Current state, not tied to the range. Liability = unused points + pledged (already deducted from balance, no double counting). Open cash refunds are not in this total: points are debited when a refund is requested, so they are listed separately under \"Pending and other\" below.",
         "liab": {
           "total": "Total liability",
           "unused": "Unused points",

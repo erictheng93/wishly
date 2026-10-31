@@ -11,7 +11,7 @@ async function load() {
   try {
     const r = await api('/admin/finance/channels', { query: { days: props.days } })
     if (my === seq) data.value = r
-  } catch (e) { if (my === seq) err.value = errMsg(e) }
+  } catch (e) { if (my === seq) { err.value = errMsg(e); data.value = null } } // 失敗時不留舊區間的數字
   finally { if (my === seq) busy.value = false }
 }
 watch(() => props.days, load)
@@ -21,7 +21,7 @@ const money = (n: number | null) => n == null ? '–' : t('admin.finance.money',
 const label = (m: string) => methodLabel(m, t, te)
 </script>
 <template>
-  <div>
+  <div :aria-busy="busy" :class="{ 'fin-busy': busy }">
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn small" :disabled="busy" @click="load">{{ $t('admin.finance.retry') }}</button></p>
     <p v-else-if="!data" class="c-mute">{{ $t('admin.finance.loading') }}</p>
     <section v-else class="c-card" :aria-label="$t('admin.finance.channels.title')">
