@@ -6,7 +6,10 @@ definePageMeta({ middleware: 'staff' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.cashRefunds.title') })
 const { api } = useApi()
-const status = ref('requested')
+const route = useRoute()
+// ?status= 可帶入初始篩選（all＝全部）；金流後台的待處理數字含申請中與處理中，連結用 all
+const qs = route.query.status
+const status = ref(qs === 'all' ? '' : (CASH_REFUND_STATUSES as readonly string[]).includes(String(qs)) ? String(qs) : 'requested')
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
 const err = ref(''), msg = ref('')
 

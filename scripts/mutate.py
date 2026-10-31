@@ -93,7 +93,7 @@ CASES = {
     "pledge-lock-timeout": (API + "contributions.rs", "create", "crate::begin_contended(&st.pool).await?", "st.pool.begin().await?", "db_overload", "pledge_waiting_on_hot_item_gives_up_with_503"),
     "item-changed-on-conflict": (API + "notify.rs", "enqueue_item_changed", "ON CONFLICT DO NOTHING", "", "item_change_notice", "edits_coalesce_into_one_pending_mail_per_active_donor"),
     "item-changed-uk": ("db/migrations/0029_item_change_notice.sql", None, "CREATE UNIQUE INDEX notifications_item_changed_uk", "CREATE INDEX notifications_item_changed_uk", "item_change_notice", "edits_coalesce_into_one_pending_mail_per_active_donor"),
-    "notifications-user-fk": ("db/migrations/0048_notification_center.sql", None, "ALTER TABLE notifications DROP CONSTRAINT notifications_user_id_fkey;", "", "concurrency", "account_delete_waits_on_topup_lock_then_sees_dispute_freeze"),
+    "notifications-user-fk": ("db/migrations/0050_notification_center.sql", None, "ALTER TABLE notifications DROP CONSTRAINT notifications_user_id_fkey;", "", "concurrency", "account_delete_waits_on_topup_lock_then_sees_dispute_freeze"),
     "activity-on-conflict": (API + "session.rs", None, "ON CONFLICT DO NOTHING", "", "activity_days", "stale_session_with_existing_row_still_advances_last_seen"),
     "activity-not-exists": (API + "session.rs", None, " OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)", "", "activity_days", "fresh_session_but_missing_today_row_reinserts"),
     "invite-list-allowed-on-conflict": (API + "friends.rs", "invite_accept", "VALUES ($1, $2) ON CONFLICT DO NOTHING", "VALUES ($1, $2)", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),

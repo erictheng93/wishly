@@ -26,10 +26,10 @@
         "analytics": "Phân tích dữ liệu",
         "cashRefunds": "Hoàn tiền mặt",
         "walletDebts": "Nợ do chargeback",
-        "topups": "Nạp điểm và tranh chấp",
         "catalog": "Thương hiệu & sản phẩm",
         "orgs": "Org and permit review",
-        "events": "Disaster events"
+        "events": "Disaster events",
+        "finance": "Tài chính"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
@@ -414,6 +414,11 @@
       "stale": "Khoản nợ này đã được tất toán. Danh sách đã được tải lại."
     },
     "topups": {
+      "methodLabel": "Kênh",
+      "searchLabel": "Tìm người dùng",
+      "searchHint": "Tên hoặc email, nhấn Enter",
+      "userFilter": "Người dùng: {name}",
+      "clearUser": "Hiện tất cả người dùng",
       "title": "Nạp điểm và tranh chấp chargeback",
       "intro": "Khi thẻ bị chargeback, đánh dấu tranh chấp sẽ đóng băng ví. Thắng thì khôi phục; thua thì thu hồi số điểm còn lại của lô nạp đó và ghi phần còn thiếu là nợ.",
       "statusLabel": "Trạng thái",
@@ -584,6 +589,128 @@
       "done": "Done",
       "selfMerge": "Cannot merge an event into itself",
       "reasonRequired": "Vui lòng nhập lý do ẩn"
+    },
+    "finance": {
+      "title": "Tài chính",
+      "tabsLabel": "Các tab tài chính",
+      "tabs": {
+        "overview": "Tổng quan",
+        "transactions": "Giao dịch",
+        "payers": "Người trả tiền",
+        "channels": "Kênh",
+        "risk": "Rủi ro & nợ"
+      },
+      "rangeLabel": "Khoảng thời gian",
+      "today": "Hôm nay",
+      "days": "{n} ngày",
+      "money": "NT$ {n}",
+      "retry": "Thử lại",
+      "loading": "Đang tải…",
+      "range": "Khoảng: {from} – {to} ({days} ngày)",
+      "todo": {
+        "title": "Cần xử lý",
+        "note": "Trạng thái hiện tại, không đổi theo khoảng thời gian. Nhấn để xử lý.",
+        "disputed": "Đang tranh chấp",
+        "cashRefunds": "Hoàn tiền chờ xử lý",
+        "debts": "Khoản nợ chưa tất toán",
+        "pending": "Chờ thanh toán"
+      },
+      "kpi": {
+        "title": "Số liệu chính",
+        "vsPrev": "{pct} so với kỳ trước",
+        "noPrev": "Không có dữ liệu kỳ trước",
+        "gross": "Doanh thu nạp tiền",
+        "payers": "Người dùng trả tiền",
+        "firstTime": "Trả tiền lần đầu",
+        "avg": "Trung bình mỗi người",
+        "grossDef": "Tổng số tiền nạp có thông báo thanh toán nhận được trong khoảng, gồm cả khoản sau đó bị tranh chấp hoặc chargeback; không gồm điểm cấp thủ công.",
+        "payersDef": "Số ví khác nhau có nạp tiền trong khoảng.",
+        "firstTimeDef": "Người dùng trả tiền có khoản thanh toán đầu tiên rơi vào khoảng này.",
+        "avgDef": "Doanh thu nạp tiền ÷ người dùng trả tiền."
+      },
+      "daily": {
+        "title": "Doanh thu theo ngày",
+        "note": "Tính theo ngày nhận thông báo thanh toán (giờ Đài Bắc); có thể lệch một ngày so với ECPay ở ranh giới ngày.",
+        "empty": "Không có khoản nạp nào trong khoảng này.",
+        "aria": "Biểu đồ đường doanh thu nạp tiền theo ngày"
+      },
+      "payers": {
+        "title": "Người thanh toán",
+        "empty": "Không có người thanh toán trong khoảng này.",
+        "payers": "Người thanh toán",
+        "firstTime": "Lần đầu",
+        "repeat": "Tỷ lệ mua lại",
+        "avg": "Trung bình mỗi người",
+        "payersDef": "Số ví khác nhau đã nạp trong khoảng.",
+        "firstTimeDef": "Người có khoản thanh toán đầu tiên từ trước đến nay rơi vào khoảng này.",
+        "repeatDef": "Tỷ lệ người thanh toán có từ 2 lần thanh toán trở lên tính tích lũy.",
+        "avgDef": "Doanh thu nạp ÷ người thanh toán.",
+        "buckets": "Mức số tiền",
+        "bucketsNote": "Nhóm theo tổng tiền nạp của từng người dùng trong khoảng; thanh thể hiện số người.",
+        "bucket": {
+          "lt500": "< 500",
+          "500_999": "500–999",
+          "1000_2999": "1.000–2.999",
+          "3000_9999": "3.000–9.999",
+          "gte10000": "≥ 10.000"
+        },
+        "top": "Top 20 theo số tiền nạp",
+        "topNote": "Chọn tên người dùng để xem giao dịch của họ.",
+        "user": "Người dùng",
+        "amount": "Tổng",
+        "count": "Số lần",
+        "first": "Thanh toán đầu",
+        "last": "Thanh toán cuối"
+      },
+      "channels": {
+        "title": "So sánh kênh",
+        "note": "Tỷ lệ thành công = đơn đã thanh toán ÷ đơn đã tạo không ở trạng thái chờ. LINE Pay và Apple Pay chưa mở, chỉ hiện khi có dữ liệu.",
+        "empty": "Không có dữ liệu kênh.",
+        "method": "Kênh",
+        "gross": "Doanh thu",
+        "count": "Số lần",
+        "avg": "Số tiền trung bình",
+        "success": "Tỷ lệ thành công",
+        "payers": "Người thanh toán"
+      },
+      "risk": {
+        "liability": "Nợ điểm",
+        "liabilityNote": "Trạng thái hiện tại, không theo khoảng thời gian. Nợ = điểm chưa dùng + đang cam kết (đã trừ khỏi số dư, không tính trùng). Các yêu cầu hoàn tiền mặt đang xử lý không nằm trong tổng này: điểm đã bị trừ khi yêu cầu hoàn tiền, nên được liệt kê riêng ở mục phía dưới.",
+        "liab": {
+          "total": "Tổng nợ",
+          "unused": "Điểm chưa dùng",
+          "refundable": "Có thể hoàn tiền mặt",
+          "non_refundable": "Không hoàn tiền mặt",
+          "pledged": "Đang cam kết"
+        },
+        "loss": "Hoàn tiền và chargeback",
+        "lossRate": "Tỷ lệ tổn thất",
+        "lossRateDef": "(Hoàn tiền + chargeback) ÷ doanh thu nạp.",
+        "refunds": "Hoàn tiền đã xong",
+        "chargebacks": "Chargeback",
+        "cnt": "{n} khoản",
+        "disputed": "Đang tranh chấp",
+        "disputedNote": "Trạng thái hiện tại, liệt kê tối đa 50.",
+        "disputedEmpty": "Hiện không có khoản nạp nào đang tranh chấp.",
+        "user": "Người dùng",
+        "amount": "Số tiền",
+        "paidAt": "Ngày thanh toán",
+        "handle": "Xử lý",
+        "open": "Chờ xử lý và khác",
+        "cashRefunds": "Hoàn tiền mặt đang chờ",
+        "debts": "Khoản nợ chưa tất toán",
+        "invoices": "Hóa đơn chờ xuất",
+        "invoicesNote": "Hóa đơn điện tử chưa được kết nối; con số này sẽ tiếp tục tăng.",
+        "frozen": "Ví bị đóng băng",
+        "go": {
+          "cashRefunds": "Đến hoàn tiền mặt",
+          "debts": "Đến khoản nợ"
+        }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
+      }
     }
   }
 }

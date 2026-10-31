@@ -26,10 +26,10 @@
         "analytics": "Analitik data",
         "cashRefunds": "Pengembalian dana tunai",
         "walletDebts": "Tunggakan chargeback",
-        "topups": "Top up dan sengketa",
         "catalog": "Produk pilihan dan merek",
         "orgs": "Org and permit review",
-        "events": "Disaster events"
+        "events": "Disaster events",
+        "finance": "Keuangan"
       },
       "tabsLabel": "Fitur panel admin",
       "tabs": {
@@ -414,6 +414,11 @@
       "stale": "Tunggakan ini sudah ditutup, daftar sudah dimuat ulang."
     },
     "topups": {
+      "methodLabel": "Saluran",
+      "searchLabel": "Cari pengguna",
+      "searchHint": "Nama atau email, tekan Enter",
+      "userFilter": "Pengguna: {name}",
+      "clearUser": "Tampilkan semua pengguna",
       "title": "Top up dan sengketa chargeback",
       "intro": "Saat terjadi chargeback kartu kredit, menandai sengketa akan membekukan dompet; jika menang, dipulihkan, jika kalah, sisa poin pada batch top up tersebut ditarik kembali dan kekurangannya dicatat sebagai tunggakan.",
       "statusLabel": "Status",
@@ -584,6 +589,128 @@
       "done": "Done",
       "selfMerge": "Cannot merge an event into itself",
       "reasonRequired": "Isi alasan penurunan"
+    },
+    "finance": {
+      "title": "Keuangan",
+      "tabsLabel": "Tab keuangan",
+      "tabs": {
+        "overview": "Ringkasan",
+        "transactions": "Transaksi",
+        "payers": "Pembayar",
+        "channels": "Kanal",
+        "risk": "Risiko & kewajiban"
+      },
+      "rangeLabel": "Rentang",
+      "today": "Hari ini",
+      "days": "{n} hari",
+      "money": "NT$ {n}",
+      "retry": "Coba lagi",
+      "loading": "Memuat…",
+      "range": "Rentang: {from} – {to} ({days} hari)",
+      "todo": {
+        "title": "Perlu ditangani",
+        "note": "Kondisi saat ini; tidak terpengaruh rentang waktu. Klik untuk menangani.",
+        "disputed": "Sengketa",
+        "cashRefunds": "Refund tertunda",
+        "debts": "Utang belum lunas",
+        "pending": "Menunggu pembayaran"
+      },
+      "kpi": {
+        "title": "Angka utama",
+        "vsPrev": "{pct} dibanding periode sebelumnya",
+        "noPrev": "Tidak ada data periode sebelumnya",
+        "gross": "Pendapatan top-up",
+        "payers": "Pengguna berbayar",
+        "firstTime": "Pembayar pertama kali",
+        "avg": "Rata-rata per orang",
+        "grossDef": "Total top-up yang pemberitahuan pembayarannya diterima dalam rentang, termasuk yang kemudian disengketakan atau chargeback; pemberian poin manual tidak dihitung.",
+        "payersDef": "Jumlah dompet unik yang melakukan top-up dalam rentang.",
+        "firstTimeDef": "Pengguna berbayar yang pembayaran pertamanya jatuh dalam rentang.",
+        "avgDef": "Pendapatan top-up ÷ pengguna berbayar."
+      },
+      "daily": {
+        "title": "Pendapatan harian",
+        "note": "Berdasarkan tanggal pemberitahuan pembayaran diterima (waktu Taipei); bisa berbeda sehari dari ECPay di batas hari.",
+        "empty": "Tidak ada top-up pada rentang ini.",
+        "aria": "Grafik garis pendapatan top-up harian"
+      },
+      "payers": {
+        "title": "Pembayar",
+        "empty": "Tidak ada pembayar pada rentang ini.",
+        "payers": "Pembayar",
+        "firstTime": "Pertama kali",
+        "repeat": "Tingkat pembelian ulang",
+        "avg": "Rata-rata per pembayar",
+        "payersDef": "Jumlah dompet unik yang top-up dalam rentang.",
+        "firstTimeDef": "Pembayar yang pembayaran pertamanya jatuh dalam rentang.",
+        "repeatDef": "Persentase pembayar dengan 2 pembayaran atau lebih secara kumulatif.",
+        "avgDef": "Pendapatan top-up ÷ pembayar.",
+        "buckets": "Tingkat nominal",
+        "bucketsNote": "Dikelompokkan menurut total top-up tiap pengguna dalam rentang; batang menunjukkan jumlah pengguna.",
+        "bucket": {
+          "lt500": "< 500",
+          "500_999": "500–999",
+          "1000_2999": "1.000–2.999",
+          "3000_9999": "3.000–9.999",
+          "gte10000": "≥ 10.000"
+        },
+        "top": "20 teratas menurut nominal top-up",
+        "topNote": "Pilih nama pengguna untuk melihat transaksinya.",
+        "user": "Pengguna",
+        "amount": "Total",
+        "count": "Jumlah",
+        "first": "Bayar pertama",
+        "last": "Bayar terakhir"
+      },
+      "channels": {
+        "title": "Perbandingan kanal",
+        "note": "Tingkat keberhasilan = pesanan terbayar ÷ pesanan non-menunggu yang dibuat. LINE Pay dan Apple Pay belum dibuka dan hanya tampil jika ada data.",
+        "empty": "Tidak ada data kanal.",
+        "method": "Kanal",
+        "gross": "Pendapatan",
+        "count": "Jumlah",
+        "avg": "Rata-rata nominal",
+        "success": "Tingkat keberhasilan",
+        "payers": "Pembayar"
+      },
+      "risk": {
+        "liability": "Kewajiban poin",
+        "liabilityNote": "Kondisi saat ini, tidak mengikuti rentang waktu. Kewajiban = poin belum terpakai + ikrar (sudah dipotong dari saldo, tidak dihitung ganda). Pengembalian dana tunai yang sedang berjalan tidak termasuk dalam total ini: poin sudah dipotong saat permintaan diajukan, jadi dicantumkan terpisah di bagian bawah.",
+        "liab": {
+          "total": "Total kewajiban",
+          "unused": "Poin belum terpakai",
+          "refundable": "Dapat dikembalikan tunai",
+          "non_refundable": "Tidak dapat dikembalikan tunai",
+          "pledged": "Diikrarkan"
+        },
+        "loss": "Pengembalian dan chargeback",
+        "lossRate": "Tingkat kerugian",
+        "lossRateDef": "(Pengembalian + chargeback) ÷ pendapatan top-up.",
+        "refunds": "Pengembalian selesai",
+        "chargebacks": "Chargeback",
+        "cnt": "{n} item",
+        "disputed": "Dalam sengketa",
+        "disputedNote": "Kondisi saat ini, maksimal 50 ditampilkan.",
+        "disputedEmpty": "Saat ini tidak ada top-up yang disengketakan.",
+        "user": "Pengguna",
+        "amount": "Nominal",
+        "paidAt": "Tanggal bayar",
+        "handle": "Tangani",
+        "open": "Menunggu dan lainnya",
+        "cashRefunds": "Pengembalian tunai tertunda",
+        "debts": "Utang belum lunas",
+        "invoices": "Faktur belum diterbitkan",
+        "invoicesNote": "Faktur elektronik belum terhubung; angka ini akan terus bertambah.",
+        "frozen": "Dompet dibekukan",
+        "go": {
+          "cashRefunds": "Buka pengembalian tunai",
+          "debts": "Buka utang"
+        }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
+      }
     }
   }
 }

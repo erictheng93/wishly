@@ -195,7 +195,7 @@ async function mockTopups(page: Page, rows: Row[], dispute: (n: number, c: { bod
   return { list, posts }
 }
 
-test('爭議：預設看爭議中；顯示使用者與錢包凍結；勝訴 / 敗訴（扣回）各有二次確認與結果', async ({ page }) => {
+test('爭議：從連結帶入爭議中；顯示使用者與錢包凍結；勝訴 / 敗訴（扣回）各有二次確認與結果', async ({ page }) => {
   await asStaff(page)
   const rows = [topup('t1', 'disputed'), topup('t2', 'disputed', { amount: 1000, user: user(6) })]
   const m = await mockTopups(page, rows, (n, c) => {
@@ -203,7 +203,7 @@ test('爭議：預設看爭議中；顯示使用者與錢包凍結；勝訴 / �
     if (c.body.action === 'won') { row.status = 'paid'; row.wallet.status = 'active'; return ok({ topup_id: row.id, status: 'paid', applied: true }) }
     row.status = 'charged_back'; return ok({ topup_id: row.id, status: 'charged_back', applied: true, recovered: 600, debt: 2400 })
   })
-  await page.goto('/admin/topups'); await hydrated(page)
+  await page.goto('/admin/finance?tab=transactions&status=disputed'); await hydrated(page)
 
   await expect.poll(() => m.list.length).toBeGreaterThan(0)
   expect(m.list[0].url.searchParams.get('status')).toBe('disputed')
@@ -243,7 +243,7 @@ test('爭議：切到已入帳 → 標記爭議（錢包被凍結）；取消不
   await asStaff(page)
   const rows = [topup('t3', 'paid')]
   const m = await mockTopups(page, rows, () => { rows[0].status = 'disputed'; return ok({ topup_id: 't3', status: 'disputed', applied: true }) })
-  await page.goto('/admin/topups'); await hydrated(page)
+  await page.goto('/admin/finance?tab=transactions&status=disputed'); await hydrated(page)
   await expect(page.getByText('沒有符合的儲值單')).toBeVisible()
   await page.getByLabel('狀態').selectOption('paid')
   const card = page.locator('article[data-status="paid"]')
@@ -271,7 +271,7 @@ test('爭議：5xx 留在對話框可重試；409 關閉並說明；applied=fals
     if (n === 2) return problem(409, 'INVALID_STATE_TRANSITION', 'x')
     return ok({ topup_id: 't4', status: 'paid', applied: false })
   })
-  await page.goto('/admin/topups'); await hydrated(page)
+  await page.goto('/admin/finance?tab=transactions&status=disputed'); await hydrated(page)
   const card = page.locator('article[data-status]').first()
   await card.getByRole('button', { name: '爭議勝訴' }).click()
   await dialog(page).getByRole('button', { name: '爭議勝訴' }).click()
@@ -288,13 +288,12 @@ test('爭議：5xx 留在對話框可重試；409 關閉並說明；applied=fals
 })
 
 // ---------- 導覽與權限 ----------
-test('後台首頁有三個新入口，可導向各頁', async ({ page }) => {
+test('後台首頁有兩個新入口，可導向各頁', async ({ page }) => {
   await asStaff(page)
   await mockRefunds(page, [])
   await mock(page, /\/api\/v1\/admin\/wallet-debts(\?|$)/, () => ok({ data: [], next_cursor: null }))
-  await mock(page, /\/api\/v1\/admin\/topups(\?|$)/, () => ok({ data: [], next_cursor: null }))
   await page.goto('/admin'); await hydrated(page)
-  for (const [name, path, heading] of [['現金退款', 'cash-refunds', '現金退款審核'], ['拒付欠款', 'wallet-debts', '拒付欠款'], ['儲值與爭議', 'topups', '儲值與拒付爭議']]) {
+  for (const [name, path, heading] of [['現金退款', 'cash-refunds', '現金退款審核'], ['拒付欠款', 'wallet-debts', '拒付欠款']]) {
     await page.getByRole('link', { name, exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/admin/${path}$`))
     await expect(page.getByRole('heading', { name: heading, exact: true }).first()).toBeVisible()

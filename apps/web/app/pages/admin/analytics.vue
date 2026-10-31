@@ -70,7 +70,7 @@ const profile = computed(() => {
     <p v-if="!data && busy" class="c-mute">{{ $t('admin.analytics.loading') }}</p>
 
     <template v-if="data">
-      <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }) }}</p>
+      <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
       <section class="c-card an-kpi-card" :aria-label="$t('admin.analytics.overview')">
         <dl class="an-tiles k-kpis">
           <div v-for="t in TILES" :key="t[0]"><dt>{{ t[0] }}</dt><dd>{{ fmtCount(t[1]) }}</dd></div>
@@ -173,27 +173,13 @@ const profile = computed(() => {
 </template>
 <style scoped>
 .an-tiles{margin:0;grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
-.an-range .c-btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:800}
-.an-range .c-btn.on::before{content:"";width:6px;height:6px;background:var(--red)}
 .an-kpi-card{padding:0!important;border-top:2px solid var(--ink-line)}
 .an-kpi-card .k-kpis{border-top:0;border-left:0}
 .an-multi{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
 .an-fig{margin:0;padding:14px 16px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
 .an-fig figcaption{display:flex;flex-direction:column;gap:2px;font-size:14px}
 .an-fig figcaption .c-mute{font:500 11px/1.5 var(--mono);letter-spacing:.04em}
-.an-svg{width:100%;height:72px;display:block;margin-top:10px}
-.an-axis{stroke:var(--ink-line);stroke-width:1}
-.an-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3}
-.an-area{fill:var(--red);opacity:.1}
-.an-line{fill:none;stroke:var(--red);stroke-width:1.5;stroke-linejoin:round}
-.an-dates{display:flex;justify-content:space-between;font:500 10.5px var(--mono);letter-spacing:.04em;margin-top:4px}
 .an-h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 6px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.an-row{display:grid;grid-template-columns:minmax(72px,120px) 1fr minmax(96px,auto);gap:12px;align-items:center;margin:0;padding:6px 0;border-bottom:1px dotted var(--line)}
-.an-l{font-size:14px;overflow-wrap:anywhere}
-.an-v{font:700 14px var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
-.an-v small{display:inline-block;min-width:3.6em;margin-left:8px;font:500 11px var(--mono)}
-.an-track{display:block;height:8px;background:var(--hatch),var(--bg-alt)}
-.an-bar{display:block;height:100%;background:var(--red);min-width:2px;transform-origin:left;animation:fill .9s var(--ease) both}
 .an-bar.sup,.an-cbar.sup{width:14px;min-width:14px;background:repeating-linear-gradient(45deg,var(--mute) 0 2px,transparent 2px 5px)}
 .an-cols{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end}
 .an-col{display:flex;flex-direction:column;align-items:center;gap:4px;font:500 11px var(--mono);font-variant-numeric:tabular-nums}
@@ -203,6 +189,6 @@ const profile = computed(() => {
 .an-table{width:100%;border-collapse:collapse;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:8px}
 .an-table th,.an-table td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line)}
 .an-table th:first-child,.an-table td:first-child{text-align:left}
-@media (max-width:520px){.an-row{grid-template-columns:minmax(64px,92px) 1fr auto;gap:8px}.an-cols{gap:2px}}
+@media (max-width:520px){.an-cols{gap:2px}}
 </style>
 

@@ -9,13 +9,13 @@ Web Push / 手機推播是下一階段（B），這裡不做，但通知內容�
 - `claim.confirmation`、`claim.item_changed` 站內立即出現；只有 email 從建立起延後 10 分鐘，讓連續操作合併，已取消的不寄。
 - 即時訊號只是提示，不帶內容：`event: inbox`、`data: {}`。內容一律由已驗證的 REST 取得，連線存活期間登出也不會外洩。
 - Email 偏好預設值不變（未設視為開）。
-- 這個分支還沒上線，直接改 `0048`，不新增 migration。
+- 這個分支還沒上線，直接改 `0050`，不新增 migration。
 
 ## 後端（apps/api、db/migrations）
 
 ### 資料
 
-`0048` 加 `inbox_body text`、`inbox_category text`。
+`0050` 加 `inbox_body text`、`inbox_category text`。
 
 ### 分類
 
@@ -36,7 +36,7 @@ Web Push / 手機推播是下一階段（B），這裡不做，但通知內容�
 - 站內寫入條件：`uid` 存在、`!has_inbox`，且 Account 類或對應的 `inbox_*` 未關。
 - 合併查詢加條件 `(n.inbox_at IS NOT NULL) = has_inbox`。第一輪只併還沒進站內的列，避免列被吞掉或重複；隔天 09:00 第二輪只併已進站內的列，email 仍然合成一封。
 - 寄信與前面的 DB 工作分開：`tick_at` 先對整批做完 DB 階段（站內立即寫入），再以併發上限 5 寄信（`for_each_concurrent` 同類做法），SMTP 卡住不能擋住站內通知。`tick_at` 回傳時兩階段都已完成，測試行為不變。
-- `spawn_worker` 間隔 5 秒改 1 秒。先確認 pending 掃描有索引；沒有就在 `0048` 補部分索引。
+- `spawn_worker` 間隔 5 秒改 1 秒。先確認 pending 掃描有索引；沒有就在 `0050` 補部分索引。
 
 ### 內文
 
