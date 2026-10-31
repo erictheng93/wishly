@@ -65,6 +65,19 @@ test('交易明細：渠道與搜尋帶入查詢；刪除用戶（無 email）�
   await expect(page.locator('article[data-status]').first()).toContainText('路人')
 })
 
+test('帶 user_id 開啟後選了狀態，清除用戶仍保留狀態篩選', async ({ page }) => {
+  await asStaff(page)
+  const list = await mock(page, /\/api\/v1\/admin\/topups(\?|$)/, () => ok({ data: [topup('t5')], next_cursor: null }))
+  await page.goto('/admin/finance?tab=transactions&user_id=u-top'); await hydrated(page)
+  await page.getByLabel('狀態').selectOption('disputed')
+  await expect.poll(() => list.at(-1)!.url.searchParams.get('status')).toBe('disputed')
+  expect(list.at(-1)!.url.searchParams.get('user_id')).toBe('u-top')
+  await page.getByRole('button', { name: '顯示全部用戶' }).click()
+  await expect.poll(() => list.at(-1)!.url.searchParams.get('user_id')).toBeNull()
+  expect(list.at(-1)!.url.searchParams.get('status')).toBe('disputed')
+  await expect(page.getByLabel('狀態')).toHaveValue('disputed')
+})
+
 test('/admin/topups 導向交易明細分頁', async ({ page }) => {
   await asStaff(page)
   await mock(page, /\/api\/v1\/admin\/topups(\?|$)/, () => ok({ data: [], next_cursor: null }))

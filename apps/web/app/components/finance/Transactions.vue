@@ -15,12 +15,14 @@ const status = ref(pick(route.query.status, STATUSES))
 const method = ref(pick(route.query.method, METHODS))
 const userId = ref(one(route.query.user_id))
 const qInput = ref(''), q = ref('') // q 為已送出的關鍵字
+// 網址是篩選的唯一來源：下拉只改網址，這個 watcher 負責同步 ref 並重新載入
+const setQuery = (k: string, v: string) => router.replace({ query: { ...route.query, [k]: v || undefined } })
 watch(() => route.query, (r) => { status.value = pick(r.status, STATUSES); method.value = pick(r.method, METHODS); userId.value = one(r.user_id) })
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(qInput, (v) => { clearTimeout(timer); timer = setTimeout(() => { q.value = v.trim() }, 400) })
 onBeforeUnmount(() => clearTimeout(timer))
 const submitQ = () => { clearTimeout(timer); q.value = qInput.value.trim() }
-const clearUser = () => router.replace({ query: { ...route.query, user_id: undefined } })
+const clearUser = () => setQuery('user_id', '')
 
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
 const err = ref(''), msg = ref('')
@@ -32,7 +34,9 @@ async function load(more = false) {
     const r = await api('/admin/topups', { query: { status: status.value || undefined, method: method.value || undefined, q: q.value || undefined, user_id: userId.value || undefined, limit: 20, cursor: more ? cursor.value : undefined } })
     if (my !== seq) return
     rows.value = more ? [...rows.value, ...listRows(r)] : listRows(r); cursor.value = r.next_cursor ?? null
-  } catch (e) { if (my === seq) err.value = errMsg(e) } finally { if (my === seq) loading.value = false }
+  } catch (e) {
+    if (my === seq) { err.value = errMsg(e); if (!more) { rows.value = []; cursor.value = null } } // 換篩選失敗：不留舊篩選的列與 cursor
+  } finally { if (my === seq) loading.value = false }
 }
 watch([status, method, q, userId], () => load())
 onMounted(() => load())
@@ -69,13 +73,13 @@ async function submit() {
     <p class="c-mute c-small">{{ $t('admin.topups.intro') }}</p>
     <div class="c-row wrap c-mb">
       <label class="c-field c-narrow"><span>{{ $t('admin.topups.statusLabel') }}</span>
-        <select v-model="status">
+        <select :value="status" @change="setQuery('status', ($event.target as HTMLSelectElement).value)">
           <option value="">{{ $t('admin.topups.all') }}</option>
           <option v-for="s in STATUSES" :key="s" :value="s">{{ $t(`admin.topups.status.${s}`) }}</option>
         </select>
       </label>
       <label class="c-field c-narrow"><span>{{ $t('admin.topups.methodLabel') }}</span>
-        <select v-model="method">
+        <select :value="method" @change="setQuery('method', ($event.target as HTMLSelectElement).value)">
           <option value="">{{ $t('admin.topups.all') }}</option>
           <option v-for="m in METHODS" :key="m" :value="m">{{ methodLabel(m, $t, te) }}</option>
         </select>
