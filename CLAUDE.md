@@ -19,7 +19,7 @@ scripts/cargo.sh test                      # 沒裝 Rust 時用 Docker
 
 # 前端 apps/web（Nuxt 4）
 cd apps/web && npm install && npm run dev  # :3000
-npm run typecheck && npm test && npm run build   # CI 依序執行；單一測試：npx vitest run tests/errors.test.ts
+npm run typecheck && npm run test:coverage && npm run build   # CI 依序執行（覆蓋率低於 tests/coverage-baseline.json 會失敗）；單一測試：npx vitest run tests/errors.test.ts
 node mocks/server.mjs                      # 訪客端契約 mock，:8080（slug: demo/closed/gone/boom/sseoff），不需後端/DB
 ```
 
