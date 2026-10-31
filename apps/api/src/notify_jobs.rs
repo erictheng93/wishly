@@ -13,7 +13,7 @@ pub async fn event_summary_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
                       WHERE i.wishlist_id = w.id AND c.status IN ('reserved', 'purchased', 'delivered')
                      UNION ALL
                      SELECT k.user_id FROM contributions k WHERE k.wishlist_id = w.id AND k.status = 'captured') r
-                    WHERE r.actor IS NOT NULL) AS givers
+                    WHERE r.actor IS NOT NULL AND r.actor <> w.owner_id) AS givers
              FROM wishlists w
             WHERE w.event_summary_sent_at IS NULL AND w.org_id IS NULL AND w.deleted_at IS NULL
               AND w.event_date BETWEEN (now() AT TIME ZONE 'Asia/Taipei')::date - 7 AND (now() AT TIME ZONE 'Asia/Taipei')::date
@@ -36,7 +36,7 @@ pub async fn staff_digest_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
             (SELECT count(*) FROM organizations WHERE verification_status = 'pending') AS orgs,
             (SELECT count(*) FROM org_permits WHERE status = 'pending') AS permits,
             (SELECT count(*) FROM purchase_orders WHERE status = 'pending') AS orders,
-            (SELECT count(*) FROM notifications WHERE status = 'failed') AS failed)
+            (SELECT count(*) FROM notifications WHERE status = 'failed' AND scheduled_at > now() - interval '7 days') AS failed)
          INSERT INTO notifications (user_id, channel, kind, payload)
          SELECT u.id, 'email'::notification_channel, 'staff.digest',
                 jsonb_build_object('reports', c.reports, 'refunds', c.refunds, 'orgs', c.orgs,

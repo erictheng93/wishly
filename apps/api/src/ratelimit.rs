@@ -102,8 +102,11 @@ pub fn spawn_cleanup(pool: PgPool) {
                 if let Err(e) = crate::notify_jobs::event_summary_tick(&pool).await {
                     tracing::error!(error=%e, "event_summary_tick");
                 }
-                if let Err(e) = crate::notify_jobs::staff_digest_tick(&pool).await {
-                    tracing::error!(error=%e, "staff_digest_tick");
+                // 台北 09:00 那一小時才彙總，寄送時間才固定；待辦數也才是當下的
+                if chrono::Timelike::hour(&(chrono::Utc::now() + chrono::Duration::hours(8))) == 9 {
+                    if let Err(e) = crate::notify_jobs::staff_digest_tick(&pool).await {
+                        tracing::error!(error=%e, "staff_digest_tick");
+                    }
                 }
                 if let Err(e) = cleanup(&pool).await {
                     tracing::error!(error=%e, "cleanup");

@@ -9,6 +9,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wishly_api::notify;
 
+// 全域 config 先搶先贏：每個測試都要先呼叫，否則會寄到 Mailpit
 fn init() {
     let mut c = wishly_api::config::Config::dev();
     c.cf_account_id = None;
@@ -118,6 +119,7 @@ async fn stale_confirmation_is_cancelled_and_not_bundled(pool: PgPool) {
     let (_, live) = user_claim(&pool, it, 1).await;
     let (_, gone) = user_claim(&pool, it, 1).await;
     sqlx::query("UPDATE claims SET status='cancelled' WHERE id=$1").bind(gone).execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM notifications").execute(&pool).await.unwrap(); // 認領自動排的確認信，這裡只驗手動塞的兩筆
     let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id=$1").bind(live).fetch_one(&pool).await.unwrap();
     let a = push(&pool, uid, "claim.confirmation", json!({"wishlist_id": wl.id, "item_id": it, "claim_id": live})).await;
     let b = push(&pool, uid, "claim.confirmation", json!({"wishlist_id": wl.id, "item_id": it, "claim_id": gone})).await;
@@ -179,6 +181,7 @@ async fn muted_and_emailless_users_still_get_inbox(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn inbox_api_is_scoped_to_caller(pool: PgPool) {
+    init();
     let a = user(&pool, "a").await;
     let b = user(&pool, "b").await;
     let mut a_ids = vec![];
@@ -219,6 +222,7 @@ async fn inbox_api_is_scoped_to_caller(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn account_deletion_clears_inbox(pool: PgPool) {
+    init();
     let _cdn = common::cdn::init();
     let a = user(&pool, "a").await;
     let id = push(&pool, a.id, "wallet.frozen", json!({})).await;
@@ -231,6 +235,7 @@ async fn account_deletion_clears_inbox(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn requeue_only_recent_non_address_failures(pool: PgPool) {
+    init();
     let st = staff(&pool, "s").await;
     let u = user(&pool, "u").await;
     let mk = |err: &'static str, age: &'static str| {
@@ -258,6 +263,7 @@ async fn requeue_only_recent_non_address_failures(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn prefs_and_unsubscribe_tokens(pool: PgPool) {
+    init();
     let u = user(&pool, "u").await;
     for bad in [json!({"email_claims": false}), json!({"email_birthdays": false}), json!({"email_gifts": "no"})] {
         let (s, ..) = call(&pool, "PATCH", "/me", &ck(&u.token), Some(json!({"notification_prefs": bad}))).await;
@@ -279,6 +285,7 @@ async fn prefs_and_unsubscribe_tokens(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn enqueue_helpers(pool: PgPool) {
+    init();
     let owner = user(&pool, "o").await;
     let wl = wishlist(&pool, owner.id, ListOpts::default()).await;
     let it = item(&pool, wl.id, "禮物", 3).await;
@@ -321,4 +328,21 @@ async fn enqueue_helpers(pool: PgPool) {
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='site.paused'").fetch_one(&pool).await.unwrap();
     let _ = (c1, c2);
     assert_eq!(n, 2);
+}
+
+/// 主列寄送失敗重試時，已併入的品項不能遺失（被併入的列已標 sent，不會再寄）
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn bundled_items_survive_primary_retry(pool: PgPool) {
+    init();
+    let u = user(&pool, "a").await;
+    let wl = wishlist(&pool, u.id, Default::default()).await;
+    for t in ["甲", "乙", "丙"] {
+        let it = item(&pool, wl.id, t, 1).await;
+        push(&pool, u.id, "claim.expired", json!({"wishlist_id": wl.id, "item_id": it})).await;
+    }
+    notify::tick_at(&pool, noon()).await.unwrap();
+    let (status, items): (String, Value) = sqlx::query_as("SELECT status::text, payload->'more_items' FROM notifications WHERE last_error NOT LIKE 'bundled:%'")
+        .fetch_one(&pool).await.unwrap();
+    assert_eq!(status, "pending", "SMTP 不通，主列留待重試");
+    assert_eq!(items.as_array().unwrap().len(), 2);
 }

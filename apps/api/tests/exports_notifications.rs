@@ -9,7 +9,7 @@ use wishly_api::session::hash_token;
 use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn no_confirmation_without_email(pool: PgPool) {
+async fn member_claim_queues_delayed_confirmation(pool: PgPool) {
     let TestUser { id: o, token: _ } = user(&pool, "u").await;
     let wl = wishlist(
         &pool,
@@ -28,7 +28,7 @@ async fn no_confirmation_without_email(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(n, 0);
+    assert_eq!(n, 1);
     assert_all_reconciled(&pool).await;
 }
 

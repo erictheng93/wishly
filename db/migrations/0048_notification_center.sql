@@ -16,3 +16,7 @@ UPDATE users
                  THEN jsonb_build_object('email_social', notification_prefs->'email_birthdays')
                  ELSE '{}'::jsonb END
  WHERE notification_prefs ? 'email_claims' OR notification_prefs ? 'email_birthdays';
+
+-- 外鍵檢查會對 users 取 FOR KEY SHARE：持有 topups / 錢包 / 品項鎖的交易寫通知時，
+-- 會與帳號刪除的 users（FOR UPDATE）→ topups → 錢包 鎖序相反而死鎖。users 只軟刪除，worker 也會處理收件人不存在。
+ALTER TABLE notifications DROP CONSTRAINT notifications_user_id_fkey;

@@ -513,7 +513,12 @@ async fn handle(
              SELECT m.id, m.title FROM m JOIN u ON u.id = m.id")
             .bind(uid).bind(gid).bind(&kind).bind(id).fetch_all(pool).await?;
         if !merged.is_empty() {
-            payload["more_items"] = merged.iter().filter_map(|(_, t)| t.clone()).collect::<Vec<_>>().into();
+            // 寫回 DB：被併入的列已標 sent，主列重試時要靠這份清單；重試時可能再併入新列，所以累加
+            let mut items: Vec<Value> = payload.get("more_items").and_then(Value::as_array).cloned().unwrap_or_default();
+            items.extend(merged.iter().filter_map(|(_, t)| t.clone()).map(Value::String));
+            sqlx::query("UPDATE notifications SET payload = jsonb_set(payload, '{more_items}', $2) WHERE id = $1")
+                .bind(id).bind(Value::Array(items.clone())).execute(pool).await?;
+            payload["more_items"] = items.into();
             bundled.extend(merged.iter().map(|(i, _)| *i));
         }
     }

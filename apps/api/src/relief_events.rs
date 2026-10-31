@@ -406,6 +406,7 @@ pub(crate) async fn event_slugs<'e, E: sqlx::PgExecutor<'e>>(
 
 /// 許可過期（台北日期）的上線據點暫停，並通知該許可所屬組織的 owner（每組織每許可一封：只對本次剛暫停的據點發，之後不再命中）。
 pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
+    let mut tx = pool.begin().await?;
     let rows: Vec<(String, Uuid, Uuid)> = sqlx::query_as(
         "WITH p AS (UPDATE wishlists w SET site_status = 'paused' FROM org_permits pm
                      WHERE pm.id = w.permit_id AND w.type = 'relief' AND w.status = 'active' AND w.site_status = 'active'
@@ -419,13 +420,14 @@ pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Erro
                       JOIN org_members m ON m.org_id = o.id AND m.role = 'owner' AND m.disabled_at IS NULL
                       JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL)
          SELECT slug, event_id, id FROM p")
-        .fetch_all(pool).await?;
+        .fetch_all(&mut *tx).await?;
     if rows.is_empty() {
         return Ok(0);
     }
-    // 剛暫停的據點通知進行中的捐助者（UPDATE 已提交，之後不再命中，所以不會重複）
+    // 同交易通知進行中的捐助者：這批據點之後不再命中，交易外寄失敗就永遠補不回來
     let site_ids: Vec<Uuid> = rows.iter().map(|r| r.2).collect();
-    crate::notify::enqueue_site_paused(pool, &site_ids).await?;
+    crate::notify::enqueue_site_paused(&mut *tx, &site_ids).await?;
+    tx.commit().await?;
     let ids: Vec<Uuid> = rows.iter().map(|r| r.1).collect();
     let ev = event_slugs(pool, &ids).await?;
     let n = rows.len();

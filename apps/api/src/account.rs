@@ -337,6 +337,8 @@ async fn delete_me(
         crate::dashboard::notify(&mut *tx, *w).await?;
         site_slugs.push(slug.clone());
     }
+    let was_active: Vec<Uuid> = closed.iter().filter(|c| c.2).map(|c| c.0).collect();
+    crate::notify::enqueue_site_paused(&mut *tx, &was_active).await?;
     // Retain replaced/issued image keys; the worker rechecks sharing under the media lock.
     let media: Vec<String> = sqlx::query_scalar(
         "SELECT object_key FROM user_media WHERE user_id=$1
