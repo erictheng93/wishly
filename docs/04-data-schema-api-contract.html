@@ -1468,7 +1468,7 @@ CREATE TABLE push_subscriptions (
 
 -- 0050：匿名 PWA 安裝事件；不存使用者、IP、UA
 CREATE TABLE pwa_events (
-  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id bigserial PRIMARY KEY,
   event text NOT NULL CHECK (event IN ('pwa_install_prompted', 'pwa_installed')),
   platform text NOT NULL CHECK (platform IN ('ios', 'android')),
   context text NOT NULL CHECK (context IN ('claim', 'fund', 'appinstalled', 'first_run')),
