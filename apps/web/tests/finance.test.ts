@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { delta, financeTab, perPayer } from '../app/utils/finance'
+import { delta, financeTab, fmtDay, perPayer } from '../app/utils/finance'
 
 describe('finance utils', () => {
   it('financeTab 未知值回 overview', () => {
@@ -15,5 +15,8 @@ describe('finance utils', () => {
   it('perPayer 無付費用戶回 null', () => {
     expect(perPayer(1000, 0)).toBeNull()
     expect(perPayer(1000, 4)).toBe(250)
+  })
+  it('fmtDay 固定用台北時間', () => {
+    expect(fmtDay('2026-10-30T16:30:00Z', 'en-US')).toBe('10/31/2026')
   })
 })

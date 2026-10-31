@@ -700,6 +700,10 @@
           "cashRefunds": "Go to cash refunds",
           "debts": "Go to debts"
         }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
       }
     }
   }

@@ -18,7 +18,6 @@ watch(() => props.days, load)
 onMounted(load)
 
 const money = (n: number | null) => n == null ? '–' : t('admin.finance.money', { n: fmtPts(Math.round(n)) })
-const day = (iso: string) => new Date(iso).toLocaleDateString()
 const KPIS = computed(() => {
   const d = data.value
   if (!d) return []
@@ -75,7 +74,7 @@ const BUCKETS = computed(() => {
             <tbody>
               <tr v-for="r in data.top" :key="r.user.id">
                 <td><NuxtLink :to="`/admin/finance?tab=transactions&user_id=${r.user.id}`">{{ r.user.display_name }}</NuxtLink><small v-if="r.user.email" class="c-mute"> {{ r.user.email }}</small></td>
-                <td>{{ money(r.amount) }}</td><td>{{ fmtCount(r.count) }}</td><td>{{ day(r.first_paid_at) }}</td><td>{{ day(r.last_paid_at) }}</td>
+                <td>{{ money(r.amount) }}</td><td>{{ fmtCount(r.count) }}</td><td>{{ fmtDay(r.first_paid_at) }}</td><td>{{ fmtDay(r.last_paid_at) }}</td>
               </tr>
             </tbody>
           </table>

@@ -700,6 +700,10 @@
           "cashRefunds": "Buka pengembalian tunai",
           "debts": "Buka utang"
         }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
       }
     }
   }

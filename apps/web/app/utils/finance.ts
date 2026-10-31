@@ -15,3 +15,11 @@ export const perPayer = (gross: number, payers: number): number | null => payers
 
 /** 0–1 比率轉百分比字串；null 顯示 – */
 export const fmtRate = (r: number | null | undefined): string => r == null ? '–' : `${(r * 100).toFixed(1)}%`
+
+/** 日期一律以台北時間顯示；locale 預設取目前介面語言 */
+export const fmtDay = (iso: string, locale: string = intlLocale()): string =>
+  new Date(iso).toLocaleDateString(locale, { timeZone: 'Asia/Taipei' })
+
+/** 付款方式名稱：優先用儲值頁的翻譯，其餘（line_pay、apple_pay）用金流後台的；都沒有才顯示代碼 */
+export const methodLabel = (m: string, t: (k: string) => string, te: (k: string) => boolean): string =>
+  te(`me.topup.method.${m}`) ? t(`me.topup.method.${m}`) : te(`admin.finance.method.${m}`) ? t(`admin.finance.method.${m}`) : m

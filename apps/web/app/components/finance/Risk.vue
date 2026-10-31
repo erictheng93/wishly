@@ -18,8 +18,7 @@ watch(() => props.days, load)
 onMounted(load)
 
 const money = (n: number | null) => n == null ? '–' : t('admin.finance.money', { n: fmtPts(Math.round(n)) })
-const label = (m: string) => te(`me.topup.method.${m}`) ? t(`me.topup.method.${m}`) : m
-const day = (iso: string) => new Date(iso).toLocaleDateString()
+const label = (m: string) => methodLabel(m, t, te)
 const LIAB = computed(() => {
   const l = data.value?.liability
   if (!l) return []
@@ -85,7 +84,7 @@ const OPEN = computed(() => {
             </tr></thead>
             <tbody>
               <tr v-for="d in data.disputed" :key="d.id">
-                <td>{{ d.display_name }}</td><td>{{ money(d.amount) }}</td><td>{{ label(d.method) }}</td><td>{{ day(d.paid_at) }}</td>
+                <td>{{ d.display_name }}</td><td>{{ money(d.amount) }}</td><td>{{ label(d.method) }}</td><td>{{ fmtDay(d.paid_at) }}</td>
                 <td><NuxtLink :to="`/admin/finance?tab=transactions&status=disputed`">{{ $t('admin.finance.risk.handle') }}</NuxtLink></td>
               </tr>
             </tbody>

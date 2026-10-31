@@ -18,8 +18,7 @@ watch(() => props.days, load)
 onMounted(load)
 
 const money = (n: number | null) => n == null ? '–' : t('admin.finance.money', { n: fmtPts(Math.round(n)) })
-// 未開放渠道（line_pay 等）沒有翻譯，直接顯示代碼
-const label = (m: string) => te(`me.topup.method.${m}`) ? t(`me.topup.method.${m}`) : m
+const label = (m: string) => methodLabel(m, t, te)
 </script>
 <template>
   <div>

@@ -700,6 +700,10 @@
           "cashRefunds": "Đến hoàn tiền mặt",
           "debts": "Đến khoản nợ"
         }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
       }
     }
   }

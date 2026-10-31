@@ -700,6 +700,10 @@
           "cashRefunds": "前往現金退款",
           "debts": "前往欠款"
         }
+      },
+      "method": {
+        "line_pay": "LINE Pay",
+        "apple_pay": "Apple Pay"
       }
     }
   }
