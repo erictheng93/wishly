@@ -148,7 +148,7 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
                 'message', message, 'is_anonymous', is_anonymous, 'visibility', visibility::text, 'captured_at', captured_at, 'released_at', released_at, 'created_at', created_at)
            FROM contributions WHERE user_id = $1 ORDER BY id").bind(u.id).fetch_all(&st.pool).await?;
     let notifications: Vec<Value> = sqlx::query_scalar(
-        "SELECT jsonb_build_object('id', id, 'kind', kind, 'title', inbox_title, 'link', inbox_link, 'created_at', inbox_at, 'read_at', read_at)
+        "SELECT jsonb_build_object('id', id, 'kind', kind, 'title', inbox_title, 'link', inbox_link, 'body', inbox_body, 'category', inbox_category, 'created_at', inbox_at, 'read_at', read_at)
            FROM notifications WHERE user_id = $1 AND inbox_at IS NOT NULL ORDER BY inbox_at, id").bind(u.id).fetch_all(&st.pool).await?;
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.export', 'users', $1)").bind(u.id).execute(&st.pool).await?;
     let now = chrono::Utc::now();
@@ -409,7 +409,7 @@ async fn delete_me(
     .await?;
     sqlx::query("UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')")
         .bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE notifications SET inbox_at=NULL, inbox_title=NULL, inbox_link=NULL WHERE user_id=$1")
+    sqlx::query("UPDATE notifications SET inbox_at=NULL, inbox_title=NULL, inbox_link=NULL, inbox_body=NULL, inbox_category=NULL WHERE user_id=$1")
         .bind(id).execute(&mut *tx).await?;
     sqlx::query(
         "UPDATE wishlists SET cover_image_key=NULL, cover_image_status='none' WHERE owner_id=$1 AND org_id IS NULL",

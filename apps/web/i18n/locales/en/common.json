@@ -33,6 +33,7 @@
     "supportSubject": "Wishly support",
     "supportBody": "Account ID: {id}\n\nDescribe the issue:\n",
     "notifications": "Notifications",
-    "unreadCount": "{n} unread"
+    "unreadCount": "{n} unread",
+    "close": "Close"
   }
 }

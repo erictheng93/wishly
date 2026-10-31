@@ -419,7 +419,14 @@
       "readAll": "全部標為已讀",
       "empty": "目前沒有通知",
       "unread": "未讀",
-      "loadMore": "載入更多"
+      "loadMore": "載入更多",
+      "viewAll": "查看全部",
+      "cat": {
+        "all": "全部",
+        "account": "帳務安全",
+        "gifts": "送禮",
+        "social": "好友生日"
+      }
     }
   }
 }

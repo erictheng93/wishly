@@ -33,6 +33,7 @@
     "supportSubject": "Wishly 客服",
     "supportBody": "帳號 ID：{id}\n\n問題描述：\n",
     "notifications": "通知",
-    "unreadCount": "{n} 則未讀"
+    "unreadCount": "{n} 則未讀",
+    "close": "關閉"
   }
 }

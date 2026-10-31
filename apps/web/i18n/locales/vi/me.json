@@ -419,7 +419,14 @@
       "readAll": "Đánh dấu tất cả đã đọc",
       "empty": "Chưa có thông báo",
       "unread": "Chưa đọc",
-      "loadMore": "Tải thêm"
+      "loadMore": "Tải thêm",
+      "viewAll": "Xem tất cả",
+      "cat": {
+        "all": "Tất cả",
+        "account": "Tài khoản",
+        "gifts": "Quà tặng",
+        "social": "Sinh nhật"
+      }
     }
   }
 }

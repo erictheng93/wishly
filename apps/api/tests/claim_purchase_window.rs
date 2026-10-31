@@ -223,7 +223,7 @@ async fn stale_reminders_are_cancelled_at_send_time(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    assert_eq!(wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap(), 6);
+    assert_eq!(wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap(), 8); // 6 筆提醒 + 2 筆認領確認
     assert_eq!(reminders(&pool, bought, "cancelled").await.len(), 2);
     assert_eq!(reminders(&pool, extended, "cancelled").await.len(), 2); // 延長前的舊期限
     assert_eq!(reminders(&pool, extended, "sent").await.len(), 2); // 新期限

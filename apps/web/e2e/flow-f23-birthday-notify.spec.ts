@@ -82,16 +82,16 @@ test('生日可見度改 private：編輯頁開關停用且已關閉', async ({ 
   await expect(page.getByText('你的生日可見度為「只有自己」，請先在設定調整。')).toBeVisible()
 })
 
-test('設定頁「生日通知信」開關重新整理後保持', async ({ page }) => {
+test('設定頁社交與生日 Email 開關重新整理後保持', async ({ page }) => {
   await member(page)
   await page.goto('/settings'); await hydrated(page)
-  const box = page.getByLabel(/生日通知信/)
+  const box = page.getByLabel('社交與生日 Email')
   await expect(box).toBeChecked()
   const saved = page.waitForResponse(r => r.url().endsWith('/me') && r.request().method() === 'PATCH')
   await box.uncheck()
   expect((await saved).ok()).toBe(true)
   await page.reload(); await hydrated(page)
-  await expect(page.getByLabel(/生日通知信/)).not.toBeChecked()
+  await expect(page.getByLabel('社交與生日 Email')).not.toBeChecked()
 })
 
 test("退訂 'b' 權杖：確認後設定頁開關變關閉", async ({ page }) => {
@@ -103,5 +103,5 @@ test("退訂 'b' 權杖：確認後設定頁開關變關閉", async ({ page }) =
   await page.getByRole('button', { name: '確定退訂' }).click()
   await expect(page.getByRole('heading', { name: '已退訂' })).toBeVisible()
   await page.goto('/settings'); await hydrated(page)
-  await expect(page.getByLabel(/生日通知信/)).not.toBeChecked()
+  await expect(page.getByLabel('社交與生日 Email')).not.toBeChecked()
 })

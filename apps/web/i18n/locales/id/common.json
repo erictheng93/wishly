@@ -33,6 +33,7 @@
     "supportSubject": "Dukungan Wishly",
     "supportBody": "ID akun: {id}\n\nJelaskan masalahnya:\n",
     "notifications": "Notifikasi",
-    "unreadCount": "{n} belum dibaca"
+    "unreadCount": "{n} belum dibaca",
+    "close": "Tutup"
   }
 }

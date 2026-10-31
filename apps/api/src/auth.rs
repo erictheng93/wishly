@@ -716,14 +716,14 @@ async fn patch_me(
         let ok = prefs.as_object().is_some_and(|o| {
             !o.is_empty()
                 && o.iter().all(|(k, v)| {
-                    matches!(k.as_str(), "email_gifts" | "email_social") && v.is_boolean()
+                    matches!(k.as_str(), "email_gifts" | "email_social" | "inbox_gifts" | "inbox_social") && v.is_boolean()
                 })
         });
         if !ok {
             return Err(AppError::invalid(
                 "/notification_prefs",
                 "FORMAT",
-                "僅支援布林值的 email_gifts / email_social",
+                "僅支援布林值的 email_gifts / email_social / inbox_gifts / inbox_social",
             ));
         }
         sqlx::query("UPDATE users SET notification_prefs = notification_prefs || $2 WHERE id=$1")

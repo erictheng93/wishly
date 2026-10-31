@@ -3,6 +3,8 @@ ALTER TABLE notifications
   ADD COLUMN inbox_at    timestamptz,
   ADD COLUMN inbox_title text,
   ADD COLUMN inbox_link  text,
+  ADD COLUMN inbox_body  text,
+  ADD COLUMN inbox_category text,
   ADD COLUMN read_at     timestamptz;
 CREATE INDEX notifications_inbox_idx ON notifications (user_id, inbox_at DESC) WHERE inbox_at IS NOT NULL;
 

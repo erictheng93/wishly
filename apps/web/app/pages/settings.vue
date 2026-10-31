@@ -118,7 +118,7 @@ async function saveName() {
   catch (e) { err.value = errMsg(e) }
 }
 const nBusy = ref(false), nErr = ref('')
-async function setMailPref(key: 'email_gifts' | 'email_social', on: boolean) {
+async function setMailPref(key: 'email_gifts' | 'email_social' | 'inbox_gifts' | 'inbox_social', on: boolean) {
   nBusy.value = true; nErr.value = ''
   try { user.value = await api('/me', { method: 'PATCH', body: { notification_prefs: { [key]: on } } }) } catch (e: any) { nErr.value = apiErrMsg(e) } finally { nBusy.value = false }
 }
@@ -257,8 +257,11 @@ async function remove() {
       </section>
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.notify.title') }}</h2>
-        <label class="c-switch"><input type="checkbox" checked disabled><span>{{ $t('settings.notify.account') }}<br><small class="c-mute">{{ $t('settings.notify.accountHint') }}</small></span></label>
-        <label v-for="k in (['gifts', 'social'] as const)" :key="k" class="c-switch"><input type="checkbox" :checked="user?.notification_prefs?.[`email_${k}`] !== false" :disabled="nBusy" @change="setMailPref(`email_${k}`, ($event.target as HTMLInputElement).checked)"><span>{{ $t(`settings.notify.${k}`) }}<br><small class="c-mute">{{ $t(`settings.notify.${k}Hint`) }}</small></span></label>
+        <!-- 每類一列、站內與 Email 兩個開關；帳務類兩個都鎖定開啟 -->
+        <div v-for="k in (['account', 'gifts', 'social'] as const)" :key="k" class="st-notify" role="group" :aria-labelledby="`nt-${k}`">
+          <p class="st-notify-t"><span :id="`nt-${k}`">{{ $t(`settings.notify.${k}`) }}</span><small class="c-mute">{{ $t(`settings.notify.${k}Hint`) }}</small></p>
+          <label v-for="ch in (['inbox', 'email'] as const)" :key="ch" class="c-switch"><input type="checkbox" :checked="k === 'account' || user?.notification_prefs?.[`${ch}_${k}`] !== false" :aria-label="`${$t(`settings.notify.${k}`)} ${$t(`settings.notify.${ch}`)}`" :disabled="k === 'account' || nBusy" @change="setMailPref(`${ch}_${k}` as any, ($event.target as HTMLInputElement).checked)"><span>{{ $t(`settings.notify.${ch}`) }}</span></label>
+        </div>
         <p v-if="nErr" class="c-err" role="alert">{{ nErr }}</p>
       </section>
       <section class="c-card">
@@ -293,6 +296,8 @@ async function remove() {
 </template>
 
 <style scoped>
+.st-notify{padding:8px 0;border-top:1px solid var(--line)}.st-notify-t{display:flex;flex-direction:column;margin:0 0 4px;font-weight:700}.st-notify-t small{font-weight:400;line-height:1.6}
+.st-notify .c-switch{display:inline-flex;margin-right:20px}
 .st-kv{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px}
 .st-kv>span{flex:0 0 100%;font:600 11px/1.6 var(--mono);letter-spacing:.1em}
 .st-kv>code,.st-kv>a{flex:1 1 12em;min-width:0;overflow-wrap:anywhere;font:500 13px/1.5 var(--mono);color:var(--fg)}

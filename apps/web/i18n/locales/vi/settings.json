@@ -114,13 +114,15 @@
     "terms": "Điều khoản dịch vụ",
     "privacy": "Chính sách quyền riêng tư",
     "notify": {
-      "title": "Email thông báo",
-      "account": "Tài khoản và bảo mật",
-      "accountHint": "Thông báo quan trọng về tài khoản, ví và đơn hàng. Luôn bật.",
-      "gifts": "Tiến độ tặng quà",
+      "title": "Cài đặt thông báo",
+      "account": "Tài khoản, bảo mật và thời hạn",
+      "accountHint": "Bảo mật tài khoản, ví, đơn hàng và các việc có thời hạn hoặc có thể gây thiệt hại (nhắc nhở, hết hạn, huỷ). Luôn bật.",
+      "gifts": "Tiến độ quà tặng",
       "giftsHint": "Có người tặng, món đạt mục tiêu, đã gửi hoặc đã giao.",
-      "social": "Bạn bè và sinh nhật",
-      "socialHint": "Hoạt động của bạn bè, nhắc sinh nhật bạn bè và nhắc bạn tạo danh sách trước sinh nhật của mình."
+      "social": "Xã hội và sinh nhật",
+      "socialHint": "Hoạt động của bạn bè, nhắc sinh nhật bạn bè và nhắc trước sinh nhật của bạn để lập danh sách.",
+      "inbox": "Trong ứng dụng",
+      "email": "Email"
     }
   }
 }

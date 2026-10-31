@@ -177,7 +177,7 @@ async fn tick_recipients_and_idempotency(pool: PgPool) {
             .await
             .unwrap();
     }
-    sqlx::query("UPDATE users SET notification_prefs='{\"email_social\": false}' WHERE id=$1")
+    sqlx::query("UPDATE users SET notification_prefs='{\"email_social\": false, \"inbox_social\": false}' WHERE id=$1")
         .bind(f_off.id)
         .execute(&pool)
         .await

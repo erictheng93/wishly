@@ -419,7 +419,14 @@
       "readAll": "Mark all as read",
       "empty": "No notifications yet",
       "unread": "Unread",
-      "loadMore": "Load more"
+      "loadMore": "Load more",
+      "viewAll": "View all",
+      "cat": {
+        "all": "All",
+        "account": "Account",
+        "gifts": "Gifts",
+        "social": "Birthdays"
+      }
     }
   }
 }

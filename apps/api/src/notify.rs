@@ -41,16 +41,15 @@ pub async fn enqueue<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
-/// 會員認領確認信：延後 10 分鐘寄，讓連續認領能在 worker 合併成一封。
+/// 會員認領確認：站內立即出現；email 由 worker 延後 10 分鐘（`EMAIL_HOLD_MINUTES`），讓連續認領合併成一封。
 pub async fn enqueue_claim_confirmation<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
     claim_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO notifications (user_id, channel, kind, payload, scheduled_at)
+        "INSERT INTO notifications (user_id, channel, kind, payload)
          SELECT c.user_id, 'email'::notification_channel, 'claim.confirmation',
-                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', c.item_id, 'claim_id', c.id, 'expires_at', c.expires_at),
-                now() + interval '10 minutes'
+                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', c.item_id, 'claim_id', c.id, 'expires_at', c.expires_at)
            FROM claims c JOIN wishlist_items i ON i.id = c.item_id
           WHERE c.id = $1 AND c.user_id IS NOT NULL")
         .bind(claim_id).execute(ex).await?;
@@ -114,23 +113,22 @@ pub async fn enqueue_site_paused<'e, E: sqlx::PgExecutor<'e>>(
 }
 
 /// Q13：建立者修改品項內容後，通知進行中的捐助者（reserved / purchased，含有 email 的舊訪客）與眾籌認捐者（pledged）。
-/// 連續修改合併：延後 10 分鐘寄，notifications_item_changed_uk 讓同一人同一品項只留一筆待寄；內容寄信時才讀最新品項。
+/// 站內立即出現；email 由 worker 延後 10 分鐘合併連續修改：notifications_item_changed_uk 讓同一人同一品項只留一筆待寄，內容寄信時才讀最新品項。
 pub async fn enqueue_item_changed<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
     item_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO notifications (user_id, guest_id, channel, kind, payload, scheduled_at)
+        "INSERT INTO notifications (user_id, guest_id, channel, kind, payload)
          SELECT r.user_id, r.guest_id, 'email'::notification_channel, 'claim.item_changed',
-                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', i.id, 'crowdfund', i.funding_mode = 'crowdfund'),
-                now() + interval '10 minutes'
+                jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', i.id, 'crowdfund', i.funding_mode = 'crowdfund')
            FROM wishlist_items i
            JOIN (SELECT user_id, guest_id FROM claims WHERE item_id = $1 AND status IN ('reserved', 'purchased')
                  UNION SELECT user_id, NULL::uuid FROM contributions WHERE item_id = $1 AND status = 'pledged') r ON true
            LEFT JOIN users u ON u.id = r.user_id
            LEFT JOIN guests g ON g.id = r.guest_id
           WHERE i.id = $1
-            AND ((u.email IS NOT NULL AND u.deleted_at IS NULL) OR (g.email IS NOT NULL AND g.deleted_at IS NULL))
+            AND ((u.id IS NOT NULL AND u.deleted_at IS NULL) OR (g.email IS NOT NULL AND g.deleted_at IS NULL)) -- 沒 email 的會員也要有站內通知
          ON CONFLICT DO NOTHING")
         .bind(item_id).execute(ex).await?;
     Ok(())
@@ -226,12 +224,29 @@ pub fn spawn_worker(pool: PgPool) {
             if let Err(e) = tick(&pool).await {
                 tracing::warn!(error = %e, "notify worker");
             }
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await; // pending 掃描走 notifications_due_idx
         }
     });
 }
 
-type PendingNotification = (Uuid, Option<Uuid>, Option<Uuid>, String, String, Value, i16);
+/// 最後一欄 has_inbox：領取時已寫過站內信（安靜時段延後的 email、重試），不再改站內欄位也不再發訊號。
+type PendingNotification = (Uuid, Option<Uuid>, Option<Uuid>, String, String, Value, i16, bool);
+
+/// DB 階段做完、等待寄出的 email（寄送與 DB 工作分開，SMTP 卡住不能擋住站內通知）。
+struct Outbound {
+    id: Uuid,
+    kind: String,
+    to: String,
+    subject: String,
+    body: String,
+    attempts: i16,
+}
+
+/// 認領確認與品項變更：站內立即出現，email 從建立起延後這麼久，讓連續操作合併、已取消的不寄。
+const EMAIL_HOLD_MINUTES: i32 = 10;
+
+/// 同時寄送上限
+const SEND_CONCURRENCY: usize = 5;
 
 /// 寄送失敗最多嘗試次數（含第一次）；超過標 failed。
 pub const MAX_ATTEMPTS: i16 = 6;
@@ -245,12 +260,27 @@ pub fn backoff(attempts: i16) -> Duration {
 /// 通知類別：決定能否關閉與是否遵守安靜時段。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Category {
-    /// 帳務、安全、治理：不可關閉、不延後
+    /// 帳務、安全、治理、會造成損失者：不可關閉、email 不延後
     Account,
-    /// 送禮進度：偏好 `email_gifts`
+    /// 送禮進度：偏好 `email_gifts` / `inbox_gifts`
     Gifts,
-    /// 好友與生日：偏好 `email_social`
+    /// 好友與生日：偏好 `email_social` / `inbox_social`
     Social,
+}
+
+impl Category {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Category::Account => "account",
+            Category::Gifts => "gifts",
+            Category::Social => "social",
+        }
+    }
+}
+
+/// 站內信內文：取 email 內文，去掉含連結（`://`）的行與空行。
+pub fn inbox_body(email_body: &str) -> String {
+    email_body.lines().map(str::trim).filter(|l| !l.is_empty() && !l.contains("://")).collect::<Vec<_>>().join("\n")
 }
 
 pub fn category(kind: &str) -> Category {
@@ -266,6 +296,13 @@ pub fn category(kind: &str) -> Category {
                 | "funding.expired"
                 | "funding.released"
                 | "item.removed"
+                | "claim.purchase_reminder"
+                | "claim.expired"
+                | "claim.cancelled_by_owner"
+                | "claim.list_closed"
+                | "claim.item_removed"
+                | "wishlist.closing"
+                | "site.paused"
         )
     {
         Category::Account
@@ -342,61 +379,76 @@ async fn set_status(pool: &PgPool, id: Uuid, status: &str, err: &str) -> Result<
     Ok(())
 }
 
-/// 處理一批到期通知；回傳領取筆數。順序固定（見計畫 Task 1）：
-/// 領取（租約 6 分鐘）→ 安靜時段 → 寄前重驗 → 驚喜把關 → 合併 → render 後寫站內信 → 偏好靜音 → 寄送 / 退避。
+/// 處理一批到期通知；回傳領取筆數。順序固定：
+/// 領取（租約 6 分鐘）→ 收件人 → 寄前重驗 → 驚喜把關 → 合併 → render → 寫站內信 + 發訊號 → email 偏好靜音 → 安靜時段延後 email → 寄送 / 退避。
+/// 站內信不受安靜時段影響；安靜時段只延後 email。
 pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
     tick_at(pool, chrono::Utc::now()).await
 }
 
-/// `tick` 的可注入時鐘版本（只影響安靜時段判斷），測試用。
+/// `tick` 的可注入時鐘版本（只影響安靜時段判斷），測試用。回傳時 DB 與寄送兩階段都已完成。
 pub async fn tick_at(pool: &PgPool, now: chrono::DateTime<chrono::Utc>) -> Result<usize, sqlx::Error> {
     // 1. 領取：租約須大於一批 20 封 × 15 秒的寄送上限
     let rows: Vec<PendingNotification> = sqlx::query_as(
         "UPDATE notifications SET attempts = attempts + 1, scheduled_at = now() + interval '6 minutes'
           WHERE id IN (SELECT id FROM notifications WHERE status = 'pending' AND scheduled_at <= now()
                         ORDER BY scheduled_at LIMIT 20 FOR UPDATE SKIP LOCKED)
-         RETURNING id, user_id, guest_id, channel::text, kind, payload, attempts")
+         RETURNING id, user_id, guest_id, channel::text, kind, payload, attempts, inbox_at IS NOT NULL")
         .fetch_all(pool).await?;
     if rows.is_empty() {
         return Ok(0);
     }
     let n = rows.len();
     let mut bundled = std::collections::HashSet::new();
+    // DB 階段（含站內信）先對整批做完，再併發寄信
+    let mut out = Vec::new();
     for row in rows {
         if bundled.contains(&row.0) {
             continue;
         }
-        handle(pool, now, row, &mut bundled).await?;
+        out.extend(handle(pool, now, row, &mut bundled).await?);
     }
+    futures_util::StreamExt::for_each_concurrent(futures_util::stream::iter(out), SEND_CONCURRENCY, |o| async move {
+        if let Err(e) = deliver(pool, o).await {
+            tracing::warn!(error = %e, "notify deliver");
+        }
+    })
+    .await;
     Ok(n)
 }
 
 async fn handle(
     pool: &PgPool,
     now: chrono::DateTime<chrono::Utc>,
-    (id, uid, gid, channel, kind, mut payload, attempts): PendingNotification,
+    (id, uid, gid, channel, kind, mut payload, attempts, has_inbox): PendingNotification,
     bundled: &mut std::collections::HashSet<Uuid>,
-) -> Result<(), sqlx::Error> {
+) -> Result<Option<Outbound>, sqlx::Error> {
+    macro_rules! done {
+        ($st:expr, $err:expr) => {{
+            set_status(pool, id, $st, $err).await?;
+            return Ok(None);
+        }};
+    }
     let cfg = crate::config::get();
     let cat = category(&kind);
-    // 2. 安靜時段：延後到 09:00，不算一次嘗試
-    if cat != Category::Account && kind != "wishlist.closing" {
-        if let Some(at) = quiet_until(now) {
-            sqlx::query("UPDATE notifications SET scheduled_at = $2, attempts = attempts - 1 WHERE id = $1")
-                .bind(id).bind(at).execute(pool).await?;
-            return Ok(());
-        }
+    // email 要延後的時間（見步驟 9）：安靜時段，或連續操作的合併窗口。站內信不等；此時不合併，否則被併掉的列就沒有自己的站內信
+    let mut hold = if cat == Category::Account { None } else { quiet_until(now) };
+    if hold.is_none() && matches!(kind.as_str(), "claim.confirmation" | "claim.item_changed") {
+        hold = sqlx::query_scalar("SELECT at FROM (SELECT created_at + make_interval(mins => $2) AS at FROM notifications WHERE id = $1) t WHERE at > now()")
+            .bind(id).bind(EMAIL_HOLD_MINUTES).fetch_optional(pool).await?;
     }
     // 會員收件人：帳號已刪除就不處理；同時取語言與偏好（偏好在步驟 7 才套用）
-    let user: Option<(String, bool, bool)> = match uid {
+    let user: Option<(String, bool, bool, bool, bool)> = match uid {
         Some(u) => {
-            let r: Option<(String, bool, bool)> = sqlx::query_as(
+            let r: Option<(String, bool, bool, bool, bool)> = sqlx::query_as(
                 "SELECT locale, COALESCE(notification_prefs->>'email_gifts', 'true') <> 'false',
-                        COALESCE(notification_prefs->>'email_social', 'true') <> 'false'
+                        COALESCE(notification_prefs->>'email_social', 'true') <> 'false',
+                        COALESCE(notification_prefs->>'inbox_gifts', 'true') <> 'false',
+                        COALESCE(notification_prefs->>'inbox_social', 'true') <> 'false'
                    FROM users WHERE id = $1 AND deleted_at IS NULL")
                 .bind(u).fetch_optional(pool).await?;
             if r.is_none() {
-                return set_status(pool, id, "cancelled", "no recipient").await;
+                done!("cancelled", "no recipient");
             }
             r
         }
@@ -411,18 +463,18 @@ async fn handle(
               WHERE c.id = ($1->>'claim_id')::uuid AND c.status = 'reserved' AND c.expires_at = ($1->>'expires_at')::timestamptz")
             .bind(&payload).fetch_optional(pool).await?;
         let Some(ended) = ended else {
-            return set_status(pool, id, "cancelled", "claim no longer due").await;
+            done!("cancelled", "claim no longer due");
         };
         if ended {
             payload["ended"] = Value::Bool(true);
         }
     } else if kind == "claim.confirmation" {
-        // 延後 10 分鐘寄：這段期間認領已取消 / 釋出就不寄
+        // email 延後期間認領已取消 / 釋出就不寄
         let ok: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM claims WHERE id = ($1->>'claim_id')::uuid AND status IN ('reserved', 'purchased'))")
             .bind(&payload).fetch_one(pool).await?;
         if !ok {
-            return set_status(pool, id, "cancelled", "claim no longer active").await;
+            done!("cancelled", "claim no longer active");
         }
     } else if kind == "friend.request" {
         // 申請可能已被撤回 / 接受 / 拒絕，或寄件人已刪除帳號：不寄
@@ -431,7 +483,7 @@ async fn handle(
               WHERE r.id = ($1->>'request_id')::uuid")
             .bind(&payload).fetch_optional(pool).await?;
         let Some(from_name) = from_name else {
-            return set_status(pool, id, "cancelled", "friend request no longer pending").await;
+            done!("cancelled", "friend request no longer pending");
         };
         payload["from_name"] = Value::String(from_name);
     } else if kind == "friend.accepted" {
@@ -439,7 +491,7 @@ async fn handle(
             "SELECT display_name FROM users WHERE id = ($1->>'from_user')::uuid AND deleted_at IS NULL")
             .bind(&payload).fetch_optional(pool).await?;
         let Some(from_name) = from_name else {
-            return set_status(pool, id, "cancelled", "friend no longer exists").await;
+            done!("cancelled", "friend no longer exists");
         };
         payload["from_name"] = Value::String(from_name);
     } else if kind == "birthday.friend" {
@@ -456,7 +508,7 @@ async fn handle(
                 AND (w.visibility::text <> 'selected' OR EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = r.id))")
             .bind(&payload).bind(uid).fetch_optional(pool).await?;
         let Some((owner_name, slug)) = row else {
-            return set_status(pool, id, "cancelled", "birthday list no longer visible").await;
+            done!("cancelled", "birthday list no longer visible");
         };
         payload["owner_name"] = owner_name.into();
         payload["slug"] = slug.into();
@@ -465,17 +517,17 @@ async fn handle(
             "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND birthday IS NOT NULL AND birthday_visibility::text <> 'private')")
             .bind(uid).fetch_one(pool).await?;
         if !ok {
-            return set_status(pool, id, "cancelled", "birthday nudge no longer wanted").await;
+            done!("cancelled", "birthday nudge no longer wanted");
         }
     } else if kind == "claim.item_changed" {
-        // 延後 10 分鐘寄：這段期間取消 / 撤回 / 轉投 / 品項被刪的就不寄
+        // email 延後期間取消 / 撤回 / 轉投 / 品項被刪的就不寄
         let still: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM claims WHERE item_id = ($1->>'item_id')::uuid AND status IN ('reserved', 'purchased')
                               AND (user_id = $2 OR guest_id = $3))
                  OR EXISTS (SELECT 1 FROM contributions WHERE item_id = ($1->>'item_id')::uuid AND status = 'pledged' AND user_id = $2)")
             .bind(&payload).bind(uid).bind(gid).fetch_one(pool).await?;
         if !still {
-            return set_status(pool, id, "cancelled", "no longer supporting item").await;
+            done!("cancelled", "no longer supporting item");
         }
     }
     // 4. 驚喜把關：受贈者端通知在驚喜鎖定中一律不寄、不進站內信
@@ -486,17 +538,18 @@ async fn handle(
             "SELECT surprise_locked(surprise_mode, event_date) FROM wishlists WHERE id = ($1->>'wishlist_id')::uuid")
             .bind(&payload).fetch_optional(pool).await?;
         if locked == Some(true) {
-            return set_status(pool, id, "cancelled", "surprise locked").await;
+            done!("cancelled", "surprise locked");
         }
     }
     // 5. 合併：同收件人短時間內的同類通知併成一封，其餘標為 sent（last_error 記主列 id）
-    if matches!(kind.as_str(), "claim.confirmation" | "claim.purchase_reminder" | "claim.expired" | "item.reopened") {
+    // 只併「站內狀態相同」的列：第一輪併還沒進站內的，隔天 09:00 的第二輪併已進站內的，email 仍合成一封
+    if hold.is_none() && matches!(kind.as_str(), "claim.confirmation" | "claim.purchase_reminder" | "claim.expired" | "item.reopened") {
         let merged: Vec<(Uuid, Option<String>)> = sqlx::query_as(
             "WITH m AS (
                SELECT n.id, i.title FROM notifications n
                  LEFT JOIN wishlist_items i ON i.id = (n.payload->>'item_id')::uuid
                 WHERE n.user_id IS NOT DISTINCT FROM $1 AND n.guest_id IS NOT DISTINCT FROM $2
-                  AND n.kind = $3 AND n.status = 'pending' AND n.id <> $4
+                  AND n.kind = $3 AND n.status = 'pending' AND n.id <> $4 AND (n.inbox_at IS NOT NULL) = $5
                   AND n.scheduled_at <= now() + interval '6 hours'
                   AND CASE n.kind
                         WHEN 'claim.purchase_reminder' THEN EXISTS (
@@ -511,7 +564,7 @@ async fn handle(
                UPDATE notifications SET status = 'sent', sent_at = now(), last_error = 'bundled:' || $4::text
                  FROM m WHERE notifications.id = m.id RETURNING notifications.id)
              SELECT m.id, m.title FROM m JOIN u ON u.id = m.id")
-            .bind(uid).bind(gid).bind(&kind).bind(id).fetch_all(pool).await?;
+            .bind(uid).bind(gid).bind(&kind).bind(id).bind(has_inbox).fetch_all(pool).await?;
         if !merged.is_empty() {
             // 寫回 DB：被併入的列已標 sent，主列重試時要靠這份清單；重試時可能再併入新列，所以累加
             let mut items: Vec<Value> = payload.get("more_items").and_then(Value::as_array).cloned().unwrap_or_default();
@@ -565,20 +618,30 @@ async fn handle(
         None => Lang::parse(payload.get("locale").and_then(Value::as_str).unwrap_or_default()),
     };
     let (subject, body) = render_lang(lang, &kind, &title, &payload);
-    // 站內信先於 email 判斷：沒有 email、偏好關閉的使用者一樣看得到
-    if uid.is_some() {
-        let inbox_title = subject
-            .strip_prefix("【Wishly】")
-            .or_else(|| subject.strip_prefix("[Wishly] "))
-            .unwrap_or(&subject);
-        sqlx::query("UPDATE notifications SET inbox_at = COALESCE(inbox_at, now()), inbox_title = $2, inbox_link = $3 WHERE id = $1")
-            .bind(id).bind(inbox_title).bind(inbox_link(&kind, &payload)).execute(pool).await?;
-    }
-    // 7. 偏好：關閉的類別只靜音 email，站內信保留
-    if let Some((_, gifts, social)) = &user {
-        if (cat == Category::Gifts && !gifts) || (cat == Category::Social && !social) {
-            return set_status(pool, id, "cancelled", "muted").await;
+    // 7. 站內信（不受安靜時段影響）：領取時已有就凍結不動；Account 類不看偏好
+    if let (Some(u), Some((_, _, _, ig, is_)), false) = (uid, &user, has_inbox) {
+        if cat == Category::Account || (cat == Category::Gifts && *ig) || (cat == Category::Social && *is_) {
+            let inbox_title = subject
+                .strip_prefix("【Wishly】")
+                .or_else(|| subject.strip_prefix("[Wishly] "))
+                .unwrap_or(&subject);
+            sqlx::query("UPDATE notifications SET inbox_at = now(), inbox_title = $2, inbox_link = $3, inbox_body = $4, inbox_category = $5 WHERE id = $1 AND inbox_at IS NULL")
+                .bind(id).bind(inbox_title).bind(inbox_link(&kind, &payload)).bind(inbox_body(&body)).bind(cat.as_str())
+                .execute(pool).await?;
+            let _ = crate::dashboard::notify(pool, u).await; // 訊號只是提示，失敗由前端重連 / 重整補上
         }
+    }
+    // 偏好：關閉的類別只靜音 email
+    if let Some((_, gifts, social, ..)) = &user {
+        if (cat == Category::Gifts && !gifts) || (cat == Category::Social && !social) {
+            done!("cancelled", "muted");
+        }
+    }
+    // email 延後（安靜時段到 09:00、連續操作的合併窗口），不算一次嘗試
+    if let Some(at) = hold {
+        sqlx::query("UPDATE notifications SET scheduled_at = $2, attempts = attempts - 1 WHERE id = $1")
+            .bind(id).bind(at).execute(pool).await?;
+        return Ok(None);
     }
     // 8. 寄送
     let security = matches!(
@@ -598,12 +661,17 @@ async fn handle(
         None
     };
     let Some(to) = to else {
-        return set_status(pool, id, "cancelled", "no email recipient").await;
+        done!("cancelled", "no email recipient");
     };
     if to.parse::<lettre::Address>().is_err() {
-        return set_status(pool, id, "failed", "bad address").await;
+        done!("failed", "bad address");
     }
-    match send_mail(&cfg, &to, &subject, &body).await {
+    Ok(Some(Outbound { id, kind, to, subject, body, attempts }))
+}
+
+async fn deliver(pool: &PgPool, o: Outbound) -> Result<(), sqlx::Error> {
+    let Outbound { id, kind, to, subject, body, attempts } = o;
+    match send_mail(&crate::config::get(), &to, &subject, &body).await {
         Ok(()) => {
             sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = NULL WHERE id = $1").bind(id).execute(pool).await?;
         }
@@ -1450,17 +1518,30 @@ mod tests {
     }
 
     #[test]
+    fn inbox_body_is_nonempty_and_linkless() {
+        let p = json!({"givers": 2, "amount": 100, "debt": 5, "status": "completed", "from_name": "A", "hidden": true,
+                       "unsubscribe_url": "https://x.test/api/v1/unsubscribe?token=t"});
+        for kind in KINDS {
+            for l in [Lang::Zh, Lang::En, Lang::Vi, Lang::Id] {
+                let b = inbox_body(&render_lang(l, kind, "T", &p).1);
+                assert!(!b.is_empty() && !b.contains("://"), "{kind} {l:?}: {b:?}");
+            }
+        }
+    }
+
+    #[test]
     fn categories() {
         use Category::*;
         for k in ["auth.mfa_reset", "org.review", "staff.digest", "account.suspended", "wallet.frozen", "topup.credited",
                   "cash_refund.updated", "wishlist.moderated", "order.failed", "order.partial_refund", "funding.expired",
-                  "funding.released", "item.removed"] {
+                  "funding.released", "item.removed", "claim.purchase_reminder", "claim.expired", "claim.cancelled_by_owner",
+                  "claim.list_closed", "claim.item_removed", "wishlist.closing", "site.paused"] {
             assert_eq!(category(k), Account, "{k}");
         }
         for k in ["friend.request", "friend.accepted", "birthday.friend", "birthday.nudge"] {
             assert_eq!(category(k), Social, "{k}");
         }
-        for k in ["claim.confirmation", "owner.funded", "event.summary", "site.paused", "wishlist.closing", "crowdfund.funded", "item.reopened"] {
+        for k in ["claim.confirmation", "claim.item_changed", "owner.funded", "event.summary", "crowdfund.funded", "item.reopened"] {
             assert_eq!(category(k), Gifts, "{k}");
         }
         for k in KINDS {

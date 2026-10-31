@@ -17,16 +17,16 @@ async fn patch(pool: &PgPool, tok: &str, claim: Uuid, status: &str) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn create_enqueues_delayed_confirmation(pool: PgPool) {
+async fn create_enqueues_immediate_confirmation(pool: PgPool) {
     let o = user(&pool, "o").await;
     let wl = wishlist(&pool, o.id, ListOpts::default()).await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
     let d = user(&pool, "d").await;
     let (s, _, b) = call(&pool, "POST", &format!("/items/{it}/claims"), &[ck(&d.token), idem(Uuid::new_v4())].concat(), Some(json!({"qty": 1}))).await;
     assert_eq!(s, axum::http::StatusCode::CREATED, "{b}");
-    let delayed: bool = sqlx::query_scalar("SELECT scheduled_at > now() + interval '5 minutes' FROM notifications WHERE kind='claim.confirmation' AND user_id=$1")
+    let due: bool = sqlx::query_scalar("SELECT scheduled_at <= now() FROM notifications WHERE kind='claim.confirmation' AND user_id=$1")
         .bind(d.id).fetch_one(&pool).await.unwrap();
-    assert!(delayed);
+    assert!(due, "站內要立刻出現：排程不延後，email 的延後由 worker 處理");
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

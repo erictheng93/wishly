@@ -82,7 +82,7 @@ async fn edits_coalesce_into_one_pending_mail_per_active_donor(pool: PgPool) {
         3,
         "one pending item_changed per donor: {rows:?}"
     ); // 兩位會員 + 有 email 的訪客，各一筆
-    assert!(rows.iter().all(|r| r.2), "延後約 10 分鐘寄出");
+    assert!(rows.iter().all(|r| !r.2), "站內要立刻出現：排程不延後");
     let changed: Option<chrono::DateTime<chrono::Utc>> =
         sqlx::query_scalar("SELECT content_changed_at FROM wishlist_items WHERE id = $1")
             .bind(it)
@@ -194,7 +194,7 @@ async fn crowdfund_pledgers_are_notified(pool: PgPool) {
         json!({ "description": "雙向推車" }),
     )
     .await;
-    assert_eq!(pending(&pool, it).await, vec![(Some(fan.id), None, true)]);
+    assert_eq!(pending(&pool, it).await, vec![(Some(fan.id), None, false)]);
     let crowdfund: bool = sqlx::query_scalar(
         "SELECT (payload->>'crowdfund')::bool FROM notifications WHERE kind = 'claim.item_changed'",
     )
@@ -264,7 +264,7 @@ async fn cancelled_claimant_notice_is_cancelled_at_send_time(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("UPDATE notifications SET scheduled_at = now() WHERE kind = 'claim.item_changed'")
+    sqlx::query("UPDATE notifications SET created_at = now() - interval '11 minutes', scheduled_at = now() WHERE kind = 'claim.item_changed'")
         .execute(&pool)
         .await
         .unwrap();

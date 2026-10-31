@@ -419,7 +419,14 @@
       "readAll": "Tandai semua dibaca",
       "empty": "Belum ada notifikasi",
       "unread": "Belum dibaca",
-      "loadMore": "Muat lebih banyak"
+      "loadMore": "Muat lebih banyak",
+      "viewAll": "Lihat semua",
+      "cat": {
+        "all": "Semua",
+        "account": "Akun",
+        "gifts": "Hadiah",
+        "social": "Ulang tahun"
+      }
     }
   }
 }

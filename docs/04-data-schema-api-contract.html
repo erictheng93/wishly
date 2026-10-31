@@ -623,7 +623,7 @@ CREATE TABLE users (
   avatar_key    text,
   locale        text        NOT NULL DEFAULT 'zh-TW',
   is_staff      boolean     NOT NULL DEFAULT false,   -- 營運人員（MVP 起：/admin 後台；P2：人工代購）
-  notification_prefs jsonb  NOT NULL DEFAULT '{"email_claims": true}'::jsonb,   -- 通知設定（PATCH /me）；鍵：email_gifts、email_social（缺鍵 = 開啟，D67）
+  notification_prefs jsonb  NOT NULL DEFAULT '{"email_claims": true}'::jsonb,   -- 通知設定（PATCH /me）；鍵：inbox_gifts、inbox_social、email_gifts、email_social（缺鍵 = 開啟，站內與 Email 各自獨立，D67）
   handle        text        CHECK (handle ~ '^[a-z0-9_]{3,30}$'),     -- v0.5：個人頁 /u/{handle}；NULL = 尚未設定（無個人頁）；UNIQUE（partial，見 users_handle_key）
   default_claim_visibility share_level NOT NULL DEFAULT 'private',    -- v0.5：登入者捐助 / 點數認捐的預設公開層級
   bio           text        CHECK (char_length(bio) BETWEEN 1 AND 160),  -- 0014：自我介紹，個人頁顯示
@@ -3059,7 +3059,8 @@ Set-Cookie: ws_guest=&lt;new guest token&gt;; Path=/; Max-Age=31536000; HttpOnly
 <tr><td><span class="badge m-DELETE">DELETE</span></td><td><code>/friends/{user_id}</code></td><td><span class="badge p-P1">P1</span></td><td>ws_session</td></tr>
 </tbody></table></div>
 <p class="note">另：<code>GET|PUT /wishlists/{id}/allowed-users</code>（見 Wishlist）、<code>PATCH /me</code> 的 <code>handle</code> / <code>default_claim_visibility</code>（見 Auth）。</p><h3 id="api-notifications">站內通知（D67）</h3><div class="tw"><table><thead><tr><th>方法</th><th>路徑</th><th>說明</th></tr></thead><tbody>
-<tr><td><span class="badge m-GET">GET</span></td><td><code>/me/notifications?limit=1-50&amp;before={id}</code></td><td>ws_session / Bearer。回 <code>{ items: [{ id, kind, title, link, created_at, read_at }], next_cursor, unread }</code>，依 <code>inbox_at</code> 新到舊；<code>next_cursor</code> 為最後一筆 id，帶回 <code>before</code> 取下一頁；<code>limit</code> 超出回 422</td></tr>
+<tr><td><span class="badge m-GET">GET</span></td><td><code>/me/notifications?limit=1-50&amp;before={id}&amp;category=account|gifts|social</code></td><td>ws_session / Bearer。回 <code>{ items: [{ id, kind, title, body, category, link, created_at, read_at }], next_cursor, unread }</code>，依 <code>inbox_at</code> 新到舊；<code>next_cursor</code> 為最後一筆 id，帶回 <code>before</code> 取下一頁；<code>limit</code> 超出或 <code>category</code> 不合法回 422</td></tr>
+<tr><td><span class="badge m-GET">GET</span></td><td><code>/me/notifications/stream</code></td><td>ws_session / Bearer。SSE，有新站內通知或已讀變動時送 <code>event: inbox</code>、<code>data: {}</code>；不帶內容，客戶端收到後呼叫 REST。連線最長 30 分鐘，15 秒心跳</td></tr>
 <tr><td><span class="badge m-GET">GET</span></td><td><code>/me/notifications/unread-count</code></td><td>ws_session / Bearer。回 <code>{ unread: n }</code>（導覽鈴鐺用）</td></tr>
 <tr><td><span class="badge m-POST">POST</span></td><td><code>/me/notifications/{id}/read</code></td><td>204；已讀者保留原時間；非本人或不在站內 404</td></tr>
 <tr><td><span class="badge m-POST">POST</span></td><td><code>/me/notifications/read-all</code></td><td>204</td></tr>
