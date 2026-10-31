@@ -19,6 +19,7 @@ pub mod identities;
 pub mod inbox;
 pub mod inspire;
 pub mod notify;
+pub mod notify_jobs;
 pub mod onboarding;
 pub mod orders;
 pub mod org_admin;

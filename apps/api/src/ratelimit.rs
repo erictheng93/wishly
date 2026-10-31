@@ -99,6 +99,12 @@ pub fn spawn_cleanup(pool: PgPool) {
                 if let Err(e) = crate::birthday::birthday_tick(&pool).await {
                     tracing::error!(error=%e, "birthday_tick");
                 }
+                if let Err(e) = crate::notify_jobs::event_summary_tick(&pool).await {
+                    tracing::error!(error=%e, "event_summary_tick");
+                }
+                if let Err(e) = crate::notify_jobs::staff_digest_tick(&pool).await {
+                    tracing::error!(error=%e, "staff_digest_tick");
+                }
                 if let Err(e) = cleanup(&pool).await {
                     tracing::error!(error=%e, "cleanup");
                 }
