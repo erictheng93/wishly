@@ -267,12 +267,16 @@ async fn patch_order(
             refunded = points::refund_partial(&mut tx, item_id, target - amount).await?; // 差額依認捐比例退回（4.3f）
             sqlx::query("UPDATE purchase_orders SET status = 'placed', merchant_order_id = $2, amount = $3, operator_user_id = $4, placed_at = now() WHERE id = $1")
                 .bind(id).bind(mo).bind(amount).bind(sid).execute(&mut *tx).await?;
+            if refunded > 0 {
+                crate::notify::enqueue_donors(&mut *tx, item_id, "order.partial_refund", &["captured"]).await?;
+            }
         }
         "shipped" => {
             sqlx::query("UPDATE purchase_orders SET status = 'shipped', tracking_no = COALESCE($2, tracking_no), operator_user_id = $3, shipped_at = now() WHERE id = $1")
                 .bind(id).bind(&tracking_no).bind(sid).execute(&mut *tx).await?;
             crate::notify::enqueue_donors(&mut *tx, item_id, "order.shipped", &["captured"])
                 .await?;
+            crate::notify::enqueue_owner(&mut *tx, wid, "owner.shipped", json!({ "item_id": item_id })).await?;
         }
         "delivered" => {
             sqlx::query("UPDATE purchase_orders SET status = 'delivered', tracking_no = COALESCE($2, tracking_no), operator_user_id = $3, delivered_at = now() WHERE id = $1")
@@ -283,6 +287,7 @@ async fn patch_order(
                 .await?;
             crate::notify::enqueue_donors(&mut *tx, item_id, "order.delivered", &["captured"])
                 .await?;
+            crate::notify::enqueue_owner(&mut *tx, wid, "owner.delivered", json!({ "item_id": item_id })).await?;
         }
         _ => {
             // failed | cancelled
@@ -299,6 +304,7 @@ async fn patch_order(
             .bind(item_id)
             .fetch_all(&mut *tx)
             .await?;
+            crate::notify::enqueue_owner(&mut *tx, wid, "owner.order_failed", json!({ "item_id": item_id })).await?;
             crate::notify::enqueue_donors(&mut *tx, item_id, "order.failed", &["captured"]).await?; // release 之前：之後這些認捐就不是 captured 了
             for r in points::release(&mut tx, &ids, &["captured"]).await? {
                 refunded += r.back;
@@ -559,6 +565,9 @@ async fn set_wallet_status(
         json!({ "from": from, "to": to, "reason": reason }),
     )
     .await?;
+    if (from == "frozen") != (to == "frozen") {
+        crate::notify::enqueue(&mut *tx, w.user_id, if to == "frozen" { "wallet.frozen" } else { "wallet.unfrozen" }, json!({})).await?;
+    }
     tx.commit().await?;
     Ok(Json(w.json()))
 }
