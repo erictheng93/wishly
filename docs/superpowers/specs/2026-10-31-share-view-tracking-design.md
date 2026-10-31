@@ -13,7 +13,7 @@
 
 ## 資料
 
-新表 `share_views`（migration 0048），只增不改：
+新表 `share_views`（migration 0050），只增不改：
 
 | 欄位 | 說明 |
 |---|---|
