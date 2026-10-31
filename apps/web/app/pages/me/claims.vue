@@ -3,6 +3,9 @@ import '~/assets/guest.css'
 const { t } = useI18n()
 useSeoMeta({ title: () => t('me.claims.title'), robots: 'noindex' })
 const { api } = useGuest()
+// 未登入時空狀態要給登入入口（D50：認捐需登入，不能只顯示空清單）
+const { user, fetchMe } = useAuth()
+onMounted(() => { fetchMe().catch(() => {}) })
 const state = ref<'loading' | 'ok' | 'empty' | 'error'>('loading')
 const guest = ref<any>(null), rows = ref<any[]>([]), recoverFailed = ref(false), msg = ref('')
 const editing = ref(false), nick = ref('')
@@ -66,6 +69,7 @@ const wipe = () => {
     <div v-else-if="state === 'empty'" class="g-center cl-state">
       <p>{{ $t('me.claims.empty1') }}</p>
       <p class="g-mute">{{ $t('me.claims.empty2') }}</p>
+      <NuxtLink v-if="!user" class="g-btn" :to="{ path: '/login', query: { redirect: '/me/claims' } }">{{ $t('me.home.login') }}</NuxtLink>
     </div>
     <template v-else>
       <div class="g-card" v-if="guest">

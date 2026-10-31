@@ -332,7 +332,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>Given</b> 我是 staff，<b>When</b> 開啟 <code>/admin</code>，<b>Then</b> 可搜尋清單（slug / 建立者 email，<code>GET /admin/wishlists?q=</code>）、查詢使用者（<code>GET /admin/users?q=</code>）、處理檢舉佇列、下架 / 恢復清單。</li>
 <li><b>Given</b> 我切換系統旗標（<code>PUT /admin/system-flags/{key}</code>，如唯讀模式），<b>When</b> 送出，<b>Then</b> 旗標生效；所有 staff 動作寫入 audit_logs（actor_type=staff）。</li>
 </ul></div>
-<div class="story"><span class="id">US-38 MVP Email 通知</span>　身為建立者，我想在有人捐助時收到 Email。
+<div class="story"><span class="id">US-38 MVP Email 通知</span>　<strong>【D58 已停用】不再通知受捐者「有新捐助」（轟炸收件匣、破壞驚喜），設定頁也已無此開關；以下為歷史設計，見 04 §4.10。</strong>身為建立者，我想在有人捐助時收到 Email。
 <ul>
 <li><b>Given</b> 我的清單第一次被捐助，<b>When</b> 捐助成功，<b>Then</b> 我收到即時 Email；之後每日彙整一封；可在 <code>/settings</code> 關閉。</li>
 <li><b>Given</b> 驚喜模式，<b>When</b> 通知內容，<b>Then</b> 只寫「有 N 件新捐助」，不含品項與捐助者。</li>
@@ -360,7 +360,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>Given</b> 網址指向內網或 loopback（如 169.254.x.x、localhost），<b>When</b> 呼叫，<b>Then</b> 被拒絕（SSRF 防護），回 <code>VALIDATION_FAILED</code>。</li>
 <li><b>Given</b> 目標網站逾時，<b>When</b> 超過上限，<b>Then</b> 回傳可手動填寫的降級結果，不阻塞建立品項。</li>
 </ul></div>
-<div class="story"><span class="id">US-12 LINE 通知</span>　身為建立者，我想在有人捐助時收到通知。
+<div class="story"><span class="id">US-12 LINE 通知</span>　<strong>【D58 後待重新定義】捐助通知已停用（見 US-38），LINE 通知若要做需另定通知內容。</strong>身為建立者，我想在有人捐助時收到通知。
 <ul>
 <li><b>Given</b> 我綁定 LINE，<b>When</b> 有新捐助，<b>Then</b> 以 LINE Messaging API 通知（Email 通知已於 MVP 提供，見 US-38；驚喜模式下僅通知數量、不含捐助者）。</li>
 <li><b>Given</b> 活動日將近，<b>When</b> 到期前提醒時間點，<b>Then</b> 發送提醒給建立者。</li>

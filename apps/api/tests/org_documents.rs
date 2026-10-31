@@ -99,6 +99,26 @@ async fn rejects_wrong_type_and_oversize(pool: PgPool) {
         (s, ptr(&v)),
         (StatusCode::UNPROCESSABLE_ENTITY, "/content_type")
     );
+    // 標頭說是 PDF / PNG，內容卻是純文字：比對檔頭後拒收
+    for ct in ["application/pdf", "image/png", "image/jpeg"] {
+        let (s, v) = up(
+            &pool,
+            &o.token,
+            org,
+            ct,
+            b"just text renamed to .pdf".to_vec(),
+        )
+        .await;
+        assert_eq!(
+            (s, ptr(&v), v["errors"][0]["code"].as_str()),
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "/content_type",
+                Some("MISMATCH")
+            ),
+            "{ct}: {v}"
+        );
+    }
     let (s, v) = up(
         &pool,
         &o.token,
@@ -145,6 +165,17 @@ async fn download_denied_to_volunteer_and_strangers(pool: PgPool) {
     );
     assert_eq!(raw_get(&pool, &co.token, org, id).await.0, StatusCode::OK);
     assert_eq!(raw_get(&pool, &st.token, org, id).await.0, StatusCode::OK);
+    // 協調人下載記為 user、營運審核下載記為 staff
+    let actors: Vec<(String, uuid::Uuid)> = sqlx::query_as(
+        "SELECT actor_type::text, actor_id FROM audit_logs WHERE action='org.document.download' ORDER BY created_at",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        actors,
+        [("user".to_string(), co.id), ("staff".to_string(), st.id)]
+    );
     // 非 owner 不可上傳
     assert_eq!(
         up(&pool, &co.token, org, "application/pdf", PDF.to_vec())
@@ -221,7 +252,14 @@ async fn permit_dates_validated_and_delete_removes(pool: PgPool) {
     let o = user(&pool, "O").await;
     let org = org(&pool, o.id, "draft").await;
     member(&pool, org, o.id, "owner").await;
-    let (_, d) = up(&pool, &o.token, org, "image/png", vec![1, 2, 3]).await;
+    let (_, d) = up(
+        &pool,
+        &o.token,
+        org,
+        "image/png",
+        b"\x89PNG\r\n\x1a\nIHDR".to_vec(),
+    )
+    .await;
     let (s, _, v) = call(&pool, "POST", &format!("/orgs/{org}/permits"), &ck(&o.token),
         Some(json!({"permit_no":"P","valid_from":"2026-05-01","valid_to":"2026-04-01","document_id":d["id"]}))).await;
     assert_eq!(

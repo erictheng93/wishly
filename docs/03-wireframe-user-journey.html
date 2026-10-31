@@ -908,7 +908,7 @@ flowchart TD
 <div class="card"><div class="im">圖</div><div class="col"><b>寶寶奶瓶 240ml</b><span class="lbl">需要 10・數量捐助・<span class="b orange">高</span></span></div><div class="ic" style="align-self:center;min-width:44px;min-height:44px;display:grid;place-items:center">⋮</div></div>
 <div class="card"><div class="im">處理中</div><div class="col"><b>NB 尿布 2 包</b><span class="lbl">需要 2・數量捐助・<span class="b orange">高</span>・圖片處理中</span></div><div class="ic" style="align-self:center;min-width:44px;min-height:44px;display:grid;place-items:center">⋮</div></div>
 <div class="card"><div class="im">圖</div><div class="col"><b>奶粉 1 號 800g</b><span class="lbl">需要 2・數量捐助・<span class="b gray">中</span></span></div><div class="ic" style="align-self:center;min-width:44px;min-height:44px;display:grid;place-items:center">⋮</div></div>
-<div class="lbl" style="text-align:center">拖曳 ⋮⋮ 調整順序</div>
+<div class="lbl" style="text-align:center">以 ↑↓ 按鈕調整順序（實作未採拖曳）</div>
 <div class="btn" style="border-style:dashed">＋ 新增品項</div>
 <div class="btn pri" style="margin-top:auto">發佈並分享</div>
 </div></div><div class="cap">清單編輯（MVP：僅數量型品項）</div></div>
@@ -930,7 +930,7 @@ flowchart TD
 </div></div><div class="cap">新增品項 bottom sheet（MVP 只能選數量捐助；眾籌設定見 5.18）</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>EditorHeader、ItemCard（編輯模式含 ⋮ 選單）、SortableList（vuedraggable / 或長按拖曳）、ItemFormSheet（含 ImageUploader、FundingModeSwitch、QtyStepper、PriorityChips）</td></tr>
+<tr><th>元件</th><td>EditorHeader、ItemCard（編輯模式含 ⋮ 選單）、排序（實作為每列 ↑↓ 按鈕、連按依序送出 <code>POST /wishlists/{id}/items/reorder</code>；未採 vuedraggable 拖曳）、ItemFormSheet（含 ImageUploader、FundingModeSwitch、QtyStepper、PriorityChips）</td></tr>
 <tr><th>狀態</th><td>loading：清單骨架；empty：「還沒有品項，先新增第一個吧」+ 大按鈕；error：存檔失敗 toast 並保留表單；圖片上傳中：縮圖上進度環，上傳失敗顯示「重新上傳」；<code>image_status</code>：pending（背景去除 EXIF 中，編輯頁顯示「圖片處理中」佔位，可繼續儲存）→ ready（顯示圖片）；rejected（顯示「圖片未通過，請換一張」並提供重新上傳）；none（無圖，顯示類型佔位圖）；離線：可編輯本機草稿但停用儲存。已有捐助的品項：<code>qty_needed</code> 不可低於 <code>qty_claimed</code>（<code>QTY_BELOW_CLAIMED</code>）；funding_mode 不可改（<code>ITEM_HAS_CLAIMS</code>）。</td></tr>
 <tr><th>互動</th><td><b>MVP 的 funding_mode 只能是 quantity</b>，「眾籌」選項灰掉並標「P2」，不可點。圖片選取後先檢查格式（image/jpeg、png、webp）與大小（≤ 5 MB），壓縮（最長邊 1280px）再 PUT 到 presigned URL；伺服器端會去除 EXIF（含 GPS 座標）後才公開，前端仍需顯示提示文字，避免孕婦或家庭住址外洩。貼網址欄在 P0 僅儲存為 <code>url</code> 文字；P1 啟用後 blur 時呼叫 link-preview 自動填入並可修改。「發佈並分享」：至少 1 項；不符條件時 API 回 409 <code>WISHLIST_NOT_PUBLISHABLE</code>，列出缺少條件。</td></tr>
 <tr><th>API</th><td>GET <code>/wishlists/{id}</code>；POST <code>/wishlists/{id}/items</code>；PATCH <code>/items/{item_id}</code>；DELETE <code>/items/{item_id}</code>；POST <code>/wishlists/{id}/items/reorder</code>；POST <code>/uploads/presign</code> 後 PUT R2；PATCH <code>/wishlists/{id}</code>（status=active）；<span class="ph p1">P1</span> POST <code>/link-preview</code></td></tr>
@@ -1838,7 +1838,7 @@ flowchart TD
 <div class="ab">‹ 帳號設定</div>
 <div class="bd">
 <div class="lbl"><b>通知</b></div>
-<div class="card" style="align-items:center"><div class="col"><b>有人捐助時寄 Email</b><span class="lbl">第一筆即時通知，之後每日彙整一封。驚喜模式下只寫「有 N 件新捐助」。</span></div><div class="sw"></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>好友生日將近時寄 Email</b><span class="lbl">（D58 後「有人捐助時寄 Email」已停用並自設定頁移除；目前通知區只有生日通知，D65。）</span></div><div class="sw"></div></div>
 <div class="lbl"><b>我的資料</b></div>
 <div class="btn">匯出我的資料（JSON）</div>
 <div class="lbl">包含個人資料、清單與捐助紀錄。</div>

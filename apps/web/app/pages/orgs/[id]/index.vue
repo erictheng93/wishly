@@ -9,6 +9,8 @@ const { orgs, current, adopt } = useOrgMode()
 const role = computed(() => orgs.value.find(o => o.id === id)?.role)
 const canEdit = computed(() => role.value === 'owner' || role.value === 'coordinator')
 const org = ref<any>(null), sites = ref<any[]>([]), events = ref<any[]>([])
+// 撤銷 / 退件後新增會被後端以 ORG_NOT_VERIFIED 擋下：直接說明原因並隱藏新增入口
+const verified = computed(() => org.value?.verification_status === 'verified')
 const loading = ref(true), err = ref(''), msg = ref(''), busy = ref(false)
 const permits = ref<any[]>([])
 const permit = reactive({ permit_no: '', valid_from: '', valid_to: '' })
@@ -61,13 +63,18 @@ async function applyPermit(pid: string) {
     <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
     <p v-if="loading" class="c-mute oe-load" role="status">{{ $t('org.apply.loading') }}</p>
     <template v-else-if="org">
+      <div v-if="!verified" class="c-err" role="status">
+        <p>{{ $t('org.console.notVerified') }}</p>
+        <p v-if="org.review_note">{{ $t('org.console.notVerifiedReason', { note: org.review_note }) }}</p>
+        <NuxtLink to="/org/apply">{{ $t('org.console.toApply') }}</NuxtLink>
+      </div>
       <nav class="c-row oh-nav">
         <NuxtLink v-if="role === 'owner'" :to="`/orgs/${id}/members`" class="c-btn">{{ $t('org.console.members') }}</NuxtLink>
       </nav>
 
       <section class="c-card oh-sec">
         <h2 class="c-h2">{{ $t('org.console.events') }}<b class="oh-count" aria-hidden="true">{{ String(events.length).padStart(2, '0') }}</b></h2>
-        <NuxtLink v-if="canEdit" :to="`/orgs/${id}/events/new`" class="c-btn primary">{{ $t('org.console.newEvent') }}</NuxtLink>
+        <NuxtLink v-if="canEdit && verified" :to="`/orgs/${id}/events/new`" class="c-btn primary">{{ $t('org.console.newEvent') }}</NuxtLink>
         <p v-if="!events.length" class="c-mute">{{ $t('org.console.noEvents') }}</p>
         <ul class="c-list oh-list">
           <li v-for="e in events" :key="e.id">
@@ -79,12 +86,12 @@ async function applyPermit(pid: string) {
 
       <section class="c-card oh-sec">
         <h2 class="c-h2">{{ $t('org.console.sites') }}<b class="oh-count" aria-hidden="true">{{ String(sites.length).padStart(2, '0') }}</b></h2>
-        <NuxtLink v-if="canEdit" :to="`/orgs/${id}/sites/new`" class="c-btn primary">{{ $t('org.console.newSite') }}</NuxtLink>
+        <NuxtLink v-if="canEdit && verified" :to="`/orgs/${id}/sites/new`" class="c-btn primary">{{ $t('org.console.newSite') }}</NuxtLink>
         <p v-if="!sites.length" class="c-mute">{{ $t('org.console.noSites') }}</p>
         <ul class="c-list oh-list">
           <li v-for="s in sites" :key="s.id">
             <strong>{{ s.title }}</strong>
-            <CreatorStatusBadge v-if="s.site_status" :v="s.site_status" />
+            <CreatorStatusBadge v-if="s.site_status" :v="s.site_status" :label="$t(`org.relief.siteStatus.${s.site_status}`)" />
             <span class="c-mute">{{ s.site_address }}</span>
             <span class="oh-acts">
               <NuxtLink v-if="canEdit" :to="`/lists/${s.id}/edit`">{{ $t('org.console.edit') }}</NuxtLink>

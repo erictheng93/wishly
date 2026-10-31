@@ -7,6 +7,9 @@ useSeoMeta({ title: () => t('guest.unsub.seoTitle'), robots: 'noindex' })
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }] }) // token 在網址上，不外洩
 const token = String(useRoute().query.token ?? '')
 const { api } = useGuest()
+// 權杖前段是 base64 的 `kind:id:exp`（非機密，簽章在後段）；生日通知（b）與送禮通知用不同文案
+const birthday = (() => { try { return atob(token.split('.')[0]!.replace(/-/g, '+').replace(/_/g, '/')).startsWith('b:') } catch { return false } })()
+const k = (key: string) => `guest.unsub.${key}${birthday ? 'Birthday' : ''}`
 const state = ref<'ask' | 'busy' | 'done' | 'invalid' | 'error'>(token ? 'ask' : 'invalid')
 const msg = ref('')
 async function submit() {
@@ -27,7 +30,7 @@ async function submit() {
     <div class="x-n-body">
     <template v-if="state === 'done'">
       <h1>{{ $t('guest.unsub.doneTitle') }}</h1>
-      <p class="g-mute">{{ $t('guest.unsub.doneBody') }}</p>
+      <p class="g-mute">{{ $t(k('doneBody')) }}</p>
       <NuxtLink to="/settings">{{ $t('guest.unsub.toSettings') }}</NuxtLink>
     </template>
     <template v-else-if="state === 'invalid'">
@@ -36,8 +39,8 @@ async function submit() {
       <NuxtLink to="/settings">{{ $t('guest.unsub.toSettings') }}</NuxtLink>
     </template>
     <template v-else>
-      <h1>{{ $t('guest.unsub.askTitle') }}</h1>
-      <p class="g-mute">{{ $t('guest.unsub.askBody') }}</p>
+      <h1>{{ $t(k('askTitle')) }}</h1>
+      <p class="g-mute">{{ $t(k('askBody')) }}</p>
       <div v-if="state === 'error'" class="g-banner err" role="alert">{{ msg }}</div>
       <button class="g-btn" :disabled="state === 'busy'" @click="submit">{{ state === 'busy' ? $t('guest.unsub.processing') : $t('guest.unsub.confirm') }}</button>
     </template>

@@ -14,7 +14,7 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.v
 <template>
   <GuestTop />
   <main class="g-wrap er-page">
-    <p class="er-code" aria-hidden="true">{{ code }}</p>
+    <p class="er-code" aria-hidden="true">{{ code === 403 ? 404 : code }}</p>
     <div class="er-body">
     <template v-if="missing">
       <h1>{{ $t('auth.error.notFoundTitle') }}</h1>

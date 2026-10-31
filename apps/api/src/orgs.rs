@@ -380,7 +380,7 @@ async fn submit(
             "請至少新增一張勸募許可",
         ));
     }
-    sqlx::query("UPDATE organizations SET verification_status='pending', submitted_at=now(), flagged_fields='{}' WHERE id=$1")
+    sqlx::query("UPDATE organizations SET verification_status='pending', submitted_at=now(), flagged_fields='{}', review_note=NULL WHERE id=$1")
         .bind(id).execute(&mut *tx).await.map_err(map_unique)?;
     audit_user(
         &mut *tx,
@@ -489,6 +489,19 @@ async fn upload(
             "檔案大小須介於 1 byte 與 10 MB",
         ));
     }
+    // Content-Type 由用戶端決定（前端依副檔名推得）：再比對檔頭，改副檔名的任意檔案不會混進審核文件
+    let magic: &[u8] = match ct {
+        "application/pdf" => b"%PDF-",
+        "image/jpeg" => &[0xFF, 0xD8, 0xFF],
+        _ => b"\x89PNG\r\n\x1a\n",
+    };
+    if !body.starts_with(magic) {
+        return Err(AppError::invalid(
+            "/content_type",
+            "MISMATCH",
+            "檔案內容與格式不符，請上傳 PDF、JPEG 或 PNG",
+        ));
+    }
     let permit = q.kind == "permit";
     let early: String =
         sqlx::query_scalar("SELECT verification_status FROM organizations WHERE id=$1")
@@ -526,10 +539,10 @@ async fn download(
     Path((id, doc)): Path<(Uuid, Uuid)>,
 ) -> R<Response> {
     let role = member_role(&st.pool, id, u.id).await?;
-    if !role
+    let member_ok = role
         .as_deref()
-        .is_some_and(|r| rank(r) >= rank("coordinator"))
-    {
+        .is_some_and(|r| rank(r) >= rank("coordinator"));
+    if !member_ok {
         if u.is_staff {
             crate::admin::require_staff(&u)?;
         } else if role.is_some() {
@@ -552,15 +565,28 @@ async fn download(
     .ok_or(AppError::NotFound)?;
     let plain = crate::sealed::open(&crate::uploads::get_object(&key).await?)
         .ok_or_else(|| AppError::problem(500, "INTERNAL_ERROR", "文件無法解密"))?;
-    audit_user(
-        &st.pool,
-        u.id,
-        "org.document.download",
-        "org_documents",
-        Some(doc),
-        json!({"org_id": id}),
-    )
-    .await?;
+    // 營運審核時的下載記為 staff，依 actor_type 統計營運讀取敏感文件才不會漏
+    if member_ok {
+        audit_user(
+            &st.pool,
+            u.id,
+            "org.document.download",
+            "org_documents",
+            Some(doc),
+            json!({"org_id": id}),
+        )
+        .await?;
+    } else {
+        crate::admin::audit(
+            &st.pool,
+            u.id,
+            "org.document.download",
+            "org_documents",
+            Some(doc),
+            json!({"org_id": id}),
+        )
+        .await?;
+    }
     Ok((
         [
             (header::CONTENT_TYPE, ct),

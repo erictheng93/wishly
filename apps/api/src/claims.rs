@@ -215,11 +215,12 @@ async fn create(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(AppError::NotFound)?;
-        let site: Option<String> =
-            sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id = $1 FOR SHARE")
-                .bind(wid)
-                .fetch_one(&mut *tx)
-                .await?;
+        let site: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT {SITE_STATUS_SQL} FROM wishlists w WHERE w.id = $1 FOR SHARE"
+        )))
+        .bind(wid)
+        .fetch_one(&mut *tx)
+        .await?;
         site_gate(site.as_deref())?;
     }
     // 4.1 (b)：條件式 UPDATE 取得 item row lock 並驗證剩餘量。
@@ -284,6 +285,10 @@ async fn create(
     tx.commit().await?;
     Ok(json_resp(201, &resp, false))
 }
+
+/// 據點的有效狀態（`wishlists` 別名須為 w）：上線中但許可已過期（台北日期）視同暫停，
+/// 不必等每小時的 `permit_expiry_tick` 把 site_status 改掉；與 tick 的到期判斷相同。
+pub(crate) const SITE_STATUS_SQL: &str = "CASE WHEN w.site_status = 'active' AND EXISTS (SELECT 1 FROM org_permits pm WHERE pm.id = w.permit_id AND (now() AT TIME ZONE 'Asia/Taipei')::date > pm.valid_to) THEN 'paused' ELSE w.site_status END";
 
 /// 4.1 (d)：失敗歸因（rollback 後獨立查詢）
 /// 救災據點暫停 / 結束時不接受新認捐（非據點的 site_status 為 NULL）。
@@ -472,13 +477,13 @@ async fn apply(
         bool,
         bool,
         Option<String>,
-    ) = sqlx::query_as(
+    ) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT i.qty_needed, i.qty_claimed, w.status::text, COALESCE(can_manage_wishlist(w.owner_id, w.org_id, $2), false),
                 surprise_locked(w.surprise_mode, w.event_date),
                 w.visibility::text, w.moderation_status::text = 'hidden',
-                (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now()), w.site_status
+                (i.deleted_at IS NOT NULL OR w.deleted_at IS NOT NULL), (w.closes_at IS NOT NULL AND w.closes_at <= now()), {SITE_STATUS_SQL}
          FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
-         WHERE i.id = $1 FOR UPDATE OF i").bind(item_id).bind(match actor { Actor::User(u) => Some(u), Actor::Guest(_) => None }).fetch_one(&mut *tx).await?;
+         WHERE i.id = $1 FOR UPDATE OF i"))).bind(item_id).bind(match actor { Actor::User(u) => Some(u), Actor::Guest(_) => None }).fetch_one(&mut *tx).await?;
     let (guest_id, user_id, cur, old_qty): (Option<Uuid>, Option<Uuid>, String, i32) =
         sqlx::query_as(
             "SELECT guest_id, user_id, status::text, qty FROM claims WHERE id = $1 FOR UPDATE",

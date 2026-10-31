@@ -76,7 +76,8 @@ async function save() {
       </div>
       <template v-if="crowd">
         <label class="c-field"><span>{{ $t('creator.itemSheet.targetPoints') }}{{ item?.pledged_points ? $t('creator.itemSheet.raisedSuffix', { n: item.pledged_points }) : '' }}</span><input v-model="f.target_points" type="number" inputmode="numeric" :min="(item?.pledged_points || 0) + 1" max="10000000" :disabled="fundLocked" required></label>
-        <label class="c-field"><span>{{ $t('creator.itemSheet.deadline') }}</span><input v-model="f.funding_deadline" type="datetime-local" :disabled="fundLocked"><small class="c-mute">{{ $t('creator.itemSheet.deadlineHint') }}</small></label>
+        <!-- 救災據點沒有活動日，截止時間必填（後端同樣要求） -->
+        <label class="c-field"><span>{{ relief ? $t('org.relief.deadlineLabel') : $t('creator.itemSheet.deadline') }}</span><input v-model="f.funding_deadline" type="datetime-local" :disabled="fundLocked" :required="relief && !fundLocked"><small v-if="!relief" class="c-mute">{{ $t('creator.itemSheet.deadlineHint') }}</small></label>
         <label class="c-field"><span>{{ $t('creator.itemSheet.refPrice') }}</span><input v-model="f.price_snapshot_amount" type="number" inputmode="numeric" min="0"></label>
         <p class="c-mute">{{ $t('creator.itemSheet.crowdNote') }}</p>
         <p v-if="fundLocked" class="c-mute">{{ $t('creator.itemSheet.fundLocked') }}</p>

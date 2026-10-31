@@ -21,7 +21,8 @@ const FIELDS = ['legal_name', 'display_name', 'org_type', 'tax_id', 'registratio
   'rep_name', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone']
 const STEPS: string[][] = [FIELDS.slice(0, 8), FIELDS.slice(8)]
 // 驗證錯誤的 pointer → 回到哪一步
-const ptrStep = (p: string) => (p === '/documents' || p === '/permits' ? 3 : STEPS[1]!.includes(p.slice(1)) ? 2 : 1)
+const PERMIT_PTRS = ['/documents', '/permits', '/permit_no', '/valid_from', '/valid_to', '/document_id'] // 第 3 步（文件與許可）
+const ptrStep = (p: string) => (PERMIT_PTRS.includes(p) ? 3 : STEPS[1]!.includes(p.slice(1)) ? 2 : 1)
 const REQUIRED = new Set(['legal_name', 'display_name', 'org_type', 'tax_id', 'registration_no', 'authority', 'rep_name', 'contact_name', 'contact_phone', 'public_email'])
 const status = computed(() => org.value?.verification_status)
 const wizard = computed(() => !org.value || status.value === 'draft' || status.value === 'needs_changes')

@@ -137,7 +137,10 @@
       "askTitle": "Unsubscribe from gift notifications?",
       "askBody": "After unsubscribing, you will no longer be emailed when someone claims a gift on your list.",
       "processing": "Working…",
-      "confirm": "Unsubscribe"
+      "confirm": "Unsubscribe",
+      "askTitleBirthday": "Unsubscribe from birthday reminders?",
+      "askBodyBirthday": "You won't get emails when a friend's birthday is coming up.",
+      "doneBodyBirthday": "You won't get friend birthday reminders anymore. To turn them back on, sign in and go to Settings."
     },
     "slug": {
       "demoBirthday": "Birthday",

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, ref } from 'vue'
 import ItemCard from '../app/components/guest/ItemCard.vue'
 import GuestTop from '../app/components/guest/GuestTop.vue'
 import { deriveDisplayStatus, displayStatusLabel, fmtPts, fmtTime } from '../app/utils/crowdfund'
@@ -102,11 +102,27 @@ it.each([quantity, crowdfunding])('masked card shows progress but hides contribu
   expect(fund).not.toHaveBeenCalled()
 })
 
-it('guest header routes home and to claim management without requiring sign in', () => {
-  const NuxtLink = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: props.to }, slots.default?.()) })
+const NuxtLink = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: props.to }, slots.default?.()) })
+const fetchMe = vi.fn()
+function top(hint: boolean | null) {
+  fetchMe.mockResolvedValue(null)
+  for (const [name, value] of Object.entries({ onMounted, useAuth: () => ({ fetchMe }), useAuthHint: () => ref(hint) })) vi.stubGlobal(name, value)
   mounted = mount(GuestTop, {}, { NuxtLink })
+}
+it('guest header routes home and to claim management without requiring sign in', () => {
+  top(null)
   const links = [...mounted.el.querySelectorAll('header a')]
   expect(links.map(a => [a.textContent, a.getAttribute('href')])).toEqual([
     ['Wishly', '/'], ['探索', '/explore'], ['靈感', '/inspire'], ['品牌館', '/brands'], ['我的送禮', '/me/claims'],
   ])
+})
+
+it('guest header only asks who is signed in when the sign-in hint cookie exists', async () => {
+  top(null)
+  await nextTick()
+  expect(fetchMe).not.toHaveBeenCalled()
+  mounted!.unmount()
+  top(true)
+  await nextTick()
+  expect(fetchMe).toHaveBeenCalledTimes(1)
 })
