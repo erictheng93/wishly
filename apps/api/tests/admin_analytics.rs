@@ -80,9 +80,10 @@ async fn funnel_and_staff_excluded(pool: PgPool) {
     assert_eq!(b["funnel"]["published_list"], 1);
     assert_eq!(b["funnel"]["received_claim"], 1);
     assert_eq!(b["totals"]["wishlists"], 1);
-    assert_eq!(b["totals"]["guests"], 1);
+    assert!(b["totals"].get("guests").is_none());
+    assert_eq!(b["totals"]["visitors"], 0);
     assert_eq!(b["claims"]["by_status"]["reserved"], 1);
-    assert_eq!(b["claims"]["by_actor"]["guest"], 1);
+    assert!(b["claims"].get("by_actor").is_none());
     assert_eq!(b["daily"][29]["claims"], 1);
     assert_eq!(b["daily"][29]["wishlists"], 1);
 }

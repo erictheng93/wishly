@@ -141,10 +141,6 @@
         "cancelled": "Đã hủy",
         "expired": "Đã quá hạn"
       },
-      "actor": {
-        "guest": "Khách",
-        "user": "Thành viên"
-      },
       "reason": {
         "scam": "Nghi lừa đảo",
         "inappropriate": "Nội dung không phù hợp",
@@ -158,14 +154,24 @@
         "relief": "Cứu trợ"
       },
       "wishlistVisibility": {
-        "link": "Liên kết",
-        "private": "Riêng tư",
-        "public": "Công khai"
+        "public": "Công khai",
+        "friends": "Bạn bè",
+        "selected": "Bạn bè được chọn",
+        "private": "Riêng tư"
       },
       "shareLevel": {
         "public": "Công khai",
         "friends": "Bạn bè",
         "private": "Riêng tư"
+      },
+      "device": {
+        "mobile": "Điện thoại",
+        "tablet": "Máy tính bảng",
+        "desktop": "Máy tính"
+      },
+      "viewOther": {
+        "direct": "Truy cập trực tiếp",
+        "unknown": "Không rõ"
       }
     },
     "bday": {

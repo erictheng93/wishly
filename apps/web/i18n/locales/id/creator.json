@@ -141,10 +141,6 @@
         "cancelled": "Dibatalkan",
         "expired": "Kedaluwarsa"
       },
-      "actor": {
-        "guest": "Tamu",
-        "user": "Anggota"
-      },
       "reason": {
         "scam": "Diduga penipuan",
         "inappropriate": "Konten tidak pantas",
@@ -158,14 +154,24 @@
         "relief": "Bantuan"
       },
       "wishlistVisibility": {
-        "link": "Tautan",
-        "private": "Pribadi",
-        "public": "Publik"
+        "public": "Publik",
+        "friends": "Teman",
+        "selected": "Teman terpilih",
+        "private": "Pribadi"
       },
       "shareLevel": {
         "public": "Publik",
         "friends": "Teman",
         "private": "Pribadi"
+      },
+      "device": {
+        "mobile": "Ponsel",
+        "tablet": "Tablet",
+        "desktop": "Desktop"
+      },
+      "viewOther": {
+        "direct": "Langsung",
+        "unknown": "Tidak diketahui"
       }
     },
     "bday": {

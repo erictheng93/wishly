@@ -466,7 +466,12 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
             format!("/orgs/{org}#permits")
         }
         "org.event_hidden" => format!("/orgs/{org}"),
-        "org.invite" | "org.review" => "/org/apply".into(),
+        // 邀請頁要帶權杖；payload.url 是完整網址，站內信只放相對路徑
+        "org.invite" => payload["url"]
+            .as_str()
+            .and_then(|u| u.find("/org/invite/").map(|i| u[i..].to_string()))
+            .unwrap_or_else(|| "/org/apply".into()),
+        "org.review" => "/org/apply".into(),
         _ => "/dashboard".into(),
     }
 }

@@ -287,19 +287,21 @@
       "overview": "Ringkasan",
       "tile": {
         "users": "Pengguna",
-        "guests": "Pengunjung",
         "wishlists": "Wishlist",
         "friendships": "Pertemanan",
         "d1": "Aktif hari ini",
         "d7": "Aktif 7 hari terakhir",
-        "d30": "Aktif 30 hari terakhir"
+        "d30": "Aktif 30 hari terakhir",
+        "visitors": "Pengunjung",
+        "views": "Tayangan (rentang)"
       },
       "metric": {
         "activeUsers": "Pengguna aktif",
         "signups": "Pendaftaran",
         "wishlists": "Wishlist baru",
         "claims": "Hadiah",
-        "newGuests": "Pengunjung baru"
+        "visitors": "Pengunjung",
+        "views": "Tayangan"
       },
       "dailyTrend": "Tren harian",
       "avg": "Rata-rata {n}",
@@ -319,13 +321,15 @@
       "pwaRate": "Rasio pemasangan PWA",
       "group": {
         "claimStatus": "Status hadiah",
-        "claimActor": "Tipe pemberi hadiah",
         "reportReason": "Alasan laporan",
         "provider": "Sumber masuk",
         "locale": "Bahasa",
         "wishlistType": "Tipe wishlist",
         "wishlistVisibility": "Visibilitas wishlist",
-        "birthdayVisibility": "Visibilitas ulang tahun"
+        "birthdayVisibility": "Visibilitas ulang tahun",
+        "viewDevice": "Perangkat penayangan",
+        "viewCountry": "Negara penayangan",
+        "viewReferrer": "Sumber rujukan"
       },
       "noData": "Tidak ada data",
       "profile": "Kelengkapan profil",

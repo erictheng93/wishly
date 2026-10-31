@@ -287,19 +287,21 @@
       "overview": "總覽",
       "tile": {
         "users": "使用者",
-        "guests": "訪客",
         "wishlists": "清單",
         "friendships": "好友關係",
         "d1": "今天活躍",
         "d7": "近 7 天活躍",
-        "d30": "近 30 天活躍"
+        "d30": "近 30 天活躍",
+        "visitors": "訪客",
+        "views": "瀏覽（區間）"
       },
       "metric": {
         "activeUsers": "活躍使用者",
         "signups": "註冊",
         "wishlists": "新清單",
         "claims": "送禮",
-        "newGuests": "新訪客"
+        "visitors": "訪客",
+        "views": "瀏覽"
       },
       "dailyTrend": "每日趨勢",
       "avg": "平均 {n}",
@@ -319,13 +321,15 @@
       "pwaRate": "PWA 安裝率",
       "group": {
         "claimStatus": "送禮狀態",
-        "claimActor": "送禮者類型",
         "reportReason": "檢舉原因",
         "provider": "登入來源",
         "locale": "語系",
         "wishlistType": "清單類型",
         "wishlistVisibility": "清單可見度",
-        "birthdayVisibility": "生日可見度"
+        "birthdayVisibility": "生日可見度",
+        "viewDevice": "瀏覽裝置",
+        "viewCountry": "瀏覽國家",
+        "viewReferrer": "瀏覽來源"
       },
       "noData": "沒有資料",
       "profile": "個人資料完整度",

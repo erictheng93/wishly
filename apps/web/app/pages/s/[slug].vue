@@ -109,7 +109,7 @@ onMounted(async () => {
   addEventListener('online', () => { online.value = true; reload() }); addEventListener('offline', () => (online.value = false))
   lineHint.value = isLineBrowser() && !getPref('ws_hint_dismissed')
   loadMine()
-  meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include', headers: nativeHeaders() }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(() => {})
+  meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include', headers: nativeHeaders() }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(e => trackIfAnonymous(e, apiBase, slug))
   if (hold(st.value) || st.value === 404) await loadClient()
   startLive()
   nextTick(focusItem)
