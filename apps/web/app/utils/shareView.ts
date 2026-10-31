@@ -21,9 +21,9 @@ function referrerHost(): string | undefined {
   } catch { return undefined }
 }
 
-/** 分享頁瀏覽紀錄：只送未登入、非原生殼、非範例清單；所有錯誤吞掉，絕不影響分享頁。 */
-export function trackShareView(apiBase: string, slug: string, loggedIn: boolean): void {
-  if (loggedIn || isNative() || slug.startsWith('demo')) return
+/** 分享頁瀏覽紀錄：只送非原生殼、非範例清單；所有錯誤吞掉，絕不影響分享頁。 */
+export function trackShareView(apiBase: string, slug: string): void {
+  if (isNative() || slug.startsWith('demo')) return
   try {
     void fetch(`${apiBase}/api/v1/public/wishlists/${slug}/views`, {
       method: 'POST',
@@ -33,4 +33,9 @@ export function trackShareView(apiBase: string, slug: string, loggedIn: boolean)
       body: JSON.stringify({ visitor_id: visitorId(), referrer_host: referrerHost() }),
     }).catch(() => {})
   } catch { /* 同步丟錯（如 fetch 不存在）也忽略 */ }
+}
+
+/** /me 失敗時呼叫：只有確認 401（未登入）才記錄；5xx、網路錯誤無法確定身分，不記。 */
+export function trackIfAnonymous(e: any, apiBase: string, slug: string): void {
+  if ((e?.statusCode ?? e?.response?.status ?? e?.status) === 401) trackShareView(apiBase, slug)
 }

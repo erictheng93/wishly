@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { trackShareView } from '../app/utils/shareView'
-import { L } from '../app/utils/analytics'
+import { trackIfAnonymous, trackShareView } from '../app/utils/shareView'
+import { barRows, L } from '../app/utils/analytics'
 
 const store = new Map<string, string>()
 const fetchMock = vi.fn()
@@ -17,7 +17,7 @@ const body = () => JSON.parse(fetchMock.mock.calls[0][1].body)
 
 describe('trackShareView', () => {
   it('sends once with visitor id and referrer host, no credentials', () => {
-    trackShareView('https://api', 'abcdefghij', false)
+    trackShareView('https://api', 'abcdefghij')
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://api/api/v1/public/wishlists/abcdefghij/views')
@@ -28,28 +28,42 @@ describe('trackShareView', () => {
   it('reuses stored visitor id and drops same-site referrer', () => {
     store.set('ws_vid', '11111111-1111-4111-8111-111111111111')
     vi.stubGlobal('document', { referrer: 'https://wishly.tw/' })
-    trackShareView('https://api', 'abcdefghij', false)
+    trackShareView('https://api', 'abcdefghij')
     expect(body().visitor_id).toBe('11111111-1111-4111-8111-111111111111')
     expect(body().referrer_host).toBeUndefined()
   })
-  it('skips logged-in, native and demo', () => {
-    trackShareView('https://api', 'abcdefghij', true)
-    trackShareView('https://api', 'demo', false)
+  it('skips native and demo', () => {
+    trackShareView('https://api', 'demo')
     vi.stubGlobal('__NATIVE__', true)
-    trackShareView('https://api', 'abcdefghij', false)
+    trackShareView('https://api', 'abcdefghij')
     expect(fetchMock).not.toHaveBeenCalled()
   })
   it('swallows rejected and thrown fetch', async () => {
     fetchMock.mockRejectedValueOnce(new Error('net'))
-    expect(() => trackShareView('https://api', 'abcdefghij', false)).not.toThrow()
+    expect(() => trackShareView('https://api', 'abcdefghij')).not.toThrow()
     fetchMock.mockImplementationOnce(() => { throw new Error('sync') })
-    expect(() => trackShareView('https://api', 'abcdefghij', false)).not.toThrow()
+    expect(() => trackShareView('https://api', 'abcdefghij')).not.toThrow()
     await new Promise(r => setTimeout(r, 0))
   })
   it('works when localStorage throws', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('denied') }, setItem: () => { throw new Error('denied') } })
-    trackShareView('https://api', 'abcdefghij', false)
+    trackShareView('https://api', 'abcdefghij')
     expect(body().visitor_id).toBeUndefined()
+  })
+})
+
+describe('trackIfAnonymous', () => {
+  it('records only on confirmed 401', () => {
+    trackIfAnonymous({ statusCode: 401 }, 'https://api', 'abcdefghij')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    trackIfAnonymous({ response: { status: 401 } }, 'https://api', 'abcdefghij')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  it('does not record on 5xx or network errors', () => {
+    trackIfAnonymous({ statusCode: 503 }, 'https://api', 'abcdefghij')
+    trackIfAnonymous(new Error('net'), 'https://api', 'abcdefghij')
+    trackIfAnonymous(undefined, 'https://api', 'abcdefghij')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 
@@ -59,5 +73,6 @@ describe('analytics labels', () => {
     expect(Object.keys(v)).toEqual(['public', 'friends', 'selected', 'private'])
     expect(Object.values(v).every(x => !x.startsWith('creator.analytics'))).toBe(true)
     expect(L.device.mobile).not.toContain('creator.analytics')
+    expect(barRows({ constructor: 1 }, {})[0]!.label).toBe('constructor')
   })
 })

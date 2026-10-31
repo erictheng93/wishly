@@ -20,7 +20,7 @@ export function barRows(obj: Record<string, Count> | undefined, labels: Record<s
   const known = ents.reduce((s, [, v]) => s + (v ?? 0), 0)
   const max = Math.max(0, ...ents.map(([, v]) => v ?? 0))
   if (sort) ents.sort((a, b) => (b[1] ?? -1) - (a[1] ?? -1))
-  return ents.map(([key, v]) => ({ key, label: labels[key] ?? key, v, share: pct(v, known), w: v && max ? v / max * 100 : 0 }))
+  return ents.map(([key, v]) => ({ key, label: Object.hasOwn(labels, key) ? labels[key]! : key, v, share: pct(v, known), w: v && max ? v / max * 100 : 0 }))
 }
 
 export interface FunnelStep { key: string; label: string; v: number; step: string; w: number }

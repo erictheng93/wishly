@@ -605,25 +605,27 @@ async fn analytics(
          ccu AS (SELECT id, (created_at AT TIME ZONE 'Asia/Taipei')::date AS s FROM cohort),
          pu AS (SELECT * FROM cu WHERE anonymized_at IS NULL),
          rc AS (SELECT * FROM claims WHERE created_at >= (SELECT t FROM lo)),
-         -- 區間內瀏覽；不重複訪客以 visitor_id 優先、否則 IP（IP 只在 SQL 內使用，不輸出）
-         sv AS (SELECT *, COALESCE(visitor_id::text, ip::text) AS vk FROM share_views WHERE created_at >= (SELECT t FROM lo)),
+         -- 區間內瀏覽，只取需要的欄位；不重複訪客以 visitor_id 優先、否則 IP（IP 只在 SQL 內使用，不輸出）
+         sv AS (SELECT (created_at AT TIME ZONE 'Asia/Taipei')::date AS d, COALESCE(visitor_id::text, ip::text) AS vk,
+                       device, country, referrer_host FROM share_views WHERE created_at >= (SELECT t FROM lo)),
+         svd AS (SELECT d, count(*) AS views, count(DISTINCT vk) AS visitors FROM sv GROUP BY d),
          -- 每日趨勢：各表只掃一次再依台北日期分組
          ev(m, d) AS (
            SELECT 'signups', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM cohort
            UNION ALL SELECT 'wishlists', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM wl WHERE created_at >= (SELECT t FROM lo)
-           UNION ALL SELECT 'claims', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM rc
-           UNION ALL SELECT 'views', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM sv),
+           UNION ALL SELECT 'claims', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM rc),
          daily AS (
            SELECT gs::date d,
              count(*) FILTER (WHERE ev.m = 'signups') signups, count(*) FILTER (WHERE ev.m = 'wishlists') wishlists,
-             count(*) FILTER (WHERE ev.m = 'claims') claims, count(*) FILTER (WHERE ev.m = 'views') views,
-             (SELECT count(DISTINCT vk) FROM sv WHERE (sv.created_at AT TIME ZONE 'Asia/Taipei')::date = gs::date) visitors,
+             count(*) FILTER (WHERE ev.m = 'claims') claims, COALESCE(max(svd.views), 0) views, COALESCE(max(svd.visitors), 0) visitors,
              (SELECT count(DISTINCT a.user_id) FROM user_activity_days a JOIN cu ON cu.id = a.user_id WHERE a.day = gs::date) active_users
-           FROM r CROSS JOIN generate_series(r.d0, r.today, interval '1 day') gs LEFT JOIN ev ON ev.d = gs::date GROUP BY gs),
+           FROM r CROSS JOIN generate_series(r.d0, r.today, interval '1 day') gs LEFT JOIN ev ON ev.d = gs::date LEFT JOIN svd ON svd.d = gs::date GROUP BY gs),
          dist(kind, k, n) AS (
-           SELECT 'view_device', device, count(*) FROM sv GROUP BY 2
-           UNION ALL SELECT 'view_country', COALESCE(country, 'unknown'), count(*) FROM sv GROUP BY 2
-           UNION ALL SELECT 'view_referrer', COALESCE(referrer_host, 'direct'), count(*) FROM sv GROUP BY 2
+           -- 以不重複訪客計，同一人重載不會湊滿 5；device 是封閉列舉（保留鍵、小樣本轉 null），
+           -- country / referrer 是開放值：鍵本身就洩漏資訊，未滿 5 的整個省略，只留前 20
+           SELECT 'view_device', device, count(DISTINCT vk) FROM sv GROUP BY 2
+           UNION ALL SELECT 'view_country', k, n FROM (SELECT COALESCE(country, 'unknown') k, count(DISTINCT vk) n FROM sv GROUP BY 1 HAVING count(DISTINCT vk) >= 5 ORDER BY n DESC LIMIT 20) c
+           UNION ALL SELECT 'view_referrer', k, n FROM (SELECT COALESCE(referrer_host, 'direct') k, count(DISTINCT vk) n FROM sv GROUP BY 1 HAVING count(DISTINCT vk) >= 5 ORDER BY n DESC LIMIT 20) r
            UNION ALL SELECT 'provider', ai.provider::text, count(DISTINCT ai.user_id) FROM auth_identities ai JOIN cu ON cu.id = ai.user_id GROUP BY 2
            UNION ALL SELECT 'locale', locale, count(*) FROM cu GROUP BY 2
            UNION ALL SELECT 'wishlist_type', type::text, count(*) FROM wl GROUP BY 2
@@ -636,6 +638,7 @@ async fn analytics(
            'range', (SELECT jsonb_build_object('from', d0, 'to', today, 'days', $1) FROM r),
            'totals', jsonb_build_object(
              'users', (SELECT count(*) FROM cu),
+             -- shortcut: 全表掃描算歷來不重複訪客，資料量大時改成每日彙總表
              'visitors', (SELECT count(DISTINCT COALESCE(visitor_id::text, ip::text)) FROM share_views),
              'wishlists', (SELECT count(*) FROM wl),
              'friendships', (SELECT count(*) FROM friendships)),

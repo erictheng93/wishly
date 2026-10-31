@@ -155,7 +155,7 @@ async fn analytics_counts_and_privacy(pool: PgPool) {
     let u = user(&pool, "一般").await;
     let w = list(&pool).await;
     let vid = uuid::Uuid::new_v4();
-    // 同一 visitor 3 次（不同 IP）+ 4 個無 visitor_id 的不同 IP = 6 位訪客、8 次瀏覽（改為 5 個無 visitor_id）
+    // 同一 visitor 3 次（不同 IP，算 1 位）+ 5 個無 visitor_id 的不同 IP = 6 位訪客、8 次瀏覽
     for ip in ["1.0.0.1", "1.0.0.2", "1.0.0.3"] {
         view(
             &pool,
@@ -189,19 +189,86 @@ async fn analytics_counts_and_privacy(pool: PgPool) {
     assert_eq!(b["daily"][0]["views"], 0);
     assert_eq!(b["distribution"]["view_device"]["mobile"], Value::Null);
     assert_eq!(b["distribution"]["view_device"]["desktop"], 5);
-    // 少於 5 抑制
-    assert_eq!(
-        b["distribution"]["view_referrer"]["l.facebook.com"],
-        Value::Null
-    );
+    // 開放值少於 5 位訪客：整個鍵省略（不是 null）
+    assert!(b["distribution"]["view_referrer"]
+        .get("l.facebook.com")
+        .is_none());
     assert_eq!(b["distribution"]["view_referrer"]["direct"], 5);
-    assert!(b["distribution"]["view_country"].is_object());
+    assert_eq!(b["distribution"]["view_country"]["unknown"], 6);
     // 任何回應都不含 IP
     let text = b.to_string();
     assert!(
         !text.contains("1.0.0.") && !text.contains("2.0.0."),
         "{text}"
     );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn suppression_counts_distinct_visitors(pool: PgPool) {
+    let s = staff(&pool, "營運").await;
+    let w = list(&pool).await;
+    let one = uuid::Uuid::new_v4();
+    // 同一位訪客重載 6 次：不得湊滿 5
+    for _ in 0..6 {
+        sqlx::query("INSERT INTO share_views (wishlist_id, visitor_id, ip, country, device, user_agent, referrer_host) VALUES ($1, $2, '9.9.9.9', 'JP', 'tablet', 'x', 'solo.example.com')")
+            .bind(w.id).bind(one).execute(&pool).await.unwrap();
+    }
+    // 5 位不同訪客：國家 TW 通過
+    for _ in 0..5 {
+        sqlx::query("INSERT INTO share_views (wishlist_id, visitor_id, ip, country, device, user_agent) VALUES ($1, $2, '8.8.8.8', 'TW', 'desktop', 'x')")
+            .bind(w.id).bind(uuid::Uuid::new_v4()).execute(&pool).await.unwrap();
+    }
+    let (_, _, b) = call(&pool, "GET", "/admin/analytics", &ck(&s.token), None).await;
+    let d = &b["distribution"];
+    assert_eq!(d["view_device"]["tablet"], Value::Null); // 封閉列舉：保留鍵、轉 null
+    assert_eq!(d["view_device"]["desktop"], 5);
+    assert!(d["view_country"].get("JP").is_none());
+    assert_eq!(d["view_country"]["TW"], 5);
+    assert!(d["view_referrer"].get("solo.example.com").is_none());
+    assert_eq!(b["visits"], json!({"views": 11, "visitors": 6}));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn open_valued_groups_empty_when_all_suppressed(pool: PgPool) {
+    let s = staff(&pool, "營運").await;
+    let w = list(&pool).await;
+    view(
+        &pool,
+        &w.slug,
+        "1.1.1.1",
+        Some(UA),
+        &[],
+        json!({"referrer_host": "a.example.com"}),
+    )
+    .await;
+    let (_, _, b) = call(&pool, "GET", "/admin/analytics", &ck(&s.token), None).await;
+    assert_eq!(b["distribution"]["view_country"], json!({}));
+    assert_eq!(b["distribution"]["view_referrer"], json!({}));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn bad_fields_independent_and_long_slug_ignored(pool: PgPool) {
+    let w = list(&pool).await;
+    view(
+        &pool,
+        &w.slug,
+        "1.1.1.1",
+        Some(UA),
+        &[],
+        json!({"visitor_id": "bad", "referrer_host": "ok.example.com"}),
+    )
+    .await;
+    let r: (Option<uuid::Uuid>, Option<String>) =
+        sqlx::query_as("SELECT visitor_id, referrer_host FROM share_views")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(r, (None, Some("ok.example.com".into())));
+    assert_eq!(
+        view(&pool, "abcdefghijk", "1.1.1.1", Some(UA), &[], json!({})).await,
+        204
+    );
+    assert_eq!(rows(&pool).await, 1);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
