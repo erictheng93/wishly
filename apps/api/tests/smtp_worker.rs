@@ -27,7 +27,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .fetch_one(&pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1, 'email', 'event.reminder', jsonb_build_object('wishlist_id', $2::uuid))")
+    sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1, 'email', 'wishlist.closing', jsonb_build_object('wishlist_id', $2::uuid))")
         .bind(owner).bind(wishlist).execute(&pool).await.unwrap();
     assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 1);
     assert_eq!(wishly_api::notify::tick(&pool).await.unwrap(), 0);
@@ -80,7 +80,7 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
     assert_eq!(message["To"][0]["Address"], email);
     assert_eq!(
         message["Subject"],
-        "【Wishly】《SMTP integration wishlist》活動日快到了"
+        "【Wishly】《SMTP integration wishlist》即將結束"
     );
     let base = std::env::var("MAILPIT_API_BASE").unwrap_or_else(|_| "http://localhost:8025".into());
     let body: Value = client
@@ -98,8 +98,8 @@ async fn worker_sends_via_smtp_and_mailpit_receives_private_notification(pool: P
         .await
         .unwrap();
     let text = body["Text"].as_str().unwrap();
-    assert!(text.contains("活動日即將到來"));
-    assert!(!text.contains("unsubscribe"), "會員信不附退訂連結（D58）");
+    assert!(text.contains("自動結束"));
+    assert!(!text.contains("/unsubscribe?token="), "wishlist.closing 是 Account 類，不附退訂連結");
     assert!(!text.contains("Secret Gift") && !text.contains("Secret Owner"));
     let payload: Value = sqlx::query_scalar("SELECT payload FROM notifications WHERE user_id=$1")
         .bind(owner)

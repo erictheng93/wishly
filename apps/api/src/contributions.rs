@@ -101,6 +101,7 @@ async fn balance(tx: &mut Tx<'_>, wallet: Uuid) -> Result<i64, AppError> {
 async fn on_funded(tx: &mut Tx<'_>, item_id: Uuid, wishlist_id: Uuid) -> Result<(), AppError> {
     points::capture_and_order(tx, item_id).await?;
     notify::enqueue_donors(&mut **tx, item_id, "crowdfund.funded", &["captured"]).await?;
+    notify::enqueue_owner(&mut **tx, wishlist_id, "owner.funded", json!({ "item_id": item_id })).await?;
     audit(
         tx,
         None,
@@ -643,6 +644,7 @@ pub async fn tick_funding(pool: &PgPool) -> Result<(usize, usize), AppError> {
             "SELECT wishlist_id FROM wishlist_items WHERE id = $1 AND funding_status = 'expired' AND expired_at + interval '7 days' <= now() FOR UPDATE")
             .bind(item).fetch_optional(&mut *tx).await?;
         let Some(wl) = row else { continue };
+        notify::enqueue_donors(&mut *tx, item, "funding.released", &["pledged"]).await?; // release 之前；空釋放時 continue 會 rollback
         let rel = points::release(&mut tx, &ids, &["pledged"]).await?;
         if rel.is_empty() {
             continue;

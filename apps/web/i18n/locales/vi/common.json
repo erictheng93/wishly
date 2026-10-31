@@ -31,6 +31,9 @@
     },
     "support": "Liên hệ hỗ trợ: ",
     "supportSubject": "Hỗ trợ Wishly",
-    "supportBody": "ID tài khoản: {id}\n\nMô tả vấn đề:\n"
+    "supportBody": "ID tài khoản: {id}\n\nMô tả vấn đề:\n",
+    "notifications": "Thông báo",
+    "unreadCount": "{n} chưa đọc",
+    "close": "Đóng"
   }
 }

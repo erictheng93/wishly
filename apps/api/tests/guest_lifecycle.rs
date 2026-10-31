@@ -120,11 +120,12 @@ async fn guest_delete_and_recover(pool: PgPool) {
 }
 
 #[test]
-fn confirmation_mail_has_recovery_and_unsubscribe_links() {
+fn confirmation_mail_has_unsubscribe_link_and_no_recovery_token() {
+    // 確認信只給會員：不再夾帶訪客恢復權杖
     let p = json!({ "recovery_token": "TOK", "unsubscribe_url": "http://x/u?token=1" });
     let (_, body) = wishly_api::notify::render("claim.confirmation", "", &p);
     assert!(
-        body.contains("/me/claims#r=TOK") && body.contains("http://x/u?token=1"),
+        body.contains("/me/claims") && !body.contains("#r=") && body.contains("http://x/u?token=1"),
         "{body}"
     );
 }

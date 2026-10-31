@@ -238,6 +238,7 @@ async fn totp_enable(
     accept_code(&st, u.id, &r.code, true).await?;
     let codes = new_recovery_codes(&st, u.id).await?;
     mark_session(&st, &u, &ip, "auth.mfa_enabled").await?;
+    security_mail(&st, u.id, "auth.mfa_enabled").await?;
     Ok(Json(json!({ "recovery_codes": codes })))
 }
 
@@ -282,7 +283,18 @@ async fn regenerate_recovery(
         json!({}),
     )
     .await?;
+    security_mail(&st, u.id, "auth.recovery_regenerated").await?;
     Ok(Json(json!({ "recovery_codes": codes })))
+}
+
+/// 帳號安全通知（Account 類，不受偏好影響）；沒有 email 就不寄。
+async fn security_mail(st: &AppState, uid: Uuid, kind: &str) -> Result<(), AppError> {
+    let mut tx = st.pool.begin().await?;
+    let email: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
+        .bind(uid).fetch_one(&mut *tx).await?;
+    crate::identities::notify(&mut tx, uid, kind, "totp", email.as_deref()).await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 /// 6 位數字走 TOTP；其他視為備用碼（條件式 UPDATE 標記已用，同一碼不能用兩次）

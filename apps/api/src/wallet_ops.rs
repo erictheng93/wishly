@@ -255,6 +255,11 @@ async fn cash_refund_patch(
         json!({ "status": to, "amount": amount, "reject_reason": reason }),
     )
     .await?;
+    if to != "processing" {
+        // 上面的狀態守衛 UPDATE 已保證只會轉一次，重送會 409 而到不了這裡
+        let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut *tx).await?;
+        crate::notify::enqueue(&mut *tx, uid, "cash_refund.updated", json!({ "amount": amount, "status": to, "note": reason })).await?;
+    }
     let out: Value = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', id, 'amount', amount, 'status', status, 'reject_reason', reject_reason,
                 'processed_by', processed_by, 'completed_at', completed_at) FROM cash_refund_requests WHERE id = $1")
@@ -352,6 +357,12 @@ async fn lock_topup(tx: &mut Tx<'_>, topup_id: Uuid) -> R<(Uuid, i64, String)> {
     Ok(t)
 }
 
+async fn notify_wallet(tx: &mut Tx<'_>, wallet: Uuid, kind: &str, payload: Value) -> R<()> {
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut **tx).await?;
+    crate::notify::enqueue(&mut **tx, uid, kind, payload).await?;
+    Ok(())
+}
+
 /// 爭議開始：paid → disputed 並凍結錢包。已不是 paid（重送 / 已處理）→ false，什麼都不動。
 pub async fn dispute_open(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
     let (wallet, amount, status) = lock_topup(tx, topup_id).await?;
@@ -367,6 +378,7 @@ pub async fn dispute_open(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
         .execute(&mut **tx)
         .await?;
     system_audit(tx, "topup.disputed", topup_id, json!({ "amount": amount })).await?;
+    notify_wallet(tx, wallet, "wallet.frozen", json!({})).await?;
     Ok(true)
 }
 
@@ -380,10 +392,14 @@ pub async fn dispute_won(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
-    sqlx::query("UPDATE point_wallets SET status = 'active' WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM topups WHERE wallet_id = $1 AND status = 'disputed')")
+    let unfrozen = sqlx::query("UPDATE point_wallets SET status = 'active' WHERE id = $1 AND status = 'frozen' AND NOT EXISTS (SELECT 1 FROM topups WHERE wallet_id = $1 AND status = 'disputed')")
         .bind(wallet)
         .execute(&mut **tx)
-        .await?;
+        .await?
+        .rows_affected() > 0;
+    if unfrozen {
+        notify_wallet(tx, wallet, "wallet.unfrozen", json!({})).await?;
+    }
     system_audit(tx, "topup.dispute_won", topup_id, json!({})).await?;
     Ok(true)
 }
@@ -460,6 +476,7 @@ pub async fn charge_back(tx: &mut Tx<'_>, topup_id: Uuid) -> R<ChargedBack> {
         json!({ "amount": amount, "recovered": recovered, "debt": debt }),
     )
     .await?;
+    notify_wallet(tx, wallet, "wallet.chargeback", json!({ "amount": recovered, "debt": debt })).await?;
     Ok(ChargedBack::Applied { recovered, debt })
 }
 

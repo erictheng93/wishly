@@ -117,6 +117,12 @@ async function loadFlags() {
 }
 watch(rStatus, () => loadReports())
 watch(tab, t => { if (t === 'flags') loadFlags() })
+const rqBusy = ref(false), rqMsg = ref('')
+async function requeue() {
+  rqBusy.value = true; rqMsg.value = statsErr.value = ''
+  try { rqMsg.value = t('admin.index.requeued', { n: (await api('/admin/notifications/requeue', { method: 'POST' })).requeued }); await loadStats() }
+  catch (e) { statsErr.value = errMsg(e) } finally { rqBusy.value = false }
+}
 onMounted(() => Promise.all([loadReports(), loadStats()]))
 </script>
 <template>
@@ -134,6 +140,8 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
         <div v-for="(name, key) in { claims_by_status: $t('admin.index.claimsByStatus'), notifications_by_status: $t('admin.index.notificationsByStatus'), audit_last_7d: $t('admin.index.auditLast7d') }" :key="key" class="c-mt">
           <strong>{{ name }}</strong><ul><li v-for="(count, status) in stats[key]" :key="status">{{ $t('admin.index.statusCount', { status, count }) }}</li></ul>
           <p v-if="!Object.keys(stats[key] || {}).length" class="c-mute">{{ $t('admin.index.noRecords') }}</p>
+          <button v-if="key === 'notifications_by_status' && Number(stats[key]?.failed) > 0" class="c-btn small" :disabled="rqBusy" @click="requeue">{{ $t('admin.index.requeue') }}</button>
+          <span v-if="key === 'notifications_by_status' && rqMsg" class="c-mute" role="status"> {{ rqMsg }}</span>
         </div>
       </details>
     </section>

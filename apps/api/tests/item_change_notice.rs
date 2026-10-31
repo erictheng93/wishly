@@ -48,7 +48,7 @@ async fn me_row(pool: &PgPool, token: &str, claim: Uuid) -> Value {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn edits_coalesce_into_one_pending_mail_per_active_donor(pool: PgPool) {
+async fn every_edit_notifies_each_active_donor(pool: PgPool) {
     let owner = user(&pool, "擁有者").await;
     let wl = wishlist(&pool, owner.id, ListOpts::default()).await.id;
     let it = item(&pool, wl, "玻璃奶瓶", 10).await;
@@ -77,12 +77,9 @@ async fn edits_coalesce_into_one_pending_mail_per_active_donor(pool: PgPool) {
     )
     .await;
     let rows = pending(&pool, it).await;
-    assert_eq!(
-        rows.len(),
-        3,
-        "one pending item_changed per donor: {rows:?}"
-    ); // 兩位會員 + 有 email 的訪客，各一筆
-    assert!(rows.iter().all(|r| r.2), "延後約 10 分鐘寄出");
+    // 兩位會員 + 有 email 的訪客，三次修改各一筆
+    assert_eq!(rows.len(), 9, "每次修改都要有通知：{rows:?}");
+    assert!(rows.iter().all(|r| !r.2), "站內要立刻出現：排程不延後");
     let changed: Option<chrono::DateTime<chrono::Utc>> =
         sqlx::query_scalar("SELECT content_changed_at FROM wishlist_items WHERE id = $1")
             .bind(it)
@@ -194,7 +191,7 @@ async fn crowdfund_pledgers_are_notified(pool: PgPool) {
         json!({ "description": "雙向推車" }),
     )
     .await;
-    assert_eq!(pending(&pool, it).await, vec![(Some(fan.id), None, true)]);
+    assert_eq!(pending(&pool, it).await, vec![(Some(fan.id), None, false)]);
     let crowdfund: bool = sqlx::query_scalar(
         "SELECT (payload->>'crowdfund')::bool FROM notifications WHERE kind = 'claim.item_changed'",
     )
@@ -235,7 +232,7 @@ async fn notif_status(
     item: Uuid,
     user_id: Option<Uuid>,
 ) -> (String, Option<String>) {
-    sqlx::query_as("SELECT status::text, last_error FROM notifications WHERE kind = 'claim.item_changed' AND payload->>'item_id' = $1 AND user_id IS NOT DISTINCT FROM $2")
+    sqlx::query_as("SELECT status::text, last_error FROM notifications WHERE kind = 'claim.item_changed' AND payload->>'item_id' = $1 AND user_id IS NOT DISTINCT FROM $2 ORDER BY id LIMIT 1")
         .bind(item.to_string()).bind(user_id).fetch_one(pool).await.unwrap()
 }
 
@@ -264,11 +261,11 @@ async fn cancelled_claimant_notice_is_cancelled_at_send_time(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("UPDATE notifications SET scheduled_at = now() WHERE kind = 'claim.item_changed'")
+    sqlx::query("UPDATE notifications SET created_at = now() - interval '11 minutes', scheduled_at = now() WHERE kind = 'claim.item_changed'")
         .execute(&pool)
         .await
         .unwrap();
-    wishly_api::notify::tick(&pool).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
     assert_eq!(
         notif_status(&pool, it, Some(gone_uid)).await,
         ("cancelled".into(), Some("no longer supporting item".into()))

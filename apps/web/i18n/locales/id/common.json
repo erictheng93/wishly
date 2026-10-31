@@ -31,6 +31,9 @@
     },
     "support": "Hubungi dukungan: ",
     "supportSubject": "Dukungan Wishly",
-    "supportBody": "ID akun: {id}\n\nJelaskan masalahnya:\n"
+    "supportBody": "ID akun: {id}\n\nJelaskan masalahnya:\n",
+    "notifications": "Notifikasi",
+    "unreadCount": "{n} belum dibaca",
+    "close": "Tutup"
   }
 }

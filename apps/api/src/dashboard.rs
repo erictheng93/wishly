@@ -36,6 +36,7 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// 給 claims / wishlists 模組呼叫：通知 SSE 訂閱者此清單有變動。
+/// 站內通知也傳 user_id 走同一通道（UUID 不會與清單 id 相撞；清單訂閱者只比對自己的 id，使用者 id 會被略過）。
 pub async fn notify<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
     wishlist_id: Uuid,
@@ -54,6 +55,8 @@ pub async fn notify<'e, E: sqlx::PgExecutor<'e>>(
 const MAX_SSE_TOTAL: usize = 2000;
 const MAX_SSE_PER_IP: u32 = 16;
 static SSE_TOTAL: Semaphore = Semaphore::const_new(MAX_SSE_TOTAL);
+/// 自上次回報以來被拒絕的公開 SSE 連線數（`sse_stats` 每小時寫進 log）
+static SSE_REJECTED: AtomicU64 = AtomicU64::new(0);
 static SSE_PER_IP: Mutex<Option<HashMap<String, u32>>> = Mutex::new(None);
 
 /// 持有期間佔用一個全域名額與該 IP 一個計數；drop 時歸還。
@@ -64,15 +67,17 @@ struct SseSlot {
 
 impl SseSlot {
     fn acquire(ip: String) -> Result<Self, AppError> {
-        let permit = SSE_TOTAL
-            .try_acquire()
-            .map_err(|_| AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試"))?;
+        let permit = SSE_TOTAL.try_acquire().map_err(|_| {
+            SSE_REJECTED.fetch_add(1, Ordering::Relaxed);
+            AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試")
+        })?;
         let mut m = SSE_PER_IP.lock().unwrap();
         let n = m
             .get_or_insert_with(HashMap::new)
             .entry(ip.clone())
             .or_insert(0);
         if *n >= MAX_SSE_PER_IP {
+            SSE_REJECTED.fetch_add(1, Ordering::Relaxed);
             return Err(AppError::problem(429, "RATE_LIMITED", "即時更新連線過多"));
         }
         *n += 1;
@@ -128,6 +133,16 @@ async fn snapshot_shared(
     cell.get_or_try_init(|| async { Ok(snapshot(pool, wid).await?.map(Arc::new)) })
         .await
         .cloned()
+}
+
+/// (連線中, 自上次呼叫以來被拒絕)
+pub fn sse_stats() -> (usize, u64) {
+    (MAX_SSE_TOTAL - SSE_TOTAL.available_permits(), SSE_REJECTED.swap(0, Ordering::Relaxed))
+}
+
+/// 站內通知串流訂閱匯流排（收到的 id 是 user_id）。
+pub(crate) async fn subscribe(pool: &PgPool) -> Result<broadcast::Receiver<(Uuid, u64)>, sqlx::Error> {
+    Ok(bus(pool).await?.subscribe())
 }
 
 static BUS: OnceCell<broadcast::Sender<(Uuid, u64)>> = OnceCell::const_new();
@@ -308,7 +323,7 @@ async fn events(
                 _ = recheck.tick() => { periodic = true; nseq = NOTIFY_SEQ.load(Ordering::Relaxed); }
                 _ = tx.closed() => break,
                 r = rx.recv() => match r {
-                    Ok((id, _)) if id != wid => continue,
+                    Ok((id, _)) if id != wid => continue, // 含站內通知的 user_id 訊號
                     Ok((_, n)) => nseq = n,
                     Err(broadcast::error::RecvError::Closed) => break,
                     Err(_) => nseq = NOTIFY_SEQ.load(Ordering::Relaxed), // Lagged：以最新序號重查
@@ -379,6 +394,11 @@ async fn events(
             } // 下架：廣播後關閉連線
         }
     });
+    Ok(sse_response(out))
+}
+
+/// 共用 SSE 回應：先送 retry 事件、心跳、no-cache 標頭。
+pub(crate) fn sse_response(out: mpsc::Receiver<Result<Event, Infallible>>) -> Response {
     // 連線一建立就先送一個 retry 事件：代理（Cloudflare Pages 同源代理等）會緩衝到第一個位元組才轉送，
     // 沒有它，要等 15 秒的第一次心跳瀏覽器才收得到回應標頭。
     let first = futures_util::stream::once(async {
@@ -403,5 +423,5 @@ async fn events(
         HeaderValue::from_static("no-cache, no-transform"),
     );
     h.insert("x-accel-buffering", HeaderValue::from_static("no"));
-    Ok(res)
+    res
 }

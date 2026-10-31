@@ -864,6 +864,10 @@ async fn update(
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;
     }
+    // 據點由營運中變為暫停 / 結束：通知進行中的捐助者
+    if relief && old_site_status.as_deref() == Some("active") && w.site_status.as_deref() != Some("active") {
+        crate::notify::enqueue_site_paused(&mut *tx, &[id]).await?;
+    }
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線立即重驗可見性 / 狀態
     if was_active && matches!(w.status.as_str(), "closed" | "archived") {
         crate::claims::grace_on_close(&mut tx, id).await?; // 須在交易最後（鎖序）
@@ -1937,10 +1941,10 @@ async fn item_delete(
                      SELECT id, 'email', 'claim.item_removed', jsonb_build_object('wishlist_id', $2::uuid) FROM guests
                       WHERE id = ANY($1) AND email IS NOT NULL AND deleted_at IS NULL")
             .bind(&guests).bind(wid).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
-                     SELECT id, 'email', 'claim.item_removed', jsonb_build_object('wishlist_id', $2::uuid) FROM users
-                      WHERE id = ANY($1) AND email IS NOT NULL AND deleted_at IS NULL")
-            .bind(&users).bind(wid).execute(&mut *tx).await?;
+        // 會員一律進站內信（email 與否由 worker 判斷）
+        for uid in &users {
+            crate::notify::enqueue(&mut *tx, *uid, "claim.item_removed", json!({"wishlist_id": wid, "item_id": id})).await?;
+        }
     }
     sqlx::query("UPDATE wishlist_items SET deleted_at=now(),
                  qty_claimed=COALESCE((SELECT sum(qty) FROM claims WHERE item_id=$1 AND status IN ('reserved','purchased','delivered')),0),

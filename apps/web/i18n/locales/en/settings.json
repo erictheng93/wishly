@@ -114,9 +114,15 @@
     "terms": "Terms of Service",
     "privacy": "Privacy Policy",
     "notify": {
-      "title": "Notifications",
-      "birthdays": "Birthday emails",
-      "birthdaysHint": "Friends' birthday reminders, and a reminder before your own birthday to set up a list."
+      "title": "Notification settings",
+      "account": "Account, security and deadlines",
+      "accountHint": "Account security, wallet, orders, and anything with a deadline or that could cost you a gift (reminders, cancellation). Always on.",
+      "gifts": "Gift progress",
+      "giftsHint": "Someone is giving, items funded, shipped, delivered, or a claim expired.",
+      "social": "Social and birthdays",
+      "socialHint": "Friend activity, friends' birthday reminders, and a reminder before your own birthday to set up a list.",
+      "inbox": "In-app",
+      "email": "Email"
     }
   }
 }

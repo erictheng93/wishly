@@ -347,11 +347,26 @@ async fn moderate(
         .ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE relief_events SET moderation_status=$2::moderation_status, moderation_reason=$3 WHERE id=$1")
         .bind(id).bind(&b.moderation_status).bind(if hide { reason.clone() } else { None }).execute(&mut *tx).await?;
-    let slugs: Vec<String> = if hide {
-        sqlx::query_scalar("UPDATE wishlists SET site_status='paused' WHERE event_id=$1 AND type='relief' AND status='active' RETURNING slug").bind(id).fetch_all(&mut *tx).await?
+    // 只暫停仍 active 的據點；已暫停 / 已關閉的不重複通知
+    let paused: Vec<(String, Uuid, Option<Uuid>)> = if hide {
+        sqlx::query_as("UPDATE wishlists SET site_status='paused' WHERE event_id=$1 AND type='relief' AND status='active' AND site_status IS DISTINCT FROM 'paused' AND site_status IS DISTINCT FROM 'closed' RETURNING slug, id, org_id").bind(id).fetch_all(&mut *tx).await?
     } else {
         vec![]
     };
+    let slugs: Vec<String> = paused.iter().map(|p| p.0.clone()).collect();
+    if !paused.is_empty() {
+        let ids: Vec<Uuid> = paused.iter().map(|p| p.1).collect();
+        crate::notify::enqueue_site_paused(&mut *tx, &ids).await?;
+        let title: String = sqlx::query_scalar("SELECT name FROM relief_events WHERE id = $1").bind(id).fetch_one(&mut *tx).await?;
+        let mut orgs_seen: Vec<Uuid> = paused.iter().filter_map(|p| p.2).collect();
+        orgs_seen.sort();
+        orgs_seen.dedup();
+        for o in orgs_seen {
+            let dn: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id = $1").bind(o).fetch_one(&mut *tx).await?;
+            crate::notify::enqueue_org_owners(&mut *tx, o, "org.event_hidden",
+                json!({"org_id": o, "display_name": dn, "event_title": title, "reason": reason})).await?;
+        }
+    }
     audit(
         &mut *tx,
         staff,
@@ -391,11 +406,12 @@ pub(crate) async fn event_slugs<'e, E: sqlx::PgExecutor<'e>>(
 
 /// 許可過期（台北日期）的上線據點暫停，並通知該許可所屬組織的 owner（每組織每許可一封：只對本次剛暫停的據點發，之後不再命中）。
 pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
-    let rows: Vec<(String, Uuid)> = sqlx::query_as(
+    let mut tx = pool.begin().await?;
+    let rows: Vec<(String, Uuid, Uuid)> = sqlx::query_as(
         "WITH p AS (UPDATE wishlists w SET site_status = 'paused' FROM org_permits pm
                      WHERE pm.id = w.permit_id AND w.type = 'relief' AND w.status = 'active' AND w.site_status = 'active'
                        AND (now() AT TIME ZONE 'Asia/Taipei')::date > pm.valid_to
-                 RETURNING w.slug::text AS slug, w.event_id, w.org_id, w.permit_id),
+                 RETURNING w.slug::text AS slug, w.event_id, w.org_id, w.permit_id, w.id),
               n AS (INSERT INTO notifications (user_id, channel, kind, payload)
                     SELECT m.user_id, 'email'::notification_channel, 'org.permit_expired',
                            jsonb_build_object('org_id', o.id, 'display_name', o.display_name, 'permit_no', pm.permit_no)
@@ -403,11 +419,15 @@ pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Erro
                       JOIN organizations o ON o.id = d.org_id JOIN org_permits pm ON pm.id = d.permit_id
                       JOIN org_members m ON m.org_id = o.id AND m.role = 'owner' AND m.disabled_at IS NULL
                       JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL)
-         SELECT slug, event_id FROM p")
-        .fetch_all(pool).await?;
+         SELECT slug, event_id, id FROM p")
+        .fetch_all(&mut *tx).await?;
     if rows.is_empty() {
         return Ok(0);
     }
+    // 同交易通知進行中的捐助者：這批據點之後不再命中，交易外寄失敗就永遠補不回來
+    let site_ids: Vec<Uuid> = rows.iter().map(|r| r.2).collect();
+    crate::notify::enqueue_site_paused(&mut *tx, &site_ids).await?;
+    tx.commit().await?;
     let ids: Vec<Uuid> = rows.iter().map(|r| r.1).collect();
     let ev = event_slugs(pool, &ids).await?;
     let n = rows.len();

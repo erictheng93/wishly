@@ -13,7 +13,7 @@ test('開啟連結不自動送出；按「確定退訂」後才 POST，成功顯
     await route.fulfill({ status: 204, headers: cors(route) })
   })
   await page.goto('/unsubscribe?token=abc.def')
-  await expect(page.getByRole('heading', { name: '確定要退訂送禮通知？' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '確定不再收到這類通知信？' })).toBeVisible()
   await page.waitForTimeout(800)
   expect(posts).toHaveLength(0)
   await hydrated(page)

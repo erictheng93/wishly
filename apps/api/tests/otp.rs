@@ -100,18 +100,18 @@ async fn otp_full_flow(pool: PgPool) {
     let (st, _, me) = call_app(&app, "GET", "/me", &[("cookie", cookie.clone())], None).await;
     assert_eq!(st, 200);
     assert_eq!(me["identities"][0]["provider"], "email");
-    assert_eq!(me["notification_prefs"]["email_claims"], true);
+    assert_eq!(me["notification_prefs"], json!({}));
     let (st, _, me) = call_app(
         &app,
         "PATCH",
         "/me",
         &[("cookie", cookie.clone())],
-        Some(json!({ "display_name": "小米", "notification_prefs": { "email_claims": false } })),
+        Some(json!({ "display_name": "小米", "notification_prefs": { "email_gifts": false } })),
     )
     .await;
     assert_eq!(st, 200);
     assert_eq!(me["display_name"], "小米");
-    assert_eq!(me["notification_prefs"]["email_claims"], false);
+    assert_eq!(me["notification_prefs"]["email_gifts"], false);
     let (st, ..) = call_app(
         &app,
         "PATCH",

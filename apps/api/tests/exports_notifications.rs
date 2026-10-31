@@ -9,7 +9,7 @@ use wishly_api::session::hash_token;
 use common::*;
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn no_confirmation_without_email(pool: PgPool) {
+async fn member_claim_queues_delayed_confirmation(pool: PgPool) {
     let TestUser { id: o, token: _ } = user(&pool, "u").await;
     let wl = wishlist(
         &pool,
@@ -28,7 +28,7 @@ async fn no_confirmation_without_email(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(n, 0);
+    assert_eq!(n, 1);
     assert_all_reconciled(&pool).await;
 }
 
@@ -79,7 +79,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    let tok = wishly_api::account::unsub_token('u', u);
+    let tok = wishly_api::account::unsub_token('c', u);
     let before: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM notifications WHERE user_id=$1 AND status='pending'",
     )
@@ -123,7 +123,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
         );
     }
     let off: bool = sqlx::query_scalar(
-        "SELECT (notification_prefs->>'email_claims')::boolean = false FROM users WHERE id=$1",
+        "SELECT (notification_prefs->>'email_gifts')::boolean = false FROM users WHERE id=$1",
     )
     .bind(u)
     .fetch_one(&pool)
@@ -136,7 +136,7 @@ async fn export_and_unsubscribe(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert!(off && pend == 0);
+    assert!(off && pend == before, "pending 不取消，由 worker 寄前靜音");
     // 訪客：清 email
     let g: Uuid = sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, email) VALUES ($1,'g','g@example.com') RETURNING id").bind(hash_token("g")).fetch_one(&pool).await.unwrap();
     let gtok = wishly_api::account::unsub_token('g', g);
