@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { shortenInboxStream } from './inbox-stream.mjs'
 
 export const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = resolve(HERE, '../../..')
@@ -96,6 +97,7 @@ export const VIEWPORTS = [
 
 export async function newCtx(browser, { viewport, scheme = 'light', cookies, ...rest } = {}) {
   const ctx = await browser.newContext({ baseURL: WEB, locale: 'zh-TW', timezoneId: 'Asia/Taipei', colorScheme: scheme, viewport: viewport ?? { width: 390, height: 844 }, ...rest })
+  await shortenInboxStream(ctx)
   if (cookies) await ctx.addCookies(cookies)
   return ctx
 }

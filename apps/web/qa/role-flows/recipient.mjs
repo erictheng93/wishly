@@ -1153,13 +1153,13 @@ await run.step('R-46', '個人頁 /u/[handle]：本人視角、好友視角、�
 
 await run.step('R-47', '通知偏好與生日清單通知：設定頁開關、清單開關（填生日後可開）', async ({ note }) => {
   await page.goto('/settings'); await hydrated(page)
-  const sw = page.getByLabel(/生日通知信/)
+  const sw = page.getByLabel('社交與生日 Email')
   await expect(sw).toBeChecked()
   const [r] = await Promise.all([page.waitForResponse(x => x.request().method() === 'PATCH' && /\/me$/.test(x.url())), sw.uncheck()])
   note('關閉生日通知信 PATCH ' + r.status())
   await page.reload(); await hydrated(page)
-  await expect(page.getByLabel(/生日通知信/)).not.toBeChecked()
-  await page.getByLabel(/生日通知信/).check(); await page.waitForTimeout(500)
+  await expect(page.getByLabel('社交與生日 Email')).not.toBeChecked()
+  await page.getByLabel('社交與生日 Email').check(); await page.waitForTimeout(500)
   note('再開啟')
   // 清單層級生日通知
   S.titleH = `生日清單 ${tag}`

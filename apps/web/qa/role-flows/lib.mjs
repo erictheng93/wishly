@@ -7,6 +7,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { shortenInboxStream } from '../inbox-stream.mjs'
 
 export const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = resolve(HERE, '../../../..')
@@ -82,6 +83,7 @@ export async function closeBrowser() { await browser?.close(); browser = undefin
 export async function newPage({ mobile = false, user } = {}) {
   const b = await getBrowser()
   const ctx = await b.newContext({ baseURL: WEB, locale: 'zh-TW', timezoneId: 'Asia/Taipei', viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 860 }, isMobile: mobile, hasTouch: mobile })
+  await shortenInboxStream(ctx)
   if (user) await ctx.addCookies((await user.api.storageState()).cookies.map(c => ({ ...c, domain: 'localhost' })))
   const page = await ctx.newPage()
   page.problems = []

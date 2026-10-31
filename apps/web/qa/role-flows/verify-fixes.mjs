@@ -46,7 +46,7 @@ await (async () => {
     await page.getByRole('button', { name: '確定退訂' }).click()
     await page.getByText('之後不會再寄好友生日提醒').waitFor({ timeout: 10000 })
     note('問句與完成文案皆為生日通知')
-    if (sql(`SELECT notification_prefs->>'email_birthdays' FROM users WHERE id='${id}'`) !== 'false') throw new Error('email_birthdays 未關閉')
+    if (sql(`SELECT notification_prefs->>'email_social' FROM users WHERE id='${id}'`) !== 'false') throw new Error('email_social 未關閉')
   }, { page })
 
   await run.step('V-04', 'P-P15 非 staff 進 /admin 顯示 404', async ({ note }) => {
