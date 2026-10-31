@@ -90,6 +90,18 @@ pub fn routes() -> Router<AppState> {
         .route("/me/notifications/{id}/read", post(read_one))
 }
 
+/// id, kind, 標題, 連結, 內文, 分類, 寫入時間, 已讀時間
+type InboxRow = (
+    Uuid,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    chrono::DateTime<chrono::Utc>,
+    Option<chrono::DateTime<chrono::Utc>>,
+);
+
 #[derive(Deserialize)]
 struct ListQ {
     before: Option<Uuid>,
@@ -122,8 +134,7 @@ async fn list(
         ));
     }
     // 多取一筆判斷有沒有下一頁；游標是上一頁最後一筆的 id（依 inbox_at DESC, id DESC）
-    #[allow(clippy::type_complexity)]
-    let rows: Vec<(Uuid, String, Option<String>, Option<String>, Option<String>, Option<String>, chrono::DateTime<chrono::Utc>, Option<chrono::DateTime<chrono::Utc>>)> = sqlx::query_as(
+    let rows: Vec<InboxRow> = sqlx::query_as(
         "SELECT n.id, n.kind, n.inbox_title, n.inbox_link, n.inbox_body, n.inbox_category, n.inbox_at, n.read_at FROM notifications n
           WHERE n.user_id = $1 AND n.inbox_at IS NOT NULL
             AND ($4::text IS NULL OR n.inbox_category = $4)
