@@ -277,6 +277,7 @@ async fn create(
     )
     .await?;
     crate::notify::enqueue_purchase_reminders(&mut *tx, &[claim.id]).await?;
+    crate::notify::enqueue_claim_confirmation(&mut *tx, claim.id).await?;
     let resp = json!({ "claim": claim, "item": item_json(item_id, needed, claimed) });
     idempotency::finish(&mut tx, &scope, key, 201, &resp).await?;
     let wid = wishlist_of(&mut tx, item_id).await?;
@@ -682,6 +683,23 @@ async fn apply(
         .await?;
     }
     let wid = wishlist_of(&mut tx, item_id).await?;
+    if cur != "cancelled" && new_status == "cancelled" {
+        let payload = json!({"wishlist_id": wid, "item_id": item_id});
+        if by_owner {
+            if let Some(uid) = user_id {
+                crate::notify::enqueue(&mut *tx, uid, "claim.cancelled_by_owner", payload).await?;
+            } else if let Some(gid) = guest_id {
+                // 舊訪客：比照品項刪除的寫法，只通知有 email 的訪客
+                sqlx::query("INSERT INTO notifications (guest_id, channel, kind, payload)
+                             SELECT id, 'email', 'claim.cancelled_by_owner', $2 FROM guests
+                              WHERE id = $1 AND email IS NOT NULL AND deleted_at IS NULL")
+                    .bind(gid).bind(payload).execute(&mut *tx).await?;
+            }
+        } else if cur == "purchased" {
+            // 驚喜鎖定期間由 worker 把關；從 reserved 取消不通知
+            crate::notify::enqueue_owner(&mut *tx, wid, "claim.cancelled_by_donor", payload).await?;
+        }
+    }
     crate::dashboard::notify(&mut *tx, wid).await?;
     tx.commit().await?;
     Ok((claim, item_json(item_id, n, c)))
