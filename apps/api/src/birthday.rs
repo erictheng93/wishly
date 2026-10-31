@@ -44,7 +44,7 @@ pub async fn birthday_tick_at(pool: &PgPool, today: NaiveDate) -> Result<u64, sq
                  SELECT r.id, 'email', 'birthday.friend', jsonb_build_object('wishlist_id', $2::uuid, 'owner_id', $1::uuid, 'birthday', $3::text)
                    FROM users r
                   WHERE r.id <> $1 AND r.deleted_at IS NULL AND r.blocked_at IS NULL
-                    AND COALESCE(r.notification_prefs->>'email_birthdays', 'true') <> 'false'
+                    AND COALESCE(r.notification_prefs->>'email_social', 'true') <> 'false'
                     AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(r.id, $1) AND f.user_b = GREATEST(r.id, $1))
                     AND ($4 <> 'selected' OR EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = $2 AND a.user_id = r.id))")
                 .bind(owner).bind(wid).bind(&bday).bind(&vis)
@@ -57,7 +57,7 @@ pub async fn birthday_tick_at(pool: &PgPool, today: NaiveDate) -> Result<u64, sq
         "SELECT u.id, u.birthday FROM users u
           WHERE u.birthday IS NOT NULL AND u.birthday_visibility::text <> 'private'
             AND u.deleted_at IS NULL AND u.blocked_at IS NULL
-            AND COALESCE(u.notification_prefs->>'email_birthdays', 'true') <> 'false'
+            AND COALESCE(u.notification_prefs->>'email_social', 'true') <> 'false'
             AND NOT EXISTS (SELECT 1 FROM wishlists w WHERE w.owner_id = u.id AND w.birthday_notify AND w.deleted_at IS NULL AND w.status = 'active')")
         .fetch_all(pool).await?;
     for (uid, bday) in nudges {

@@ -186,8 +186,7 @@ async fn invite_create(
             .bind(id)
             .fetch_one(&mut *tx)
             .await?;
-        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1,'email','org.invite',$2)")
-            .bind(uid).bind(json!({"org_id": id, "org_display_name": name, "role": b.role, "url": url})).execute(&mut *tx).await?;
+        crate::notify::enqueue(&mut *tx, uid, "org.invite", json!({"org_id": id, "org_display_name": name, "role": b.role, "url": url})).await?;
     }
     audit_user(
         &mut *tx,

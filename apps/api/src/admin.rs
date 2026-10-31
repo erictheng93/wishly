@@ -27,6 +27,7 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/audit-logs", get(list_audit_logs))
         .route("/admin/system-flags", get(list_flags))
         .route("/admin/system-flags/{key}", put(set_flag))
+        .route("/admin/notifications/requeue", post(requeue_notifications))
         .route("/admin/stats", get(stats))
         .route("/admin/analytics", get(analytics))
 }
@@ -271,6 +272,17 @@ async fn revoke_sessions(
         .execute(&mut **tx)
         .await?;
     Ok(())
+}
+
+/// 把最近 7 天寄送失敗（非地址錯誤）的通知重新排入佇列。
+async fn requeue_notifications(State(st): State<AppState>, Staff(sid): Staff) -> Result<Json<Value>, AppError> {
+    let mut tx = st.pool.begin().await?;
+    let n = sqlx::query("UPDATE notifications SET status = 'pending', attempts = 0, scheduled_at = now()
+                          WHERE status = 'failed' AND scheduled_at > now() - interval '7 days' AND last_error IS DISTINCT FROM 'bad address'")
+        .execute(&mut *tx).await?.rows_affected();
+    audit(&mut *tx, sid, "notification.requeue", "notifications", None, json!({ "requeued": n })).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "requeued": n })))
 }
 
 async fn update_user(

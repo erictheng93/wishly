@@ -16,6 +16,7 @@ pub mod guest;
 pub mod health;
 pub mod idempotency;
 pub mod identities;
+pub mod inbox;
 pub mod inspire;
 pub mod notify;
 pub mod onboarding;
@@ -92,6 +93,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(inspire::routes())
                 .merge(catalog::routes())
                 .merge(profiles::routes())
+                .merge(inbox::routes())
                 .merge(onboarding::routes()),
         )
         .layer(axum::middleware::from_fn_with_state(
