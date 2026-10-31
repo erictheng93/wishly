@@ -1291,3 +1291,34 @@ async fn dispute_webhook_is_a_documented_501_placeholder(pool: PgPool) {
         )
     );
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn dispute_transitions_touch_updated_at(pool: PgPool) {
+    let staff = common::staff(&pool, "營運").await;
+    let TestUser { id: a, .. } = common::user(&pool, "甲").await;
+    let topup = topup_credit(&pool, a, 100).await;
+    for action in ["open", "won", "open", "lost"] {
+        sqlx::query("UPDATE topups SET updated_at = now() - interval '1 day' WHERE id = $1")
+            .bind(topup)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (s, _, b) = dispute(
+            &pool,
+            &staff.token,
+            topup,
+            Uuid::new_v4(),
+            json!({ "action": action }),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{action}: {b}");
+        let fresh: bool = sqlx::query_scalar(
+            "SELECT updated_at > now() - interval '1 minute' FROM topups WHERE id = $1",
+        )
+        .bind(topup)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(fresh, "{action} 應更新 updated_at");
+    }
+}

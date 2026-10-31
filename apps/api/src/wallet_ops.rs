@@ -357,7 +357,7 @@ pub async fn dispute_open(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
     if status != "paid" {
         return Ok(false);
     }
-    sqlx::query("UPDATE topups SET status = 'disputed' WHERE id = $1")
+    sqlx::query("UPDATE topups SET status = 'disputed', updated_at = now() WHERE id = $1")
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
@@ -375,7 +375,7 @@ pub async fn dispute_won(tx: &mut Tx<'_>, topup_id: Uuid) -> R<bool> {
     if status != "disputed" {
         return Ok(false);
     }
-    sqlx::query("UPDATE topups SET status = 'paid' WHERE id = $1")
+    sqlx::query("UPDATE topups SET status = 'paid', updated_at = now() WHERE id = $1")
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
@@ -404,7 +404,7 @@ pub async fn charge_back(tx: &mut Tx<'_>, topup_id: Uuid) -> R<ChargedBack> {
     if status != "paid" && status != "disputed" {
         return Ok(ChargedBack::Ignored);
     }
-    sqlx::query("UPDATE topups SET status = 'charged_back' WHERE id = $1")
+    sqlx::query("UPDATE topups SET status = 'charged_back', updated_at = now() WHERE id = $1")
         .bind(topup_id)
         .execute(&mut **tx)
         .await?;
