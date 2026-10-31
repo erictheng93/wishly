@@ -16,7 +16,7 @@ afterEach(() => vi.useRealTimers())
 function setup(conns: Array<ReturnType<typeof conn> | 'fail'>, extra = {}) {
   const onEvent = vi.fn(); let n = 0
   const fetchImpl = vi.fn(async () => { const c = conns[Math.min(n++, conns.length - 1)]!; if (c === 'fail') throw new Error('net'); return c.res }) as any
-  const s = startInboxStream({ url: 'u', headers: () => ({}), onEvent, fetchImpl, ...extra })
+  const s = startInboxStream({ url: 'u', headers: () => ({}), onEvent, fetchImpl, jitter: 0, ...extra })
   return { s, onEvent, fetchImpl }
 }
 
@@ -61,11 +61,24 @@ describe('startInboxStream', () => {
     const c = conn(), c2 = conn()
     let n = 0
     const fetchImpl = vi.fn(async (_: string, i: RequestInit) => { const x = n++ ? c2 : c; i.signal!.addEventListener('abort', x.fail); return x.res }) as any
-    const s = startInboxStream({ url: 'u', headers: () => ({}), onEvent: vi.fn(), fetchImpl })
+    const s = startInboxStream({ url: 'u', headers: () => ({}), onEvent: vi.fn(), fetchImpl, jitter: 0 })
     await tick(); await tick(40000); c.push(': heartbeat\n\n'); await tick(40000)
     expect(fetchImpl).toHaveBeenCalledTimes(1)
     await tick(5000 + 2000); expect(fetchImpl).toHaveBeenCalledTimes(2)
     s.stop()
+  })
+  it('429 / 503 名額已滿：馬上輪詢，不用等三次失敗', async () => {
+    const { s, onEvent } = setup([conn(429)])
+    await tick(); await tick(15000)
+    expect(onEvent).toHaveBeenCalled()
+    s.stop()
+  })
+  it('重連延遲有隨機放大，不會同時湧入', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(1)
+    const c = conn(), c2 = conn(); const { s, fetchImpl } = setup([c, c2], { jitter: 0.5 })
+    await tick(); c.end(); await tick(2500); expect(fetchImpl).toHaveBeenCalledTimes(1)
+    await tick(600); expect(fetchImpl).toHaveBeenCalledTimes(2)
+    s.stop(); vi.restoreAllMocks()
   })
   it('stop() 中止連線且不再重連', async () => {
     const c = conn(); const { s, fetchImpl } = setup([c])

@@ -9,10 +9,11 @@ export interface InboxStreamOpts {
   failLimit?: number // 連續失敗幾次後改輪詢
   pollMs?: number
   idleMs?: number // 超過這麼久沒收到任何位元組（伺服器每 15 秒有心跳）就視為斷線
+  jitter?: number // 重連延遲隨機放大的比例，避免部署重啟後所有客戶端同時湧入
 }
 
 export function startInboxStream(o: InboxStreamOpts) {
-  const { delays = [2000, 5000, 15000, 30000], failLimit = 3, pollMs = 15000, idleMs = 45000, fetchImpl = (...a) => fetch(...a) } = o
+  const { delays = [2000, 5000, 15000, 30000], failLimit = 3, pollMs = 15000, idleMs = 45000, jitter = 0.5, fetchImpl = (...a) => fetch(...a) } = o
   let stopped = false, ctrl: AbortController | undefined, poll: ReturnType<typeof setInterval> | undefined
   let timer: ReturnType<typeof setTimeout> | undefined, wake: (() => void) | undefined
   const sleep = (ms: number) => new Promise<void>((r) => { wake = r; timer = setTimeout(r, ms) })
@@ -26,6 +27,7 @@ export function startInboxStream(o: InboxStreamOpts) {
         ctrl = new AbortController()
         const r = await fetchImpl(o.url, { headers: { Accept: 'text/event-stream', ...o.headers() }, credentials: 'include', cache: 'no-store', signal: ctrl.signal })
         if (r.status === 401 || r.status === 403) return stop() // 沒登入或被拒：不重試
+        if (r.status === 429 || r.status === 503) fails = failLimit // 名額已滿：不用再試三次才知道，先輪詢兜底
         if (!r.ok || !r.body) throw new Error(String(r.status))
         ok = true; fails = 0; stopPoll(); o.onEvent() // 每次連上補一次，涵蓋斷線期間的通知
         const reader = r.body.getReader(), dec = new TextDecoder()
@@ -45,7 +47,7 @@ export function startInboxStream(o: InboxStreamOpts) {
       } catch { /* 斷線或被 stop 中止，走下面的重連 */ }
       if (stopped) return
       if (!ok && ++fails >= failLimit) poll ??= setInterval(o.onEvent, pollMs) // 連不上時用輪詢兜底
-      await sleep(delays[Math.min(ok ? 0 : fails - 1, delays.length - 1)]!)
+      await sleep(delays[Math.min(ok ? 0 : fails - 1, delays.length - 1)]! * (1 + Math.random() * jitter))
     }
   }
   function stop() { stopped = true; ctrl?.abort(); stopPoll(); clearTimeout(timer); wake?.() }

@@ -22,3 +22,6 @@ UPDATE users
 -- 外鍵檢查會對 users 取 FOR KEY SHARE：持有 topups / 錢包 / 品項鎖的交易寫通知時，
 -- 會與帳號刪除的 users（FOR UPDATE）→ topups → 錢包 鎖序相反而死鎖。users 只軟刪除，worker 也會處理收件人不存在。
 ALTER TABLE notifications DROP CONSTRAINT notifications_user_id_fkey;
+
+-- 品項每次修改都要有自己的站內通知；email 改由 worker 在寄送時合併，不再靠「只留一筆待寄」
+DROP INDEX notifications_item_changed_uk;

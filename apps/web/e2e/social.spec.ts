@@ -140,7 +140,7 @@ test('個人頁 /u/{handle}：公開 / 僅好友清單依身分可見；捐助�
   // 本人看得到自己的私人捐助
   const pd = await pageFor(browser, donor)
   await pd.goto(`/u/${donor.handle}`)
-  await expect(pd.getByText('私人禮')).toBeVisible()
+  await expect(pd.getByText('私人禮 × 1')).toBeVisible()
   await closeAll([owner, friend, stranger, donor])
 })
 

@@ -116,9 +116,9 @@
     "notify": {
       "title": "Pengaturan notifikasi",
       "account": "Akun, keamanan, dan tenggat",
-      "accountHint": "Keamanan akun, dompet, pesanan, serta hal yang punya tenggat atau bisa merugikan (pengingat, kedaluwarsa, pembatalan). Selalu aktif.",
+      "accountHint": "Keamanan akun, dompet, pesanan, serta hal yang punya tenggat atau bisa merugikan (pengingat, pembatalan). Selalu aktif.",
       "gifts": "Progres hadiah",
-      "giftsHint": "Ada yang memberi, item tercapai, dikirim, atau tiba.",
+      "giftsHint": "Ada yang memberi, item tercapai, dikirim, tiba, atau klaim kedaluwarsa.",
       "social": "Sosial dan ulang tahun",
       "socialHint": "Aktivitas teman, pengingat ulang tahun teman, dan pengingat sebelum ulang tahun Anda untuk menyiapkan daftar.",
       "inbox": "Dalam aplikasi",

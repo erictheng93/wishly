@@ -18,6 +18,12 @@ fn init() {
     wishly_api::config::init(c);
 }
 
+/// birthday.nudge 是 Social 類、不需額外資料列的樣本；寄前重驗要求生日已公開
+async fn push_social(pool: &PgPool, uid: Uuid) -> Uuid {
+    sqlx::query("UPDATE users SET birthday='10-05', birthday_visibility='friends'::share_level WHERE id=$1").bind(uid).execute(pool).await.unwrap();
+    push(pool, uid, "birthday.nudge", json!({"birthday": "10-05"})).await
+}
+
 async fn push(pool: &PgPool, uid: Uuid, kind: &str, payload: Value) -> Uuid {
     // 建立時間往前推，避開認領確認 email 的 10 分鐘合併窗口
     sqlx::query_scalar("INSERT INTO notifications (user_id, channel, kind, payload, created_at) VALUES ($1,'email',$2,$3, now() - interval '11 minutes') RETURNING id")
@@ -36,8 +42,7 @@ async fn quiet_hours_defer_email_not_inbox(pool: PgPool) {
     let u = user(&pool, "u").await;
     let wl = wishlist(&pool, u.id, ListOpts::default()).await;
     let gifts = push(&pool, u.id, "crowdfund.funded", json!({"wishlist_id": wl.id})).await;
-    let from = user(&pool, "阿花").await;
-    let social = push(&pool, u.id, "friend.accepted", json!({"from_user": from.id})).await;
+    let social = push_social(&pool, u.id).await;
     let closing = push(&pool, u.id, "wishlist.closing", json!({"wishlist_id": wl.id})).await;
     let account = push(&pool, u.id, "wallet.unfrozen", json!({})).await;
     let paused = push(&pool, u.id, "site.paused", json!({"wishlist_id": wl.id})).await;
@@ -74,7 +79,7 @@ async fn night_rows_each_get_inbox_then_bundle_email(pool: PgPool) {
     let mut ids = vec![];
     for t in ["甲", "乙"] {
         let it = item(&pool, wl.id, t, 1).await;
-        ids.push(push(&pool, u.id, "item.reopened", json!({"wishlist_id": wl.id, "item_id": it})).await);
+        ids.push(push(&pool, u.id, "claim.expired", json!({"wishlist_id": wl.id, "item_id": it})).await);
     }
     notify::tick_at(&pool, Utc.with_ymd_and_hms(2026, 10, 31, 15, 0, 0).unwrap()).await.unwrap();
     for id in &ids {
@@ -97,8 +102,7 @@ async fn inbox_pref_off_skips_inbox_but_still_emails(pool: PgPool) {
     init();
     let u = user(&pool, "u").await;
     sqlx::query("UPDATE users SET notification_prefs='{\"inbox_social\": false, \"inbox_gifts\": false}' WHERE id=$1").bind(u.id).execute(&pool).await.unwrap();
-    let from = user(&pool, "阿花").await;
-    let social = push(&pool, u.id, "friend.accepted", json!({"from_user": from.id})).await;
+    let social = push_social(&pool, u.id).await;
     let gifts = push(&pool, u.id, "crowdfund.funded", json!({})).await;
     let account = push(&pool, u.id, "site.paused", json!({})).await;
     notify::tick_at(&pool, noon()).await.unwrap();
@@ -115,7 +119,7 @@ async fn smtp_failure_does_not_block_batch_inbox(pool: PgPool) {
     let ids = [
         push(&pool, u.id, "wallet.frozen", json!({})).await,
         push(&pool, u.id, "wallet.unfrozen", json!({})).await,
-        push(&pool, u.id, "topup.expired", json!({})).await,
+        push(&pool, u.id, "funding.expired", json!({})).await,
     ];
     notify::tick_at(&pool, noon()).await.unwrap();
     for id in ids {
@@ -244,8 +248,7 @@ async fn muted_and_emailless_users_still_get_inbox(pool: PgPool) {
     let wl = wishlist(&pool, u.id, ListOpts::default()).await;
     sqlx::query("UPDATE users SET notification_prefs='{\"email_gifts\": false, \"email_social\": false}' WHERE id=$1").bind(u.id).execute(&pool).await.unwrap();
     let gifts = push(&pool, u.id, "crowdfund.funded", json!({"wishlist_id": wl.id})).await;
-    let from = user(&pool, "阿花").await;
-    let social = push(&pool, u.id, "friend.accepted", json!({"from_user": from.id})).await;
+    let social = push_social(&pool, u.id).await;
     let account = push(&pool, u.id, "wallet.frozen", json!({})).await;
     notify::tick_at(&pool, noon()).await.unwrap();
     for id in [gifts, social] {
@@ -254,8 +257,6 @@ async fn muted_and_emailless_users_still_get_inbox(pool: PgPool) {
     }
     let (st, _, _, inbox, _) = row(&pool, account).await;
     assert_eq!((st.as_str(), inbox), ("pending", true), "Account 不可關閉：照常嘗試寄送");
-    let t: String = sqlx::query_scalar("SELECT inbox_title FROM notifications WHERE id=$1").bind(social).fetch_one(&pool).await.unwrap();
-    assert_eq!(t, "阿花 接受了你的好友邀請");
     // 沒有 email 的使用者
     let n = user(&pool, "n").await;
     sqlx::query("UPDATE users SET email=NULL WHERE id=$1").bind(n.id).execute(&pool).await.unwrap();
@@ -444,36 +445,138 @@ async fn bundled_items_survive_primary_retry(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn claim_confirmation_is_in_app_now_and_email_merges_after_ten_minutes(pool: PgPool) {
+async fn in_app_only_kinds_never_email_members(pool: PgPool) {
+    init();
+    let u = user(&pool, "u").await;
+    let from = user(&pool, "阿花").await;
+    let wl = wishlist(&pool, u.id, ListOpts::default()).await;
+    let it = item(&pool, wl.id, "禮物", 1).await;
+    let (_, c) = user_claim(&pool, it, 1).await;
+    sqlx::query("DELETE FROM notifications").execute(&pool).await.unwrap();
+    let ids = [
+        push(&pool, u.id, "friend.accepted", json!({"from_user": from.id})).await,
+        push(&pool, u.id, "item.reopened", json!({"wishlist_id": wl.id, "item_id": it})).await,
+        push(&pool, u.id, "claim.cancelled_by_donor", json!({"wishlist_id": wl.id, "item_id": it})).await,
+        push(&pool, u.id, "topup.expired", json!({})).await,
+        push(&pool, u.id, "claim.confirmation", json!({"wishlist_id": wl.id, "item_id": it, "claim_id": c})).await,
+    ];
+    notify::tick_at(&pool, noon()).await.unwrap();
+    for id in ids {
+        let (st, err, _, inbox, _) = row(&pool, id).await;
+        assert_eq!((st.as_str(), err.as_deref(), inbox), ("cancelled", Some("in-app only"), true));
+    }
+    let t: String = sqlx::query_scalar("SELECT inbox_title FROM notifications WHERE id=$1").bind(ids[0]).fetch_one(&pool).await.unwrap();
+    assert_eq!(t, "阿花 接受了你的好友邀請");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn legacy_guest_still_gets_email_for_in_app_only_kinds(pool: PgPool) {
+    init();
+    let g: Uuid = sqlx::query_scalar("INSERT INTO guests (guest_token_hash, display_name, email) VALUES (sha256('legacy'::bytea), '舊訪客', 'g@example.com') RETURNING id").fetch_one(&pool).await.unwrap();
+    let owner = user(&pool, "o").await;
+    let wl = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let it = item(&pool, wl.id, "禮物", 1).await;
+    let id: Uuid = sqlx::query_scalar("INSERT INTO notifications (guest_id, channel, kind, payload, created_at) VALUES ($1,'email','item.reopened',$2, now() - interval '11 minutes') RETURNING id")
+        .bind(g).bind(json!({"wishlist_id": wl.id, "item_id": it})).fetch_one(&pool).await.unwrap();
+    notify::tick_at(&pool, noon()).await.unwrap();
+    let (st, _, attempts, inbox, _) = row(&pool, id).await;
+    assert_eq!((st.as_str(), attempts, inbox), ("pending", 1, false), "沒有站內，照常嘗試寄信");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn daytime_tier_waits_for_nine_unless_deadline_is_sooner(pool: PgPool) {
     init();
     let owner = user(&pool, "o").await;
     let wl = wishlist(&pool, owner.id, ListOpts::default()).await;
     let it = item(&pool, wl.id, "禮物", 5).await;
-    let (_, c1) = user_claim(&pool, it, 1).await;
-    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id=$1").bind(c1).fetch_one(&pool).await.unwrap();
+    let u = user(&pool, "u").await;
+    let (_, soon) = user_claim(&pool, it, 1).await;
+    let (_, later) = user_claim(&pool, it, 1).await;
     sqlx::query("DELETE FROM notifications").execute(&pool).await.unwrap();
-    notify::enqueue_claim_confirmation(&pool, c1).await.unwrap();
-    let it2 = item(&pool, wl.id, "第二件", 5).await;
-    let c2: Uuid = sqlx::query_scalar("INSERT INTO claims (item_id, user_id, claimer_name, status, qty, expires_at) SELECT $2, user_id, claimer_name, status, qty, expires_at FROM claims WHERE id=$1 RETURNING id")
-        .bind(c1).bind(it2).fetch_one(&pool).await.unwrap();
-    notify::enqueue_claim_confirmation(&pool, c2).await.unwrap();
-
-    // 第一輪：兩筆都立刻進站內，各自獨立；email 延後約 10 分鐘，不算嘗試
-    notify::tick_at(&pool, noon()).await.unwrap();
-    let rows: Vec<(Uuid, String, bool, i16, f64)> = sqlx::query_as(
-        "SELECT id, status::text, inbox_at IS NOT NULL, attempts, extract(epoch FROM scheduled_at - now())::float8 FROM notifications WHERE user_id=$1 ORDER BY id")
-        .bind(uid).fetch_all(&pool).await.unwrap();
-    assert_eq!(rows.len(), 2);
-    for r in &rows {
-        assert_eq!((r.1.as_str(), r.2, r.3), ("pending", true, 0));
-        assert!((590.0..=601.0).contains(&r.4), "{}", r.4);
+    // 台北 23:00；soon 在 09:00 前到期，later 在 09:00 後
+    let now = Utc.with_ymd_and_hms(2026, 10, 31, 15, 0, 0).unwrap();
+    let u2 = user(&pool, "u2").await; // 兩位收件人：同一人的提醒會互相合併
+    let reminder = |to: Uuid, claim: Uuid, at: chrono::DateTime<Utc>| {
+        let pool = pool.clone();
+        async move {
+            let db_at: String = sqlx::query_scalar("UPDATE claims SET expires_at=$2 WHERE id=$1 RETURNING to_jsonb(expires_at)#>>'{}'").bind(claim).bind(at).fetch_one(&pool).await.unwrap();
+            push(&pool, to, "claim.purchase_reminder", json!({"claim_id": claim, "expires_at": db_at})).await
+        }
+    };
+    let urgent = reminder(u.id, soon, Utc.with_ymd_and_hms(2026, 11, 1, 0, 0, 0).unwrap()).await;
+    let relaxed = reminder(u2.id, later, Utc.with_ymd_and_hms(2026, 11, 1, 6, 0, 0).unwrap()).await;
+    let cancelled = push(&pool, u.id, "claim.cancelled_by_owner", json!({"wishlist_id": wl.id, "item_id": it})).await;
+    notify::tick_at(&pool, now).await.unwrap();
+    assert_eq!(row(&pool, urgent).await.2, 1, "趕不及 09:00：立刻寄");
+    for id in [relaxed, cancelled] {
+        let (st, _, attempts, inbox, _) = row(&pool, id).await;
+        assert_eq!((st.as_str(), attempts, inbox), ("pending", 0, true), "email 等 09:00，站內立即");
     }
+    // 可關閉 / 不可關閉：關掉送禮進度 email 也不影響這一級
+    sqlx::query("UPDATE users SET notification_prefs='{\"email_gifts\": false}' WHERE id=$1").bind(u.id).execute(&pool).await.unwrap();
+    let c2 = push(&pool, u.id, "claim.item_removed", json!({"wishlist_id": wl.id})).await;
+    notify::tick_at(&pool, noon()).await.unwrap();
+    assert_eq!(row(&pool, c2).await.2, 1);
+}
 
-    // 窗口過後：email 併成一封，兩筆站內都保留
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn item_change_is_in_app_now_and_email_waits_ten_minutes(pool: PgPool) {
+    init();
+    let owner = user(&pool, "o").await;
+    let wl = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let it = item(&pool, wl.id, "禮物", 5).await;
+    let (_, claim) = user_claim(&pool, it, 1).await;
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id=$1").bind(claim).fetch_one(&pool).await.unwrap();
+    sqlx::query("DELETE FROM notifications").execute(&pool).await.unwrap();
+    notify::enqueue_item_changed(&pool, it).await.unwrap();
+    notify::tick_at(&pool, noon()).await.unwrap();
+    let (id, st, inbox, attempts, secs): (Uuid, String, bool, i16, f64) = sqlx::query_as(
+        "SELECT id, status::text, inbox_at IS NOT NULL, attempts, extract(epoch FROM scheduled_at - now())::float8 FROM notifications WHERE user_id=$1").bind(uid).fetch_one(&pool).await.unwrap();
+    assert_eq!((st.as_str(), inbox, attempts), ("pending", true, 0));
+    assert!((590.0..=601.0).contains(&secs), "{secs}");
+    // 窗口內取消：email 不寄，站內保留
+    sqlx::query("UPDATE claims SET status='cancelled' WHERE id=$1").bind(claim).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE notifications SET created_at = now() - interval '11 minutes', scheduled_at = now() WHERE id=$1").bind(id).execute(&pool).await.unwrap();
+    notify::tick_at(&pool, noon()).await.unwrap();
+    let (st, err, _, inbox, _) = row(&pool, id).await;
+    assert_eq!((st.as_str(), err.as_deref(), inbox), ("cancelled", Some("no longer supporting item"), true));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn every_item_edit_reaches_inbox_but_email_is_merged_and_rate_limited(pool: PgPool) {
+    init();
+    let owner = user(&pool, "o").await;
+    let wl = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let it = item(&pool, wl.id, "禮物", 5).await;
+    let (_, claim) = user_claim(&pool, it, 1).await;
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id=$1").bind(claim).fetch_one(&pool).await.unwrap();
+    sqlx::query("DELETE FROM notifications").execute(&pool).await.unwrap();
+    let count = |sql: &'static str| {
+        let pool = pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).bind(uid).fetch_one(&pool).await.unwrap() }
+    };
+    let inbox = "SELECT count(*) FROM notifications WHERE user_id=$1 AND inbox_at IS NOT NULL";
+
+    // 連改三次：每次都有站內通知，email 都還在等
+    for n in 1..=3 {
+        notify::enqueue_item_changed(&pool, it).await.unwrap();
+        notify::tick_at(&pool, noon()).await.unwrap();
+        assert_eq!(count(inbox).await, n);
+    }
+    assert_eq!(count("SELECT count(*) FROM notifications WHERE user_id=$1 AND attempts > 0").await, 0);
+
+    // 窗口過後：三筆只試寄一封（寄不出去所以主列留 pending），其餘併入，站內全保留
     sqlx::query("UPDATE notifications SET created_at = now() - interval '11 minutes', scheduled_at = now() WHERE user_id=$1").bind(uid).execute(&pool).await.unwrap();
     notify::tick_at(&pool, noon()).await.unwrap();
-    let merged: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE user_id=$1 AND last_error LIKE 'bundled:%' AND inbox_at IS NOT NULL").bind(uid).fetch_one(&pool).await.unwrap();
-    assert_eq!(merged, 1);
-    let inbox: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE user_id=$1 AND inbox_at IS NOT NULL").bind(uid).fetch_one(&pool).await.unwrap();
-    assert_eq!(inbox, 2);
+    assert_eq!(count("SELECT count(*) FROM notifications WHERE user_id=$1 AND status='pending'").await, 1);
+    assert_eq!(count("SELECT count(*) FROM notifications WHERE user_id=$1 AND last_error LIKE 'bundled:%'").await, 2);
+    assert_eq!(count(inbox).await, 3);
+
+    // 剛寄出過：再改一次，站內照常，email 要等滿 1 小時
+    sqlx::query("UPDATE notifications SET status='sent', sent_at=now(), last_error=NULL WHERE user_id=$1").bind(uid).execute(&pool).await.unwrap();
+    notify::enqueue_item_changed(&pool, it).await.unwrap();
+    notify::tick_at(&pool, noon()).await.unwrap();
+    assert_eq!(count(inbox).await, 4);
+    let secs: f64 = sqlx::query_scalar("SELECT extract(epoch FROM scheduled_at - now())::float8 FROM notifications WHERE user_id=$1 AND status='pending'").bind(uid).fetch_one(&pool).await.unwrap();
+    assert!((3590.0..=3601.0).contains(&secs), "{secs}");
 }

@@ -27,4 +27,7 @@ test('建立者改數量：捐助者看到提醒、按知道了後消失，並�
   const row = page.locator('.c-inbox li', { hasText: '內容有更新' })
   await expect(row).toContainText('安撫奶嘴')
   await expect(row).toContainText(list.title)
+  // 再改一次：不用重新整理就多一則，連續修改不會被吃掉
+  await expect(owner.api.patch(`items/${item.id}`, { data: { qty_needed: 3 } })).resolves.toBeOK()
+  await expect(page.locator('.c-inbox li', { hasText: '內容有更新' })).toHaveCount(2)
 })

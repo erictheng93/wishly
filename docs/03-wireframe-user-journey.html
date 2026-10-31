@@ -312,7 +312,7 @@ flowchart TD
 <tr><td>3 加品項</td><td>逐項新增：奶瓶 ×10、奶粉 ×2（MVP 皆為數量捐助）。<span class="ph p2">P2</span> 另加嬰兒推車：從商品目錄選，設為眾籌</td><td>「推車太貴，大家分攤比較好開口，但錢不要經過我的手」</td><td>認真 / 稍累</td><td>/lists/{id}/edit、新增品項 sheet</td><td>P0 眾籌選項灰掉標示 P2；P1 貼網址自動帶入標題與圖片；P2 CatalogPicker 直接算出 target_points</td></tr>
 <tr><td>4 設驚喜與收件地址</td><td>開驚喜模式；<span class="ph p2">P2</span> 有眾籌品項時填收件地址（發佈前必填）</td><td>「我想保留拆禮物的驚喜，但包裹要寄得到」</td><td>安心</td><td>建立頁開關、收件地址設定</td><td>解釋「活動日前只看完成度與彙總（已下單 N / 運送中 M）」；說明地址只有你與履約人員看得到，捐贈者看不到</td></tr>
 <tr><td>5 分享</td><td>按「分享」→ 傳到家族群組、朋友群</td><td>「連結點開要一眼看懂」</td><td>期待</td><td>ShareSheet、LINE OG 預覽</td><td>OG 卡片含完成度與封面；LINE 分享帶 <code>openExternalBrowser</code> 選項</td></tr>
-<tr><td>6 追蹤</td><td>每週看 /lists/{id}/progress；<span class="ph p2">P2</span> 眾籌品項看「募集中 / 已達標 / 已下單 / 運送中」</td><td>「還缺哪些？推車什麼時候會到？」（但不想被劇透）</td><td>滿足 / 偶爾焦慮</td><td>儀表板、Email 通知（MVP）</td><td>Email 通知第一筆捐助即時、之後每日彙整，可在設定關閉（驚喜模式只寫「有 N 件新捐助」）；缺口排序；驚喜模式下眾籌只顯示彙總（已下單 N / 運送中 M），不顯示逐品項對應與捐贈者；點數不會經過建立者，不需對帳</td></tr>
+<tr><td>6 追蹤</td><td>每週看 /lists/{id}/progress；<span class="ph p2">P2</span> 眾籌品項看「募集中 / 已達標 / 已下單 / 運送中」</td><td>「還缺哪些？推車什麼時候會到？」（但不想被劇透）</td><td>滿足 / 偶爾焦慮</td><td>儀表板</td><td>不再通知「有新捐助」（D58）；進度看儀表板；缺口排序；驚喜模式下眾籌只顯示彙總（已下單 N / 運送中 M），不顯示逐品項對應與捐贈者；點數不會經過建立者，不需對帳</td></tr>
 <tr><td>7 活動日後</td><td>驚喜解鎖，查看誰送了什麼，寫謝卡；眾籌包裹送達即揭曉</td><td>「想知道謝誰」</td><td>感動</td><td>儀表板（解鎖後）</td><td>匿名捐贈者（is_anonymous）仍只顯示「匿名朋友」；匯出送禮名單（待決）</td></tr>
 </tbody></table></div>
 
@@ -1838,7 +1838,9 @@ flowchart TD
 <div class="ab">‹ 帳號設定</div>
 <div class="bd">
 <div class="lbl"><b>通知</b></div>
-<div class="card" style="align-items:center"><div class="col"><b>好友生日將近時寄 Email</b><span class="lbl">（D58 後「有人捐助時寄 Email」已停用並自設定頁移除；目前通知區只有生日通知，D65。）</span></div><div class="sw"></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>送禮進度</b><span class="lbl">站內 / Email 兩個開關</span></div><div class="sw"></div></div>
+<div class="card" style="align-items:center"><div class="col"><b>社交與生日</b><span class="lbl">站內 / Email 兩個開關</span></div><div class="sw"></div></div>
+<div class="lbl">帳務、安全與期限類固定開啟，不提供開關（D67，見 <code>docs/notification-policy.md</code>）。</div>
 <div class="lbl"><b>我的資料</b></div>
 <div class="btn">匯出我的資料（JSON）</div>
 <div class="lbl">包含個人資料、清單與捐助紀錄。</div>
@@ -1862,10 +1864,10 @@ flowchart TD
 </div></div><div class="cap">刪除二次確認（P2 有餘額時的阻擋說明）</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>SettingsSection、SwitchRow（notification_prefs.email_claims）、ExportButton、DeleteAccountSheet（輸入確認字樣）、BlockerNotice（P2：餘額 / 未完成認捐 / 未結案訂單）</td></tr>
+<tr><th>元件</th><td>SettingsSection、SwitchRow（每類兩個：<code>inbox_*</code> / <code>email_*</code>，類別為 gifts、social）、ExportButton、DeleteAccountSheet（輸入確認字樣）、BlockerNotice（P2：餘額 / 未完成認捐 / 未結案訂單）</td></tr>
 <tr><th>狀態</th><td>loading / error / 匯出中（按鈕 spinner，完成後瀏覽器下載 JSON）/ 刪除中 / 刪除成功（登出並導向首頁，toast「帳號已刪除」）/ <span class="ph p2">P2</span> <code>ACCOUNT_HAS_BALANCE</code>（409，顯示阻擋說明，並列出可退現金金額與需確認放棄的點數；金融紀錄依商業會計法保存並假名化，年限待會計師確認）。離線：停用。</td></tr>
-<tr><th>互動</th><td>通知開關對應 <code>notification_prefs.email_claims</code>，即時儲存（樂觀更新，失敗回滾）；從信件退訂的使用者進入此頁時開關已為關閉。刪除需輸入確認字樣後才啟用按鈕。訪客（免登入）的對應操作在 /me/claims：「刪除我的暱稱與聯絡方式」，claims 保留為「已刪除的訪客」。</td></tr>
-<tr><th>API</th><td>GET <code>/me</code>；GET <code>/me/export</code>；DELETE <code>/me</code>；DELETE <code>/guest/me</code>（訪客）。通知偏好以 PATCH <code>/me</code> 更新 <code>notification_prefs</code>（MVP 鍵 <code>{"email_claims": true}</code>）；信件內「一鍵退訂」連結為 GET <code>/unsubscribe?token=</code>（HMAC 簽章、免登入），退訂後此開關顯示為關</td></tr>
+<tr><th>互動</th><td>通知分三類：帳務、安全與期限（固定開啟）、送禮進度、社交與生日；後兩類各有站內與 Email 兩個開關，對應 <code>notification_prefs.inbox_gifts / email_gifts / inbox_social / email_social</code>（缺鍵視為開啟），即時儲存（樂觀更新，失敗回滾）；從信件退訂的使用者進入此頁時開關已為關閉。刪除需輸入確認字樣後才啟用按鈕。訪客（免登入）的對應操作在 /me/claims：「刪除我的暱稱與聯絡方式」，claims 保留為「已刪除的訪客」。</td></tr>
+<tr><th>API</th><td>GET <code>/me</code>；GET <code>/me/export</code>；DELETE <code>/me</code>；DELETE <code>/guest/me</code>（訪客）。通知偏好以 PATCH <code>/me</code> 更新 <code>notification_prefs</code>（鍵 <code>inbox_gifts</code>、<code>email_gifts</code>、<code>inbox_social</code>、<code>email_social</code>；原 <code>email_claims</code> 已淘汰）；站內通知另有 <code>/me/notifications*</code>（清單、已讀、全部已讀、未讀數與串流）；信件內「一鍵退訂」連結為 GET <code>/unsubscribe?token=</code>（HMAC 簽章、免登入），退訂後此開關顯示為關</td></tr>
 </tbody></table></div></div></div>
 
 
@@ -2545,8 +2547,9 @@ async function waitTopup(before) {
 <tr><td>捐助確認信（Email）</td><td>你已捐助「寶寶奶瓶 240ml × 2」。點這裡管理我的捐助：{連結}（連結只能使用一次，30 天內有效）。不想再收到通知？<u>一鍵退訂</u></td></tr>
 <tr><td>退訂成功</td><td>已為你取消這類 Email 通知。之後想重新開啟，可以到帳號設定。</td></tr>
 <tr><td>管理連結失效</td><td>這個管理連結已失效（只能使用一次，且 30 天內有效）。請回到朋友分享的清單連結，或聯絡客服。</td></tr>
-<tr><td>建立者捐助通知（信件頁尾）</td><td>不想收到捐助通知？<u>一鍵退訂</u>，或到帳號設定調整。</td></tr>
-<tr><td>建立者捐助通知（驚喜模式）</td><td>你的清單有 2 件新捐助。驚喜模式中，活動日前不會顯示內容。</td></tr>
+<tr><td>可關閉通知信（信件頁尾）</td><td>不想再收到這類通知？<u>一鍵退訂</u>，或到帳號設定調整。只有可關閉的第三級會員信與寄給舊訪客的信才附。</td></tr>
+<tr><td>建立者捐助通知（已停用，D58）</td><td>不再通知「有新捐助」，驚喜鎖定中受贈者端通知也不寄、不進站內。</td></tr>
+<tr><td>站內通知中心</td><td>鈴鐺顯示未讀數，面板列最新 5 筆；新通知即時以 toast 提示，不需重新整理；<code>/me/notifications</code> 顯示全部通知，可依類別（全部 / 帳務安全 / 送禮 / 好友生日）篩選；點通知標為已讀並前往對應頁，可全部已讀。</td></tr>
 <tr><td>刪除帳號確認</td><td>你的 Email 與名稱會被移除，清單會封存並從公開移除。此動作無法復原。</td></tr>
 <tr><td>帳號已刪除</td><td>帳號已刪除。謝謝你曾經使用 Wishly。</td></tr>
 <tr><td>409 ACCOUNT_HAS_BALANCE</td><td>你的錢包還有點數，或有進行中的認捐。請先處理後再刪除帳號。</td></tr>

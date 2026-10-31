@@ -113,7 +113,7 @@ pub async fn enqueue_site_paused<'e, E: sqlx::PgExecutor<'e>>(
 }
 
 /// Q13：建立者修改品項內容後，通知進行中的捐助者（reserved / purchased，含有 email 的舊訪客）與眾籌認捐者（pledged）。
-/// 站內立即出現；email 由 worker 延後 10 分鐘合併連續修改：notifications_item_changed_uk 讓同一人同一品項只留一筆待寄，內容寄信時才讀最新品項。
+/// 每次修改一筆，站內都立即出現；email 由 worker 合併（`EMAIL_HOLD_MINUTES`、`ITEM_EMAIL_COOLDOWN_MINUTES`），內容寄信時才讀最新品項。
 pub async fn enqueue_item_changed<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
     item_id: Uuid,
@@ -128,8 +128,7 @@ pub async fn enqueue_item_changed<'e, E: sqlx::PgExecutor<'e>>(
            LEFT JOIN users u ON u.id = r.user_id
            LEFT JOIN guests g ON g.id = r.guest_id
           WHERE i.id = $1
-            AND ((u.id IS NOT NULL AND u.deleted_at IS NULL) OR (g.email IS NOT NULL AND g.deleted_at IS NULL)) -- 沒 email 的會員也要有站內通知
-         ON CONFLICT DO NOTHING")
+            AND ((u.id IS NOT NULL AND u.deleted_at IS NULL) OR (g.email IS NOT NULL AND g.deleted_at IS NULL)) -- 沒 email 的會員也要有站內通知")
         .bind(item_id).execute(ex).await?;
     Ok(())
 }
@@ -242,8 +241,10 @@ struct Outbound {
     attempts: i16,
 }
 
-/// 認領確認與品項變更：站內立即出現，email 從建立起延後這麼久，讓連續操作合併、已取消的不寄。
+/// 品項變更（與舊訪客的認領確認）：站內立即出現，email 從建立起延後這麼久，讓連續操作合併、已取消的不寄。
 const EMAIL_HOLD_MINUTES: i32 = 10;
+/// 同一人同一品項寄出 email 後，至少隔這麼久才寄下一封：品項被反覆修改時不會變成郵件轟炸。站內不受影響。
+const ITEM_EMAIL_COOLDOWN_MINUTES: i32 = 60;
 
 /// 同時寄送上限
 const SEND_CONCURRENCY: usize = 5;
@@ -297,7 +298,6 @@ pub fn category(kind: &str) -> Category {
                 | "funding.released"
                 | "item.removed"
                 | "claim.purchase_reminder"
-                | "claim.expired"
                 | "claim.cancelled_by_owner"
                 | "claim.list_closed"
                 | "claim.item_removed"
@@ -313,7 +313,29 @@ pub fn category(kind: &str) -> Category {
     }
 }
 
-/// 所有會被 render 的 kind（單元測試用它確認四語文案齊全）。新增 kind 時一併加進這裡、`category` 與 `inbox_link`。
+/// Email 分級（站內通知不受影響；規則與理由見 docs/notification-policy.md）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EmailTier {
+    /// 不可關閉，立刻寄（夜間也寄）
+    Immediate,
+    /// 不可關閉，安靜時段延後到 09:00
+    Daytime,
+    /// 預設開、可關閉，安靜時段延後到 09:00
+    Optional,
+    /// 會員不寄 email，只留站內（舊訪客沒有站內，照常寄）
+    InAppOnly,
+}
+
+pub fn email_tier(kind: &str) -> EmailTier {
+    match kind {
+        "claim.confirmation" | "friend.accepted" | "item.reopened" | "claim.cancelled_by_donor" | "topup.expired" => EmailTier::InAppOnly,
+        "claim.purchase_reminder" | "claim.list_closed" | "claim.cancelled_by_owner" | "claim.item_removed" => EmailTier::Daytime,
+        _ if category(kind) == Category::Account => EmailTier::Immediate,
+        _ => EmailTier::Optional,
+    }
+}
+
+/// 所有會被 render 的 kind（單元測試用它確認四語文案齊全）。新增 kind 時一併加進這裡、`category`、`email_tier`、`inbox_link` 與 docs/notification-policy.md。
 pub const KINDS: &[&str] = &[
     "auth.password_changed", "auth.mfa_reset", "auth.identity_linked", "auth.identity_unlinked",
     "auth.mfa_enabled", "auth.recovery_regenerated",
@@ -432,10 +454,26 @@ async fn handle(
     let cfg = crate::config::get();
     let cat = category(&kind);
     // email 要延後的時間（見步驟 9）：安靜時段，或連續操作的合併窗口。站內信不等；此時不合併，否則被併掉的列就沒有自己的站內信
-    let mut hold = if cat == Category::Account { None } else { quiet_until(now) };
-    if hold.is_none() && matches!(kind.as_str(), "claim.confirmation" | "claim.item_changed") {
-        hold = sqlx::query_scalar("SELECT at FROM (SELECT created_at + make_interval(mins => $2) AS at FROM notifications WHERE id = $1) t WHERE at > now()")
-            .bind(id).bind(EMAIL_HOLD_MINUTES).fetch_optional(pool).await?;
+    let tier = email_tier(&kind);
+    let in_app_only = uid.is_some() && tier == EmailTier::InAppOnly;
+    let mut hold = if tier == EmailTier::Immediate { None } else { quiet_until(now) };
+    // 購買期限早於 09:00：等到天亮就來不及了，立刻寄
+    if kind == "claim.purchase_reminder" {
+        let due = payload["expires_at"].as_str().and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok());
+        if matches!((hold, due), (Some(at), Some(d)) if d <= at) {
+            hold = None;
+        }
+    }
+    if hold.is_none() && !in_app_only && matches!(kind.as_str(), "claim.confirmation" | "claim.item_changed") {
+        hold = sqlx::query_scalar(
+            "SELECT at FROM (
+               SELECT GREATEST(n.created_at + make_interval(mins => $2),
+                        (SELECT max(o.sent_at) + make_interval(mins => $3) FROM notifications o
+                          WHERE o.kind = n.kind AND o.id <> n.id AND o.payload->>'item_id' = n.payload->>'item_id'
+                            AND o.user_id IS NOT DISTINCT FROM n.user_id AND o.guest_id IS NOT DISTINCT FROM n.guest_id)) AS at
+                 FROM notifications n WHERE n.id = $1) t
+              WHERE at > now()")
+            .bind(id).bind(EMAIL_HOLD_MINUTES).bind(ITEM_EMAIL_COOLDOWN_MINUTES).fetch_optional(pool).await?;
     }
     // 會員收件人：帳號已刪除就不處理；同時取語言與偏好（偏好在步驟 7 才套用）
     let user: Option<(String, bool, bool, bool, bool)> = match uid {
@@ -543,13 +581,22 @@ async fn handle(
     }
     // 5. 合併：同收件人短時間內的同類通知併成一封，其餘標為 sent（last_error 記主列 id）
     // 只併「站內狀態相同」的列：第一輪併還沒進站內的，隔天 09:00 的第二輪併已進站內的，email 仍合成一封
-    if hold.is_none() && matches!(kind.as_str(), "claim.confirmation" | "claim.purchase_reminder" | "claim.expired" | "item.reopened") {
+    let inbox_on = match &user {
+        Some((_, _, _, ig, is_)) => cat == Category::Account || (cat == Category::Gifts && *ig) || (cat == Category::Social && *is_),
+        None => false,
+    };
+    // 品項變更每次都要有自己的站內通知：還沒進站內的列不能被併掉
+    let keep_each = kind == "claim.item_changed" && inbox_on && !has_inbox;
+    if hold.is_none() && !in_app_only && !keep_each
+        && matches!(kind.as_str(), "claim.confirmation" | "claim.purchase_reminder" | "claim.expired" | "item.reopened" | "claim.item_changed")
+    {
         let merged: Vec<(Uuid, Option<String>)> = sqlx::query_as(
             "WITH m AS (
                SELECT n.id, i.title FROM notifications n
                  LEFT JOIN wishlist_items i ON i.id = (n.payload->>'item_id')::uuid
                 WHERE n.user_id IS NOT DISTINCT FROM $1 AND n.guest_id IS NOT DISTINCT FROM $2
                   AND n.kind = $3 AND n.status = 'pending' AND n.id <> $4 AND (n.inbox_at IS NOT NULL) = $5
+                  AND (n.kind <> 'claim.item_changed' OR n.payload->>'item_id' = $6)
                   AND n.scheduled_at <= now() + interval '6 hours'
                   AND CASE n.kind
                         WHEN 'claim.purchase_reminder' THEN EXISTS (
@@ -564,15 +611,16 @@ async fn handle(
                UPDATE notifications SET status = 'sent', sent_at = now(), last_error = 'bundled:' || $4::text
                  FROM m WHERE notifications.id = m.id RETURNING notifications.id)
              SELECT m.id, m.title FROM m JOIN u ON u.id = m.id")
-            .bind(uid).bind(gid).bind(&kind).bind(id).bind(has_inbox).fetch_all(pool).await?;
-        if !merged.is_empty() {
+            .bind(uid).bind(gid).bind(&kind).bind(id).bind(has_inbox).bind(payload["item_id"].as_str()).fetch_all(pool).await?;
+        bundled.extend(merged.iter().map(|(i, _)| *i));
+        // 品項變更併的是同一品項，不需要「共 N 件」
+        if !merged.is_empty() && kind != "claim.item_changed" {
             // 寫回 DB：被併入的列已標 sent，主列重試時要靠這份清單；重試時可能再併入新列，所以累加
             let mut items: Vec<Value> = payload.get("more_items").and_then(Value::as_array).cloned().unwrap_or_default();
             items.extend(merged.iter().filter_map(|(_, t)| t.clone()).map(Value::String));
             sqlx::query("UPDATE notifications SET payload = jsonb_set(payload, '{more_items}', $2) WHERE id = $1")
                 .bind(id).bind(Value::Array(items.clone())).execute(pool).await?;
             payload["more_items"] = items.into();
-            bundled.extend(merged.iter().map(|(i, _)| *i));
         }
     }
     // 6. render
@@ -619,17 +667,18 @@ async fn handle(
     };
     let (subject, body) = render_lang(lang, &kind, &title, &payload);
     // 7. 站內信（不受安靜時段影響）：領取時已有就凍結不動；Account 類不看偏好
-    if let (Some(u), Some((_, _, _, ig, is_)), false) = (uid, &user, has_inbox) {
-        if cat == Category::Account || (cat == Category::Gifts && *ig) || (cat == Category::Social && *is_) {
-            let inbox_title = subject
-                .strip_prefix("【Wishly】")
-                .or_else(|| subject.strip_prefix("[Wishly] "))
-                .unwrap_or(&subject);
-            sqlx::query("UPDATE notifications SET inbox_at = now(), inbox_title = $2, inbox_link = $3, inbox_body = $4, inbox_category = $5 WHERE id = $1 AND inbox_at IS NULL")
-                .bind(id).bind(inbox_title).bind(inbox_link(&kind, &payload)).bind(inbox_body(&body)).bind(cat.as_str())
-                .execute(pool).await?;
-            let _ = crate::dashboard::notify(pool, u).await; // 訊號只是提示，失敗由前端重連 / 重整補上
-        }
+    if let (Some(u), true, false) = (uid, inbox_on, has_inbox) {
+        let inbox_title = subject
+            .strip_prefix("【Wishly】")
+            .or_else(|| subject.strip_prefix("[Wishly] "))
+            .unwrap_or(&subject);
+        sqlx::query("UPDATE notifications SET inbox_at = now(), inbox_title = $2, inbox_link = $3, inbox_body = $4, inbox_category = $5 WHERE id = $1 AND inbox_at IS NULL")
+            .bind(id).bind(inbox_title).bind(inbox_link(&kind, &payload)).bind(inbox_body(&body)).bind(cat.as_str())
+            .execute(pool).await?;
+        let _ = crate::dashboard::notify(pool, u).await; // 訊號只是提示，失敗由前端重連 / 重整補上
+    }
+    if in_app_only {
+        done!("cancelled", "in-app only");
     }
     // 偏好：關閉的類別只靜音 email
     if let Some((_, gifts, social, ..)) = &user {
@@ -1534,18 +1583,37 @@ mod tests {
         use Category::*;
         for k in ["auth.mfa_reset", "org.review", "staff.digest", "account.suspended", "wallet.frozen", "topup.credited",
                   "cash_refund.updated", "wishlist.moderated", "order.failed", "order.partial_refund", "funding.expired",
-                  "funding.released", "item.removed", "claim.purchase_reminder", "claim.expired", "claim.cancelled_by_owner",
+                  "funding.released", "item.removed", "claim.purchase_reminder", "claim.cancelled_by_owner",
                   "claim.list_closed", "claim.item_removed", "wishlist.closing", "site.paused"] {
             assert_eq!(category(k), Account, "{k}");
         }
         for k in ["friend.request", "friend.accepted", "birthday.friend", "birthday.nudge"] {
             assert_eq!(category(k), Social, "{k}");
         }
-        for k in ["claim.confirmation", "claim.item_changed", "owner.funded", "event.summary", "crowdfund.funded", "item.reopened"] {
+        for k in ["claim.confirmation", "claim.item_changed", "claim.expired", "owner.funded", "event.summary", "crowdfund.funded", "item.reopened"] {
             assert_eq!(category(k), Gifts, "{k}");
         }
         for k in KINDS {
             category(k); // 全部可分類
+        }
+    }
+
+    #[test]
+    fn email_tiers() {
+        use EmailTier::*;
+        for k in ["auth.mfa_reset", "topup.credited", "site.paused", "wishlist.closing", "funding.released", "org.invite", "staff.digest"] {
+            assert_eq!(email_tier(k), Immediate, "{k}");
+        }
+        for k in ["claim.purchase_reminder", "claim.list_closed", "claim.cancelled_by_owner", "claim.item_removed"] {
+            assert_eq!(email_tier(k), Daytime, "{k}");
+            assert_eq!(category(k), Category::Account, "{k}：不可關閉");
+        }
+        for k in ["claim.expired", "claim.item_changed", "crowdfund.funded", "order.shipped", "owner.funded", "event.summary", "friend.request", "birthday.friend"] {
+            assert_eq!(email_tier(k), Optional, "{k}");
+            assert_ne!(category(k), Category::Account, "{k}：要能關閉");
+        }
+        for k in ["claim.confirmation", "friend.accepted", "item.reopened", "claim.cancelled_by_donor", "topup.expired"] {
+            assert_eq!(email_tier(k), InAppOnly, "{k}");
         }
     }
 }

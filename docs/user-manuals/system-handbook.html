@@ -134,7 +134,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <p>Wishly（心願同步）解決「想要的人說不出口、想送的人怕重複」。建立者列出品項與數量，用一條連結分享到 LINE / FB / 簡訊；朋友點開即可瀏覽，不必安裝；認捐時需登入（D50），登入後回到原品項即可完成。系統保證同一品項不會被超額捐助，並即時更新完成度。</p>
 <pre><code>建立者  建清單 → 加品項 → 發佈 → 複製連結傳到群組
 訪客    點連結 → 看清單（免登入）→ 登入 / 註冊 → 回原品項捐助（D50：認捐需登入）
-系統    條件式 UPDATE 防超賣 → SSE 即時推播 → Email 通知建立者
+系統    條件式 UPDATE 防超賣 → SSE 即時推播 → 站內通知（Email 為補充）
 大件品  登入使用者以「點數」多人湊 → 達標後平台代購寄出</code></pre>
 
 <h3 id="scope">1.1 功能範圍與成熟度</h3>
@@ -151,7 +151,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>好友、邀請連結、個人頁、指定名單</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>心願眾籌（認捐、撤回、轉投、達標、採購、差額退回）</td><td><span class="tag live">已實作</span></td><td>點數目前<b>只能由營運人工發放</b></td></tr>
 <tr><td>營運後台：檢舉、下架、使用者、旗標、稽核、採購單、錢包</td><td><span class="tag live">已實作</span></td><td>staff 可啟用 TOTP 兩步驟驗證</td></tr>
-<tr><td>Email 通知 outbox、一鍵退訂</td><td><span class="tag live">已實作</span></td><td></td></tr>
+<tr><td>站內通知中心（鈴鐺、面板、toast、即時更新）、Email 通知 outbox、一鍵退訂</td><td><span class="tag live">已實作</span></td><td>規則見 <code>docs/notification-policy.md</code></td></tr>
 <tr><td>帳號刪除、資料匯出</td><td><span class="tag live">已實作</span></td><td></td></tr>
 <tr><td>Tauri 原生殼（Bearer 權杖）</td><td><span class="tag live">已實作</span></td><td>後端與前端建置模式已備；未見上架紀錄</td></tr>
 <tr><td>儲值（綠界金流）</td><td><span class="tag live">已實作</span></td><td>前端 <code>/me/topup</code>；後端 <code>ECPAY_*</code> 未設定時顯示「儲值功能尚未開放」</td></tr>
@@ -161,7 +161,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>電子禮物卡、回饋星星、企業禮券</td><td><span class="tag plan">規劃中</span></td><td>P2-B / P2-C，無對應 migration</td></tr>
 <tr><td>目錄商品自動下單</td><td><span class="tag plan">規劃中</span></td><td>目前僅人工代購（<code>concierge</code>）流程由營運操作採購單</td></tr>
 <tr><td>救災 <code>relief</code> 據點與組織</td><td><span class="tag live">已上線（第一段）</span></td><td>0041：組織申請 / 審核、成員、事件、據點、實收；由 <code>ORGS_ENABLED</code> 控制（production 預設關）。地圖、捐款收據延後（D63、D64）。一般 <code>POST /wishlists</code> 仍不能建 relief，據點走 <code>POST /orgs/{id}/sites</code></td></tr>
-<tr><td>LINE Messaging API 通知</td><td><span class="tag plan">規劃中</span></td><td>目前通知僅 Email</td></tr>
+<tr><td>LINE Messaging API 通知</td><td><span class="tag plan">規劃中</span></td><td>目前通知為站內與 Email（LINE 登入帳號同樣有站內通知）</td></tr>
 </table>
 <div class="box warn"><b class="t">上線前阻擋項（README 2026-10-12 查核）</b>
 技術 Spike S1–S3（Cloudflare Pages SSR 與 LINE / FB 預覽、LINE 內建瀏覽器 cookie、SSE 經 Tunnel 的穩定度）<b>尚無可追溯的真機結案證據，均未驗收</b>。心願眾籌的法規（禮券履約保證、單一用途點數）也列為上線前阻斷項，需律師與會計師審閱（PRD 8.7）。</div>
@@ -356,7 +356,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <p>適合生日 / 婚禮：活動日之前你只看得到整體完成度，看不到誰送了什麼，保留驚喜。</p>
 <ul>
 <li>建立時必須填<b>未來的活動日</b>。鎖定持續到活動日當天 00:00（台北時間）。</li>
-<li>鎖定期間：進度頁只顯示整體完成度與倒數；各品項進度顯示「進度已隱藏」；捐助者資訊不可見；匯出資料中的各品項捐助數為空；通知信只寫「有 N 件新捐助」，不含品項與捐助者。</li>
+<li>鎖定期間：進度頁只顯示整體完成度與倒數；各品項進度顯示「進度已隱藏」；捐助者資訊不可見；匯出資料中的各品項捐助數為空；受贈者端的通知一律不寄、不進站內，不含品項與捐助者。</li>
 <li>鎖定期間不能關閉驚喜模式、不能刪除品項或調降數量；你只能在解鎖後標記「已送達」或取消捐助。</li>
 <li>眾籌品項的完成度只在「達標」那一刻跳動，不會隨每筆認捐洩漏進度。</li>
 <li>已知限制（契約 D4）：公開頁仍回傳 x/y，由前端對建立者本人做軟性遮罩；技術上能繞過的是建立者本人的瀏覽器，不是其他訪客。</li>
@@ -380,7 +380,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <li>最下方有「眾籌採購彙總」：已達標、已下單、運送中、已送達的項數。</li>
 <li>進度頁的捐助明細只有姓名、數量、狀態、留言與時間；訪客選填的聯絡方式目前<b>不會</b>顯示在進度頁。</li>
 </ul>
-<p>收到通知：訪客捐助後第一封<b>即時寄出</b>，之後同一清單的新捐助<b>合併為每日台北 09:00 的彙整信</b>。在「帳號設定 → 通知」可關閉，或點信中的一鍵退訂連結。</p>
+<p>有人捐助時<b>不會通知你</b>（D58，包含舊的「有 N 件新捐助」彙整信）。進度請看此頁；站內通知與 Email 偏好在「帳號設定 → 通知」調整，見 7.5。</p>
 
 <h3 id="c-lifecycle">4.8 結束、重開、封存</h3>
 <div class="flow"><span>draft 草稿</span><i>→</i><span>active 使用中</span><i>⇄</i><span>closed 已結束</span><i>⇄</i><span class="end">archived 已封存</span></div>
@@ -412,11 +412,11 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <tr><td>變更密碼</td><td>輸入目前密碼與新密碼（8–128 字元）。成功後其他裝置登出；15 分鐘內最多 5 次嘗試。僅有 Email 但還沒密碼的人，用「設定 Email 登入密碼」走驗證碼流程（會登出所有裝置）</td></tr>
 <tr><td>登入裝置</td><td>列出所有 session（裝置、最後使用、IP）；可登出單一裝置或「登出其他所有裝置」</td></tr>
 <tr><td>個人頁與送禮</td><td>設定帳號代號（小寫英文、數字、底線，3–30 字，唯一）；設定「送禮紀錄預設誰看得到」</td></tr>
-<tr><td>通知</td><td>開關「有人捐助時寄 Email」。沒有 Email 的帳號此開關停用</td></tr>
+<tr><td>通知</td><td>分三類：帳務、安全與期限（固定開啟）、送禮進度、社交與生日；後兩類各有「站內」與「Email」兩個開關。沒有 Email 的帳號只有站內通知，Email 開關停用</td></tr>
 <tr><td>匯出資料</td><td>下載 JSON：個人資料、登入方式、清單與品項、你的捐助、錢包與認捐。每帳號每日最多 3 次。他人資料不會出現</td></tr>
 <tr><td>刪除帳號</td><td>輸入「刪除」確認。你的 Email、名稱與登入方式被移除，清單封存並從公開移除，所有 session 登出。若仍有進行中（pledged）的認捐或點數餘額，會回 <code>ACCOUNT_HAS_POINTS</code>，須先撤回認捐並聯絡客服處理餘額。已 captured（採購中）的認捐不阻擋刪除</td></tr>
 </table>
-<div class="box warn"><b class="t">沒有 Email 的 LINE 帳號</b>可以使用，但收不到通知信、不能用密碼重設找回。建議在失去 LINE 登入能力前，先綁定 Email 或另一種登入方式。</div>
+<div class="box warn"><b class="t">沒有 Email 的 LINE 帳號</b>可以使用，有站內通知但收不到通知信、不能用密碼重設找回。建議在失去 LINE 登入能力前，先綁定 Email 或另一種登入方式。</div>
 
 <!-- ========================================================= 5 -->
 <h2 id="guest">5. 訪客與贊助者手冊</h2>
@@ -441,7 +441,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <h3 id="g-manage">5.2 管理我的送禮（<code>/me/claims</code>）</h3>
 <div class="flow"><span>已捐助 reserved</span><i>→</i><span>已購買 purchased</span><i>→</i><span class="end">已送達 delivered</span></div>
 <ul>
-<li>捐助後可按「標記已購買」「標記已送達」；「取消」可在送達前隨時使用（目前取消不會寄通知信給建立者，只有進度頁的即時刷新）。取消後數量立即歸還給其他人。</li>
+<li>捐助後可按「標記已購買」「標記已送達」；「取消」可在送達前隨時使用（取消不會寄 Email 給建立者；建立者端沒有「有人取消」的通知，只有進度頁的即時刷新）。取消後數量立即歸還給其他人。</li>
 <li>可調整這筆捐助誰看得到（僅登入者）；舊訪客捐助（D50 前）可改暱稱，可減量、取消，但<b>不能增加數量</b>（須登入）。</li>
 <li>「過去的紀錄」收納已取消 / 已逾期的捐助。</li>
 <li><b>換裝置找回（舊訪客捐助）</b>：確認信中的「管理我的送禮」連結是<b>一次性</b>、30 天內有效的恢復權杖；使用後會換發新的訪客權杖。失效時回清單連結或聯絡客服。</li>
@@ -455,7 +455,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <li>在眾籌品項按「心願眾籌」，輸入點數（1 到剩餘額之間的整數；可按「剩餘全額」）。</li>
 <li>選填留言（至多 200 字）、勾選「匿名贊助」（頁面顯示為「匿名朋友」）、選這筆贊助誰看得到。</li>
 <li>確認後點數從錢包扣出，狀態為 <b>pledged</b>（認捐中）。餘額不足會顯示還缺多少。</li>
-<li>達標的那一刻，所有 pledged 轉為 <b>captured</b>，平台建立採購單；你會收到 Email 通知，之後依序收到出貨、送達通知。</li>
+<li>達標的那一刻，所有 pledged 轉為 <b>captured</b>，平台建立採購單；你會收到站內通知（Email 預設也會寄，可在設定關閉），之後依序收到出貨、送達通知。</li>
 </ol>
 <div class="box note"><b class="t">點數 1 點 = NT$1</b>點數只能用在心願品項，<b>不會轉成現金給建立者</b>，也不可轉讓。儲值款項屬預收款，依退款規則辦理。</div>
 <h4>如何儲值（<code>/me/topup</code>）</h4>
@@ -642,20 +642,19 @@ RETURNING qty_needed, qty_claimed;
 <p>唯一定義：<code>sum(已完成單位) / sum(需求單位) × 100</code>，四捨五入；總需求為 0 回 0。數量型 = (qty_claimed, qty_needed)；眾籌型 = 達標（funded / fulfilled）算 1/1，否則 0/1。「已完成項數」為 claimed ≥ needed 的品項數。</p>
 
 <h3>7.5 通知</h3>
+<p>站內通知是主要管道，Email 是補充；所有會員通知都進站內（驚喜鎖定中的受贈者端與使用者關閉該類站內除外），不受安靜時段與 Email 開關影響。分級與判斷標準以 <code>docs/notification-policy.md</code> 為唯一來源，程式在 <code>notify.rs</code> 的 <code>category</code> / <code>email_tier</code>。</p>
 <table>
-<tr><th>種類（kind）</th><th>對象</th><th>時機</th></tr>
-<tr><td><s><code>claim.created</code> / <code>claim.digest</code></s></td><td>建立者</td><td>已停用（D58）：有人捐助時不再寄信給建立者</td></tr>
-<tr><td><code>claim.confirmation</code></td><td>訪客（legacy）</td><td>D50 前捐助時填了 Email（D50 起不再產生）；含「管理我的送禮」連結（限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
-<tr><td><code>claim.item_removed</code></td><td>訪客</td><td>你捐助的品項被建立者刪除</td></tr>
-<tr><td><code>wishlist.closing</code></td><td>建立者</td><td>自動結束前 24 小時（一次）</td></tr>
-<tr><td><code>event.reminder</code></td><td>建立者</td><td>僅有信件模板，<b>尚未接入自動提醒</b>（沒有排程或觸發流程建立此通知）</td></tr>
-<tr><td><code>crowdfund.funded</code> / <code>order.shipped</code> / <code>order.delivered</code> / <code>order.failed</code> / <code>funding.expired</code> / <code>item.removed</code></td><td>捐贈者</td><td>眾籌達標、出貨、送達、失敗、截止、品項被刪除</td></tr>
-<tr><td><code>auth.identity_linked</code> / <code>auth.identity_unlinked</code> / <code>auth.password_changed</code></td><td>本人</td><td>安全通知，<b>不受退訂影響</b>，寄往變更當下的已驗證信箱</td></tr>
+<tr><th>Email 等級</th><th>代表 kind</th><th>規則</th></tr>
+<tr><td>第一級 立刻寄，不可關閉</td><td><code>auth.*</code> 安全通知、<code>account.suspended</code> / <code>restored</code>、<code>topup.credited</code>、<code>cash_refund.updated</code>、<code>wallet.*</code>、<code>order.failed</code> / <code>partial_refund</code>、<code>funding.expired</code> / <code>released</code>、<code>item.removed</code>、<code>org.*</code>、<code>wishlist.moderated</code>、<code>site.paused</code>、<code>wishlist.closing</code>、<code>staff.digest</code></td><td>不受安靜時段影響；安全通知寄往變更當下的已驗證信箱</td></tr>
+<tr><td>第二級 不可關閉，09:00 才寄</td><td><code>claim.purchase_reminder</code>、<code>claim.list_closed</code>、<code>claim.cancelled_by_owner</code>、<code>claim.item_removed</code></td><td>購買提醒的期限早於下一個 09:00 時立刻寄</td></tr>
+<tr><td>第三級 預設開、可關閉，09:00 才寄</td><td>捐助者：<code>claim.expired</code>、<code>claim.item_changed</code>、<code>crowdfund.funded</code>、<code>order.shipped</code> / <code>delivered</code>；擁有者：<code>owner.*</code>、<code>event.summary</code>；社交：<code>friend.request</code>、<code>birthday.*</code></td><td>附退訂連結；<code>claim.item_changed</code> 每次修改都有站內通知；Email 延後 10 分鐘合併，同一品項至少隔 1 小時</td></tr>
+<tr><td>第四級 會員只留站內</td><td><code>claim.confirmation</code>、<code>friend.accepted</code>、<code>item.reopened</code>、<code>claim.cancelled_by_donor</code>、<code>topup.expired</code></td><td>舊訪客若收到這些 kind 仍照常寄信（<code>claim.confirmation</code> 含「管理我的送禮」連結，限流：每 Email 每小時 3 封、每訪客每日 10 封）</td></tr>
 </table>
 <ul>
-<li>通知內容刻意不含品項與捐助者名稱（驚喜模式天然不洩漏）；眾籌通知可含品項名稱，因為捐贈者本來就知道。</li>
-<li>outbox 機制：背景 worker 每 5 秒輪詢，一次領 20 筆；領取時 <code>attempts+1</code> 並把 <code>scheduled_at</code> 推後 1 分鐘當租約，最多重試 3 次。</li>
-<li>一鍵退訂：信中連結為 <code>GET /unsubscribe?token=…</code>（只轉址、不變更狀態，避免信件掃描器誤退訂），確認頁 POST 才生效。權杖 1 年有效。創建者退訂 = 關閉捐助通知；訪客退訂 = 清除其 Email。</li>
+<li>通知內容刻意不含捐助者身分，也沒有「有新捐助」通知（D58）；驚喜鎖定中受贈者端通知不寄、不進站內。眾籌通知可含品項名稱，因為捐贈者本來就知道。</li>
+<li>站內通知即時更新：登入者每人最多 6 條專屬 SSE 連線（<code>GET /me/notifications/stream</code>，全站 4000 條，與公開頁每 IP 16 條各自獨立）；名額已滿或連不上時改每 15 秒輪詢。前端有鈴鐺未讀數、最新 5 筆面板、toast，<code>/me/notifications</code> 可依類別篩選與全部已讀。</li>
+<li>outbox 機制：背景 worker 每 5 秒輪詢，一次領 20 筆；領取時 <code>attempts+1</code> 並把 <code>scheduled_at</code> 推後 1 分鐘當租約，最多重試 6 次（退避 1m / 5m / 30m / 2h / 6h），營運可在後台把近 7 天的失敗通知重新排入。同收件人的同類 Email（如購買提醒、認領逾期）併成一封。</li>
+<li>一鍵退訂：信中連結為 <code>GET /unsubscribe?token=…</code>（只轉址、不變更狀態，避免信件掃描器誤退訂），確認頁 POST 才生效。權杖 1 年有效。會員退訂 = 關閉對應類別的 Email（送禮進度 <code>email_gifts</code> 或社交與生日 <code>email_social</code>）；訪客退訂 = 清除其 Email。</li>
 </ul>
 
 <h3>7.6 圖片</h3>
@@ -752,6 +751,7 @@ RETURNING qty_needed, qty_claimed;
 <tr><td>POST</td><td><code>/guest/recover</code></td><td>—</td><td>用一次性恢復權杖換發訪客權杖（legacy，D50）</td></tr>
 <tr><td>GET</td><td><code>/users/{handle}</code></td><td>選用</td><td>個人頁（依關係顯示）</td></tr>
 <tr><td>GET / POST</td><td><code>/unsubscribe</code></td><td>—</td><td>GET 轉址；POST 退訂</td></tr>
+<tr><td>GET / POST</td><td><code>/me/notifications</code>、<code>/stream</code>、<code>/unread-count</code>、<code>/{id}/read</code>、<code>/read-all</code></td><td>U</td><td>站內通知：列表（可依類別篩選）、SSE、未讀數、標已讀、全部已讀</td></tr>
 </table>
 <h4>驗證與帳號</h4>
 <table>
@@ -951,7 +951,7 @@ node scripts/cdn-canary.mjs      # 失敗 exit 1</code></pre>
 <p>全部在後端行程內以 <code>tokio::spawn</code> 長駐（單實例）：</p>
 <table>
 <tr><th>任務</th><th>頻率</th><th>內容</th></tr>
-<tr><td><code>notify::spawn_worker</code></td><td>每 5 秒</td><td>領取到期通知並寄出，失敗最多重試 3 次</td></tr>
+<tr><td><code>notify::spawn_worker</code></td><td>每 5 秒</td><td>領取到期通知並寄出，失敗最多重試 6 次（退避 1m / 5m / 30m / 2h / 6h）</td></tr>
 <tr><td><code>ratelimit::spawn_cleanup</code></td><td>每 5 分鐘（清理每小時）</td><td>每 5 分鐘執行 <code>claims::expire_due</code>（釋放逾期捐助）、<code>wishlists::close_due</code>（結束到期清單，並清 CDN）、<code>wishlists::remind_closing</code>（結束前 24h 提醒）、<code>contributions::tick_funding</code>（眾籌截止與 7 天選擇期自動退點）；另每 12 個 tick（約每小時）清理過期冪等鍵（&gt;24h）與限流計數（&gt;2 天）</td></tr>
 </table>
 <div class="box warn"><b class="t">已知風險</b>任務迴圈若 panic 會靜默終止，而行程仍存活（<code>/healthz</code> 仍 200）。建議加上「逾期捐助未釋放」告警，或讓行程在背景任務結束時退出由 Dokploy 重啟（檢查清單 §0.6）。擴充為多實例前須先確認各任務的冪等性（大多已用列鎖下重檢條件設計）。</div>
@@ -1043,7 +1043,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <tr><td>儲存時顯示「已在其他地方被修改」</td><td>你在別的分頁 / 裝置改過，按「重新載入」</td></tr>
 <tr><td>無法調降數量 / 刪除品項</td><td>數量不得低於已捐助量；驚喜鎖定期間不能刪除或調降</td></tr>
 <tr><td>圖片一直「處理中」</td><td>後端正在去 EXIF 與重新編碼，頁面每 4 秒自動重查；若變「未通過」請換 jpg / png / webp 且 5 MB 內</td></tr>
-<tr><td>沒收到捐助通知</td><td>捐助通知預設只在第一筆即時，之後為每日 09:00 彙整；檢查設定頁通知開關與 Email 是否已綁定、垃圾信匣</td></tr>
+<tr><td>沒收到捐助通知</td><td>設計如此：D58 起不通知「有新捐助」。其他通知先看站內鈴鐺（一定有，除非該類站內被關）；沒收到 Email 時檢查設定頁開關、安靜時段（21:00–09:00 的可延後信 09:00 才寄）、Email 是否已綁定與垃圾信匣</td></tr>
 <tr><td>收到驗證碼信很慢或沒收到</td><td>同 Email 60 秒內不能重寄；每小時最多 5 封</td></tr>
 <tr><td>無法解除某登入方式</td><td>必須至少保留一種；先綁另一種</td></tr>
 <tr><td>無法刪除帳號</td><td>仍有進行中的認捐或點數餘額，先到「我的點數」撤回</td></tr>

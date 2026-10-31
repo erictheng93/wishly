@@ -62,7 +62,7 @@ window.__DECISIONS__ = {
       spec: '02 F3 / 6.2：每 IP 同時 5 條。',
       current: '實作 16 條，超過回 429；全域上限 2000。',
       decision: '交由技術負責人決定。',
-      resolution: '決定：維持 16，02 更新。理由：(1) 台灣行動網路普遍走電信 CGNAT，大量使用者共用同一出口 IP；一個家庭 3–4 人各開 2 個分頁就超過 5。(2) SSE 被拒時前端自動改輪詢，功能不壞，上限只是保護伺服器資源，真正的保護是全域 2000 條與 Cloudflare 邊緣的新連線速率規則。(3) 一條閒置 SSE 不占資料庫連線（共用一條 LISTEN），成本主要是記憶體，16 條 / IP 可承受。上線後以 sse_connections 指標與 429 次數再調整。',
+      resolution: '決定：維持 16，02 更新。理由：(1) 台灣行動網路普遍走電信 CGNAT，大量使用者共用同一出口 IP；一個家庭 3–4 人各開 2 個分頁就超過 5。(2) SSE 被拒時前端自動改輪詢，功能不壞，上限只是保護伺服器資源，真正的保護是全域 2000 條與 Cloudflare 邊緣的新連線速率規則。(3) 一條閒置 SSE 不占資料庫連線（共用一條 LISTEN），成本主要是記憶體，16 條 / IP 可承受。上線後以 sse_connections 指標與 429 次數再調整。（2026-10-31 補記：登入者的站內通知串流是另一條端點，按使用者限制、與本題的公開頁名額各自獨立，見 docs/notification-policy.md；沒有 metrics 系統，sse_connections 指標改為 API 每小時一筆 log，欄位含 public、public_rejected、inbox、inbox_rejected。）',
     },
     {
       id: 'q8', flow: 'F3 / F7', status: 'done', title: '驚喜清單：訪客提示與擁有者能看到什麼',

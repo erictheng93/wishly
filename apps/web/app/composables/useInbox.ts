@@ -8,13 +8,19 @@ export function useInbox() {
   const toast = useState<any>('inbox-toast', () => null)
   const seen = useState<{ top: string | null, unread: number } | null>('inbox-seen', () => null)
   const { api } = useApi()
+  let busy = false, again = false
+  // 同時間只抓一次，期間又有訊號就結束後再抓一次：一連串訊號不會變成一連串請求，回應也不會亂序
   async function refresh() {
+    if (busy) { again = true; return }
+    busy = true
     try {
       const r = await api('/me/notifications', { query: { limit: 5 }, noRedirect: true })
       toast.value = pickToast(seen.value, r.items, r.unread) ?? toast.value
       seen.value = { top: r.items[0]?.id ?? null, unread: r.unread }
       latest.value = r.items; unread.value = r.unread; version.value++
     } catch {}
+    busy = false
+    if (again) { again = false; return refresh() }
   }
   async function readOne(n: any) {
     if (n.read_at) return

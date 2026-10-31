@@ -116,9 +116,9 @@
     "notify": {
       "title": "Cài đặt thông báo",
       "account": "Tài khoản, bảo mật và thời hạn",
-      "accountHint": "Bảo mật tài khoản, ví, đơn hàng và các việc có thời hạn hoặc có thể gây thiệt hại (nhắc nhở, hết hạn, huỷ). Luôn bật.",
+      "accountHint": "Bảo mật tài khoản, ví, đơn hàng và các việc có thời hạn hoặc có thể gây thiệt hại (nhắc nhở, huỷ). Luôn bật.",
       "gifts": "Tiến độ quà tặng",
-      "giftsHint": "Có người tặng, món đạt mục tiêu, đã gửi hoặc đã giao.",
+      "giftsHint": "Có người tặng, món đạt mục tiêu, đã gửi, đã giao hoặc lượt nhận hết hạn.",
       "social": "Xã hội và sinh nhật",
       "socialHint": "Hoạt động của bạn bè, nhắc sinh nhật bạn bè và nhắc trước sinh nhật của bạn để lập danh sách.",
       "inbox": "Trong ứng dụng",

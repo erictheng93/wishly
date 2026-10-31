@@ -2,14 +2,70 @@
 use crate::{error::AppError, session::CurrentUser, AppState};
 use axum::{
     extract::{Path, Query, State},
-    http::{request::Parts, StatusCode},
+    http::StatusCode,
     response::{sse::Event, Response},
     routing::{get, post},
     Json, Router,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+use tokio::sync::{Semaphore, SemaphorePermit};
 use uuid::Uuid;
+
+/// 站內通知串流上限。有登入所以按使用者算，不看 IP：行動網路常共用對外 IP（CGNAT），按 IP 會讓無關的人互相排擠；
+/// 也與公開頁 SSE 分開計算。背景分頁會斷線，6 條足夠。實測見 docs/notification-policy.md。
+const MAX_STREAMS_TOTAL: usize = 4000;
+const MAX_STREAMS_PER_USER: u32 = 6;
+static STREAMS_TOTAL: Semaphore = Semaphore::const_new(MAX_STREAMS_TOTAL);
+static STREAMS_PER_USER: Mutex<Option<HashMap<Uuid, u32>>> = Mutex::new(None);
+static STREAMS_REJECTED: AtomicU64 = AtomicU64::new(0);
+
+/// 持有期間佔用一個全域名額與該使用者一個計數；drop 時歸還。
+struct StreamSlot {
+    _permit: SemaphorePermit<'static>,
+    uid: Uuid,
+}
+
+impl StreamSlot {
+    fn acquire(uid: Uuid) -> Result<Self, AppError> {
+        let reject = |e| {
+            STREAMS_REJECTED.fetch_add(1, Ordering::Relaxed);
+            e
+        };
+        let permit = STREAMS_TOTAL
+            .try_acquire()
+            .map_err(|_| reject(AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試")))?;
+        let mut m = STREAMS_PER_USER.lock().unwrap();
+        let n = m.get_or_insert_with(HashMap::new).entry(uid).or_insert(0);
+        if *n >= MAX_STREAMS_PER_USER {
+            return Err(reject(AppError::problem(429, "RATE_LIMITED", "即時更新連線過多")));
+        }
+        *n += 1;
+        Ok(StreamSlot { _permit: permit, uid })
+    }
+}
+
+impl Drop for StreamSlot {
+    fn drop(&mut self) {
+        let mut g = STREAMS_PER_USER.lock().unwrap();
+        if let Some(m) = g.as_mut() {
+            if let Some(n) = m.get_mut(&self.uid) {
+                *n -= 1;
+                if *n == 0 {
+                    m.remove(&self.uid);
+                }
+            }
+        }
+    }
+}
+
+/// (連線中, 自上次呼叫以來被拒絕)
+pub fn stream_stats() -> (usize, u64) {
+    (MAX_STREAMS_TOTAL - STREAMS_TOTAL.available_permits(), STREAMS_REJECTED.swap(0, Ordering::Relaxed))
+}
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -82,14 +138,16 @@ async fn ping(st: &AppState, uid: Uuid) {
     let _ = crate::dashboard::notify(&st.pool, uid).await;
 }
 
-/// 即時訊號：只送 `event: inbox`、`data: {}`，內容由 REST 取得。連線最長 30 分鐘，客戶端重連時重新驗證 session。
-async fn stream(State(st): State<AppState>, u: CurrentUser, parts: Parts) -> Result<Response, AppError> {
-    let slot = crate::dashboard::SseSlot::acquire(crate::config::client_ip(&parts, &crate::config::get()))?;
+/// 即時訊號：只送 `event: inbox`、`data: {}`，內容由 REST 取得。
+/// 連線最長 25–35 分鐘（依 user id 分散，避免同時重連），客戶端重連時重新驗證 session。
+async fn stream(State(st): State<AppState>, u: CurrentUser) -> Result<Response, AppError> {
+    let slot = StreamSlot::acquire(u.id)?;
     let mut rx = crate::dashboard::subscribe(&st.pool).await?;
     let (tx, out) = tokio::sync::mpsc::channel::<Result<Event, std::convert::Infallible>>(16);
     tokio::spawn(async move {
         let _slot = slot;
-        let deadline = tokio::time::sleep(std::time::Duration::from_secs(30 * 60));
+        let secs = 25 * 60 + (u.id.as_u128() % 600) as u64;
+        let deadline = tokio::time::sleep(std::time::Duration::from_secs(secs));
         tokio::pin!(deadline);
         loop {
             tokio::select! {
@@ -108,4 +166,20 @@ async fn stream(State(st): State<AppState>, u: CurrentUser, parts: Parts) -> Res
         }
     });
     Ok(crate::dashboard::sse_response(out))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stream_slots_are_per_user_and_released_on_drop() {
+        let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+        let held: Vec<_> = (0..MAX_STREAMS_PER_USER).map(|_| StreamSlot::acquire(a).ok().unwrap()).collect();
+        assert!(StreamSlot::acquire(a).is_err(), "超過每人上限");
+        let other = StreamSlot::acquire(b);
+        assert!(other.is_ok(), "同 IP 的其他使用者不受影響");
+        drop(held);
+        assert!(StreamSlot::acquire(a).is_ok(), "斷線後歸還");
+    }
 }

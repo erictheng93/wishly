@@ -99,6 +99,14 @@ pub fn spawn_cleanup(pool: PgPool) {
                 if let Err(e) = crate::birthday::birthday_tick(&pool).await {
                     tracing::error!(error=%e, "birthday_tick");
                 }
+                // 沒有 metrics 系統：連線數與被拒次數寫進 log；被拒數持續大於 0 就要調整上限
+                let (public, public_rejected) = crate::dashboard::sse_stats();
+                let (inbox, inbox_rejected) = crate::inbox::stream_stats();
+                if public_rejected + inbox_rejected > 0 {
+                    tracing::warn!(public, public_rejected, inbox, inbox_rejected, "sse connections rejected");
+                } else {
+                    tracing::info!(public, inbox, "sse connections");
+                }
                 if let Err(e) = crate::notify_jobs::event_summary_tick(&pool).await {
                     tracing::error!(error=%e, "event_summary_tick");
                 }

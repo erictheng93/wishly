@@ -36,7 +36,7 @@ watch(() => route.fullPath, () => { open.value = false })
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="miter" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4l2-2zM10 21h4" /></svg>
       <b v-if="unread > 0" class="c-bell-n" aria-hidden="true">{{ unread > 99 ? '99+' : unread }}</b>
     </button>
-    <section v-show="open" :id="panelId" class="c-bell-pop" :aria-label="$t('common.notifications')">
+    <section v-if="open" :id="panelId" class="c-bell-pop" :aria-label="$t('common.notifications')">
       <p v-if="!latest.length" class="c-bell-empty">{{ $t('me.notifications.empty') }}</p>
       <ul v-else>
         <li v-for="n in latest" :key="n.id" :class="{ unread: !n.read_at }">

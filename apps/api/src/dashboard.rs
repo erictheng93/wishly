@@ -55,25 +55,29 @@ pub async fn notify<'e, E: sqlx::PgExecutor<'e>>(
 const MAX_SSE_TOTAL: usize = 2000;
 const MAX_SSE_PER_IP: u32 = 16;
 static SSE_TOTAL: Semaphore = Semaphore::const_new(MAX_SSE_TOTAL);
+/// 自上次回報以來被拒絕的公開 SSE 連線數（`sse_stats` 每小時寫進 log）
+static SSE_REJECTED: AtomicU64 = AtomicU64::new(0);
 static SSE_PER_IP: Mutex<Option<HashMap<String, u32>>> = Mutex::new(None);
 
 /// 持有期間佔用一個全域名額與該 IP 一個計數；drop 時歸還。
-pub(crate) struct SseSlot {
+struct SseSlot {
     _permit: SemaphorePermit<'static>,
     ip: String,
 }
 
 impl SseSlot {
-    pub(crate) fn acquire(ip: String) -> Result<Self, AppError> {
-        let permit = SSE_TOTAL
-            .try_acquire()
-            .map_err(|_| AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試"))?;
+    fn acquire(ip: String) -> Result<Self, AppError> {
+        let permit = SSE_TOTAL.try_acquire().map_err(|_| {
+            SSE_REJECTED.fetch_add(1, Ordering::Relaxed);
+            AppError::problem(503, "SSE_CAPACITY", "即時更新連線已滿，請稍後再試")
+        })?;
         let mut m = SSE_PER_IP.lock().unwrap();
         let n = m
             .get_or_insert_with(HashMap::new)
             .entry(ip.clone())
             .or_insert(0);
         if *n >= MAX_SSE_PER_IP {
+            SSE_REJECTED.fetch_add(1, Ordering::Relaxed);
             return Err(AppError::problem(429, "RATE_LIMITED", "即時更新連線過多"));
         }
         *n += 1;
@@ -129,6 +133,11 @@ async fn snapshot_shared(
     cell.get_or_try_init(|| async { Ok(snapshot(pool, wid).await?.map(Arc::new)) })
         .await
         .cloned()
+}
+
+/// (連線中, 自上次呼叫以來被拒絕)
+pub fn sse_stats() -> (usize, u64) {
+    (MAX_SSE_TOTAL - SSE_TOTAL.available_permits(), SSE_REJECTED.swap(0, Ordering::Relaxed))
 }
 
 /// 站內通知串流訂閱匯流排（收到的 id 是 user_id）。
