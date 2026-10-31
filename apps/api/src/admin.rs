@@ -605,20 +605,26 @@ async fn analytics(
          ccu AS (SELECT id, (created_at AT TIME ZONE 'Asia/Taipei')::date AS s FROM cohort),
          pu AS (SELECT * FROM cu WHERE anonymized_at IS NULL),
          rc AS (SELECT * FROM claims WHERE created_at >= (SELECT t FROM lo)),
+         -- 區間內瀏覽；不重複訪客以 visitor_id 優先、否則 IP（IP 只在 SQL 內使用，不輸出）
+         sv AS (SELECT *, COALESCE(visitor_id::text, ip::text) AS vk FROM share_views WHERE created_at >= (SELECT t FROM lo)),
          -- 每日趨勢：各表只掃一次再依台北日期分組
          ev(m, d) AS (
            SELECT 'signups', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM cohort
            UNION ALL SELECT 'wishlists', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM wl WHERE created_at >= (SELECT t FROM lo)
            UNION ALL SELECT 'claims', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM rc
-           UNION ALL SELECT 'new_guests', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM guests WHERE created_at >= (SELECT t FROM lo)),
+           UNION ALL SELECT 'views', (created_at AT TIME ZONE 'Asia/Taipei')::date FROM sv),
          daily AS (
            SELECT gs::date d,
              count(*) FILTER (WHERE ev.m = 'signups') signups, count(*) FILTER (WHERE ev.m = 'wishlists') wishlists,
-             count(*) FILTER (WHERE ev.m = 'claims') claims, count(*) FILTER (WHERE ev.m = 'new_guests') new_guests,
+             count(*) FILTER (WHERE ev.m = 'claims') claims, count(*) FILTER (WHERE ev.m = 'views') views,
+             (SELECT count(DISTINCT vk) FROM sv WHERE (sv.created_at AT TIME ZONE 'Asia/Taipei')::date = gs::date) visitors,
              (SELECT count(DISTINCT a.user_id) FROM user_activity_days a JOIN cu ON cu.id = a.user_id WHERE a.day = gs::date) active_users
            FROM r CROSS JOIN generate_series(r.d0, r.today, interval '1 day') gs LEFT JOIN ev ON ev.d = gs::date GROUP BY gs),
          dist(kind, k, n) AS (
-           SELECT 'provider', ai.provider::text, count(DISTINCT ai.user_id) FROM auth_identities ai JOIN cu ON cu.id = ai.user_id GROUP BY 2
+           SELECT 'view_device', device, count(*) FROM sv GROUP BY 2
+           UNION ALL SELECT 'view_country', COALESCE(country, 'unknown'), count(*) FROM sv GROUP BY 2
+           UNION ALL SELECT 'view_referrer', COALESCE(referrer_host, 'direct'), count(*) FROM sv GROUP BY 2
+           UNION ALL SELECT 'provider', ai.provider::text, count(DISTINCT ai.user_id) FROM auth_identities ai JOIN cu ON cu.id = ai.user_id GROUP BY 2
            UNION ALL SELECT 'locale', locale, count(*) FROM cu GROUP BY 2
            UNION ALL SELECT 'wishlist_type', type::text, count(*) FROM wl GROUP BY 2
            UNION ALL SELECT 'wishlist_visibility', visibility::text, count(*) FROM wl GROUP BY 2
@@ -630,14 +636,14 @@ async fn analytics(
            'range', (SELECT jsonb_build_object('from', d0, 'to', today, 'days', $1) FROM r),
            'totals', jsonb_build_object(
              'users', (SELECT count(*) FROM cu),
-             'guests', (SELECT count(*) FROM guests WHERE deleted_at IS NULL),
+             'visitors', (SELECT count(DISTINCT COALESCE(visitor_id::text, ip::text)) FROM share_views),
              'wishlists', (SELECT count(*) FROM wl),
              'friendships', (SELECT count(*) FROM friendships)),
            'active', (SELECT jsonb_object_agg('d' || n, (
                SELECT count(DISTINCT a.user_id) FROM user_activity_days a JOIN cu ON cu.id = a.user_id
                WHERE a.day > (SELECT today FROM b) - n)) FROM unnest(ARRAY[1, 7, 30]) n),
            'daily', (SELECT jsonb_agg(jsonb_build_object('date', d, 'signups', signups, 'wishlists', wishlists,
-               'claims', claims, 'new_guests', new_guests, 'active_users', active_users) ORDER BY d) FROM daily),
+               'claims', claims, 'views', views, 'visitors', visitors, 'active_users', active_users) ORDER BY d) FROM daily),
            -- 留存：區間內註冊且視窗已完整結束者為 cohort；視窗內任一天活躍即 retained
            'retention', (SELECT jsonb_object_agg('d' || w.k, jsonb_build_object(
                'cohort', (SELECT count(*) FROM ccu WHERE ccu.s + w.hi < (SELECT today FROM b)),
@@ -653,10 +659,8 @@ async fn analytics(
                 WHERE wl.owner_id = cohort.id AND (EXISTS (SELECT 1 FROM claims c WHERE c.item_id = i.id)
                   OR EXISTS (SELECT 1 FROM contributions k WHERE k.item_id = i.id))))),
            'claims', jsonb_build_object(
-             'by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM rc GROUP BY 1) t),
-             'by_actor', jsonb_build_object(
-               'guest', (SELECT count(*) FROM rc WHERE guest_id IS NOT NULL),
-               'user', (SELECT count(*) FROM rc WHERE user_id IS NOT NULL))),
+             'by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM rc GROUP BY 1) t)),
+           'visits', jsonb_build_object('views', (SELECT count(*) FROM sv), 'visitors', (SELECT count(DISTINCT vk) FROM sv)),
            'trust', jsonb_build_object(
              'reports', (SELECT count(*) FROM content_reports WHERE created_at >= (SELECT t FROM lo)),
              'reports_by_reason', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT reason::text s, count(*) n FROM content_reports WHERE created_at >= (SELECT t FROM lo) GROUP BY 1) t),
@@ -676,13 +680,16 @@ async fn analytics(
     .fetch_one(&st.pool)
     .await?;
     let mut v = v;
-    // 空桶整組省略後，前端仍需要五個鍵
+    // 空桶整組省略後，前端仍需要這些鍵
     for k in [
         "provider",
         "locale",
         "wishlist_type",
         "wishlist_visibility",
         "birthday_visibility",
+        "view_device",
+        "view_country",
+        "view_referrer",
     ] {
         if v["distribution"].get(k).is_none() {
             v["distribution"][k] = json!({});

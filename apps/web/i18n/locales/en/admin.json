@@ -285,19 +285,21 @@
       "overview": "Overview",
       "tile": {
         "users": "Users",
-        "guests": "Guests",
         "wishlists": "Lists",
         "friendships": "Friendships",
         "d1": "Active today",
         "d7": "Active, 7 days",
-        "d30": "Active, 30 days"
+        "d30": "Active, 30 days",
+        "visitors": "Visitors",
+        "views": "Views (range)"
       },
       "metric": {
         "activeUsers": "Active users",
         "signups": "Sign-ups",
         "wishlists": "New lists",
         "claims": "Gifts",
-        "newGuests": "New guests"
+        "visitors": "Visitors",
+        "views": "Views"
       },
       "dailyTrend": "Daily trend",
       "avg": "avg {n}",
@@ -314,13 +316,15 @@
       "loginFailures": "Login failures (range)",
       "group": {
         "claimStatus": "Gift status",
-        "claimActor": "Giver type",
         "reportReason": "Report reason",
         "provider": "Sign-in provider",
         "locale": "Language",
         "wishlistType": "List type",
         "wishlistVisibility": "List visibility",
-        "birthdayVisibility": "Birthday visibility"
+        "birthdayVisibility": "Birthday visibility",
+        "viewDevice": "Viewing device",
+        "viewCountry": "Viewing country",
+        "viewReferrer": "Referrer"
       },
       "noData": "No data",
       "profile": "Profile completeness",

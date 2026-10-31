@@ -141,10 +141,6 @@
         "cancelled": "Cancelled",
         "expired": "Expired"
       },
-      "actor": {
-        "guest": "Guest",
-        "user": "Member"
-      },
       "reason": {
         "scam": "Suspected scam",
         "inappropriate": "Inappropriate content",
@@ -158,14 +154,24 @@
         "relief": "Relief"
       },
       "wishlistVisibility": {
-        "link": "Link",
-        "private": "Private",
-        "public": "Public"
+        "public": "Public",
+        "friends": "Friends",
+        "selected": "Selected friends",
+        "private": "Private"
       },
       "shareLevel": {
         "public": "Public",
         "friends": "Friends",
         "private": "Private"
+      },
+      "device": {
+        "mobile": "Mobile",
+        "tablet": "Tablet",
+        "desktop": "Desktop"
+      },
+      "viewOther": {
+        "direct": "Direct",
+        "unknown": "Unknown"
       }
     },
     "bday": {

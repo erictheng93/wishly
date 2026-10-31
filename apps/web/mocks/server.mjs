@@ -127,6 +127,7 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }); res.write('retry: 5000\n: heartbeat\n\n')
     sse.add(res); req.on('close', () => sse.delete(res)); return
   }
+  if (p.match(/^\/public\/wishlists\/[^/]+\/views$/)) return send(res, 204)
   if (p.match(/^\/public\/wishlists\/[^/]+\/reports$/)) {
     if (!body.turnstile_token) return err(res, 422, 'VALIDATION_FAILED', '驗證失敗', { errors: [{ pointer: '/turnstile_token', code: 'INVALID', detail: '驗證失敗' }] })
     return send(res, 201, { id: 'r' + ++n, status: 'open' })

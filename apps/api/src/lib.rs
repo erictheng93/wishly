@@ -35,6 +35,7 @@ pub mod reports;
 pub mod sealed;
 pub mod security;
 pub mod session;
+pub mod share_views;
 pub mod topup;
 pub mod uploads;
 pub mod validate;
@@ -68,6 +69,7 @@ pub fn app(state: AppState) -> Router {
             "/api/v1",
             Router::new()
                 .merge(public::routes())
+                .merge(share_views::routes())
                 .merge(guest::routes())
                 .merge(claims::routes())
                 .merge(contributions::routes())

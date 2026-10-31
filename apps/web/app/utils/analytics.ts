@@ -53,10 +53,11 @@ export function retentionRows(r: Record<string, { cohort?: number; retained?: nu
 const grp = (g: string, ks: string[]) => Object.fromEntries(ks.map(k => [k, t(`creator.analytics.${g}.${k}`)]))
 export const L = {
   get claimStatus() { return grp('claimStatus', ['reserved', 'purchased', 'delivered', 'cancelled', 'expired']) },
-  get actor() { return grp('actor', ['guest', 'user']) },
+  get device() { return grp('device', ['mobile', 'tablet', 'desktop']) },
+  get viewOther() { return grp('viewOther', ['direct', 'unknown']) },
   get reason() { return grp('reason', ['scam', 'inappropriate', 'copyright', 'personal_info', 'other']) },
   provider: { email: 'Email', line: 'LINE', google: 'Google' },
   get wishlistType() { return grp('wishlistType', ['personal', 'registry', 'relief']) },
-  get wishlistVisibility() { return grp('wishlistVisibility', ['link', 'private', 'public']) },
+  get wishlistVisibility() { return grp('wishlistVisibility', ['public', 'friends', 'selected', 'private']) },
   get shareLevel() { return grp('shareLevel', ['public', 'friends', 'private']) },
 } as Record<string, Record<string, string>>
