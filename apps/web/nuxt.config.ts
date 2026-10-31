@@ -56,7 +56,6 @@ export default defineNuxtConfig({
       // 首繪前套用手動主題，避免閃白；key 與 composables/useTheme.ts 一致
       script: [{ innerHTML: "try{var t=localStorage.getItem('ws_theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;else if(t!=='auto')document.documentElement.dataset.theme='light'}catch(e){document.documentElement.dataset.theme='light'}", tagPriority: 'critical' }],
       link: [
-        { rel: 'manifest', href: '/manifest.webmanifest' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       ],
     },
