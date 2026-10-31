@@ -268,6 +268,76 @@ async fn paused_site_blocks_new_claims_and_pledges(pool: PgPool) {
     assert_eq!(balance(&pool, u.id).await, 100);
 }
 
+/// 許可過期但每小時的 permit_expiry_tick 尚未把據點改成 paused：認捐、贊助、加量要比照暫停擋下，公開事件頁也不列出。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn expired_permit_blocks_site_before_tick(pool: PgPool) {
+    let owner = user(&pool, "O").await;
+    let o = org(&pool, owner.id, "verified").await;
+    member(&pool, o, owner.id, "owner").await;
+    let p = permit(&pool, o, "approved", 30).await;
+    let (e, slug) = event(&pool, o).await;
+    let site = site(&pool, o, owner.id, e, p, "active").await;
+    let q = relief_item(&pool, site.id, false).await;
+    let c = relief_item(&pool, site.id, true).await;
+    let u = user(&pool, "捐").await;
+    grant(&pool, u.id, 100).await;
+    let app = test_app(&pool);
+    let (s, v) = claim(&pool, q, &u.token).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let cid = v["claim"]["id"].as_str().unwrap().to_string();
+    let public_sites = || async {
+        let (s, _, v) = call(
+            &pool,
+            "GET",
+            &format!("/public/relief-events/{slug}"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        v["sites"].as_array().map_or(0, |a| a.len())
+    };
+    assert_eq!(public_sites().await, 1);
+
+    // 台北日期的昨天到期；site_status 仍是 active（tick 還沒跑）
+    sqlx::query("UPDATE org_permits SET valid_from = valid_from - interval '60 days', valid_to = (now() AT TIME ZONE 'Asia/Taipei')::date - 1 WHERE id=$1")
+        .bind(p).execute(&pool).await.unwrap();
+    let st: String = sqlx::query_scalar("SELECT site_status FROM wishlists WHERE id=$1")
+        .bind(site.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(st, "active");
+
+    let (s, v) = claim(&pool, q, &u.token).await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("SITE_PAUSED")),
+        "{v}"
+    );
+    let (s, _, v) = pledge(&app, c, &u.token, 10).await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("SITE_PAUSED")),
+        "{v}"
+    );
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        &format!("/claims/{cid}"),
+        &ck(&u.token),
+        Some(json!({"qty":2})),
+    )
+    .await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("SITE_PAUSED")),
+        "{v}"
+    );
+    assert_eq!(public_sites().await, 0);
+    assert_eq!(balance(&pool, u.id).await, 100);
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn paused_site_still_allows_cancel_decrease_and_withdraw(pool: PgPool) {
     let f = fx(&pool).await;

@@ -96,10 +96,23 @@ async fn submit_requires_fields_documents_permit(pool: PgPool) {
     let (s, e) = submit(&pool, &u.token, id).await;
     assert_eq!((s, ptr(&e)), (StatusCode::UNPROCESSABLE_ENTITY, "/permits"));
     add_docs(&pool, id, u.id, false, true).await;
+    // 上一輪的補件意見：重新送審後要清掉，staff 不會看到過期的備註
+    sqlx::query("UPDATE organizations SET review_note='請補統編證明' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
     let (s, v) = submit(&pool, &u.token, id).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["verification_status"], "pending");
     assert!(!v["submitted_at"].is_null());
+    let note: Option<String> =
+        sqlx::query_scalar("SELECT review_note FROM organizations WHERE id=$1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(note, None);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

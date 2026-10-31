@@ -278,6 +278,45 @@ async fn concurrent_reviews_apply_once(pool: PgPool) {
     assert_eq!(n, 1);
 }
 
+/// 送審中的許可被退件：owner 收到帶備註的通知（P-P3）
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reject_pending_permit_notifies_owner(pool: PgPool) {
+    let TestUser { id: owner, .. } = user(&pool, "owner").await;
+    let TestUser { token: st, .. } = staff(&pool, "staff").await;
+    let o = common::org(&pool, owner, "verified").await;
+    common::member(&pool, o, owner, "owner").await;
+    let p = common::permit(&pool, o, "pending", 30).await;
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        &format!("/admin/permits/{p}/review"),
+        &ck(&st),
+        Some(json!({"decision":"reject","note":"字號不清楚"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let note: String = sqlx::query_scalar(
+        "SELECT payload->>'note' FROM notifications WHERE kind='org.permit_rejected' AND user_id=$1",
+    )
+    .bind(owner)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(note, "字號不清楚");
+    let (subj, body) = wishly_api::notify::render_lang(
+        wishly_api::notify::Lang::Zh,
+        "org.permit_rejected",
+        "",
+        &json!({"display_name":"協會","permit_no":"P-1","note":"字號不清楚","org_id":o}),
+    );
+    assert!(
+        subj.contains("P-1")
+            && body.contains("審核備註：字號不清楚")
+            && body.contains(&format!("/orgs/{o}")),
+        "{subj} {body}"
+    );
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn revoke_approved_permit_pauses_sites(pool: PgPool) {
     let cdn = common::cdn::init();
@@ -343,7 +382,13 @@ fn org_review_copy() {
         assert!(render_lang(Lang::Zh, "org.review", "", &p).0.contains(zh));
         let (s, b) = render_lang(Lang::En, "org.review", "", &p);
         assert!(s.contains(en) && b.contains("/org/apply"), "{s}");
+        // 沒有備註就不印備註行（不再出現「審核備註：-」）
+        assert!(!b.contains("Review note"), "{b}");
     }
+    let p = json!({"decision":"needs_changes","display_name":"協會","note":"請補統編證明"});
+    assert!(render_lang(Lang::Zh, "org.review", "", &p)
+        .1
+        .contains("審核備註：請補統編證明"));
 }
 
 /// 已通過的組織送了新許可 → pending_permits 偽狀態列得出來，每列帶待審數量；cursor 分頁照常。

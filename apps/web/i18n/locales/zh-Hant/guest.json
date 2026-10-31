@@ -137,7 +137,10 @@
       "askTitle": "確定要退訂送禮通知？",
       "askBody": "退訂後，有人要送你清單上的禮物時不會再寄信通知你。",
       "processing": "處理中…",
-      "confirm": "確定退訂"
+      "confirm": "確定退訂",
+      "askTitleBirthday": "確定要退訂生日通知？",
+      "askBodyBirthday": "退訂後，好友生日將近時不會再寄信提醒你。",
+      "doneBodyBirthday": "之後不會再寄好友生日提醒。想重新開啟，登入後到「帳號設定」即可。"
     },
     "slug": {
       "demoBirthday": "生日",

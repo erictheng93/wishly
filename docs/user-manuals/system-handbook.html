@@ -160,7 +160,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>自動儲值</td><td><span class="tag plan">規劃中</span></td><td>後端有設定端點，尚無前端頁面</td></tr>
 <tr><td>電子禮物卡、回饋星星、企業禮券</td><td><span class="tag plan">規劃中</span></td><td>P2-B / P2-C，無對應 migration</td></tr>
 <tr><td>目錄商品自動下單</td><td><span class="tag plan">規劃中</span></td><td>目前僅人工代購（<code>concierge</code>）流程由營運操作採購單</td></tr>
-<tr><td>救災 <code>relief</code> 據點與組織</td><td><span class="tag plan">規劃中</span></td><td>API 建立 <code>relief</code> 回 422</td></tr>
+<tr><td>救災 <code>relief</code> 據點與組織</td><td><span class="tag live">已上線（第一段）</span></td><td>0041：組織申請 / 審核、成員、事件、據點、實收；由 <code>ORGS_ENABLED</code> 控制（production 預設關）。地圖、捐款收據延後（D63、D64）。一般 <code>POST /wishlists</code> 仍不能建 relief，據點走 <code>POST /orgs/{id}/sites</code></td></tr>
 <tr><td>LINE Messaging API 通知</td><td><span class="tag plan">規劃中</span></td><td>目前通知僅 Email</td></tr>
 </table>
 <div class="box warn"><b class="t">上線前阻擋項（README 2026-10-12 查核）</b>
@@ -1092,7 +1092,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 <h3>14.2 狀態枚舉速查</h3>
 <table>
 <tr><th>名稱</th><th>值</th></tr>
-<tr><td><code>wishlist_type</code></td><td>personal、registry（D58 起不再由前端建立，僅舊資料）、relief（尚未開放建立）</td></tr>
+<tr><td><code>wishlist_type</code></td><td>personal、registry（D58 起不再由前端建立，僅舊資料）、relief（救災據點，只能經 <code>POST /orgs/{id}/sites</code> 建立）</td></tr>
 <tr><td><code>wishlist_status</code></td><td>draft、active、closed、archived</td></tr>
 <tr><td><code>visibility</code></td><td>public、friends、selected、private（link、password 已於 0016 移除）</td></tr>
 <tr><td><code>moderation_status</code></td><td>ok、hidden</td></tr>
@@ -1112,7 +1112,7 @@ npm run e2e:headed                                                  # 顯示瀏�
 </table>
 <h3>14.3 已知限制與規劃中事項</h3>
 <ul>
-<li>點數無儲值管道（僅營運發放）；自動儲值、禮物卡、回饋星星、企業禮券、目錄商品自動下單、relief 救災、LINE Messaging API 通知皆未實作。</li>
+<li>點數來源為營運發放與綠界儲值（<code>/me/topup</code>）；自動儲值、禮物卡、回饋星星、企業禮券、目錄商品自動下單、LINE Messaging API 通知皆未實作。relief 救災第一段已上線（見上表），地圖、捐款收據尚未實作（2026-10-29 角色流程模擬，見 <code>docs/role-flows/</code>）。</li>
 <li>訪客登入後，其先前 guest 捐助<b>不會合併</b>到使用者帳號（契約待決問題）；D50 後舊訪客捐助僅保留管理權（查看、取消、減量），不可增量。</li>
 <li>兩個既有帳號不會因綁定而合併資料。</li>
 <li>驚喜模式對建立者本人為前端軟性遮罩（契約 D4）。</li>

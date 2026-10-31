@@ -505,6 +505,22 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         );
     }
+    if kind == "org.permit_rejected" {
+        let name = payload["display_name"].as_str().unwrap_or("");
+        let no = payload["permit_no"].as_str().unwrap_or("");
+        let note = payload["note"].as_str().filter(|n| !n.trim().is_empty());
+        let line = |label: &str| note.map(|n| format!("{label}{n}\n")).unwrap_or_default();
+        let url = format!("{app}/orgs/{}", payload["org_id"].as_str().unwrap_or(""));
+        return (
+            l.pick(format!("【Wishly】勸募許可 {no} 未通過審核"), format!("[Wishly] Fundraising permit {no} was not approved"), format!("[Wishly] Giấy phép gây quỹ {no} không được duyệt"), format!("[Wishly] Izin penggalangan dana {no} tidak disetujui")),
+            l.pick(
+                format!("組織「{name}」送審的勸募許可 {no} 未通過審核。\n{}請確認許可內容後重新上傳送審。\n組織頁面：{url}\n", line("審核備註：")),
+                format!("The fundraising permit {no} submitted by \"{name}\" was not approved.\n{}Please check the permit and submit it again.\nOrganization page: {url}\n", line("Review note: ")),
+                format!("Giấy phép gây quỹ {no} do \"{name}\" gửi không được duyệt.\n{}Vui lòng kiểm tra giấy phép rồi gửi lại.\nTrang tổ chức: {url}\n", line("Ghi chú xét duyệt: ")),
+                format!("Izin penggalangan dana {no} yang diajukan \"{name}\" tidak disetujui.\n{}Periksa izin lalu ajukan kembali.\nHalaman organisasi: {url}\n", line("Catatan peninjauan: ")),
+            ),
+        );
+    }
     if kind == "org.permit_expired" {
         let name = payload["display_name"].as_str().unwrap_or("");
         let no = payload["permit_no"].as_str().unwrap_or("");
@@ -543,10 +559,9 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
     }
     if kind == "org.review" {
         let name = payload["display_name"].as_str().unwrap_or("");
-        let note = payload["note"]
-            .as_str()
-            .filter(|n| !n.is_empty())
-            .unwrap_or("-");
+        // 沒有備註（例如直接核准）就不印「審核備註」那一行
+        let note = payload["note"].as_str().filter(|n| !n.trim().is_empty());
+        let line = |label: &str| note.map(|n| format!("{label}{n}\n")).unwrap_or_default();
         let d = payload["decision"].as_str().unwrap_or("");
         let (zh, en, vi, id) = match d {
             "verified" => (
@@ -577,10 +592,10 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         return (
             l.pick(format!("【Wishly】組織「{name}」{zh}"), format!("[Wishly] Organization \"{name}\" {en}"), format!("[Wishly] Tổ chức \"{name}\" {vi}"), format!("[Wishly] Organisasi \"{name}\" {id}")),
             l.pick(
-                format!("你的組織「{name}」{zh}。\n審核備註：{note}\n組織申請頁面：{app}/org/apply\n"),
-                format!("Your organization \"{name}\" {en}.\nReview note: {note}\nOrganization application: {app}/org/apply\n"),
-                format!("Tổ chức \"{name}\" của bạn {vi}.\nGhi chú xét duyệt: {note}\nTrang đăng ký tổ chức: {app}/org/apply\n"),
-                format!("Organisasi \"{name}\" kamu {id}.\nCatatan peninjauan: {note}\nHalaman pendaftaran organisasi: {app}/org/apply\n"),
+                format!("你的組織「{name}」{zh}。\n{}組織申請頁面：{app}/org/apply\n", line("審核備註：")),
+                format!("Your organization \"{name}\" {en}.\n{}Organization application: {app}/org/apply\n", line("Review note: ")),
+                format!("Tổ chức \"{name}\" của bạn {vi}.\n{}Trang đăng ký tổ chức: {app}/org/apply\n", line("Ghi chú xét duyệt: ")),
+                format!("Organisasi \"{name}\" kamu {id}.\n{}Halaman pendaftaran organisasi: {app}/org/apply\n", line("Catatan peninjauan: ")),
             ),
         );
     }
