@@ -89,6 +89,7 @@
 - [ ] `RUST_LOG=info`（image 已預設）；日誌可在 Dokploy 檢視並有保存期限。
 
 ### 2.5 Cloudflare Tunnel
+- [ ] 分享頁瀏覽紀錄要記城市：Cloudflare 後台 Rules → Managed Transforms 開啟 **Add visitor location headers**（`CF-IPCity`；國家 `CF-IPCountry` 預設就有）。部署後實際開一次分享頁，確認 `share_views.city` 有值；沒開則城市一律為 NULL。
 - [ ] cloudflared 以容器或系統服務執行並設為自動重啟；憑證／token 當成機密保管。
 - [x] 公開主機名稱 `api.<域名>` → **直接指向後端容器** `http://wishly-api-…:8080`（不經 Traefik；Traefik 沒有任何指向 API 的路由）。**需實測**：該路徑對 SSE 是否不緩衝。
 - [x] 後端 `BIND=0.0.0.0:8080`（容器內，Tunnel 同 Docker 網路）；`bind_warning` 的 WARN 屬預期。放行理由：API 容器未對主機發佈任何埠，且主機入站由 §2.3 兩層防火牆擋下，`CF-Connecting-IP` 無法被直連者偽造。

@@ -141,10 +141,6 @@
         "cancelled": "已取消",
         "expired": "已逾期"
       },
-      "actor": {
-        "guest": "訪客",
-        "user": "會員"
-      },
       "reason": {
         "scam": "疑似詐騙",
         "inappropriate": "不當內容",
@@ -158,14 +154,24 @@
         "relief": "救助"
       },
       "wishlistVisibility": {
-        "link": "連結",
-        "private": "私人",
-        "public": "公開"
+        "public": "公開",
+        "friends": "好友",
+        "selected": "指定好友",
+        "private": "私人"
       },
       "shareLevel": {
         "public": "公開",
         "friends": "好友",
         "private": "私人"
+      },
+      "device": {
+        "mobile": "手機",
+        "tablet": "平板",
+        "desktop": "電腦"
+      },
+      "viewOther": {
+        "direct": "直接開啟",
+        "unknown": "未知"
       }
     },
     "bday": {
