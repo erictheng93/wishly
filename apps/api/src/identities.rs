@@ -82,7 +82,7 @@ async fn lock_user(
     Ok(email)
 }
 
-/// 保留寄送當下的收件人，即使之後解除 email 也能收到安全信；不受 email_claims 影響。
+/// 保留寄送當下的收件人，即使之後解除 email 也能收到安全信；不受通知偏好影響（Account 類）。
 pub(crate) async fn notify(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
@@ -240,6 +240,7 @@ async fn absorb(
         "DELETE FROM otp_challenges WHERE link_user_id=$1",
         "UPDATE notifications SET status='cancelled' WHERE user_id=$1 AND status='pending'",
         "UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')",
+        "UPDATE notifications SET inbox_at=NULL, inbox_title=NULL, inbox_link=NULL, inbox_body=NULL, inbox_category=NULL WHERE user_id=$1",
     ] {
         sqlx::query(sql).bind(other).execute(&mut **tx).await?;
     }

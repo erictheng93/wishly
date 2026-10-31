@@ -9,4 +9,5 @@ useHead({ htmlAttrs: { lang: computed(() => locales.value.find(l => typeof l !==
 <template>
   <SystemBanner />
   <NuxtPage />
+  <ClientOnly><CreatorInboxToast /></ClientOnly>
 </template>

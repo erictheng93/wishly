@@ -55,14 +55,14 @@ test('會員認捐旅程：SSR meta → 捐助 → 重新整理 → 我的捐助
   await test.step('/me/claims 列出這筆捐助', async () => {
     await page.getByRole('link', { name: '我的送禮' }).click()
     await expect(page).toHaveURL(/\/me\/claims$/)
-    await expect(page.getByRole('link', { name: '小愛的待產清單' })).toBeVisible()
+    await expect(page.getByRole('link', { name: '小愛的待產清單', exact: true })).toBeVisible()
     await expect(page.getByText('奶瓶組 × 2')).toBeVisible()
     // 頁首帳號選單也會出現名字，只看內文
     await expect(page.getByRole('main').getByText(member.name)).toBeVisible()
   })
 
   await test.step('回清單修改數量為 1', async () => {
-    await page.getByRole('link', { name: '小愛的待產清單' }).click()
+    await page.getByRole('link', { name: '小愛的待產清單', exact: true }).click()
     await card.getByRole('button', { name: '修改我要送的' }).click()
     await expect(dialog.getByText('修改我要送的「奶瓶組」')).toBeVisible()
     await dialog.getByRole('button', { name: '減少' }).click()

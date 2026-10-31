@@ -370,7 +370,7 @@ async fn login_19_distributed_failures_not_locked(pool: PgPool) {
 async fn unsubscribe_post_allowed_in_read_only(pool: PgPool) {
     let common::TestUser { id: u, token: _ } = common::user(&pool, "u").await;
     sqlx::query("INSERT INTO system_flags (key, value) VALUES ('read_only','true') ON CONFLICT (key) DO UPDATE SET value='true'").execute(&pool).await.unwrap();
-    let tok = wishly_api::account::unsub_token('u', u);
+    let tok = wishly_api::account::unsub_token('c', u);
     assert_eq!(
         common::call(
             &pool,

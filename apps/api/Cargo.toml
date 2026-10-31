@@ -25,7 +25,7 @@ subtle = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
-futures-util = { version = "0.3", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 argon2 = "0.5"
 jsonwebtoken = "9"
 chacha20poly1305 = "0.10"

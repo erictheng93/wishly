@@ -154,7 +154,7 @@
       "ackItemChange": "Mengerti",
       "past": "Riwayat sebelumnya ({n})",
       "wipe": "Hapus nama panggilan dan kontak saya",
-      "confirmCancelPurchased": "Pemilik akan menerima pemberitahuan. Yakin tidak jadi kasih?",
+      "confirmCancelPurchased": "Pemilik akan menerima pemberitahuan (kecuali saat kejutan). Yakin tidak jadi kasih?",
       "confirmCancel": "Yakin tidak jadi kasih hadiah ini?",
       "confirmWipe": "Yakin ingin menghapus nama panggilan dan kontakmu? Riwayat hadiah akan tetap ada sebagai \"tamu yang dihapus\", dan perangkat ini tidak bisa mengelolanya lagi.",
       "deadline": "Tandai sudah dibeli sebelum {date}",
@@ -412,6 +412,20 @@
         "network": "Koneksi gagal, periksa jaringan lalu coba lagi.",
         "server": "Sistem sementara tidak bisa memproses, coba lagi nanti.",
         "generic": "Pengajuan gagal, coba lagi nanti."
+      }
+    },
+    "notifications": {
+      "title": "Pusat notifikasi",
+      "readAll": "Tandai semua dibaca",
+      "empty": "Belum ada notifikasi",
+      "unread": "Belum dibaca",
+      "loadMore": "Muat lebih banyak",
+      "viewAll": "Lihat semua",
+      "cat": {
+        "all": "Semua",
+        "account": "Akun",
+        "gifts": "Hadiah",
+        "social": "Ulang tahun"
       }
     }
   }

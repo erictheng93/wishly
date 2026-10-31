@@ -140,7 +140,7 @@ async fn api_rules(pool: PgPool) {
         "PATCH",
         "/me",
         &ck(&o.token),
-        Some(json!({"notification_prefs": {"email_birthdays": false}})),
+        Some(json!({"notification_prefs": {"email_social": false}})),
     )
     .await;
     assert_eq!(s.as_u16(), 200);
@@ -177,7 +177,7 @@ async fn tick_recipients_and_idempotency(pool: PgPool) {
             .await
             .unwrap();
     }
-    sqlx::query("UPDATE users SET notification_prefs='{\"email_birthdays\": false}' WHERE id=$1")
+    sqlx::query("UPDATE users SET notification_prefs='{\"email_social\": false, \"inbox_social\": false}' WHERE id=$1")
         .bind(f_off.id)
         .execute(&pool)
         .await
@@ -305,7 +305,7 @@ async fn worker_rechecks_before_sending(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    wishly_api::notify::tick(&pool).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
     let st: String =
         sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.friend'")
             .fetch_one(&pool)
@@ -313,13 +313,13 @@ async fn worker_rechecks_before_sending(pool: PgPool) {
             .unwrap();
     assert_eq!(st, "cancelled");
     // nudge：寄前偏好被關 -> cancelled
-    sqlx::query("UPDATE users SET notification_prefs='{\"email_birthdays\": false}' WHERE id=$1")
+    sqlx::query("UPDATE users SET notification_prefs='{\"email_social\": false}' WHERE id=$1")
         .bind(o.id)
         .execute(&pool)
         .await
         .unwrap();
     sqlx::query("INSERT INTO notifications(user_id,channel,kind,payload) VALUES($1,'email','birthday.nudge','{}')").bind(o.id).execute(&pool).await.unwrap();
-    wishly_api::notify::tick(&pool).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
     let st: String =
         sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.nudge'")
             .fetch_one(&pool)
@@ -345,7 +345,7 @@ async fn unsubscribe_b_token(pool: PgPool) {
     assert_eq!(s.as_u16(), 204);
     let (p, st): (Value, String) = sqlx::query_as("SELECT (SELECT notification_prefs FROM users WHERE id=$1), status::text FROM notifications WHERE user_id=$1").bind(o.id).fetch_one(&pool).await.unwrap();
     assert_eq!(
-        (p["email_birthdays"].clone(), st.as_str()),
-        (json!(false), "cancelled")
+        (p["email_social"].clone(), st.as_str()),
+        (json!(false), "pending") // pending 不取消，由 worker 寄前靜音
     );
 }

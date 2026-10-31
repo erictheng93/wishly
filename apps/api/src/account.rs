@@ -29,7 +29,7 @@ fn mac(msg: &str) -> Hmac<Sha256> {
     m
 }
 
-/// kind: 'u'（建立者）| 'g'（訪客）| 'b'（生日通知）；有效一年
+/// kind: 'c'（送禮進度）| 'b'（社交與生日）| 'g'（訪客）；有效一年
 pub fn unsub_token(kind: char, id: Uuid) -> String {
     let msg = format!(
         "{kind}:{id}:{}",
@@ -52,7 +52,7 @@ fn verify(token: &str) -> Option<(char, Uuid)> {
         it.next()?.parse().ok()?,
         it.next()?.parse::<i64>().ok()?,
     );
-    (exp > chrono::Utc::now().timestamp() && matches!(k, 'u' | 'g' | 'b')).then_some((k, id))
+    (exp > chrono::Utc::now().timestamp() && matches!(k, 'c' | 'g' | 'b')).then_some((k, id))
 }
 
 #[derive(Deserialize)]
@@ -92,12 +92,10 @@ async fn unsubscribe(
         ));
     };
     let mut tx = st.pool.begin().await?;
-    if k == 'b' {
-        sqlx::query("UPDATE users SET notification_prefs = jsonb_set(COALESCE(notification_prefs, '{}'::jsonb), '{email_birthdays}', 'false'::jsonb) WHERE id = $1 AND deleted_at IS NULL").bind(id).execute(&mut *tx).await?;
-        sqlx::query("UPDATE notifications SET status = 'cancelled' WHERE user_id = $1 AND status = 'pending' AND kind IN ('birthday.friend', 'birthday.nudge')").bind(id).execute(&mut *tx).await?;
-    } else if k == 'u' {
-        sqlx::query("UPDATE users SET notification_prefs = jsonb_set(COALESCE(notification_prefs, '{}'::jsonb), '{email_claims}', 'false'::jsonb) WHERE id = $1 AND deleted_at IS NULL").bind(id).execute(&mut *tx).await?;
-        sqlx::query("UPDATE notifications SET status = 'cancelled' WHERE user_id = $1 AND status = 'pending' AND kind IN ('claim.created', 'claim.digest')").bind(id).execute(&mut *tx).await?;
+    // 會員只設偏好：pending 的信不用取消，worker 寄前會依偏好靜音（站內信保留）
+    if k == 'b' || k == 'c' {
+        let key = if k == 'b' { "email_social" } else { "email_gifts" };
+        sqlx::query("UPDATE users SET notification_prefs = jsonb_set(COALESCE(notification_prefs, '{}'::jsonb), ARRAY[$2], 'false'::jsonb) WHERE id = $1 AND deleted_at IS NULL").bind(id).bind(key).execute(&mut *tx).await?;
     } else {
         sqlx::query("UPDATE guests SET email = NULL WHERE id = $1")
             .bind(id)
@@ -149,10 +147,13 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
         "SELECT jsonb_build_object('id', id, 'item_id', item_id, 'wishlist_id', wishlist_id, 'points', points, 'refunded_points', refunded_points, 'status', status::text,
                 'message', message, 'is_anonymous', is_anonymous, 'visibility', visibility::text, 'captured_at', captured_at, 'released_at', released_at, 'created_at', created_at)
            FROM contributions WHERE user_id = $1 ORDER BY id").bind(u.id).fetch_all(&st.pool).await?;
+    let notifications: Vec<Value> = sqlx::query_scalar(
+        "SELECT jsonb_build_object('id', id, 'kind', kind, 'title', inbox_title, 'link', inbox_link, 'body', inbox_body, 'category', inbox_category, 'created_at', inbox_at, 'read_at', read_at)
+           FROM notifications WHERE user_id = $1 AND inbox_at IS NOT NULL ORDER BY inbox_at, id").bind(u.id).fetch_all(&st.pool).await?;
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.export', 'users', $1)").bind(u.id).execute(&st.pool).await?;
     let now = chrono::Utc::now();
     let mut res = Json(json!({ "exported_at": now, "user": user, "identities": identities, "wishlists": wishlists, "claims": claims,
-        "wallet": wallet, "ledger": ledger, "contributions": contributions })).into_response();
+        "wallet": wallet, "ledger": ledger, "contributions": contributions, "notifications": notifications })).into_response();
     let h = res.headers_mut();
     h.insert(
         header::CONTENT_DISPOSITION,
@@ -336,6 +337,8 @@ async fn delete_me(
         crate::dashboard::notify(&mut *tx, *w).await?;
         site_slugs.push(slug.clone());
     }
+    let was_active: Vec<Uuid> = closed.iter().filter(|c| c.2).map(|c| c.0).collect();
+    crate::notify::enqueue_site_paused(&mut *tx, &was_active).await?;
     // Retain replaced/issued image keys; the worker rechecks sharing under the media lock.
     let media: Vec<String> = sqlx::query_scalar(
         "SELECT object_key FROM user_media WHERE user_id=$1
@@ -405,6 +408,8 @@ async fn delete_me(
     .execute(&mut *tx)
     .await?;
     sqlx::query("UPDATE notifications SET payload=payload - 'to' WHERE user_id=$1 AND kind IN ('auth.identity_linked','auth.identity_unlinked')")
+        .bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE notifications SET inbox_at=NULL, inbox_title=NULL, inbox_link=NULL, inbox_body=NULL, inbox_category=NULL WHERE user_id=$1")
         .bind(id).execute(&mut *tx).await?;
     sqlx::query(
         "UPDATE wishlists SET cover_image_key=NULL, cover_image_status='none' WHERE owner_id=$1 AND org_id IS NULL",

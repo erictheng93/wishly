@@ -1590,7 +1590,7 @@ async fn account_delete_waits_on_topup_lock_then_sees_dispute_freeze(pool: PgPoo
         .unwrap());
     gate.commit().await.unwrap();
     let r = finish(d).await;
-    assert_eq!(r.0, StatusCode::CONFLICT, "{}", r.2);
+    assert_eq!(r.0, StatusCode::CONFLICT, "帳號刪除不可與爭議交易死鎖");
     assert_eq!(r.2["code"], "ACCOUNT_HAS_POINTS");
     let deleted: bool = sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM users WHERE id=$1")
         .bind(u)

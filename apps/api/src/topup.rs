@@ -77,12 +77,22 @@ pub fn spawn_expire(pool: PgPool) {
 /// pending 且已過期 → expired，回傳筆數。與 webhook 競爭時以列鎖序列化：webhook 先拿到鎖則此處看到已非 pending 而略過。
 /// 已 expired 但事後收到付款成功通知，webhook 仍會入帳（錢已收）。
 pub async fn expire_due(pool: &PgPool) -> Result<u64, AppError> {
-    Ok(sqlx::query(
-        "UPDATE topups SET status = 'expired', updated_at = now() WHERE status = 'pending' AND expires_at < now()",
+    let mut tx = pool.begin().await?;
+    let rows: Vec<(Uuid, i64, bool)> = sqlx::query_as(
+        "UPDATE topups SET status = 'expired', updated_at = now() WHERE status = 'pending' AND expires_at < now()
+         RETURNING wallet_id, amount, payment_info IS NOT NULL",
     )
-    .execute(pool)
-    .await?
-    .rows_affected())
+    .fetch_all(&mut *tx)
+    .await?;
+    for (wallet, amount, has_info) in &rows {
+        if !*has_info {
+            continue; // 沒取號就放棄的訂單不打擾使用者
+        }
+        let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut *tx).await?;
+        crate::notify::enqueue(&mut *tx, uid, "topup.expired", json!({ "amount": amount })).await?;
+    }
+    tx.commit().await?;
+    Ok(rows.len() as u64)
 }
 
 // ---- 綠界 CheckMacValue ----
@@ -660,6 +670,8 @@ async fn credit(pool: &PgPool, id: Uuid, txn: &str) -> Result<(), AppError> {
         },
     )
     .await?;
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut *tx).await?;
+    crate::notify::enqueue(&mut *tx, uid, "topup.credited", json!({ "amount": amount })).await?;
     tx.commit().await?;
     Ok(())
 }

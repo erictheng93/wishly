@@ -138,7 +138,9 @@
       },
       "staffMfaLow": "Có ít hơn 2 nhân viên đã thiết lập xác minh hai bước. Nếu ai đó mất ứng dụng xác thực và mã dự phòng, sẽ không ai đặt lại được. Hãy nhờ thêm một nhân viên hoàn tất thiết lập.",
       "mfaHint": "Nên bật xác minh hai bước: quản trị có thể khóa tài khoản và cấp điểm, tài khoản bị chiếm đoạt sẽ gây hậu quả lớn.",
-      "mfaSetup": "Thiết lập ngay"
+      "mfaSetup": "Thiết lập ngay",
+      "requeue": "Xếp lại thông báo thất bại",
+      "requeued": "Đã xếp lại {n}"
     },
     "audit": {
       "title": "Nhật ký kiểm toán",
