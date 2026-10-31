@@ -1448,7 +1448,7 @@ CREATE TABLE notifications (
   attempts      smallint             NOT NULL DEFAULT 0,
   last_error    text,
   created_at    timestamptz          NOT NULL DEFAULT now(),
-  CONSTRAINT notifications_has_recipient CHECK (user_id IS NOT NULL OR guest_id IS NOT NULL)
+  CONSTRAINT notifications_has_recipient CHECK (user_id IS NOT NULL OR guest_id IS NOT NULL OR payload ? 'to')
 );
 -- 每位建立者每份清單同時只有一封待發的每日彙整信（累加 count）
 CREATE UNIQUE INDEX notifications_digest_uk ON notifications (user_id, kind, (payload-&gt;&gt;'wishlist_id'))

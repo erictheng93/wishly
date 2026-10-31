@@ -160,6 +160,8 @@ async fn invite_create(
         return Err(AppError::invalid("/role", "ENUM", "角色不正確"));
     }
     let handle = clean_handle(&b.handle)?;
+    // 會寄信到任意信箱，且邀請人可自訂組織名稱，限流防止被當垃圾信管道；tx 外計數，429 不被 rollback
+    crate::ratelimit::check(&st.pool, &format!("org-invite:{}", u.id), 30, 3600).await?;
     let (token, h) = new_token();
     let url = format!("{}/org/invite/{token}", crate::auth::app_url());
     let mut tx = st.pool.begin().await?;
@@ -175,20 +177,23 @@ async fn invite_create(
     .bind(u.id)
     .fetch_one(&mut *tx)
     .await?;
-    // 只通知既有使用者；寄給信箱的邀請連結由邀請人自行轉交
     let existing: Option<Uuid> =
         sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL")
             .bind(&email)
             .fetch_optional(&mut *tx)
             .await?;
-    if let Some(uid) = existing {
-        let name: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id=$1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await?;
-        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1,'email','org.invite',$2)")
-            .bind(uid).bind(json!({"org_id": id, "org_display_name": name, "role": b.role, "url": url})).execute(&mut *tx).await?;
+    let name: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id=$1")
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let mut payload = json!({"org_id": id, "org_display_name": name, "role": b.role, "url": url});
+    // 還沒帳號的人沒有 user：收件者與語言都放 payload，語言跟邀請人
+    if existing.is_none() {
+        payload["to"] = email.clone().into();
+        payload["locale"] = crate::notify::request_lang().code().into();
     }
+    sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1,'email','org.invite',$2)")
+        .bind(existing).bind(payload).execute(&mut *tx).await?;
     audit_user(
         &mut *tx,
         u.id,
