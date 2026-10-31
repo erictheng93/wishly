@@ -291,7 +291,9 @@ async fn regenerate_recovery(
 async fn security_mail(st: &AppState, uid: Uuid, kind: &str) -> Result<(), AppError> {
     let mut tx = st.pool.begin().await?;
     let email: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
-        .bind(uid).fetch_one(&mut *tx).await?;
+        .bind(uid)
+        .fetch_one(&mut *tx)
+        .await?;
     crate::identities::notify(&mut tx, uid, kind, "totp", email.as_deref()).await?;
     tx.commit().await?;
     Ok(())

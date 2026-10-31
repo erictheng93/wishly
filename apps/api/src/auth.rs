@@ -716,7 +716,10 @@ async fn patch_me(
         let ok = prefs.as_object().is_some_and(|o| {
             !o.is_empty()
                 && o.iter().all(|(k, v)| {
-                    matches!(k.as_str(), "email_gifts" | "email_social" | "inbox_gifts" | "inbox_social") && v.is_boolean()
+                    matches!(
+                        k.as_str(),
+                        "email_gifts" | "email_social" | "inbox_gifts" | "inbox_social"
+                    ) && v.is_boolean()
                 })
         });
         if !ok {

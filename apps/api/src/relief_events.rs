@@ -357,14 +357,26 @@ async fn moderate(
     if !paused.is_empty() {
         let ids: Vec<Uuid> = paused.iter().map(|p| p.1).collect();
         crate::notify::enqueue_site_paused(&mut *tx, &ids).await?;
-        let title: String = sqlx::query_scalar("SELECT name FROM relief_events WHERE id = $1").bind(id).fetch_one(&mut *tx).await?;
+        let title: String = sqlx::query_scalar("SELECT name FROM relief_events WHERE id = $1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
         let mut orgs_seen: Vec<Uuid> = paused.iter().filter_map(|p| p.2).collect();
         orgs_seen.sort();
         orgs_seen.dedup();
         for o in orgs_seen {
-            let dn: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id = $1").bind(o).fetch_one(&mut *tx).await?;
-            crate::notify::enqueue_org_owners(&mut *tx, o, "org.event_hidden",
-                json!({"org_id": o, "display_name": dn, "event_title": title, "reason": reason})).await?;
+            let dn: String =
+                sqlx::query_scalar("SELECT display_name FROM organizations WHERE id = $1")
+                    .bind(o)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            crate::notify::enqueue_org_owners(
+                &mut *tx,
+                o,
+                "org.event_hidden",
+                json!({"org_id": o, "display_name": dn, "event_title": title, "reason": reason}),
+            )
+            .await?;
         }
     }
     audit(

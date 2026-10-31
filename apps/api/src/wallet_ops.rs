@@ -257,8 +257,17 @@ async fn cash_refund_patch(
     .await?;
     if to != "processing" {
         // 上面的狀態守衛 UPDATE 已保證只會轉一次，重送會 409 而到不了這裡
-        let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut *tx).await?;
-        crate::notify::enqueue(&mut *tx, uid, "cash_refund.updated", json!({ "amount": amount, "status": to, "note": reason })).await?;
+        let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1")
+            .bind(wallet)
+            .fetch_one(&mut *tx)
+            .await?;
+        crate::notify::enqueue(
+            &mut *tx,
+            uid,
+            "cash_refund.updated",
+            json!({ "amount": amount, "status": to, "note": reason }),
+        )
+        .await?;
     }
     let out: Value = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', id, 'amount', amount, 'status', status, 'reject_reason', reject_reason,
@@ -358,7 +367,10 @@ async fn lock_topup(tx: &mut Tx<'_>, topup_id: Uuid) -> R<(Uuid, i64, String)> {
 }
 
 async fn notify_wallet(tx: &mut Tx<'_>, wallet: Uuid, kind: &str, payload: Value) -> R<()> {
-    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1").bind(wallet).fetch_one(&mut **tx).await?;
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM point_wallets WHERE id = $1")
+        .bind(wallet)
+        .fetch_one(&mut **tx)
+        .await?;
     crate::notify::enqueue(&mut **tx, uid, kind, payload).await?;
     Ok(())
 }
@@ -476,7 +488,13 @@ pub async fn charge_back(tx: &mut Tx<'_>, topup_id: Uuid) -> R<ChargedBack> {
         json!({ "amount": amount, "recovered": recovered, "debt": debt }),
     )
     .await?;
-    notify_wallet(tx, wallet, "wallet.chargeback", json!({ "amount": recovered, "debt": debt })).await?;
+    notify_wallet(
+        tx,
+        wallet,
+        "wallet.chargeback",
+        json!({ "amount": recovered, "debt": debt }),
+    )
+    .await?;
     Ok(ChargedBack::Applied { recovered, debt })
 }
 

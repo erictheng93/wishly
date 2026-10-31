@@ -8,8 +8,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 async fn open(addr: std::net::SocketAddr, token: Option<&str>) -> tokio::net::TcpStream {
     let mut c = tokio::net::TcpStream::connect(addr).await.unwrap();
-    let ck = token.map(|t| format!("Cookie: ws_session={t}\r\n")).unwrap_or_default();
-    c.write_all(format!("GET /api/v1/me/notifications/stream HTTP/1.1\r\nHost: x\r\n{ck}\r\n").as_bytes()).await.unwrap();
+    let ck = token
+        .map(|t| format!("Cookie: ws_session={t}\r\n"))
+        .unwrap_or_default();
+    c.write_all(
+        format!("GET /api/v1/me/notifications/stream HTTP/1.1\r\nHost: x\r\n{ck}\r\n").as_bytes(),
+    )
+    .await
+    .unwrap();
     c
 }
 
@@ -40,17 +46,24 @@ async fn stream_signals_only_the_owner(pool: PgPool) {
 
     // 未登入 401
     let mut anon = open(addr, None).await;
-    assert!(read_until(&mut anon, "\r\n", Duration::from_secs(5)).await.starts_with("HTTP/1.1 401"));
+    assert!(read_until(&mut anon, "\r\n", Duration::from_secs(5))
+        .await
+        .starts_with("HTTP/1.1 401"));
 
     let mut ca = open(addr, Some(&a.token)).await;
     let mut cb = open(addr, Some(&b.token)).await;
     // retry 事件出現代表已完成訂閱
-    assert!(read_until(&mut ca, "retry", Duration::from_secs(5)).await.contains("text/event-stream"));
+    assert!(read_until(&mut ca, "retry", Duration::from_secs(5))
+        .await
+        .contains("text/event-stream"));
     read_until(&mut cb, "retry", Duration::from_secs(5)).await;
 
     wishly_api::dashboard::notify(&pool, a.id).await.unwrap();
     let got = read_until(&mut ca, "event: inbox", Duration::from_secs(5)).await;
-    assert!(got.contains("event: inbox") && got.contains("data: {}"), "{got}");
+    assert!(
+        got.contains("event: inbox") && got.contains("data: {}"),
+        "{got}"
+    );
     let other = read_until(&mut cb, "event: inbox", Duration::from_millis(500)).await;
     assert!(!other.contains("event: inbox"), "別人不該收到：{other}");
 }

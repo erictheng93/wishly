@@ -165,7 +165,8 @@ async fn review(
     let slugs: Vec<String> = if status == "verified" {
         let down: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug, id")
             .bind(id).fetch_all(&mut *tx).await?;
-        crate::notify::enqueue_site_paused(&mut *tx, &down.iter().map(|p| p.1).collect::<Vec<_>>()).await?;
+        crate::notify::enqueue_site_paused(&mut *tx, &down.iter().map(|p| p.1).collect::<Vec<_>>())
+            .await?;
         down.into_iter().map(|p| p.0).collect()
     } else {
         vec![]
@@ -251,7 +252,11 @@ async fn review_permit(
         let paused: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET site_status = 'paused' WHERE permit_id = $1 AND type = 'relief' AND site_status = 'active' RETURNING slug, id")
             .bind(id).fetch_all(&mut *tx).await?;
         let slugs: Vec<String> = paused.iter().map(|p| p.0.clone()).collect();
-        crate::notify::enqueue_site_paused(&mut *tx, &paused.iter().map(|p| p.1).collect::<Vec<_>>()).await?;
+        crate::notify::enqueue_site_paused(
+            &mut *tx,
+            &paused.iter().map(|p| p.1).collect::<Vec<_>>(),
+        )
+        .await?;
         sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
                      SELECT m.user_id, 'email'::notification_channel, 'org.permit_revoked',
                             jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
