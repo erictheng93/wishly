@@ -38,3 +38,27 @@ self.addEventListener('fetch', e => {
   }
   // 其餘（/api/*、text/event-stream、/_payload.json、manifest 等）不呼叫 respondWith：完全走網路
 })
+
+// Web Push（push.rs）：本文只有 { title, path }，不含信件內容。解析失敗仍要顯示通知（瀏覽器要求 push 事件必須顯示），不 throw。
+self.addEventListener('push', e => {
+  let d = {}
+  try { d = e.data ? e.data.json() : {} } catch {}
+  e.waitUntil(self.registration.showNotification(typeof d.title === 'string' && d.title ? d.title : 'Wishly', {
+    icon: '/icons/icon-192.png',
+    data: { path: typeof d.path === 'string' ? d.path : '/dashboard' },
+  }))
+})
+
+// 只接受站內路徑；已有視窗就聚焦並導向，否則開新視窗
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  let url
+  try {
+    const u = new URL(e.notification.data?.path ?? '', location.origin)
+    url = u.origin === location.origin ? u.href : new URL('/dashboard', location.origin).href
+  } catch { url = new URL('/dashboard', location.origin).href }
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
+    const w = ws[0]
+    return w ? w.focus().then(c => (c || w).navigate(url)) : clients.openWindow(url)
+  }))
+})

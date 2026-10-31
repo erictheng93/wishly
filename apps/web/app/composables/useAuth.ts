@@ -25,6 +25,7 @@ export function useAuth() {
   }
   async function logout(redirect?: string) {
     const hint = useAuthHint() // await 之前取：useCookie 需要 Nuxt context
+    await dropPush(api) // 共用裝置：先退訂，下一位使用者才不會收到前一位的通知（需趁 session 還在）
     try { await api('/auth/logout', { method: 'POST', noRedirect: true }) } catch {}
     user.value = null
     hint.value = null
