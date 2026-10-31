@@ -101,7 +101,13 @@ async fn balance(tx: &mut Tx<'_>, wallet: Uuid) -> Result<i64, AppError> {
 async fn on_funded(tx: &mut Tx<'_>, item_id: Uuid, wishlist_id: Uuid) -> Result<(), AppError> {
     points::capture_and_order(tx, item_id).await?;
     notify::enqueue_donors(&mut **tx, item_id, "crowdfund.funded", &["captured"]).await?;
-    notify::enqueue_owner(&mut **tx, wishlist_id, "owner.funded", json!({ "item_id": item_id })).await?;
+    notify::enqueue_owner(
+        &mut **tx,
+        wishlist_id,
+        "owner.funded",
+        json!({ "item_id": item_id }),
+    )
+    .await?;
     audit(
         tx,
         None,

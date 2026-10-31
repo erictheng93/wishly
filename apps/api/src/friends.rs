@@ -175,7 +175,13 @@ async fn accept(
     .ok_or(AppError::NotFound)?;
     befriend(&mut tx, u.id, from).await?;
     let friend = friend_json(&mut tx, u.id, from).await?;
-    crate::notify::enqueue(&mut *tx, from, "friend.accepted", json!({"from_user": u.id})).await?;
+    crate::notify::enqueue(
+        &mut *tx,
+        from,
+        "friend.accepted",
+        json!({"from_user": u.id}),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(json!({ "friend": friend })))
 }
@@ -337,7 +343,13 @@ async fn invite_accept(
         }
     }
     let friend = friend_json(&mut tx, u.id, inviter).await?;
-    crate::notify::enqueue(&mut *tx, inviter, "friend.accepted", json!({"from_user": u.id})).await?;
+    crate::notify::enqueue(
+        &mut *tx,
+        inviter,
+        "friend.accepted",
+        json!({"from_user": u.id}),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(
         json!({ "friend": friend, "wishlist": list.map(|(slug, ..)| json!({ "slug": slug })) }),

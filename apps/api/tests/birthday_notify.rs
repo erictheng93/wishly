@@ -305,7 +305,9 @@ async fn worker_rechecks_before_sending(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     let st: String =
         sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.friend'")
             .fetch_one(&pool)
@@ -319,7 +321,9 @@ async fn worker_rechecks_before_sending(pool: PgPool) {
         .await
         .unwrap();
     sqlx::query("INSERT INTO notifications(user_id,channel,kind,payload) VALUES($1,'email','birthday.nudge','{}')").bind(o.id).execute(&pool).await.unwrap();
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     let st: String =
         sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.nudge'")
             .fetch_one(&pool)

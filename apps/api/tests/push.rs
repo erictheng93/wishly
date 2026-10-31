@@ -322,7 +322,12 @@ async fn pushes_encrypted_payload_without_body(pool: PgPool) {
     .await;
     assert_eq!(s, 204);
     queue_mail(&pool, u.id).await;
-    assert_eq!(wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap(), 1);
+    assert_eq!(
+        wishly_api::notify::tick_at(&pool, common::noon())
+            .await
+            .unwrap(),
+        1
+    );
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 1);
     let (h, body) = &seen[0];
@@ -368,7 +373,9 @@ async fn gone_deletes_subscription_and_server_error_keeps_it_and_notification_se
     )
     .await;
     queue_mail(&pool, u.id).await;
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(seen.lock().unwrap().len(), 1);
     assert_eq!(sub_count(&pool).await, 1);
     let st: String = sqlx::query_scalar("SELECT status::text FROM notifications WHERE user_id=$1")
@@ -388,7 +395,9 @@ async fn gone_deletes_subscription_and_server_error_keeps_it_and_notification_se
         )
         .await;
         queue_mail(&pool, u.id).await;
-        wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+        wishly_api::notify::tick_at(&pool, common::noon())
+            .await
+            .unwrap();
         assert_eq!(sub_count(&pool).await, 0, "{c}");
     }
 }
@@ -404,22 +413,43 @@ async fn push_follows_notification_policy_not_email(pool: PgPool) {
     let u = user(&pool, "A").await;
     let from = user(&pool, "B").await;
     let (url, seen, _) = mock(201).await;
-    let (s, ..) = call(&pool, "POST", "/me/push-subscriptions", &ck(&u.token), Some(Device::new().body(&url))).await;
+    let (s, ..) = call(
+        &pool,
+        "POST",
+        "/me/push-subscriptions",
+        &ck(&u.token),
+        Some(Device::new().body(&url)),
+    )
+    .await;
     assert_eq!(s, 204);
     let pushed = || seen.lock().unwrap().len();
     let night = chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2026, 10, 31, 15, 0, 0).unwrap();
 
     // 第四級不推
-    queue(&pool, u.id, "friend.accepted", json!({"from_user": from.id})).await;
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    queue(
+        &pool,
+        u.id,
+        "friend.accepted",
+        json!({"from_user": from.id}),
+    )
+    .await;
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(pushed(), 0);
 
     // 第三級：夜間站內先到，推播跟 email 一起等到 09:00
     let id = queue(&pool, u.id, "crowdfund.funded", json!({})).await;
     wishly_api::notify::tick_at(&pool, night).await.unwrap();
     assert_eq!(pushed(), 0);
-    sqlx::query("UPDATE notifications SET scheduled_at = now() WHERE id = $1").bind(id).execute(&pool).await.unwrap();
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    sqlx::query("UPDATE notifications SET scheduled_at = now() WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(pushed(), 1);
 
     // 第一級：夜間立刻推
@@ -429,20 +459,34 @@ async fn push_follows_notification_policy_not_email(pool: PgPool) {
 
     // email 重試不重複推
     let id = queue(&pool, u.id, "wallet.unfrozen", json!({})).await;
-    sqlx::query("UPDATE notifications SET attempts = 1 WHERE id = $1").bind(id).execute(&pool).await.unwrap();
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    sqlx::query("UPDATE notifications SET attempts = 1 WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(pushed(), 2);
 
     // 關掉 email、沒有 email 地址：照推
     sqlx::query("UPDATE users SET email = NULL, notification_prefs = '{\"email_gifts\": false}' WHERE id = $1").bind(u.id).execute(&pool).await.unwrap();
     queue(&pool, u.id, "crowdfund.funded", json!({})).await;
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(pushed(), 3);
 
     // 關掉該類站內：不推
-    sqlx::query("UPDATE users SET notification_prefs = '{\"inbox_gifts\": false}' WHERE id = $1").bind(u.id).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE users SET notification_prefs = '{\"inbox_gifts\": false}' WHERE id = $1")
+        .bind(u.id)
+        .execute(&pool)
+        .await
+        .unwrap();
     queue(&pool, u.id, "crowdfund.funded", json!({})).await;
-    wishly_api::notify::tick_at(&pool, common::noon()).await.unwrap();
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
     assert_eq!(pushed(), 3);
 }
 

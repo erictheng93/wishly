@@ -275,12 +275,23 @@ async fn revoke_sessions(
 }
 
 /// 把最近 7 天寄送失敗（非地址錯誤）的通知重新排入佇列。
-async fn requeue_notifications(State(st): State<AppState>, Staff(sid): Staff) -> Result<Json<Value>, AppError> {
+async fn requeue_notifications(
+    State(st): State<AppState>,
+    Staff(sid): Staff,
+) -> Result<Json<Value>, AppError> {
     let mut tx = st.pool.begin().await?;
     let n = sqlx::query("UPDATE notifications SET status = 'pending', attempts = 0, scheduled_at = now()
                           WHERE status = 'failed' AND scheduled_at > now() - interval '7 days' AND last_error IS DISTINCT FROM 'bad address'")
         .execute(&mut *tx).await?.rows_affected();
-    audit(&mut *tx, sid, "notification.requeue", "notifications", None, json!({ "requeued": n })).await?;
+    audit(
+        &mut *tx,
+        sid,
+        "notification.requeue",
+        "notifications",
+        None,
+        json!({ "requeued": n }),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(json!({ "requeued": n })))
 }
@@ -330,7 +341,17 @@ async fn update_user(
         vec![]
     };
     if new_blocked != blocked {
-        crate::notify::enqueue(&mut *tx, id, if new_blocked { "account.suspended" } else { "account.restored" }, json!({})).await?;
+        crate::notify::enqueue(
+            &mut *tx,
+            id,
+            if new_blocked {
+                "account.suspended"
+            } else {
+                "account.restored"
+            },
+            json!({}),
+        )
+        .await?;
     }
     audit(&mut *tx, sid, "user.update", "users", Some(id), json!({"reason":reason,"before":{"is_staff":staff,"blocked":blocked},"after":{"is_staff":new_staff,"blocked":new_blocked}})).await?;
     tx.commit().await?;

@@ -89,8 +89,13 @@ pub async fn enqueue_org_owners<'e, E: sqlx::PgExecutor<'e>>(
         "INSERT INTO notifications (user_id, channel, kind, payload)
          SELECT m.user_id, 'email'::notification_channel, $2, $3
            FROM org_members m JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL
-          WHERE m.org_id = $1 AND m.disabled_at IS NULL AND m.role = 'owner'")
-        .bind(org_id).bind(kind).bind(payload).execute(ex).await?;
+          WHERE m.org_id = $1 AND m.disabled_at IS NULL AND m.role = 'owner'",
+    )
+    .bind(org_id)
+    .bind(kind)
+    .bind(payload)
+    .execute(ex)
+    .await?;
     Ok(())
 }
 
@@ -229,7 +234,16 @@ pub fn spawn_worker(pool: PgPool) {
 }
 
 /// 最後一欄 has_inbox：領取時已寫過站內信（安靜時段延後的 email、重試），不再改站內欄位也不再發訊號。
-type PendingNotification = (Uuid, Option<Uuid>, Option<Uuid>, String, String, Value, i16, bool);
+type PendingNotification = (
+    Uuid,
+    Option<Uuid>,
+    Option<Uuid>,
+    String,
+    String,
+    Value,
+    i16,
+    bool,
+);
 
 /// DB 階段做完、等待寄出的 email（寄送與 DB 工作分開，SMTP 卡住不能擋住站內通知）。
 struct Outbound {
@@ -281,7 +295,12 @@ impl Category {
 
 /// 站內信內文：取 email 內文，去掉含連結（`://`）的行與空行。
 pub fn inbox_body(email_body: &str) -> String {
-    email_body.lines().map(str::trim).filter(|l| !l.is_empty() && !l.contains("://")).collect::<Vec<_>>().join("\n")
+    email_body
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.contains("://"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub fn category(kind: &str) -> Category {
@@ -328,8 +347,15 @@ pub enum EmailTier {
 
 pub fn email_tier(kind: &str) -> EmailTier {
     match kind {
-        "claim.confirmation" | "friend.accepted" | "item.reopened" | "claim.cancelled_by_donor" | "topup.expired" => EmailTier::InAppOnly,
-        "claim.purchase_reminder" | "claim.list_closed" | "claim.cancelled_by_owner" | "claim.item_removed" => EmailTier::Daytime,
+        "claim.confirmation"
+        | "friend.accepted"
+        | "item.reopened"
+        | "claim.cancelled_by_donor"
+        | "topup.expired" => EmailTier::InAppOnly,
+        "claim.purchase_reminder"
+        | "claim.list_closed"
+        | "claim.cancelled_by_owner"
+        | "claim.item_removed" => EmailTier::Daytime,
         _ if category(kind) == Category::Account => EmailTier::Immediate,
         _ => EmailTier::Optional,
     }
@@ -337,43 +363,106 @@ pub fn email_tier(kind: &str) -> EmailTier {
 
 /// 所有會被 render 的 kind（單元測試用它確認四語文案齊全）。新增 kind 時一併加進這裡、`category`、`email_tier`、`inbox_link` 與 docs/notification-policy.md。
 pub const KINDS: &[&str] = &[
-    "auth.password_changed", "auth.mfa_reset", "auth.identity_linked", "auth.identity_unlinked",
-    "auth.mfa_enabled", "auth.recovery_regenerated",
-    "org.invite", "org.permit_revoked", "org.permit_expired", "org.permit_expiring", "org.review",
-    "org.permit_rejected", "org.permit_reviewed", "org.event_hidden",
-    "crowdfund.funded", "order.shipped", "order.delivered", "order.failed", "order.partial_refund",
-    "funding.expired", "funding.released", "item.removed",
-    "claim.confirmation", "claim.item_removed", "claim.item_changed", "claim.purchase_reminder",
-    "claim.list_closed", "claim.expired", "claim.cancelled_by_owner", "claim.cancelled_by_donor",
-    "item.reopened", "wishlist.closing", "site.paused",
-    "owner.funded", "owner.shipped", "owner.delivered", "owner.order_failed", "event.summary",
-    "friend.request", "friend.accepted", "birthday.friend", "birthday.nudge",
-    "topup.credited", "topup.expired", "cash_refund.updated",
-    "wallet.frozen", "wallet.unfrozen", "wallet.chargeback",
-    "wishlist.moderated", "account.suspended", "account.restored", "staff.digest",
+    "auth.password_changed",
+    "auth.mfa_reset",
+    "auth.identity_linked",
+    "auth.identity_unlinked",
+    "auth.mfa_enabled",
+    "auth.recovery_regenerated",
+    "org.invite",
+    "org.permit_revoked",
+    "org.permit_expired",
+    "org.permit_expiring",
+    "org.review",
+    "org.permit_rejected",
+    "org.permit_reviewed",
+    "org.event_hidden",
+    "crowdfund.funded",
+    "order.shipped",
+    "order.delivered",
+    "order.failed",
+    "order.partial_refund",
+    "funding.expired",
+    "funding.released",
+    "item.removed",
+    "claim.confirmation",
+    "claim.item_removed",
+    "claim.item_changed",
+    "claim.purchase_reminder",
+    "claim.list_closed",
+    "claim.expired",
+    "claim.cancelled_by_owner",
+    "claim.cancelled_by_donor",
+    "item.reopened",
+    "wishlist.closing",
+    "site.paused",
+    "owner.funded",
+    "owner.shipped",
+    "owner.delivered",
+    "owner.order_failed",
+    "event.summary",
+    "friend.request",
+    "friend.accepted",
+    "birthday.friend",
+    "birthday.nudge",
+    "topup.credited",
+    "topup.expired",
+    "cash_refund.updated",
+    "wallet.frozen",
+    "wallet.unfrozen",
+    "wallet.chargeback",
+    "wishlist.moderated",
+    "account.suspended",
+    "account.restored",
+    "staff.digest",
 ];
 
 /// 站內通知點擊後的前端相對路徑。
 pub fn inbox_link(kind: &str, payload: &Value) -> String {
     let org = payload["org_id"].as_str().unwrap_or("");
     match kind {
-        "claim.confirmation" | "claim.cancelled_by_owner" | "claim.purchase_reminder"
-        | "claim.expired" | "claim.list_closed" | "claim.item_removed" | "site.paused" => "/me/claims".into(),
+        "claim.confirmation"
+        | "claim.cancelled_by_owner"
+        | "claim.purchase_reminder"
+        | "claim.expired"
+        | "claim.list_closed"
+        | "claim.item_removed"
+        | "site.paused" => "/me/claims".into(),
         "claim.item_changed" if payload["crowdfund"] == true => "/me/wallet".into(),
         "claim.item_changed" => "/me/claims".into(),
-        "crowdfund.funded" | "order.shipped" | "order.delivered" | "order.failed" | "order.partial_refund"
-        | "funding.expired" | "funding.released" | "item.removed" | "topup.credited" | "topup.expired"
-        | "cash_refund.updated" | "wallet.frozen" | "wallet.unfrozen" | "wallet.chargeback" => "/me/wallet".into(),
+        "crowdfund.funded"
+        | "order.shipped"
+        | "order.delivered"
+        | "order.failed"
+        | "order.partial_refund"
+        | "funding.expired"
+        | "funding.released"
+        | "item.removed"
+        | "topup.credited"
+        | "topup.expired"
+        | "cash_refund.updated"
+        | "wallet.frozen"
+        | "wallet.unfrozen"
+        | "wallet.chargeback" => "/me/wallet".into(),
         "friend.request" | "friend.accepted" => "/friends".into(),
         "birthday.friend" => match payload["slug"].as_str() {
             Some(s) => format!("/s/{s}"),
             None => "/friends".into(),
         },
         "birthday.nudge" => "/lists/new".into(),
-        "auth.password_changed" | "auth.identity_linked" | "auth.identity_unlinked" | "auth.mfa_enabled"
-        | "auth.recovery_regenerated" | "account.suspended" | "account.restored" => "/settings".into(),
+        "auth.password_changed"
+        | "auth.identity_linked"
+        | "auth.identity_unlinked"
+        | "auth.mfa_enabled"
+        | "auth.recovery_regenerated"
+        | "account.suspended"
+        | "account.restored" => "/settings".into(),
         "auth.mfa_reset" | "staff.digest" => "/admin".into(),
-        "org.permit_revoked" | "org.permit_rejected" | "org.permit_expired" | "org.permit_expiring" | "org.permit_reviewed" => {
+        "org.permit_revoked"
+        | "org.permit_rejected"
+        | "org.permit_expired"
+        | "org.permit_expiring"
+        | "org.permit_reviewed" => {
             format!("/orgs/{org}#permits")
         }
         "org.event_hidden" => format!("/orgs/{org}"),
@@ -390,14 +479,24 @@ pub fn quiet_until(now: chrono::DateTime<chrono::Utc>) -> Option<chrono::DateTim
     if (9..21).contains(&h) {
         return None;
     }
-    let day = if h >= 21 { local.date_naive() + chrono::Duration::days(1) } else { local.date_naive() };
+    let day = if h >= 21 {
+        local.date_naive() + chrono::Duration::days(1)
+    } else {
+        local.date_naive()
+    };
     let at = day.and_hms_opt(9, 0, 0)?.and_utc() - chrono::Duration::hours(8);
     Some(at)
 }
 
 async fn set_status(pool: &PgPool, id: Uuid, status: &str, err: &str) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE notifications SET status = $2::notification_status, last_error = $3 WHERE id = $1")
-        .bind(id).bind(status).bind(err).execute(pool).await?;
+    sqlx::query(
+        "UPDATE notifications SET status = $2::notification_status, last_error = $3 WHERE id = $1",
+    )
+    .bind(id)
+    .bind(status)
+    .bind(err)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -409,7 +508,10 @@ pub async fn tick(pool: &PgPool) -> Result<usize, sqlx::Error> {
 }
 
 /// `tick` 的可注入時鐘版本（只影響安靜時段判斷），測試用。回傳時 DB 與寄送兩階段都已完成。
-pub async fn tick_at(pool: &PgPool, now: chrono::DateTime<chrono::Utc>) -> Result<usize, sqlx::Error> {
+pub async fn tick_at(
+    pool: &PgPool,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<usize, sqlx::Error> {
     // 1. 領取：租約須大於一批 20 封 × 15 秒的寄送上限
     let rows: Vec<PendingNotification> = sqlx::query_as(
         "UPDATE notifications SET attempts = attempts + 1, scheduled_at = now() + interval '6 minutes'
@@ -435,18 +537,26 @@ pub async fn tick_at(pool: &PgPool, now: chrono::DateTime<chrono::Utc>) -> Resul
 }
 
 async fn send_all(pool: &PgPool, out: Vec<Outbound>) {
-    futures_util::StreamExt::for_each_concurrent(futures_util::stream::iter(out), SEND_CONCURRENCY, |o| async move {
-        if let Err(e) = deliver(pool, o).await {
-            tracing::warn!(error = %e, "notify deliver");
-        }
-    })
+    futures_util::StreamExt::for_each_concurrent(
+        futures_util::stream::iter(out),
+        SEND_CONCURRENCY,
+        |o| async move {
+            if let Err(e) = deliver(pool, o).await {
+                tracing::warn!(error = %e, "notify deliver");
+            }
+        },
+    )
     .await;
 }
 
 async fn push_all(pool: &PgPool, pushes: Vec<(Uuid, String, String)>) {
-    futures_util::StreamExt::for_each_concurrent(futures_util::stream::iter(pushes), SEND_CONCURRENCY, |(u, title, path)| async move {
-        crate::push::deliver(pool, u, &title, &path).await;
-    })
+    futures_util::StreamExt::for_each_concurrent(
+        futures_util::stream::iter(pushes),
+        SEND_CONCURRENCY,
+        |(u, title, path)| async move {
+            crate::push::deliver(pool, u, &title, &path).await;
+        },
+    )
     .await;
 }
 
@@ -468,15 +578,24 @@ async fn handle(
     // email 要延後的時間（見步驟 9）：安靜時段，或連續操作的合併窗口。站內信不等；此時不合併，否則被併掉的列就沒有自己的站內信
     let tier = email_tier(&kind);
     let in_app_only = uid.is_some() && tier == EmailTier::InAppOnly;
-    let mut hold = if tier == EmailTier::Immediate { None } else { quiet_until(now) };
+    let mut hold = if tier == EmailTier::Immediate {
+        None
+    } else {
+        quiet_until(now)
+    };
     // 購買期限早於 09:00：等到天亮就來不及了，立刻寄
     if kind == "claim.purchase_reminder" {
-        let due = payload["expires_at"].as_str().and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok());
+        let due = payload["expires_at"]
+            .as_str()
+            .and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok());
         if matches!((hold, due), (Some(at), Some(d)) if d <= at) {
             hold = None;
         }
     }
-    if hold.is_none() && !in_app_only && matches!(kind.as_str(), "claim.confirmation" | "claim.item_changed") {
+    if hold.is_none()
+        && !in_app_only
+        && matches!(kind.as_str(), "claim.confirmation" | "claim.item_changed")
+    {
         hold = sqlx::query_scalar(
             "SELECT at FROM (
                SELECT GREATEST(n.created_at + make_interval(mins => $2),
@@ -488,22 +607,23 @@ async fn handle(
             .bind(id).bind(EMAIL_HOLD_MINUTES).bind(ITEM_EMAIL_COOLDOWN_MINUTES).fetch_optional(pool).await?;
     }
     // 會員收件人：帳號已刪除就不處理；同時取語言與偏好（偏好在步驟 7 才套用）
-    let user: Option<(String, bool, bool, bool, bool)> = match uid {
-        Some(u) => {
-            let r: Option<(String, bool, bool, bool, bool)> = sqlx::query_as(
+    let user: Option<(String, bool, bool, bool, bool)> =
+        match uid {
+            Some(u) => {
+                let r: Option<(String, bool, bool, bool, bool)> = sqlx::query_as(
                 "SELECT locale, COALESCE(notification_prefs->>'email_gifts', 'true') <> 'false',
                         COALESCE(notification_prefs->>'email_social', 'true') <> 'false',
                         COALESCE(notification_prefs->>'inbox_gifts', 'true') <> 'false',
                         COALESCE(notification_prefs->>'inbox_social', 'true') <> 'false'
                    FROM users WHERE id = $1 AND deleted_at IS NULL")
                 .bind(u).fetch_optional(pool).await?;
-            if r.is_none() {
-                done!("cancelled", "no recipient");
+                if r.is_none() {
+                    done!("cancelled", "no recipient");
+                }
+                r
             }
-            r
-        }
-        None => None,
-    };
+            None => None,
+        };
     // 3. 寄前重驗
     if kind == "claim.purchase_reminder" {
         // 寄送當下：認領仍待購且期限沒變才寄；清單已結束（Q14）時改用不提「延長」的文案
@@ -582,7 +702,10 @@ async fn handle(
     }
     // 4. 驚喜把關：受贈者端通知在驚喜鎖定中一律不寄、不進站內信
     if kind.starts_with("owner.")
-        || matches!(kind.as_str(), "claim.cancelled_by_donor" | "item.reopened" | "event.summary")
+        || matches!(
+            kind.as_str(),
+            "claim.cancelled_by_donor" | "item.reopened" | "event.summary"
+        )
     {
         let locked: Option<bool> = sqlx::query_scalar(
             "SELECT surprise_locked(surprise_mode, event_date) FROM wishlists WHERE id = ($1->>'wishlist_id')::uuid")
@@ -594,13 +717,26 @@ async fn handle(
     // 5. 合併：同收件人短時間內的同類通知併成一封，其餘標為 sent（last_error 記主列 id）
     // 只併「站內狀態相同」的列：第一輪併還沒進站內的，隔天 09:00 的第二輪併已進站內的，email 仍合成一封
     let inbox_on = match &user {
-        Some((_, _, _, ig, is_)) => cat == Category::Account || (cat == Category::Gifts && *ig) || (cat == Category::Social && *is_),
+        Some((_, _, _, ig, is_)) => {
+            cat == Category::Account
+                || (cat == Category::Gifts && *ig)
+                || (cat == Category::Social && *is_)
+        }
         None => false,
     };
     // 品項變更每次都要有自己的站內通知：還沒進站內的列不能被併掉
     let keep_each = kind == "claim.item_changed" && inbox_on && !has_inbox;
-    if hold.is_none() && !in_app_only && !keep_each
-        && matches!(kind.as_str(), "claim.confirmation" | "claim.purchase_reminder" | "claim.expired" | "item.reopened" | "claim.item_changed")
+    if hold.is_none()
+        && !in_app_only
+        && !keep_each
+        && matches!(
+            kind.as_str(),
+            "claim.confirmation"
+                | "claim.purchase_reminder"
+                | "claim.expired"
+                | "item.reopened"
+                | "claim.item_changed"
+        )
     {
         let merged: Vec<(Uuid, Option<String>)> = sqlx::query_as(
             "WITH m AS (
@@ -628,8 +764,17 @@ async fn handle(
         // 品項變更併的是同一品項，不需要「共 N 件」
         if !merged.is_empty() && kind != "claim.item_changed" {
             // 寫回 DB：被併入的列已標 sent，主列重試時要靠這份清單；重試時可能再併入新列，所以累加
-            let mut items: Vec<Value> = payload.get("more_items").and_then(Value::as_array).cloned().unwrap_or_default();
-            items.extend(merged.iter().filter_map(|(_, t)| t.clone()).map(Value::String));
+            let mut items: Vec<Value> = payload
+                .get("more_items")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            items.extend(
+                merged
+                    .iter()
+                    .filter_map(|(_, t)| t.clone())
+                    .map(Value::String),
+            );
             sqlx::query("UPDATE notifications SET payload = jsonb_set(payload, '{more_items}', $2) WHERE id = $1")
                 .bind(id).bind(Value::Array(items.clone())).execute(pool).await?;
             payload["more_items"] = items.into();
@@ -654,10 +799,11 @@ async fn handle(
         .and_then(Value::as_str)
         .and_then(|s| s.parse::<Uuid>().ok())
     {
-        let t: Option<String> = sqlx::query_scalar("SELECT title FROM wishlist_items WHERE id = $1")
-            .bind(it)
-            .fetch_optional(pool)
-            .await?;
+        let t: Option<String> =
+            sqlx::query_scalar("SELECT title FROM wishlist_items WHERE id = $1")
+                .bind(it)
+                .fetch_optional(pool)
+                .await?;
         if let Some(t) = t {
             payload["item_title"] = t.into();
         }
@@ -675,7 +821,12 @@ async fn handle(
     }
     let lang = match &user {
         Some((locale, ..)) => Lang::parse(locale),
-        None => Lang::parse(payload.get("locale").and_then(Value::as_str).unwrap_or_default()),
+        None => Lang::parse(
+            payload
+                .get("locale")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+        ),
     };
     let (subject, body) = render_lang(lang, &kind, &title, &payload);
     // 7. 站內信（不受安靜時段影響）：領取時已有就凍結不動；Account 類不看偏好
@@ -694,8 +845,13 @@ async fn handle(
     }
     // email 與推播延後（安靜時段到 09:00、連續操作的合併窗口），不算一次嘗試
     if let Some(at) = hold {
-        sqlx::query("UPDATE notifications SET scheduled_at = $2, attempts = attempts - 1 WHERE id = $1")
-            .bind(id).bind(at).execute(pool).await?;
+        sqlx::query(
+            "UPDATE notifications SET scheduled_at = $2, attempts = attempts - 1 WHERE id = $1",
+        )
+        .bind(id)
+        .bind(at)
+        .execute(pool)
+        .await?;
         return Ok(None);
     }
     // 推播：時機與合併都跟 email 一樣，但不受 email 開關影響；關了站內就不推。attempts 為 1 才推，email 重試不重複推
@@ -711,8 +867,12 @@ async fn handle(
     // 8. 寄送
     let security = matches!(
         kind.as_str(),
-        "auth.identity_linked" | "auth.identity_unlinked" | "auth.password_changed" | "auth.mfa_reset"
-            | "auth.mfa_enabled" | "auth.recovery_regenerated"
+        "auth.identity_linked"
+            | "auth.identity_unlinked"
+            | "auth.password_changed"
+            | "auth.mfa_reset"
+            | "auth.mfa_enabled"
+            | "auth.recovery_regenerated"
     );
     let to: Option<String> = if channel != "email" {
         None
@@ -721,7 +881,10 @@ async fn handle(
             .bind(u).bind(security).bind(payload.get("to").and_then(Value::as_str)).fetch_optional(pool).await?.flatten()
     } else if let Some(g) = gid {
         sqlx::query_scalar("SELECT email FROM guests WHERE id = $1 AND deleted_at IS NULL")
-            .bind(g).fetch_optional(pool).await?.flatten()
+            .bind(g)
+            .fetch_optional(pool)
+            .await?
+            .flatten()
     } else {
         payload.get("to").and_then(Value::as_str).map(String::from)
     };
@@ -731,11 +894,25 @@ async fn handle(
     if to.parse::<lettre::Address>().is_err() {
         done!("failed", "bad address");
     }
-    Ok(Some(Outbound { id, kind, to, subject, body, attempts }))
+    Ok(Some(Outbound {
+        id,
+        kind,
+        to,
+        subject,
+        body,
+        attempts,
+    }))
 }
 
 async fn deliver(pool: &PgPool, o: Outbound) -> Result<(), sqlx::Error> {
-    let Outbound { id, kind, to, subject, body, attempts } = o;
+    let Outbound {
+        id,
+        kind,
+        to,
+        subject,
+        body,
+        attempts,
+    } = o;
     match send_mail(&crate::config::get(), &to, &subject, &body).await {
         Ok(()) => {
             sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = NULL WHERE id = $1").bind(id).execute(pool).await?;
@@ -755,8 +932,18 @@ async fn deliver(pool: &PgPool, o: Outbound) -> Result<(), sqlx::Error> {
 /// 台北時間字串（含「（台北時間）」）；沒有時間就寫「期限」
 fn at_str(l: Lang, at: Option<String>) -> String {
     match at {
-        Some(a) => l.pick(format!("{a}（台北時間）"), format!("{a} (Taipei time)"), format!("{a} (giờ Đài Bắc)"), format!("{a} (waktu Taipei)")),
-        None => l.pick("期限".into(), "the deadline".into(), "hạn chót".into(), "batas waktu".into()),
+        Some(a) => l.pick(
+            format!("{a}（台北時間）"),
+            format!("{a} (Taipei time)"),
+            format!("{a} (giờ Đài Bắc)"),
+            format!("{a} (waktu Taipei)"),
+        ),
+        None => l.pick(
+            "期限".into(),
+            "the deadline".into(),
+            "hạn chót".into(),
+            "batas waktu".into(),
+        ),
     }
 }
 
@@ -1519,13 +1706,34 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         _ => (l.pick("【Wishly】通知".into(), "[Wishly] Notification".into(), "[Wishly] Thông báo".into(), "[Wishly] Pemberitahuan".into()), format!("{base}\n")),
     };
     // 合併通知（worker 步驟 5）：主旨加件數，內文列出其餘品項
-    let (subject, body) = match payload.get("more_items").and_then(Value::as_array).filter(|m| !m.is_empty()) {
+    let (subject, body) = match payload
+        .get("more_items")
+        .and_then(Value::as_array)
+        .filter(|m| !m.is_empty())
+    {
         Some(more) => {
             let n = more.len() + 1;
-            let suffix = l.pick(format!("（共 {n} 件）"), format!(" ({n} items)"), format!(" ({n} món)"), format!(" ({n} barang)"));
-            let head = l.pick("其他品項：".into(), "Other items:".into(), "Các món khác:".into(), "Barang lainnya:".into());
-            let list: String = more.iter().filter_map(Value::as_str).map(|t| format!("- {t}\n")).collect();
-            (format!("{subject}{suffix}"), format!("{body}\n{head}\n{list}"))
+            let suffix = l.pick(
+                format!("（共 {n} 件）"),
+                format!(" ({n} items)"),
+                format!(" ({n} món)"),
+                format!(" ({n} barang)"),
+            );
+            let head = l.pick(
+                "其他品項：".into(),
+                "Other items:".into(),
+                "Các món khác:".into(),
+                "Barang lainnya:".into(),
+            );
+            let list: String = more
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|t| format!("- {t}\n"))
+                .collect();
+            (
+                format!("{subject}{suffix}"),
+                format!("{body}\n{head}\n{list}"),
+            )
         }
         None => (subject, body),
     };
@@ -1554,9 +1762,18 @@ mod tests {
         // 台北 21:00 = UTC 13:00；09:00 = UTC 01:00
         let q = |h, m| quiet_until(Utc.with_ymd_and_hms(2026, 10, 31, h, m, 0).unwrap());
         assert_eq!(q(12, 59), None); // 台北 20:59
-        assert_eq!(q(13, 0), Some(Utc.with_ymd_and_hms(2026, 11, 1, 1, 0, 0).unwrap()));
-        assert_eq!(q(20, 0), Some(Utc.with_ymd_and_hms(2026, 11, 1, 1, 0, 0).unwrap())); // 台北 04:00 前一天夜裡也順延到隔天早上
-        assert_eq!(q(0, 30), Some(Utc.with_ymd_and_hms(2026, 10, 31, 1, 0, 0).unwrap())); // 台北 08:30
+        assert_eq!(
+            q(13, 0),
+            Some(Utc.with_ymd_and_hms(2026, 11, 1, 1, 0, 0).unwrap())
+        );
+        assert_eq!(
+            q(20, 0),
+            Some(Utc.with_ymd_and_hms(2026, 11, 1, 1, 0, 0).unwrap())
+        ); // 台北 04:00 前一天夜裡也順延到隔天早上
+        assert_eq!(
+            q(0, 30),
+            Some(Utc.with_ymd_and_hms(2026, 10, 31, 1, 0, 0).unwrap())
+        ); // 台北 08:30
         assert_eq!(q(1, 0), None); // 台北 09:00
     }
 
@@ -1597,16 +1814,46 @@ mod tests {
     #[test]
     fn categories() {
         use Category::*;
-        for k in ["auth.mfa_reset", "org.review", "staff.digest", "account.suspended", "wallet.frozen", "topup.credited",
-                  "cash_refund.updated", "wishlist.moderated", "order.failed", "order.partial_refund", "funding.expired",
-                  "funding.released", "item.removed", "claim.purchase_reminder", "claim.cancelled_by_owner",
-                  "claim.list_closed", "claim.item_removed", "wishlist.closing", "site.paused"] {
+        for k in [
+            "auth.mfa_reset",
+            "org.review",
+            "staff.digest",
+            "account.suspended",
+            "wallet.frozen",
+            "topup.credited",
+            "cash_refund.updated",
+            "wishlist.moderated",
+            "order.failed",
+            "order.partial_refund",
+            "funding.expired",
+            "funding.released",
+            "item.removed",
+            "claim.purchase_reminder",
+            "claim.cancelled_by_owner",
+            "claim.list_closed",
+            "claim.item_removed",
+            "wishlist.closing",
+            "site.paused",
+        ] {
             assert_eq!(category(k), Account, "{k}");
         }
-        for k in ["friend.request", "friend.accepted", "birthday.friend", "birthday.nudge"] {
+        for k in [
+            "friend.request",
+            "friend.accepted",
+            "birthday.friend",
+            "birthday.nudge",
+        ] {
             assert_eq!(category(k), Social, "{k}");
         }
-        for k in ["claim.confirmation", "claim.item_changed", "claim.expired", "owner.funded", "event.summary", "crowdfund.funded", "item.reopened"] {
+        for k in [
+            "claim.confirmation",
+            "claim.item_changed",
+            "claim.expired",
+            "owner.funded",
+            "event.summary",
+            "crowdfund.funded",
+            "item.reopened",
+        ] {
             assert_eq!(category(k), Gifts, "{k}");
         }
         for k in KINDS {
@@ -1617,18 +1864,46 @@ mod tests {
     #[test]
     fn email_tiers() {
         use EmailTier::*;
-        for k in ["auth.mfa_reset", "topup.credited", "site.paused", "wishlist.closing", "funding.released", "org.invite", "staff.digest"] {
+        for k in [
+            "auth.mfa_reset",
+            "topup.credited",
+            "site.paused",
+            "wishlist.closing",
+            "funding.released",
+            "org.invite",
+            "staff.digest",
+        ] {
             assert_eq!(email_tier(k), Immediate, "{k}");
         }
-        for k in ["claim.purchase_reminder", "claim.list_closed", "claim.cancelled_by_owner", "claim.item_removed"] {
+        for k in [
+            "claim.purchase_reminder",
+            "claim.list_closed",
+            "claim.cancelled_by_owner",
+            "claim.item_removed",
+        ] {
             assert_eq!(email_tier(k), Daytime, "{k}");
             assert_eq!(category(k), Category::Account, "{k}：不可關閉");
         }
-        for k in ["claim.expired", "claim.item_changed", "crowdfund.funded", "order.shipped", "owner.funded", "event.summary", "friend.request", "birthday.friend"] {
+        for k in [
+            "claim.expired",
+            "claim.item_changed",
+            "crowdfund.funded",
+            "order.shipped",
+            "owner.funded",
+            "event.summary",
+            "friend.request",
+            "birthday.friend",
+        ] {
             assert_eq!(email_tier(k), Optional, "{k}");
             assert_ne!(category(k), Category::Account, "{k}：要能關閉");
         }
-        for k in ["claim.confirmation", "friend.accepted", "item.reopened", "claim.cancelled_by_donor", "topup.expired"] {
+        for k in [
+            "claim.confirmation",
+            "friend.accepted",
+            "item.reopened",
+            "claim.cancelled_by_donor",
+            "topup.expired",
+        ] {
             assert_eq!(email_tier(k), InAppOnly, "{k}");
         }
     }
