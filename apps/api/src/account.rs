@@ -426,7 +426,7 @@ async fn delete_me(
     sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.delete', 'users', $1)")
         .bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
-    crate::uploads::delete_objects(st.pool.clone(), media); // COMMIT 後才刪：交易失敗不會留下指向已刪物件的資料
+    crate::uploads::drain_soon(st.pool.clone()); // 要求已隨交易提交；COMMIT 後才刪：交易失敗不會留下指向已刪物件的資料
     crate::cdn::purge_wishlists(slugs); // 已封存為 private：邊緣快取的公開副本立即清掉
     let mut res = Json(json!({ "deleted": true, "anonymized_at": at })).into_response();
     res.headers_mut().insert(

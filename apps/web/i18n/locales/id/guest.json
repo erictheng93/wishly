@@ -137,7 +137,10 @@
       "askTitle": "Berhenti menerima email notifikasi jenis ini?",
       "askBody": "Setelah berhenti, email jenis ini tidak dikirim lagi, tetapi tetap ada di pusat notifikasi.",
       "processing": "Memproses…",
-      "confirm": "Ya, berhenti berlangganan"
+      "confirm": "Ya, berhenti berlangganan",
+      "askTitleBirthday": "Berhenti menerima pengingat ulang tahun?",
+      "askBodyBirthday": "Kamu tidak akan menerima email saat ulang tahun teman sudah dekat.",
+      "doneBodyBirthday": "Kamu tidak akan lagi menerima pengingat ulang tahun teman. Untuk mengaktifkannya lagi, masuk lalu buka Pengaturan."
     },
     "slug": {
       "demoBirthday": "Ulang tahun",

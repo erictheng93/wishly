@@ -28,7 +28,7 @@ async function saveReceipt() {
     <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
     <p v-if="loading" class="c-mute" role="status">{{ $t('org.apply.loading') }}</p>
     <template v-else-if="data">
-      <p class="c-mute rc-site"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" />　{{ data.site.site_address }}</p>
+      <p class="c-mute rc-site"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" :label="$t(`org.relief.siteStatus.${data.site.site_status}`)" />　{{ data.site.site_address }}</p>
       <p v-if="!data.items.length" class="c-mute">{{ $t('org.relief.receiptsNone') }}</p>
       <ul class="c-list rc-list">
         <li v-for="i in data.items" :key="i.item_id" class="c-card">

@@ -260,6 +260,15 @@ async fn review_permit(
             .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
         slugs
     } else {
+        // 送審中的許可被退件：同樣通知 owner（帶備註），不必回狀態頁才知道
+        if new_status == "rejected" {
+            sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
+                         SELECT m.user_id, 'email'::notification_channel, 'org.permit_rejected',
+                                jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
+                           FROM org_members m JOIN users u ON u.id = m.user_id
+                          WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
+                .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
+        }
         vec![]
     };
     if status == "pending" {

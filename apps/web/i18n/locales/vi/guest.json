@@ -137,7 +137,10 @@
       "askTitle": "Ngừng nhận email thông báo loại này?",
       "askBody": "Sau khi hủy, bạn sẽ không nhận email loại này nữa nhưng vẫn xem được trong trung tâm thông báo.",
       "processing": "Đang xử lý…",
-      "confirm": "Xác nhận hủy"
+      "confirm": "Xác nhận hủy",
+      "askTitleBirthday": "Hủy nhận nhắc sinh nhật?",
+      "askBodyBirthday": "Bạn sẽ không nhận email khi sắp đến sinh nhật của bạn bè.",
+      "doneBodyBirthday": "Bạn sẽ không nhận nhắc sinh nhật bạn bè nữa. Để bật lại, hãy đăng nhập và vào Cài đặt."
     },
     "slug": {
       "demoBirthday": "Sinh nhật",

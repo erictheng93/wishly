@@ -137,7 +137,10 @@
       "askTitle": "Stop this kind of notification email?",
       "askBody": "After unsubscribing you will not get these emails, but they stay in your notification center.",
       "processing": "Working…",
-      "confirm": "Unsubscribe"
+      "confirm": "Unsubscribe",
+      "askTitleBirthday": "Unsubscribe from birthday reminders?",
+      "askBodyBirthday": "You won't get emails when a friend's birthday is coming up.",
+      "doneBodyBirthday": "You won't get friend birthday reminders anymore. To turn them back on, sign in and go to Settings."
     },
     "slug": {
       "demoBirthday": "Birthday",

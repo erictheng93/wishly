@@ -29,7 +29,9 @@ const text = computed(() => act.value ? t(`admin.events.${act.value.kind === 'me
 function open(row: any, kind: Act['kind']) { act.value = { row, kind }; into.value = ''; reason.value = ''; aerr.value = '' }
 async function submit() {
   const { row, kind } = act.value!
-  busy.value = true; aerr.value = ''
+  aerr.value = ''
+  if (kind === 'hide' && !reason.value.trim()) { aerr.value = t('admin.events.reasonRequired'); return } // 後端下架原因必填
+  busy.value = true
   try {
     if (kind === 'merge') {
       const v = into.value.trim()
@@ -71,7 +73,7 @@ async function submit() {
 
     <CreatorConfirm :open="!!act" :title="title" :text="text" :ok="title" :danger="act?.kind === 'hide'" :busy="busy" :error="aerr" @close="act = null" @ok="submit">
       <label v-if="act?.kind === 'merge'" class="c-field"><span>{{ $t('admin.events.mergeIntoLabel') }}</span><input v-model="into" name="into"></label>
-      <label v-else class="c-field"><span>{{ $t('admin.events.reasonLabel') }}</span><input v-model="reason" maxlength="200" name="reason"></label>
+      <label v-else class="c-field"><span>{{ $t('admin.events.reasonLabel') }}</span><input v-model="reason" maxlength="200" name="reason" :required="act?.kind === 'hide'"></label>
     </CreatorConfirm>
   </main>
 </template>

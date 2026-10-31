@@ -170,7 +170,10 @@ function onFunded(r: any) {
   useOnboarding().refresh() // 點數認捐也算完成「捐助」
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
-function onStale(rem: number) { items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i) }
+function onStale(rem: number) {
+  items.value = items.value.map(i => i.id === sheetItem.value?.id ? { ...i, qty_remaining: rem, is_fully_claimed: rem <= 0 } : i)
+  if (rem <= 0 && !sheetMine.value) toast.value = t('guest.claim.soldOut') // sheet 1.2 秒後自動關閉，結果留在頁面上
+}
 // Q9：非好友看到好友限定清單時，直接用擁有者 ID 送好友邀請（擁有者不一定有 handle / 個人頁）
 const { api: authApi } = useApi()
 const friendReq = ref<'idle' | 'busy' | 'sent'>('idle'), friendErr = ref('')
@@ -213,7 +216,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <div class="sx-main">
           <h1>{{ data.title }}</h1>
           <p class="g-mute sx-meta">
-            <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
+            <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
           </p>
           <p v-if="data.org" class="g-mute">
             <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
