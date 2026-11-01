@@ -67,7 +67,7 @@ const text = computed(() => {
 async function submit() {
   const a = act.value!
   if (a.decision === 'reject' && !note.value.trim()) { aerr.value = t('admin.orgs.noteRequired'); return }
-  if (a.revoke && a.kind === 'org' && a.step === 1) { a.step = 2; return } // 撤銷組織：二次確認
+  if (a.revoke && a.kind === 'org' && a.step === 1) { a.step = 2; aerr.value = ''; return } // 撤銷組織：二次確認
   if (a.decision === 'needs_changes' && !flagged.value.length) { aerr.value = t('admin.orgs.flagRequired'); return }
   busy.value = true; aerr.value = ''
   try {
