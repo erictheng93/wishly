@@ -95,7 +95,7 @@ async fn explore(
     let rows: Vec<ExploreRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
                 o.display_name, o.handle,
-                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL AND i.funding_mode <> 'support'),
+                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({claimed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({needed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          FROM wishlists w JOIN users o ON o.id = w.owner_id

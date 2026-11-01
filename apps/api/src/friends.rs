@@ -391,7 +391,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
          JOIN fr ON fr.id = w.owner_id
          JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
          CROSS JOIN LATERAL (
-           SELECT count(*) FILTER (WHERE i.created_at > now() - interval '30 days') AS n_new, max(i.created_at) AS at, count(*) FILTER (WHERE i.funding_mode <> 'support') AS n,
+           SELECT count(*) FILTER (WHERE i.created_at > now() - interval '30 days') AS n_new, max(i.created_at) AS at, count(*) AS n,
                   COALESCE(sum({claimed}), 0)::bigint AS got,
                   COALESCE(sum({needed}), 0)::bigint AS need
            FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL) s

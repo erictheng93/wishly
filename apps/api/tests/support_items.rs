@@ -9,7 +9,7 @@ use uuid::Uuid;
 async fn support_item(pool: &PgPool, wl: Uuid, target: Uuid, relief: bool) {
     sqlx::query(
         "INSERT INTO wishlist_items(wishlist_id,title,qty_needed,funding_mode,support_wishlist_id,category,urgency)
-         VALUES($1,'支持',1,'support',$2,$3,$4)",
+         VALUES($1,'支持',2,'support',$2,$3,$4)",
     )
     .bind(wl)
     .bind(target)
@@ -73,4 +73,18 @@ async fn relief_needs_ignore_support_item(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["sites"][0]["needs"]["critical"], 0, "{v}");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn explore_keeps_list_with_only_support_items(pool: PgPool) {
+    let owner = user(&pool, "owner").await;
+    let other = user(&pool, "other").await;
+    let target = wishlist(&pool, other.id, ListOpts::default()).await;
+    let list = wishlist(&pool, owner.id, ListOpts::default()).await;
+    support_item(&pool, list.id, target.id, false).await;
+    let (s, _, v) = call(&pool, "GET", "/public/wishlists", &[], None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let l = v["wishlists"].as_array().unwrap().iter().find(|w| w["slug"] == list.slug.as_str()).expect("留在探索頁");
+    assert_eq!(l["item_count"], 1);
+    assert_eq!(l["completion_pct"], 0);
 }
