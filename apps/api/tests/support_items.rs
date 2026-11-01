@@ -262,7 +262,8 @@ async fn claim_and_pledge_rejected_on_support_item(pool: PgPool) {
             Some(body),
         )
         .await;
-        assert!(!s.is_success(), "{path} {v}");
+        assert_eq!(s, StatusCode::CONFLICT, "{path} {v}");
+        assert_eq!(v["code"], "FUNDING_MODE_MISMATCH", "{path} {v}");
     }
     let (c, p): (i32, i64) =
         sqlx::query_as("SELECT qty_claimed, pledged_points FROM wishlist_items WHERE id=$1::uuid")
@@ -701,7 +702,6 @@ async fn published_list_notifies_target_owner(pool: PgPool) {
     assert_eq!(n.len(), 1);
     assert_eq!(n[0]["wishlist_id"], target.id.to_string());
     assert_eq!(n[0]["supporter_name"], "阿花");
-    assert_eq!(n[0]["list_title"], "清單");
     assert_eq!(
         wishly_api::notify::inbox_link("wishlist.supported", &n[0]),
         format!("/lists/{}/edit", target.id)
@@ -792,6 +792,11 @@ async fn supported_is_in_app_only(pool: PgPool) {
     let b = user(&pool, "b").await;
     let target = wishlist(&pool, b.id, ListOpts::default()).await;
     let list = wishlist(&pool, a.id, ListOpts::default()).await;
+    sqlx::query("UPDATE wishlists SET title='我的清單' WHERE id=$1")
+        .bind(list.id)
+        .execute(&pool)
+        .await
+        .unwrap();
     create(&pool, &a.token, list.id, &target.slug).await;
     wishly_api::notify::tick_at(&pool, noon()).await.unwrap();
     let (st, err, title, link): (String, Option<String>, Option<String>, Option<String>) =
@@ -807,4 +812,92 @@ async fn supported_is_in_app_only(pool: PgPool) {
     );
     assert_eq!(title.unwrap(), "阿花 把你的清單「清單」放進了他們的願望");
     assert_eq!(link.unwrap(), format!("/lists/{}/edit", target.id));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn recreate_within_24h_notifies_once(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let b = user(&pool, "b").await;
+    let target = wishlist(&pool, b.id, ListOpts::default()).await;
+    let list = wishlist(&pool, a.id, ListOpts::default()).await;
+    let (_, v) = create(&pool, &a.token, list.id, &target.slug).await;
+    let id = v["id"].as_str().unwrap();
+    let (s, _, _) = call(
+        &pool,
+        "DELETE",
+        &format!("/items/{id}"),
+        &ck(&a.token),
+        None,
+    )
+    .await;
+    assert!(s.is_success());
+    let (s, v) = create(&pool, &a.token, list.id, &target.slug).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(supported(&pool, b.id).await.len(), 1);
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM wishlist_items WHERE wishlist_id=$1 AND support_notified_at IS NOT NULL",
+    )
+    .bind(list.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 2);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn support_item_ignores_catalog_ref(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let b = user(&pool, "b").await;
+    let target = wishlist(&pool, b.id, ListOpts::default()).await;
+    let list = wishlist(&pool, a.id, ListOpts::default()).await;
+    let (s, _, v) = call(
+        &pool,
+        "POST",
+        &format!("/wishlists/{}/items", list.id),
+        &ck(&a.token),
+        Some(json!({ "title": "支持", "funding_mode": "support", "support_slug": target.slug, "catalog_ref": "abc" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let r: Option<String> =
+        sqlx::query_scalar("SELECT catalog_ref FROM wishlist_items WHERE id=$1::uuid")
+            .bind(v["id"].as_str().unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(r, None);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn closed_to_active_republish_notifies(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let b = user(&pool, "b").await;
+    let target = wishlist(&pool, b.id, ListOpts::default()).await;
+    let list = wishlist(
+        &pool,
+        a.id,
+        ListOpts {
+            status: Some("draft"),
+            ..Default::default()
+        },
+    )
+    .await;
+    // 品項建立時清單非 active 不通知；模擬舊資料「已有品項但未標記」，再由非 draft 狀態轉 active 補發
+    let (s, v) = create(&pool, &a.token, list.id, &target.slug).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    sqlx::query("UPDATE wishlists SET status='closed' WHERE id=$1")
+        .bind(list.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        &format!("/wishlists/{}", list.id),
+        &ck(&a.token),
+        Some(json!({ "status": "active" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(supported(&pool, b.id).await.len(), 1);
 }

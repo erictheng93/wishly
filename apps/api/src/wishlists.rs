@@ -617,7 +617,7 @@ impl I {
             "image_url": self.image_key.as_ref().filter(|_| self.image_status == "ready").map(|k| uploads::S3::get().public_url(k)),
             "image_status": self.image_status, "product_url": self.product_url, "unit_price_amount": self.unit_price_amount,
             "funding_mode": self.funding_mode, "priority": self.priority, "category": self.category, "urgency": self.urgency,
-            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": self.qty_received, "support_wishlist_id": self.support_wishlist_id,
+            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": self.qty_received,
             // 眾籌欄位：驚喜鎖定時 pledged_points / funding_status / display_status / order_status 一律 null（否則可由「已達標」推知有人捐）
             "target_points": self.target_points, "pledged_points": if cf && !locked { Some(self.pledged_points) } else { None },
             "funding_status": self.funding_status.as_ref().filter(|_| !locked),
@@ -861,7 +861,7 @@ async fn update(
     if res.rows_affected() == 0 {
         return Err(stale());
     }
-    if old_status == "draft" && w.status == "active" {
+    if old_status != "active" && w.status == "active" {
         crate::support::notify_targets(&mut tx, id).await?;
     }
     if bday {
@@ -1671,7 +1671,7 @@ async fn item_create(
                  $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20,$21) RETURNING id")
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency).bind(i.support_wishlist_id)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(if mode == "support" { None } else { catalog_ref.as_deref() }).bind(&i.category).bind(&i.urgency).bind(i.support_wishlist_id)
         .fetch_one(&mut *tx).await?;
     if mode == "support" && w.status == "active" {
         crate::support::notify_targets(&mut tx, wid).await?;

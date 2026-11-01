@@ -13,17 +13,17 @@ const fundLocked = computed(() => !!props.item && props.item.funding_mode === 'c
 const crowd = computed(() => f.funding_mode === 'crowdfund')
 const support = computed(() => f.funding_mode === 'support')
 // 支持品項的目標：新增時由貼上的連結帶出標題；失敗就停用儲存
-const supLink = ref(''), supSlug = ref<string | null>(null), supChecked = ref(false)
+const supLink = ref(''), supSlug = ref<string | null>(null), supTitle = ref('')
 async function checkTarget() {
-  supSlug.value = null; supChecked.value = false
+  supSlug.value = null; supTitle.value = ''
   const slug = parseListSlug(supLink.value)
   if (!slug) { err.value = supLink.value.trim() ? tr('creator.itemSheet.supportBad') : ''; return }
   try {
     const r = await api(`/public/wishlists/${slug}`)
     if (!isCurrentSlug(supLink.value, slug)) return // 輸入已改，丟棄過期回應
-    supSlug.value = slug; err.value = ''
+    supSlug.value = slug; supTitle.value = r?.title ?? ''; err.value = ''
     if (!f.title.trim() && r?.title) f.title = r.title
-  } catch { if (isCurrentSlug(supLink.value, slug)) err.value = tr('creator.itemSheet.supportBad') } finally { if (isCurrentSlug(supLink.value, slug)) supChecked.value = true }
+  } catch { if (isCurrentSlug(supLink.value, slug)) err.value = tr('creator.itemSheet.supportBad') }
 }
 watch(() => props.open, (v) => {
   if (!v) return
@@ -31,7 +31,7 @@ watch(() => props.open, (v) => {
   const p = i ? {} : props.prefill ?? {} // 預填只用於新增
   Object.assign(f, { title: i?.title ?? p.title ?? '', brand: i?.brand ?? p.brand ?? '', spec: i?.spec ?? p.spec ?? '', product_url: i?.product_url ?? p.product_url ?? '', qty_needed: i?.qty_needed ?? 1, unit_price_amount: i?.unit_price_amount ?? p.unit_price_amount ?? '', priority: i?.priority ?? 'medium', category: i?.category ?? '', urgency: i?.urgency ?? '',
     funding_mode: ['crowdfund', 'support'].includes(i?.funding_mode) ? i.funding_mode : 'quantity', target_points: i?.target_points ?? '', funding_deadline: toTaipeiInput(i?.funding_deadline), price_snapshot_amount: i?.price_snapshot_amount ?? i?.unit_price_amount ?? '' })
-  supLink.value = ''; supSlug.value = null; supChecked.value = false
+  supLink.value = ''; supSlug.value = null; supTitle.value = ''
   imageKey.value = null; err.value = ''; stale.value = false; needAddr.value = false; version.value = i?.updated_at ?? null
 })
 async function save() {
@@ -57,7 +57,7 @@ async function save() {
     body.unit_price_amount = f.unit_price_amount === '' ? null : Number(f.unit_price_amount)
   }
   if (!support.value && (!props.item || f.funding_mode !== (props.item.funding_mode ?? 'quantity'))) body.funding_mode = f.funding_mode
-  if (imageKey.value) body.image_key = imageKey.value
+  if (imageKey.value && !support.value) body.image_key = imageKey.value
   if (!props.item && props.prefill?.catalog_ref) body.catalog_ref = props.prefill.catalog_ref // 僅新增
   busy.value = true
   try {
@@ -78,7 +78,7 @@ async function save() {
 <template>
   <CreatorSheet :open="open" :title="item ? $t('creator.itemSheet.titleEdit') : $t('creator.itemSheet.titleNew')" @close="emit('close')">
     <form @submit.prevent="save">
-      <CreatorImageUploader v-model="imageKey" purpose="item" :current-url="item?.image_url" @busy="upBusy = $event" />
+      <CreatorImageUploader v-if="!support" v-model="imageKey" purpose="item" :current-url="item?.image_url" @busy="upBusy = $event" />
       <label class="c-field"><span>{{ $t('creator.itemSheet.name') }}</span><input v-model="f.title" maxlength="120" :placeholder="$t('creator.itemSheet.namePh')" required></label>
       <template v-if="!support">
       <label class="c-field"><span>{{ $t('creator.itemSheet.brand') }}</span><input v-model="f.brand" maxlength="100"></label>
@@ -97,7 +97,8 @@ async function save() {
       </div>
       <template v-if="support">
         <p v-if="item" class="c-mute">{{ $t('creator.itemSheet.supportTarget', { name: item.support?.target?.title ?? $t('creator.itemSheet.supportEnded') }) }}</p>
-        <label v-else class="c-field"><span>{{ $t('creator.itemSheet.supportLink') }}</span><input v-model="supLink" maxlength="300" placeholder="https://wishly.tw/s/…" @input="supSlug = null; supChecked = false" @blur="checkTarget"></label>
+        <label v-else class="c-field"><span>{{ $t('creator.itemSheet.supportLink') }}</span><input v-model="supLink" maxlength="300" placeholder="https://wishly.tw/s/…" @input="supSlug = null; supTitle = ''" @keydown.enter.prevent="checkTarget" @blur="checkTarget"></label>
+        <p v-if="!item && supTitle" class="c-mute">{{ $t('creator.itemSheet.supportTarget', { name: supTitle }) }}</p>
         <p class="c-mute">{{ $t('creator.itemSheet.supportNote') }}</p>
       </template>
       <template v-else-if="crowd">

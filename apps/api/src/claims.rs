@@ -174,7 +174,12 @@ async fn create(
 
     // 歸因：開交易前驗證、不加鎖；不成立就當沒帶
     let via = match &wl {
-        Some((wid, ..)) => crate::support::valid_via(&st.pool, req.via_item_id, *wid).await?,
+        Some((wid, ..)) => crate::support::valid_via(&st.pool, req.via_item_id, *wid)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = ?e, "valid_via 失敗，當作沒帶歸因");
+                None
+            }),
         None => None,
     };
     let route = "POST /items/{id}/claims";

@@ -69,7 +69,7 @@ onMounted(async () => {
           <div class="c-mute dsh-kind">{{ $t('lists.common.personal') }}</div>
         </div>
       </div>
-      <div class="dsh-gauge">
+      <div v-if="w.completion?.item_count" class="dsh-gauge">
         <b class="dsh-pct" aria-hidden="true">{{ pctOf(w) }}<small>%</small></b>
         <div class="dsh-gc">
           <div class="c-bar dsh-prog" aria-hidden="true"><i :style="{ width: pctOf(w) + '%' }" /></div>

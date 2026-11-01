@@ -50,7 +50,7 @@ if (error.value && import.meta.server) setResponseStatus(useRequestEvent()!, gon
 
 if (data.value) {
   // 規格：docs 03 §5.6 meta 內容規則
-  const left = () => (data.value?.items ?? []).filter((i: any) => !i.is_fully_claimed).length
+  const left = () => (data.value?.items ?? []).filter((i: any) => i.funding_mode !== 'support' && !i.is_fully_claimed).length
   const origin = useRequestURL().origin
   useSeoMeta({
     title: () => data.value?.title,
@@ -229,7 +229,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
           <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
           <p v-if="data.description" class="sx-desc">{{ data.description }}</p>
         </div>
-        <aside class="sx-gauge">
+        <aside v-if="data.completion.item_count" class="sx-gauge">
           <div class="sx-big" aria-hidden="true"><b>{{ pct }}</b><span>%</span></div>
           <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
           <div class="g-mute sx-cap">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
@@ -247,7 +247,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
         <template v-for="(it, n) in sorted" :key="it.id">
-          <GuestSupportCard v-if="it.funding_mode === 'support'" :index="n + 1" :item="it" :closed="closed" />
+          <GuestSupportCard v-if="it.funding_mode === 'support'" :index="n + 1" :item="it" :closed="closed || siteOff" />
           <GuestItemCard v-else :index="n + 1" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked"
             :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
         </template>

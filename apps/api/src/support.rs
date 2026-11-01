@@ -54,7 +54,8 @@ pub async fn notify_targets(tx: &mut Tx<'_>, wishlist_id: Uuid) -> Result<(), Ap
         RETURNING support_wishlist_id)
          INSERT INTO notifications (user_id, channel, kind, payload)
          SELECT r.uid, 'email', 'wishlist.supported',
-                jsonb_build_object('wishlist_id', tw.id, 'supporter_name', COALESCE(so.display_name, su.display_name), 'list_title', tw.title)
+                jsonb_build_object('wishlist_id', tw.id, 'supporter_name', COALESCE(so.display_name, su.display_name),
+                                    'supporter_id', COALESCE(sw.org_id, sw.owner_id))
            FROM t
            JOIN wishlists tw ON tw.id = t.support_wishlist_id
            JOIN wishlists sw ON sw.id = $1
@@ -65,7 +66,12 @@ pub async fn notify_targets(tx: &mut Tx<'_>, wishlist_id: Uuid) -> Result<(), Ap
                 UNION
                 SELECT m.user_id FROM org_members m
                  WHERE m.org_id = tw.org_id AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL) r
-           JOIN users ru ON ru.id = r.uid AND ru.deleted_at IS NULL AND ru.blocked_at IS NULL",
+           JOIN users ru ON ru.id = r.uid AND ru.deleted_at IS NULL AND ru.blocked_at IS NULL
+          WHERE NOT EXISTS (SELECT 1 FROM notifications n
+                             WHERE n.user_id = r.uid AND n.kind = 'wishlist.supported'
+                               AND n.payload->>'wishlist_id' = tw.id::text
+                               AND n.payload->>'supporter_id' = COALESCE(sw.org_id, sw.owner_id)::text
+                               AND n.created_at > now() - interval '24 hours')",
     )
     .bind(wishlist_id)
     .execute(&mut **tx)
