@@ -2895,8 +2895,9 @@ Authorization: Bearer &lt;session_token&gt;（原生殼；網頁用 ws_session c
   "qty": 3,
   "note": "週末前寄到",
   "visibility": "friends",
-  "is_anonymous": false
-}</code></pre><h5>Response 201</h5><pre><code>Location: /api/v1/claims/0192f3b2-4d21-7e4c-a1b2-3c4d5e6f7a01</code></pre><pre><code>{
+  "is_anonymous": false,
+  "via_item_id": "0192f3a1-0a13-7c3b-8e5f-2b3c4d5e6f03"（選填）
+}</code></pre><div class="note"><code>via_item_id</code>（選填）：從支持品項點入時的品項 id。後端驗證該品項為指向本清單的支持品項，不成立時以 NULL 寫入、捐助照常完成，不回錯誤；詳見文件資訊表「支持品項」。</div><h5>Response 201</h5><pre><code>Location: /api/v1/claims/0192f3b2-4d21-7e4c-a1b2-3c4d5e6f7a01</code></pre><pre><code>{
   "claim": {
     "id": "0192f3b2-4d21-7e4c-a1b2-3c4d5e6f7a01",
     "item_id": "0192f3a1-0a11-7c3b-8e5f-2b3c4d5e6f01",
@@ -3258,8 +3259,9 @@ MerchantTradeNo=T0192F5A00A01&amp;RtnCode=10100073&amp;PaymentType=CVS_CVS&amp;T
   "points": 3000,
   "message": "寶寶加油",
   "is_anonymous": false,
-  "visibility": "friends"
-}</code></pre><h5>Response 201</h5><pre><code>{
+  "visibility": "friends",
+  "via_item_id": "0192f3a1-0a13-7c3b-8e5f-2b3c4d5e6f03"（選填）
+}</code></pre><div class="note"><code>via_item_id</code>（選填）：從支持品項點入時的品項 id。後端驗證該品項為指向本清單的支持品項，不成立時以 NULL 寫入、捐助照常完成，不回錯誤；詳見文件資訊表「支持品項」。</div><h5>Response 201</h5><pre><code>{
   "contribution": {
     "id": "0192f3b2-4d22-7e4c-a1b2-3c4d5e6f7a02",
     "item_id": "0192f3a1-0a12-7c3b-8e5f-2b3c4d5e6f02",
