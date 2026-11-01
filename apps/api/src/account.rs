@@ -356,10 +356,7 @@ async fn delete_me(
         .bind(id).fetch_all(&mut *tx).await?;
     let media: Vec<String> = media
         .into_iter()
-        .filter(|k| {
-            (crate::uploads::valid_key(k) && !k.starts_with("catalog/"))
-                || crate::uploads::avatar_url(Some(k)).is_some()
-        })
+        .filter(|k| crate::uploads::is_user_media(k))
         .collect();
     for key in &media {
         sqlx::query(

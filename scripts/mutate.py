@@ -34,6 +34,8 @@ CASES = {
     "reallocate-wallet-for-update": (API + "contributions.rs", "reallocate", "SELECT status::text FROM point_wallets w WHERE w.id = $1 FOR UPDATE", "SELECT status::text FROM point_wallets w WHERE w.id = $1", "concurrency", "wallet_freeze_vs_reallocate_checks_status_under_lock"),
     "claim-wishlist-for-share": (API + "claims.rs", "create", "FROM wishlists w WHERE w.id = $1 FOR SHARE\"", "FROM wishlists w WHERE w.id = $1\"", "concurrency", "archive_vs_waiting_claim_cannot_accept_after_archive_commit"),
     "absorb-skip-locked": (API + "identities.rs", "lock_blank", "SELECT id FROM users WHERE id=$1 FOR UPDATE SKIP LOCKED", "SELECT id FROM users WHERE id=$1 FOR UPDATE", "identities", "absorb_does_not_wait_for_a_locked_account"),
+    "absorb-wallet-lock": (API + "identities.rs", "lock_blank", "SELECT id FROM point_wallets WHERE user_id=$1 FOR UPDATE SKIP LOCKED", "SELECT id FROM point_wallets WHERE user_id=$1", "identities", "absorb_is_busy_while_a_wallet_credit_is_in_flight"),
+    "grant-recheck-after-wallet-lock": (API + "orders.rs", "grant", "if !live {", "if false {", "concurrency", "grant_waiting_on_wallet_rechecks_account_deleted_by_absorb"),
     "idempotency-claim-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_claim_requests_overlap_and_claim_once"),
     "idempotency-pledge-on-conflict": (API + "idempotency.rs", "begin", "ON CONFLICT (scope, key) DO NOTHING RETURNING key", "RETURNING key", "concurrency", "same_key_pledge_requests_overlap_and_debit_once"),
     "delete-item-for-update": (API + "wishlists.rs", "item_delete", "SELECT id FROM wishlist_items WHERE id=$1 FOR UPDATE", "SELECT id FROM wishlist_items WHERE id=$1", "concurrency", "force_delete_vs_claim_update_uses_item_then_claim_lock_order"),
@@ -58,7 +60,7 @@ CASES = {
     "cash-refund-reject-once": (API + "wallet_ops.rs", "cash_refund_patch", "ELSE status IN ('requested', 'processing') END", "ELSE true END", "wallet_ops", "concurrent_rejections_restore_points_once"),
     "wallet-debt-state-guard": (API + "wallet_ops.rs", "debt_patch", "WHERE id = $1 AND status = 'open'", "WHERE id = $1", "wallet_ops", "charge_back_recovers_remaining_lot_records_debt_and_is_idempotent"),
     "debt-offset-settled-guard": (API + "points.rs", "offset_charged_back", "d.status IN ('open', 'written_off')", "true", "wallet_ops", "settled_debt_lets_returned_points_credit_normally"),
-    "birthday-friend-once": (API + "birthday.rs", "birthday_tick_at", "WHERE id = $1 AND birthday_notified_year IS DISTINCT FROM $2 RETURNING id", "WHERE id = $1 RETURNING id", "birthday_notify", "tick_recipients_and_idempotency"),
+    "birthday-friend-once": (API + "birthday.rs", "birthday_tick_at", "VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING wishlist_id", "VALUES ($1, $2) ON CONFLICT (wishlist_id, year) DO UPDATE SET year = EXCLUDED.year RETURNING wishlist_id", "birthday_notify", "tick_recipients_and_idempotency"),
     "birthday-nudge-once": (API + "birthday.rs", "birthday_tick_at", "WHERE id = $1 AND birthday_nudged_year IS DISTINCT FROM $2 RETURNING id", "WHERE id = $1 RETURNING id", "birthday_notify", "nudge_rules"),
     "debt-offset-return-path": (API + "points.rs", "return_to_allocations", "running = offset_charged_back(tx, wallet_id, lot, take, running).await?;", "let _ = offset_charged_back;", "wallet_ops", "withdrawn_pledge_after_charge_back_offsets_debt_instead_of_reviving_points"),
     "charge-back-idempotent": (API + "wallet_ops.rs", "charge_back", 'if status != "paid" && status != "disputed" {', "if false {", "wallet_ops", "charge_back_recovers_remaining_lot_records_debt_and_is_idempotent"),
@@ -124,6 +126,8 @@ for name, function, condition in [
 FAILURE_MARKERS = {name: "CDN purge missing for wishlist" for name in CASES if name.startswith("cdn-")}
 FAILURE_MARKERS.update({
     "absorb-skip-locked": "不可等待對方的列鎖",
+    "absorb-wallet-lock": "入帳進行中不可併入",
+    "grant-recheck-after-wallet-lock": "已刪帳號不可被入點",
     "ledger-update": "DB must reject SQLSTATE 23001 constraint unnamed",
     "ledger-delete": "DB must reject SQLSTATE 23001 constraint unnamed",
     "event-merge-lock-order": "opposite event merges caused a PostgreSQL deadlock: pg_stat_database.deadlocks",

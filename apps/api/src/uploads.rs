@@ -446,15 +446,18 @@ pub(crate) async fn media_tx(
     Ok(tx)
 }
 
+/// 使用者自己的物件（可隨帳號退役）；官方目錄圖與外部頭像網址不算。
+pub(crate) fn is_user_media(key: &str) -> bool {
+    (valid_key(key) && !key.starts_with("catalog/")) || avatar_url(Some(key)).is_some()
+}
+
 /// 記下使用者擁有的圖片 key（刪帳號時才找得到），並拒絕已退役的 key；物件鎖持有到交易結束。
 pub(crate) async fn remember_media(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user: Uuid,
     key: Option<&str>,
 ) -> Result<(), AppError> {
-    let Some(key) = key
-        .filter(|k| (valid_key(k) && !k.starts_with("catalog/")) || avatar_url(Some(k)).is_some())
-    else {
+    let Some(key) = key.filter(|k| is_user_media(k)) else {
         return Ok(());
     };
     lock_key(tx, key).await?;

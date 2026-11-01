@@ -629,7 +629,6 @@ CREATE TABLE users (
   bio           text        CHECK (char_length(bio) BETWEEN 1 AND 160),  -- 0014：自我介紹，個人頁顯示
   birthday      text        CHECK (birthday ~ '^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'),  -- 0014：'MM-DD'，不收年份
   birthday_visibility share_level NOT NULL DEFAULT 'friends',       -- 0014：個人頁誰看得到生日
-  birthday_notified_year smallint,                          -- 0043（D65）：已寄過朋友生日通知的生日年份（條件式 UPDATE 保證每年一次）
   birthday_nudged_year   smallint,                          -- 0043：已提醒壽星開清單的生日年份
   onboarding_done_at     timestamptz,                       -- 0044（D66）：新手導覽完成或跳過的時間；NULL = 導覽進行中（既有帳號上線時記為已完成）
   blocked_at    timestamptz,                              -- 封鎖（拒付 / 盜刷購買者）
@@ -819,7 +818,7 @@ CREATE TABLE wishlists (
   cover_image_status image_status    NOT NULL DEFAULT 'none',
   cover_preset       text            CHECK (cover_preset IN ('birthday','wedding','baby','housewarming','graduation','holiday','travel','gift')), -- 預設封面 id，圖在前端 /covers/{id}.svg
   event_date         date,
-  birthday_notify    boolean         NOT NULL DEFAULT false,   -- 0043（D65）：生日清單通知；每位 owner 最多一份（partial unique）；POST/PATCH 可帶；清單改 private 自動關
+  birthday_notify    boolean         NOT NULL DEFAULT false,   -- 0043（D65）：生日清單通知；同一 owner 可開多份（0054），已寄年份記在 wishlist_birthday_sent；POST/PATCH 可帶；清單改 private 自動關
   show_claimer_names boolean         NOT NULL DEFAULT false,
   surprise_mode      boolean         NOT NULL DEFAULT false,
   location           geography(Point, 4326),

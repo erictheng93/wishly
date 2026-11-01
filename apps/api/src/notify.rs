@@ -670,11 +670,11 @@ async fn handle(
         };
         payload["from_name"] = Value::String(from_name);
     } else if kind == "birthday.friend" {
-        // 寄前重驗（D65）：清單仍開著生日通知且仍看得到、壽星生日仍公開給好友、收件人仍是好友（selected 仍在名單）。偏好於步驟 7 靜音
+        // 寄前重驗（D65）：清單仍開著生日通知且仍看得到、壽星生日仍公開給好友、日期沒改、收件人仍是好友（selected 仍在名單）。偏好於步驟 7 靜音
         let row: Option<(String, String)> = sqlx::query_as(
             "SELECT o.display_name, w.slug::text FROM wishlists w
                JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
-                            AND o.birthday IS NOT NULL AND o.birthday_visibility::text <> 'private'
+                            AND o.birthday = $1->>'birthday' AND o.birthday_visibility::text <> 'private'
                JOIN users r ON r.id = $2 AND r.deleted_at IS NULL AND r.blocked_at IS NULL
               WHERE w.id = ($1->>'wishlist_id')::uuid AND w.owner_id = ($1->>'owner_id')::uuid
                 AND w.birthday_notify AND w.deleted_at IS NULL AND w.status = 'active' AND w.moderation_status = 'ok'
@@ -689,7 +689,8 @@ async fn handle(
         payload["slug"] = slug.into();
     } else if kind == "birthday.nudge" {
         let ok: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND birthday IS NOT NULL AND birthday_visibility::text <> 'private')")
+            "SELECT EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL AND u.birthday IS NOT NULL AND u.birthday_visibility::text <> 'private'
+                              AND NOT EXISTS (SELECT 1 FROM wishlists w WHERE w.owner_id = u.id AND w.birthday_notify AND w.deleted_at IS NULL AND w.status = 'active'))")
             .bind(uid).fetch_one(pool).await?;
         if !ok {
             done!("cancelled", "birthday nudge no longer wanted");

@@ -797,9 +797,22 @@ async fn patch_me(
         }
         sqlx::query("UPDATE users SET birthday=$2 WHERE id=$1")
             .bind(u.id)
-            .bind(b)
+            .bind(&b)
             .execute(&st.pool)
             .await?;
+        // 改日期：排隊中的朋友通知帶舊日期，取消並清掉該清單的已寄記錄，新日期進窗口時才排得回來（清空走下方）
+        if b.is_some() {
+            sqlx::query(
+                "WITH c AS (UPDATE notifications SET status='cancelled'
+                             WHERE status='pending' AND kind='birthday.friend' AND payload->>'owner_id' = $1::text AND payload->>'birthday' <> $2
+                             RETURNING (payload->>'wishlist_id')::uuid AS wishlist_id)
+                 DELETE FROM wishlist_birthday_sent WHERE wishlist_id IN (SELECT wishlist_id FROM c)",
+            )
+            .bind(u.id)
+            .bind(&b)
+            .execute(&st.pool)
+            .await?;
+        }
     }
     if let Some(v) = &p.birthday_visibility {
         share_level(v, "/birthday_visibility")?;
