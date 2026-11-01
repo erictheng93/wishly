@@ -56,6 +56,7 @@
       "stepDone": "Done",
       "stepNow": "Now",
       "stepTodo": "To do",
+      "nameHint": "This is the name your friends will see.",
       "profileHint": "Fill in at least one of handle, bio or birthday. You can change them later in Settings.",
       "profileNeedOne": "Please fill in at least one of handle, bio or birthday",
       "profileSave": "Save and create a list",

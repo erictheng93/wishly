@@ -1,5 +1,18 @@
 {
   "creator": {
+    "nudge": {
+      "later": "Nanti saja",
+      "email": {
+        "title": "Tautkan email agar akunmu lebih aman",
+        "body": "Setelah ditautkan, kamu tetap bisa masuk dengan kode saat LINE atau Google tidak bisa dipakai, dan menerima notifikasi lewat email.",
+        "link": "Tautkan sekarang"
+      },
+      "name": {
+        "title": "Atur nama tampilanmu",
+        "body": "Teman-temanmu akan melihat nama ini. Saat ini nama diambil dari emailmu, sebaiknya ganti dengan nama yang mudah mereka kenali.",
+        "link": "Ubah nama"
+      }
+    },
     "confirm": {
       "cancel": "Batal",
       "busy": "Memproses…",

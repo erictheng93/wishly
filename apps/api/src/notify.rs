@@ -364,6 +364,7 @@ pub fn email_tier(kind: &str) -> EmailTier {
 /// 所有會被 render 的 kind（單元測試用它確認四語文案齊全）。新增 kind 時一併加進這裡、`category`、`email_tier`、`inbox_link` 與 docs/notification-policy.md。
 pub const KINDS: &[&str] = &[
     "auth.password_changed",
+    "auth.new_device",
     "auth.mfa_reset",
     "auth.identity_linked",
     "auth.identity_unlinked",
@@ -451,6 +452,7 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
         },
         "birthday.nudge" => "/lists/new".into(),
         "auth.password_changed"
+        | "auth.new_device"
         | "auth.identity_linked"
         | "auth.identity_unlinked"
         | "auth.mfa_enabled"
@@ -1034,6 +1036,17 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("The password for your account's email login was just changed, and your other devices have been signed out.\nIf this wasn't you, reset it right away with \"Forgot password\".\nAccount settings: {app}/settings\nThis is an account security notice."),
                 format!("Mật khẩu đăng nhập bằng email của tài khoản bạn vừa được thay đổi, các thiết bị khác đã bị đăng xuất.\nNếu không phải bạn thực hiện, hãy đặt lại ngay bằng \"Quên mật khẩu\".\nCài đặt tài khoản: {app}/settings\nĐây là thông báo bảo mật tài khoản."),
                 format!("Kata sandi login email akun kamu baru saja diubah, dan perangkat lain sudah dikeluarkan.\nKalau bukan kamu yang melakukannya, segera atur ulang lewat \"Lupa kata sandi\".\nPengaturan akun: {app}/settings\nIni adalah pemberitahuan keamanan akun."),
+            ),
+        );
+    }
+    if kind == "auth.new_device" {
+        return (
+            l.pick("【Wishly】你的帳號在新裝置登入".into(), "[Wishly] New device sign-in to your account".into(), "[Wishly] Tài khoản của bạn vừa đăng nhập trên thiết bị mới".into(), "[Wishly] Akunmu masuk dari perangkat baru".into()),
+            l.pick(
+                format!("你的帳號剛剛在新的裝置或瀏覽器登入。\n如果是你本人，可以忽略這則通知。如果不是，請到帳號設定登出該裝置，並立即檢查你的信箱安全。\n帳號設定：{app}/settings\n這是帳號安全通知。"),
+                format!("Your account was just signed in on a new device or browser.\nIf this was you, you can ignore this notice. If it wasn't, sign that device out in your account settings and check your email account's security right away.\nAccount settings: {app}/settings\nThis is an account security notice."),
+                format!("Tài khoản của bạn vừa được đăng nhập trên một thiết bị hoặc trình duyệt mới.\nNếu đó là bạn, có thể bỏ qua thông báo này. Nếu không, hãy vào cài đặt tài khoản để đăng xuất thiết bị đó và kiểm tra ngay độ an toàn của hộp thư.\nCài đặt tài khoản: {app}/settings\nĐây là thông báo bảo mật tài khoản."),
+                format!("Akunmu baru saja masuk dari perangkat atau browser baru.\nKalau itu kamu, abaikan saja pemberitahuan ini. Kalau bukan, keluarkan perangkat itu di pengaturan akun dan segera periksa keamanan email kamu.\nPengaturan akun: {app}/settings\nIni adalah pemberitahuan keamanan akun."),
             ),
         );
     }

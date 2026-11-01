@@ -96,7 +96,7 @@ onMounted(async () => {
           <div v-if="s.key === cur" class="wl-body">
             <p class="c-mute">{{ $t(`onboarding.steps.${s.key}.body`) }}</p>
             <form v-if="s.key === 'profile'" @submit.prevent="saveProfile">
-              <label class="c-field"><span>{{ $t('settings.displayName') }}</span><input v-model="name" maxlength="50" required></label>
+              <label class="c-field"><span>{{ $t('settings.displayName') }}</span><input v-model="name" maxlength="50" required><small class="c-mute">{{ $t('onboarding.welcome.nameHint') }}</small></label>
               <label class="c-field"><span>{{ $t('settings.social.handle') }}</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" :placeholder="$t('settings.social.handlePh')"></label>
               <p v-if="hBad" class="c-err" role="alert">{{ $t('settings.social.handleBadHint') }}</p>
               <label class="c-field"><span>{{ $t('settings.social.bio') }}</span><textarea v-model="bio" maxlength="160" rows="3" /></label>

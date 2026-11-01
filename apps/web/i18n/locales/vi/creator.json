@@ -1,5 +1,18 @@
 {
   "creator": {
+    "nudge": {
+      "later": "Để sau",
+      "email": {
+        "title": "Liên kết Email để bảo vệ tài khoản",
+        "body": "Sau khi liên kết, bạn vẫn đăng nhập được bằng mã khi không dùng được LINE hoặc Google, và nhận được email thông báo.",
+        "link": "Liên kết ngay"
+      },
+      "name": {
+        "title": "Đặt tên hiển thị của bạn",
+        "body": "Bạn bè sẽ thấy tên này. Hiện tên được lấy từ Email của bạn, nên đổi sang tên mọi người dễ nhận ra.",
+        "link": "Đổi tên"
+      }
+    },
     "confirm": {
       "cancel": "Hủy",
       "busy": "Đang xử lý…",

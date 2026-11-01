@@ -107,6 +107,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>狀態</td><td>Draft</td></tr>
 <tr><td>D51 變更（2026-10-18）</td><td>清單可見性精簡為 public / friends / selected / private，新清單預設 friends；移除 <code>link</code>（知道連結）與 <code>password</code>（密碼保護），連同 <code>POST /public/wishlists/{slug}/unlock</code>、<code>X-List-Access</code>、SSE <code>?access=</code>、<code>access_password</code> / <code>has_password</code>、錯誤碼 <code>PASSWORD_REQUIRED</code> / <code>WRONG_PASSWORD</code>（migration 0016，既有 link / password 清單收緊為 friends）。新增訪客探索 <code>GET /public/wishlists</code>（見 F21）。下文 v0.5 描述的 link / password 已被取代。</td></tr>
 <tr><td>流程驗證決策（2026-10-22）</td><td>依 <a href="flow-verification/decisions.html">流程驗證待決事項</a> 的決策更新：delivered 不可取消、擁有者標送達需確認（Q1）；清單結束後不可新認領 / 改量 / 延長，但仍可回報已購買 / 已送達（Q2、Q14）；認領 7 天購買期限、結束寬限（Q12、Q14）；purchased 可改量（Q3）；不設每清單捐助筆數上限（Q4）；完成度為數量比例並即時更新（Q5）；公開頁 SSE 每 IP 16 條（Q7；登入者站內通知串流另按使用者計，見 <a href="notification-policy.md">通知政策</a>）；驚喜清單訪客提示、鎖定期擁有者可看每品項數量但看不到是誰（Q8）；好友申請可用使用者 ID（Q9）；刪帳號前重新驗證（Q10）；搶同一列的交易設 lock_timeout 2 秒、閒置交易 30 秒中止（Q11）；另同步 02 落後實作 / 04 之處（Q6 a–k）。</td></tr>
+<tr><td>D69 變更（2026-11-01）</td><td>F1-a Email OTP 重新成為 /login 的正式入口，與 F1-c 密碼登入並存；尚未註冊的信箱會自動開戶；以驗證碼或密碼在沒見過的裝置登入時發 <code>auth.new_device</code> 安全通知（LINE / Google 不通知）。</td></tr>
 <tr><td>v0.5 變更</td><td>對齊 10/11 已實作的功能（原文件停在 10/8，流程圖落後實作）：新增 F1-c Email＋密碼註冊 / 登入 / 忘記密碼（登入頁實際入口）、F20 好友與邀請連結、F21 清單可見性與存取（好友 / 指定 / 密碼 / CDN 受限路徑）、F22 個人頁與捐助可見度；更新角色矩陣、錯誤碼（LOGIN_REQUIRED、FRIENDS_ONLY、NOT_ALLOWED、PASSWORD_REQUIRED、WRONG_PASSWORD、INVALID_CREDENTIALS、EMAIL_EXISTS、HANDLE_TAKEN、NOT_FRIEND、SELF_INVITE）；修正 F1-a 的 OTP_INVALID 狀態碼為 400（與實作與 04 一致）。</td></tr>
 <tr><td>v0.4 變更</td><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證（本文件新增 F15 到 F19、6.7 到 6.9，並更新 F2、F9、F10）。前端部署為 Cloudflare Pages（Pages Functions SSR），Workers 為備案。</td></tr>
 <tr><td>v0.3 變更</td><td>效仿星巴克，新增自動儲值（F11）、電子禮物卡（F12）、回饋星星（F13）、企業禮券（F14）；點數改為分批（point lots）管理。</td></tr>
@@ -349,7 +350,7 @@ sequenceDiagram
 
 
 <h4>F1-c Email＋密碼：註冊、登入、忘記密碼 <span class="badge p0">P0</span></h4>
-<p>/login 頁實際提供的主要入口（Email＋密碼，另有 Google / LINE）。F1-a 的 OTP 端點仍保留；註冊與重設密碼用 OTP 驗證 Email 所有權。</p>
+<p>/login 頁的入口之一（另有 F1-a Email 驗證碼與 Google / LINE，見 D69）。密碼為選用；註冊與重設密碼用 OTP 驗證 Email 所有權。</p>
 <pre class="mermaid">
 sequenceDiagram
   autonumber
@@ -394,7 +395,7 @@ sequenceDiagram
 <table class="meta"><tbody>
 <tr><td>前置條件</td><td>無（公開端點）。</td></tr>
 <tr><td>規則</td><td>密碼 8–128 字元（argon2）；註冊不論 Email 是否已註冊都回 202，已有密碼者到 verify 才回 <code>EMAIL_EXISTS</code>，避免帳號列舉；OTP 規則同 F1-a（10 分鐘、5 次錯誤作廢、每 email 每小時 5 封、重送冷卻 60 秒、每小時最多 10 次驗證嘗試）。登入失敗限流以 DB 計數：15 分鐘內同 (email, IP) 5 次、同 email 跨 IP 20 次、同 IP 30 次即鎖（回 429，附 Retry-After）；成功登入或重設密碼即清除該 email 紀錄。重設密碼同時撤銷所有既有 session，使用者需重新登入。原本只用 OTP / Google 登入的帳號，第一次經由「忘記密碼」設定密碼即可改用密碼登入。</td></tr>
-<tr><td>步驟</td><td>註冊：form → 寄驗證碼 → 輸入 6 碼 → 自動登入並導向 <code>redirect</code>（僅接受站內相對路徑，<code>//</code> 開頭拒絕）。登入：成功導向 <code>redirect</code> 或 /dashboard；LINE / Google 為整頁跳轉。忘記密碼：Email → 驗證碼＋新密碼 → 回 /login 顯示「密碼已重設」。</td></tr>
+<tr><td>步驟</td><td>註冊：form → 寄驗證碼 → 輸入 6 碼 → 自動登入並導向 <code>redirect</code>（僅接受站內相對路徑，<code>//</code> 開頭拒絕）。登入：成功導向 <code>redirect</code> 或 /dashboard；密碼失敗時提示可改用 Email 驗證碼登入；LINE / Google 為整頁跳轉。忘記密碼：Email → 驗證碼＋新密碼 → 回 /login 顯示「密碼已重設」。</td></tr>
 <tr><td>API</td><td><code>POST /auth/register</code>、<code>POST /auth/register/verify</code>、<code>POST /auth/login</code>、<code>POST /auth/password/reset/request</code>、<code>POST /auth/password/reset/confirm</code></td></tr>
 <tr><td>交易邊界</td><td>寄信在 COMMIT 之後；verify 成功路徑於單一交易完成 consumed、users / identities upsert、sessions 新增；reset confirm 於單一交易完成設定密碼、撤銷 sessions、清除失敗紀錄。argon2 在 <code>spawn_blocking</code> 執行，不佔用 async worker。</td></tr>
 <tr><td>例外 / 錯誤碼</td><td><code>VALIDATION_FAILED</code> 422（Email 格式、密碼長度、名稱長度）；<code>OTP_INVALID</code> 400；<code>EMAIL_EXISTS</code> 409；<code>INVALID_CREDENTIALS</code> 401（不區分無帳號 / 密碼錯）；<code>RATE_LIMITED</code> 429。</td></tr>

@@ -1,5 +1,18 @@
 {
   "creator": {
+    "nudge": {
+      "later": "Not now",
+      "email": {
+        "title": "Add an email to protect your account",
+        "body": "With an email, you can still sign in with a code if LINE or Google isn't available, and you'll get email notifications.",
+        "link": "Add email"
+      },
+      "name": {
+        "title": "Choose your display name",
+        "body": "Friends see this name. It currently comes from your email, so consider changing it to one they'll recognize.",
+        "link": "Change name"
+      }
+    },
     "confirm": {
       "cancel": "Cancel",
       "busy": "Processing…",

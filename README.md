@@ -53,7 +53,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 ## 登入方式管理
 
-`/settings` 可綁定或解除 Email／Google／LINE，保留至少一種登入方式。LINE 無 Email 帳號可透過 OTP 補上信箱；新增／解除會寄送安全通知。註冊頁也提供 Google／LINE 入口。既有兩個帳號不搬移資料合併；已驗證 Email 的自動連結政策保持有效。
+登入頁提供 LINE、Google、Email 驗證碼與 Email + 密碼（密碼選用，D69）；尚未註冊的信箱用驗證碼登入會直接開戶，以驗證碼或密碼在沒見過的裝置登入時會發安全通知。`/settings` 可綁定或解除 Email／Google／LINE，保留至少一種登入方式。LINE 無 Email 帳號可透過 OTP 補上信箱；新增／解除會寄送安全通知。註冊頁也提供 Google／LINE 入口。既有兩個帳號不搬移資料合併；已驗證 Email 的自動連結政策保持有效。
 
 詳見[登入方式與 Email 政策](docs/account-login-methods.md)，包含無 Email 限制、解除後重新連結、頭像轉存、JWKS 快取與新增 API。新增 migration `0007_identity_linking.sql`，API 啟動時自動套用，無新增環境變數或依賴。
 

@@ -43,6 +43,7 @@ onMounted(async () => {
 <template>
   <main class="c-page">
     <CreatorHeader :title="archived ? $t('lists.dashboard.showArchived') : $t('lists.dashboard.title')" />
+    <CreatorAccountNudge />
     <div class="dsh-bar">
       <span class="x-idx" aria-hidden="true">INDEX / {{ pad(list.length) }}</span>
       <button class="c-btn small" @click="toggleArchived">{{ archived ? $t('lists.dashboard.backToLists') : $t('lists.dashboard.showArchived') }}</button>
