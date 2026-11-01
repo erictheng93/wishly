@@ -181,7 +181,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <div v-else class="c-thumb">{{ i.image_status === 'pending' ? $t('lists.edit.processing') : $t('creator.image.none') }}</div>
           <div class="c-grow">
             <strong>{{ i.title }}</strong>
-            <div v-if="i.funding_mode === 'crowdfund'" class="c-mute">{{ $t('lists.edit.crowdLine', { pledged: fmtPts(i.pledged_points), target: fmtPts(i.target_points) }) }}<template v-if="i.funding_deadline">{{ $t('lists.edit.until', { time: fmtTime(i.funding_deadline) }) }}</template>{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
+            <div v-if="i.funding_mode === 'support'" class="c-mute">{{ $t('lists.edit.supportLine', { name: i.support?.target?.title ?? $t('lists.edit.supportEnded'), points: i.support?.points ?? '–', qty: i.support?.qty ?? '–' }) }}{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
+            <div v-else-if="i.funding_mode === 'crowdfund'" class="c-mute">{{ $t('lists.edit.crowdLine', { pledged: fmtPts(i.pledged_points), target: fmtPts(i.target_points) }) }}<template v-if="i.funding_deadline">{{ $t('lists.edit.until', { time: fmtTime(i.funding_deadline) }) }}</template>{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
             <div v-else class="c-mute">{{ $t('lists.edit.qtyLine', { n: i.qty_needed }) }}{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>
             <div v-if="relief" class="c-mute">{{ $t(`org.relief.category.${i.category}`) }} · {{ $t(`org.relief.urgency.${i.urgency}`) }} <template v-if="i.funding_mode !== 'crowdfund'"> · {{ $t('org.relief.claimed', { n: i.qty_claimed ?? 0 }) }}</template> · {{ $t('org.relief.received', { n: i.qty_received ?? 0 }) }}</div>
             <CreatorStatusBadge v-if="i.image_status === 'pending' || i.image_status === 'rejected'" :v="i.image_status" />

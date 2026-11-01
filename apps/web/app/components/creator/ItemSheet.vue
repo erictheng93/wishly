@@ -11,21 +11,39 @@ const upBusy = ref(false), busy = ref(false), err = ref(''), stale = ref(false),
 const modeLocked = computed(() => !!props.item && (props.item.qty_claimed > 0 || props.item.pledged_points > 0))
 const fundLocked = computed(() => !!props.item && props.item.funding_mode === 'crowdfund' && props.item.funding_status !== 'open')
 const crowd = computed(() => f.funding_mode === 'crowdfund')
+const support = computed(() => f.funding_mode === 'support')
+// 支持品項的目標：新增時由貼上的連結帶出標題；失敗就停用儲存
+const supLink = ref(''), supSlug = ref<string | null>(null), supChecked = ref(false)
+async function checkTarget() {
+  supSlug.value = null; supChecked.value = false
+  const slug = parseListSlug(supLink.value)
+  if (!slug) { err.value = supLink.value.trim() ? tr('creator.itemSheet.supportBad') : ''; return }
+  try {
+    const r = await api(`/public/wishlists/${slug}`)
+    supSlug.value = slug; err.value = ''
+    if (!f.title.trim() && r?.title) f.title = r.title
+  } catch { err.value = tr('creator.itemSheet.supportBad') } finally { supChecked.value = true }
+}
 watch(() => props.open, (v) => {
   if (!v) return
   const i = props.item
   const p = i ? {} : props.prefill ?? {} // 預填只用於新增
   Object.assign(f, { title: i?.title ?? p.title ?? '', brand: i?.brand ?? p.brand ?? '', spec: i?.spec ?? p.spec ?? '', product_url: i?.product_url ?? p.product_url ?? '', qty_needed: i?.qty_needed ?? 1, unit_price_amount: i?.unit_price_amount ?? p.unit_price_amount ?? '', priority: i?.priority ?? 'medium', category: i?.category ?? '', urgency: i?.urgency ?? '',
-    funding_mode: i?.funding_mode === 'crowdfund' ? 'crowdfund' : 'quantity', target_points: i?.target_points ?? '', funding_deadline: toTaipeiInput(i?.funding_deadline), price_snapshot_amount: i?.price_snapshot_amount ?? i?.unit_price_amount ?? '' })
+    funding_mode: ['crowdfund', 'support'].includes(i?.funding_mode) ? i.funding_mode : 'quantity', target_points: i?.target_points ?? '', funding_deadline: toTaipeiInput(i?.funding_deadline), price_snapshot_amount: i?.price_snapshot_amount ?? i?.unit_price_amount ?? '' })
+  supLink.value = ''; supSlug.value = null; supChecked.value = false
   imageKey.value = null; err.value = ''; stale.value = false; needAddr.value = false; version.value = i?.updated_at ?? null
 })
 async function save() {
   err.value = ''; needAddr.value = false
   if (!f.title.trim()) { err.value = tr('creator.itemSheet.errName'); return }
   if (props.relief && (!f.category || !f.urgency)) { err.value = tr('org.relief.errRelief'); return }
+  if (support.value && !props.item && !supSlug.value) { err.value = tr('creator.itemSheet.supportBad'); return }
   const body: any = { title: f.title.trim(), brand: f.brand || null, spec: f.spec || null, product_url: f.product_url || null, priority: f.priority }
   if (props.relief) Object.assign(body, { category: f.category, urgency: f.urgency })
-  if (crowd.value) {
+  if (support.value) {
+    for (const k of ['brand', 'spec', 'product_url']) delete body[k]
+    if (!props.item) Object.assign(body, { funding_mode: 'support', support_slug: supSlug.value })
+  } else if (crowd.value) {
     const t = Number(f.target_points)
     if (!Number.isInteger(t) || t < 1) { err.value = tr('creator.itemSheet.errTarget'); return }
     if (!fundLocked.value) {
@@ -37,7 +55,7 @@ async function save() {
     body.qty_needed = Number(f.qty_needed) || 1
     body.unit_price_amount = f.unit_price_amount === '' ? null : Number(f.unit_price_amount)
   }
-  if (!props.item || f.funding_mode !== (props.item.funding_mode ?? 'quantity')) body.funding_mode = f.funding_mode
+  if (!support.value && (!props.item || f.funding_mode !== (props.item.funding_mode ?? 'quantity'))) body.funding_mode = f.funding_mode
   if (imageKey.value) body.image_key = imageKey.value
   if (!props.item && props.prefill?.catalog_ref) body.catalog_ref = props.prefill.catalog_ref // 僅新增
   busy.value = true
@@ -61,20 +79,26 @@ async function save() {
     <form @submit.prevent="save">
       <CreatorImageUploader v-model="imageKey" purpose="item" :current-url="item?.image_url" @busy="upBusy = $event" />
       <label class="c-field"><span>{{ $t('creator.itemSheet.name') }}</span><input v-model="f.title" maxlength="120" :placeholder="$t('creator.itemSheet.namePh')" required></label>
+      <template v-if="!support">
       <label class="c-field"><span>{{ $t('creator.itemSheet.brand') }}</span><input v-model="f.brand" maxlength="100"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.spec') }}</span><input v-model="f.spec" maxlength="200"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.url') }}</span><input v-model="f.product_url" type="url" maxlength="2000" placeholder="https://"></label>
-      <template v-if="relief">
+      </template>      <template v-if="relief">
         <label class="c-field"><span>{{ $t('org.relief.categoryLabel') }}</span>
           <select v-model="f.category" name="category" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="c in CATEGORIES" :key="c" :value="c">{{ $t(`org.relief.category.${c}`) }}</option></select></label>
         <label class="c-field"><span>{{ $t('org.relief.urgencyLabel') }}</span>
           <select v-model="f.urgency" name="urgency" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="u in URGENCIES" :key="u" :value="u">{{ $t(`org.relief.urgency.${u}`) }}</option></select></label>
       </template>
       <div class="c-field"><span>{{ $t('creator.itemSheet.mode') }}</span>
-        <div class="c-seg" style="margin:0"><label v-for="m in [['quantity', $t('creator.itemSheet.modeQty')], ['crowdfund', $t('creator.itemSheet.modeCrowd')]]" :key="m[0]"><input v-model="f.funding_mode" type="radio" name="funding_mode" :value="m[0]" :disabled="modeLocked"><span>{{ m[1] }}</span></label></div>
+        <div class="c-seg" style="margin:0"><label v-for="m in [['quantity', $t('creator.itemSheet.modeQty')], ['crowdfund', $t('creator.itemSheet.modeCrowd')], ...(item && !support ? [] : [['support', $t('creator.itemSheet.modeSupport')]])]" :key="m[0]"><input v-model="f.funding_mode" type="radio" name="funding_mode" :value="m[0]" :disabled="modeLocked || (!!item && support)"><span>{{ m[1] }}</span></label></div>
         <p v-if="modeLocked" class="c-mute c-small">{{ $t('creator.itemSheet.modeLocked') }}</p>
       </div>
-      <template v-if="crowd">
+      <template v-if="support">
+        <p v-if="item" class="c-mute">{{ $t('creator.itemSheet.supportTarget', { name: item.support?.target?.title ?? $t('creator.itemSheet.supportEnded') }) }}</p>
+        <label v-else class="c-field"><span>{{ $t('creator.itemSheet.supportLink') }}</span><input v-model="supLink" maxlength="300" placeholder="https://wishly.tw/s/…" @blur="checkTarget"></label>
+        <p class="c-mute">{{ $t('creator.itemSheet.supportNote') }}</p>
+      </template>
+      <template v-else-if="crowd">
         <label class="c-field"><span>{{ $t('creator.itemSheet.targetPoints') }}{{ item?.pledged_points ? $t('creator.itemSheet.raisedSuffix', { n: item.pledged_points }) : '' }}</span><input v-model="f.target_points" type="number" inputmode="numeric" :min="(item?.pledged_points || 0) + 1" max="10000000" :disabled="fundLocked" required></label>
         <!-- 救災據點沒有活動日，截止時間必填（後端同樣要求） -->
         <label class="c-field"><span>{{ relief ? $t('org.relief.deadlineLabel') : $t('creator.itemSheet.deadline') }}</span><input v-model="f.funding_deadline" type="datetime-local" :disabled="fundLocked" :required="relief && !fundLocked"><small v-if="!relief" class="c-mute">{{ $t('creator.itemSheet.deadlineHint') }}</small></label>
@@ -94,7 +118,7 @@ async function save() {
       <p v-if="err" class="c-err" role="alert">{{ err }} <button v-if="stale" type="button" class="c-btn" @click="emit('reload')">{{ $t('creator.itemSheet.reload') }}</button><button v-if="needAddr" type="button" class="c-btn" @click="emit('address')">{{ $t('creator.itemSheet.fillAddress') }}</button></p>
       <div class="c-row">
         <button type="button" class="c-btn c-grow" @click="emit('close')">{{ $t('creator.itemSheet.cancel') }}</button>
-        <button class="c-btn primary c-grow" :disabled="busy || upBusy">{{ busy ? $t('creator.itemSheet.saving') : $t('creator.itemSheet.save') }}</button>
+        <button class="c-btn primary c-grow" :disabled="busy || upBusy || (support && !item && !supSlug)">{{ busy ? $t('creator.itemSheet.saving') : $t('creator.itemSheet.save') }}</button>
       </div>
     </form>
   </CreatorSheet>

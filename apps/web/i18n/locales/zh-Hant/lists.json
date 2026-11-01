@@ -114,7 +114,9 @@
       "invite": "附上好友邀請",
       "invite_friends": "對方接受邀請後成為你的好友，就能看到這份清單；連結 7 天內有效。",
       "invite_selected": "對方接受後會成為你的好友，並自動加入這份清單的摯友名單；連結 7 天內有效、可多人使用，請只傳給你想分享的人。",
-      "sms": "簡訊"
+      "sms": "簡訊",
+      "supportLine": "支持 {name}・{points} 點・{qty} 件",
+      "supportEnded": "已結束"
     },
     "progress": {
       "pageTitle": "完成度",
@@ -162,7 +164,9 @@
       "cancelConfirm": "確定要取消「{name}」的認領嗎？數量會釋出給其他人。",
       "ordersTitle": "眾籌採購彙總",
       "ordersLine": "已達標 {funded}・已下單 {ordered}・運送中 {shipped}・已送達 {delivered}",
-      "shareList": "分享清單"
+      "shareList": "分享清單",
+      "supportEnded": "對方清單已結束",
+      "supportLine": "{name}：{points} 點・{qty} 件"
     },
     "cover": {
       "title": "封面",
