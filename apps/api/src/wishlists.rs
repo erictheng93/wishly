@@ -861,6 +861,9 @@ async fn update(
     if res.rows_affected() == 0 {
         return Err(stale());
     }
+    if old_status == "draft" && w.status == "active" {
+        crate::support::notify_targets(&mut tx, id).await?;
+    }
     if bday {
         enable_birthday(
             &mut tx,
@@ -1670,6 +1673,9 @@ async fn item_create(
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
         .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency).bind(i.support_wishlist_id)
         .fetch_one(&mut *tx).await?;
+    if mode == "support" && w.status == "active" {
+        crate::support::notify_targets(&mut tx, wid).await?;
+    }
     tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1"

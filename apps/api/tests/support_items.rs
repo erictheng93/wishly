@@ -676,3 +676,135 @@ async fn no_donor_identity_in_response(pool: PgPool) {
         ]
     );
 }
+
+// ---------- 站內通知 ----------
+
+async fn supported(pool: &PgPool, user: Uuid) -> Vec<Value> {
+    sqlx::query_scalar(
+        "SELECT payload FROM notifications WHERE kind='wishlist.supported' AND user_id=$1",
+    )
+    .bind(user)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn published_list_notifies_target_owner(pool: PgPool) {
+    let a = user(&pool, "阿花").await;
+    let b = user(&pool, "b").await;
+    let target = wishlist(&pool, b.id, ListOpts::default()).await;
+    let list = wishlist(&pool, a.id, ListOpts::default()).await;
+    let (s, v) = create(&pool, &a.token, list.id, &target.slug).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let n = supported(&pool, b.id).await;
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["wishlist_id"], target.id.to_string());
+    assert_eq!(n[0]["supporter_name"], "阿花");
+    assert_eq!(n[0]["list_title"], "清單");
+    assert_eq!(
+        wishly_api::notify::inbox_link("wishlist.supported", &n[0]),
+        format!("/lists/{}/edit", target.id)
+    );
+    assert!(supported(&pool, a.id).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn draft_notifies_on_publish_once(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let b = user(&pool, "b").await;
+    let target = wishlist(&pool, b.id, ListOpts::default()).await;
+    let list = wishlist(
+        &pool,
+        a.id,
+        ListOpts {
+            status: Some("draft"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let (s, v) = create(&pool, &a.token, list.id, &target.slug).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert!(supported(&pool, b.id).await.is_empty());
+    let path = format!("/wishlists/{}", list.id);
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        &path,
+        &ck(&a.token),
+        Some(json!({ "status": "active" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(supported(&pool, b.id).await.len(), 1);
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        &path,
+        &ck(&a.token),
+        Some(json!({ "title": "改名" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(supported(&pool, b.id).await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn org_target_notifies_owners_and_coordinators(pool: PgPool) {
+    let owner = user(&pool, "o").await;
+    let coord = user(&pool, "c").await;
+    let vol = user(&pool, "v").await;
+    let off = user(&pool, "off").await;
+    let a = user(&pool, "a").await;
+    let o = org(&pool, owner.id, "verified").await;
+    member(&pool, o, owner.id, "owner").await;
+    member(&pool, o, coord.id, "coordinator").await;
+    member(&pool, o, vol.id, "volunteer").await;
+    member(&pool, o, off.id, "coordinator").await;
+    sqlx::query("UPDATE org_members SET disabled_at=now() WHERE user_id=$1")
+        .bind(off.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let p = permit(&pool, o, "approved", 30).await;
+    let (e, _) = event(&pool, o).await;
+    let st = site(&pool, o, owner.id, e, p, "active").await;
+    let list = wishlist(&pool, a.id, ListOpts::default()).await;
+    let (s, v) = create(&pool, &a.token, list.id, &st.slug).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(supported(&pool, owner.id).await.len(), 1);
+    assert_eq!(supported(&pool, coord.id).await.len(), 1);
+    assert!(supported(&pool, vol.id).await.is_empty());
+    assert!(supported(&pool, off.id).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn supported_is_in_app_only(pool: PgPool) {
+    use wishly_api::notify::{category, email_tier, Category, EmailTier};
+    let mut c = wishly_api::config::Config::dev();
+    c.cf_account_id = None;
+    c.cf_email_api_token = None;
+    c.smtp_port = 1;
+    wishly_api::config::init(c);
+    assert_eq!(email_tier("wishlist.supported"), EmailTier::InAppOnly);
+    assert_eq!(category("wishlist.supported"), Category::Social);
+    let a = user(&pool, "阿花").await;
+    let b = user(&pool, "b").await;
+    let target = wishlist(&pool, b.id, ListOpts::default()).await;
+    let list = wishlist(&pool, a.id, ListOpts::default()).await;
+    create(&pool, &a.token, list.id, &target.slug).await;
+    wishly_api::notify::tick_at(&pool, noon()).await.unwrap();
+    let (st, err, title, link): (String, Option<String>, Option<String>, Option<String>) =
+        sqlx::query_as(
+            "SELECT status::text, last_error, inbox_title, inbox_link FROM notifications WHERE kind='wishlist.supported'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        (st.as_str(), err.as_deref()),
+        ("cancelled", Some("in-app only"))
+    );
+    assert_eq!(title.unwrap(), "阿花 把你的清單「清單」放進了他們的願望");
+    assert_eq!(link.unwrap(), format!("/lists/{}/edit", target.id));
+}
