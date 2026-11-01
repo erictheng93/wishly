@@ -636,16 +636,35 @@ async fn items_of(pool: &PgPool, wid: Uuid) -> R<Vec<I>> {
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!("SELECT {ICOLS} FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL ORDER BY sort_order, id"))).bind(wid).fetch_all(pool).await?)
 }
 
+async fn support_of(pool: &PgPool, items: &[I]) -> R<std::collections::HashMap<Uuid, Value>> {
+    let ids: Vec<Uuid> = items
+        .iter()
+        .filter(|i| i.funding_mode == "support")
+        .map(|i| i.id)
+        .collect();
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    crate::support::summaries(pool, &ids).await
+}
+
 async fn get_one(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
     let w = load_owned(&st.pool, id, u.id).await?;
-    let items: Vec<Value> = items_of(&st.pool, id)
-        .await?
+    let rows = items_of(&st.pool, id).await?;
+    let mut sup = support_of(&st.pool, &rows).await?;
+    let items: Vec<Value> = rows
         .iter()
-        .map(|i| i.json(w.surprise_locked))
+        .map(|i| {
+            let mut v = i.json(w.surprise_locked);
+            if let Some(s) = sup.remove(&i.id) {
+                v["support"] = s;
+            }
+            v
+        })
         .collect();
     Ok(Json(json!({ "wishlist": w.json(), "items": items })))
 }
@@ -1105,6 +1124,7 @@ async fn dashboard(
 ) -> R<Json<Value>> {
     let w = load_owned(&st.pool, id, u.id).await?;
     let items = items_of(&st.pool, id).await?;
+    let mut sup = support_of(&st.pool, &items).await?;
     let locked = w.surprise_locked;
     let (mut n, mut f, mut claimed, mut needed) = (0i64, 0i64, 0i64, 0i64);
     for i in &items {
@@ -1218,7 +1238,7 @@ async fn dashboard(
             "funded_item_count": if locked { None } else { Some(funded) } },
         "items": items.iter().map(|i| {
             let cf = i.funding_mode == "crowdfund";
-            json!({ "item_id": i.id, "title": i.title, "funding_mode": i.funding_mode, "qty_needed": i.qty_needed,
+            json!({ "item_id": i.id, "title": i.title, "funding_mode": i.funding_mode, "support": sup.remove(&i.id), "qty_needed": i.qty_needed,
                 "qty_claimed": i.qty_claimed, "claimer_count": counts.get(&i.id).copied().unwrap_or(0),
                 "target_points": i.target_points, "pledged_points": cf.then_some(i.pledged_points),
                 "funding_status": i.funding_status.as_ref().filter(|_| !locked),

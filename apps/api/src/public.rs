@@ -241,16 +241,27 @@ async fn render(
         w.updated_at.timestamp_millis(),
         if w.locked { "-l" } else { "" }
     );
+    // 含支持品項的公開清單：成果數字不隨清單 updated_at 變動，不能用 ETag 做 304（先判斷、不讀 cookie）
+    let has_support = !restricted
+        && sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT 1 FROM wishlist_items WHERE wishlist_id = $1 AND deleted_at IS NULL AND funding_mode = 'support')",
+        )
+        .bind(w.id)
+        .fetch_one(&st.pool)
+        .await?;
     let cache = [(
         header::CACHE_CONTROL,
         if restricted {
             "private, no-store"
+        } else if has_support {
+            "public, s-maxage=10"
         } else {
             "public, s-maxage=10, stale-while-revalidate=60"
         }
         .to_string(),
     )];
     if !restricted
+        && !has_support
         && parts
             .headers
             .get(header::IF_NONE_MATCH)
@@ -267,6 +278,17 @@ async fn render(
          FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id
          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id", crate::points::DISPLAY_STATUS_SQL)))
         .bind(w.id).fetch_all(&st.pool).await?;
+
+    let support_ids: Vec<Uuid> = items
+        .iter()
+        .filter(|i| i.funding_mode == "support")
+        .map(|i| i.id)
+        .collect();
+    let mut support = if support_ids.is_empty() {
+        HashMap::new()
+    } else {
+        crate::support::summaries(&st.pool, &support_ids).await?
+    };
 
     // 驚喜鎖定期間無論 show_claimer_names 為何一律不輸出（伺服器端強制）
     let visible = w.show_claimer_names && !w.locked;
@@ -354,7 +376,9 @@ async fn render(
             "funding_status": i.funding_status, "display_status": i.display_status, "funding_deadline": i.funding_deadline,
             "progress_percent": if cf { pct(i.pledged_points, i.target_points.unwrap_or(0)) } else { pct(i.qty_claimed as i64, i.qty_needed as i64) },
         });
-        if visible {
+        if let Some(sp) = support.remove(&i.id) {
+            v["support"] = sp;
+        } else if visible {
             v["claimers"] = json!(claimers.remove(&i.id).unwrap_or_default());
             if cf { v["contributors"] = json!(contributors.remove(&i.id).unwrap_or_default()); }
         }
@@ -376,6 +400,9 @@ async fn render(
         relief::extend_site(&st.pool, w.id, &mut body).await?;
     }
     if restricted {
+        return Ok((cache, Json(body)).into_response());
+    }
+    if has_support {
         return Ok((cache, Json(body)).into_response());
     }
     Ok((cache, [(header::ETAG, etag)], Json(body)).into_response())

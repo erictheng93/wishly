@@ -121,6 +121,7 @@ struct CreateReq {
     note: Option<String>,
     visibility: Option<String>,
     is_anonymous: Option<bool>,
+    via_item_id: Option<Uuid>,
 }
 
 pub(crate) fn share_level(v: &Option<String>) -> Result<(), AppError> {
@@ -171,6 +172,11 @@ async fn create(
         .await?;
     }
 
+    // 歸因：開交易前驗證、不加鎖；不成立就當沒帶
+    let via = match &wl {
+        Some((wid, ..)) => crate::support::valid_via(&st.pool, req.via_item_id, *wid).await?,
+        None => None,
+    };
     let route = "POST /items/{id}/claims";
     let scope = format!("user:{}:{route}", me.id);
     let hash = idempotency::request_hash(&format!("POST /items/{item_id}/claims"), &body);
@@ -241,16 +247,17 @@ async fn create(
     // Q12 購買期限：清單設定（NULL = 不限）；有活動日且「活動日台北 00:00 前 3 天」較早就用它，但至少保留 48 小時。
     // LEAST 忽略 NULL：沒有活動日時只看清單設定。
     let ins = sqlx::query_as::<_, ClaimRow>(sqlx::AssertSqlSafe(format!(
-        "INSERT INTO claims AS c (item_id, user_id, claimer_name, qty, note, expires_at, visibility, is_anonymous)
+        "INSERT INTO claims AS c (item_id, user_id, claimer_name, qty, note, expires_at, visibility, is_anonymous, via_item_id)
          VALUES ($1, $2, $3, $4, $5,
                  CASE WHEN $6::int IS NULL THEN NULL ELSE LEAST(now() + $6::int * interval '1 hour',
                    CASE WHEN $9::date IS NOT NULL THEN GREATEST(now() + interval '48 hours', ($9::date::timestamp AT TIME ZONE 'Asia/Taipei') - interval '3 days') END) END,
-                 $7::text::share_level, $8)
+                 $7::text::share_level, $8, $10)
          RETURNING {CLAIM_COLS}")))
         .bind(item_id).bind(me.id).bind(&name).bind(req.qty).bind(&req.note).bind(ttl)
         .bind(req.visibility.as_deref()) // NULL 時由 trigger 套帳號預設
         .bind(req.is_anonymous.unwrap_or(false))
         .bind(event)
+        .bind(via)
         .fetch_one(&mut *tx).await;
     let claim = match ins {
         Ok(c) => c,
