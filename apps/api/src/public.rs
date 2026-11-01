@@ -95,9 +95,9 @@ async fn explore(
     let rows: Vec<ExploreRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
                 o.display_name, o.handle,
-                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
+                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL AND i.funding_mode <> 'support'),
                 (SELECT COALESCE(sum({claimed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+                (SELECT COALESCE(sum({needed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          FROM wishlists w JOIN users o ON o.id = w.owner_id
          WHERE w.visibility = 'public' AND w.status = 'active' AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
            AND o.deleted_at IS NULL AND o.blocked_at IS NULL
@@ -107,7 +107,7 @@ async fn explore(
            AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND ($1::text IS NULL OR w.type::text = $1)
            AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
-         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL)))
+         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL, needed = crate::wishlists::NEEDED_SQL)))
         .bind(ty).bind(EXPLORE_PAGE + 1).bind((page - 1) * EXPLORE_PAGE).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > EXPLORE_PAGE;
     let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, cp, ev, on, oh, n, got, need)| json!({
@@ -320,7 +320,7 @@ async fn render(
     }
 
     // 完成度：數量型 = qty_claimed/qty_needed；眾籌型達標（funded / fulfilled）算 1/1（見 wishlists::units）
-    let (mut total, mut got, mut fulfilled) = (0i64, 0i64, 0usize);
+    let (mut total, mut got, mut fulfilled, mut counted) = (0i64, 0i64, 0usize, 0usize);
     for i in &items {
         let (c, n) = crate::wishlists::units(
             &i.funding_mode,
@@ -328,6 +328,10 @@ async fn render(
             i.qty_claimed,
             i.funding_status.as_deref(),
         );
+        if n == 0 {
+            continue; // 支持品項不計入
+        }
+        counted += 1;
         total += n;
         got += c;
         if c >= n {
@@ -365,7 +369,7 @@ async fn render(
         // 救災據點是組織的，不曝露建立者個人資料（改顯示 org）
         "owner": if w.r#type == "relief" { Value::Null } else { json!({ "id": w.owner_id, "display_name": w.owner_name }) },
         "surprise_mode": w.surprise_mode, "surprise_locked": w.locked, "claimers_visible": visible,
-        "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
+        "completion": { "item_count": counted, "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
         "items": item_json, "updated_at": w.updated_at,
     });
     if w.r#type == "relief" {
@@ -496,7 +500,7 @@ mod relief {
               WHERE w.event_id = $1 AND {LIVE_SITE}
               GROUP BY w.id, o.id ORDER BY w.created_at, w.id",
             needs = ["critical", "high", "medium", "low"].map(|u| format!(
-                "'{u}', count(i.id) FILTER (WHERE i.urgency = '{u}' AND CASE WHEN i.funding_mode = 'crowdfund' THEN i.funding_status = 'open' ELSE i.qty_claimed < i.qty_needed END)"
+                "'{u}', count(i.id) FILTER (WHERE i.urgency = '{u}' AND i.funding_mode <> 'support' AND CASE WHEN i.funding_mode = 'crowdfund' THEN i.funding_status = 'open' ELSE i.qty_claimed < i.qty_needed END)"
             )).join(","))))
             .bind(ev.0).fetch_all(&st.pool).await?;
         Ok((

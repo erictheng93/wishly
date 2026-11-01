@@ -105,16 +105,21 @@ pub fn display_status(fs: Option<&str>, order: Option<&str>) -> Option<&'static 
 /// 完成度的 (已完成, 需求) 單位：數量型 = (qty_claimed, qty_needed)；眾籌型 = 達標（funded / fulfilled）算 1/1，否則 0/1。
 /// 刻意不用 pledged/target 換算：驚喜鎖定時完成度只會在「達標」那一刻跳動，不會隨每筆認捐洩漏進度。
 pub fn units(mode: &str, needed: i32, claimed: i32, fs: Option<&str>) -> (i64, i64) {
-    if mode == "crowdfund" {
+    if mode == "support" {
+        (0, 0) // 支持品項不計入完成度
+    } else if mode == "crowdfund" {
         (matches!(fs, Some("funded" | "fulfilled")) as i64, 1)
     } else {
         (claimed as i64, needed as i64)
     }
 }
 /// 同 `units` 的 SQL 版（wishlist_items 欄位，無別名）
-pub const CLAIMED_SQL: &str = "CASE WHEN funding_mode = 'crowdfund' THEN (funding_status IN ('funded', 'fulfilled'))::int ELSE qty_claimed END";
+pub const CLAIMED_SQL: &str = "CASE WHEN funding_mode = 'support' THEN 0 WHEN funding_mode = 'crowdfund' THEN (funding_status IN ('funded', 'fulfilled'))::int ELSE qty_claimed END";
+/// 同 `units` 的需求量 SQL 版（無別名）：眾籌 1、支持 0、其餘 qty_needed
+pub const NEEDED_SQL: &str =
+    "CASE funding_mode WHEN 'crowdfund' THEN 1 WHEN 'support' THEN 0 ELSE qty_needed END";
 /// 品項是否還能送：眾籌依募資狀態與期限（同 contributions.rs 的檢查），一般品項依剩餘數量
-pub const OPEN_SQL: &str = "CASE WHEN funding_mode = 'crowdfund' THEN funding_status = 'open' AND funding_deadline > now() ELSE qty_claimed < qty_needed END";
+pub const OPEN_SQL: &str = "CASE WHEN funding_mode = 'support' THEN false WHEN funding_mode = 'crowdfund' THEN funding_status = 'open' AND funding_deadline > now() ELSE qty_claimed < qty_needed END";
 
 /// 清單封存 / 帳號刪除：把這些清單所有品項的 pledged 認捐退回錢包（captured 的採購單照常進行）。
 /// 呼叫端須已在同交易 UPDATE 過 wishlists（取得清單鎖，鎖序：清單 → 錢包 → 品項 → 認捐）。
@@ -546,8 +551,8 @@ async fn list(
     let rows = &rows[..rows.len().min(limit as usize)];
     let ids: Vec<Uuid> = rows.iter().map(|w| w.id).collect();
     let stats: Vec<(Uuid, i64, i64, i64, i64)> = sqlx::query_as(
-        sqlx::AssertSqlSafe(format!("SELECT wishlist_id, count(*), count(*) FILTER (WHERE {CLAIMED_SQL} >= qty_needed), sum({CLAIMED_SQL})::bigint, sum(qty_needed)::bigint FROM wishlist_items
-         WHERE wishlist_id = ANY($1) AND deleted_at IS NULL GROUP BY wishlist_id"))).bind(&ids).fetch_all(&st.pool).await?;
+        sqlx::AssertSqlSafe(format!("SELECT wishlist_id, count(*), count(*) FILTER (WHERE {CLAIMED_SQL} >= qty_needed), sum({CLAIMED_SQL})::bigint, sum({NEEDED_SQL})::bigint FROM wishlist_items
+         WHERE wishlist_id = ANY($1) AND deleted_at IS NULL AND funding_mode <> 'support' GROUP BY wishlist_id"))).bind(&ids).fetch_all(&st.pool).await?;
     let data: Vec<Value> = rows.iter().map(|w| {
         let (c, f, q, nd) = stats.iter().find(|s| s.0 == w.id).map(|s| (s.1, s.2, s.3, s.4)).unwrap_or((0, 0, 0, 0));
         let j = w.json();
@@ -1108,6 +1113,9 @@ async fn dashboard(
             i.qty_claimed,
             i.funding_status.as_deref(),
         );
+        if nd == 0 {
+            continue;
+        }
         n += 1;
         claimed += c;
         needed += nd;

@@ -391,9 +391,9 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
          JOIN fr ON fr.id = w.owner_id
          JOIN users o ON o.id = w.owner_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
          CROSS JOIN LATERAL (
-           SELECT count(*) FILTER (WHERE i.created_at > now() - interval '30 days') AS n_new, max(i.created_at) AS at, count(*) AS n,
+           SELECT count(*) FILTER (WHERE i.created_at > now() - interval '30 days') AS n_new, max(i.created_at) AS at, count(*) FILTER (WHERE i.funding_mode <> 'support') AS n,
                   COALESCE(sum({claimed}), 0)::bigint AS got,
-                  COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0)::bigint AS need
+                  COALESCE(sum({needed}), 0)::bigint AS need
            FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL) s
          JOIN LATERAL (
            SELECT i.title, i.image_key, i.image_status, i.unit_price_amount, {open} AS open
@@ -404,7 +404,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
            AND (w.visibility::text IN ('public', 'friends')
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $1)))
            AND s.n_new > 0
-         ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL, open = crate::wishlists::OPEN_SQL)))
+         ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL, needed = crate::wishlists::NEEDED_SQL, open = crate::wishlists::OPEN_SQL)))
         .bind(u.id).fetch_all(&st.pool).await?;
     let mut events: Vec<(chrono::DateTime<chrono::Utc>, Value)> = lists.into_iter().map(|r| (r.at, json!({
         "kind": "items_added", "at": r.at, "owner": { "id": r.owner_id, "display_name": r.display_name, "handle": r.handle },
