@@ -1082,13 +1082,13 @@ async fn admin_order_placed_partial_refund_and_lifecycle(pool: PgPool) {
         "{b}"
     );
 
-    // 佇列：含解密後的收件資訊，且逐筆寫 audit
+    // 佇列不解密；只有明確查看才寫 audit
     let (st, h, l) = call(&pool, "GET", "/admin/orders?status=pending", &ck(&s), None).await;
     assert_eq!(st, StatusCode::OK, "{l}");
     assert_eq!(h["cache-control"], "private, no-store");
     assert_eq!(
         l["data"][0]["shipping_address"],
-        json!({ "recipient_name": "王小米", "phone": "0912345678", "address": "台北市大安區和平東路二段 1 號 3 樓" })
+        json!({ "recipient_name": "***", "phone": "***", "address": "***" })
     );
     assert_eq!(
         (
@@ -1099,7 +1099,52 @@ async fn admin_order_placed_partial_refund_and_lifecycle(pool: PgPool) {
         (Some(7600), Some("嬰兒推車"), Some("寶寶清單"))
     );
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE action = 'order.view_address' AND entity_id = $1 AND actor_id = $2").bind(oid).bind(sid).fetch_one(&pool).await.unwrap();
-    assert_eq!(n, 1, "讀取收件地址必須寫 audit");
+    assert_eq!(n, 0, "列表不記收件資訊稽核");
+    for (headers, status) in [
+        (vec![], StatusCode::UNAUTHORIZED),
+        (ck(&t), StatusCode::FORBIDDEN),
+    ] {
+        assert_eq!(
+            call(
+                &pool,
+                "GET",
+                &format!("{url}/shipping-address"),
+                &headers,
+                None
+            )
+            .await
+            .0,
+            status
+        );
+    }
+    let (st, h, addr) = call(
+        &pool,
+        "GET",
+        &format!("{url}/shipping-address"),
+        &ck(&s),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(h["cache-control"], "private, no-store");
+    assert_eq!(
+        addr,
+        json!({ "recipient_name": "王小米", "phone": "0912345678", "address": "台北市大安區和平東路二段 1 號 3 樓" })
+    );
+    let audits: Vec<serde_json::Value> = sqlx::query_scalar("SELECT diff FROM audit_logs WHERE action='order.view_address' AND entity_id=$1 AND actor_id=$2").bind(oid).bind(sid).fetch_all(&pool).await.unwrap();
+    assert_eq!(audits, vec![json!({"item_id":item})]);
+    assert_eq!(
+        call(
+            &pool,
+            "GET",
+            &format!("/admin/orders/{}/shipping-address", Uuid::new_v4()),
+            &ck(&s),
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
     assert_eq!(
         call(&pool, "GET", "/admin/orders?status=bogus", &ck(&s), None)
             .await
@@ -1922,7 +1967,7 @@ async fn account_delete_blocked_by_points(pool: PgPool) {
 
 // 分頁多查的那一筆只用來判斷 next_cursor，不可被解密或寫入 order.view_address
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn admin_orders_audit_only_returned_rows(pool: PgPool) {
+async fn admin_orders_pagination_never_audits_addresses(pool: PgPool) {
     let TestUser { id: _, token: t } = common::user(&pool, "媽媽").await;
     let TestUser { id: sid, token: s } = common::staff(&pool, "營運").await;
     let TestUser { id: a, token: _ } = common::user(&pool, "阿明").await;
@@ -1946,7 +1991,7 @@ async fn admin_orders_audit_only_returned_rows(pool: PgPool) {
     assert_eq!(st, StatusCode::OK, "{p1}");
     assert_eq!(p1["data"].as_array().unwrap().len(), 2);
     assert_eq!(p1["next_cursor"], p1["data"][1]["id"]);
-    assert_eq!(audits().await, 2, "只記實際回傳的筆數");
+    assert_eq!(audits().await, 0, "列表不解密也不記稽核");
 
     let (_, _, p2) = call(
         &pool,
@@ -1961,7 +2006,7 @@ async fn admin_orders_audit_only_returned_rows(pool: PgPool) {
     .await;
     assert_eq!(p2["data"].as_array().unwrap().len(), 1);
     assert!(p2["next_cursor"].is_null());
-    assert_eq!(audits().await, 3);
+    assert_eq!(audits().await, 0);
     common::assert_all_reconciled(&pool).await;
 }
 

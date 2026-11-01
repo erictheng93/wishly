@@ -58,7 +58,9 @@
         "empty": "No reports",
         "list": "List: ",
         "meta": "{time}・Reporter: {reporter}",
-        "onItem": "・on an item"
+        "onItem": "・on an item",
+        "note": "Resolution note",
+        "noteLabel": "Resolution note (optional, up to 1,000 characters)"
       },
       "reason": {
         "scam": "Suspected scam",
@@ -140,7 +142,15 @@
       "mfaHint": "Enable two-step verification: staff can block users and grant points, so a compromised account is costly.",
       "mfaSetup": "Set up now",
       "requeue": "Requeue failed notifications",
-      "requeued": "Requeued {n}"
+      "requeued": "Requeued {n}",
+      "todo": {
+        "pending_orgs": "Organizations pending {n}",
+        "pending_permits": "Permits pending {n}",
+        "pending_orders": "Orders pending {n}",
+        "requested_refunds": "Refunds requested {n}",
+        "disputed_topups": "Disputes {n}",
+        "open_debts": "Open debts {n}"
+      }
     },
     "audit": {
       "title": "Audit log",
@@ -273,7 +283,9 @@
       "deliveredNote": "Confirm the parcel was delivered? The item will be marked fulfilled and contributors notified.",
       "updated": "\"{title}\" status updated to \"{status}\"",
       "refundedSuffix": "; difference of {points} pts refunded to contributors",
-      "stale": "Status was already updated; refresh and try again"
+      "stale": "Status was already updated; refresh and try again",
+      "showAddress": "Show shipping details",
+      "hideAddress": "Hide shipping details"
     },
     "analytics": {
       "title": "Analytics",
@@ -422,8 +434,8 @@
     },
     "topups": {
       "methodLabel": "Channel",
-      "searchLabel": "Search user",
-      "searchHint": "Name or email, press Enter",
+      "searchLabel": "Search transactions",
+      "searchHint": "Name, email, merchant / provider transaction number",
       "userFilter": "User: {name}",
       "clearUser": "Show all users",
       "title": "Top-ups and chargeback disputes",
@@ -573,7 +585,8 @@
         "documents": "Documents",
         "permits": "Fundraising permits"
       },
-      "flagRequired": "Select at least one field"
+      "flagRequired": "Select at least one field",
+      "noteRequired": "Rejection / revocation reason (required)"
     },
     "events": {
       "title": "Disaster events",

@@ -58,7 +58,9 @@
         "empty": "Belum ada laporan",
         "list": "Wishlist: ",
         "meta": "{time}・Pelapor: {reporter}",
-        "onItem": "・Pada barang"
+        "onItem": "・Pada barang",
+        "note": "Catatan penyelesaian",
+        "noteLabel": "Catatan penyelesaian (opsional, maksimal 1.000 karakter)"
       },
       "reason": {
         "scam": "Diduga penipuan",
@@ -140,7 +142,15 @@
       "mfaHint": "Disarankan mengaktifkan verifikasi dua langkah: panel admin bisa membekukan akun dan memberi poin, jadi dampaknya besar jika akun dibobol.",
       "mfaSetup": "Atur sekarang",
       "requeue": "Antrekan ulang notifikasi gagal",
-      "requeued": "{n} diantrekan ulang"
+      "requeued": "{n} diantrekan ulang",
+      "todo": {
+        "pending_orgs": "Organisasi menunggu {n}",
+        "pending_permits": "Izin menunggu {n}",
+        "pending_orders": "Pesanan menunggu {n}",
+        "requested_refunds": "Pengembalian diminta {n}",
+        "disputed_topups": "Sengketa {n}",
+        "open_debts": "Utang terbuka {n}"
+      }
     },
     "audit": {
       "title": "Catatan audit",
@@ -273,7 +283,9 @@
       "deliveredNote": "Pastikan paket sudah diterima? Barang akan ditandai terpenuhi dan peserta patungan diberi tahu.",
       "updated": "Status \"{title}\" diperbarui menjadi \"{status}\"",
       "refundedSuffix": ", selisih {points} poin sudah dikembalikan ke peserta patungan",
-      "stale": "Status sudah diperbarui, muat ulang lalu coba lagi"
+      "stale": "Status sudah diperbarui, muat ulang lalu coba lagi",
+      "showAddress": "Tampilkan informasi penerima",
+      "hideAddress": "Sembunyikan informasi penerima"
     },
     "analytics": {
       "title": "Analitik data",
@@ -422,8 +434,8 @@
     },
     "topups": {
       "methodLabel": "Saluran",
-      "searchLabel": "Cari pengguna",
-      "searchHint": "Nama atau email, tekan Enter",
+      "searchLabel": "Cari transaksi",
+      "searchHint": "Nama, email, nomor transaksi toko / penyedia",
       "userFilter": "Pengguna: {name}",
       "clearUser": "Tampilkan semua pengguna",
       "title": "Top up dan sengketa chargeback",
@@ -573,7 +585,8 @@
         "documents": "Documents",
         "permits": "Fundraising permits"
       },
-      "flagRequired": "Select at least one field"
+      "flagRequired": "Select at least one field",
+      "noteRequired": "Alasan penolakan / pencabutan (wajib)"
     },
     "events": {
       "title": "Disaster events",

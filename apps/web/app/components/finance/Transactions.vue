@@ -26,10 +26,12 @@ const clearUser = () => setQuery('user_id', '')
 
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
 const err = ref(''), msg = ref('')
+const shown = ref<Record<string, boolean>>({})
+const mask = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2')
 let seq = 0
 async function load(more = false) {
   const my = ++seq // 篩選快速變動或回應較慢時只採用最後一次
-  loading.value = true; err.value = ''
+  loading.value = true; err.value = ''; shown.value = {}
   try {
     const r = await api('/admin/topups', { query: { status: status.value || undefined, method: method.value || undefined, q: q.value || undefined, user_id: userId.value || undefined, limit: 20, cursor: more ? cursor.value : undefined } })
     if (my !== seq) return
@@ -104,7 +106,7 @@ async function submit() {
         <span v-if="x.wallet?.status === 'frozen'" class="c-badge frozen">{{ $t('admin.topups.walletFrozen') }}</span>
         <span class="c-badge" :class="x.status">{{ $t(`admin.topups.status.${x.status}`, x.status) }}</span>
       </div>
-      <div>{{ x.user?.display_name }}<span v-if="x.user?.email" class="c-mute">{{ x.user?.display_name ? '　' : '' }}{{ x.user.email }}</span></div>
+      <div>{{ x.user?.display_name }}<span v-if="x.user?.email" class="c-mute">{{ x.user?.display_name ? '　' : '' }}{{ shown[x.id] ? x.user.email : mask(x.user.email) }} <button class="c-btn small" @click="shown[x.id] = !shown[x.id]">{{ $t(shown[x.id] ? 'admin.index.users.hideEmail' : 'admin.index.users.show') }}</button></span></div>
       <dl class="c-dl">
         <dt>{{ $t('admin.topups.provider') }}</dt><dd>{{ x.provider }}<template v-if="x.provider_txn_id">　<code>{{ x.provider_txn_id }}</code></template></dd>
         <dt>{{ $t('admin.topups.createdAt') }}</dt><dd>{{ fmtTime(x.created_at) }}</dd>

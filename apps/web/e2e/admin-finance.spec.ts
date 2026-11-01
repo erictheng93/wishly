@@ -60,7 +60,7 @@ test('交易明細：渠道與搜尋帶入查詢；刪除用戶（無 email）�
   await expect(page.getByLabel('狀態')).toHaveValue('pending')
   await page.getByLabel('渠道').selectOption('atm')
   await expect.poll(() => list.at(-1)!.url.searchParams.get('method')).toBe('atm')
-  await page.getByLabel('搜尋用戶').fill('ming'); await page.keyboard.press('Enter')
+  await page.getByLabel('搜尋交易').fill('ming'); await page.keyboard.press('Enter')
   await expect.poll(() => list.at(-1)!.url.searchParams.get('q')).toBe('ming')
   await expect(page.locator('article[data-status]').first()).toContainText('路人')
 })

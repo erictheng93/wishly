@@ -186,6 +186,27 @@ async fn org_json<'e>(ex: impl PgExecutor<'e>, id: Uuid, role: &str) -> R<Value>
     Ok(v)
 }
 
+// 草稿不占用統編；提早檢查有效申請，送審時仍以唯一索引防競態。
+async fn check_tax_id<'e>(
+    ex: impl PgExecutor<'e>,
+    tax_id: Option<&str>,
+    id: Option<Uuid>,
+) -> R<()> {
+    let Some(tax_id) = tax_id else {
+        return Ok(());
+    };
+    let taken: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM organizations WHERE tax_id=$1 AND verification_status IN ('pending','needs_changes','verified') AND ($2::uuid IS NULL OR id <> $2))")
+        .bind(tax_id).bind(id).fetch_one(ex).await?;
+    if taken {
+        return Err(AppError::problem(
+            409,
+            "TAX_ID_TAKEN",
+            "此統一編號已有申請中或已通過的組織",
+        ));
+    }
+    Ok(())
+}
+
 async fn create(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -200,6 +221,7 @@ async fn create(
         }
     }
     let (f, _) = clean(b)?;
+    check_tax_id(&st.pool, f.tax_id.as_deref(), None).await?;
     for _ in 0..5 {
         let mut tx = crate::begin_contended(&st.pool).await?;
         let r = sqlx::query_scalar::<_, Uuid>(
@@ -295,6 +317,7 @@ async fn patch(
             ))
         }
     };
+    check_tax_id(&mut *tx, f.tax_id.as_deref(), Some(id)).await?;
     sqlx::query(
         "UPDATE organizations SET legal_name=COALESCE($2,legal_name), display_name=COALESCE($3,display_name), org_type=COALESCE($4,org_type),
            tax_id=COALESCE($5,tax_id), registration_no=COALESCE($6,registration_no), authority=COALESCE($7,authority),

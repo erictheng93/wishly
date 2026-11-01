@@ -120,3 +120,46 @@ async fn small_samples_suppressed(pool: PgPool) {
         .unwrap()
         .is_empty());
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn stats_includes_pending_work(pool: PgPool) {
+    let st = staff(&pool, "營運").await;
+    let u = user(&pool, "申請人").await;
+    let o = org(&pool, u.id, "pending").await;
+    permit(&pool, o, "pending", 30).await;
+    permit(&pool, o, "approved", 30).await;
+    let draft = org(&pool, u.id, "draft").await;
+    permit(&pool, draft, "pending", 30).await;
+    let topup = topup_credit(&pool, u.id, 100).await;
+    let wallet: uuid::Uuid = sqlx::query_scalar("SELECT wallet_id FROM topups WHERE id=$1")
+        .bind(topup)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE topups SET status='disputed' WHERE id=$1")
+        .bind(topup)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO cash_refund_requests(wallet_id,amount,status) VALUES($1,10,'requested'),($1,10,'processing')").bind(wallet).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO wallet_debts(wallet_id,topup_id,amount) VALUES($1,$2,10)")
+        .bind(wallet)
+        .bind(topup)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let w = wishlist(&pool, u.id, ListOpts::default()).await;
+    let i = crowdfund_item(&pool, w.id, 100).await;
+    sqlx::query("INSERT INTO purchase_orders(item_id,fulfillment_type,amount,shipping_address_snapshot) VALUES($1,'concierge',100,'\\x00')").bind(i).execute(&pool).await.unwrap();
+    let (_, _, b) = call(&pool, "GET", "/admin/stats", &ck(&st.token), None).await;
+    assert_eq!(b["pending_orgs"], 1);
+    assert_eq!(b["pending_permits"], 1);
+    for k in [
+        "pending_orders",
+        "requested_refunds",
+        "disputed_topups",
+        "open_debts",
+    ] {
+        assert_eq!(b[k], 1, "{k}");
+    }
+}

@@ -65,6 +65,7 @@ const text = computed(() => {
 })
 async function submit() {
   const a = act.value!
+  if (a.decision === 'reject' && !note.value.trim()) { aerr.value = t('admin.orgs.noteRequired'); return }
   if (a.revoke && a.kind === 'org' && a.step === 1) { a.step = 2; return } // 撤銷組織：二次確認
   if (a.decision === 'needs_changes' && !flagged.value.length) { aerr.value = t('admin.orgs.flagRequired'); return }
   busy.value = true; aerr.value = ''
@@ -122,6 +123,7 @@ async function submit() {
           <div v-for="p in detail.permits" :key="p.id" class="c-card" :data-permit="p.id" :data-status="p.status">
             <div class="c-row"><strong class="c-grow">{{ p.permit_no }}</strong><span class="c-badge" :class="p.status">{{ $t(`admin.orgs.permitStatus.${p.status}`, p.status) }}</span></div>
             <div class="c-mute">{{ $t('admin.orgs.validRange', { from: p.valid_from, to: p.valid_to }) }}</div>
+            <button v-if="detail.documents.some((d: any) => d.id === p.document_id)" class="c-btn c-mt" @click="download(o.id, detail.documents.find((d: any) => d.id === p.document_id))">{{ $t('admin.orgs.download') }}</button>
             <div v-if="p.status !== 'rejected'" class="c-row wrap c-mt">
               <button v-if="p.status === 'pending'" class="c-btn c-grow primary" @click="open('permit', p, 'approve')">{{ $t('admin.orgs.permitAction.approve') }}</button>
               <button class="c-btn c-grow danger" @click="open('permit', p, 'reject')">{{ $t(`admin.orgs.permitAction.${p.status === 'approved' ? 'revoke' : 'reject'}`) }}</button>
@@ -143,18 +145,20 @@ async function submit() {
     </article>
     <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">{{ $t('admin.orgs.loadMore') }}</button>
 
-    <CreatorConfirm :open="!!act" :title="title" :text="text" :ok="title" :danger="act?.decision === 'reject'" :busy="busy" :error="aerr" @close="act = null" @ok="submit">
+    <CreatorConfirm :open="!!act" :title="title" :text="text" :ok="title" :danger="act?.decision === 'reject'" :busy="busy" :disabled="act?.decision === 'reject' && !note.trim()" :error="aerr" @close="act = null" @ok="submit">
       <template v-if="act && !(act.revoke && act.kind === 'org' && act.step === 2)">
         <fieldset v-if="act.decision === 'needs_changes'" class="c-field ao-flags">
           <legend>{{ $t('admin.orgs.flagLabel') }}</legend>
           <label v-for="f in FLAGS" :key="f" class="c-row"><input v-model="flagged" type="checkbox" :value="f" :name="`flag-${f}`"><span>{{ flagLabel(f) }}</span></label>
         </fieldset>
-        <label class="c-field"><span>{{ $t('admin.orgs.noteLabel') }}</span><textarea v-model="note" maxlength="500" rows="3" /></label>
+        <label class="c-field"><span>{{ $t(act.decision === 'reject' ? 'admin.orgs.noteRequired' : 'admin.orgs.noteLabel') }}</span><textarea v-model="note" :required="act.decision === 'reject'" maxlength="500" rows="3" /></label>
       </template>
+      <p v-else class="ao-note"><strong>{{ $t('admin.orgs.reviewNote') }}</strong><br>{{ note }}</p>
     </CreatorConfirm>
   </main>
 </template>
 <style scoped>
+.ao-note{white-space:pre-wrap;overflow-wrap:anywhere}
 /* 補件欄位：桌面兩欄 */
 @media (min-width:768px){.ao-flags{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}.ao-flags>legend{grid-column:1/-1}}
 /* 手機：詳情標籤在上、值在下，網址與長名稱不被窄欄斷成一字一行 */

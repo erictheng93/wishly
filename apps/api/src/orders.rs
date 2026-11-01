@@ -23,6 +23,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/orders", get(list_orders))
         .route("/admin/orders/{id}", patch(patch_order))
+        .route("/admin/orders/{id}/shipping-address", get(view_address))
         .route("/admin/wallets", get(list_wallets))
         .route("/admin/wallets/grants", post(grant))
         .route("/admin/wallets/{id}", patch(set_wallet_status))
@@ -62,7 +63,6 @@ struct OrderRow {
     merchant_order_id: Option<String>,
     tracking_no: Option<String>,
     failure_reason: Option<String>,
-    snapshot: Vec<u8>,
     operator_id: Option<Uuid>,
     operator_name: Option<String>,
     placed_at: Option<DateTime<Utc>>,
@@ -74,7 +74,7 @@ struct OrderRow {
 
 async fn list_orders(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(_): Staff,
     Query(q): Query<OrdQ>,
 ) -> R<Response> {
     if q.status.as_deref().is_some_and(|s| !STATUSES.contains(&s)) {
@@ -100,7 +100,7 @@ async fn list_orders(
     let rows: Vec<OrderRow> = sqlx::query_as(
         "SELECT po.id, po.fulfillment_type::text AS fulfillment_type, po.status::text AS status, i.id AS item_id, i.title AS item_title, i.product_url,
                 w.id AS wishlist_id, w.title AS wishlist_title, i.target_points, po.amount, po.merchant_order_id, po.tracking_no, po.failure_reason,
-                po.shipping_address_snapshot AS snapshot, po.operator_user_id AS operator_id, ou.display_name AS operator_name,
+                po.operator_user_id AS operator_id, ou.display_name AS operator_name,
                 po.placed_at, po.shipped_at, po.delivered_at, po.created_at, po.updated_at
            FROM purchase_orders po JOIN wishlist_items i ON i.id = po.item_id JOIN wishlists w ON w.id = i.wishlist_id
            LEFT JOIN users ou ON ou.id = po.operator_user_id
@@ -109,21 +109,8 @@ async fn list_orders(
         .bind(&q.status).bind(&q.fulfillment_type).bind(q.cursor).bind(lim + 1).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > lim;
     let mut out = Vec::with_capacity(rows.len());
-    // 只處理實際回傳的 lim 筆：多查的那一筆只用來判斷有沒有下一頁，不解密、不寫 audit
+    // 列表不讀取或解密收件快照；明文只能由獨立查看端點取得。
     for r in rows.into_iter().take(lim as usize) {
-        // 讀取收件明文 = 敏感操作，逐筆留 audit（明文本身不進 audit）
-        audit(
-            &st.pool,
-            sid,
-            "order.view_address",
-            "purchase_orders",
-            Some(r.id),
-            json!({ "item_id": r.item_id }),
-        )
-        .await?;
-        let addr = crate::sealed::open(&r.snapshot)
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-            .unwrap_or(Value::Null);
         let image: Option<(Option<String>, String)> = sqlx::query_as(
             "SELECT image_key, image_status::text FROM wishlist_items WHERE id = $1",
         )
@@ -136,7 +123,7 @@ async fn list_orders(
             "item": { "id": r.item_id, "title": r.item_title, "product_url": r.product_url, "image_url": image_url },
             "wishlist": { "id": r.wishlist_id, "title": r.wishlist_title },
             "target_points": r.target_points, "amount": r.amount, "merchant": null, "merchant_order_id": r.merchant_order_id,
-            "tracking_no": r.tracking_no, "failure_reason": r.failure_reason, "shipping_address": addr,
+            "tracking_no": r.tracking_no, "failure_reason": r.failure_reason, "shipping_address": { "recipient_name": "***", "phone": "***", "address": "***" },
             "operator": r.operator_id.map(|id| json!({ "user_id": id, "display_name": r.operator_name })),
             "placed_at": r.placed_at, "shipped_at": r.shipped_at, "delivered_at": r.delivered_at,
             "created_at": r.created_at, "updated_at": r.updated_at,
@@ -146,6 +133,36 @@ async fn list_orders(
         out.push((Uuid::nil(), Value::Null));
     } // 佔位：page() 據此給 next_cursor，並把它截掉
     Ok(page(out, lim))
+}
+
+/// 明確查看收件資訊才解密並寫稽核；明文不進稽核紀錄。
+async fn view_address(
+    State(st): State<AppState>,
+    Staff(sid): Staff,
+    Path(id): Path<Uuid>,
+) -> R<Response> {
+    let (item_id, snapshot): (Uuid, Vec<u8>) = sqlx::query_as(
+        "SELECT item_id, shipping_address_snapshot FROM purchase_orders WHERE id=$1",
+    )
+    .bind(id)
+    .fetch_optional(&st.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let addr = crate::sealed::open(&snapshot)
+        .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+        .ok_or_else(|| {
+            AppError::problem(500, "ADDRESS_UNAVAILABLE", "收件資訊無法讀取，請稍後重試")
+        })?;
+    audit(
+        &st.pool,
+        sid,
+        "order.view_address",
+        "purchase_orders",
+        Some(id),
+        json!({ "item_id": item_id }),
+    )
+    .await?;
+    Ok(([(header::CACHE_CONTROL, "private, no-store")], Json(addr)).into_response())
 }
 
 // ---------- PATCH /admin/orders/{id} ----------
