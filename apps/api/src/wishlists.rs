@@ -150,7 +150,7 @@ pub async fn release_pledged(tx: &mut crate::points::Tx<'_>, wishlist_ids: &[Uui
     Ok(())
 }
 
-/// 開啟生日通知（D65）：檢查擁有者生日與清單條件，同交易關掉該擁有者其他清單再設為真（不回 409）。
+/// 開啟生日通知（D65）：檢查擁有者生日與清單條件後設為真；同一人可開多份。
 async fn enable_birthday(
     tx: &mut crate::points::Tx<'_>,
     id: Uuid,
@@ -176,12 +176,6 @@ async fn enable_birthday(
     if b.1 == "private" {
         return Err(e("BIRTHDAY_PRIVATE", "生日設為私人時無法通知朋友"));
     }
-    sqlx::query("UPDATE wishlists SET birthday_notify=false WHERE owner_id=$1 AND id<>$2 AND birthday_notify")
-        .bind(owner)
-        .bind(id)
-        .execute(&mut **tx)
-        .await?;
-    // shortcut: 同一人並行開兩份清單時後到者撞 unique index 回 500，實務幾乎不會發生；有回報再改鎖 users 列
     sqlx::query("UPDATE wishlists SET birthday_notify=true WHERE id=$1")
         .bind(id)
         .execute(&mut **tx)

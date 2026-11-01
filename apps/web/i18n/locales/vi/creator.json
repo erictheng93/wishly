@@ -185,8 +185,7 @@
         "private": "Ngày sinh của bạn chỉ hiển thị cho mình bạn. Hãy đổi trong Cài đặt trước.",
         "listPrivate": "Danh sách riêng tư không thông báo cho ai. Hãy chọn chế độ hiển thị khác trước."
       },
-      "goSettings": "Đến Cài đặt",
-      "single": "Chỉ một danh sách được bật cùng lúc; bật danh sách này sẽ tắt thông báo của các danh sách khác."
+      "goSettings": "Đến Cài đặt"
     }
   }
 }
