@@ -148,7 +148,9 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   await sp.goto('/admin/orders')
   await sp.getByLabel('狀態').selectOption({ label: '全部' }) // 預設只看待下單（工作佇列），推進後會離開該篩選
   const order = sp.locator('article', { hasText: '嬰兒推車' })
-  await expect(order).toContainText(ADDR.address) // staff 看得到明文收件資訊
+  await expect(order).not.toContainText(ADDR.address) // 列表不外洩明文
+  await order.getByRole('button', { name: '顯示收件資訊' }).click() // 點擊才解密並寫 order.view_address 稽核
+  await expect(order).toContainText(ADDR.address)
   await order.getByRole('button', { name: '標記已下單' }).click()
   await sp.getByLabel(/商家訂單編號/).fill('SHOP-E2E-1')
   await sp.getByLabel(/實際金額/).fill('900')

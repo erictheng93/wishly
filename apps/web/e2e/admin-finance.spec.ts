@@ -60,7 +60,7 @@ test('交易明細：渠道與搜尋帶入查詢；刪除用戶（無 email）�
   await expect(page.getByLabel('狀態')).toHaveValue('pending')
   await page.getByLabel('渠道').selectOption('atm')
   await expect.poll(() => list.at(-1)!.url.searchParams.get('method')).toBe('atm')
-  await page.getByLabel('搜尋用戶').fill('ming'); await page.keyboard.press('Enter')
+  await page.getByLabel('搜尋交易').fill('ming'); await page.keyboard.press('Enter')
   await expect.poll(() => list.at(-1)!.url.searchParams.get('q')).toBe('ming')
   await expect(page.locator('article[data-status]').first()).toContainText('路人')
 })
@@ -103,7 +103,7 @@ test('後台首頁有金流後台入口，可導向', async ({ page }) => {
   await asStaff(page)
   await mock(page, /\/api\/v1\/admin\/finance\/overview(\?|$)/, () => ok(overview(30)))
   await page.goto('/admin'); await hydrated(page)
-  await page.getByRole('link', { name: '金流後台', exact: true }).click()
+  await page.locator('a[href^="/admin/finance"]').click()
   await expect(page).toHaveURL(/\/admin\/finance$/)
 })
 

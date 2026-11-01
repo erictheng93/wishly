@@ -12,6 +12,7 @@ const actLabel = computed(() => (act.value ? ACTION.value[act.value.to] ?? '' : 
 
 async function load(more = false) {
   loading.value = true; err.value = ''
+  addressGeneration++; addresses.value = {}; addressBusy.value = {}; addressErrors.value = {}
   try {
     const r = await api('/admin/orders', { query: { status: status.value || undefined, fulfillment_type: fulfillment.value || undefined, limit: 20, cursor: more ? cursor.value : undefined } })
     rows.value = more ? [...rows.value, ...r.data] : r.data; cursor.value = r.next_cursor
@@ -19,6 +20,22 @@ async function load(more = false) {
 }
 watch([status, fulfillment], () => load())
 onMounted(() => load())
+
+// 明文只保留到隱藏／重新載入；載入列表不會要求收件資訊。
+const addresses = ref<Record<string, any>>({}), addressBusy = ref<Record<string, boolean>>({})
+const addressErrors = ref<Record<string, string>>({})
+let addressGeneration = 0
+async function toggleAddress(o: any) {
+  if (addresses.value[o.id]) { delete addresses.value[o.id]; return }
+  if (addressBusy.value[o.id]) return
+  const generation = addressGeneration
+  addressBusy.value[o.id] = true; addressErrors.value[o.id] = ''
+  try {
+    const address = await api(`/admin/orders/${o.id}/shipping-address`)
+    if (generation === addressGeneration) addresses.value[o.id] = address
+  } catch (e) { if (generation === addressGeneration) addressErrors.value[o.id] = errMsg(e) }
+  finally { if (generation === addressGeneration) addressBusy.value[o.id] = false }
+}
 
 // 狀態更新：依目前狀態只提供合法動作（orderActions），欄位依目標狀態顯示
 const act = ref<{ row: any, to: string } | null>(null)
@@ -73,7 +90,9 @@ async function submit() {
       </dl>
       <div v-if="o.shipping_address" class="c-sub">
         <strong class="c-small">{{ $t('admin.orders.shippingTitle') }}</strong>
-        <dl class="c-dl"><dt>{{ $t('admin.orders.recipient') }}</dt><dd>{{ o.shipping_address.recipient_name }}</dd><dt>{{ $t('admin.orders.phone') }}</dt><dd>{{ o.shipping_address.phone }}</dd><dt>{{ $t('admin.orders.address') }}</dt><dd>{{ o.shipping_address.address }}</dd></dl>
+        <button class="c-btn small" :disabled="addressBusy[o.id]" :aria-expanded="!!addresses[o.id]" @click="toggleAddress(o)">{{ $t(addresses[o.id] ? 'admin.orders.hideAddress' : 'admin.orders.showAddress') }}</button>
+        <p v-if="addressErrors[o.id]" class="c-err" role="alert">{{ addressErrors[o.id] }}</p>
+        <dl class="c-dl"><dt>{{ $t('admin.orders.recipient') }}</dt><dd>{{ (addresses[o.id] || o.shipping_address).recipient_name }}</dd><dt>{{ $t('admin.orders.phone') }}</dt><dd>{{ (addresses[o.id] || o.shipping_address).phone }}</dd><dt>{{ $t('admin.orders.address') }}</dt><dd>{{ (addresses[o.id] || o.shipping_address).address }}</dd></dl>
       </div>
       <div v-if="orderActions(o.status).length" class="c-row wrap c-mt">
         <button v-for="to in orderActions(o.status)" :key="to" class="c-btn c-grow" :class="to === 'failed' || to === 'cancelled' ? 'danger' : 'primary'" @click="open(o, to)">{{ ACTION[to] }}</button>

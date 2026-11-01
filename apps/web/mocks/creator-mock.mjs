@@ -275,7 +275,7 @@ http.createServer(async (req, res) => {
     }
     if (p === '/admin/wishlists' && m === 'GET') {
       const q = (url.searchParams.get('q') || '').toLowerCase()
-      const data = [...lists.values()].filter((w) => !q || w.slug.toLowerCase() === q || w.owner.email.startsWith(q)).map((w) => ({ id: w.id, slug: w.slug, title: w.title, status: w.status, type: w.type, owner: { id: w.owner.id, display_name: w.owner.display_name, email: w.owner.email }, moderation_status: w.moderation_status, open_report_count: reports.filter((r) => r.wishlist?.id === w.id && r.status === 'open').length, created_at: w.created_at }))
+      const data = [...lists.values()].filter((w) => !q || w.slug.toLowerCase() === q || w.owner.email.startsWith(q)).map((w) => ({ id: w.id, slug: w.slug, title: w.title, status: w.status, type: w.type, owner: { id: w.owner.id, display_name: w.owner.display_name, email: w.owner.email }, moderation_status: w.moderation_status, open_report_count: reports.filter((r) => r.wishlist?.id === w.id && r.status === 'open').length, report_count: reports.filter((r) => r.wishlist?.id === w.id).length, created_at: w.created_at }))
       return send(res, 200, { data, next_cursor: null })
     }
     if (p === '/admin/users' && m === 'GET') {

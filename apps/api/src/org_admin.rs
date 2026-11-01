@@ -96,11 +96,23 @@ struct Review {
     flagged_fields: Option<Vec<String>>,
 }
 
+fn review_note(note: Option<&str>, required: bool) -> Result<Option<String>, AppError> {
+    let note = crate::validate::optional_note(note, "/note", 500)?;
+    if required && note.is_none() {
+        return Err(AppError::invalid(
+            "/note",
+            "REQUIRED",
+            "退件／撤銷必須填原因",
+        ));
+    }
+    Ok(note)
+}
+
 async fn review(
     Staff(sid): Staff,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(b): Json<Review>,
+    Json(mut b): Json<Review>,
 ) -> Result<Json<Value>, AppError> {
     let flagged = b.flagged_fields.unwrap_or_default();
     if b.decision == "needs_changes"
@@ -115,6 +127,7 @@ async fn review(
     if !matches!(b.decision.as_str(), "approve" | "needs_changes" | "reject") {
         return Err(AppError::invalid("/decision", "INVALID", "decision 不合法"));
     }
+    b.note = review_note(b.note.as_deref(), b.decision == "reject")?;
     let mut tx = crate::begin_contended(&st.pool).await?;
     // 鎖組織列：兩位 staff 同時審同一筆時，只有一個轉移會成功
     let (status, display_name): (String, String) = sqlx::query_as(
@@ -208,13 +221,14 @@ async fn review_permit(
     Staff(sid): Staff,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(b): Json<PermitReview>,
+    Json(mut b): Json<PermitReview>,
 ) -> Result<Json<Value>, AppError> {
     let new_status = match b.decision.as_str() {
         "approve" => "approved",
         "reject" => "rejected",
         _ => return Err(AppError::invalid("/decision", "INVALID", "decision 不合法")),
     };
+    b.note = review_note(b.note.as_deref(), b.decision == "reject")?;
     let mut tx = crate::begin_contended(&st.pool).await?;
     // 鎖序：組織 → 許可（與組織審核一致）
     let org_id: Uuid = sqlx::query_scalar("SELECT org_id FROM org_permits WHERE id = $1")

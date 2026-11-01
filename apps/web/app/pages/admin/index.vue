@@ -8,7 +8,6 @@ const { api } = useApi()
 const { user: me } = useAuth()
 const tab = ref<'reports' | 'lists' | 'users' | 'flags'>('reports')
 const err = ref(''), msg = ref('')
-const mask = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2')
 
 // 檢舉佇列
 const rStatus = ref('open')
@@ -28,10 +27,21 @@ async function loadReports(more = false) {
     reports.value = more ? [...reports.value, ...r.data] : r.data; rCursor.value = r.next_cursor
   } catch (e) { err.value = errMsg(e) } finally { rLoading.value = false }
 }
-async function handle(r: any, status: 'actioned' | 'dismissed') {
-  err.value = ''
-  try { await api(`/admin/reports/${r.id}`, { method: 'PATCH', body: { status } }); await Promise.all([loadReports(), loadStats()]) }
-  catch (e) { err.value = errMsg(e) }
+const reportAct = ref<{ id: string; title: string; status: 'actioned' | 'dismissed' } | null>(null)
+const reportNote = ref(''), reportBusy = ref(false), reportErr = ref('')
+function openReport(r: any, status: 'actioned' | 'dismissed') {
+  if (reportBusy.value) return // 舊請求還在跑，避免它的錯誤落到新對話框
+  reportAct.value = { id: r.id, title: r.wishlist.title, status }; reportNote.value = ''; reportErr.value = ''
+}
+async function handleReport() {
+  if (!reportAct.value || reportBusy.value) return
+  const { id, status } = reportAct.value
+  reportBusy.value = true; reportErr.value = ''
+  try {
+    await api(`/admin/reports/${id}`, { method: 'PATCH', body: { status, note: reportNote.value.trim() || undefined } })
+    reportAct.value = null
+    await Promise.all([loadReports(), loadStats()])
+  } catch (e) { if (reportAct.value) reportErr.value = errMsg(e); else err.value = errMsg(e) } finally { reportBusy.value = false }
 }
 
 // 下架 / 恢復
@@ -146,16 +156,16 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       </details>
     </section>
     <nav class="k-nav" aria-label="Admin">
-      <NuxtLink to="/admin/orders" class="c-btn c-grow">{{ $t('admin.index.nav.orders') }}</NuxtLink>
-      <NuxtLink to="/admin/wallets" class="c-btn c-grow">{{ $t('admin.index.nav.wallets') }}</NuxtLink>
-      <NuxtLink to="/admin/cash-refunds" class="c-btn c-grow">{{ $t('admin.index.nav.cashRefunds') }}</NuxtLink>
-      <NuxtLink to="/admin/wallet-debts" class="c-btn c-grow">{{ $t('admin.index.nav.walletDebts') }}</NuxtLink>
-      <NuxtLink to="/admin/catalog" class="c-btn c-grow">{{ $t('admin.index.nav.catalog') }}</NuxtLink>
-      <NuxtLink to="/admin/orgs" class="c-btn c-grow">{{ $t('admin.index.nav.orgs') }}</NuxtLink>
-      <NuxtLink to="/admin/relief-events" class="c-btn c-grow">{{ $t('admin.index.nav.events') }}</NuxtLink>
-      <NuxtLink to="/admin/audit" class="c-btn c-grow">{{ $t('admin.index.nav.audit') }}</NuxtLink>
-      <NuxtLink to="/admin/finance" class="c-btn c-grow">{{ $t('admin.index.nav.finance') }}</NuxtLink>
-      <NuxtLink to="/admin/analytics" class="c-btn c-grow">{{ $t('admin.index.nav.analytics') }}</NuxtLink>
+      <NuxtLink to="/admin/orders" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orders') }} <span class="c-badge" data-testid="todo-pending_orders">{{ $t('admin.index.todo.pending_orders', { n: stats?.pending_orders ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/wallets" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.wallets') }}</span></NuxtLink>
+      <NuxtLink to="/admin/cash-refunds" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.cashRefunds') }} <span class="c-badge" data-testid="todo-requested_refunds">{{ $t('admin.index.todo.requested_refunds', { n: stats?.requested_refunds ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/wallet-debts" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.walletDebts') }} <span class="c-badge" data-testid="todo-open_debts">{{ $t('admin.index.todo.open_debts', { n: stats?.open_debts ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/catalog" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.catalog') }}</span></NuxtLink>
+      <NuxtLink :to="stats?.pending_orgs > 0 || !(stats?.pending_permits > 0) ? '/admin/orgs' : '/admin/orgs?status=pending_permits'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orgs') }} <span class="c-badge" data-testid="todo-pending_orgs">{{ $t('admin.index.todo.pending_orgs', { n: stats?.pending_orgs ?? '–' }) }}</span> <span class="c-badge" data-testid="todo-pending_permits">{{ $t('admin.index.todo.pending_permits', { n: stats?.pending_permits ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/relief-events" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.events') }}</span></NuxtLink>
+      <NuxtLink to="/admin/audit" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.audit') }}</span></NuxtLink>
+      <NuxtLink :to="stats?.disputed_topups > 0 ? '/admin/finance?tab=transactions&status=disputed' : '/admin/finance'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/analytics" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.analytics') }}</span></NuxtLink>
     </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">
       <button v-for="t in [['reports', $t('admin.index.tabs.reports')], ['lists', $t('admin.index.tabs.lists')], ['users', $t('admin.index.tabs.users')], ['flags', $t('admin.index.tabs.flags')]]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>
@@ -171,11 +181,12 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
         <div class="c-row"><strong class="c-grow">{{ REASON[r.reason] || r.reason }}</strong><CreatorStatusBadge :v="r.status" /></div>
         <div>{{ $t('admin.index.reports.list') }}<a :href="`/s/${r.wishlist.slug}`" target="_blank" rel="noopener">{{ r.wishlist.title }}</a>（{{ r.wishlist.slug }}）</div>
         <div v-if="r.detail" class="c-mute">{{ r.detail }}</div>
+        <p v-if="r.resolution_note" class="report-note"><strong>{{ $t('admin.index.reports.note') }}</strong><br>{{ r.resolution_note }}</p>
         <div class="c-mute">{{ $t('admin.index.reports.meta', { time: new Date(r.created_at).toLocaleString(dl), reporter: r.reporter }) }}{{ r.item_id ? $t('admin.index.reports.onItem') : '' }}</div>
         <div v-if="r.status === 'open'" class="c-row wrap c-mt">
           <button class="c-btn danger c-grow" @click="openMod({ id: r.wishlist.id, title: r.wishlist.title, moderation_status: 'ok' })">{{ $t('admin.index.hide') }}</button>
-          <button class="c-btn c-grow" @click="handle(r, 'actioned')">{{ $t('admin.index.reports.actioned') }}</button>
-          <button class="c-btn c-grow" @click="handle(r, 'dismissed')">{{ $t('admin.index.reports.dismiss') }}</button>
+          <button class="c-btn c-grow" @click="openReport(r, 'actioned')">{{ $t('admin.index.reports.actioned') }}</button>
+          <button class="c-btn c-grow" @click="openReport(r, 'dismissed')">{{ $t('admin.index.reports.dismiss') }}</button>
         </div>
       </article>
       <button v-if="rCursor" class="c-btn block" @click="loadReports(true)">{{ $t('admin.index.loadMore') }}</button>
@@ -190,7 +201,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p v-if="lDone && !lists.length" class="c-center c-mute">{{ $t('admin.index.lists.empty') }}</p>
       <article v-for="w in lists" :key="w.id" class="c-card c-mt12">
         <div class="c-row"><strong class="c-grow">{{ w.title }}</strong><CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" /></div>
-        <div class="c-mute">{{ $t('admin.index.lists.meta', { slug: w.slug, email: mask(w.owner.email || ''), count: w.open_report_count }) }}</div>
+        <div class="c-mute">{{ $t('admin.index.lists.meta', { slug: w.slug, email: maskEmail(w.owner.email || ''), count: w.report_count }) }}</div>
         <div class="c-row c-mt">
           <a :href="`/s/${w.slug}`" target="_blank" rel="noopener" class="c-btn">{{ $t('admin.index.lists.publicPage') }}</a>
           <button class="c-btn c-grow" :class="{ danger: w.moderation_status !== 'hidden' }" @click="openMod(w)">{{ w.moderation_status === 'hidden' ? $t('admin.index.restore') : $t('admin.index.hide') }}</button>
@@ -208,7 +219,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p v-if="uDone && !users.length" class="c-center c-mute">{{ $t('admin.index.users.empty') }}</p>
       <article v-for="u in users" :key="u.id" class="c-card c-mt12">
         <strong>{{ u.display_name }}</strong> <span v-if="u.is_staff" class="c-badge">STAFF</span> <span v-if="u.blocked" class="c-badge hidden">{{ $t('admin.index.users.badgeBlocked') }}</span> <span v-if="u.deleted" class="c-badge">{{ $t('admin.index.deleted') }}</span>
-        <div class="c-mute">{{ shown[u.id] ? u.email : mask(u.email || '') }} <button v-if="u.email" class="c-btn small" @click="shown[u.id] = !shown[u.id]">{{ shown[u.id] ? $t('admin.index.users.hideEmail') : $t('admin.index.users.show') }}</button></div>
+        <div class="c-mute">{{ shown[u.id] ? u.email : maskEmail(u.email || '') }} <button v-if="u.email" class="c-btn small" @click="shown[u.id] = !shown[u.id]">{{ shown[u.id] ? $t('admin.index.users.hideEmail') : $t('admin.index.users.show') }}</button></div>
         <div class="c-mute admin-id">{{ u.id }}<span v-if="u.handle">・@{{ u.handle }}</span></div>
         <div class="c-mute">{{ $t('admin.index.users.loginMethods') }}{{ u.identities.map((i: any) => PROVIDER[i.provider]).join($t('admin.index.users.sep')) || $t('admin.index.users.none') }}</div>
         <div class="c-row wrap c-mt c-mb" v-if="!u.deleted">
@@ -230,6 +241,9 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p class="c-mute">{{ $t('admin.index.flags.auditNote') }}</p>
     </section>
 
+    <CreatorConfirm :open="!!reportAct" :title="reportAct?.status === 'dismissed' ? $t('admin.index.reports.dismiss') : $t('admin.index.reports.actioned')" :text="reportAct?.title" :busy="reportBusy" :error="reportErr" @close="reportAct = null" @ok="handleReport">
+      <label class="c-field"><span>{{ $t('admin.index.reports.noteLabel') }}</span><textarea v-model="reportNote" :disabled="reportBusy" maxlength="1000" rows="3" /></label>
+    </CreatorConfirm>
     <CreatorConfirm :open="!!mod" :title="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideTitle')" :text="$t('admin.index.mod.text', { title: mod?.title })" :ok="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideOk')" :danger="!mod?.hidden" :busy="modBusy" :disabled="!mod?.hidden && !reason.trim()" :error="modErr" @close="mod = null" @ok="doMod">
       <label v-if="mod && !mod.hidden" class="c-field"><span>{{ $t('admin.index.mod.reason') }}</span><input v-model="reason" maxlength="200"></label>
     </CreatorConfirm>
@@ -241,12 +255,15 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
 </template>
 
 <style scoped>
+.report-note{white-space:pre-wrap;overflow-wrap:anywhere}
 .admin-stats{margin:0 0 20px}
 .admin-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .admin-id{overflow-wrap:anywhere;font:500 12px var(--mono)}
 /* 功能索引：編號磚，紅色只在 hover / 目前位置 */
 .k-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 24px;border-top:1px solid var(--ink-line);border-left:1px solid var(--line);counter-reset:kn}
-.k-nav .c-btn{counter-increment:kn;justify-content:flex-start;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:0 14px;gap:12px;font-size:14px;letter-spacing:.03em;white-space:normal;text-align:left;background:var(--card);position:relative}
+.k-nav .c-btn{counter-increment:kn;justify-content:flex-start;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:12px 14px;gap:8px;font-size:14px;letter-spacing:.03em;white-space:normal;text-align:left;background:var(--card);position:relative}
+.k-nav-content{flex:1;min-width:0;overflow-wrap:anywhere}
+.k-nav-content .c-badge{display:table;max-width:100%;margin-top:6px;white-space:normal}
 .k-nav .c-btn::before{content:counter(kn,decimal-leading-zero) / "";font:600 11px var(--mono);color:var(--red-text);letter-spacing:.08em;flex:none}
 .k-nav .c-btn::after{content:"\2192" / "";margin-left:auto;font-family:var(--mono);color:var(--mute);transition:transform var(--t) var(--ease)}
 @media (min-width:768px){.k-nav{grid-template-columns:repeat(5,minmax(0,1fr))}}

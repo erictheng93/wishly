@@ -29,6 +29,26 @@ pub fn text(s: &str, pointer: &str, multi: bool) -> Result<String, AppError> {
     Ok(s.to_string())
 }
 
+/// 選填備註：多行文字驗證、空字串視為 None、超過 max 字回 TOO_LONG
+pub fn optional_note(
+    value: Option<&str>,
+    pointer: &str,
+    max: usize,
+) -> Result<Option<String>, AppError> {
+    let note = value
+        .map(|s| text(s, pointer, true))
+        .transpose()?
+        .filter(|s| !s.is_empty());
+    if note.as_ref().is_some_and(|s| s.chars().count() > max) {
+        return Err(AppError::invalid(
+            pointer,
+            "TOO_LONG",
+            &format!("最多 {max} 字"),
+        ));
+    }
+    Ok(note)
+}
+
 /// 活動日限制 2000-01-01..2100-12-31
 pub fn event_date(d: NaiveDate, pointer: &str) -> Result<NaiveDate, AppError> {
     let (lo, hi) = (
