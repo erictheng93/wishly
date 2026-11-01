@@ -7,6 +7,7 @@
 - 所有會員通知都會進站內，只有兩種情況例外：驚喜鎖定中的受贈者端通知，以及使用者關閉了該類站內通知。
 - 站內通知不受安靜時段、Email 延後或 Email 開關影響，寫入後立即提示前端，不需重新整理。
 - 帳務、安全與期限類不可關閉。送禮進度、社交與生日可分別關閉站內或 Email（`inbox_gifts`、`email_gifts`、`inbox_social`、`email_social`，缺鍵視為開啟）。
+- `wishlist.supported`（有人把你的清單設為支持對象）屬社交類、只留站內，只發給個人清單擁有者或組織的 owner / coordinator。
 
 ## Email 判斷標準
 
@@ -47,7 +48,7 @@
 
 ### 第四級：會員不寄，只留站內（`InAppOnly`）
 
-`claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`。
+`claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`、`wishlist.supported`。
 
 舊訪客沒有站內通知，這些 kind 若寄給舊訪客仍照常寄信。
 

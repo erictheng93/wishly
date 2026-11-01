@@ -50,7 +50,7 @@ if (error.value && import.meta.server) setResponseStatus(useRequestEvent()!, gon
 
 if (data.value) {
   // 規格：docs 03 §5.6 meta 內容規則
-  const left = () => (data.value?.items ?? []).filter((i: any) => !i.is_fully_claimed).length
+  const left = () => (data.value?.items ?? []).filter((i: any) => i.funding_mode !== 'support' && !i.is_fully_claimed).length
   const origin = useRequestURL().origin
   useSeoMeta({
     title: () => data.value?.title,
@@ -69,7 +69,7 @@ useHead({ noscript: [{ innerHTML: '<style>.js-claim{display:none!important}.g-no
 const items = ref<any[]>(data.value?.items ?? [])
 watch(data, v => { if (v) items.value = v.items })
 // 剩餘優先 → 已滿排最後（穩定排序）
-const isDone = (i: any) => i.funding_mode === 'crowdfund' ? deriveDisplayStatus(i) !== 'open' : i.is_fully_claimed
+const isDone = (i: any) => i.funding_mode === 'support' ? false : i.funding_mode === 'crowdfund' ? deriveDisplayStatus(i) !== 'open' : i.is_fully_claimed
 const sorted = computed(() => [...items.value].sort((a, b) => Number(isDone(a)) - Number(isDone(b))))
 const pct = computed(() => data.value?.completion?.completion_pct ?? 0)
 const siteOff = computed(() => !!data.value?.site_status && data.value.site_status !== 'active') // 救災據點非 active 一律當暫停
@@ -104,7 +104,10 @@ const toLogin = () => navigateTo(loginUrl(route.fullPath))
 const auth = useAuth()
 function onLoginExpired() { sheetItem.value = null; me.value = null; auth.user.value = null; toLogin() }
 async function openClaim(it: any) { await meReady; if (!me.value) return toLogin(); sheetItem.value = it }
+// 歸因：SSR 不讀 localStorage，掛載後才有值，避免 hydration 不一致
+const viaId = ref<string>()
 onMounted(async () => {
+  rememberVia(slug, route.query.via); viaId.value = currentVia(slug)
   online.value = navigator.onLine
   addEventListener('online', () => { online.value = true; reload() }); addEventListener('offline', () => (online.value = false))
   lineHint.value = isLineBrowser() && !getPref('ws_hint_dismissed')
@@ -226,7 +229,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
           <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
           <p v-if="data.description" class="sx-desc">{{ data.description }}</p>
         </div>
-        <aside class="sx-gauge">
+        <aside v-if="data.completion.item_count" class="sx-gauge">
           <div class="sx-big" aria-hidden="true"><b>{{ pct }}</b><span>%</span></div>
           <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
           <div class="g-mute sx-cap">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
@@ -243,8 +246,11 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <p v-if="!items.length" class="sx-empty g-mute">{{ $t('guest.slug.empty') }}</p>
       <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
-        <GuestItemCard v-for="(it, n) in sorted" :key="it.id" :index="n + 1" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked" 
-          :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
+        <template v-for="(it, n) in sorted" :key="it.id">
+          <GuestSupportCard v-if="it.funding_mode === 'support'" :index="n + 1" :item="it" :closed="closed || siteOff" />
+          <GuestItemCard v-else :index="n + 1" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked"
+            :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
+        </template>
       </ul>
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
@@ -253,9 +259,9 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       </div>
     </template>
 
-    <GuestClaimSheet v-if="sheetItem" :key="sheetItem.id + (sheetMine?.id ?? '')" :item="sheetItem" :mine="sheetMine" :online="online" :logged-in-name="me?.display_name"
+    <GuestClaimSheet v-if="sheetItem" :key="sheetItem.id + (sheetMine?.id ?? '')" :item="sheetItem" :mine="sheetMine" :via="viaId" :online="online" :logged-in-name="me?.display_name"
       @close="sheetItem = null" @done="onDone" @stale="onStale" @switch-edit="onSwitchEdit" @login="onLoginExpired" />
-    <GuestFundSheet v-if="fundItem" :key="fundItem.id" :item="fundItem" :slug="slug" :online="online" :logged-in-name="me?.display_name"
+    <GuestFundSheet v-if="fundItem" :key="fundItem.id" :item="fundItem" :slug="slug" :via="viaId" :online="online" :logged-in-name="me?.display_name"
       @close="fundId = null" @done="onFunded" @stale="refresh()" />
     <GuestDialog v-if="funded" labelledby="funded-title" @close="funded = null"><div class="g-sheet center">
       <h1 id="funded-title" class="ok">{{ $t('guest.slug.fundedTitle') }}</h1>

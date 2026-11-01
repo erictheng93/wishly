@@ -65,7 +65,13 @@
       "errName": "Vui lòng nhập tên món quà",
       "errTarget": "Vui lòng nhập điểm mục tiêu (số nguyên dương)",
       "errStale": "Món quà này đã được sửa ở nơi khác. Vui lòng tải lại.",
-      "errAddr": "Món quà góp quỹ cần có thông tin nhận hàng trước, để nền tảng biết gửi đến đâu khi đạt mục tiêu."
+      "errAddr": "Món quà góp quỹ cần có thông tin nhận hàng trước, để nền tảng biết gửi đến đâu khi đạt mục tiêu.",
+      "modeSupport": "Ủng hộ một danh sách",
+      "supportLink": "Liên kết chia sẻ danh sách của họ",
+      "supportBad": "Hãy dán liên kết danh sách hợp lệ",
+      "supportTarget": "Ủng hộ: {name}",
+      "supportEnded": "Danh sách của họ đã kết thúc",
+      "supportNote": "Chuyển điều ước này sang danh sách của họ; quà của bạn bè sẽ tính cho họ."
     },
     "otp": {
       "group": "Mã xác minh 6 chữ số",

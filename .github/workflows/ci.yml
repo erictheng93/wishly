@@ -39,7 +39,7 @@ jobs:
         with: { workspaces: apps/api }
       - run: cargo fmt --manifest-path apps/api/Cargo.toml --check
       - run: cargo clippy --manifest-path apps/api/Cargo.toml --all-targets -- -D warnings
-      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with: { tool: "cargo-llvm-cov@0.9.1,cargo-audit@0.22.2" }
       - run: sh scripts/audit-api.sh
       - run: python3 scripts/test_coverage.py
@@ -161,7 +161,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

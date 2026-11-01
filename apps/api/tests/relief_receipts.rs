@@ -189,3 +189,32 @@ async fn idempotent_replay(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 1);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn support_item_not_receivable_nor_listed(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let other = user(&pool, "別人").await;
+    let target = wishlist(&pool, other.id, ListOpts::default()).await;
+    let sup: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,funding_mode,support_wishlist_id,category,urgency) VALUES($1,'支持',1,'support',$2,'food','high') RETURNING id")
+        .bind(f.site.id).bind(target.id).fetch_one(&pool).await.unwrap();
+    let mut h = ck(&f.vol.token);
+    h.extend(idem(Uuid::new_v4()));
+    let (s, _, _) = call(
+        &pool,
+        "POST",
+        &format!("/orgs/{}/receipts", f.org),
+        &h,
+        Some(json!({"item_id": sup, "qty": 1})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, _, v) = call(
+        &pool,
+        "GET",
+        &format!("/orgs/{}/sites/{}/receipts", f.org, f.site.id),
+        &ck(&f.vol.token),
+        None,
+    )
+    .await;
+    assert_eq!(v["items"].as_array().unwrap().len(), 1);
+}

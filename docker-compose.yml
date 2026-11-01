@@ -1,7 +1,7 @@
 # 本機開發環境（D38）：PostGIS、MinIO（模擬 R2）、Mailpit（收 OTP 信）
 services:
   db:
-    image: postgis/postgis:16-3.6@sha256:bdd9351e706076260ac21552cd9c1bed01582e69a902b1b5843f83fa0b4c5a9c
+    image: postgis/postgis:16-3.6@sha256:d07ce3f06f657b6516c7511412232e97174d7e9dcf4c9fe520109b682b44a201
     platform: linux/amd64 # 官方映像沒有 arm64，Apple Silicon 走模擬
     environment:
       POSTGRES_USER: wishly
@@ -21,7 +21,7 @@ services:
     ports: ["9000:9000", "9001:9001"]
     volumes: [minio:/bitnami/minio/data]
   mailpit:
-    image: axllent/mailpit:v1.31.6@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
+    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     ports: ["1025:1025", "8025:8025"]
 volumes:
   db:

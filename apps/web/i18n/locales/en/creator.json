@@ -65,7 +65,13 @@
       "errName": "Please enter an item name",
       "errTarget": "Please enter the target points (a positive whole number)",
       "errStale": "This item was changed elsewhere. Please reload.",
-      "errAddr": "Crowdfunded items need shipping info first, so the platform knows where to send it once the goal is reached."
+      "errAddr": "Crowdfunded items need shipping info first, so the platform knows where to send it once the goal is reached.",
+      "modeSupport": "Support a list",
+      "supportLink": "Share link of their list",
+      "supportBad": "Paste a valid list link",
+      "supportTarget": "Supporting: {name}",
+      "supportEnded": "Their list has ended",
+      "supportNote": "Hand this wish to their list; gifts from friends count toward them."
     },
     "otp": {
       "group": "6-digit verification code",

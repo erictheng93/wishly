@@ -101,7 +101,12 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
       <h2 class="c-h2 x-h" data-n="ITEMS">{{ $t('lists.progress.itemsTitle') }}</h2>
       <article v-for="(i, n) in d.items" :key="i.item_id" class="c-card pg-item">
         <span class="pg-n" aria-hidden="true">{{ String(Number(n) + 1).padStart(2, '0') }}</span>
-        <template v-if="i.funding_mode === 'crowdfund'">
+        <template v-if="i.funding_mode === 'support'">
+          <div class="c-row"><strong class="c-grow">{{ i.title }}</strong>
+            <span v-if="!i.support?.target" class="c-mute">{{ $t('lists.progress.supportEnded') }}</span></div>
+          <p class="c-mute c-m0">{{ $t('lists.progress.supportLine', { name: i.support?.target?.title ?? '–', points: i.support?.points ?? '–', qty: i.support?.qty ?? '–' }) }}</p>
+        </template>
+        <template v-else-if="i.funding_mode === 'crowdfund'">
           <div class="c-row"><strong class="c-grow">{{ i.title }}</strong>
             <span v-if="i.pledged_points === null" class="c-mute">{{ $t('lists.progress.hiddenProgress') }}</span>
             <span v-else-if="fundStatus(i)" class="c-badge" :class="fundStatus(i)">{{ displayStatusLabel(fundStatus(i)) }}</span>

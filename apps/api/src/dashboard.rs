@@ -372,16 +372,11 @@ async fn events(
                     }
                 }
             }
-            let fulfilled = s
-                .items
-                .values()
-                .filter(|i| {
-                    let (c, n) = units(i);
-                    c >= n
-                })
-                .count();
+            let counted: Vec<(i64, i64)> =
+                s.items.values().map(units).filter(|u| u.1 > 0).collect();
+            let fulfilled = counted.iter().filter(|(c, n)| c >= n).count();
             evs.push(("wishlist.updated", json!({ "status": s.status, "title": s.title,
-                "completion": { "item_count": s.items.len(), "fulfilled_count": fulfilled, "completion_pct": crate::wishlists::completion_pct(s.items.values().map(|i| units(i).0).sum(), s.items.values().map(|i| units(i).1).sum()) },
+                "completion": { "item_count": counted.len(), "fulfilled_count": fulfilled, "completion_pct": crate::wishlists::completion_pct(counted.iter().map(|u| u.0).sum(), counted.iter().map(|u| u.1).sum()) },
                 "updated_at": chrono::Utc::now() })));
             seen = s.items.clone();
             for (name, data) in evs {

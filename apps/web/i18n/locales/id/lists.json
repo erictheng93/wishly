@@ -114,7 +114,9 @@
       "invite": "Sertakan undangan teman",
       "invite_friends": "Setelah menerima, mereka menjadi temanmu dan bisa melihat daftar ini. Tautan berlaku 7 hari.",
       "invite_selected": "Setelah menerima, mereka menjadi temanmu dan otomatis masuk ke daftar teman dekat untuk daftar ini. Berlaku 7 hari dan bisa dipakai banyak orang, jadi kirim hanya ke orang yang kamu mau.",
-      "sms": "SMS"
+      "sms": "SMS",
+      "supportLine": "Mendukung {name} · {points} poin · {qty} barang",
+      "supportEnded": "Berakhir"
     },
     "progress": {
       "pageTitle": "Progres",
@@ -162,7 +164,9 @@
       "cancelConfirm": "Yakin ingin membatalkan klaim \"{name}\"? Jumlahnya akan dilepas untuk orang lain.",
       "ordersTitle": "Ringkasan pembelian patungan",
       "ordersLine": "Target tercapai {funded} · Dipesan {ordered} · Dikirim {shipped} · Sudah diterima {delivered}",
-      "shareList": "Bagikan wishlist"
+      "shareList": "Bagikan wishlist",
+      "supportEnded": "Daftar mereka telah berakhir",
+      "supportLine": "{name}: {points} poin · {qty} barang"
     },
     "cover": {
       "title": "Sampul",

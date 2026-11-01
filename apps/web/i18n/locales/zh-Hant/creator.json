@@ -65,7 +65,13 @@
       "errName": "請輸入品項名稱",
       "errTarget": "請輸入目標點數（正整數）",
       "errStale": "這個品項已在其他地方被修改，請重新載入",
-      "errAddr": "眾籌品項需要先填寫收件資訊，達標後平台才知道要寄到哪裡。"
+      "errAddr": "眾籌品項需要先填寫收件資訊，達標後平台才知道要寄到哪裡。",
+      "modeSupport": "支持一份清單",
+      "supportLink": "對方清單的分享連結",
+      "supportBad": "請貼上有效的清單連結",
+      "supportTarget": "支持：{name}",
+      "supportEnded": "對方清單已結束",
+      "supportNote": "把這個心願交給對方的清單，朋友的贈禮會算在對方身上。"
     },
     "otp": {
       "group": "6 位數驗證碼",

@@ -126,3 +126,38 @@ it('guest header only asks who is signed in when the sign-in hint cookie exists'
   await nextTick()
   expect(fetchMe).toHaveBeenCalledTimes(1)
 })
+
+// --- 支持品項卡片 ---
+import SupportCard from '../app/components/guest/SupportCard.vue'
+const support = (over: Record<string, any> = {}) => ({ id: 'it1', title: '幫基金會', funding_mode: 'support',
+  support: { ended: false, target: { slug: 'org-1', title: '震災物資', cover_image_url: null, cover_preset: 'gift', owner_name: '家園基金會' }, points: 12000, qty: 85, ...over } })
+function supportCard(item: any, closed = false) {
+  const NuxtLink = defineComponent({ props: ['to'], setup: (p, { slots }) => () => h('a', { href: p.to }, slots.default?.()) })
+  mounted = mount(SupportCard, { item, closed, index: 1 }, { NuxtLink }, { fmtPts, coverSrc: (w: any) => w.cover_image_url ?? '/covers/gift.svg' })
+  return mounted.el
+}
+it('support card shows both numbers with labels and links with via', () => {
+  const el = supportCard(support())
+  expect(el.textContent).toContain('12,000')
+  expect(el.textContent).toContain('85')
+  expect(el.textContent).toContain('透過這裡籌到的點數')
+  expect(el.textContent).toContain('透過這裡認捐的物資')
+  expect(el.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')).toBe('/s/org-1?via=it1')
+})
+it('support card zero is shown, null hides the numbers row', () => {
+  const zero = supportCard(support({ points: 0, qty: 0 }))
+  expect(zero.querySelector('.sp-nums')).not.toBeNull()
+  expect([...zero.querySelectorAll('.sp-nums dd')].map(d => d.textContent)).toEqual(['0', '0'])
+  mounted?.unmount()
+  const el = supportCard(support({ points: null, qty: null }))
+  expect(el.querySelector('.sp-nums')).toBeNull()
+})
+it('ended support card has no link', () => {
+  const el = supportCard(support({ ended: true }))
+  expect(el.querySelector('a')).toBeNull()
+  expect(el.textContent).toContain('已結束')
+  expect(el.textContent).toContain('12,000')
+})
+it('closed list support card has no link', () => {
+  expect(supportCard(support(), true).querySelector('a')).toBeNull()
+})

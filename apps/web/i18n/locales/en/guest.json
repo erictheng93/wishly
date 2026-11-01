@@ -344,6 +344,13 @@
       "counties": "Affected areas: {list}",
       "loadMore": "Load more",
       "viewSite": "View site"
+    },
+    "support": {
+      "kind": "SUPPORT LIST",
+      "points": "Points raised through here",
+      "qty": "Items claimed through here",
+      "go": "Go support",
+      "ended": "Ended"
     }
   }
 }

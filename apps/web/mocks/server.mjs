@@ -14,6 +14,9 @@ const items = [
   { id: 'i4', title: 'Combi 嬰兒推車', brand: 'Combi', spec: null, image_url: null, product_url: null, unit_price_amount: null, priority: 'high', qty_needed: 1, qty_claimed: 0,
     funding_mode: 'crowdfund', target_points: 9800, pledged_points: 6300, remaining_points: 3500, funding_status: 'open', display_status: 'open', funding_deadline: '2026-12-19T15:59:00Z',
     contributors: [{ display_name: '阿明', points: 3000 }, { display_name: '匿名朋友', points: 1300 }, { display_name: '小華', points: 2000 }] },
+  // 支持品項：指向另一份公開清單，只有累計成果、沒有進度條；「前往支持」連到 /s/demo?via=i5（mock 只認 demo / closed / sseoff）
+  { id: 'i5', title: '一起幫助災區的朋友', brand: null, spec: null, image_url: null, product_url: null, unit_price_amount: null, priority: 'medium', qty_needed: 1, qty_claimed: 0,
+    funding_mode: 'support', support: { ended: false, target: { slug: 'demo', title: '花蓮救災物資', cover_image_url: null, cover_preset: 'gift', owner_name: '慈善協會' }, points: 1200, qty: 18 } },
 ]
 const view = i => { const r = i.qty_needed - i.qty_claimed; return { funding_mode: 'quantity', ...i, qty_remaining: r, is_fully_claimed: r <= 0, progress_percent: i.target_points ? Math.floor(i.pledged_points / i.target_points * 100) : Math.round(i.qty_claimed / i.qty_needed * 100) } }
 const mockUser = { name: '登入會員' }, guests = new Map(), claims = new Map(), idem = new Map(), sse = new Set(), topups = [], refunds = []
