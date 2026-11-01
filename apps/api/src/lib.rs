@@ -40,6 +40,7 @@ pub mod sealed;
 pub mod security;
 pub mod session;
 pub mod share_views;
+pub mod support;
 pub mod topup;
 pub mod uploads;
 pub mod validate;

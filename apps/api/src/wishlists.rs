@@ -601,12 +601,13 @@ struct I {
     category: Option<String>,
     urgency: Option<String>,
     qty_received: i64,
+    support_wishlist_id: Option<Uuid>,
 }
 const ICOLS: &str = "id, wishlist_id, title, description, brand, spec, image_key, image_status::text AS image_status, product_url, unit_price_amount,
   funding_mode::text AS funding_mode, priority::text AS priority, qty_needed, qty_claimed, sort_order, created_at, updated_at,
   target_points, pledged_points, funding_status::text AS funding_status, funding_deadline, fulfillment_type::text AS fulfillment_type,
   price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status,
-  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received";
+  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received, support_wishlist_id";
 
 impl I {
     fn json(&self, locked: bool) -> Value {
@@ -616,7 +617,7 @@ impl I {
             "image_url": self.image_key.as_ref().filter(|_| self.image_status == "ready").map(|k| uploads::S3::get().public_url(k)),
             "image_status": self.image_status, "product_url": self.product_url, "unit_price_amount": self.unit_price_amount,
             "funding_mode": self.funding_mode, "priority": self.priority, "category": self.category, "urgency": self.urgency,
-            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": self.qty_received,
+            "qty_needed": self.qty_needed, "qty_claimed": if locked { None } else { Some(self.qty_claimed) }, "qty_received": self.qty_received, "support_wishlist_id": self.support_wishlist_id,
             // 眾籌欄位：驚喜鎖定時 pledged_points / funding_status / display_status / order_status 一律 null（否則可由「已達標」推知有人捐）
             "target_points": self.target_points, "pledged_points": if cf && !locked { Some(self.pledged_points) } else { None },
             "funding_status": self.funding_status.as_ref().filter(|_| !locked),
@@ -1581,7 +1582,8 @@ async fn item_create(
     if !m.get("title").is_some_and(|t| t.is_string()) {
         return Err(AppError::invalid("/title", "REQUIRED", "title 必填"));
     }
-    let mode = one_of(m, "funding_mode", &["quantity", "crowdfund"])?.unwrap_or("quantity");
+    let mode =
+        one_of(m, "funding_mode", &["quantity", "crowdfund", "support"])?.unwrap_or("quantity");
     let mut i = I {
         id: Uuid::nil(),
         wishlist_id: wid,
@@ -1611,6 +1613,7 @@ async fn item_create(
         category: None,
         urgency: None,
         qty_received: 0,
+        support_wishlist_id: None,
     };
     apply_item(m, &mut i)?;
     apply_relief(m, &mut i, w.ty == "relief", true)?;
@@ -1628,17 +1631,24 @@ async fn item_create(
     }
     if mode == "crowdfund" {
         init_crowdfund(&mut *tx, m, &mut i, w.event_date).await?;
+    } else if mode == "support" {
+        let slug = text(m, "support_slug", 1, 64)?
+            .flatten()
+            .ok_or_else(|| AppError::invalid("/support_slug", "REQUIRED", "support_slug 必填"))?;
+        crate::ratelimit::check(&mut *tx, &format!("support_item:{}", u.id), 20, 3600).await?;
+        i.support_wishlist_id = Some(crate::support::resolve_target(&mut tx, &slug, u.id).await?);
+        i.funding_mode = "support".into();
     }
     uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, description, brand, spec, image_key, image_status, product_url, unit_price_amount, priority, qty_needed, sort_order,
-                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref, category, urgency)
+                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref, category, urgency, support_wishlist_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7::image_status,$8,$9,$10::item_priority,$11,
                  (SELECT coalesce(max(sort_order),0)+10 FROM wishlist_items WHERE wishlist_id=$1),
-                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20) RETURNING id")
+                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20,$21) RETURNING id")
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency).bind(i.support_wishlist_id)
         .fetch_one(&mut *tx).await?;
     tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
@@ -1670,6 +1680,20 @@ async fn apply_funding(
     locked: bool,
 ) -> R<()> {
     let want = one_of(m, "funding_mode", &["quantity", "crowdfund"])?;
+    if m.contains_key("support_slug") {
+        return Err(AppError::problem(
+            422,
+            "SUPPORT_TARGET_LOCKED",
+            "支持對象建立後不可變更。",
+        ));
+    }
+    if i.funding_mode == "support" && want.is_some_and(|w| w != "support") {
+        return Err(AppError::problem(
+            409,
+            "FUNDING_MODE_LOCKED",
+            "支持品項無法變更募集方式。",
+        ));
+    }
     let touches = ["target_points", "funding_deadline", "price_snapshot_amount"]
         .iter()
         .any(|k| m.contains_key(*k));
