@@ -457,6 +457,7 @@
       },
       "walletFrozen": "錢包已凍結",
       "provider": "金流",
+      "merchantTradeNo": "商店交易編號",
       "createdAt": "建立時間",
       "paidAt": "付款時間",
       "action": {

@@ -8,7 +8,6 @@ const { api } = useApi()
 const { user: me } = useAuth()
 const tab = ref<'reports' | 'lists' | 'users' | 'flags'>('reports')
 const err = ref(''), msg = ref('')
-const mask = (e: string) => e.replace(/^(.).*(@.*)$/, '$1***$2')
 
 // 檢舉佇列
 const rStatus = ref('open')
@@ -31,6 +30,7 @@ async function loadReports(more = false) {
 const reportAct = ref<{ id: string; title: string; status: 'actioned' | 'dismissed' } | null>(null)
 const reportNote = ref(''), reportBusy = ref(false), reportErr = ref('')
 function openReport(r: any, status: 'actioned' | 'dismissed') {
+  if (reportBusy.value) return // 舊請求還在跑，避免它的錯誤落到新對話框
   reportAct.value = { id: r.id, title: r.wishlist.title, status }; reportNote.value = ''; reportErr.value = ''
 }
 async function handleReport() {
@@ -40,8 +40,8 @@ async function handleReport() {
   try {
     await api(`/admin/reports/${id}`, { method: 'PATCH', body: { status, note: reportNote.value.trim() || undefined } })
     reportAct.value = null
-    await Promise.all([loadReports(), loadStats(), tab.value === 'lists' ? searchLists() : 0])
-  } catch (e) { reportErr.value = errMsg(e) } finally { reportBusy.value = false }
+    await Promise.all([loadReports(), loadStats()])
+  } catch (e) { if (reportAct.value) reportErr.value = errMsg(e); else err.value = errMsg(e) } finally { reportBusy.value = false }
 }
 
 // 下架 / 恢復
@@ -161,10 +161,10 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <NuxtLink to="/admin/cash-refunds" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.cashRefunds') }} <span class="c-badge" data-testid="todo-requested_refunds">{{ $t('admin.index.todo.requested_refunds', { n: stats?.requested_refunds ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/wallet-debts" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.walletDebts') }} <span class="c-badge" data-testid="todo-open_debts">{{ $t('admin.index.todo.open_debts', { n: stats?.open_debts ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/catalog" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.catalog') }}</span></NuxtLink>
-      <NuxtLink to="/admin/orgs" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orgs') }} <span class="c-badge" data-testid="todo-pending_orgs">{{ $t('admin.index.todo.pending_orgs', { n: stats?.pending_orgs ?? '–' }) }}</span> <span class="c-badge" data-testid="todo-pending_permits">{{ $t('admin.index.todo.pending_permits', { n: stats?.pending_permits ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink :to="stats?.pending_orgs > 0 || !(stats?.pending_permits > 0) ? '/admin/orgs' : '/admin/orgs?status=pending_permits'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orgs') }} <span class="c-badge" data-testid="todo-pending_orgs">{{ $t('admin.index.todo.pending_orgs', { n: stats?.pending_orgs ?? '–' }) }}</span> <span class="c-badge" data-testid="todo-pending_permits">{{ $t('admin.index.todo.pending_permits', { n: stats?.pending_permits ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/relief-events" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.events') }}</span></NuxtLink>
       <NuxtLink to="/admin/audit" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.audit') }}</span></NuxtLink>
-      <NuxtLink to="/admin/finance" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink :to="stats?.disputed_topups > 0 ? '/admin/finance?tab=transactions&status=disputed' : '/admin/finance'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/analytics" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.analytics') }}</span></NuxtLink>
     </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">
@@ -201,7 +201,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p v-if="lDone && !lists.length" class="c-center c-mute">{{ $t('admin.index.lists.empty') }}</p>
       <article v-for="w in lists" :key="w.id" class="c-card c-mt12">
         <div class="c-row"><strong class="c-grow">{{ w.title }}</strong><CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" /></div>
-        <div class="c-mute">{{ $t('admin.index.lists.meta', { slug: w.slug, email: mask(w.owner.email || ''), count: w.report_count }) }}</div>
+        <div class="c-mute">{{ $t('admin.index.lists.meta', { slug: w.slug, email: maskEmail(w.owner.email || ''), count: w.report_count }) }}</div>
         <div class="c-row c-mt">
           <a :href="`/s/${w.slug}`" target="_blank" rel="noopener" class="c-btn">{{ $t('admin.index.lists.publicPage') }}</a>
           <button class="c-btn c-grow" :class="{ danger: w.moderation_status !== 'hidden' }" @click="openMod(w)">{{ w.moderation_status === 'hidden' ? $t('admin.index.restore') : $t('admin.index.hide') }}</button>
@@ -219,7 +219,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p v-if="uDone && !users.length" class="c-center c-mute">{{ $t('admin.index.users.empty') }}</p>
       <article v-for="u in users" :key="u.id" class="c-card c-mt12">
         <strong>{{ u.display_name }}</strong> <span v-if="u.is_staff" class="c-badge">STAFF</span> <span v-if="u.blocked" class="c-badge hidden">{{ $t('admin.index.users.badgeBlocked') }}</span> <span v-if="u.deleted" class="c-badge">{{ $t('admin.index.deleted') }}</span>
-        <div class="c-mute">{{ shown[u.id] ? u.email : mask(u.email || '') }} <button v-if="u.email" class="c-btn small" @click="shown[u.id] = !shown[u.id]">{{ shown[u.id] ? $t('admin.index.users.hideEmail') : $t('admin.index.users.show') }}</button></div>
+        <div class="c-mute">{{ shown[u.id] ? u.email : maskEmail(u.email || '') }} <button v-if="u.email" class="c-btn small" @click="shown[u.id] = !shown[u.id]">{{ shown[u.id] ? $t('admin.index.users.hideEmail') : $t('admin.index.users.show') }}</button></div>
         <div class="c-mute admin-id">{{ u.id }}<span v-if="u.handle">・@{{ u.handle }}</span></div>
         <div class="c-mute">{{ $t('admin.index.users.loginMethods') }}{{ u.identities.map((i: any) => PROVIDER[i.provider]).join($t('admin.index.users.sep')) || $t('admin.index.users.none') }}</div>
         <div class="c-row wrap c-mt c-mb" v-if="!u.deleted">
@@ -241,7 +241,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p class="c-mute">{{ $t('admin.index.flags.auditNote') }}</p>
     </section>
 
-    <CreatorConfirm :open="!!reportAct" :title="reportAct?.status === 'dismissed' ? $t('admin.index.reports.dismiss') : $t('admin.index.reports.actioned')" :text="reportAct?.title" :busy="reportBusy" :error="reportErr" @close="!reportBusy && (reportAct = null)" @ok="handleReport">
+    <CreatorConfirm :open="!!reportAct" :title="reportAct?.status === 'dismissed' ? $t('admin.index.reports.dismiss') : $t('admin.index.reports.actioned')" :text="reportAct?.title" :busy="reportBusy" :error="reportErr" @close="reportAct = null" @ok="handleReport">
       <label class="c-field"><span>{{ $t('admin.index.reports.noteLabel') }}</span><textarea v-model="reportNote" :disabled="reportBusy" maxlength="1000" rows="3" /></label>
     </CreatorConfirm>
     <CreatorConfirm :open="!!mod" :title="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideTitle')" :text="$t('admin.index.mod.text', { title: mod?.title })" :ok="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideOk')" :danger="!mod?.hidden" :busy="modBusy" :disabled="!mod?.hidden && !reason.trim()" :error="modErr" @close="mod = null" @ok="doMod">

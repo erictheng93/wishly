@@ -457,6 +457,7 @@
       },
       "walletFrozen": "Ví đã đóng băng",
       "provider": "Cổng thanh toán",
+      "merchantTradeNo": "Mã giao dịch của cửa hàng",
       "createdAt": "Thời gian tạo",
       "paidAt": "Thời gian thanh toán",
       "action": {

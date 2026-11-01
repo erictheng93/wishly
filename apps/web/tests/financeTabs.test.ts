@@ -7,6 +7,7 @@ import Payers from '../app/components/finance/Payers.vue'
 import Risk from '../app/components/finance/Risk.vue'
 import Transactions from '../app/components/finance/Transactions.vue'
 import { fmtCount } from '../app/utils/analytics'
+import { maskEmail } from '../app/utils/mask'
 import { fmtPts, fmtTime } from '../app/utils/crowdfund'
 import { delta, fmtDay, fmtRate, methodLabel, perPayer } from '../app/utils/finance'
 import { flush, input, mount, submit } from './vueHarness'
@@ -15,7 +16,7 @@ const api = vi.fn()
 const route = reactive<{ query: Record<string, string | undefined> }>({ query: {} })
 const replace = vi.fn(({ query }: { query: Record<string, string | undefined> }) => { route.query = query })
 const range = { from: '2026-10-02', to: '2026-10-31', days: 30 }
-const helpers = { fmtCount, fmtDay, fmtPts, fmtRate, fmtTime, methodLabel }
+const helpers = { maskEmail, fmtCount, fmtDay, fmtPts, fmtRate, fmtTime, methodLabel }
 const stubs: Record<string, Component> = {
   NuxtLink: { props: ['to'], setup: (props: any, { slots }: any) => () => h('a', { href: props.to }, slots.default?.()) },
   CreatorConfirm: {
@@ -296,4 +297,12 @@ it('交易 Email 預設遮罩，明確點擊才顯示，重新載入恢復遮罩
   route.query = { status: 'paid' }
   await settle()
   expect(el.textContent).not.toContain('alice@example.com')
+})
+
+it('交易明細：有商店交易編號才顯示', async () => {
+  api.mockResolvedValue(list([row({ id: 'a', merchant_trade_no: 'WT2610310001' }), row({ id: 'b', merchant_trade_no: null })]))
+  const el = show(Transactions)
+  await settle()
+  expect(el.textContent).toContain('WT2610310001')
+  expect(el.textContent!.split('WT2610310001').length).toBe(2)
 })

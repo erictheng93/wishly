@@ -457,6 +457,7 @@
       },
       "walletFrozen": "Wallet frozen",
       "provider": "Provider",
+      "merchantTradeNo": "Merchant trade no.",
       "createdAt": "Created at",
       "paidAt": "Paid at",
       "action": {

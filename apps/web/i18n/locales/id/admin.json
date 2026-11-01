@@ -457,6 +457,7 @@
       },
       "walletFrozen": "Dompet dibekukan",
       "provider": "Penyedia pembayaran",
+      "merchantTradeNo": "No. transaksi merchant",
       "createdAt": "Waktu dibuat",
       "paidAt": "Waktu pembayaran",
       "action": {

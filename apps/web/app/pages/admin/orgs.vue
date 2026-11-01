@@ -10,7 +10,8 @@ const STATUSES = ['pending', 'pending_permits', 'needs_changes', 'verified', 're
 const FLAGS = ['legal_name', 'display_name', 'org_type', 'tax_id', 'registration_no', 'authority', 'website', 'intro', 'logo_key', 'rep_name', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone', 'documents', 'permits']
 const show = (f: string, v: any) => v == null || v === '' ? '—' : f === 'org_type' ? t(`org.apply.type.${v}`, String(v)) : v
 const flagLabel = (f: string) => t(['logo_key', 'documents', 'permits'].includes(f) ? `admin.orgs.flag.${f}` : `org.apply.f.${f}`)
-const status = ref('pending')
+const qs = useRoute().query.status
+const status = ref(typeof qs === 'string' && STATUSES.includes(qs) ? qs : 'pending')
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
 const err = ref(''), msg = ref(''), dErr = ref('') // dErr：展開的詳情內的錯誤（下載、載入詳情），顯示在卡片內而非頁首
 
@@ -76,7 +77,8 @@ async function submit() {
     act.value = null; msg.value = t('admin.orgs.done')
     await load(); if (openId.value && rows.value.some(r => r.id === openId.value)) await reloadDetail(); else openId.value = null
   } catch (e: any) {
-    if (e.code === 'INVALID_STATE') { act.value = null; await load(); err.value = t('admin.orgs.stale'); if (openId.value) await reloadDetail() }
+    if (e.code === 'VALIDATION_FAILED' && e.errors?.[0]?.pointer === '/note') { a.step = 1; aerr.value = errMsg(e) } // 後端格式檢查比前端嚴：退回有輸入框的第一步
+    else if (e.code === 'INVALID_STATE') { act.value = null; await load(); err.value = t('admin.orgs.stale'); if (openId.value) await reloadDetail() }
     else aerr.value = errMsg(e)
   } finally { busy.value = false }
 }
