@@ -183,3 +183,22 @@ it('fund without a loaded account default hides the picker and lets the server a
   await input(el, '#fp', '100'); await submit(el); await flush()
   expect(api.mock.calls[0][1].body.visibility).toBeUndefined()
 })
+
+const VIA = '11111111-1111-4111-8111-111111111111'
+it('claim POST carries via_item_id from the via prop', async () => {
+  api.mockResolvedValue({ id: 'claim' })
+  const el = claim(null, true, '阿明', { via: VIA })
+  await submit(el); await flush()
+  expect(api.mock.calls[0]![1].body.via_item_id).toBe(VIA)
+})
+
+it('fund POST carries via_item_id from the via prop', async () => {
+  api.mockImplementation((path: string) => path === '/wallet' ? Promise.resolve({ wallet: { balance: 1000 } }) : Promise.resolve({ id: 'contribution' }))
+  mounted = mount(FundSheet, { item: { id: 'item', title: '禮物', remaining_points: 1000 }, online: true, slug: 'list', via: VIA, onDone: done, onStale: stale }, { GuestDialog, NuxtLink }, { fmtPts, fmtTime })
+  await flush()
+  const el = mounted.el
+  await input(el, '#fp', '300'); await submit(el)
+  el.querySelector<HTMLButtonElement>('button.g-btn:not(.ghost)')!.click(); await flush()
+  const post = api.mock.calls.find(c => c[0] === '/items/item/contributions')!
+  expect(post[1].body.via_item_id).toBe(VIA)
+})

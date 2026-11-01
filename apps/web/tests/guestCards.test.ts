@@ -145,7 +145,9 @@ it('support card shows both numbers with labels and links with via', () => {
   expect(el.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')).toBe('/s/org-1?via=it1')
 })
 it('support card zero is shown, null hides the numbers row', () => {
-  expect(supportCard(support({ points: 0, qty: 0 })).textContent).toContain('0')
+  const zero = supportCard(support({ points: 0, qty: 0 }))
+  expect(zero.querySelector('.sp-nums')).not.toBeNull()
+  expect([...zero.querySelectorAll('.sp-nums dd')].map(d => d.textContent)).toEqual(['0', '0'])
   mounted?.unmount()
   const el = supportCard(support({ points: null, qty: null }))
   expect(el.querySelector('.sp-nums')).toBeNull()
