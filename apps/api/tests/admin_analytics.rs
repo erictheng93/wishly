@@ -130,6 +130,10 @@ async fn stats_includes_pending_work(pool: PgPool) {
     permit(&pool, o, "approved", 30).await;
     let draft = org(&pool, u.id, "draft").await;
     permit(&pool, draft, "pending", 30).await;
+    let rejected = org(&pool, u.id, "rejected").await;
+    permit(&pool, rejected, "pending", 30).await;
+    let verified = org(&pool, u.id, "verified").await;
+    permit(&pool, verified, "pending", 30).await;
     let topup = topup_credit(&pool, u.id, 100).await;
     let wallet: uuid::Uuid = sqlx::query_scalar("SELECT wallet_id FROM topups WHERE id=$1")
         .bind(topup)
@@ -153,6 +157,7 @@ async fn stats_includes_pending_work(pool: PgPool) {
     sqlx::query("INSERT INTO purchase_orders(item_id,fulfillment_type,amount,shipping_address_snapshot) VALUES($1,'concierge',100,'\\x00')").bind(i).execute(&pool).await.unwrap();
     let (_, _, b) = call(&pool, "GET", "/admin/stats", &ck(&st.token), None).await;
     assert_eq!(b["pending_orgs"], 1);
+    // 只算 verified 組織的待審許可（與 org 列表 pending_permits 一致）：pending / rejected 的不計
     assert_eq!(b["pending_permits"], 1);
     for k in [
         "pending_orders",

@@ -546,7 +546,7 @@ async fn topup_list(
     let lim = q.limit.unwrap_or(50).clamp(1, 100);
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT t.id, jsonb_build_object('id', t.id, 'amount', t.amount, 'method', t.method, 'status', t.status,
-                'provider', t.provider, 'provider_txn_id', t.provider_txn_id, 'created_at', t.created_at, 'paid_at', t.paid_at,
+                'provider', t.provider, 'provider_txn_id', t.provider_txn_id, 'merchant_trade_no', t.merchant_trade_no, 'created_at', t.created_at, 'paid_at', t.paid_at,
                 'user', jsonb_build_object('id', u.id, 'display_name', u.display_name, 'email', u.email),
                 'wallet', jsonb_build_object('id', w.id, 'status', w.status))
            FROM topups t JOIN point_wallets w ON w.id = t.wallet_id JOIN users u ON u.id = w.user_id

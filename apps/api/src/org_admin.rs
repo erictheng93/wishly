@@ -97,19 +97,13 @@ struct Review {
 }
 
 fn review_note(note: Option<&str>, required: bool) -> Result<Option<String>, AppError> {
-    let note = note
-        .map(|s| crate::validate::text(s, "/note", true))
-        .transpose()?
-        .filter(|s| !s.is_empty());
+    let note = crate::validate::optional_note(note, "/note", 500)?;
     if required && note.is_none() {
         return Err(AppError::invalid(
             "/note",
             "REQUIRED",
             "退件／撤銷必須填原因",
         ));
-    }
-    if note.as_ref().is_some_and(|s| s.chars().count() > 500) {
-        return Err(AppError::invalid("/note", "TOO_LONG", "最多 500 字"));
     }
     Ok(note)
 }

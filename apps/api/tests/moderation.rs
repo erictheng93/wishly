@@ -303,3 +303,44 @@ async fn report_resolution_notes_and_lifetime_counts(pool: PgPool) {
         );
     }
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn moderation_reason_validated(pool: PgPool) {
+    let staff = staff(&pool, "營運").await;
+    let owner = user(&pool, "擁有者").await;
+    let w = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let uri = format!("/admin/wishlists/{}/moderation", w.id);
+    for bad in [
+        "含控制\u{0007}字元".to_string(),
+        "含bidi\u{202E}字元".to_string(),
+        "字".repeat(1001),
+    ] {
+        let (s, _, _) = call(
+            &pool,
+            "PATCH",
+            &uri,
+            &ck(&staff.token),
+            Some(json!({"moderation_status":"hidden","reason":bad})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let rid: Uuid = sqlx::query_scalar("INSERT INTO content_reports(wishlist_id, reason) VALUES ($1,'other'::report_reason) RETURNING id")
+        .bind(w.id).fetch_one(&pool).await.unwrap();
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&staff.token),
+        Some(json!({"moderation_status":"hidden","reason":" 合法原因 "})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let note: String =
+        sqlx::query_scalar("SELECT resolution_note FROM content_reports WHERE id=$1")
+            .bind(rid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(note, "合法原因");
+}

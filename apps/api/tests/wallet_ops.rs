@@ -1087,6 +1087,12 @@ async fn admin_topup_list_filters_and_paginates(pool: PgPool) {
         )
     );
     assert!(d[0]["user"]["email"].is_string() && d[0].get("paid_at").is_some());
+    let mtn: String = sqlx::query_scalar("SELECT merchant_trade_no FROM topups WHERE id=$1")
+        .bind(ids[1])
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(d[0]["merchant_trade_no"].as_str(), Some(mtn.as_str()));
     assert!(b["next_cursor"].is_null());
 
     // 分頁：limit=2 → 兩頁共 3 筆、不重複；limit 越界被夾住

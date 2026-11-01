@@ -232,15 +232,7 @@ async fn handle(
             "actioned | dismissed",
         ));
     }
-    let note = b
-        .note
-        .as_deref()
-        .map(|s| crate::validate::text(s, "/note", true))
-        .transpose()?
-        .filter(|s| !s.is_empty());
-    if note.as_ref().is_some_and(|s| s.chars().count() > 1000) {
-        return Err(AppError::invalid("/note", "TOO_LONG", "最多 1000 字"));
-    }
+    let note = crate::validate::optional_note(b.note.as_deref(), "/note", 1000)?;
     let mut tx = st.pool.begin().await?;
     let cur: String =
         sqlx::query_scalar("SELECT status::text FROM content_reports WHERE id = $1 FOR UPDATE")
@@ -298,7 +290,8 @@ async fn moderate(
             ))
         }
     };
-    let reason = b.reason.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let reason = crate::validate::optional_note(b.reason.as_deref(), "/reason", 1000)?;
+    let reason = reason.as_deref();
     if hidden && reason.is_none() {
         return Err(AppError::invalid("/reason", "REQUIRED", "下架必須填原因"));
     }
