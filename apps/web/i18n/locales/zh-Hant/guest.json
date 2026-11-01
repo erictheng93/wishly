@@ -344,6 +344,13 @@
       "counties": "受災縣市：{list}",
       "loadMore": "載入更多",
       "viewSite": "查看據點"
+    },
+    "support": {
+      "kind": "支持清單",
+      "points": "透過這裡籌到的點數",
+      "qty": "透過這裡認捐的物資",
+      "go": "前往支持",
+      "ended": "已結束"
     }
   }
 }

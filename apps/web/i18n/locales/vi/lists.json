@@ -114,7 +114,9 @@
       "invite": "Kèm lời mời kết bạn",
       "invite_friends": "Khi họ chấp nhận, họ sẽ thành bạn của bạn và xem được danh sách này. Liên kết có hiệu lực 7 ngày.",
       "invite_selected": "Khi họ chấp nhận, họ sẽ thành bạn của bạn và được tự động thêm vào danh sách bạn thân của danh sách này. Có hiệu lực 7 ngày, nhiều người dùng được, chỉ gửi cho người bạn muốn chia sẻ.",
-      "sms": "Tin nhắn SMS"
+      "sms": "Tin nhắn SMS",
+      "supportLine": "Ủng hộ {name} · {points} điểm · {qty} món",
+      "supportEnded": "Đã kết thúc"
     },
     "progress": {
       "pageTitle": "Tiến độ hoàn thành",
@@ -162,7 +164,9 @@
       "cancelConfirm": "Bạn có chắc muốn hủy lượt nhận tặng của \"{name}\"? Số lượng sẽ được mở lại cho người khác.",
       "ordersTitle": "Tổng hợp mua hàng góp quỹ",
       "ordersLine": "Đã đạt mục tiêu {funded}・Đã đặt hàng {ordered}・Đang vận chuyển {shipped}・Đã giao {delivered}",
-      "shareList": "Chia sẻ danh sách"
+      "shareList": "Chia sẻ danh sách",
+      "supportEnded": "Danh sách của họ đã kết thúc",
+      "supportLine": "{name}: {points} điểm · {qty} món"
     },
     "cover": {
       "title": "Ảnh bìa",

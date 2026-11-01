@@ -85,14 +85,14 @@ async fn profile(
         "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({claimed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+                (SELECT COALESCE(sum({needed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          FROM wishlists w
          WHERE w.owner_id = $1 AND w.org_id IS NULL AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND (w.visibility::text = 'public'
                 OR (w.visibility::text IN ('friends', 'selected') AND $3)
                 OR (w.visibility::text = 'friends' AND $4)
                 OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $2)))
-         ORDER BY w.created_at DESC, w.id DESC", claimed = crate::wishlists::CLAIMED_SQL)))
+         ORDER BY w.created_at DESC, w.id DESC", claimed = crate::wishlists::CLAIMED_SQL, needed = crate::wishlists::NEEDED_SQL)))
         .bind(uid).bind(viewer).bind(is_self).bind(friend).fetch_all(&st.pool).await?;
     let wishlists: Vec<Value> = lists
         .into_iter()

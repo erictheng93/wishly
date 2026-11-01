@@ -127,6 +127,7 @@ struct CreateReq {
     message: Option<String>,
     is_anonymous: Option<bool>,
     visibility: Option<String>,
+    via_item_id: Option<Uuid>,
 }
 
 async fn create(
@@ -172,6 +173,16 @@ async fn create(
         .await?;
     }
 
+    // 歸因：開交易前驗證、不加鎖；不成立就當沒帶
+    let via = match &acl {
+        Some((wid, ..)) => crate::support::valid_via(&st.pool, req.via_item_id, *wid)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = ?e, "valid_via 失敗，當作沒帶歸因");
+                None
+            }),
+        None => None,
+    };
     let scope = format!("user:{}:POST /items/{{id}}/contributions", user.id);
     let hash = idempotency::request_hash(&format!("POST /items/{item_id}/contributions"), &body);
     let mut tx = crate::begin_contended(&st.pool).await?;
@@ -254,9 +265,9 @@ async fn create(
 
     // ③ 認捐紀錄 ④ 扣點（post 於餘額不足回 409 INSUFFICIENT_POINTS，整筆 rollback）
     let cid: Uuid = sqlx::query_scalar(
-        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text::share_level) RETURNING id")
-        .bind(item_id).bind(wl).bind(user.id).bind(wallet).bind(&donor).bind(req.points).bind(&message).bind(anon).bind(&req.visibility).fetch_one(&mut *tx).await?;
+        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility, via_item_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text::share_level, $10) RETURNING id")
+        .bind(item_id).bind(wl).bind(user.id).bind(wallet).bind(&donor).bind(req.points).bind(&message).bind(anon).bind(&req.visibility).bind(via).fetch_one(&mut *tx).await?;
     let bal = points::post(
         &mut tx,
         wallet,
@@ -581,8 +592,8 @@ async fn reallocate(
         .await?;
     sqlx::query("UPDATE contributions SET status = 'reallocated', reallocated_to_item_id = $2 WHERE id = $1").bind(id).bind(tgt).execute(&mut *tx).await?;
     let new_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility)
-         SELECT $2, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility FROM contributions WHERE id = $1 RETURNING id")
+        "INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility, via_item_id)
+         SELECT $2, wishlist_id, user_id, wallet_id, donor_name, points, message, is_anonymous, visibility, via_item_id FROM contributions WHERE id = $1 RETURNING id")
         .bind(id).bind(tgt).fetch_one(&mut *tx).await?;
     // 扣點批次分配跟著轉投後的新認捐走（之後撤回 / 退點才退得回原批次）
     sqlx::query(

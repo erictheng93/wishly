@@ -105,16 +105,21 @@ pub fn display_status(fs: Option<&str>, order: Option<&str>) -> Option<&'static 
 /// 完成度的 (已完成, 需求) 單位：數量型 = (qty_claimed, qty_needed)；眾籌型 = 達標（funded / fulfilled）算 1/1，否則 0/1。
 /// 刻意不用 pledged/target 換算：驚喜鎖定時完成度只會在「達標」那一刻跳動，不會隨每筆認捐洩漏進度。
 pub fn units(mode: &str, needed: i32, claimed: i32, fs: Option<&str>) -> (i64, i64) {
-    if mode == "crowdfund" {
+    if mode == "support" {
+        (0, 0) // 支持品項不計入完成度
+    } else if mode == "crowdfund" {
         (matches!(fs, Some("funded" | "fulfilled")) as i64, 1)
     } else {
         (claimed as i64, needed as i64)
     }
 }
 /// 同 `units` 的 SQL 版（wishlist_items 欄位，無別名）
-pub const CLAIMED_SQL: &str = "CASE WHEN funding_mode = 'crowdfund' THEN (funding_status IN ('funded', 'fulfilled'))::int ELSE qty_claimed END";
+pub const CLAIMED_SQL: &str = "CASE WHEN funding_mode = 'support' THEN 0 WHEN funding_mode = 'crowdfund' THEN (funding_status IN ('funded', 'fulfilled'))::int ELSE qty_claimed END";
+/// 同 `units` 的需求量 SQL 版（無別名）：眾籌 1、支持 0、其餘 qty_needed
+pub const NEEDED_SQL: &str =
+    "CASE funding_mode WHEN 'crowdfund' THEN 1 WHEN 'support' THEN 0 ELSE qty_needed END";
 /// 品項是否還能送：眾籌依募資狀態與期限（同 contributions.rs 的檢查），一般品項依剩餘數量
-pub const OPEN_SQL: &str = "CASE WHEN funding_mode = 'crowdfund' THEN funding_status = 'open' AND funding_deadline > now() ELSE qty_claimed < qty_needed END";
+pub const OPEN_SQL: &str = "CASE WHEN funding_mode = 'support' THEN false WHEN funding_mode = 'crowdfund' THEN funding_status = 'open' AND funding_deadline > now() ELSE qty_claimed < qty_needed END";
 
 /// 清單封存 / 帳號刪除：把這些清單所有品項的 pledged 認捐退回錢包（captured 的採購單照常進行）。
 /// 呼叫端須已在同交易 UPDATE 過 wishlists（取得清單鎖，鎖序：清單 → 錢包 → 品項 → 認捐）。
@@ -540,8 +545,8 @@ async fn list(
     let rows = &rows[..rows.len().min(limit as usize)];
     let ids: Vec<Uuid> = rows.iter().map(|w| w.id).collect();
     let stats: Vec<(Uuid, i64, i64, i64, i64)> = sqlx::query_as(
-        sqlx::AssertSqlSafe(format!("SELECT wishlist_id, count(*), count(*) FILTER (WHERE {CLAIMED_SQL} >= qty_needed), sum({CLAIMED_SQL})::bigint, sum(qty_needed)::bigint FROM wishlist_items
-         WHERE wishlist_id = ANY($1) AND deleted_at IS NULL GROUP BY wishlist_id"))).bind(&ids).fetch_all(&st.pool).await?;
+        sqlx::AssertSqlSafe(format!("SELECT wishlist_id, count(*), count(*) FILTER (WHERE {CLAIMED_SQL} >= qty_needed), sum({CLAIMED_SQL})::bigint, sum({NEEDED_SQL})::bigint FROM wishlist_items
+         WHERE wishlist_id = ANY($1) AND deleted_at IS NULL AND funding_mode <> 'support' GROUP BY wishlist_id"))).bind(&ids).fetch_all(&st.pool).await?;
     let data: Vec<Value> = rows.iter().map(|w| {
         let (c, f, q, nd) = stats.iter().find(|s| s.0 == w.id).map(|s| (s.1, s.2, s.3, s.4)).unwrap_or((0, 0, 0, 0));
         let j = w.json();
@@ -590,12 +595,13 @@ struct I {
     category: Option<String>,
     urgency: Option<String>,
     qty_received: i64,
+    support_wishlist_id: Option<Uuid>,
 }
 const ICOLS: &str = "id, wishlist_id, title, description, brand, spec, image_key, image_status::text AS image_status, product_url, unit_price_amount,
   funding_mode::text AS funding_mode, priority::text AS priority, qty_needed, qty_claimed, sort_order, created_at, updated_at,
   target_points, pledged_points, funding_status::text AS funding_status, funding_deadline, fulfillment_type::text AS fulfillment_type,
   price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status,
-  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received";
+  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received, support_wishlist_id";
 
 impl I {
     fn json(&self, locked: bool) -> Value {
@@ -624,16 +630,35 @@ async fn items_of(pool: &PgPool, wid: Uuid) -> R<Vec<I>> {
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!("SELECT {ICOLS} FROM wishlist_items WHERE wishlist_id=$1 AND deleted_at IS NULL ORDER BY sort_order, id"))).bind(wid).fetch_all(pool).await?)
 }
 
+async fn support_of(pool: &PgPool, items: &[I]) -> R<std::collections::HashMap<Uuid, Value>> {
+    let ids: Vec<Uuid> = items
+        .iter()
+        .filter(|i| i.funding_mode == "support")
+        .map(|i| i.id)
+        .collect();
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    crate::support::summaries(pool, &ids).await
+}
+
 async fn get_one(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
     let w = load_owned(&st.pool, id, u.id).await?;
-    let items: Vec<Value> = items_of(&st.pool, id)
-        .await?
+    let rows = items_of(&st.pool, id).await?;
+    let mut sup = support_of(&st.pool, &rows).await?;
+    let items: Vec<Value> = rows
         .iter()
-        .map(|i| i.json(w.surprise_locked))
+        .map(|i| {
+            let mut v = i.json(w.surprise_locked);
+            if let Some(s) = sup.remove(&i.id) {
+                v["support"] = s;
+            }
+            v
+        })
         .collect();
     Ok(Json(json!({ "wishlist": w.json(), "items": items })))
 }
@@ -829,6 +854,9 @@ async fn update(
         .bind(reopening).bind(u.id).bind(&old_site_status).bind(old_event).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
+    }
+    if old_status != "active" && w.status == "active" {
+        crate::support::notify_targets(&mut tx, id).await?;
     }
     if bday {
         enable_birthday(
@@ -1093,6 +1121,7 @@ async fn dashboard(
 ) -> R<Json<Value>> {
     let w = load_owned(&st.pool, id, u.id).await?;
     let items = items_of(&st.pool, id).await?;
+    let mut sup = support_of(&st.pool, &items).await?;
     let locked = w.surprise_locked;
     let (mut n, mut f, mut claimed, mut needed) = (0i64, 0i64, 0i64, 0i64);
     for i in &items {
@@ -1102,6 +1131,9 @@ async fn dashboard(
             i.qty_claimed,
             i.funding_status.as_deref(),
         );
+        if nd == 0 {
+            continue;
+        }
         n += 1;
         claimed += c;
         needed += nd;
@@ -1203,7 +1235,7 @@ async fn dashboard(
             "funded_item_count": if locked { None } else { Some(funded) } },
         "items": items.iter().map(|i| {
             let cf = i.funding_mode == "crowdfund";
-            json!({ "item_id": i.id, "title": i.title, "funding_mode": i.funding_mode, "qty_needed": i.qty_needed,
+            json!({ "item_id": i.id, "title": i.title, "funding_mode": i.funding_mode, "support": sup.remove(&i.id), "qty_needed": i.qty_needed,
                 "qty_claimed": i.qty_claimed, "claimer_count": counts.get(&i.id).copied().unwrap_or(0),
                 "target_points": i.target_points, "pledged_points": cf.then_some(i.pledged_points),
                 "funding_status": i.funding_status.as_ref().filter(|_| !locked),
@@ -1567,7 +1599,8 @@ async fn item_create(
     if !m.get("title").is_some_and(|t| t.is_string()) {
         return Err(AppError::invalid("/title", "REQUIRED", "title 必填"));
     }
-    let mode = one_of(m, "funding_mode", &["quantity", "crowdfund"])?.unwrap_or("quantity");
+    let mode =
+        one_of(m, "funding_mode", &["quantity", "crowdfund", "support"])?.unwrap_or("quantity");
     let mut i = I {
         id: Uuid::nil(),
         wishlist_id: wid,
@@ -1597,6 +1630,7 @@ async fn item_create(
         category: None,
         urgency: None,
         qty_received: 0,
+        support_wishlist_id: None,
     };
     apply_item(m, &mut i)?;
     apply_relief(m, &mut i, w.ty == "relief", true)?;
@@ -1614,18 +1648,28 @@ async fn item_create(
     }
     if mode == "crowdfund" {
         init_crowdfund(&mut *tx, m, &mut i, w.event_date).await?;
+    } else if mode == "support" {
+        let slug = text(m, "support_slug", 1, 64)?
+            .flatten()
+            .ok_or_else(|| AppError::invalid("/support_slug", "REQUIRED", "support_slug 必填"))?;
+        crate::ratelimit::check(&mut *tx, &format!("support_item:{}", u.id), 20, 3600).await?;
+        i.support_wishlist_id = Some(crate::support::resolve_target(&mut tx, &slug, u.id).await?);
+        i.funding_mode = "support".into();
     }
     uploads::remember_media(&mut tx, u.id, i.image_key.as_deref()).await?;
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO wishlist_items (wishlist_id, title, description, brand, spec, image_key, image_status, product_url, unit_price_amount, priority, qty_needed, sort_order,
-                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref, category, urgency)
+                funding_mode, target_points, funding_status, funding_deadline, fulfillment_type, price_snapshot_amount, catalog_ref, category, urgency, support_wishlist_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7::image_status,$8,$9,$10::item_priority,$11,
                  (SELECT coalesce(max(sort_order),0)+10 FROM wishlist_items WHERE wishlist_id=$1),
-                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20) RETURNING id")
+                 $12::funding_mode,$13,$14::funding_status,$15,$16::fulfillment_type,$17,$18,$19,$20,$21) RETURNING id")
         .bind(wid).bind(&i.title).bind(&i.description).bind(&i.brand).bind(&i.spec).bind(&i.image_key).bind(&i.image_status)
         .bind(&i.product_url).bind(i.unit_price_amount).bind(&i.priority).bind(i.qty_needed)
-        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(&catalog_ref).bind(&i.category).bind(&i.urgency)
+        .bind(&i.funding_mode).bind(i.target_points).bind(&i.funding_status).bind(i.funding_deadline).bind(&i.fulfillment_type).bind(i.price_snapshot_amount).bind(if mode == "support" { None } else { catalog_ref.as_deref() }).bind(&i.category).bind(&i.urgency).bind(i.support_wishlist_id)
         .fetch_one(&mut *tx).await?;
+    if mode == "support" && w.status == "active" {
+        crate::support::notify_targets(&mut tx, wid).await?;
+    }
     tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1"
@@ -1656,6 +1700,20 @@ async fn apply_funding(
     locked: bool,
 ) -> R<()> {
     let want = one_of(m, "funding_mode", &["quantity", "crowdfund"])?;
+    if m.contains_key("support_slug") {
+        return Err(AppError::problem(
+            422,
+            "SUPPORT_TARGET_LOCKED",
+            "支持對象建立後不可變更。",
+        ));
+    }
+    if i.funding_mode == "support" && want.is_some_and(|w| w != "support") {
+        return Err(AppError::problem(
+            409,
+            "FUNDING_MODE_LOCKED",
+            "支持品項無法變更募集方式。",
+        ));
+    }
     let touches = ["target_points", "funding_deadline", "price_snapshot_amount"]
         .iter()
         .any(|k| m.contains_key(*k));

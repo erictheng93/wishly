@@ -52,7 +52,13 @@
       "errName": "Masukkan nama barang",
       "errTarget": "Masukkan target poin (bilangan bulat positif)",
       "errStale": "Barang ini sudah diubah di tempat lain, muat ulang",
-      "errAddr": "Barang patungan perlu alamat pengiriman dulu, supaya platform tahu mengirim ke mana setelah target tercapai."
+      "errAddr": "Barang patungan perlu alamat pengiriman dulu, supaya platform tahu mengirim ke mana setelah target tercapai.",
+      "modeSupport": "Dukung sebuah daftar",
+      "supportLink": "Tautan bagikan daftar mereka",
+      "supportBad": "Tempel tautan daftar yang valid",
+      "supportTarget": "Mendukung: {name}",
+      "supportEnded": "Daftar mereka telah berakhir",
+      "supportNote": "Serahkan harapan ini ke daftar mereka; hadiah teman dihitung untuk mereka."
     },
     "otp": {
       "group": "Kode verifikasi 6 digit",

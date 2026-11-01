@@ -325,7 +325,7 @@ pub fn category(kind: &str) -> Category {
         )
     {
         Category::Account
-    } else if matches!(head, "friend" | "birthday") {
+    } else if matches!(head, "friend" | "birthday") || kind == "wishlist.supported" {
         Category::Social
     } else {
         Category::Gifts
@@ -351,7 +351,8 @@ pub fn email_tier(kind: &str) -> EmailTier {
         | "friend.accepted"
         | "item.reopened"
         | "claim.cancelled_by_donor"
-        | "topup.expired" => EmailTier::InAppOnly,
+        | "topup.expired"
+        | "wishlist.supported" => EmailTier::InAppOnly,
         "claim.purchase_reminder"
         | "claim.list_closed"
         | "claim.cancelled_by_owner"
@@ -405,6 +406,7 @@ pub const KINDS: &[&str] = &[
     "friend.accepted",
     "birthday.friend",
     "birthday.nudge",
+    "wishlist.supported",
     "topup.credited",
     "topup.expired",
     "cash_refund.updated",
@@ -450,6 +452,10 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
             None => "/friends".into(),
         },
         "birthday.nudge" => "/lists/new".into(),
+        "wishlist.supported" => match payload["wishlist_id"].as_str() {
+            Some(w) => format!("/lists/{w}/edit"),
+            None => "/dashboard".into(),
+        },
         "auth.password_changed"
         | "auth.identity_linked"
         | "auth.identity_unlinked"
@@ -1709,6 +1715,18 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("Ulang tahunmu sudah dekat. Buat wishlist ulang tahun dan beri tahu teman-temanmu.\n{base}/lists/new\n"),
             ),
         ),
+        "wishlist.supported" => {
+            let who = payload["supporter_name"].as_str().unwrap_or_default();
+            (
+                l.pick(format!("{who} 把你的清單「{title}」放進了他們的願望"), format!("{who} added your list \"{title}\" to their wishes"), format!("{who} đã đưa danh sách \"{title}\" của bạn vào điều ước của họ"), format!("{who} memasukkan wishlist \"{title}\" milikmu ke daftar harapan mereka")),
+                l.pick(
+                    format!("{who} 把你的清單「{title}」放進了他們的願望，朋友可以從他們的清單找到你。\n我的清單：{base}/dashboard\n"),
+                    format!("{who} added your list \"{title}\" to their wishes, so their friends can find you from their list.\nMy lists: {base}/dashboard\n"),
+                    format!("{who} đã đưa danh sách \"{title}\" của bạn vào điều ước của họ, bạn bè của họ có thể tìm thấy bạn từ danh sách đó.\nDanh sách của tôi: {base}/dashboard\n"),
+                    format!("{who} memasukkan wishlist \"{title}\" milikmu ke daftar harapan mereka, jadi teman-teman mereka bisa menemukanmu dari sana.\nWishlistku: {base}/dashboard\n"),
+                ),
+            )
+        }
         _ => (l.pick("【Wishly】通知".into(), "[Wishly] Notification".into(), "[Wishly] Thông báo".into(), "[Wishly] Pemberitahuan".into()), format!("{base}\n")),
     };
     // 合併通知（worker 步驟 5）：主旨加件數，內文列出其餘品項
@@ -1848,6 +1866,7 @@ mod tests {
             "friend.accepted",
             "birthday.friend",
             "birthday.nudge",
+            "wishlist.supported",
         ] {
             assert_eq!(category(k), Social, "{k}");
         }
@@ -1909,6 +1928,7 @@ mod tests {
             "item.reopened",
             "claim.cancelled_by_donor",
             "topup.expired",
+            "wishlist.supported",
         ] {
             assert_eq!(email_tier(k), InAppOnly, "{k}");
         }

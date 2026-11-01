@@ -97,7 +97,7 @@ async fn explore(
                 o.display_name, o.handle,
                 (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
                 (SELECT COALESCE(sum({claimed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum(CASE WHEN funding_mode = 'crowdfund' THEN 1 ELSE qty_needed END), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+                (SELECT COALESCE(sum({needed}), 0)::bigint FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
          FROM wishlists w JOIN users o ON o.id = w.owner_id
          WHERE w.visibility = 'public' AND w.status = 'active' AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
            AND o.deleted_at IS NULL AND o.blocked_at IS NULL
@@ -107,7 +107,7 @@ async fn explore(
            AND NOT surprise_locked(w.surprise_mode, w.event_date)
            AND ($1::text IS NULL OR w.type::text = $1)
            AND EXISTS (SELECT 1 FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
-         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL)))
+         ORDER BY w.created_at DESC, w.id DESC LIMIT $2 OFFSET $3", claimed = crate::wishlists::CLAIMED_SQL, needed = crate::wishlists::NEEDED_SQL)))
         .bind(ty).bind(EXPLORE_PAGE + 1).bind((page - 1) * EXPLORE_PAGE).fetch_all(&st.pool).await?;
     let more = rows.len() as i64 > EXPLORE_PAGE;
     let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, cp, ev, on, oh, n, got, need)| json!({
@@ -241,16 +241,27 @@ async fn render(
         w.updated_at.timestamp_millis(),
         if w.locked { "-l" } else { "" }
     );
+    // 含支持品項的公開清單：成果數字不隨清單 updated_at 變動，不能用 ETag 做 304（先判斷、不讀 cookie）
+    let has_support = !restricted
+        && sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT 1 FROM wishlist_items WHERE wishlist_id = $1 AND deleted_at IS NULL AND funding_mode = 'support')",
+        )
+        .bind(w.id)
+        .fetch_one(&st.pool)
+        .await?;
     let cache = [(
         header::CACHE_CONTROL,
         if restricted {
             "private, no-store"
+        } else if has_support {
+            "public, s-maxage=10"
         } else {
             "public, s-maxage=10, stale-while-revalidate=60"
         }
         .to_string(),
     )];
     if !restricted
+        && !has_support
         && parts
             .headers
             .get(header::IF_NONE_MATCH)
@@ -267,6 +278,17 @@ async fn render(
          FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id
          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id", crate::points::DISPLAY_STATUS_SQL)))
         .bind(w.id).fetch_all(&st.pool).await?;
+
+    let support_ids: Vec<Uuid> = items
+        .iter()
+        .filter(|i| i.funding_mode == "support")
+        .map(|i| i.id)
+        .collect();
+    let mut support = if support_ids.is_empty() {
+        HashMap::new()
+    } else {
+        crate::support::summaries(&st.pool, &support_ids).await?
+    };
 
     // 驚喜鎖定期間無論 show_claimer_names 為何一律不輸出（伺服器端強制）
     let visible = w.show_claimer_names && !w.locked;
@@ -320,7 +342,7 @@ async fn render(
     }
 
     // 完成度：數量型 = qty_claimed/qty_needed；眾籌型達標（funded / fulfilled）算 1/1（見 wishlists::units）
-    let (mut total, mut got, mut fulfilled) = (0i64, 0i64, 0usize);
+    let (mut total, mut got, mut fulfilled, mut counted) = (0i64, 0i64, 0usize, 0usize);
     for i in &items {
         let (c, n) = crate::wishlists::units(
             &i.funding_mode,
@@ -328,6 +350,10 @@ async fn render(
             i.qty_claimed,
             i.funding_status.as_deref(),
         );
+        if n == 0 {
+            continue; // 支持品項不計入
+        }
+        counted += 1;
         total += n;
         got += c;
         if c >= n {
@@ -350,7 +376,9 @@ async fn render(
             "funding_status": i.funding_status, "display_status": i.display_status, "funding_deadline": i.funding_deadline,
             "progress_percent": if cf { pct(i.pledged_points, i.target_points.unwrap_or(0)) } else { pct(i.qty_claimed as i64, i.qty_needed as i64) },
         });
-        if visible {
+        if let Some(sp) = support.remove(&i.id) {
+            v["support"] = sp;
+        } else if visible {
             v["claimers"] = json!(claimers.remove(&i.id).unwrap_or_default());
             if cf { v["contributors"] = json!(contributors.remove(&i.id).unwrap_or_default()); }
         }
@@ -365,7 +393,7 @@ async fn render(
         // 救災據點是組織的，不曝露建立者個人資料（改顯示 org）
         "owner": if w.r#type == "relief" { Value::Null } else { json!({ "id": w.owner_id, "display_name": w.owner_name }) },
         "surprise_mode": w.surprise_mode, "surprise_locked": w.locked, "claimers_visible": visible,
-        "completion": { "item_count": items.len(), "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
+        "completion": { "item_count": counted, "fulfilled_count": fulfilled, "completion_pct": pct(got, total) },
         "items": item_json, "updated_at": w.updated_at,
     });
     if w.r#type == "relief" {
@@ -374,10 +402,25 @@ async fn render(
     if restricted {
         return Ok((cache, Json(body)).into_response());
     }
+    if has_support {
+        return Ok((cache, Json(body)).into_response());
+    }
     Ok((cache, [(header::ETAG, etag)], Json(body)).into_response())
 }
 
 // ---------- 救災：事件 / 組織公開頁（皆不讀 cookie，可被 CDN 快取） ----------
+/// 公開可見的據點：上線、public、據點狀態 active、未下架、許可未過期（不等每小時 tick 暫停）
+macro_rules! live_site {
+    () => {
+        "w.type = 'relief' AND w.status = 'active' AND w.visibility = 'public' AND w.site_status = 'active'
+        AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
+        AND EXISTS (SELECT 1 FROM organizations vo WHERE vo.id = w.org_id AND vo.verification_status = 'verified')
+        AND NOT EXISTS (SELECT 1 FROM org_permits vp WHERE vp.id = w.permit_id AND (now() AT TIME ZONE 'Asia/Taipei')::date > vp.valid_to)"
+    };
+}
+pub(crate) use live_site;
+pub(crate) const LIVE_SITE: &str = live_site!();
+
 mod relief {
     use super::*;
     use axum::extract::Query;
@@ -387,12 +430,6 @@ mod relief {
         "public, s-maxage=10, stale-while-revalidate=60",
     )];
     const EVENTS_PAGE: i64 = 20;
-    /// 公開可見的據點：上線、public、據點狀態 active、未下架、許可未過期（不等每小時 tick 暫停）
-    const LIVE_SITE: &str = "w.type = 'relief' AND w.status = 'active' AND w.visibility = 'public' AND w.site_status = 'active'
-        AND w.deleted_at IS NULL AND w.moderation_status = 'ok'
-        AND EXISTS (SELECT 1 FROM organizations vo WHERE vo.id = w.org_id AND vo.verification_status = 'verified')
-        AND NOT EXISTS (SELECT 1 FROM org_permits vp WHERE vp.id = w.permit_id AND (now() AT TIME ZONE 'Asia/Taipei')::date > vp.valid_to)";
-
     /// relief 清單頁多帶組織 / 事件 / 據點資訊
     pub async fn extend_site(
         pool: &sqlx::PgPool,
@@ -496,7 +533,7 @@ mod relief {
               WHERE w.event_id = $1 AND {LIVE_SITE}
               GROUP BY w.id, o.id ORDER BY w.created_at, w.id",
             needs = ["critical", "high", "medium", "low"].map(|u| format!(
-                "'{u}', count(i.id) FILTER (WHERE i.urgency = '{u}' AND CASE WHEN i.funding_mode = 'crowdfund' THEN i.funding_status = 'open' ELSE i.qty_claimed < i.qty_needed END)"
+                "'{u}', count(i.id) FILTER (WHERE i.urgency = '{u}' AND i.funding_mode <> 'support' AND CASE WHEN i.funding_mode = 'crowdfund' THEN i.funding_status = 'open' ELSE i.qty_claimed < i.qty_needed END)"
             )).join(","))))
             .bind(ev.0).fetch_all(&st.pool).await?;
         Ok((

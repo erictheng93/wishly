@@ -79,7 +79,8 @@ async fn record(
     }
     let site: (Uuid, String) = sqlx::query_as(
         "SELECT w.id, w.site_status FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
-         WHERE i.id = $1 AND i.deleted_at IS NULL AND w.type = 'relief' AND w.org_id = $2 AND w.deleted_at IS NULL")
+         WHERE i.id = $1 AND i.deleted_at IS NULL AND w.type = 'relief' AND w.org_id = $2 AND w.deleted_at IS NULL
+           AND i.funding_mode <> 'support'")
         .bind(req.item_id).bind(org).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
     if site.1 == "closed" {
         return Err(AppError::problem(
@@ -125,7 +126,7 @@ async fn list(
                 'qty', x.qty, 'note', x.note, 'recorded_by_name', u.display_name, 'created_at', x.created_at)
                 ORDER BY x.created_at DESC, x.id DESC) AS entries
               FROM receipts x JOIN users u ON u.id = x.recorded_by WHERE x.item_id = i.id) r ON true
-          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id")
+          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND i.funding_mode <> 'support' ORDER BY i.sort_order, i.id")
         .bind(wid).fetch_all(&st.pool).await?;
     Ok(Json(json!({ "site": site, "items": items })))
 }

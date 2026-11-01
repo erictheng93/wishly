@@ -344,6 +344,13 @@
       "counties": "Khu vực bị ảnh hưởng: {list}",
       "loadMore": "Tải thêm",
       "viewSite": "Xem điểm"
+    },
+    "support": {
+      "kind": "DANH SÁCH ỦNG HỘ",
+      "points": "Điểm gây quỹ qua đây",
+      "qty": "Vật phẩm nhận tặng qua đây",
+      "go": "Đến ủng hộ",
+      "ended": "Đã kết thúc"
     }
   }
 }
