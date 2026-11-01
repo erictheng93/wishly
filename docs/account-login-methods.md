@@ -1,7 +1,9 @@
 # 登入方式與 Email 政策
 
 - 設定頁可新增或解除 Email、Google、LINE。原生殼的 Google／LINE 走系統瀏覽器 + deep link（登入 `native_exchange`、綁定 `link-ticket` → `link-confirm`）。
-- 網頁登入頁只有「Email + 密碼」與 Google／LINE，`/auth/otp/*` 沒有前端入口。綁定 Email 只驗證信箱、不設密碼，LINE／Google 開戶的使用者要先在設定頁走「設定 Email 登入密碼」（或忘記密碼），之後才能用 Email 登入。
+- 登入頁提供 LINE、Google、Email 驗證碼與 Email + 密碼（D69）：驗證碼是主要的 Email 登入方式，密碼為選用，保留給信箱暫時收不到信時備援。綁定 Email 只驗證信箱、不設密碼，綁定後就能用驗證碼登入；要用密碼，再到設定頁走「設定 Email 登入密碼」（或忘記密碼）。
+- 尚未註冊的信箱以驗證碼登入時會直接開戶，顯示名稱取信箱 @ 前段（`/login` 有說明）。`/welcome` 的名稱欄位說明用途，儀表板在名稱仍等於信箱前綴時提示改名（`AccountNudge`）。
+- 以驗證碼或密碼登入且是沒見過的裝置時發 `auth.new_device` 安全通知。LINE／Google 由供應商把關，且同一支手機在瀏覽器與 LINE 內建瀏覽器間切換是最大的誤報來源，所以不通知；這類登入留下的 session 仍算見過的裝置。比對方式是去掉版本號後的 User-Agent，所以瀏覽器更新不算新裝置，開戶第一次登入也不通知；攻擊者仿冒相同 User-Agent 時不會觸發。
 - 手動 OAuth 綁定須保留發起的同一個 session；state 簽章包含供應商、帳號、session、用途及 10 分鐘期限。Email 綁定 OTP 同樣限定帳號、session 與用途，不能拿來登入、註冊或重設密碼。
 - 綁定的 provider identity 或已驗證 Email 屬於另一個**空帳號**（SQL 函式 `user_is_blank`：沒有任何指向 users 的外鍵資料，只允許登入方式、session、通知、活動日、頭像與零餘額且無帳本的錢包；staff、停權帳號不算空）時，該帳號會被併入：這次綁定的 identity 連同密碼搬到目前帳號，其餘 identity 移除、session 撤銷、帳號軟刪除並匿名化、頭像退役，稽核紀錄 `account.absorb`（`actor_id` 為保留帳號、`entity_id` 為被併入帳號）。常見情境是先用 Email 註冊、之後誤按 LINE 登入開出新帳號，再到 `/settings` 綁定 LINE。
 - 另一個帳號有資料，或衝突涉及兩個以上帳號，仍回 `409 IDENTITY_IN_USE`。不合併兩個都有資料的帳號，也不搬移清單、捐助、點數與訂單，由客服個案處理（使用者可在 `/settings` 複製帳號 ID）。對方帳號正被其他操作鎖住時回 `409 IDENTITY_BUSY`（不等待，避免互相吸收時鎖死）。
@@ -17,7 +19,7 @@
 
 ## 沒有 Email 的 LINE 帳號
 
-允許使用，但無法收取 Email 通知或用密碼重設找回帳號，也沒有 LINE 通知替代通道。設定頁顯示限制並停用 Email 通知開關。建議在失去 LINE 登入能力前，驗證 Email 或綁定另一種登入方式。Email 綁定後可使用「設定／重設 Email 登入密碼」；重設會登出所有裝置。後台可用名稱、帳號代號或 UUID 搜尋。
+允許使用，但無法收取 Email 通知或用驗證碼、密碼重設找回帳號，也沒有 LINE 通知替代通道。設定頁顯示限制並停用 Email 通知開關；儀表板顯示可關閉的綁定提示，關閉後同一台裝置不再出現。建議在失去 LINE 登入能力前，驗證 Email 或綁定另一種登入方式。Email 綁定後可用驗證碼登入，也可使用「設定／重設 Email 登入密碼」；重設會登出所有裝置。後台可用名稱、帳號代號或 UUID 搜尋。
 
 新增／解除登入方式的安全通知沿用 durable outbox，不受任何通知偏好或退訂影響（屬通知政策的第一級，見 `docs/notification-policy.md`），寄往變更時的已驗證信箱；解除後即使聯絡 Email 清空，也保留該次安全信的收件人。沒有任何已驗證 Email 時無法寄送安全信；帳號刪除仍會取消待寄通知，並清除安全信收件地址與該帳號所有綁定驗證碼。
 

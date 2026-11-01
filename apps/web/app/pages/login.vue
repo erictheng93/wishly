@@ -8,6 +8,8 @@ const redirect = safeRedirect(route.query.redirect)
 const email = ref(''), password = ref('')
 const busy = ref(false)
 const err = ref('')
+const useCode = ref(false), noPwHint = ref(false)
+function toggleCode() { useCode.value = !useCode.value; err.value = ''; noPwHint.value = false }
 // 失敗多次後後端要求人機驗證；不自動重送（新 token 一到就送會拿舊的錯密碼連續失敗）
 const needCaptcha = ref(false), tsToken = ref(''), capKey = ref(0)
 const authError = useState<string>('auth-error', () => '')
@@ -30,7 +32,7 @@ onMounted(async () => {
 })
 
 async function submit() {
-  err.value = ''; busy.value = true
+  err.value = ''; noPwHint.value = false; busy.value = true
   try {
     await login(email.value.trim(), password.value, tsToken.value || undefined)
     needCaptcha.value = false
@@ -38,6 +40,7 @@ async function submit() {
   } catch (e: any) {
     // token 只能用一次：每次失敗後都重新出一張
     if (needCaptcha.value || e.code === 'CAPTCHA_REQUIRED') { needCaptcha.value = true; tsToken.value = ''; capKey.value++ }
+    noPwHint.value = e.code === 'INVALID_CREDENTIALS'
     err.value = e.code === 'CAPTCHA_REQUIRED' ? t('auth.login.captcha') : e.code === 'INVALID_CREDENTIALS' ? t('auth.login.badCredentials') : e.status === 429 ? t('auth.login.tooMany') : errMsg(e)
   } finally { busy.value = false }
 }
@@ -59,15 +62,18 @@ async function social(provider: 'google' | 'line') {
       <CreatorAuthTag left="No.001" right="Member access" />
       <p class="c-mute c-auth-lead">{{ $t('auth.login.note') }}</p>
       <p v-if="okMsg" class="c-ok" role="status">{{ okMsg }}</p>
-      <form @submit.prevent="submit">
+      <CreatorCodeLogin v-if="useCode" :email="email" @done="navigateTo(redirect)" />
+      <form v-else @submit.prevent="submit">
         <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
         <CreatorPasswordField v-model="password" :label="$t('auth.login.password')" autocomplete="current-password" />
         <p class="c-auth-forgot"><NuxtLink to="/forgot-password">{{ $t('auth.login.forgot') }}</NuxtLink></p>
         <Turnstile v-if="needCaptcha" :key="capKey" v-model="tsToken" />
         <p v-if="err || loginError" class="c-err" role="alert">{{ err || loginError }} <SupportLink /></p>
+        <p v-if="noPwHint" class="c-mute">{{ $t('auth.login.noPasswordHint') }}</p>
         <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
       </form>
       <p class="c-or">{{ $t('auth.login.or') }}</p>
+      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="toggleCode">{{ useCode ? $t('auth.login.usePassword') : $t('auth.login.useCode') }}</button>
       <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
       <button type="button" class="c-btn block" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
       <p class="c-auth-foot">{{ $t('auth.login.noAccount') }}<NuxtLink :to="{ path: '/register', query: q }">{{ $t('auth.login.register') }}</NuxtLink></p>

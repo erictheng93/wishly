@@ -115,6 +115,26 @@ pub(crate) async fn new_session(
         json!({ "method": method }),
     )
     .await?;
+    // 只看驗證碼與密碼（D69）：OAuth 由供應商把關，且同機在瀏覽器與 LINE 內建瀏覽器間切換是最大的誤報來源。
+    // 有舊 session 但都不是這台裝置才通知：開戶第一次登入沒有比對對象，去掉版本號後瀏覽器更新不算新裝置。
+    // shortcut: 只比 User-Agent，攻擊者仿冒同樣的 UA 就不會觸發；要更準再改成長效裝置 cookie。
+    let new_device = matches!(method, "otp" | "password")
+        && sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM sessions WHERE user_id=$1 AND id<>$2)
+                AND NOT EXISTS(SELECT 1 FROM sessions WHERE user_id=$1 AND id<>$2
+                    AND regexp_replace(user_agent, '[0-9._]+', '', 'g') IS NOT DISTINCT FROM regexp_replace($3, '[0-9._]+', '', 'g'))",
+        )
+        .bind(user_id)
+        .bind(sid)
+        .bind(ua)
+        .fetch_one(&mut *tx)
+        .await?;
+    if new_device {
+        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1,'email','auth.new_device','{}')")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
     Ok(token)
 }

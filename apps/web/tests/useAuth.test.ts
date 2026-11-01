@@ -56,6 +56,24 @@ it.each(['login', 'verifyRegister'] as const)('%s saves native session before fe
   expect(api.mock.calls[1]).toEqual(['/me', { noRedirect: true }])
 })
 
+it('requestLoginCode passes the captcha token without starting a session', async () => {
+  api.mockResolvedValueOnce({ challenge_id: 'c' })
+  expect(await useAuth().requestLoginCode('me@example.test', 'ts')).toEqual({ challenge_id: 'c' })
+  expect(api).toHaveBeenCalledTimes(1)
+  expect(api).toHaveBeenCalledWith('/auth/otp/request', { method: 'POST', body: { email: 'me@example.test', turnstile_token: 'ts' }, noRedirect: true, credentials: 'include' })
+})
+
+it('verifyLoginCode saves native session before fetching fresh identity', async () => {
+  api.mockResolvedValueOnce({ session_token: 'session' }).mockResolvedValueOnce({ id: 'signed-in' })
+  expect(await useAuth().verifyLoginCode('me@example.test', '123456', 'challenge')).toEqual({ id: 'signed-in' })
+  expect(api.mock.calls[0]).toEqual(['/auth/otp/verify', {
+    method: 'POST', body: { email: 'me@example.test', code: '123456', challenge_id: 'challenge' },
+    noRedirect: true, credentials: 'include',
+  }])
+  expect(token).toHaveBeenCalledWith('session')
+  expect(api.mock.calls[1]).toEqual(['/me', { noRedirect: true }])
+})
+
 it('logout clears identity and native token even if server logout fails', async () => {
   const auth = useAuth()
   auth.user.value = { id: 'old' }
