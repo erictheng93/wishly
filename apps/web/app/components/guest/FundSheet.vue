@@ -2,7 +2,7 @@
 import '~/assets/guest.css'
 // 「心願眾籌」bottom sheet（契約 POST /items/{id}/contributions）。需要登入；Idempotency-Key 於開啟時產生，
 // 確定性失敗後換新 key（body 可能已改），網路失敗才沿用同一把重試。
-const props = defineProps<{ item: any, online: boolean, slug: string, loggedInName?: string }>()
+const props = defineProps<{ item: any, online: boolean, slug: string, loggedInName?: string, via?: string }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [] }>()
 const { api } = useApi()
 const { t } = useI18n()
@@ -31,7 +31,7 @@ async function submit() {
   try {
     const r = await api(`/items/${props.item.id}/contributions`, {
       method: 'POST', headers: { 'Idempotency-Key': key.value }, noRedirect: true,
-      body: { points: points.value, message: message.value.trim() || undefined, is_anonymous: anon.value, visibility: vis.value },
+      body: { points: points.value, message: message.value.trim() || undefined, is_anonymous: anon.value, visibility: vis.value, via_item_id: props.via },
     })
     emit('done', r)
   } catch (e: any) {

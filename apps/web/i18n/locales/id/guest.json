@@ -344,6 +344,13 @@
       "counties": "Wilayah terdampak: {list}",
       "loadMore": "Muat lebih banyak",
       "viewSite": "Lihat lokasi"
+    },
+    "support": {
+      "kind": "DAFTAR DUKUNGAN",
+      "points": "Poin terkumpul lewat sini",
+      "qty": "Barang yang diambil lewat sini",
+      "go": "Pergi mendukung",
+      "ended": "Selesai"
     }
   }
 }

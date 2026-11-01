@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
 // 捐助 / 修改捐助 bottom sheet（docs 03 §5.7）。Idempotency-Key 於開啟時產生，重試沿用。
-const props = defineProps<{ item: any, mine: any | null, online: boolean, loggedInName?: string }>()
+const props = defineProps<{ item: any, mine: any | null, online: boolean, loggedInName?: string, via?: string }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [remaining: number], switchEdit: [], login: [] }>()
 const { api, newKey } = useGuest()
 const { t } = useI18n()
@@ -33,7 +33,7 @@ async function submit() {
     } else {
       r = await api(`/items/${props.item.id}/claims`, {
         method: 'POST', headers: { 'Idempotency-Key': key }, keepToken: true,
-        body: { qty: qty.value, note: note.value || undefined, visibility: vis.value, is_anonymous: anon.value },
+        body: { qty: qty.value, note: note.value || undefined, visibility: vis.value, is_anonymous: anon.value, via_item_id: props.via },
       })
     }
     emit('done', r)
