@@ -20,9 +20,10 @@ async function checkTarget() {
   if (!slug) { err.value = supLink.value.trim() ? tr('creator.itemSheet.supportBad') : ''; return }
   try {
     const r = await api(`/public/wishlists/${slug}`)
+    if (!isCurrentSlug(supLink.value, slug)) return // 輸入已改，丟棄過期回應
     supSlug.value = slug; err.value = ''
     if (!f.title.trim() && r?.title) f.title = r.title
-  } catch { err.value = tr('creator.itemSheet.supportBad') } finally { supChecked.value = true }
+  } catch { if (isCurrentSlug(supLink.value, slug)) err.value = tr('creator.itemSheet.supportBad') } finally { if (isCurrentSlug(supLink.value, slug)) supChecked.value = true }
 }
 watch(() => props.open, (v) => {
   if (!v) return
@@ -83,7 +84,8 @@ async function save() {
       <label class="c-field"><span>{{ $t('creator.itemSheet.brand') }}</span><input v-model="f.brand" maxlength="100"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.spec') }}</span><input v-model="f.spec" maxlength="200"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.url') }}</span><input v-model="f.product_url" type="url" maxlength="2000" placeholder="https://"></label>
-      </template>      <template v-if="relief">
+      </template>
+      <template v-if="relief">
         <label class="c-field"><span>{{ $t('org.relief.categoryLabel') }}</span>
           <select v-model="f.category" name="category" required><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="c in CATEGORIES" :key="c" :value="c">{{ $t(`org.relief.category.${c}`) }}</option></select></label>
         <label class="c-field"><span>{{ $t('org.relief.urgencyLabel') }}</span>
@@ -95,7 +97,7 @@ async function save() {
       </div>
       <template v-if="support">
         <p v-if="item" class="c-mute">{{ $t('creator.itemSheet.supportTarget', { name: item.support?.target?.title ?? $t('creator.itemSheet.supportEnded') }) }}</p>
-        <label v-else class="c-field"><span>{{ $t('creator.itemSheet.supportLink') }}</span><input v-model="supLink" maxlength="300" placeholder="https://wishly.tw/s/…" @blur="checkTarget"></label>
+        <label v-else class="c-field"><span>{{ $t('creator.itemSheet.supportLink') }}</span><input v-model="supLink" maxlength="300" placeholder="https://wishly.tw/s/…" @input="supSlug = null; supChecked = false" @blur="checkTarget"></label>
         <p class="c-mute">{{ $t('creator.itemSheet.supportNote') }}</p>
       </template>
       <template v-else-if="crowd">
