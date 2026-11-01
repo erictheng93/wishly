@@ -120,7 +120,7 @@ async fn reject_sets_resubmit_after_30d(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject"})),
+        Some(json!({"decision":"reject","note":"原因"})),
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
@@ -194,7 +194,7 @@ async fn non_staff_forbidden(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&token),
-        Some(json!({"decision":"reject"})),
+        Some(json!({"decision":"reject","note":"原因"})),
     )
     .await;
     assert_eq!(
@@ -431,4 +431,38 @@ async fn list_pending_permits_filter(pool: PgPool) {
     assert!(b["next_cursor"].is_null(), "{b}");
     let (_, _, b) = call(&pool, "GET", "/admin/orgs?status=verified", &ck(&st), None).await;
     assert_eq!(b["data"][0]["pending_permits"], 2, "{b}");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn rejection_requires_nonblank_note_for_org_and_permit(pool: PgPool) {
+    let owner = user(&pool, "owner").await;
+    let st = staff(&pool, "staff").await;
+    for status in ["pending", "verified"] {
+        let o = common::org(&pool, owner.id, status).await;
+        let p = common::permit(
+            &pool,
+            o,
+            if status == "verified" {
+                "approved"
+            } else {
+                "pending"
+            },
+            30,
+        )
+        .await;
+        for uri in [
+            format!("/admin/orgs/{o}/review"),
+            format!("/admin/permits/{p}/review"),
+        ] {
+            for body in [
+                json!({"decision":"reject"}),
+                json!({"decision":"reject","note":" \n "}),
+            ] {
+                let (s, _, b) = call(&pool, "POST", &uri, &ck(&st.token), Some(body)).await;
+                assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{b}");
+                assert_eq!(b["errors"][0]["pointer"], "/note");
+            }
+        }
+        assert_eq!(org_status(&pool, o).await, status);
+    }
 }

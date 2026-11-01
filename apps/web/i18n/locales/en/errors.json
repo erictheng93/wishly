@@ -157,6 +157,7 @@
       "birthday_notify_BIRTHDAY_PRIVATE": "Your birthday is visible to \"only me\", so birthday notifications can't be turned on.",
       "birthday_notify_LIST_PRIVATE": "Private lists can't send birthday notifications.",
       "birthday_notify_NOT_PERSONAL": "Organization and relief-site lists can't send birthday notifications."
-    }
+    },
+    "ADDRESS_UNAVAILABLE": "Shipping details are temporarily unavailable. Please try again later."
   }
 }

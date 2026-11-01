@@ -157,6 +157,7 @@
       "birthday_notify_BIRTHDAY_PRIVATE": "Ngày sinh của bạn chỉ hiển thị cho mình bạn nên không thể bật thông báo sinh nhật.",
       "birthday_notify_LIST_PRIVATE": "Danh sách riêng tư không thể gửi thông báo sinh nhật.",
       "birthday_notify_NOT_PERSONAL": "Danh sách của tổ chức và điểm cứu trợ không thể gửi thông báo sinh nhật."
-    }
+    },
+    "ADDRESS_UNAVAILABLE": "Tạm thời không thể đọc thông tin nhận hàng. Vui lòng thử lại sau."
   }
 }

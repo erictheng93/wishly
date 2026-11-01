@@ -212,3 +212,135 @@ async fn staff_guard_report_and_moderation(pool: PgPool) {
     assert_eq!(v["claims_by_status"]["reserved"], 1);
     assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn report_resolution_notes_and_lifetime_counts(pool: PgPool) {
+    let owner = user(&pool, "owner").await;
+    let staff = staff(&pool, "staff").await;
+    let w = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let ids: Vec<Uuid> = sqlx::query_scalar("INSERT INTO content_reports(wishlist_id, reason) SELECT $1, 'other'::report_reason FROM generate_series(1,3) RETURNING id")
+        .bind(w.id).fetch_all(&pool).await.unwrap();
+    for (id, status) in [(ids[0], "dismissed"), (ids[1], "actioned")] {
+        let uri = format!("/admin/reports/{id}");
+        let (s, _, _) = call(
+            &pool,
+            "PATCH",
+            &uri,
+            &ck(&owner.token),
+            Some(json!({"status":status,"note":"不允許"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN);
+        let (s, _, b) = call(
+            &pool,
+            "PATCH",
+            &uri,
+            &ck(&staff.token),
+            Some(json!({"status":status,"note":"  查證後結案  "})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{b}");
+        assert_eq!(b["resolution_note"], "查證後結案");
+        let (_, _, list) = call(
+            &pool,
+            "GET",
+            &format!("/admin/reports?status={status}"),
+            &ck(&staff.token),
+            None,
+        )
+        .await;
+        assert_eq!(list["data"][0]["resolution_note"], "查證後結案");
+        let (s, _, _) = call(
+            &pool,
+            "PATCH",
+            &uri,
+            &ck(&staff.token),
+            Some(json!({"status":status,"note":"覆寫"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT);
+    }
+    let uri = format!("/admin/reports/{}", ids[2]);
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&staff.token),
+        Some(json!({"status":"actioned","note":"字".repeat(1001)})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (_, _, before) = call(&pool, "GET", "/admin/wishlists", &ck(&staff.token), None).await;
+    assert_eq!(before["data"][0]["open_report_count"], 1);
+    assert_eq!(before["data"][0]["report_count"], 3);
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/wishlists/{}/moderation", w.id),
+        &ck(&staff.token),
+        Some(json!({"moderation_status":"hidden","reason":"違反規範"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, _, after) = call(&pool, "GET", "/admin/wishlists", &ck(&staff.token), None).await;
+    assert_eq!(after["data"][0]["open_report_count"], 0);
+    assert_eq!(after["data"][0]["report_count"], 3);
+    let notes: Vec<(Uuid, String)> =
+        sqlx::query_as("SELECT id, resolution_note FROM content_reports WHERE wishlist_id=$1")
+            .bind(w.id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(notes.len(), 3);
+    for (id, note) in notes {
+        assert_eq!(
+            note,
+            if id == ids[2] {
+                "違反規範"
+            } else {
+                "查證後結案"
+            }
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn moderation_reason_validated(pool: PgPool) {
+    let staff = staff(&pool, "營運").await;
+    let owner = user(&pool, "擁有者").await;
+    let w = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let uri = format!("/admin/wishlists/{}/moderation", w.id);
+    for bad in [
+        "含控制\u{0007}字元".to_string(),
+        "含bidi\u{202E}字元".to_string(),
+        "字".repeat(1001),
+    ] {
+        let (s, _, _) = call(
+            &pool,
+            "PATCH",
+            &uri,
+            &ck(&staff.token),
+            Some(json!({"moderation_status":"hidden","reason":bad})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let rid: Uuid = sqlx::query_scalar("INSERT INTO content_reports(wishlist_id, reason) VALUES ($1,'other'::report_reason) RETURNING id")
+        .bind(w.id).fetch_one(&pool).await.unwrap();
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&staff.token),
+        Some(json!({"moderation_status":"hidden","reason":" 合法原因 "})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let note: String =
+        sqlx::query_scalar("SELECT resolution_note FROM content_reports WHERE id=$1")
+            .bind(rid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(note, "合法原因");
+}

@@ -58,7 +58,9 @@
         "empty": "目前沒有檢舉",
         "list": "清單：",
         "meta": "{time}・檢舉者：{reporter}",
-        "onItem": "・針對品項"
+        "onItem": "・針對品項",
+        "note": "結案備註",
+        "noteLabel": "結案備註（選填，最多 1000 字）"
       },
       "reason": {
         "scam": "疑似詐騙",
@@ -140,7 +142,15 @@
       "mfaHint": "建議啟用兩步驟驗證：後台可停權、發放點數，帳號被盜影響很大。",
       "mfaSetup": "現在設定",
       "requeue": "重新排入失敗通知",
-      "requeued": "已重新排入 {n} 封"
+      "requeued": "已重新排入 {n} 封",
+      "todo": {
+        "pending_orgs": "待審組織 {n}",
+        "pending_permits": "待審許可 {n}",
+        "pending_orders": "待下單 {n}",
+        "requested_refunds": "待審退款 {n}",
+        "disputed_topups": "爭議 {n}",
+        "open_debts": "欠款 {n}"
+      }
     },
     "audit": {
       "title": "稽核紀錄",
@@ -273,7 +283,9 @@
       "deliveredNote": "確認包裹已送達？品項會標為已履行並通知贊助者。",
       "updated": "「{title}」狀態已更新為「{status}」",
       "refundedSuffix": "，差額 {points} 點已退回贊助者",
-      "stale": "狀態已被更新過，請重新整理後再操作"
+      "stale": "狀態已被更新過，請重新整理後再操作",
+      "showAddress": "顯示收件資訊",
+      "hideAddress": "隱藏收件資訊"
     },
     "analytics": {
       "title": "數據分析",
@@ -422,8 +434,8 @@
     },
     "topups": {
       "methodLabel": "渠道",
-      "searchLabel": "搜尋用戶",
-      "searchHint": "名稱或 email，按 Enter 搜尋",
+      "searchLabel": "搜尋交易",
+      "searchHint": "姓名、Email、商店／金流交易序號",
       "userFilter": "用戶：{name}",
       "clearUser": "顯示全部用戶",
       "title": "儲值與拒付爭議",
@@ -445,6 +457,7 @@
       },
       "walletFrozen": "錢包已凍結",
       "provider": "金流",
+      "merchantTradeNo": "商店交易編號",
       "createdAt": "建立時間",
       "paidAt": "付款時間",
       "action": {
@@ -573,7 +586,8 @@
         "documents": "文件",
         "permits": "勸募許可"
       },
-      "flagRequired": "請至少勾選一個欄位"
+      "flagRequired": "請至少勾選一個欄位",
+      "noteRequired": "退件／撤銷原因（必填）"
     },
     "events": {
       "title": "救災事件管理",

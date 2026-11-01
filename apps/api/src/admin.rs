@@ -136,6 +136,7 @@ async fn list_wishlists(
         "SELECT w.id, jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title, 'status', w.status::text, 'type', w.type::text,
            'owner', jsonb_build_object('id', u.id, 'display_name', u.display_name, 'email', u.email),
            'moderation_status', w.moderation_status::text,
+           'report_count', (SELECT count(*) FROM content_reports r WHERE r.wishlist_id = w.id),
            'open_report_count', (SELECT count(*) FROM content_reports r WHERE r.wishlist_id = w.id AND r.status = 'open'),
            'created_at', w.created_at)
          FROM wishlists w JOIN users u ON u.id = w.owner_id
@@ -597,6 +598,12 @@ pub async fn stats_json(pool: &PgPool) -> Result<Value, sqlx::Error> {
            'active_wishlists', (SELECT count(*) FROM wishlists WHERE deleted_at IS NULL AND status = 'active'),
            'hidden_wishlists', (SELECT count(*) FROM wishlists WHERE moderation_status = 'hidden'),
            'claims_by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM claims GROUP BY 1) t),
+           'pending_orgs', (SELECT count(*) FROM organizations WHERE verification_status = 'pending'),
+           'pending_permits', (SELECT count(*) FROM org_permits p JOIN organizations o ON o.id = p.org_id WHERE p.status = 'pending' AND o.verification_status = 'verified'),
+           'pending_orders', (SELECT count(*) FROM purchase_orders WHERE status = 'pending'),
+           'requested_refunds', (SELECT count(*) FROM cash_refund_requests WHERE status = 'requested'),
+           'disputed_topups', (SELECT count(*) FROM topups WHERE status = 'disputed'),
+           'open_debts', (SELECT count(*) FROM wallet_debts WHERE status = 'open'),
            'open_reports', (SELECT count(*) FROM content_reports WHERE status = 'open'),
            'staff_mfa', (SELECT count(*) FROM users WHERE is_staff AND totp_enabled_at IS NOT NULL AND deleted_at IS NULL AND blocked_at IS NULL),
            'notifications_by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM notifications GROUP BY 1) t),

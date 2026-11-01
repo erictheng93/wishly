@@ -62,14 +62,14 @@ test('可見度切 private 自動取消並停用；切摯友說明改摯友版�
   await expect(page.getByText('只會通知你在這份清單勾選的摯友。')).toBeVisible()
 })
 
-test('開第二份清單的生日通知，第一份編輯頁顯示已關閉', async ({ page }) => {
+test('開第二份清單的生日通知，第一份維持開啟', async ({ page }) => {
   await member(page, { date: '06-15' })
   const first = await newList(page, 'bday-1', { tick: true })
   await expect(sw(page)).toBeChecked()
   await newList(page, 'bday-2', { tick: true })
   await expect(sw(page)).toBeChecked()
   await page.goto(`/lists/${first}/edit`); await hydrated(page); await openSettings(page)
-  await expect(sw(page)).not.toBeChecked()
+  await expect(sw(page)).toBeChecked()
 })
 
 test('生日可見度改 private：編輯頁開關停用且已關閉', async ({ page }) => {

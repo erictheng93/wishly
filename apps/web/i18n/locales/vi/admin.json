@@ -58,7 +58,9 @@
         "empty": "Không có báo cáo",
         "list": "Danh sách: ",
         "meta": "{time}・Người báo cáo: {reporter}",
-        "onItem": "・về một món quà"
+        "onItem": "・về một món quà",
+        "note": "Ghi chú kết thúc",
+        "noteLabel": "Ghi chú kết thúc (không bắt buộc, tối đa 1.000 ký tự)"
       },
       "reason": {
         "scam": "Nghi ngờ lừa đảo",
@@ -140,7 +142,15 @@
       "mfaHint": "Nên bật xác minh hai bước: quản trị có thể khóa tài khoản và cấp điểm, tài khoản bị chiếm đoạt sẽ gây hậu quả lớn.",
       "mfaSetup": "Thiết lập ngay",
       "requeue": "Xếp lại thông báo thất bại",
-      "requeued": "Đã xếp lại {n}"
+      "requeued": "Đã xếp lại {n}",
+      "todo": {
+        "pending_orgs": "Tổ chức chờ duyệt {n}",
+        "pending_permits": "Giấy phép chờ duyệt {n}",
+        "pending_orders": "Đơn chờ đặt {n}",
+        "requested_refunds": "Hoàn tiền chờ duyệt {n}",
+        "disputed_topups": "Tranh chấp {n}",
+        "open_debts": "Nợ chưa trả {n}"
+      }
     },
     "audit": {
       "title": "Nhật ký kiểm toán",
@@ -273,7 +283,9 @@
       "deliveredNote": "Xác nhận kiện hàng đã giao? Món quà sẽ được đánh dấu đã hoàn tất và người tài trợ sẽ được thông báo.",
       "updated": "Trạng thái \"{title}\" đã được cập nhật thành \"{status}\"",
       "refundedSuffix": "; phần chênh lệch {points} điểm đã hoàn cho người tài trợ",
-      "stale": "Trạng thái đã được cập nhật; hãy làm mới rồi thử lại"
+      "stale": "Trạng thái đã được cập nhật; hãy làm mới rồi thử lại",
+      "showAddress": "Hiện thông tin nhận hàng",
+      "hideAddress": "Ẩn thông tin nhận hàng"
     },
     "analytics": {
       "title": "Phân tích dữ liệu",
@@ -422,8 +434,8 @@
     },
     "topups": {
       "methodLabel": "Kênh",
-      "searchLabel": "Tìm người dùng",
-      "searchHint": "Tên hoặc email, nhấn Enter",
+      "searchLabel": "Tìm giao dịch",
+      "searchHint": "Tên, email, mã giao dịch cửa hàng / cổng thanh toán",
       "userFilter": "Người dùng: {name}",
       "clearUser": "Hiện tất cả người dùng",
       "title": "Nạp điểm và tranh chấp chargeback",
@@ -445,6 +457,7 @@
       },
       "walletFrozen": "Ví đã đóng băng",
       "provider": "Cổng thanh toán",
+      "merchantTradeNo": "Mã giao dịch của cửa hàng",
       "createdAt": "Thời gian tạo",
       "paidAt": "Thời gian thanh toán",
       "action": {
@@ -573,7 +586,8 @@
         "documents": "Documents",
         "permits": "Fundraising permits"
       },
-      "flagRequired": "Select at least one field"
+      "flagRequired": "Select at least one field",
+      "noteRequired": "Lý do từ chối / thu hồi (bắt buộc)"
     },
     "events": {
       "title": "Disaster events",

@@ -509,7 +509,7 @@ struct TopupQ {
 }
 
 /// GET /admin/topups?status=&method=&q=&user_id=&limit=&cursor=：營運找儲值單 / 看爭議中清單。最新在前（uuid v7），cursor 為上一頁最後一筆 id。
-/// q 不分大小寫比對姓名 / email 子字串（用 position 而非 LIKE，避免 % _ 被當萬用字元）；空白視為不篩選。
+/// q 不分大小寫比對姓名 / email / 商店交易序號 / 金流交易序號子字串（用 position 而非 LIKE，避免 % _ 被當萬用字元）；空白視為不篩選。
 async fn topup_list(
     State(st): State<AppState>,
     Staff(_): Staff,
@@ -546,14 +546,16 @@ async fn topup_list(
     let lim = q.limit.unwrap_or(50).clamp(1, 100);
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT t.id, jsonb_build_object('id', t.id, 'amount', t.amount, 'method', t.method, 'status', t.status,
-                'provider', t.provider, 'provider_txn_id', t.provider_txn_id, 'created_at', t.created_at, 'paid_at', t.paid_at,
+                'provider', t.provider, 'provider_txn_id', t.provider_txn_id, 'merchant_trade_no', t.merchant_trade_no, 'created_at', t.created_at, 'paid_at', t.paid_at,
                 'user', jsonb_build_object('id', u.id, 'display_name', u.display_name, 'email', u.email),
                 'wallet', jsonb_build_object('id', w.id, 'status', w.status))
            FROM topups t JOIN point_wallets w ON w.id = t.wallet_id JOIN users u ON u.id = w.user_id
           WHERE ($1::text IS NULL OR t.status::text = $1) AND ($2::uuid IS NULL OR t.id < $2)
             AND ($4::text IS NULL OR t.method::text = $4) AND ($5::uuid IS NULL OR u.id = $5)
             AND ($6::text IS NULL OR position(lower($6) IN lower(u.display_name)) > 0
-                 OR COALESCE(position(lower($6) IN lower(u.email)) > 0, false))
+                 OR COALESCE(position(lower($6) IN lower(u.email)) > 0, false)
+                 OR COALESCE(position(lower($6) IN lower(t.merchant_trade_no)) > 0, false)
+                 OR COALESCE(position(lower($6) IN lower(t.provider_txn_id)) > 0, false))
           ORDER BY t.id DESC LIMIT $3")
         .bind(&q.status).bind(q.cursor).bind(lim + 1).bind(&q.method).bind(q.user_id).bind(kw).fetch_all(&st.pool).await?;
     Ok(page(rows, lim))

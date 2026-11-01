@@ -191,7 +191,7 @@ const REPORT_SQL: &str =
     "SELECT r.id, jsonb_build_object('id', r.id, 'wishlist', jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title),
        'item_id', r.item_id, 'reason', r.reason::text, 'detail', r.detail, 'status', r.status::text,
        'reporter', CASE WHEN r.reporter_user_id IS NOT NULL THEN 'user' WHEN r.reporter_guest_id IS NOT NULL THEN 'guest' ELSE 'anonymous' END,
-       'handled_at', r.handled_at, 'created_at', r.created_at)
+       'resolution_note', r.resolution_note, 'handled_at', r.handled_at, 'created_at', r.created_at)
      FROM content_reports r JOIN wishlists w ON w.id = r.wishlist_id";
 
 async fn list(
@@ -232,6 +232,7 @@ async fn handle(
             "actioned | dismissed",
         ));
     }
+    let note = crate::validate::optional_note(b.note.as_deref(), "/note", 1000)?;
     let mut tx = st.pool.begin().await?;
     let cur: String =
         sqlx::query_scalar("SELECT status::text FROM content_reports WHERE id = $1 FOR UPDATE")
@@ -246,15 +247,15 @@ async fn handle(
             "檢舉已處理",
         ));
     }
-    sqlx::query("UPDATE content_reports SET status = $2::report_status, handled_by = $3, handled_at = now() WHERE id = $1")
-        .bind(id).bind(&b.status).bind(sid).execute(&mut *tx).await?;
+    sqlx::query("UPDATE content_reports SET status = $2::report_status, handled_by = $3, handled_at = now(), resolution_note = $4 WHERE id = $1")
+        .bind(id).bind(&b.status).bind(sid).bind(&note).execute(&mut *tx).await?;
     audit(
         &mut *tx,
         sid,
         "report.handle",
         "content_reports",
         Some(id),
-        json!({ "status": b.status, "note": b.note }),
+        json!({ "status": b.status, "note": note }),
     )
     .await?;
     let (_, v): (Uuid, Value) =
@@ -289,7 +290,8 @@ async fn moderate(
             ))
         }
     };
-    let reason = b.reason.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let reason = crate::validate::optional_note(b.reason.as_deref(), "/reason", 1000)?;
+    let reason = reason.as_deref();
     if hidden && reason.is_none() {
         return Err(AppError::invalid("/reason", "REQUIRED", "下架必須填原因"));
     }
@@ -334,8 +336,8 @@ async fn moderate(
     )
     .await?;
     if hidden {
-        sqlx::query("UPDATE content_reports SET status = 'actioned', handled_by = $2, handled_at = now() WHERE wishlist_id = $1 AND status = 'open'")
-            .bind(id).bind(sid).execute(&mut *tx).await?;
+        sqlx::query("UPDATE content_reports SET status = 'actioned', handled_by = $2, handled_at = now(), resolution_note = $3 WHERE wishlist_id = $1 AND status = 'open'")
+            .bind(id).bind(sid).bind(reason).execute(&mut *tx).await?;
     }
     dashboard::notify(&mut *tx, id).await?; // commit 時才送出，SSE 收到後關閉連線
     tx.commit().await?;

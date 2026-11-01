@@ -157,6 +157,7 @@
       "birthday_notify_BIRTHDAY_PRIVATE": "你的生日可見度為「只有自己」，無法開啟生日通知。",
       "birthday_notify_LIST_PRIVATE": "私人清單無法開啟生日通知。",
       "birthday_notify_NOT_PERSONAL": "組織與救災據點清單無法開啟生日通知。"
-    }
+    },
+    "ADDRESS_UNAVAILABLE": "收件資訊暫時無法讀取，請稍後重試。"
   }
 }

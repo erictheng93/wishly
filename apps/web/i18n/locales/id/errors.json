@@ -157,6 +157,7 @@
       "birthday_notify_BIRTHDAY_PRIVATE": "Ulang tahun Anda hanya terlihat oleh Anda, jadi notifikasi ulang tahun tidak bisa diaktifkan.",
       "birthday_notify_LIST_PRIVATE": "Daftar pribadi tidak dapat mengirim notifikasi ulang tahun.",
       "birthday_notify_NOT_PERSONAL": "Daftar organisasi dan titik bantuan tidak dapat mengirim notifikasi ulang tahun."
-    }
+    },
+    "ADDRESS_UNAVAILABLE": "Informasi penerima sementara tidak tersedia. Coba lagi nanti."
   }
 }

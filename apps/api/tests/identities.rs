@@ -974,3 +974,106 @@ async fn absorb_does_not_wait_for_a_locked_account(pool: PgPool) {
         .unwrap();
     assert!(!deleted);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn absorb_is_busy_while_a_wallet_credit_is_in_flight(pool: PgPool) {
+    let common::TestUser { token, .. } = provider_user(&pool, "line").await;
+    let common::TestUser { id: other, .. } = common::user(&pool, "誤開的帳號").await;
+    sqlx::query("UPDATE users SET email='wallet@example.com' WHERE id=$1")
+        .bind(other)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let wallet: Uuid =
+        sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) RETURNING id")
+            .bind(other)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    // 模擬發點交易已持錢包鎖、餘額尚未提交
+    let mut holder = pool.begin().await.unwrap();
+    sqlx::query("SELECT id FROM point_wallets WHERE id=$1 FOR UPDATE")
+        .bind(wallet)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    let (s, b) = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        link_email(&pool, &token, "wallet@example.com"),
+    )
+    .await
+    .expect("不可等待對方的錢包鎖");
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("IDENTITY_BUSY")),
+        "入帳進行中不可併入"
+    );
+    holder.rollback().await.unwrap();
+    let deleted: bool = sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM users WHERE id=$1")
+        .bind(other)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!deleted);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn absorb_refuses_account_with_a_topup_order(pool: PgPool) {
+    let common::TestUser { token, .. } = provider_user(&pool, "line").await;
+    let common::TestUser { id: other, .. } = common::user(&pool, "誤開的帳號").await;
+    sqlx::query("UPDATE users SET email='topup@example.com' WHERE id=$1")
+        .bind(other)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let wallet: Uuid =
+        sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) RETURNING id")
+            .bind(other)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query("INSERT INTO topups (wallet_id, merchant_trade_no, amount, method, provider, expires_at) VALUES ($1, 'T1', 500, 'card', 'ecpay', now() + interval '1 day')")
+        .bind(wallet)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, b) = link_email(&pool, &token, "topup@example.com").await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("IDENTITY_IN_USE"))
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn absorb_retires_unused_uploads(pool: PgPool) {
+    let common::TestUser { token, .. } = provider_user(&pool, "line").await;
+    let common::TestUser { id: other, .. } = common::user(&pool, "誤開的帳號").await;
+    sqlx::query("UPDATE users SET email='media@example.com' WHERE id=$1")
+        .bind(other)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let keys = [
+        format!("covers/{}.jpg", Uuid::new_v4()),
+        format!("items/{}.jpg", Uuid::new_v4()),
+        format!("avatars/{}.png", Uuid::new_v4()),
+    ];
+    for k in &keys {
+        sqlx::query("INSERT INTO user_media (user_id, object_key) VALUES ($1,$2)")
+            .bind(other)
+            .bind(k)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    let (s, b) = link_email(&pool, &token, "media@example.com").await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM user_media WHERE user_id=$1 AND retire_requested_at IS NULL",
+    )
+    .bind(other)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(pending, 0, "封面 / 品項圖也要隨帳號退役");
+}

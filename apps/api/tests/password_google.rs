@@ -836,12 +836,13 @@ async fn google_link_absorbs_blank_account(pool: PgPool) {
     common::wishlist(&pool, id, Default::default()).await;
     // 不小心用 Google 登入而開出的空帳號（信箱不同，所以沒自動連結）
     let other: Uuid = sqlx::query_scalar(
-        "INSERT INTO users (display_name,email) VALUES ('g','other@example.com') RETURNING id",
+        "INSERT INTO users (display_name,email) VALUES ('g','old@example.com') RETURNING id",
     )
     .fetch_one(&pool)
     .await
     .unwrap();
-    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'google','blank-google','other@example.com')").bind(other).execute(&pool).await.unwrap();
+    // Google 信箱已換：identity 上的 old@ 不可跟著搬過來，否則驗證 old@ 的人會被自動連結到本帳號
+    sqlx::query("INSERT INTO auth_identities (user_id,provider,provider_uid,email) VALUES ($1,'google','blank-google','old@example.com')").bind(other).execute(&pool).await.unwrap();
     let session = common::ck(&token)[0].1.clone();
     let (s, h, _) = common::call_app(
         &app,
@@ -879,12 +880,17 @@ async fn google_link_absorbs_blank_account(pool: PgPool) {
         .to_str()
         .unwrap()
         .ends_with("/settings?linked=google"));
-    let owner: Uuid =
-        sqlx::query_scalar("SELECT user_id FROM auth_identities WHERE provider_uid='blank-google'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(owner, id);
+    let (owner, email): (Uuid, Option<String>) = sqlx::query_as(
+        "SELECT user_id, email FROM auth_identities WHERE provider_uid='blank-google'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (owner, email.as_deref()),
+        (id, Some("other@example.com")),
+        "identity 搬到本人且 email 為這次驗證到的值"
+    );
     let deleted: bool = sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM users WHERE id=$1")
         .bind(other)
         .fetch_one(&pool)

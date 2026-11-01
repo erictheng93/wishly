@@ -191,8 +191,7 @@
         "private": "Your birthday is visible to \"only me\". Change it in Settings first.",
         "listPrivate": "A private list notifies no one. Choose another visibility first."
       },
-      "goSettings": "Go to Settings",
-      "single": "Only one list can have this on at a time; turning it on here turns it off for your other lists."
+      "goSettings": "Go to Settings"
     }
   }
 }

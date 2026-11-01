@@ -1087,6 +1087,12 @@ async fn admin_topup_list_filters_and_paginates(pool: PgPool) {
         )
     );
     assert!(d[0]["user"]["email"].is_string() && d[0].get("paid_at").is_some());
+    let mtn: String = sqlx::query_scalar("SELECT merchant_trade_no FROM topups WHERE id=$1")
+        .bind(ids[1])
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(d[0]["merchant_trade_no"].as_str(), Some(mtn.as_str()));
     assert!(b["next_cursor"].is_null());
 
     // 分頁：limit=2 → 兩頁共 3 筆、不重複；limit 越界被夾住
@@ -1418,4 +1424,20 @@ async fn dispute_transitions_touch_updated_at(pool: PgPool) {
         .unwrap();
         assert!(fresh, "{action} 應更新 updated_at");
     }
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn topups_search_transaction_numbers(pool: PgPool) {
+    let st = common::staff(&pool, "營運").await;
+    let u = common::user(&pool, "付款人").await;
+    let id = topup_credit(&pool, u.id, 100).await;
+    topup_credit(&pool, u.id, 100).await;
+    sqlx::query("UPDATE topups SET merchant_trade_no='Merchant_123', provider_txn_id='Provider%456' WHERE id=$1").bind(id).execute(&pool).await.unwrap();
+    for q in ["merchant_123", "provider%25456", "%25"] {
+        let (s, r) = topup_get(&pool, &st.token, &format!("?q={q}")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(topup_ids(&r), [id.to_string()]);
+    }
+    let (_, r) = topup_get(&pool, &st.token, "?q=merchant_123&status=failed").await;
+    assert!(topup_ids(&r).is_empty());
 }

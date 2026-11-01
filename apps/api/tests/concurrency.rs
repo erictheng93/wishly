@@ -1696,3 +1696,41 @@ async fn patch_wishlist_with_stale_status_returns_409(pool: PgPool) {
         .unwrap();
     assert_ne!(t, "x");
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn grant_waiting_on_wallet_rechecks_account_deleted_by_absorb(pool: PgPool) {
+    let _slot = RACE_SLOTS.acquire().await.unwrap();
+    let TestUser {
+        id: _,
+        token: staff,
+    } = common::staff(&pool, "staff").await;
+    let TestUser { id: u, token: _ } = common::user(&pool, "blank").await;
+    let wallet: Uuid =
+        sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) RETURNING id")
+            .bind(u)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let app = app(AppState { pool: pool.clone() });
+    // 併入交易：持錢包鎖，提交時帳號已刪
+    let (mut gate, pid) = gate(&pool, "point_wallets", wallet).await;
+    let g = send(
+        &app,
+        (
+            "POST",
+            "/admin/wallets/grants".into(),
+            [common::ck(&staff), common::idem(Uuid::new_v4())].concat(),
+            Some(json!({"user_id":u,"points":500,"reason":"race"})),
+        ),
+    );
+    blocked(&pool, pid, "SELECT id FROM point_wallets WHERE id = ANY", 1).await;
+    sqlx::query("UPDATE users SET deleted_at=now() WHERE id=$1")
+        .bind(u)
+        .execute(&mut *gate)
+        .await
+        .unwrap();
+    gate.commit().await.unwrap();
+    let r = finish(g).await;
+    assert_eq!(balance(&pool, u).await, 0, "已刪帳號不可被入點");
+    assert_eq!(r.0, StatusCode::NOT_FOUND, "{}", r.2);
+}

@@ -125,14 +125,45 @@ async fn tax_id_taken_by_live_org(pool: PgPool) {
         .await
         .unwrap();
     let b = user(&pool, "B").await;
-    let (_, v) = create(&pool, &b.token, full("12345675")).await;
-    let id = oid(&v);
-    add_docs(&pool, id, b.id, true, true).await;
-    let (s, e) = submit(&pool, &b.token, id).await;
+    let (s, e) = create(&pool, &b.token, full("12345675")).await;
     assert_eq!(
-        (s, e["code"].as_str().unwrap()),
-        (StatusCode::CONFLICT, "TAX_ID_TAKEN")
+        (s, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("TAX_ID_TAKEN"))
     );
+    let (_, v) = create(
+        &pool,
+        &b.token,
+        json!({"legal_name":"乙","display_name":"乙"}),
+    )
+    .await;
+    let id = oid(&v);
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{id}"),
+        &ck(&b.token),
+        Some(json!({"tax_id":"12345675"})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("TAX_ID_TAKEN"))
+    );
+    // 舊草稿仍可能在他人送審後衝突，送審索引保留最後防線。
+    sqlx::query("UPDATE organizations SET tax_id='12345675' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{id}"),
+        &ck(&b.token),
+        Some(full("12345675")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -330,4 +361,33 @@ async fn patch_waits_on_org_row_lock_then_sees_rejection(pool: PgPool) {
         (StatusCode::CONFLICT, "RESUBMIT_TOO_EARLY"),
         "owner PATCH overwrote the concurrent rejection: {e}"
     );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn draft_tax_id_does_not_reserve_and_submit_still_checks_uniqueness(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let b = user(&pool, "B").await;
+    let (s, oa) = create(&pool, &a.token, full("12345675")).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, ob) = create(&pool, &b.token, full("12345675")).await;
+    assert_eq!(s, StatusCode::CREATED);
+    for (o, u) in [(oid(&oa), &a), (oid(&ob), &b)] {
+        add_docs(&pool, o, u.id, true, true).await;
+    }
+    assert_eq!(submit(&pool, &a.token, oid(&oa)).await.0, StatusCode::OK);
+    let (s, e) = submit(&pool, &b.token, oid(&ob)).await;
+    assert_eq!(
+        (s, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("TAX_ID_TAKEN"))
+    );
+    sqlx::query("UPDATE organizations SET verification_status='needs_changes', flagged_fields='{tax_id}' WHERE id=$1").bind(oid(&oa)).execute(&pool).await.unwrap();
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{}", oid(&oa)),
+        &ck(&a.token),
+        Some(json!({"tax_id":"12345675"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "self must not conflict: {e}");
 }
