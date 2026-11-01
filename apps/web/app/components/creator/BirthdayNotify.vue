@@ -15,6 +15,5 @@ watch(block, b => { if (b) on.value = false }, { immediate: true }) // 不能開
       </span>
     </label>
     <p v-if="block && block !== 'listPrivate'" class="c-mute c-m0"><small><NuxtLink to="/settings">{{ $t('creator.bday.goSettings') }}</NuxtLink></small></p>
-    <p class="c-mute c-m0"><small>{{ $t('creator.bday.single') }}</small></p>
   </div>
 </template>

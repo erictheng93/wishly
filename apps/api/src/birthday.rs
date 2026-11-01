@@ -18,7 +18,7 @@ fn year_of(today: NaiveDate, days: i64) -> i16 {
 }
 
 /// 回傳排入的通知筆數。補跑邏輯：只要在窗口內（含停機後晚到），且該年尚未寄過，就排一次。
-/// 冪等全靠條件式 UPDATE（birthday_notified_year / birthday_nudged_year），多實例同時跑也只有一個拿到 RETURNING。
+/// 朋友通知以清單為單位（同一人可開多份，對象各自不同），冪等靠 wishlist_birthday_sent 主鍵；壽星提醒靠條件式 UPDATE。多實例同時跑也只有一個拿到 RETURNING。
 pub async fn birthday_tick_at(pool: &PgPool, today: NaiveDate) -> Result<u64, sqlx::Error> {
     let mut queued = 0;
 
@@ -36,8 +36,8 @@ pub async fn birthday_tick_at(pool: &PgPool, today: NaiveDate) -> Result<u64, sq
         };
         let mut tx = pool.begin().await?;
         let won = sqlx::query_scalar::<_, Uuid>(
-            "UPDATE users SET birthday_notified_year = $2 WHERE id = $1 AND birthday_notified_year IS DISTINCT FROM $2 RETURNING id")
-            .bind(owner).bind(year_of(today, d)).fetch_optional(&mut *tx).await?;
+            "INSERT INTO wishlist_birthday_sent (wishlist_id, year) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING wishlist_id")
+            .bind(wid).bind(year_of(today, d)).fetch_optional(&mut *tx).await?;
         if won.is_some() {
             queued += sqlx::query(
                 "INSERT INTO notifications (user_id, channel, kind, payload)

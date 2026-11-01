@@ -185,8 +185,7 @@
         "private": "Ulang tahun Anda hanya terlihat oleh Anda. Ubah dulu di Pengaturan.",
         "listPrivate": "Daftar pribadi tidak memberi tahu siapa pun. Pilih visibilitas lain dulu."
       },
-      "goSettings": "Ke Pengaturan",
-      "single": "Hanya satu daftar yang bisa aktif sekaligus; mengaktifkan ini akan menonaktifkan daftar lain."
+      "goSettings": "Ke Pengaturan"
     }
   }
 }
