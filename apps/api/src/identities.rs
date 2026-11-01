@@ -168,7 +168,7 @@ pub(crate) async fn link(
         return Err(email_mismatch());
     }
     let (media, moved) = match other {
-        Some(other) => absorb(&mut tx, id, other, provider, uid).await?,
+        Some(other) => absorb(&mut tx, id, other, provider, uid, email).await?,
         None => (vec![], false),
     };
     if !moved {
@@ -205,16 +205,27 @@ async fn lock_blank(
             .bind(other)
             .fetch_optional(&mut **tx)
             .await?;
+    // 判斷前先拿錢包鎖並持有到提交：進行中的入帳要嘛讓這裡回 busy，要嘛之後重驗帳號而失敗（orders::grant、topup::credit）
+    let wallet_locked: bool = sqlx::query_scalar(
+        "WITH l AS (SELECT id FROM point_wallets WHERE user_id=$1 FOR UPDATE SKIP LOCKED)
+         SELECT (SELECT count(*) FROM l) = (SELECT count(*) FROM point_wallets WHERE user_id=$1)",
+    )
+    .bind(other)
+    .fetch_one(&mut **tx)
+    .await?;
     // 衝突是在鎖住對方前讀到的：對方可能剛解除那個登入方式，重新核對
     let still: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_identities WHERE user_id=$1 AND ((provider=$2::auth_provider AND provider_uid=$3) OR email=$4)) OR EXISTS(SELECT 1 FROM users WHERE id=$1 AND email=$4)")
         .bind(other).bind(provider).bind(uid).bind(email).fetch_one(&mut **tx).await?;
-    if locked.is_none() || !still {
+    if locked.is_none() || !wallet_locked || !still {
         return Err(busy());
     }
-    let blank: bool = sqlx::query_scalar("SELECT user_is_blank($1)")
-        .bind(other)
-        .fetch_one(&mut **tx)
-        .await?;
+    // 儲值單沒有帳本紀錄也算資料：待付款的單入帳時帳號已刪，只能人工退款
+    let blank: bool = sqlx::query_scalar(
+        "SELECT user_is_blank($1) AND NOT EXISTS (SELECT 1 FROM topups t JOIN point_wallets w ON w.id=t.wallet_id WHERE w.user_id=$1)",
+    )
+    .bind(other)
+    .fetch_one(&mut **tx)
+    .await?;
     if !blank {
         return Err(in_use());
     }
@@ -222,6 +233,7 @@ async fn lock_blank(
 }
 
 /// 刪掉 lock_blank 鎖住的空帳號，並把這次綁定的 identity 搬過來（保留密碼）；不搬任何資料。
+/// identity 的 email 改寫成這次驗證到的值：舊值若留著，日後驗證舊信箱的人會被自動連結到本帳號。
 /// 回傳待刪的媒體與 identity 是否已搬移。
 async fn absorb(
     tx: &mut Transaction<'_, Postgres>,
@@ -229,6 +241,7 @@ async fn absorb(
     other: Uuid,
     provider: &str,
     uid: &str,
+    email: Option<&str>,
 ) -> Result<(Vec<String>, bool), AppError> {
     sqlx::query("UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL")
         .bind(other)
@@ -246,14 +259,15 @@ async fn absorb(
     }
     sqlx::query("DELETE FROM auth_identities WHERE user_id=$1 AND NOT (provider=$2::auth_provider AND provider_uid=$3)")
         .bind(other).bind(provider).bind(uid).execute(&mut **tx).await?;
-    let moved = sqlx::query("UPDATE auth_identities SET user_id=$2 WHERE user_id=$1")
+    let moved = sqlx::query("UPDATE auth_identities SET user_id=$2, email=$3 WHERE user_id=$1")
         .bind(other)
         .bind(into)
+        .bind(email)
         .execute(&mut **tx)
         .await?
         .rows_affected()
         > 0;
-    // 空帳號只可能有頭像（OAuth 轉存）；與刪帳號相同，同交易要求退役、COMMIT 後才刪物件。
+    // 空帳號沒有清單，但可能有頭像或上傳後未使用的封面 / 品項圖；與刪帳號相同，同交易要求退役、COMMIT 後才刪物件。
     let media: Vec<String> = sqlx::query_scalar(
         "SELECT object_key FROM user_media WHERE user_id=$1
          UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL",
@@ -263,7 +277,7 @@ async fn absorb(
     .await?;
     let media: Vec<String> = media
         .into_iter()
-        .filter(|k| crate::uploads::avatar_url(Some(k)).is_some())
+        .filter(|k| crate::uploads::is_user_media(k))
         .collect();
     for key in &media {
         sqlx::query(

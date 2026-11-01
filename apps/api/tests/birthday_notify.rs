@@ -487,6 +487,95 @@ async fn worker_rechecks_before_sending(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
+async fn worker_cancels_friend_notice_with_stale_birthday(pool: PgPool) {
+    wishly_api::config::init(wishly_api::config::Config::dev());
+    let o = user(&pool, "壽星").await;
+    let f = user(&pool, "友").await;
+    befriend(&pool, o.id, f.id).await;
+    set_birthday(&pool, o.id, "10-05", "friends").await;
+    let w = wishlist(&pool, o.id, ListOpts::default()).await;
+    enable(&pool, w.id).await;
+    wishly_api::birthday::birthday_tick_at(&pool, day(9, 30))
+        .await
+        .unwrap();
+    // 直接改 DB：模擬改日期時這筆已被 worker 領走、PATCH /me 取消不到
+    set_birthday(&pool, o.id, "12-25", "friends").await;
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
+    let st: String =
+        sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.friend'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(st, "cancelled");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn changing_birthday_requeues_friend_notice_for_the_new_date(pool: PgPool) {
+    let o = user(&pool, "壽星").await;
+    let f = user(&pool, "友").await;
+    befriend(&pool, o.id, f.id).await;
+    set_birthday(&pool, o.id, "10-05", "friends").await;
+    let w = wishlist(&pool, o.id, ListOpts::default()).await;
+    enable(&pool, w.id).await;
+    wishly_api::birthday::birthday_tick_at(&pool, day(9, 30))
+        .await
+        .unwrap();
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        "/me",
+        &ck(&o.token),
+        Some(json!({"birthday": "10-06"})),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    let st: String =
+        sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.friend'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(st, "cancelled");
+    assert_eq!(
+        wishly_api::birthday::birthday_tick_at(&pool, day(9, 30))
+            .await
+            .unwrap(),
+        1,
+        "新日期要能重排"
+    );
+    let dates: Vec<String> = sqlx::query_scalar(
+        "SELECT payload->>'birthday' FROM notifications WHERE kind='birthday.friend' AND status='pending'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(dates, vec!["10-06"]);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn worker_cancels_nudge_once_a_birthday_list_exists(pool: PgPool) {
+    wishly_api::config::init(wishly_api::config::Config::dev());
+    let o = user(&pool, "壽星").await;
+    set_birthday(&pool, o.id, "10-05", "friends").await;
+    wishly_api::birthday::birthday_tick_at(&pool, day(9, 30))
+        .await
+        .unwrap();
+    assert_eq!(queued(&pool, "birthday.nudge").await, vec![o.id]);
+    let w = wishlist(&pool, o.id, ListOpts::default()).await;
+    enable(&pool, w.id).await;
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
+    let st: String =
+        sqlx::query_scalar("SELECT status::text FROM notifications WHERE kind='birthday.nudge'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(st, "cancelled");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
 async fn unsubscribe_b_token(pool: PgPool) {
     wishly_api::config::init(wishly_api::config::Config::dev());
     let o = user(&pool, "友").await;

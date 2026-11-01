@@ -489,6 +489,16 @@ async fn grant(
     }
     let wid = points::ensure_wallet(&mut tx, user_id).await?;
     points::lock_wallets(&mut tx, &[wid]).await?;
+    // 空帳號併入持錢包鎖刪帳號（identities::lock_blank）：等到鎖後要重驗，否則點數入到已刪帳號
+    let live: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL)",
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !live {
+        return Err(AppError::NotFound);
+    }
     let kind = if pts > 0 { "grant" } else { "adjustment" };
     points::post(
         &mut tx,
