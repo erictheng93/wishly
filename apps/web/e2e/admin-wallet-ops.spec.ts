@@ -210,6 +210,9 @@ test('爭議：從連結帶入爭議中；顯示使用者與錢包凍結；勝�
   const cards = page.locator('article[data-status]')
   await expect(cards).toHaveCount(2)
   await expect(cards.first()).toContainText('使用者5')
+  await expect(cards.first()).toContainText('u***@example.com')
+  await expect(cards.first()).not.toContainText('u5@example.com')
+  await cards.first().getByRole('button', { name: '顯示' }).click()
   await expect(cards.first()).toContainText('u5@example.com')
   await expect(cards.first()).toContainText('T-t1')
   await expect(cards.first().getByText('錢包已凍結')).toBeVisible()
@@ -236,7 +239,7 @@ test('爭議：從連結帶入爭議中；顯示使用者與錢包凍結；勝�
   expect(m.posts[1].headers['idempotency-key']).toMatch(UUID)
   expect(m.posts[1].headers['idempotency-key']).not.toBe(m.posts[0].headers['idempotency-key'])
   await expect(cards.nth(1).locator('.c-badge.charged_back')).toHaveText('已拒付')
-  await expect(cards.nth(1).getByRole('button')).toHaveCount(0)
+  await expect(cards.nth(1).getByRole('button').filter({ hasNotText: /^(顯示|隱藏)$/ })).toHaveCount(0) // 排除 Email 顯示鈕
 })
 
 test('爭議：切到已入帳 → 標記爭議（錢包被凍結）；取消不送出', async ({ page }) => {
@@ -293,8 +296,8 @@ test('後台首頁有兩個新入口，可導向各頁', async ({ page }) => {
   await mockRefunds(page, [])
   await mock(page, /\/api\/v1\/admin\/wallet-debts(\?|$)/, () => ok({ data: [], next_cursor: null }))
   await page.goto('/admin'); await hydrated(page)
-  for (const [name, path, heading] of [['現金退款', 'cash-refunds', '現金退款審核'], ['拒付欠款', 'wallet-debts', '拒付欠款']]) {
-    await page.getByRole('link', { name, exact: true }).click()
+  for (const [path, heading] of [['cash-refunds', '現金退款審核'], ['wallet-debts', '拒付欠款']]) {
+    await page.locator(`a[href="/admin/${path}"]`).click()
     await expect(page).toHaveURL(new RegExp(`/admin/${path}$`))
     await expect(page.getByRole('heading', { name: heading, exact: true }).first()).toBeVisible()
     await page.goBack(); await hydrated(page)

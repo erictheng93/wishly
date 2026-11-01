@@ -103,7 +103,7 @@ test('後台首頁有金流後台入口，可導向', async ({ page }) => {
   await asStaff(page)
   await mock(page, /\/api\/v1\/admin\/finance\/overview(\?|$)/, () => ok(overview(30)))
   await page.goto('/admin'); await hydrated(page)
-  await page.getByRole('link', { name: '金流後台', exact: true }).click()
+  await page.locator('a[href^="/admin/finance"]').click()
   await expect(page).toHaveURL(/\/admin\/finance$/)
 })
 
