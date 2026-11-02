@@ -44,6 +44,11 @@ async function loadPermits() {
   try { permits.value = await api(`/orgs/${w.value.org_id}/permits`) } catch { /* 許可清單失敗不擋編輯 */ }
 }
 const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null), coverBusy = ref(false)
+// 未儲存偵測：與最後一次載入 / 儲存的設定比對（封面另外即時儲存，不算在內）
+const snap = ref('')
+const snapNow = () => JSON.stringify([meta, allowed.value])
+const dirty = computed(() => !!snap.value && snapNow() !== snap.value)
+function revert() { const [m, a] = JSON.parse(snap.value); Object.assign(meta, m); allowed.value = a }
 let poll: any
 
 async function load(quiet = false) {
@@ -51,9 +56,12 @@ async function load(quiet = false) {
   try {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
-    Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours, birthday_notify: !!r.wishlist.birthday_notify })
-    coverPreset.value = r.wishlist.cover_preset ?? null; coverKey.value = null
-    if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
+    if (!quiet || !dirty.value) { // 背景重載（圖片輪詢、品項儲存後）不蓋掉還沒存的設定
+      Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours, birthday_notify: !!r.wishlist.birthday_notify })
+      coverPreset.value = r.wishlist.cover_preset ?? null; coverKey.value = null
+      if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
+      snap.value = snapNow()
+    }
     err.value = ''; stale.value = false
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
   loadReceipts(); if (!permits.value.length) loadPermits()
@@ -101,11 +109,20 @@ async function saveMeta() {
   if (coverKey.value) Object.assign(body, { cover_image_key: coverKey.value, cover_preset: null })
   else if (coverPreset.value !== (w.value?.cover_preset ?? null)) Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
   if (!await patchList(body)) return
+  coverKey.value = null
   if (!relief.value && meta.visibility === 'selected') {
     try { await api(`/wishlists/${id}/allowed-users`, { method: 'PUT', body: { user_ids: allowed.value } }) }
-    catch (e) { msg.value = ''; err.value = errMsg(e) }
+    catch (e) { msg.value = ''; err.value = errMsg(e); return }
   }
+  snap.value = snapNow()
 }
+// 封面上傳完成或點選預設圖就直接儲存；失敗時留著，按「儲存設定」會再送一次
+watch([coverPreset, coverKey], async () => {
+  if (!w.value) return
+  const body = coverKey.value ? { cover_image_key: coverKey.value, cover_preset: null }
+    : coverPreset.value !== (w.value.cover_preset ?? null) ? { cover_preset: coverPreset.value, cover_image_key: null } : null
+  if (body && await patchList(body, t('lists.edit.coverSaved'))) coverKey.value = null
+})
 async function publish() {
   pubBusy.value = true; pubErrs.value = []
   if (await patchList({ status: 'active' }, t('lists.edit.published'))) { showShare.value = true; tour.refresh() }
@@ -221,7 +238,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <!-- 封存後只能取消封存（後端拒絕其他修改），不顯示設定與分享 -->
       <details v-if="w.status !== 'archived'" class="c-card ed-side">
         <summary>{{ $t('lists.edit.settings') }}</summary>
-        <form class="c-mt12" @submit.prevent="saveMeta">
+        <form id="ed-settings" class="c-mt12" @submit.prevent="saveMeta">
           <label class="c-field"><span>{{ $t('lists.edit.name') }}</span><input v-model="meta.title" maxlength="100" required></label>
           <label class="c-field"><span>{{ $t('lists.edit.desc') }}</span><textarea v-model="meta.description" rows="2" /></label>
           <label class="c-field"><span>{{ $t('lists.edit.event') }}</span><input v-model="meta.event_date" type="date"></label>
@@ -242,7 +259,11 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       </details>
       </aside></div>
 
-      <div class="c-bottom"><div>
+      <div class="c-bottom"><div v-if="dirty" class="ed-dirty">
+        <span class="c-grow" role="status">{{ $t('lists.edit.unsaved') }}</span>
+        <button type="button" class="c-btn" @click="revert">{{ $t('lists.edit.revert') }}</button>
+        <button form="ed-settings" class="c-btn primary" :disabled="coverBusy">{{ $t('lists.edit.saveShort') }}</button>
+      </div><div v-else>
         <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? $t('lists.edit.publishing') : $t('lists.edit.publish') }}</button>
         <button v-else-if="w.status !== 'archived'" class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
       </div></div>
@@ -300,6 +321,9 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 .ed-side[open]{border-color:var(--ink-line);padding-bottom:18px}
 .ed-side[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
 @media (max-width:767px){.ed-item .c-thumb{width:60px;height:60px}}
+.ed-dirty{align-items:center}
+.ed-dirty>span{font:600 12px/1.3 var(--mono);letter-spacing:.06em;color:var(--red-text)}
+.ed-dirty>.c-btn{flex:none}
 .rc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--ink-line)}
 .rc-hist{list-style:none;padding:0;margin:0 0 18px;font:500 12px/1.5 var(--mono)}
 .rc-hist li{padding:8px 0;border-bottom:1px dotted var(--line);overflow-wrap:anywhere}
