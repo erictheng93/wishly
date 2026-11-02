@@ -63,10 +63,10 @@ async fn user_claim(pool: &PgPool, item: Uuid, user: Uuid, vis: &str) -> Uuid {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn friend_request_flow_and_no_enumeration(pool: PgPool) {
+async fn friend_request_flow_and_not_found(pool: PgPool) {
     let (a, ta, _) = handle_user(&pool, "A", Some("alice")).await;
     let (b, tb, eb) = handle_user(&pool, "B", Some("bobby")).await;
-    // 不存在的帳號與存在的帳號回應相同
+    // 找不到人回 404，對自己回 422
     assert_eq!(
         common::call(
             &pool,
@@ -77,7 +77,7 @@ async fn friend_request_flow_and_no_enumeration(pool: PgPool) {
         )
         .await
         .0,
-        StatusCode::ACCEPTED
+        StatusCode::NOT_FOUND
     );
     assert_eq!(
         common::call(
@@ -89,7 +89,7 @@ async fn friend_request_flow_and_no_enumeration(pool: PgPool) {
         )
         .await
         .0,
-        StatusCode::ACCEPTED
+        StatusCode::NOT_FOUND
     );
     assert_eq!(
         common::call(
@@ -101,7 +101,7 @@ async fn friend_request_flow_and_no_enumeration(pool: PgPool) {
         )
         .await
         .0,
-        StatusCode::ACCEPTED
+        StatusCode::UNPROCESSABLE_ENTITY
     ); // 對自己
     assert_eq!(
         common::call(
@@ -338,7 +338,7 @@ async fn friend_request_rate_limited(pool: PgPool) {
             )
             .await
             .0,
-            StatusCode::ACCEPTED
+            StatusCode::NOT_FOUND
         );
     }
     assert_eq!(

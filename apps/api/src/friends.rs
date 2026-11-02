@@ -26,6 +26,7 @@ pub fn routes() -> Router<AppState> {
         .route("/friends", get(list))
         .route("/friends/feed", get(feed))
         .route("/friends/requests", post(request))
+        .route("/friends/search", get(search))
         .route("/friends/requests/count", get(request_count))
         .route("/friends/requests/{id}/accept", post(accept))
         .route("/friends/requests/{id}", delete(drop_request))
@@ -101,7 +102,8 @@ struct ReqBody {
     to: String,
 }
 
-/// `to`：Email、@handle 或使用者 ID。一律 202，不洩漏帳號是否存在
+/// `to`：Email、@handle 或使用者 ID（搜尋結果送的是 ID）。找不到人回 404 USER_NOT_FOUND，
+/// 成功回 202 `{ status: "requested" | "friends" }`（對方先邀過你就直接成為好友）
 async fn request(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -133,22 +135,102 @@ async fn request(
             .fetch_optional(&st.pool)
             .await?
     };
-    if let Some(t) = target.filter(|t| *t != u.id) {
-        if !are_friends(&st.pool, u.id, t).await? {
-            let mut tx = st.pool.begin().await?;
-            let reverse: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = $2)").bind(t).bind(u.id).fetch_one(&mut *tx).await?;
-            if reverse {
-                befriend(&mut tx, u.id, t).await?;
-            } else {
-                let new_id: Option<Uuid> = sqlx::query_scalar("INSERT INTO friend_requests (from_user, to_user) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id").bind(u.id).bind(t).fetch_optional(&mut *tx).await?;
-                if let Some(rid) = new_id {
-                    notify::enqueue_friend_request(&mut *tx, t, u.id, rid).await?;
-                }
-            }
-            tx.commit().await?;
+    let Some(t) = target else {
+        return Err(AppError::problem(404, "USER_NOT_FOUND", "找不到這位使用者"));
+    };
+    if t == u.id {
+        return Err(AppError::invalid("/to", "SELF", "不能加自己為好友"));
+    }
+    if are_friends(&st.pool, u.id, t).await? {
+        return Ok((StatusCode::ACCEPTED, Json(json!({ "status": "friends" }))));
+    }
+    let mut tx = st.pool.begin().await?;
+    let reverse: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = $2)",
+    )
+    .bind(t)
+    .bind(u.id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if reverse {
+        befriend(&mut tx, u.id, t).await?;
+    } else {
+        let new_id: Option<Uuid> = sqlx::query_scalar("INSERT INTO friend_requests (from_user, to_user) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id").bind(u.id).bind(t).fetch_optional(&mut *tx).await?;
+        if let Some(rid) = new_id {
+            notify::enqueue_friend_request(&mut *tx, t, u.id, rid).await?;
         }
     }
-    Ok((StatusCode::ACCEPTED, Json(json!({}))))
+    tx.commit().await?;
+    let status = if reverse { "friends" } else { "requested" };
+    Ok((StatusCode::ACCEPTED, Json(json!({ "status": status }))))
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    q: String,
+}
+
+/// 加好友的邊打邊搜：全站依名稱（包含）、handle（前綴）、Email（完全相符）找人；輸入 Email 時只做完全相符。
+/// 排序：完全相符 → 自己 / 好友 → 共同好友多者 → 名稱。
+// shortcut: ILIKE '%q%' 是全表掃描，使用者量大到搜尋變慢時再加 pg_trgm GIN 索引
+async fn search(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Query(p): Query<SearchQuery>,
+) -> R<Json<Value>> {
+    ratelimit::check(&st.pool, &format!("user_search:{}", u.id), 600, 3600).await?;
+    let q = p.q.trim().to_lowercase();
+    if q.is_empty() || q.chars().count() > 100 {
+        return Ok(Json(json!({ "users": [] })));
+    }
+    let esc = |s: &str| {
+        s.replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
+    };
+    let bare = q.trim_start_matches('@');
+    // 打的是 Email（中間有 @）就只做完全相符，不做部分比對，避免邊打邊試出別人的信箱。
+    // 名稱含 @（多半是把信箱當名字）的人同理不參與部分比對，只有打出完整名稱才找得到。
+    let partial = !(q.contains('@') && !q.starts_with('@'));
+    #[allow(clippy::type_complexity)]
+    let rows: Vec<(Uuid, String, Option<String>, Option<String>, String, i64)> = sqlx::query_as(
+        "WITH mine AS (SELECT CASE WHEN user_a = $1 THEN user_b ELSE user_a END AS id FROM friendships WHERE $1 IN (user_a, user_b))
+         SELECT u.id, u.display_name, u.handle, u.avatar_key,
+                CASE WHEN u.id = $1 THEN 'self'
+                     WHEN u.id IN (SELECT id FROM mine) THEN 'friend'
+                     WHEN EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = u.id) THEN 'outgoing'
+                     WHEN EXISTS (SELECT 1 FROM friend_requests WHERE from_user = u.id AND to_user = $1) THEN 'incoming'
+                     ELSE 'none' END AS relation,
+                (SELECT count(*) FROM friendships f
+                  WHERE (f.user_a = u.id AND f.user_b IN (SELECT id FROM mine))
+                     OR (f.user_b = u.id AND f.user_a IN (SELECT id FROM mine))) AS mutual
+           FROM users u
+          WHERE u.deleted_at IS NULL AND u.blocked_at IS NULL
+            AND ((u.display_name NOT LIKE '%@%' AND u.display_name ILIKE $2 ESCAPE '\\')
+                 OR lower(u.display_name) = $4 OR u.handle LIKE $3 ESCAPE '\\' OR u.email = $4)
+          ORDER BY (u.handle = $5 OR u.email = $4) IS TRUE DESC, -- handle / email 為 NULL 時比較結果是 NULL，DESC 會排到最前
+                   (u.id = $1 OR u.id IN (SELECT id FROM mine)) DESC,
+                   mutual DESC, u.display_name
+          LIMIT 8",
+    )
+    .bind(u.id)
+    .bind(partial.then(|| format!("%{}%", esc(&q))))
+    .bind(partial.then(|| format!("{}%", esc(bare))))
+    .bind(&q)
+    .bind(bare)
+    .fetch_all(&st.pool)
+    .await?;
+    let users: Vec<Value> = rows
+        .into_iter()
+        .map(|(id, n, h, a, rel, m)| {
+            json!({
+                "id": id, "display_name": n, "handle": h,
+                "avatar_url": crate::uploads::avatar_url(a.as_deref()),
+                "relation": rel, "mutual": m,
+            })
+        })
+        .collect();
+    Ok(Json(json!({ "users": users })))
 }
 
 /// 導覽列徽章用：待我處理的好友申請數（與 `list` 的 incoming 同一過濾）

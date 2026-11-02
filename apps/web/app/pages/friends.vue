@@ -7,7 +7,6 @@ const { api } = useApi()
 const { count: reqCount } = useFriendRequests()
 const data = ref<any>({ friends: [], incoming: [], outgoing: [] })
 const loading = ref(true), err = ref(''), msg = ref('')
-const to = ref(''), sending = ref(false)
 const invite = ref<any>(null), copied = ref(false)
 const unfriend = ref<any>(null), ufBusy = ref(false), ufErr = ref('')
 const feed = ref<any>(null), feedErr = ref('')
@@ -27,14 +26,42 @@ async function act(f: () => Promise<any>) {
   err.value = msg.value = ''
   try { await f(); await load() } catch (e) { err.value = msgOf(e) }
 }
-async function send() {
-  const v = to.value.trim().replace(/^@/, '')
-  if (!v) return
-  sending.value = true; err.value = msg.value = ''
+// 即時搜尋：debounce 後查全站；seq 丟棄過期回應
+type Hit = { id: string, display_name: string, handle: string | null, avatar_url: string | null, relation: 'self' | 'friend' | 'outgoing' | 'incoming' | 'none', mutual: number }
+const q = ref(''), hits = ref<Hit[] | null>(null), searching = ref(false), rowBusy = ref('')
+let seq = 0, timer: ReturnType<typeof setTimeout> | undefined
+watch(q, (v) => {
+  clearTimeout(timer); const key = v.trim(); const my = ++seq
+  if (!key) { hits.value = null; searching.value = false; return }
+  searching.value = true
+  timer = setTimeout(async () => {
+    try { const r = await api('/friends/search', { query: { q: key } }); if (my === seq) { hits.value = r.users; err.value = '' } }
+    catch (e) { if (my === seq) { hits.value = null; err.value = msgOf(e) } }
+    finally { if (my === seq) searching.value = false }
+  }, 250)
+})
+onBeforeUnmount(() => clearTimeout(timer))
+const relText = (u: Hit) => u.relation === 'none' ? (u.mutual ? t('me.friends.mutual', { n: u.mutual }, u.mutual) : '')
+  : t({ self: 'me.friends.relSelf', friend: 'me.friends.relFriend', outgoing: 'me.friends.relOutgoing', incoming: 'me.friends.relIncoming' }[u.relation])
+// 比對到的片段加粗（不分大小寫）；以 index 切開，不用 v-html
+function parts(name: string) {
+  const k = q.value.trim().toLowerCase(), i = k ? name.toLowerCase().indexOf(k) : -1
+  return i < 0 ? [name, '', ''] : [name.slice(0, i), name.slice(i, i + k.length), name.slice(i + k.length)]
+}
+async function addHit(u: Hit) {
+  rowBusy.value = u.id; err.value = ''
   try {
-    await api('/friends/requests', { method: 'POST', body: { to: v } })
-    msg.value = t('me.friends.sent'); to.value = ''; await load()
-  } catch (e) { err.value = msgOf(e) } finally { sending.value = false }
+    const r = await api('/friends/requests', { method: 'POST', body: { to: u.id } })
+    u.relation = r?.status === 'friends' ? 'friend' : 'outgoing'
+    await load(); if (u.relation === 'friend') loadFeed()
+  } catch (e) { err.value = msgOf(e) } finally { rowBusy.value = '' }
+}
+async function acceptHit(u: Hit) {
+  const r = data.value.incoming.find((x: any) => x.user.id === u.id)
+  if (!r) return
+  rowBusy.value = u.id
+  await accept(r); rowBusy.value = ''
+  if (!err.value) u.relation = 'friend'
 }
 const accept = (r: any) => act(async () => { await api(`/friends/requests/${r.id}/accept`, { method: 'POST' }); loadFeed() })
 const dropReq = (r: any) => act(() => api(`/friends/requests/${r.id}`, { method: 'DELETE' }))
@@ -137,11 +164,26 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
       <div class="fr-side">
         <section class="c-card">
           <h2 class="c-h2">{{ $t('me.friends.addTitle') }}</h2>
-          <form @submit.prevent="send">
-            <label class="c-field"><span>{{ $t('me.friends.toLabel') }}</span><input v-model="to" maxlength="120" required :placeholder="$t('me.friends.toPh')"></label>
-            <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
-            <button class="c-btn primary" :disabled="sending">{{ sending ? $t('me.friends.sending') : $t('me.friends.send') }}</button>
-          </form>
+          <label class="c-field"><span>{{ $t('me.friends.searchLabel') }}</span>
+            <input v-model="q" type="search" maxlength="120" autocomplete="off" aria-controls="fr-hits" :placeholder="$t('me.friends.searchPh')" @keydown.esc="q = ''">
+          </label>
+          <p v-if="searching" class="c-mute c-m0" role="status">{{ $t('me.friends.searching') }}</p>
+          <ul v-if="hits?.length" id="fr-hits" class="fr-hits" :aria-label="$t('me.friends.searchResults')">
+            <li v-for="u in hits" :key="u.id" class="fr-hit">
+              <img v-if="u.avatar_url" :src="u.avatar_url" alt="" class="fr-ava" loading="lazy">
+              <span v-else class="fr-ava" aria-hidden="true">{{ initial(u.display_name) }}</span>
+              <span class="c-grow fr-hit-t">
+                <NuxtLink v-if="u.handle && u.relation !== 'none'" :to="`/u/${u.handle}`"><strong>{{ parts(u.display_name)[0] }}<mark>{{ parts(u.display_name)[1] }}</mark>{{ parts(u.display_name)[2] }}</strong></NuxtLink>
+                <strong v-else>{{ parts(u.display_name)[0] }}<mark>{{ parts(u.display_name)[1] }}</mark>{{ parts(u.display_name)[2] }}</strong>
+                <small v-if="u.handle" class="c-mute"> @{{ u.handle }}</small>
+                <span v-if="relText(u)" class="c-mute fr-hit-s">{{ relText(u) }}</span>
+              </span>
+              <button v-if="u.relation === 'none'" class="c-btn primary" :disabled="rowBusy === u.id" :aria-label="`${$t('me.friends.add')} ${u.display_name}`" @click="addHit(u)">{{ $t('me.friends.add') }}</button>
+              <button v-else-if="u.relation === 'incoming'" class="c-btn primary" :disabled="rowBusy === u.id" @click="acceptHit(u)">{{ $t('me.friends.accept') }}</button>
+              <button v-else-if="u.relation === 'outgoing'" class="c-btn" disabled>{{ $t('me.friends.requested') }}</button>
+            </li>
+          </ul>
+          <p v-else-if="hits && !searching" class="c-mute c-m0" role="status">{{ $t('me.friends.noMatch') }}</p>
         </section>
 
         <section id="fr-invite" class="c-card">
@@ -194,6 +236,12 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 .fr-feed .x-h{margin-top:0}
 .fr-top .c-h2,.fr-side .c-h2{font-size:15px;font-family:var(--font)}
 .fr-side .c-card>form .c-btn,.fr-side .c-card>.c-btn{margin-right:8px}
+.fr-hits{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--ink-line)}
+.fr-hit{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.fr-hit .fr-ava{width:36px;height:36px;object-fit:cover}
+.fr-hit-t{min-width:0;overflow-wrap:anywhere}
+.fr-hit-s{display:block}
+.fr-hit mark{background:none;color:inherit;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
 .fr-who{align-items:flex-start}
 .fr-who strong{margin-inline-end:.25em}
 .fr-ava{flex:none;display:grid;place-items:center;width:40px;height:40px;background:var(--fg);color:var(--bg);font:800 15px var(--mono)}

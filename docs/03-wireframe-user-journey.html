@@ -1943,7 +1943,7 @@ flowchart TD
 <div class="st"><span>9:41</span><span></span></div>
 <div class="ab">‹ 好友</div>
 <div class="bd">
-<div class="card" style="flex-direction:column"><b>加好友</b><div><div class="lbl"><b>對方的 Email 或帳號代號</b></div><div class="inp">name@example.com 或 @handle</div></div><div class="btn pri">送出邀請</div></div>
+<div class="card" style="flex-direction:column"><b>加好友</b><div><div class="lbl"><b>搜尋使用者</b></div><div class="inp">輸入名稱、@代號或完整 Email</div></div><div class="row"><span class="fl">阿嘉 <span class="lbl">@jia · 3 位共同朋友</span></span><div class="btn pri" style="min-width:64px">加好友</div></div><div class="row"><span class="fl">阿凱 <span class="lbl">@kai_w · 對方邀請你</span></span><div class="btn pri" style="min-width:64px">接受</div></div></div>
 <div class="card" style="flex-direction:column"><b>邀請連結</b><span class="lbl">把連結或 QR 給朋友，對方登入後即可成為好友。連結 7 天有效，重新產生會讓舊連結失效。</span><div class="inp">https://wishly.tw/invite/Xk2…</div><div class="im" style="width:88px;height:88px">QR</div><div class="row"><div class="btn fl ghost">複製網址</div><div class="btn fl ghost">重新產生</div><div class="btn fl ghost" style="color:var(--red)">撤銷</div></div></div>
 <div class="card" style="flex-direction:column"><b>收到的邀請</b><div class="row"><span class="fl">阿凱 <span class="lbl">@kai_w</span></span><div class="btn pri" style="min-width:64px">接受</div><div class="btn ghost" style="min-width:64px">婉拒</div></div></div>
 <div class="card" style="flex-direction:column"><b>我的好友（2）</b><div class="row"><span class="fl">阿明 <span class="lbl">@aming</span></span><div class="btn ghost">解除好友</div></div><div class="row"><span class="fl">小芸</span><div class="btn ghost">解除好友</div></div></div>
@@ -1958,10 +1958,10 @@ flowchart TD
 </div></div><div class="cap">解除好友確認</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>AddFriendForm、InviteLinkCard（URL、QR、複製、重新產生、撤銷）、RequestRow（incoming：接受 / 婉拒；outgoing：取消邀請）、FriendRow（連到 /u/{handle}）、ConfirmSheet</td></tr>
-<tr><th>狀態</th><td>loading；empty：「還沒有好友，用上面的方式邀請朋友吧。」；送出後顯示「若對方有帳號，已送出邀請」（不論對方是否存在，避免帳號列舉）；error：<code>RATE_LIMITED</code>（每小時 30 次）；複製失敗改提示手動選取。</td></tr>
-<tr><th>互動</th><td>輸入可含或不含 @；包含 @ 且不是開頭視為 Email。重新產生邀請連結會讓舊連結立即失效；每位使用者同時只有一條有效連結。解除好友為二次確認。</td></tr>
-<tr><th>API</th><td>GET <code>/friends</code>；POST <code>/friends/requests</code>；POST <code>/friends/requests/{id}/accept</code>；DELETE <code>/friends/requests/{id}</code>；DELETE <code>/friends/{user_id}</code>；POST / DELETE <code>/friends/invites</code>。需登入（auth middleware，未登入導向 /login）。</td></tr>
+<tr><th>元件</th><td>FriendSearch（輸入即搜尋的下拉結果列）、InviteLinkCard（URL、QR、複製、重新產生、撤銷）、RequestRow（incoming：接受 / 婉拒；outgoing：取消邀請）、FriendRow（連到 /u/{handle}）、ConfirmSheet</td></tr>
+<tr><th>狀態</th><td>loading；empty：「還沒有好友，用上面的方式邀請朋友吧。」；搜尋中顯示「搜尋中…」，無結果顯示「找不到符合的使用者」；結果列依關係顯示 加好友 / 已送出 / 接受 / 無按鈕（自己、朋友），送出後該列就地更新；2026-11-02 推翻原「防帳號列舉」規則；error：<code>RATE_LIMITED</code>（申請每小時 30 次、搜尋每小時 600 次）、<code>USER_NOT_FOUND</code>；複製失敗改提示手動選取。</td></tr>
+<tr><th>互動</th><td>輸入後 250ms debounce 搜尋，過期回應丟棄；Esc 清空；名稱比對部分加底線標示。重新產生邀請連結會讓舊連結立即失效；每位使用者同時只有一條有效連結。解除好友為二次確認。</td></tr>
+<tr><th>API</th><td>GET <code>/friends</code>；GET <code>/friends/search?q=</code>；POST <code>/friends/requests</code>；POST <code>/friends/requests/{id}/accept</code>；DELETE <code>/friends/requests/{id}</code>；DELETE <code>/friends/{user_id}</code>；POST / DELETE <code>/friends/invites</code>。需登入（auth middleware，未登入導向 /login）。</td></tr>
 </tbody></table></div></div>
 </div>
 
