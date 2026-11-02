@@ -54,6 +54,13 @@ export function homeLd(siteUrl: string, faq: { q: string, a: string }[]) {
   return [
     { '@context': 'https://schema.org', '@type': 'Organization', name: 'Wishly', url: siteUrl, logo: `${siteUrl}/icons/icon-512.png` },
     { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Wishly', url: siteUrl },
-    { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
+    faqLd(faq),
   ]
 }
+
+export const faqLd = (faq: { q: string, a: string }[]) => ({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) })
+
+export const breadcrumbLd = (siteUrl: string, crumbs: [string, string][]) => ({
+  '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+  itemListElement: crumbs.map(([name, path], n) => ({ '@type': 'ListItem', position: n + 1, name, item: siteUrl + path })),
+})

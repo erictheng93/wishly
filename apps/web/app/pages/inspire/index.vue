@@ -19,6 +19,7 @@ const groups = computed(() => [
   <main class="g-wrap">
     <p class="x-idx" aria-hidden="true"><span>INDEX / 020</span><span>CURATED CATALOG</span></p>
     <h1>{{ $t('guest.inspire.heading') }}</h1>
+    <nav class="g-chips x-scenes" :aria-label="$t('guest.inspire.scenes')"><NuxtLink v-for="s in SCENES" :key="s.slug" class="g-btn ghost sm" :to="`/inspire/${s.slug}`">{{ s.heading }}</NuxtLink></nav>
     <div class="x-filters">
     <template v-for="g in groups" :key="g.key">
       <div class="g-chips x-row" role="group" :aria-label="$t(`guest.inspire.${g.key}`)">
@@ -51,6 +52,7 @@ const groups = computed(() => [
 .x-row .g-btn{flex:none;min-height:40px;padding:0 14px;font-size:13px}
 .x-lab{flex:none;min-width:5em;font:700 11px/1 var(--mono);letter-spacing:.16em;color:var(--mute);text-transform:uppercase}
 .x-lab::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;background:var(--red)}
+.x-scenes{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}
 .x-soon{display:block;font-size:20px;color:var(--fg);margin-bottom:8px}
 @media (max-width:767px){.x-row{flex-wrap:nowrap}.x-lab{min-width:4em}}
 </style>

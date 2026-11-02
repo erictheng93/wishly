@@ -196,7 +196,8 @@
       "doneHint": "View, mark as purchased, or cancel in \"My gifts\".",
       "lineBrowser": "In the LINE in-app browser, stay signed in; tapping ⋯ at the top right and choosing \"Open in default browser\" is more reliable.",
       "viewMyClaims": "View my gifts",
-      "doneDeadline": "Please mark it as purchased in My gifts before {date}, or it will be released to other friends."
+      "doneDeadline": "Please mark it as purchased in My gifts before {date}, or it will be released to other friends.",
+      "madeWith": "Make your own wishlist with Wishly"
     },
     "live": {
       "live": "Live updates",
@@ -303,7 +304,8 @@
         "holiday": "Holiday"
       },
       "soonTitle": "Curated picks are coming soon",
-      "soonBody": "We are choosing gifts worth giving. Check back soon."
+      "soonBody": "We are choosing gifts worth giving. Check back soon.",
+      "scenes": "Gift occasions"
     },
     "brands": {
       "seoTitle": "Brands {'|'} Wishly",

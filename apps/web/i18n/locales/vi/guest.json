@@ -196,7 +196,8 @@
       "doneHint": "Xem, đánh dấu đã mua hoặc hủy trong \"Quà tôi tặng\".",
       "lineBrowser": "Trong trình duyệt tích hợp của LINE, hãy giữ trạng thái đăng nhập; chạm ⋯ ở góc phải trên rồi chọn \"Mở bằng trình duyệt mặc định\" sẽ ổn định hơn.",
       "viewMyClaims": "Xem quà tôi tặng",
-      "doneDeadline": "Vui lòng đánh dấu đã mua trong \"Quà tôi tặng\" trước {date}, quá hạn sẽ được nhường cho bạn bè khác."
+      "doneDeadline": "Vui lòng đánh dấu đã mua trong \"Quà tôi tặng\" trước {date}, quá hạn sẽ được nhường cho bạn bè khác.",
+      "madeWith": "Tạo danh sách mong ước của bạn với Wishly"
     },
     "live": {
       "live": "Cập nhật trực tiếp",
@@ -303,7 +304,8 @@
         "holiday": "Lễ hội"
       },
       "soonTitle": "Sản phẩm tuyển chọn sắp ra mắt",
-      "soonBody": "Chúng tôi đang chọn những món quà đáng tặng. Hãy quay lại sớm nhé."
+      "soonBody": "Chúng tôi đang chọn những món quà đáng tặng. Hãy quay lại sớm nhé.",
+      "scenes": "Dịp tặng quà"
     },
     "brands": {
       "seoTitle": "Thương hiệu {'|'} Wishly",
