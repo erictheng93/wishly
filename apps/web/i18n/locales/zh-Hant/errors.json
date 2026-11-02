@@ -93,6 +93,7 @@
     "TURNSTILE_FAILED": "人機驗證失敗，請重新驗證",
     "UNSUPPORTED_MEDIA_TYPE": "內容類型不支援，請重新整理後再試",
     "UPSTREAM_ERROR": "外部服務暫時無法使用，請稍後再試",
+    "USER_NOT_FOUND": "找不到這位使用者",
     "VALIDATION_FAILED": "請檢查輸入內容後再試",
     "WALLET_CAP_EXCEEDED": "儲值後餘額將超過上限，請減少金額",
     "WALLET_DEBT_OPEN": "錢包仍有未結清的拒付欠款，請先結案再解凍",

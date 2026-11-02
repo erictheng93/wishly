@@ -182,7 +182,11 @@ const { api: authApi } = useApi()
 const friendReq = ref<'idle' | 'busy' | 'sent'>('idle'), friendErr = ref('')
 async function sendFriendRequest() {
   friendReq.value = 'busy'; friendErr.value = ''
-  try { await authApi('/friends/requests', { method: 'POST', body: { to: gate.value.owner.id } }); friendReq.value = 'sent' }
+  try {
+    const r = await authApi('/friends/requests', { method: 'POST', body: { to: gate.value.owner.id } })
+    if (r?.status === 'friends') return location.reload() // 對方早已邀請你：已成為好友，重載後即可看到清單
+    friendReq.value = 'sent'
+  }
   catch (e) { friendErr.value = errMsg(e); friendReq.value = 'idle' }
 }
 const { context: pwaCtx, dismiss: pwaDismiss, install: pwaInstall } = usePwaContext()
