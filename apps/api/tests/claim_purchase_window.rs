@@ -62,11 +62,11 @@ const D: i64 = 24 * H;
 
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn window_defaults_event_rule_and_unlimited(pool: PgPool) {
-    // 預設 7 天，提醒在截止前 3 天與 24 小時
+    // 預設 7 天，提醒只在截止前 24 小時一封
     let (_, _, it) = setup(&pool, Some(168), None).await;
     let (_, c) = user_claim(&pool, it, 1).await;
     assert_eq!(window_secs(&pool, c).await, Some(7 * D));
-    assert_eq!(reminders(&pool, c, "pending").await, vec![3 * D, D]);
+    assert_eq!(reminders(&pool, c, "pending").await, vec![D]);
 
     // 14 天設定
     let (_, _, it) = setup(&pool, Some(336), None).await;
@@ -152,12 +152,12 @@ async fn extend_once_by_seven_days(pool: PgPool) {
     assert_eq!(s, StatusCode::OK, "{b}");
     assert!(b["claim"]["extended_at"].is_string());
     assert_eq!(window_secs(&pool, c).await, Some(14 * D));
-    // 新期限重排提醒（舊的兩封留著，寄信時會被取消）
+    // 新期限重排提醒（舊的留著，寄信時會被取消）
     let new_ones: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM notifications n JOIN claims c ON c.id = (n.payload->>'claim_id')::uuid
           WHERE n.kind = 'claim.purchase_reminder' AND c.id = $1 AND (n.payload->>'expires_at')::timestamptz = c.expires_at")
         .bind(c).fetch_one(&pool).await.unwrap();
-    assert_eq!(new_ones, 2);
+    assert_eq!(new_ones, 1);
 
     let (s, _, b) = patch(&pool, c, &t, json!({"extend":true})).await;
     assert_eq!(s, StatusCode::CONFLICT);
@@ -227,11 +227,11 @@ async fn stale_reminders_are_cancelled_at_send_time(pool: PgPool) {
         wishly_api::notify::tick_at(&pool, common::noon())
             .await
             .unwrap(),
-        8
-    ); // 6 筆提醒 + 2 筆認領確認
-    assert_eq!(reminders(&pool, bought, "cancelled").await.len(), 2);
-    assert_eq!(reminders(&pool, extended, "cancelled").await.len(), 2); // 延長前的舊期限
-    assert_eq!(reminders(&pool, extended, "sent").await.len(), 2); // 新期限
+        5
+    ); // 3 筆提醒 + 2 筆認領確認
+    assert_eq!(reminders(&pool, bought, "cancelled").await.len(), 1);
+    assert_eq!(reminders(&pool, extended, "cancelled").await.len(), 1); // 延長前的舊期限
+    assert_eq!(reminders(&pool, extended, "sent").await.len(), 1); // 新期限
 }
 
 #[test]
@@ -479,7 +479,7 @@ async fn closing_a_list_grants_seven_day_grace(pool: PgPool) {
                 "SELECT count(*) FROM notifications n JOIN claims c ON c.id = (n.payload->>'claim_id')::uuid
                   WHERE n.kind = 'claim.purchase_reminder' AND c.id = $1 AND n.status = 'pending' AND (n.payload->>'expires_at')::timestamptz = c.expires_at")
                 .bind(c).fetch_one(&pool).await.unwrap();
-            assert_eq!(fresh, 2, "{how}");
+            assert_eq!(fresh, 1, "{how}");
         }
         // 重開不縮短期限
         if how == "patch_closed" {

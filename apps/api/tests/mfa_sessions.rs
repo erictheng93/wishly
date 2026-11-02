@@ -403,7 +403,7 @@ async fn expires_in_days(pool: &PgPool, token: &str) -> f64 {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn session_slides_on_use_but_caps_at_90_days(pool: PgPool) {
+async fn session_slides_on_use_but_caps_at_180_days(pool: PgPool) {
     let u = common::user(&pool, "u").await;
     let t = common::session(&pool, u.id).await;
     let h = wishly_api::session::hash_token(&t);
@@ -418,12 +418,12 @@ async fn session_slides_on_use_but_caps_at_90_days(pool: PgPool) {
     assert_eq!(call(&pool, "GET", "/me", &ck(&t), None).await.0, 200);
     let d = expires_in_days(&pool, &t).await;
     assert!((29.9..=30.0).contains(&d), "未續期：{d}");
-    // 建立已 80 天：只能續到建立後 90 天
-    sqlx::query("UPDATE sessions SET created_at = now() - interval '80 days', last_seen_at = now() - interval '10 minutes' WHERE token_hash = $1")
+    // 建立已 170 天：只能續到建立後 180 天
+    sqlx::query("UPDATE sessions SET created_at = now() - interval '170 days', last_seen_at = now() - interval '10 minutes' WHERE token_hash = $1")
         .bind(&h).execute(&pool).await.unwrap();
     call(&pool, "GET", "/me", &ck(&t), None).await;
     let d = expires_in_days(&pool, &t).await;
-    assert!((9.9..=10.0).contains(&d), "超過 90 天上限：{d}");
+    assert!((9.9..=10.0).contains(&d), "超過 180 天上限：{d}");
     // 閒置過期後不再接受（也不會被續期救回）
     sqlx::query(
         "UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token_hash = $1",

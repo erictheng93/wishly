@@ -163,7 +163,7 @@ pub async fn enqueue_friend_request<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
-/// Q12：認領購買期限提醒，截止前 3 天與 24 小時各一封（只排還在未來的）。
+/// Q12：認領購買期限提醒，截止前 24 小時一封（只排還在未來的；原本另有 3 天前一封，為減少信件已拿掉）。
 /// payload 記下排程時的 expires_at；寄信時若捐助已不是 reserved 或期限已改（延長），worker 會取消不寄。
 pub async fn enqueue_purchase_reminders<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
@@ -173,10 +173,9 @@ pub async fn enqueue_purchase_reminders<'e, E: sqlx::PgExecutor<'e>>(
         "INSERT INTO notifications (user_id, guest_id, channel, kind, payload, scheduled_at)
          SELECT c.user_id, c.guest_id, 'email'::notification_channel, 'claim.purchase_reminder',
                 jsonb_build_object('wishlist_id', i.wishlist_id, 'item_id', c.item_id, 'claim_id', c.id, 'expires_at', c.expires_at),
-                c.expires_at - d.before
-           FROM claims c JOIN wishlist_items i ON i.id = c.item_id,
-                (VALUES (interval '3 days'), (interval '24 hours')) d(before)
-          WHERE c.id = ANY($1) AND c.status = 'reserved' AND c.expires_at - d.before > now()")
+                c.expires_at - interval '24 hours'
+           FROM claims c JOIN wishlist_items i ON i.id = c.item_id
+          WHERE c.id = ANY($1) AND c.status = 'reserved' AND c.expires_at - interval '24 hours' > now()")
         .bind(claim_ids).execute(ex).await?;
     Ok(())
 }
@@ -343,10 +342,15 @@ pub enum EmailTier {
     Optional,
     /// 會員不寄 email，只留站內（舊訪客沒有站內，照常寄）
     InAppOnly,
+    /// 會員不寄 email，但照 Optional 的時機推播（舊訪客照常寄）
+    PushOnly,
 }
 
 pub fn email_tier(kind: &str) -> EmailTier {
     match kind {
+        // 送禮進度：打開 App 就看得到，錯過也沒有損失（送達、失敗仍寄）；有時效，推播保留
+        "claim.item_changed" | "crowdfund.funded" | "order.shipped" | "owner.funded"
+        | "owner.shipped" => EmailTier::PushOnly,
         "claim.confirmation"
         | "friend.accepted"
         | "item.reopened"
@@ -590,7 +594,9 @@ async fn handle(
     let cat = category(&kind);
     // email 要延後的時間（見步驟 9）：安靜時段，或連續操作的合併窗口。站內信不等；此時不合併，否則被併掉的列就沒有自己的站內信
     let tier = email_tier(&kind);
-    let in_app_only = uid.is_some() && tier == EmailTier::InAppOnly;
+    let in_app_only = uid.is_some()
+        && (tier == EmailTier::InAppOnly
+            || (kind == "auth.new_device" && payload["method"] == "otp"));
     let mut hold = if tier == EmailTier::Immediate {
         None
     } else {
@@ -871,6 +877,12 @@ async fn handle(
     // 推播：時機與合併都跟 email 一樣，但不受 email 開關影響；關了站內就不推。attempts 為 1 才推，email 重試不重複推
     if let (Some(u), true, 1) = (uid, inbox_on, attempts) {
         pushes.push((u, inbox_title.to_string(), inbox_link(&kind, &payload)));
+    }
+    // 標 sent（不是 cancelled）：品項修改的 1 小時冷卻看同類的 sent_at
+    if uid.is_some() && tier == EmailTier::PushOnly {
+        sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = 'push only' WHERE id = $1")
+            .bind(id).execute(pool).await?;
+        return Ok(None);
     }
     // 偏好：關閉的類別只靜音 email
     if let Some((_, gifts, social, ..)) = &user {
@@ -1924,10 +1936,9 @@ mod tests {
         }
         for k in [
             "claim.expired",
-            "claim.item_changed",
-            "crowdfund.funded",
-            "order.shipped",
-            "owner.funded",
+            "order.delivered",
+            "owner.delivered",
+            "owner.order_failed",
             "event.summary",
             "friend.request",
             "birthday.friend",
@@ -1944,6 +1955,15 @@ mod tests {
             "wishlist.supported",
         ] {
             assert_eq!(email_tier(k), InAppOnly, "{k}");
+        }
+        for k in [
+            "claim.item_changed",
+            "crowdfund.funded",
+            "order.shipped",
+            "owner.funded",
+            "owner.shipped",
+        ] {
+            assert_eq!(email_tier(k), PushOnly, "{k}");
         }
     }
 }

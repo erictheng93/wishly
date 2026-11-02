@@ -272,5 +272,9 @@ async fn cancelled_claimant_notice_is_cancelled_at_send_time(pool: PgPool) {
         notif_status(&pool, it, Some(gone_uid)).await,
         ("cancelled".into(), Some("no longer supporting item".into()))
     );
-    assert_eq!(notif_status(&pool, it, Some(active_uid)).await.0, "sent");
+    // 會員只推播不寄信（PushOnly）
+    assert_eq!(
+        notif_status(&pool, it, Some(active_uid)).await,
+        ("sent".into(), Some("push only".into()))
+    );
 }

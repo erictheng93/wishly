@@ -50,7 +50,7 @@ async fn quiet_hours_defer_email_not_inbox(pool: PgPool) {
     let gifts = push(
         &pool,
         u.id,
-        "crowdfund.funded",
+        "owner.delivered",
         json!({"wishlist_id": wl.id}),
     )
     .await;
@@ -174,7 +174,7 @@ async fn inbox_pref_off_skips_inbox_but_still_emails(pool: PgPool) {
     let u = user(&pool, "u").await;
     sqlx::query("UPDATE users SET notification_prefs='{\"inbox_social\": false, \"inbox_gifts\": false}' WHERE id=$1").bind(u.id).execute(&pool).await.unwrap();
     let social = push_social(&pool, u.id).await;
-    let gifts = push(&pool, u.id, "crowdfund.funded", json!({})).await;
+    let gifts = push(&pool, u.id, "owner.delivered", json!({})).await;
     let account = push(&pool, u.id, "site.paused", json!({})).await;
     notify::tick_at(&pool, noon()).await.unwrap();
     for (id, inbox) in [(social, false), (gifts, false), (account, true)] {
@@ -447,7 +447,7 @@ async fn muted_and_emailless_users_still_get_inbox(pool: PgPool) {
     let gifts = push(
         &pool,
         u.id,
-        "crowdfund.funded",
+        "owner.delivered",
         json!({"wishlist_id": wl.id}),
     )
     .await;
@@ -1150,11 +1150,11 @@ async fn every_item_edit_reaches_inbox_but_email_is_merged_and_rate_limited(pool
         0
     );
 
-    // 窗口過後：三筆只試寄一封（寄不出去所以主列留 pending），其餘併入，站內全保留
+    // 窗口過後：三筆只推播一次（會員不寄信，主列標 push only），其餘併入，站內全保留
     sqlx::query("UPDATE notifications SET created_at = now() - interval '11 minutes', scheduled_at = now() WHERE user_id=$1").bind(uid).execute(&pool).await.unwrap();
     notify::tick_at(&pool, noon()).await.unwrap();
     assert_eq!(
-        count("SELECT count(*) FROM notifications WHERE user_id=$1 AND status='pending'").await,
+        count("SELECT count(*) FROM notifications WHERE user_id=$1 AND status='sent' AND last_error='push only'").await,
         1
     );
     assert_eq!(
