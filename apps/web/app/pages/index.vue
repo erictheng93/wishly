@@ -44,6 +44,8 @@ const steps = computed(() => [1, 2, 3].map(i => ({ n: `0${i}`, t: t(`me.home.ste
 const feats = computed(() => [0, 1, 2, 3].map(i => ({ t: t(`me.home.feats.${i}.t`), d: t(`me.home.feats.${i}.d`) })))
 const links = [['/explore', 'explore'], ['/inspire', 'inspire'], ['/brands', 'brands'], ['/#scenes', 'seeDemo']] as const
 const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: t(`me.home.faq.${i}.a`) })))
+const { public: { siteUrl } } = useRuntimeConfig()
+useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
 </script>
 
 <template>

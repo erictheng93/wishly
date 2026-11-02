@@ -3,6 +3,8 @@
 const { public: { apiBase } } = useRuntimeConfig()
 const { t } = useI18n()
 useSeoMeta({ title: () => t('guest.relief.seoTitle'), description: () => t('guest.relief.seoDesc') })
+// 功能關閉時回真 404（同 /org），否則爬蟲會收錄一頁空殼
+if (!(await useOrgsEnabled()).value) throw createError({ statusCode: 404, fatal: true })
 const { data, error, refresh } = await useAsyncData('relief-events', () => $fetch<any>(`${apiBase}/api/v1/public/relief-events`))
 const extra = ref<any[]>([]), extraNext = ref<number | null | undefined>(undefined), busy = ref(false), moreErr = ref(false)
 watch(data, () => { extra.value = []; extraNext.value = undefined })

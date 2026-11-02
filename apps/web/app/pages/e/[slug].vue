@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 救援事件頁：事件資訊 + 各據點與缺口數字（SSR；公開 API 不帶 cookie）
-const { public: { apiBase } } = useRuntimeConfig()
+const { public: { apiBase, siteUrl } } = useRuntimeConfig()
 const { t } = useI18n()
 const slug = String(useRoute().params.slug)
 const { data, error, refresh } = await useAsyncData(`relief-event-${slug}`, () => $fetch<any>(`${apiBase}/api/v1/public/relief-events/${encodeURIComponent(slug)}`))
@@ -11,6 +11,7 @@ const sites = computed<any[]>(() => data.value?.sites ?? [])
 const notFound = computed(() => (error.value as any)?.statusCode === 404 || (error.value as any)?.status === 404)
 if (notFound.value && import.meta.server) setResponseStatus(useRequestEvent()!, 404)
 const origin = useRequestURL().origin
+useHead({ script: () => ev.value ? [ldScript(eventLd(siteUrl, slug, ev.value))] : [] })
 useSeoMeta({
   title: () => ev.value?.name ?? t('guest.relief.heading'),
   description: () => ev.value?.description || t('guest.relief.seoDesc'),
