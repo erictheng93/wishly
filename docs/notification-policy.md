@@ -65,6 +65,33 @@
 
 寄信與站內寫入分開：一批通知先全部寫入站內，再以最多 5 個併發寄信，SMTP 卡住不影響站內。
 
+## 寄信量統計
+
+寄信量看兩個來源：`notifications`（通知信）與 `otp_challenges`（驗證碼信不進通知表，每列就是一封）。
+
+`notifications` 裡 `status = 'sent'` 不等於寄了一封信，以下兩種要排除：
+
+- `last_error` 以 `bundled:` 開頭：被併進另一封信。
+- `last_error = 'push only'`：`PushOnly` 只推播。標成 `sent` 是為了讓品項修改的 1 小時冷卻能看 `sent_at`。
+
+只留站內、Email 靜音、沒有 Email 地址都標 `cancelled`，不會被算到。
+
+```sql
+SELECT kind, count(*) AS mails, count(DISTINCT user_id) AS users
+  FROM notifications
+ WHERE status = 'sent' AND sent_at > now() - interval '30 days'
+   AND COALESCE(last_error, '') NOT LIKE 'bundled:%'
+   AND COALESCE(last_error, '') <> 'push only'
+ GROUP BY kind
+UNION ALL
+SELECT 'otp.' || purpose, count(*), count(DISTINCT email)
+  FROM otp_challenges WHERE created_at > now() - interval '30 days'
+ GROUP BY purpose
+ORDER BY mails DESC;
+```
+
+驗證碼列的 `users` 是不同 email 數。這只算送出去的信，退信等實際送達結果要看 Cloudflare Email 後台。
+
 ## 推播
 
 Web Push 是 APP 外的提醒，開關在每台裝置上，需使用者主動開啟。
