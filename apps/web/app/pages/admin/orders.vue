@@ -10,13 +10,16 @@ const err = ref(''), msg = ref('')
 const ACTION = computed<Record<string, string>>(() => ({ placed: t('admin.orders.action.placed'), shipped: t('admin.orders.action.shipped'), delivered: t('admin.orders.action.delivered'), failed: t('admin.orders.action.failed'), cancelled: t('admin.orders.action.cancelled') }))
 const actLabel = computed(() => (act.value ? ACTION.value[act.value.to] ?? '' : ''))
 
+let loadSeq = 0 // 較慢回來的舊請求不可蓋掉目前篩選的列表
 async function load(more = false) {
+  const seq = ++loadSeq
   loading.value = true; err.value = ''
   addressGeneration++; addresses.value = {}; addressBusy.value = {}; addressErrors.value = {}
   try {
     const r = await api('/admin/orders', { query: { status: status.value || undefined, fulfillment_type: fulfillment.value || undefined, limit: 20, cursor: more ? cursor.value : undefined } })
+    if (seq !== loadSeq) return
     rows.value = more ? [...rows.value, ...r.data] : r.data; cursor.value = r.next_cursor
-  } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
+  } catch (e) { if (seq === loadSeq) err.value = errMsg(e) } finally { if (seq === loadSeq) loading.value = false }
 }
 watch([status, fulfillment], () => load())
 onMounted(() => load())

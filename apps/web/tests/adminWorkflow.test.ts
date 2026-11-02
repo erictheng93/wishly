@@ -164,3 +164,17 @@ it('組織撤銷：後端拒絕理由格式時退回第一步，保留已輸入�
   expect(el.querySelector<HTMLTextAreaElement>('.confirm textarea')!.value).toBe('含控制字元')
   expect(el.querySelector('.confirm')!.textContent).toContain('理由含不允許的字元')
 })
+
+it('訂單切換篩選時，較慢回來的舊請求不會蓋掉新列表', async () => {
+  const row = (id: string, title: string, status: string) => ({ id, status, item: { title }, list: { title: 'L' } })
+  let oldList!: (v: any) => void
+  api.mockReturnValueOnce(new Promise(resolve => { oldList = resolve }))
+    .mockResolvedValueOnce({ data: [row('new', '運送中訂單', 'shipped')], next_cursor: null })
+  const el = show(Orders); await settle()
+  const status = el.querySelector<HTMLSelectElement>('select')!
+  status.value = 'shipped'; status.dispatchEvent(new Event('change', { bubbles: true }))
+  await settle()
+  oldList({ data: [row('old', '待下單訂單', 'pending')], next_cursor: 'stale' }); await settle()
+  expect(el.textContent).toContain('運送中訂單')
+  expect(el.textContent).not.toContain('待下單訂單')
+})

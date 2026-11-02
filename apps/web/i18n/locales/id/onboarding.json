@@ -56,6 +56,7 @@
       "stepDone": "Selesai",
       "stepNow": "Sekarang",
       "stepTodo": "Belum",
+      "nameHint": "Nama ini yang akan dilihat teman-temanmu.",
       "profileHint": "Isi minimal satu dari nama pengguna, bio, atau tanggal lahir; bisa diubah nanti di Pengaturan.",
       "profileNeedOne": "Isi minimal satu dari nama pengguna, bio, atau tanggal lahir",
       "profileSave": "Simpan dan buat daftar",

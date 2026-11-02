@@ -56,6 +56,7 @@
       "stepDone": "Xong",
       "stepNow": "Hiện tại",
       "stepTodo": "Chưa làm",
+      "nameHint": "Đây là tên bạn bè sẽ nhìn thấy.",
       "profileHint": "Điền ít nhất một trong mã tài khoản, lời giới thiệu hoặc ngày sinh; có thể sửa sau trong Cài đặt.",
       "profileNeedOne": "Vui lòng điền ít nhất một trong mã tài khoản, lời giới thiệu hoặc ngày sinh",
       "profileSave": "Lưu và tạo danh sách",

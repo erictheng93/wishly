@@ -42,6 +42,8 @@ export function useAuth() {
   const login = (email: string, password: string, turnstile_token?: string) => session('/auth/login', { email, password, turnstile_token })
   const register = (email: string, password: string, display_name: string, turnstile_token?: string) => post('/auth/register', { email, password, display_name, turnstile_token })
   const verifyRegister = (email: string, code: string, challenge_id?: string) => session('/auth/register/verify', { email, code, challenge_id })
+  const requestLoginCode = (email: string, turnstile_token?: string) => post('/auth/otp/request', { email, turnstile_token })
+  const verifyLoginCode = (email: string, code: string, challenge_id?: string) => session('/auth/otp/verify', { email, code, challenge_id })
   const requestReset = (email: string, turnstile_token?: string) => post('/auth/password/reset/request', { email, turnstile_token })
   const confirmReset = (email: string, code: string, new_password: string, challenge_id?: string) => post('/auth/password/reset/confirm', { email, code, new_password, challenge_id })
   async function oauth(provider: 'google' | 'line', redirect = '/dashboard', link = false) {
@@ -62,5 +64,5 @@ export function useAuth() {
     }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
-  return { oauth, user, loaded, fetchMe, logout, login, register, verifyRegister, requestReset, confirmReset }
+  return { oauth, user, loaded, fetchMe, logout, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }
 }

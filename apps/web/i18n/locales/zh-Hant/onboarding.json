@@ -56,6 +56,7 @@
       "stepDone": "完成",
       "stepNow": "目前",
       "stepTodo": "待完成",
+      "nameHint": "這是朋友會看到的名稱。",
       "profileHint": "代號、自我介紹、生日至少填一項；之後都能在「設定」修改。",
       "profileNeedOne": "請至少填寫帳號代號、自我介紹或生日其中一項",
       "profileSave": "儲存並建立清單",

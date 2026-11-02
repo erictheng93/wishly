@@ -185,6 +185,7 @@ main{padding:0 16px 60px}
 <tr><th>狀態</th><td>Draft</td></tr>
 <tr><th>D58 變更</th><td>清單類型 personal / registry 合併為「心願清單」：5.5 建立清單的類型只剩一個選項（欄位保留給日後 relief）、清單卡片一律標「心願清單」、5.36 探索頁移除類型篩選。見 PRD D58。</td></tr>
 <tr><th>D51 變更</th><td>清單可見性精簡為 public / friends（所有好友，預設）/ selected（摯友）/ private；移除知道連結與密碼保護（含 5.35 密碼門檻、3.10 密碼清單旅程）。新增訪客探索頁 /explore（5.36 與 3.10）。下文 v0.5 提及 link / password / 解鎖之處已被取代。</td></tr>
+<tr><th>D69 變更（2026-11-01）</th><td>/login 開放 Email 驗證碼登入，與密碼並存（5.30）；儀表板新增綁定 Email 與顯示名稱提示，/welcome 名稱欄位加用途說明。</td></tr>
 <tr><th>v0.5 變更</th><td>對齊 10/11 已實作功能，補齊原文件缺漏的畫面與流程：Email＋密碼註冊 / 登入 / 忘記密碼（5.30）、好友（5.31）、好友邀請連結（5.32）、個人頁（5.33）、清單可見性選擇器（5.34）、受限清單門檻頁（5.35）、帳號設定的個人頁與捐助可見度、捐助可見度（5.36）；新增旅程 3.9 / 3.10、User Flow 4.12 至 4.16、路由對照與實作覆蓋矩陣（5.37）、E2E 必測情境（13.1）。5.2 登入頁改以實作為準（密碼為主，OTP 僅用於註冊與重設）。</td></tr>
 <tr><th>v0.4 變更</th><td>補齊上線前遺漏——行為分析、檢舉下架、MVP 營運後台、測試策略、環境與備份、MVP Email 通知、帳號刪除與資料匯出、信用卡拒付、電子發票、救災組織驗證、技術 Spike、P2 前 Go/No-Go 關卡。本文件對應：檢舉與下架畫面、/admin、/settings、個資告知與 Email 管理連結、圖片 EXIF 提示、發票選項、錢包凍結、已驗證組織徽章、第 12 至 14 節。</td></tr>
 <tr><th>v0.3 變更</th><td>效仿星巴克，新增自動儲值、電子禮物卡、回饋星星、企業禮券。核心原則不變：點數永遠不能提領成現金給受捐者（收卡者也不能變現），只能用在心願品項。</td></tr>
@@ -872,7 +873,7 @@ flowchart TD
 <tr><th>API</th><td>POST <code>/auth/otp/request</code>；POST <code>/auth/otp/verify</code>；GET <code>/auth/oauth/{provider}/start</code>（provider = line|google）；callback 由後端 302 回前端並設定 <code>ws_session</code>。</td></tr>
 </tbody></table></div></div></div>
 
-<div class="note w"><b>v0.5 實作對照：</b>上圖為 v0.1 的 OTP 登入設計。實作的 /login 以「Email＋密碼」為主、Google / LINE 為輔，OTP 只用於註冊與忘記密碼，畫面見 <a href="#w-register">5.30</a>。</div>
+<div class="note w"><b>v0.5 實作對照：</b>上圖為 v0.1 的 OTP 登入設計。實作的 /login 提供 Email＋密碼、Email 驗證碼（D69）、Google / LINE，畫面見 <a href="#w-register">5.30</a>。</div>
 
 <!-- 5.3 NEW -->
 <h3 id="w-new">5.3 建立清單 /lists/new <span class="ph p0">P0</span></h3>
@@ -1882,6 +1883,8 @@ flowchart TD
 <div><div class="lbl"><b>Email</b></div><div class="inp">name@example.com</div></div>
 <div><div class="lbl"><b>密碼</b></div><div class="inp">••••••••　👁</div></div>
 <div style="color:var(--red);font-size:12px">帳號或密碼錯誤（錯誤示範）</div>
+<div class="lbl">如果你是用 LINE 或 Google 註冊、還沒設定過密碼，可以改用 Email 驗證碼登入。</div>
+<div class="lbl">或　用 Email 驗證碼登入</div>
 <div class="btn pri">登入</div>
 <div class="row"><span class="fl lbl">建立帳號</span><span class="lbl">忘記密碼</span></div>
 <div class="lbl" style="text-align:center">或</div>
@@ -1925,10 +1928,10 @@ flowchart TD
 </div></div><div class="cap">/forgot-password 步驟 2（步驟 1 僅 Email 欄位與「寄送驗證碼」）</div></div>
 </div>
 <div class="spec"><div class="tw"><table><tbody>
-<tr><th>元件</th><td>EmailField、PasswordField（顯示 / 隱藏切換、<code>autocomplete="current-password"</code> 或 <code>"new-password"</code>）、OtpInput（6 格自動送出）、ResendTimer、OAuthButton</td></tr>
-<tr><th>狀態</th><td>loading：按鈕 spinner 並停用；error：<code>INVALID_CREDENTIALS</code>「帳號或密碼錯誤」、<code>RATE_LIMITED</code>「嘗試次數過多，請稍後再試」、<code>OTP_INVALID</code>「驗證碼不正確或已過期」並清空重填、<code>EMAIL_EXISTS</code> 顯示「前往登入」；OAuth 失敗：回 /login 顯示「第三方登入失敗，請重試」；重設成功：/login 顯示「密碼已重設，請用新密碼登入」。</td></tr>
-<tr><th>互動</th><td><code>?redirect=</code> 僅接受以 / 開頭且非 // 的站內路徑，否則回 /dashboard；/register 的「登入」連結保留 redirect。已登入者開 /login 直接導向 redirect。重設密碼會登出所有裝置。</td></tr>
-<tr><th>API</th><td>POST <code>/auth/login</code>、<code>/auth/register</code>、<code>/auth/register/verify</code>、<code>/auth/password/reset/request</code>、<code>/auth/password/reset/confirm</code>；GET <code>/auth/oauth/{provider}/start</code>。詳 02 F1-c。</td></tr>
+<tr><th>元件</th><td>EmailField、PasswordField（顯示 / 隱藏切換、<code>autocomplete="current-password"</code> 或 <code>"new-password"</code>）、OtpInput（6 格自動送出）、ResendTimer、OAuthButton、CodeLogin（Email 驗證碼登入，D69）</td></tr>
+<tr><th>狀態</th><td>loading：按鈕 spinner 並停用；error：<code>INVALID_CREDENTIALS</code>「帳號或密碼錯誤」並提示可改用 Email 驗證碼登入（文案不透露帳號是否存在）、<code>RATE_LIMITED</code>「嘗試次數過多，請稍後再試」、<code>OTP_INVALID</code>「驗證碼不正確或已過期」並清空重填、<code>EMAIL_EXISTS</code> 顯示「前往登入」；OAuth 失敗：回 /login 顯示「第三方登入失敗，請重試」；重設成功：/login 顯示「密碼已重設，請用新密碼登入」。</td></tr>
+<tr><th>互動</th><td><code>?redirect=</code> 僅接受以 / 開頭且非 // 的站內路徑，否則回 /dashboard；/register 的「登入」連結保留 redirect。已登入者開 /login 直接導向 redirect。重設密碼會登出所有裝置。/login 可在密碼與 Email 驗證碼之間切換，已填的 Email 會帶過去，並說明尚未註冊的信箱會自動開戶；驗證碼登入一樣回到 redirect。</td></tr>
+<tr><th>API</th><td>POST <code>/auth/login</code>、<code>/auth/otp/request</code>、<code>/auth/otp/verify</code>、<code>/auth/register</code>、<code>/auth/register/verify</code>、<code>/auth/password/reset/request</code>、<code>/auth/password/reset/confirm</code>；GET <code>/auth/oauth/{provider}/start</code>。詳 02 F1-c。</td></tr>
 </tbody></table></div></div>
 </div>
 
@@ -2759,6 +2762,7 @@ async function waitTopup(before) {
 <tr><td>刪除帳號</td><td>已登入</td><td>需輸入確認字樣；P2 有餘額時顯示 <code>ACCOUNT_HAS_BALANCE</code> 阻擋</td></tr>
 <tr><td>事件白名單</td><td>攔截 PostHog 請求</td><td>事件名與屬性皆在 12 節白名單內，不含暱稱與聯絡方式</td></tr>
 <tr><td>密碼註冊與登入</td><td>全新 Email；Mailpit 取得 OTP</td><td>註冊 → 輸入 OTP → 進 /dashboard；登出後以密碼登入成功；錯誤密碼顯示「帳號或密碼錯誤」；重複 Email 驗證顯示「此 Email 已註冊」</td></tr>
+<tr><td>Email 驗證碼登入</td><td>已綁定 Email、沒有密碼的帳號；全新 Email</td><td>密碼失敗顯示改用驗證碼的提示 → 輸入 OTP → 回到同一帳號；全新 Email 自動開戶並進 /welcome，名稱預填信箱前綴；登入後回到 redirect</td></tr>
 <tr><td>忘記密碼</td><td>已註冊帳號</td><td>寄出 OTP → 設新密碼 → 回 /login 顯示「密碼已重設」；舊密碼失效、其他裝置 session 被撤銷</td></tr>
 <tr><td>探索頁</td><td>多位使用者各有 public / friends / selected / private 清單</td><td>匿名開 /explore 只看到 public 且有品項的清單；卡片標「心願清單」、無類型篩選（D58）；載入更多正常；點進清單可瀏覽但「我要送」要求登入</td></tr>
 <tr><td>好友清單</td><td>visibility=friends</td><td>未登入「請先登入」→ 登入後非好友「僅限好友」→ 成為好友後可看；解除好友後再次被擋</td></tr>

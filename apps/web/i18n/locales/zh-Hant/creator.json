@@ -1,5 +1,18 @@
 {
   "creator": {
+    "nudge": {
+      "later": "之後再說",
+      "email": {
+        "title": "綁定 Email，帳號更有保障",
+        "body": "綁定後，LINE 或 Google 無法使用時也能用驗證碼登入，還能收到通知信。",
+        "link": "前往綁定"
+      },
+      "name": {
+        "title": "設定你的顯示名稱",
+        "body": "朋友會看到這個名稱。它目前取自你的 Email，建議換成大家認得的名字。",
+        "link": "修改名稱"
+      }
+    },
     "confirm": {
       "cancel": "取消",
       "busy": "處理中…",

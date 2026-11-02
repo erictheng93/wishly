@@ -25,7 +25,7 @@
 | 類別 | kind |
 |---|---|
 | 驗證碼 | 登入、註冊、重設密碼（直接寄送，不進站內） |
-| 安全 | `auth.password_changed`、`auth.mfa_enabled`、`auth.mfa_reset`、`auth.recovery_regenerated`、`auth.identity_linked`、`auth.identity_unlinked` |
+| 安全 | `auth.password_changed`、`auth.new_device`、`auth.mfa_enabled`、`auth.mfa_reset`、`auth.recovery_regenerated`、`auth.identity_linked`、`auth.identity_unlinked` |
 | 帳號處分 | `account.suspended`、`account.restored` |
 | 金流 | `topup.credited`、`cash_refund.updated`、`wallet.frozen`、`wallet.unfrozen`、`wallet.chargeback`、`order.failed`、`order.partial_refund`、`funding.expired`、`funding.released`、`item.removed` |
 | 組織與治理 | `org.invite`、`org.review`、`org.permit_reviewed`、`org.permit_rejected`、`org.permit_revoked`、`org.permit_expiring`、`org.permit_expired`、`org.event_hidden`、`wishlist.moderated` |

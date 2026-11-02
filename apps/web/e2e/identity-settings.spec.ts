@@ -14,6 +14,63 @@ test('註冊入口保留第三方登入與導向', async ({ page }) => {
   await expect.poll(() => startUrl).toContain('redirect=%2Flists%2Fnew')
 })
 
+test('沒有 Email 的帳號在儀表板看到綁定提示，關閉後不再出現；綁定入口可用', async ({ page, context }) => {
+  const user = await registerUser()
+  await context.addCookies((await user.api.storageState()).cookies)
+  const nudge = page.getByRole('region', { name: '綁定 Email，帳號更有保障' })
+  await page.goto('/dashboard')
+  await expect(page.getByRole('heading', { name: '我的清單' })).toBeVisible()
+  await expect(nudge).toHaveCount(0) // 有 Email 不打擾
+
+  const id = (await (await user.api.get('me')).json()).id as string
+  sql(`DELETE FROM auth_identities WHERE user_id='${id}'`)
+  sql(`UPDATE users SET email=NULL WHERE id='${id}'`)
+  sql(`INSERT INTO auth_identities (user_id,provider,provider_uid) VALUES ('${id}','line','${uid()}')`)
+  await page.goto('/dashboard')
+  await nudge.getByRole('link', { name: '前往綁定' }).click()
+  await expect(page).toHaveURL(/\/settings/)
+  await expect(page.getByRole('region', { name: '登入方式' }).getByLabel('綁定 Email')).toBeVisible()
+
+  await page.goto('/dashboard')
+  await nudge.getByRole('button', { name: '之後再說' }).click()
+  await expect(nudge).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '我的清單' })).toBeVisible()
+  await expect(nudge).toHaveCount(0)
+  await user.api.dispose()
+})
+
+test('顯示名稱還是信箱前綴：導覽頁說明用途，儀表板提示改名，改好或關閉後不再出現', async ({ page, context }) => {
+  const user = await registerUser({ onboarding: true })
+  const id = (await (await user.api.get('me')).json()).id as string
+  const prefix = user.email.split('@')[0]!
+  sql(`UPDATE users SET display_name='${prefix}' WHERE id='${id}'`)
+  await context.addCookies((await user.api.storageState()).cookies)
+  await page.goto('/welcome')
+  await expect(page.getByLabel('顯示名稱')).toHaveValue(prefix)
+  await expect(page.getByText('這是朋友會看到的名稱。')).toBeVisible()
+
+  await user.api.patch('me/onboarding', { data: { done: true } })
+  const nudge = page.getByRole('region', { name: '設定你的顯示名稱' })
+  await page.goto('/dashboard')
+  await nudge.getByRole('link', { name: '修改名稱' }).click()
+  await expect(page).toHaveURL(/\/settings/)
+  await expect(page.getByLabel('顯示名稱').first()).toHaveValue(prefix)
+
+  await page.goto('/dashboard')
+  await nudge.getByRole('button', { name: '之後再說' }).click()
+  await expect(nudge).toHaveCount(0)
+  await page.evaluate(() => localStorage.clear())
+  await page.goto('/dashboard')
+  await expect(nudge).toBeVisible()
+
+  sql(`UPDATE users SET display_name='小魏' WHERE id='${id}'`)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '我的清單' })).toBeVisible()
+  await expect(nudge).toHaveCount(0)
+  await user.api.dispose()
+})
+
 test('LINE 設定：補 Email、OTP 驗證、解除綁定及最後登入方式保護', async ({ page, context }) => {
   page.on('pageerror', error => { throw error })
   const user = await registerUser()
