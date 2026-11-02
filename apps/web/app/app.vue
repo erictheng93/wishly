@@ -4,6 +4,14 @@ import '~/assets/creator.css'
 
 // <html lang> 跟著目前語系
 const { locale, locales } = useI18n()
+const { public: { siteUrl } } = useRuntimeConfig()
+const route = useRoute()
+useHead({
+  // canonical 一律指向正式網域、去掉查詢字串（?via= 等），避免預覽網域與帶參數網址被當重複頁
+  // 頁面沒指定時的預設分享圖（頁面自己的 og:image 會覆蓋）
+  meta: [{ key: 'og:image', property: 'og:image', content: `${siteUrl}/og-default.png` }],
+  link: [{ key: 'canonical', rel: 'canonical', href: computed(() => siteUrl + route.path) }],
+})
 useHead({
   htmlAttrs: { lang: computed(() => locales.value.find(l => typeof l !== 'string' && l.code === locale.value)?.language ?? locale.value) },
   // manifest 依語系：zh-Hant 為預設檔，其餘 manifest.<code>.webmanifest（id 皆為 "/"，不會被當成不同 App）；key 讓切語系時取代而非重複

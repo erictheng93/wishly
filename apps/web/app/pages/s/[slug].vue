@@ -6,7 +6,7 @@ const { t, locale } = useI18n()
 const slug = route.params.slug as string
 // 範例清單（db/seed/demo.sql）：頂端提供互相切換，一般清單不顯示
 const demos = slug.startsWith('demo') ? [['demobirth0', t('guest.slug.demoBirthday')], ['demogift00', t('guest.slug.demoGift')], ['demowedd00', t('guest.slug.demoWedding')]] : []
-const { public: { apiBase } } = useRuntimeConfig()
+const { public: { apiBase, siteUrl } } = useRuntimeConfig()
 const { api } = useGuest()
 const listUrl = `${apiBase}/api/v1/public/wishlists/${slug}`
 
@@ -52,7 +52,9 @@ if (data.value) {
   // 規格：docs 03 §5.6 meta 內容規則
   const left = () => (data.value?.items ?? []).filter((i: any) => i.funding_mode !== 'support' && !i.is_fully_claimed).length
   const origin = useRequestURL().origin
+    useHead({ script: [computed(() => ldScript(listLd(siteUrl, slug, data.value ?? {})))] })
   useSeoMeta({
+    robots: () => ownItems(data.value?.items).length < INDEX_MIN_ITEMS ? 'noindex' : undefined,
     title: () => data.value?.title,
     ogTitle: () => t('guest.slug.ogTitle', { name: data.value?.owner?.display_name ?? data.value?.org?.display_name ?? t('guest.slug.friend'), title: data.value?.title }),
     description: () => data.value?.description ?? undefined,

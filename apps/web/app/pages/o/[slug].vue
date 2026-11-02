@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // 組織公開頁：已驗證組織的介紹與收件據點（SSR；公開 API 不帶 cookie）
-const { public: { apiBase } } = useRuntimeConfig()
+const { public: { apiBase, siteUrl } } = useRuntimeConfig()
 const { t } = useI18n()
 const slug = String(useRoute().params.slug)
 const { data: org, error, refresh } = await useAsyncData(`org-${slug}`, () => $fetch<any>(`${apiBase}/api/v1/public/orgs/${encodeURIComponent(slug)}`))
 const notFound = computed(() => (error.value as any)?.statusCode === 404 || (error.value as any)?.status === 404)
 if (notFound.value && import.meta.server) setResponseStatus(useRequestEvent()!, 404)
 const origin = useRequestURL().origin
+useHead({ script: () => org.value ? [ldScript(orgLd(siteUrl, slug, org.value))] : [] })
 useSeoMeta({
   title: () => org.value ? t('guest.relief.orgSeo', { name: org.value.display_name }) : t('guest.relief.heading'),
   description: () => org.value?.intro || t('guest.relief.seoDesc'),
