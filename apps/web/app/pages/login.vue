@@ -62,6 +62,10 @@ async function social(provider: 'google' | 'line') {
       <CreatorAuthTag left="No.001" right="Member access" />
       <p class="c-mute c-auth-lead">{{ $t('auth.login.note') }}</p>
       <p v-if="okMsg" class="c-ok" role="status">{{ okMsg }}</p>
+      <!-- 社群登入不寄信，放在 Email 前面 -->
+      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
+      <button type="button" class="c-btn block" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
+      <p class="c-or">{{ $t('auth.login.or') }}</p>
       <CreatorCodeLogin v-if="useCode" :email="email" @done="navigateTo(redirect)" />
       <form v-else @submit.prevent="submit">
         <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
@@ -72,10 +76,7 @@ async function social(provider: 'google' | 'line') {
         <p v-if="noPwHint" class="c-mute">{{ $t('auth.login.noPasswordHint') }}</p>
         <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
       </form>
-      <p class="c-or">{{ $t('auth.login.or') }}</p>
-      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="toggleCode">{{ useCode ? $t('auth.login.usePassword') : $t('auth.login.useCode') }}</button>
-      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
-      <button type="button" class="c-btn block" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
+      <button type="button" class="c-btn block c-mt12" :disabled="busy" @click="toggleCode">{{ useCode ? $t('auth.login.usePassword') : $t('auth.login.useCode') }}</button>
       <p class="c-auth-foot">{{ $t('auth.login.noAccount') }}<NuxtLink :to="{ path: '/register', query: q }">{{ $t('auth.login.register') }}</NuxtLink></p>
       <p v-if="orgsOn" class="c-center c-m0"><NuxtLink to="/org">{{ $t('org.loginHint') }}</NuxtLink></p>
     </div>

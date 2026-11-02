@@ -1,4 +1,5 @@
 //! 登入成功且是沒見過的裝置時發安全通知：驗證碼登入不像重設密碼有任何信號，帳號被盜時本人要看得到。
+//! 驗證碼登入只進站內（剛寄過驗證碼到同一信箱），密碼登入另寄 email。
 mod common;
 use axum::{
     http::header,
@@ -97,6 +98,20 @@ async fn the_notice_reaches_the_inbox_and_links_to_sessions(pool: PgPool) {
     .unwrap();
     assert!(title.unwrap().contains("新裝置"));
     assert_eq!(link.as_deref(), Some("/settings"));
+    assert_eq!(
+        email_outcome(&pool).await,
+        ("cancelled".into(), Some("in-app only".into())),
+        "驗證碼登入剛寄過信，不再寄警示"
+    );
+}
+
+async fn email_outcome(pool: &PgPool) -> (String, Option<String>) {
+    sqlx::query_as(
+        "SELECT status::text, last_error FROM notifications WHERE kind='auth.new_device'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap()
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -139,6 +154,12 @@ async fn password_login_from_an_unseen_device_triggers_the_notice(pool: PgPool) 
     let (st, _, b) = call_app(&app, "POST", "/auth/login", &other, Some(login)).await;
     assert_eq!(st, 200, "{b}");
     assert_eq!(notices(&pool).await, 1, "密碼登入的新裝置要通知");
+    wishly_api::notify::tick(&pool).await.unwrap();
+    assert_ne!(
+        email_outcome(&pool).await.0,
+        "cancelled",
+        "密碼登入照寄 email"
+    );
 }
 
 /// 同一支手機在瀏覽器與 LINE 內建瀏覽器間切換是最大的誤報來源，所以 OAuth 登入不通知（D69）。

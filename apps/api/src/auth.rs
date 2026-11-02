@@ -130,8 +130,10 @@ pub(crate) async fn new_session(
         .fetch_one(&mut *tx)
         .await?;
     if new_device {
-        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1,'email','auth.new_device','{}')")
+        // 驗證碼登入：剛寄過驗證碼到同一信箱，再寄警示是重複（能收碼的人也能刪信），只留站內；密碼登入照寄
+        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload) VALUES ($1,'email','auth.new_device',jsonb_build_object('method',$2::text))")
             .bind(user_id)
+            .bind(method)
             .execute(&mut *tx)
             .await?;
     }

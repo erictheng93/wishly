@@ -1,6 +1,6 @@
 //! 共用身分：Cookie `ws_session=<opaque token>`，DB 只存 SHA-256(token)（sessions.token_hash）。
 //! 簽發 session 的是 auth 模組；其他模組只用 `CurrentUser` extractor。
-//! 期限：閒置 30 天（使用中隨 last_seen_at 一起續期）、自建立起最長 90 天；MFA 通過後 12 小時內有效。
+//! 期限：閒置 30 天（使用中隨 last_seen_at 一起續期）、自建立起最長 180 天（減少重新登入的驗證碼信）；MFA 通過後 12 小時內有效。
 use crate::{error::AppError, AppState};
 use axum::{
     extract::FromRequestParts,
@@ -94,7 +94,7 @@ impl FromRequestParts<AppState> for CurrentUser {
                         .await;
                     if done.is_ok() {
                         let _ =
-                            sqlx::query("UPDATE sessions SET last_seen_at = now(), expires_at = LEAST(created_at + interval '90 days', now() + interval '30 days') WHERE id = $1")
+                            sqlx::query("UPDATE sessions SET last_seen_at = now(), expires_at = LEAST(created_at + interval '180 days', now() + interval '30 days') WHERE id = $1")
                                 .bind(r.session_id)
                                 .execute(&st.pool)
                                 .await;

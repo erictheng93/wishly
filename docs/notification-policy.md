@@ -25,7 +25,7 @@
 | 類別 | kind |
 |---|---|
 | 驗證碼 | 登入、註冊、重設密碼（直接寄送，不進站內） |
-| 安全 | `auth.password_changed`、`auth.new_device`、`auth.mfa_enabled`、`auth.mfa_reset`、`auth.recovery_regenerated`、`auth.identity_linked`、`auth.identity_unlinked` |
+| 安全 | `auth.password_changed`、`auth.new_device`（驗證碼登入只進站內）、`auth.mfa_enabled`、`auth.mfa_reset`、`auth.recovery_regenerated`、`auth.identity_linked`、`auth.identity_unlinked` |
 | 帳號處分 | `account.suspended`、`account.restored` |
 | 金流 | `topup.credited`、`cash_refund.updated`、`wallet.frozen`、`wallet.unfrozen`、`wallet.chargeback`、`order.failed`、`order.partial_refund`、`funding.expired`、`funding.released`、`item.removed` |
 | 組織與治理 | `org.invite`、`org.review`、`org.permit_reviewed`、`org.permit_rejected`、`org.permit_revoked`、`org.permit_expiring`、`org.permit_expired`、`org.event_hidden`、`wishlist.moderated` |
@@ -36,26 +36,28 @@
 
 `claim.purchase_reminder`、`claim.list_closed`、`claim.cancelled_by_owner`、`claim.item_removed`。
 
-例外：`claim.purchase_reminder` 的期限早於下一個 09:00 時立刻寄。
+`claim.purchase_reminder` 每筆認領只寄一封，在截止前 24 小時（2026-11 起拿掉 3 天前那封，避免一週內連收兩封提醒）。期限早於下一個 09:00 時立刻寄。
 
 ### 第三級：預設開、可關閉，09:00 才寄（`Optional`）
 
 | 對象 | kind |
 |---|---|
-| 捐助者 | `claim.expired`、`claim.item_changed`、`crowdfund.funded`、`order.shipped`、`order.delivered` |
-| 擁有者 | `owner.funded`、`owner.shipped`、`owner.delivered`、`owner.order_failed`、`event.summary` |
+| 捐助者 | `claim.expired`、`order.delivered` |
+| 擁有者 | `owner.delivered`、`owner.order_failed`、`event.summary` |
 | 社交 | `friend.request`、`birthday.friend`、`birthday.nudge` |
 
 ### 第四級：會員不寄，只留站內（`InAppOnly`）
 
 `claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`、`wishlist.supported`。
 
+送禮進度 `claim.item_changed`、`crowdfund.funded`、`order.shipped`、`owner.funded`、`owner.shipped`（2026-11 起，`PushOnly`）：會員不寄 Email，但**仍會推播**，時機與合併同第三級。打開 App 就看得到，錯過也沒有損失；品項修改有時效，所以保留推播。送達與訂單失敗仍寄 Email。
+
 舊訪客沒有站內通知，這些 kind 若寄給舊訪客仍照常寄信。
 
 ## Email 寄送規則
 
 - **安靜時段：** 台北 21:00–09:00，第二、三級延後到 09:00，不算寄送嘗試。
-- **品項修改：** 每次修改都立刻出現一則站內通知。Email 從修改起延後 10 分鐘，同一人同一品項的修改併成一封，內容以寄出當下為準；寄出後至少隔 1 小時才寄下一封。窗口內取消支持就不寄。
+- **品項修改：** 每次修改都立刻出現一則站內通知，會員不寄 Email（只推播）。推播與舊訪客的 Email 從修改起延後 10 分鐘，同一人同一品項的修改併成一封，內容以寄出當下為準；寄出後至少隔 1 小時才寄下一封。窗口內取消支持就不寄。
 - **同類合併：** `claim.purchase_reminder`、`claim.expired` 等同收件人的同類 Email 併成一封，站內各自保留。
 - **重試：** 最多 6 次，退避 1m / 5m / 30m / 2h / 6h。營運可重新排入近 7 天的失敗通知。
 - **退訂連結：** 只有第三級的會員信，以及寄給舊訪客的信才附。
@@ -68,7 +70,7 @@
 Web Push 是 APP 外的提醒，開關在每台裝置上，需使用者主動開啟。
 
 - **時機與合併：** 跟 Email 相同。安靜時段延到 09:00（第一級除外），品項修改 10 分鐘合併、同人同品項至少隔 1 小時。
-- **第四級不推：** 使用者剛做完或不需要處理的事，留在站內即可。
+- **第四級不推：** 使用者剛做完或不需要處理的事，留在站內即可。送禮進度（`PushOnly`）不寄 Email 但會推。
 - **與 Email 無關：** 關閉 Email 或沒有 Email 地址，仍然會推播。關閉該類站內通知才會停止。
 - **內容：** 只有標題與站內路徑，不放內文，避免在鎖定畫面外洩。
 - **失敗：** 只記 log，不重試，也不影響通知狀態。
