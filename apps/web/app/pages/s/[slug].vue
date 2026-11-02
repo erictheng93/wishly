@@ -258,6 +258,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
         <button class="g-link" @click="reporting = true">{{ $t('guest.report.title') }}</button>
         ・<NuxtLink to="/terms">{{ $t('guest.slug.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('guest.slug.privacy') }}</NuxtLink>
+        <p><NuxtLink to="/">{{ $t('guest.slug.madeWith') }}</NuxtLink></p>
       </div>
     </template>
 

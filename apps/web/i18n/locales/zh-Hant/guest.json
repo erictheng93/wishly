@@ -196,7 +196,8 @@
       "doneHint": "可在「我的送禮」查看、標記已購買或取消。",
       "lineBrowser": "LINE 內建瀏覽器請保持登入狀態；點右上角 ⋯ →「用預設瀏覽器開啟」會更穩定。",
       "viewMyClaims": "查看我的送禮",
-      "doneDeadline": "請在 {date} 前到「我的送禮」標記已購買，逾期會自動釋出給其他朋友"
+      "doneDeadline": "請在 {date} 前到「我的送禮」標記已購買，逾期會自動釋出給其他朋友",
+      "madeWith": "用 Wishly 建立你的願望清單"
     },
     "live": {
       "live": "即時更新中",
@@ -303,7 +304,8 @@
         "holiday": "節慶"
       },
       "soonTitle": "精選商品即將上架",
-      "soonBody": "我們正在挑選值得送的好物，敬請期待。"
+      "soonBody": "我們正在挑選值得送的好物，敬請期待。",
+      "scenes": "送禮情境"
     },
     "brands": {
       "seoTitle": "品牌館 {'|'} Wishly",

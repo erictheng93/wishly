@@ -196,7 +196,8 @@
       "doneHint": "Lihat, tandai sudah dibeli, atau batalkan di \"Hadiah dariku\".",
       "lineBrowser": "Pastikan tetap masuk di browser bawaan LINE; ketuk ⋯ di kanan atas → \"Buka di browser default\" akan lebih stabil.",
       "viewMyClaims": "Lihat hadiah dariku",
-      "doneDeadline": "Tandai sudah dibeli di \"Hadiah dariku\" sebelum {date}, jika lewat akan otomatis dilepas ke teman lain"
+      "doneDeadline": "Tandai sudah dibeli di \"Hadiah dariku\" sebelum {date}, jika lewat akan otomatis dilepas ke teman lain",
+      "madeWith": "Buat daftar keinginanmu dengan Wishly"
     },
     "live": {
       "live": "Pembaruan langsung",
@@ -303,7 +304,8 @@
         "holiday": "Hari raya"
       },
       "soonTitle": "Produk pilihan segera hadir",
-      "soonBody": "Kami sedang memilih barang yang layak dihadiahkan, nantikan ya."
+      "soonBody": "Kami sedang memilih barang yang layak dihadiahkan, nantikan ya.",
+      "scenes": "Momen hadiah"
     },
     "brands": {
       "seoTitle": "Galeri merek {'|'} Wishly",
