@@ -263,8 +263,7 @@
       "vis": {
         "public": "Công khai",
         "friends": "Chỉ bạn bè",
-        "selected": "Bạn bè được chọn",
-        "link": "Liên kết"
+        "selected": "Bạn bè được chọn"
       },
       "title": "Điều ước của {name}",
       "page": "Trang cá nhân",
@@ -280,13 +279,26 @@
       "lists": "Danh sách ước nguyện",
       "noLists": "Hiện chưa có danh sách nào để xem.",
       "closed": "Đã kết thúc",
-      "personal": "Danh sách điều ước",
       "completion": "Hoàn thành {pct}% ({n} món)",
       "donations": "Lịch sử tặng quà",
       "noDonations": "Hiện chưa có lịch sử tặng quà nào để xem.",
       "pledgePts": " · {pts} điểm",
       "qty": " × {qty}",
-      "to": "Tặng {name} · "
+      "to": "Tặng {name}",
+      "next": "Dịp sắp tới",
+      "nextDays": "Còn {n} ngày",
+      "nextToday": "chính là hôm nay",
+      "share": "Chia sẻ",
+      "copied": "Đã sao chép liên kết",
+      "ogDesc": "Xem danh sách điều ước của {name}.",
+      "cancelRequest": "Hủy lời mời",
+      "decline": "Từ chối",
+      "unfriend": "Hủy kết bạn",
+      "unfriendTitle": "Hủy kết bạn với {name}?",
+      "unfriendText": "Họ sẽ không còn thấy các danh sách chỉ dành cho bạn bè của bạn. Bạn có thể gửi lời mời lại sau.",
+      "mutual": "{n} bạn chung",
+      "sent": "Đã tặng {n} món quà",
+      "createList": "Tạo danh sách đầu tiên"
     },
     "topup": {
       "title": "Nạp điểm",

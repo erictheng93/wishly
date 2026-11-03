@@ -263,8 +263,7 @@
       "vis": {
         "public": "Publik",
         "friends": "Hanya teman",
-        "selected": "Teman pilihan",
-        "link": "Tautan"
+        "selected": "Teman pilihan"
       },
       "title": "Keinginan {name}",
       "page": "Halaman profil",
@@ -280,13 +279,26 @@
       "lists": "Wishlist",
       "noLists": "Saat ini tidak ada wishlist yang bisa dilihat.",
       "closed": "Ditutup",
-      "personal": "Wishlist",
       "completion": "Terpenuhi {pct}% ({n} barang)",
       "donations": "Riwayat hadiah",
       "noDonations": "Saat ini tidak ada riwayat hadiah yang bisa dilihat.",
       "pledgePts": " · {pts} poin",
       "qty": " × {qty}",
-      "to": "Untuk {name} · "
+      "to": "Untuk {name}",
+      "next": "Acara berikutnya",
+      "nextDays": "{n} hari lagi",
+      "nextToday": "hari ini",
+      "share": "Bagikan",
+      "copied": "Tautan disalin",
+      "ogDesc": "Lihat wishlist {name}.",
+      "cancelRequest": "Batalkan permintaan",
+      "decline": "Tolak",
+      "unfriend": "Hapus teman",
+      "unfriendTitle": "Hapus {name} dari teman?",
+      "unfriendText": "Mereka tidak akan lagi melihat daftar khusus teman milikmu. Kamu bisa mengirim permintaan lagi nanti.",
+      "mutual": "{n} teman bersama",
+      "sent": "{n} hadiah terkirim",
+      "createList": "Buat daftar pertamamu"
     },
     "topup": {
       "title": "Top up",

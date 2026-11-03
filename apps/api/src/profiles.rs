@@ -54,8 +54,8 @@ async fn profile(
         return Err(AppError::NotFound);
     }
     #[allow(clippy::type_complexity)]
-    let (uid, handle, name, bio, birthday, bv): (Uuid, Option<String>, String, Option<String>, Option<String>, String) = sqlx::query_as(
-        "SELECT id, handle, display_name, bio, birthday, birthday_visibility::text FROM users
+    let (uid, handle, name, bio, birthday, bv, avatar_key): (Uuid, Option<String>, String, Option<String>, Option<String>, String, Option<String>) = sqlx::query_as(
+        "SELECT id, handle, display_name, bio, birthday, birthday_visibility::text, avatar_key FROM users
           WHERE (id = $1 OR ($1 IS NULL AND handle = $2)) AND deleted_at IS NULL AND blocked_at IS NULL",
     )
     .bind(by_id)
@@ -68,22 +68,52 @@ async fn profile(
         Some(v) => access::are_friends(&st.pool, uid, v).await?,
         None => false,
     };
+    let mut request_id: Option<Uuid> = None;
     let relation = match viewer {
         None => "anonymous",
         Some(_) if is_self => "self",
         Some(_) if friend => "friend",
         Some(v) => {
-            let (inc, out): (bool, bool) = sqlx::query_as(
-                "SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = $2),
-                        EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $2 AND to_user = $1)").bind(uid).bind(v).fetch_one(&st.pool).await?;
-            if inc {
+            // 兩個方向各自唯一；incoming（對方寄給我）優先
+            let (inc, out): (Option<Uuid>, Option<Uuid>) = sqlx::query_as(
+                "SELECT (SELECT id FROM friend_requests WHERE from_user = $1 AND to_user = $2),
+                        (SELECT id FROM friend_requests WHERE from_user = $2 AND to_user = $1)",
+            )
+            .bind(uid)
+            .bind(v)
+            .fetch_one(&st.pool)
+            .await?;
+            request_id = inc.or(out);
+            if inc.is_some() {
                 "incoming"
-            } else if out {
+            } else if out.is_some() {
                 "outgoing"
             } else {
                 "none"
             }
         }
+    };
+
+    // 共同好友：同時是觀看者與本人好友者（匿名與本人不顯示）；排除已刪除 / 停權。
+    // 刻意比照 Facebook：任何登入者（不必是好友）都看得到，產品決策，不是外洩
+    let mutual = match viewer {
+        Some(v) if !is_self => {
+            // 從兩人的好友（PK user_a / friendships_b_idx）取交集，不掃 users
+            #[allow(clippy::type_complexity)]
+            let rows: Vec<(Uuid, Option<String>, String, Option<String>, i64)> = sqlx::query_as(
+                "WITH a AS (SELECT CASE WHEN user_a = $1 THEN user_b ELSE user_a END AS id FROM friendships WHERE user_a = $1 OR user_b = $1),
+                      b AS (SELECT CASE WHEN user_a = $2 THEN user_b ELSE user_a END AS id FROM friendships WHERE user_a = $2 OR user_b = $2)
+                 SELECT u.id, u.handle, u.display_name, u.avatar_key, count(*) OVER ()
+                   FROM a JOIN b USING (id) JOIN users u ON u.id = a.id
+                  WHERE u.deleted_at IS NULL AND u.blocked_at IS NULL
+                  ORDER BY u.display_name, u.id LIMIT 3")
+                .bind(uid).bind(v).fetch_all(&st.pool).await?;
+            let count = rows.first().map_or(0, |r| r.4);
+            let users: Vec<Value> = rows.iter().map(|(id, h, n, a, _)| json!({
+                "id": id, "handle": h, "display_name": n, "avatar_url": crate::uploads::avatar_url(a.as_deref()) })).collect();
+            json!({ "count": count, "users": users })
+        }
+        _ => Value::Null,
     };
 
     let birthday = birthday.filter(|_| bv == "public" || is_self || (bv == "friends" && friend));
@@ -147,7 +177,9 @@ async fn profile(
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
     Ok(Json(
-        json!({ "user": { "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday }, "relation": relation,
+        json!({ "user": { "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday,
+                              "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()) },
+                    "relation": relation, "request_id": request_id, "mutual": mutual,
                     "wishlists": wishlists, "donations": donations }),
     ))
 }

@@ -263,8 +263,7 @@
       "vis": {
         "public": "Public",
         "friends": "Friends only",
-        "selected": "Selected friends",
-        "link": "Link"
+        "selected": "Selected friends"
       },
       "title": "{name}'s wishes",
       "page": "Profile",
@@ -280,13 +279,26 @@
       "lists": "Wishlists",
       "noLists": "No lists to show right now.",
       "closed": "Closed",
-      "personal": "Wishlist",
       "completion": "{pct}% complete ({n} item) | {pct}% complete ({n} items)",
       "donations": "Gift history",
       "noDonations": "No gift history to show right now.",
       "pledgePts": " · {pts} pts",
       "qty": " × {qty}",
-      "to": "For {name} · "
+      "to": "For {name}",
+      "next": "Next occasion",
+      "nextDays": "{n} days to go",
+      "nextToday": "it's today",
+      "share": "Share",
+      "copied": "Link copied",
+      "ogDesc": "Take a look at {name}'s wishlists.",
+      "cancelRequest": "Cancel request",
+      "decline": "Decline",
+      "unfriend": "Unfriend",
+      "unfriendTitle": "Unfriend {name}?",
+      "unfriendText": "They will no longer see your friends-only lists. You can send a new request later.",
+      "mutual": "{n} mutual friend | {n} mutual friends",
+      "sent": "{n} gifts sent",
+      "createList": "Create your first list"
     },
     "topup": {
       "title": "Top up",

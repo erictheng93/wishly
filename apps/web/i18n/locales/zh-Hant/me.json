@@ -263,8 +263,7 @@
       "vis": {
         "public": "公開",
         "friends": "僅好友",
-        "selected": "指定好友",
-        "link": "連結"
+        "selected": "指定好友"
       },
       "title": "{name} 的心願",
       "page": "個人頁",
@@ -280,13 +279,26 @@
       "lists": "心願清單",
       "noLists": "目前沒有可看的清單。",
       "closed": "已結束",
-      "personal": "心願清單",
       "completion": "完成度 {pct}%（{n} 件）",
       "donations": "送禮紀錄",
       "noDonations": "目前沒有可看的送禮紀錄。",
       "pledgePts": "・{pts} 點",
       "qty": " × {qty}",
-      "to": "送給 {name}・"
+      "to": "送給 {name}",
+      "next": "下一個場合",
+      "nextDays": "還有 {n} 天",
+      "nextToday": "就是今天",
+      "share": "分享",
+      "copied": "已複製連結",
+      "ogDesc": "看看 {name} 的心願清單。",
+      "cancelRequest": "取消邀請",
+      "decline": "拒絕",
+      "unfriend": "解除好友",
+      "unfriendTitle": "解除與 {name} 的好友關係？",
+      "unfriendText": "解除後對方不再看得到你的僅好友清單，之後可重新送出邀請。",
+      "mutual": "共 {n} 位共同好友",
+      "sent": "送出 {n} 份心意",
+      "createList": "建立第一份清單"
     },
     "topup": {
       "title": "儲值",
