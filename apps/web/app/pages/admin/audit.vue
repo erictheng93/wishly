@@ -4,9 +4,9 @@ definePageMeta({ middleware: 'staff' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('admin.audit.title') })
 const { api } = useApi()
-const filters = reactive({ actor_id: '', action: '', entity: '', entity_id: '', from: '', to: '' })
+const filters = reactive({ actor_id: '', action: '', entity: '', entity_id: '', request_id: '', from: '', to: '' })
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), busy = ref(false), err = ref(''), done = ref(false)
-const fields = computed<Record<string, string>>(() => ({ actor_id: t('admin.audit.fields.actorId'), action: t('admin.audit.fields.action'), entity: t('admin.audit.fields.entity'), entity_id: t('admin.audit.fields.entityId'), from: t('admin.audit.fields.from'), to: t('admin.audit.fields.to') }))
+const fields = computed<Record<string, string>>(() => ({ actor_id: t('admin.audit.fields.actorId'), action: t('admin.audit.fields.action'), entity: t('admin.audit.fields.entity'), entity_id: t('admin.audit.fields.entityId'), request_id: t('admin.audit.fields.requestId'), from: t('admin.audit.fields.from'), to: t('admin.audit.fields.to') }))
 const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
 async function load(more = false) {
   if (busy.value) return
@@ -36,6 +36,7 @@ onMounted(() => load())
       <div class="c-row wrap"><strong class="c-grow">{{ r.action }}</strong><time class="c-mute">{{ new Date(r.created_at).toLocaleString(dl, { timeZone: 'Asia/Taipei' }) }}</time></div>
       <p>{{ $t('admin.audit.actor') }}{{ r.actor_name || r.actor_type }}<span v-if="r.actor_id">（{{ r.actor_id }}）</span></p>
       <p>{{ $t('admin.audit.entity') }}{{ r.entity }}<span v-if="r.entity_id">・{{ r.entity_id }}</span></p>
+      <p v-if="r.ip || r.request_id" class="audit-ctx">{{ r.ip }}<span v-if="r.request_id"> ・ {{ r.request_id }}</span></p>
       <details v-if="r.diff"><summary>{{ $t('admin.audit.diff') }}</summary><pre>{{ JSON.stringify(r.diff, null, 2) }}</pre></details>
     </article>
     <button v-if="cursor" class="c-btn block" :disabled="busy" @click="load(true)">{{ $t('admin.audit.loadMore') }}</button>
@@ -44,5 +45,6 @@ onMounted(() => load())
 <style scoped>
 .audit-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 12px}
 .audit-row{overflow-wrap:anywhere}
+.audit-ctx{font-family:ui-monospace,monospace;font-size:12px;color:var(--c-mute,#666)}
 .audit-row pre{white-space:pre-wrap;font-size:13px}
 </style>
