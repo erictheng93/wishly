@@ -131,6 +131,38 @@
       "denied": "Trình duyệt đang chặn thông báo. Hãy vào cài đặt trang web, đặt Thông báo thành Cho phép cho trang này rồi quay lại bật.",
       "install": "Trên iPhone / iPad, hãy thêm Wishly vào Màn hình chính và mở từ đó để bật thông báo đẩy (nút Chia sẻ của Safari, rồi Thêm vào Màn hình chính).",
       "failed": "Không thể bật thông báo đẩy. Vui lòng thử lại sau."
+    },
+    "activity": {
+      "title": "Hoạt động bảo mật",
+      "hint": "Các lần đăng nhập và thao tác nhạy cảm gần đây trên tài khoản. Nếu không phải bạn, hãy đổi mật khẩu và đăng xuất các thiết bị khác ngay.",
+      "empty": "Chưa có hoạt động",
+      "more": "Tải thêm",
+      "a": {
+        "auth_login": "Đăng nhập",
+        "auth_logout": "Đăng xuất",
+        "auth_new_device": "Đăng nhập từ thiết bị mới",
+        "auth_password_changed": "Đổi mật khẩu",
+        "auth_password_reset": "Đặt lại mật khẩu",
+        "auth_mfa_enabled": "Bật xác minh hai bước",
+        "auth_mfa_verified": "Đã qua xác minh hai bước",
+        "auth_mfa_recovery_used": "Dùng mã khôi phục",
+        "auth_mfa_recovery_regenerated": "Tạo lại mã khôi phục",
+        "auth_recovery_regenerated": "Tạo lại mã khôi phục",
+        "auth_mfa_reset": "Nhân viên đặt lại xác minh hai bước",
+        "auth_session_revoked": "Đăng xuất một thiết bị",
+        "auth_sessions_revoked": "Đăng xuất mọi thiết bị khác",
+        "auth_identity_linked": "Liên kết cách đăng nhập",
+        "auth_identity_unlinked": "Hủy liên kết cách đăng nhập",
+        "account_export": "Xuất dữ liệu tài khoản",
+        "account_absorb": "Gộp tài khoản",
+        "account_suspended": "Tài khoản bị khóa",
+        "account_restored": "Tài khoản được khôi phục",
+        "user_mfa_reset": "Nhân viên đặt lại xác minh hai bước",
+        "user_recovery": "Nhân viên hỗ trợ khôi phục tài khoản",
+        "user_identity_unlink": "Nhân viên hủy liên kết cách đăng nhập",
+        "wishlist_shipping_address_update": "Cập nhật địa chỉ nhận hàng",
+        "other": "Hoạt động tài khoản khác"
+      }
     }
   }
 }

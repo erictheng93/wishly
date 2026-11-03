@@ -43,6 +43,7 @@ onMounted(async () => { await fetchMe(true); name.value = user.value?.display_na
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
   loadSessions()
+  loadActivity()
 })
 
 async function sendLinkEmail() {
@@ -88,6 +89,14 @@ function device(ua?: string | null) {
   return [pick(BROWSER), pick(OS)].filter(Boolean).join('・') || ua.slice(0, 60)
 }
 const when = (d: string) => new Date(d).toLocaleString(locale.value === 'zh-Hant' ? 'zh-TW' : locale.value, { dateStyle: 'medium', timeStyle: 'short' })
+const acts = ref<any[]>([]), actNext = ref<string | null>(null), actErr = ref('')
+async function loadActivity(more = false) {
+  try {
+    const r = await api('/me/security-activity', { query: more && actNext.value ? { before: actNext.value } : {} })
+    acts.value = more ? [...acts.value, ...r.data] : r.data
+    actNext.value = r.next_cursor ?? null
+  } catch (e) { actErr.value = errMsg(e) }
+}
 async function loadSessions() {
   try { sessions.value = (await api('/me/sessions')).data } catch (e) { sessErr.value = errMsg(e) }
 }
@@ -230,6 +239,19 @@ async function remove() {
         <button v-if="sessions.length > 1" type="button" class="c-btn" :disabled="sessBusy" @click="revokeSession()">{{ $t('settings.sess.logoutOthers') }}</button>
         <p v-if="sessErr" class="c-err" role="alert">{{ sessErr }}</p>
         <p v-if="sessMsg" class="c-ok" role="status">{{ sessMsg }}</p>
+      </section>
+      <section class="c-card" aria-labelledby="activity-title">
+        <h2 id="activity-title" class="c-h2">{{ $t('settings.activity.title') }}</h2>
+        <p class="c-mute">{{ $t('settings.activity.hint') }}</p>
+        <ul class="identity-list">
+          <li v-for="a in acts" :key="a.id" class="c-row">
+            <span class="c-grow">{{ $t(activityLabelKey(a.action)) }}<template v-if="a.provider || a.method"> ({{ a.provider || a.method }})</template><br>
+              <small class="c-mute">{{ when(a.created_at) }}<template v-if="a.ip">・{{ a.ip }}</template></small></span>
+          </li>
+        </ul>
+        <p v-if="!acts.length && !actErr" class="c-mute">{{ $t('settings.activity.empty') }}</p>
+        <button v-if="actNext" type="button" class="c-btn" @click="loadActivity(true)">{{ $t('settings.activity.more') }}</button>
+        <p v-if="actErr" class="c-err" role="alert">{{ actErr }}</p>
       </section>
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.social.title') }}</h2>

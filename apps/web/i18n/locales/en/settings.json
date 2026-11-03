@@ -131,6 +131,38 @@
       "denied": "Notifications are blocked in your browser. Open the site settings, set Notifications to Allow for this site, then come back and turn this on.",
       "install": "On iPhone / iPad, add Wishly to your Home Screen and open it from there to turn on push (Safari Share button, then Add to Home Screen).",
       "failed": "Couldn't turn on push. Please try again later."
+    },
+    "activity": {
+      "title": "Security activity",
+      "hint": "Recent sign-ins and sensitive actions on your account. If something is not you, change your password and sign out other devices right away.",
+      "empty": "No activity yet",
+      "more": "Load more",
+      "a": {
+        "auth_login": "Signed in",
+        "auth_logout": "Signed out",
+        "auth_new_device": "Sign-in from a new device",
+        "auth_password_changed": "Password changed",
+        "auth_password_reset": "Password reset",
+        "auth_mfa_enabled": "Two-step verification enabled",
+        "auth_mfa_verified": "Two-step verification passed",
+        "auth_mfa_recovery_used": "Recovery code used",
+        "auth_mfa_recovery_regenerated": "Recovery codes regenerated",
+        "auth_recovery_regenerated": "Recovery codes regenerated",
+        "auth_mfa_reset": "Two-step verification reset by staff",
+        "auth_session_revoked": "Signed out one device",
+        "auth_sessions_revoked": "Signed out all other devices",
+        "auth_identity_linked": "Login method linked",
+        "auth_identity_unlinked": "Login method unlinked",
+        "account_export": "Account data exported",
+        "account_absorb": "Accounts merged",
+        "account_suspended": "Account suspended",
+        "account_restored": "Account restored",
+        "user_mfa_reset": "Staff reset two-step verification",
+        "user_recovery": "Staff assisted account recovery",
+        "user_identity_unlink": "Staff unlinked a login method",
+        "wishlist_shipping_address_update": "Shipping address updated",
+        "other": "Other account activity"
+      }
     }
   }
 }
