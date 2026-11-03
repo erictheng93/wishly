@@ -363,6 +363,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
 .l-feat h3{margin-top:0}
 .l-origin-body{font-size:clamp(17px,2.2vw,20px);line-height:1.8}
 .l-origin-body span{display:block;text-wrap:balance}
+.l-origin-body:not(:lang(zh)) p:not(:last-child) span+span{margin-top:.5em}
 .l-origin-body p+p{margin-top:16px}
 .l-origin-body p:last-child{margin-top:32px;padding-left:20px;border-left:3px solid var(--red);font-size:clamp(22px,3vw,30px);font-weight:700;line-height:1.7}
 .l-faq-body{border-top:1px solid var(--ink-line)}
