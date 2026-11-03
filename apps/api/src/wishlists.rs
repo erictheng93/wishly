@@ -143,8 +143,16 @@ pub async fn release_pledged(tx: &mut crate::points::Tx<'_>, wishlist_ids: &[Uui
             .bind(r.back)
             .execute(&mut **tx)
             .await?;
-        sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', 'contribution.release_wishlist_closed', 'contributions', $1, $2)")
-            .bind(r.contribution_id).bind(json!({ "item_id": r.item_id, "points": r.back })).execute(&mut **tx).await?;
+        crate::audit_ctx::insert(
+            &mut **tx,
+            "system",
+            None,
+            "contribution.release_wishlist_closed",
+            "contributions",
+            Some(r.contribution_id),
+            Some(json!({ "item_id": r.item_id, "points": r.back })),
+        )
+        .await?;
     }
     let mut ws: Vec<Uuid> = rows.iter().map(|r| r.2).collect();
     ws.sort();
@@ -2037,8 +2045,16 @@ async fn item_delete(
             .await?;
             crate::notify::enqueue_donors(&mut *tx, id, "item.removed", &["pledged"]).await?; // 先通知：release 後狀態就不是 pledged 了
             for r in crate::points::release(&mut tx, &ids, &["pledged"]).await? {
-                sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('user'::actor_type, $1, 'contribution.release_by_item_delete', 'contributions', $2, $3)")
-                    .bind(u.id).bind(r.contribution_id).bind(json!({ "points": r.back, "item_id": id })).execute(&mut *tx).await?;
+                crate::audit_ctx::insert(
+                    &mut *tx,
+                    "user",
+                    Some(u.id),
+                    "contribution.release_by_item_delete",
+                    "contributions",
+                    Some(r.contribution_id),
+                    Some(json!({ "points": r.back, "item_id": id })),
+                )
+                .await?;
             }
         }
     }
@@ -2066,8 +2082,16 @@ async fn item_delete(
             "UPDATE claims SET status='cancelled', cancelled_at=now() WHERE item_id=$1 AND status IN ('reserved','purchased')
              RETURNING id, qty, guest_id, user_id").bind(id).fetch_all(&mut *tx).await?;
         for (cid, qty, _, _) in &cancelled {
-            sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('user'::actor_type, $1, 'claim.cancel_by_item_delete', 'claims', $2, $3)")
-                .bind(u.id).bind(cid).bind(json!({ "qty": qty, "item_id": id })).execute(&mut *tx).await?;
+            crate::audit_ctx::insert(
+                &mut *tx,
+                "user",
+                Some(u.id),
+                "claim.cancel_by_item_delete",
+                "claims",
+                Some(*cid),
+                Some(json!({ "qty": qty, "item_id": id })),
+            )
+            .await?;
         }
         let guests: Vec<Uuid> = cancelled.iter().filter_map(|c| c.2).collect();
         let users: Vec<Uuid> = cancelled.iter().filter_map(|c| c.3).collect();

@@ -553,12 +553,7 @@ async fn webhook(
 }
 
 async fn audit(pool: &PgPool, action: &str, id: Uuid, diff: Value) -> Result<(), AppError> {
-    sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', $1, 'topups', $2, $3)")
-        .bind(action)
-        .bind(id)
-        .bind(diff)
-        .execute(pool)
-        .await?;
+    crate::audit_ctx::insert(pool, "system", None, action, "topups", Some(id), Some(diff)).await?;
     Ok(())
 }
 
@@ -652,8 +647,16 @@ async fn credit(pool: &PgPool, id: Uuid, txn: &str) -> Result<(), AppError> {
     if deleted {
         // 留在 audit_logs（後台 /admin/audit-logs 查得到），不只是 log
         tracing::error!(topup = %id, "topup paid after account deletion; refund manually");
-        sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', 'topup.paid_after_account_delete', 'topups', $1, jsonb_build_object('amount', $2::bigint))")
-            .bind(id).bind(amount).execute(&mut *tx).await?;
+        crate::audit_ctx::insert(
+            &mut *tx,
+            "system",
+            None,
+            "topup.paid_after_account_delete",
+            "topups",
+            Some(id),
+            Some(json!({ "amount": amount })),
+        )
+        .await?;
     }
     sqlx::query("UPDATE topups SET status = 'paid', paid_at = now(), provider_txn_id = $2, failure_reason = NULL, updated_at = now() WHERE id = $1")
         .bind(id)

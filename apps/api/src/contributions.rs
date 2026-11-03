@@ -65,9 +65,17 @@ async fn audit(
     id: Uuid,
     diff: Value,
 ) -> Result<(), AppError> {
-    let c = crate::audit_ctx::current();
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ($1::actor_type, $2, $3, 'contributions', $4, $5, $6::inet, $7, $8)")
-        .bind(if actor.is_some() { "user" } else { "system" }).bind(actor).bind(action).bind(id).bind(diff).bind(c.ip).bind(c.request_id).bind(c.user_agent).execute(&mut **tx).await?;
+    let t = if actor.is_some() { "user" } else { "system" };
+    crate::audit_ctx::insert(
+        &mut **tx,
+        t,
+        actor,
+        action,
+        "contributions",
+        Some(id),
+        Some(diff),
+    )
+    .await?;
     Ok(())
 }
 

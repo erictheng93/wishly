@@ -95,9 +95,16 @@ async fn audit(
         Actor::Guest(g) => ("guest", g),
         Actor::User(u) => ("user", u),
     };
-    let c = crate::audit_ctx::current();
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ($1::actor_type, $2, $3, 'claims', $4, $5, $6::inet, $7, $8)")
-        .bind(t).bind(id).bind(action).bind(claim).bind(diff).bind(c.ip).bind(c.request_id).bind(c.user_agent).execute(&mut **tx).await?;
+    crate::audit_ctx::insert(
+        &mut **tx,
+        t,
+        Some(id),
+        action,
+        "claims",
+        Some(claim),
+        Some(diff),
+    )
+    .await?;
     Ok(())
 }
 
@@ -776,6 +783,7 @@ pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE status = 'reserved' AND expires_at <= now())
                    AND NOT EXISTS (SELECT 1 FROM wishlists w WHERE w.id = wishlist_id AND w.status = 'active' AND w.closes_at <= now())
                  ORDER BY id FOR UPDATE").execute(&mut *tx).await?;
+    let actx = crate::audit_ctx::current();
     let rows: Vec<(Uuid, i64)> = sqlx::query_as(
         "WITH x AS (
            UPDATE claims c SET status = 'expired', expires_at = NULL
@@ -788,8 +796,8 @@ pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
            FROM (SELECT item_id, sum(qty)::int AS q FROM x GROUP BY item_id) s
            WHERE i.id = s.item_id RETURNING i.wishlist_id, i.id),
          a AS (
-           INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff)
-           SELECT 'system'::actor_type, 'claim.expire', 'claims', id, jsonb_build_object('qty', qty) FROM x),
+           INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff, ip, request_id, user_agent)
+           SELECT 'system'::actor_type, 'claim.expire', 'claims', id, jsonb_build_object('qty', qty), $1::inet, $2, $3 FROM x),
          -- Q12：通知捐助者；擁有者每個品項一封且不帶捐助者（驚喜安全）。清單已結束也照樣釋出，不重開清單；
          -- 此時沒有人能再認領，捐助者改收「已取消」文案（ended），擁有者不寄「重新開放」
          nd AS (
@@ -804,6 +812,7 @@ pub async fn expire_due(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
              FROM r JOIN wishlists w ON w.id = r.wishlist_id
             WHERE w.status = 'active' AND (w.closes_at IS NULL OR w.closes_at > now()))
          SELECT DISTINCT wishlist_id, (SELECT count(*) FROM x) FROM r")
+        .bind(actx.ip).bind(actx.request_id).bind(actx.user_agent)
         .fetch_all(&mut *tx).await?;
     for (w, _) in &rows {
         crate::dashboard::notify(&mut *tx, *w).await?;

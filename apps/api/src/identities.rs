@@ -297,8 +297,16 @@ async fn absorb(
     .bind(other)
     .execute(&mut **tx)
     .await?;
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('user', $1, 'account.absorb', 'users', $2, jsonb_build_object('provider', $3::text))")
-        .bind(into).bind(other).bind(provider).execute(&mut **tx).await?;
+    crate::audit_ctx::insert(
+        &mut **tx,
+        "user",
+        Some(into),
+        "account.absorb",
+        "users",
+        Some(other),
+        Some(serde_json::json!({ "provider": provider })),
+    )
+    .await?;
     Ok((media, moved))
 }
 
