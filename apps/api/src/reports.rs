@@ -188,12 +188,17 @@ async fn create(
 }
 
 const REPORT_SQL: &str =
-    "SELECT r.id, jsonb_build_object('id', r.id, 'wishlist', CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title) END,
-       'user', CASE WHEN ru.id IS NULL THEN NULL ELSE jsonb_build_object('id', ru.id, 'handle', ru.handle, 'display_name', ru.display_name) END,
+    "SELECT r.id, jsonb_build_object('id', r.id, 'wishlist', CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title,
+         'moderation_status', w.moderation_status::text,
+         'owner', CASE WHEN ow.id IS NULL THEN NULL ELSE jsonb_build_object('id', ow.id, 'handle', ow.handle, 'display_name', ow.display_name) END) END,
+       'user', CASE WHEN ru.id IS NULL THEN NULL ELSE jsonb_build_object('id', ru.id, 'handle', ru.handle, 'display_name', ru.display_name, 'suspended', ru.blocked_at IS NOT NULL) END,
+       'target_open_count', (SELECT count(*) FROM content_reports o WHERE o.status = 'open'
+          AND ((r.wishlist_id IS NOT NULL AND o.wishlist_id = r.wishlist_id) OR (r.reported_user_id IS NOT NULL AND o.reported_user_id = r.reported_user_id))),
        'item_id', r.item_id, 'reason', r.reason::text, 'detail', r.detail, 'status', r.status::text,
        'reporter', CASE WHEN r.reporter_user_id IS NOT NULL THEN 'user' WHEN r.reporter_guest_id IS NOT NULL THEN 'guest' ELSE 'anonymous' END,
        'resolution_note', r.resolution_note, 'handled_at', r.handled_at, 'created_at', r.created_at)
-     FROM content_reports r LEFT JOIN wishlists w ON w.id = r.wishlist_id LEFT JOIN users ru ON ru.id = r.reported_user_id";
+     FROM content_reports r LEFT JOIN wishlists w ON w.id = r.wishlist_id LEFT JOIN users ru ON ru.id = r.reported_user_id
+     LEFT JOIN users ow ON ow.id = w.owner_id";
 
 async fn list(
     State(st): State<AppState>,
@@ -208,9 +213,16 @@ async fn list(
             "open | actioned | dismissed",
         ));
     }
+    if let Some(k) = q.kind.as_deref() {
+        if k != "wishlist" && k != "user" {
+            return Err(AppError::invalid("/kind", "INVALID", "wishlist | user"));
+        }
+    }
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "{REPORT_SQL} WHERE r.status = $1::report_status AND ($2::uuid IS NULL OR r.id > $2) ORDER BY r.id LIMIT $3")))
-        .bind(status).bind(q.cursor).bind(limit(&q) + 1).fetch_all(&st.pool).await?;
+        "{REPORT_SQL} WHERE r.status = $1::report_status AND ($2::uuid IS NULL OR r.id > $2)
+           AND ($4::text IS NULL OR ($4 = 'wishlist' AND r.wishlist_id IS NOT NULL) OR ($4 = 'user' AND r.reported_user_id IS NOT NULL))
+         ORDER BY r.id LIMIT $3")))
+        .bind(status).bind(q.cursor).bind(limit(&q) + 1).bind(q.kind.as_deref()).fetch_all(&st.pool).await?;
     Ok(page(rows, limit(&q)))
 }
 

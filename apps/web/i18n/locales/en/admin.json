@@ -29,17 +29,15 @@
         "catalog": "Brands & products",
         "orgs": "Org and permit review",
         "events": "Disaster events",
-        "finance": "Finance"
+        "finance": "Finance",
+        "reports": "Report review"
       },
       "tabsLabel": "Console sections",
       "tabs": {
-        "reports": "Reports",
         "lists": "List search",
         "users": "Users",
         "flags": "System flags"
       },
-      "loading": "Loading…",
-      "loadMore": "Load more",
       "search": "Search",
       "searching": "Searching…",
       "all": "All",
@@ -48,28 +46,6 @@
       "normal": "Normal",
       "hidden": "Hidden",
       "deleted": "Deleted",
-      "reports": {
-        "status": "Status",
-        "open": "Open",
-        "actioned": "Actioned",
-        "dismissed": "Dismissed",
-        "dismiss": "Dismiss",
-        "emptyOpen": "No open reports",
-        "empty": "No reports",
-        "list": "List: ",
-        "meta": "{time}・Reporter: {reporter}",
-        "onItem": "・on an item",
-        "note": "Resolution note",
-        "noteLabel": "Resolution note (optional, up to 1,000 characters)",
-        "user": "User: "
-      },
-      "reason": {
-        "scam": "Suspected scam",
-        "inappropriate": "Inappropriate content",
-        "copyright": "Copyright infringement",
-        "personal_info": "Personal info leak",
-        "other": "Other"
-      },
       "lists": {
         "placeholder": "Slug or owner email prefix",
         "searchLabel": "Search lists",
@@ -150,7 +126,8 @@
         "pending_orders": "Orders pending {n}",
         "requested_refunds": "Refunds requested {n}",
         "disputed_topups": "Disputes {n}",
-        "open_debts": "Open debts {n}"
+        "open_debts": "Open debts {n}",
+        "open_reports": "{n} open"
       }
     },
     "audit": {
@@ -734,6 +711,52 @@
         "line_pay": "LINE Pay",
         "apple_pay": "Apple Pay"
       }
+    },
+    "reports": {
+      "status": "Status",
+      "open": "Open",
+      "actioned": "Actioned",
+      "dismissed": "Dismissed",
+      "dismiss": "Dismiss",
+      "emptyOpen": "No open reports",
+      "empty": "No reports",
+      "note": "Resolution note",
+      "noteLabel": "Resolution note (optional, up to 1,000 characters)",
+      "title": "Report review",
+      "kindLabel": "Target type",
+      "kinds": {
+        "all": "All",
+        "wishlist": "Lists",
+        "user": "Users"
+      },
+      "stateHidden": "Hidden",
+      "stateSuspended": "Suspended",
+      "stateOk": "Normal",
+      "moreOpen": "{n} open reports for this target",
+      "reporterTypes": {
+        "user": "Member",
+        "guest": "Guest",
+        "anonymous": "Anonymous"
+      },
+      "markDone": "Mark handled (no action)",
+      "hideList": "Hide list",
+      "suspendUser": "Suspend user",
+      "owner": "Owner: ",
+      "hideText": "Hide \"{name}\". Other open reports for the same list will also be marked actioned.",
+      "suspendText": "Suspend \"{name}\". Other open reports for the same user will also be marked actioned.",
+      "hideReason": "Reason (required, shown to the owner)",
+      "suspendReason": "Reason for suspension (required)",
+      "doneHide": "Hidden; related reports closed",
+      "doneSuspend": "Suspended; related reports closed",
+      "reason": {
+        "scam": "Suspected scam",
+        "inappropriate": "Inappropriate content",
+        "copyright": "Copyright infringement",
+        "personal_info": "Personal info leak",
+        "other": "Other"
+      },
+      "meta": "{time}・Reporter: {reporter}",
+      "onItem": "・on an item"
     }
   }
 }

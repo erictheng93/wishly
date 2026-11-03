@@ -6,12 +6,9 @@ useHead({ title: () => t('admin.index.title') })
 const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
 const { api } = useApi()
 const { user: me } = useAuth()
-const tab = ref<'reports' | 'lists' | 'users' | 'flags'>('reports')
+const tab = ref<'lists' | 'users' | 'flags'>('lists')
 const err = ref(''), msg = ref('')
 
-// 檢舉佇列
-const rStatus = ref('open')
-const reports = ref<any[]>([]), rCursor = ref<string | null>(null), rLoading = ref(false)
 const stats = ref<any>(null), statsErr = ref(''), statsBusy = ref(false)
 const STAT = computed<Record<string, string>>(() => ({ users: t('admin.index.stat.users'), wishlists: t('admin.index.stat.wishlists'), active_wishlists: t('admin.index.stat.activeWishlists'), hidden_wishlists: t('admin.index.stat.hiddenWishlists'), open_reports: t('admin.index.stat.openReports') }))
 async function loadStats() {
@@ -19,31 +16,6 @@ async function loadStats() {
   try { stats.value = await api('/admin/stats') }
   catch (e) { statsErr.value = errMsg(e) } finally { statsBusy.value = false }
 }
-const REASON = computed<Record<string, string>>(() => ({ scam: t('admin.index.reason.scam'), inappropriate: t('admin.index.reason.inappropriate'), copyright: t('admin.index.reason.copyright'), personal_info: t('admin.index.reason.personal_info'), other: t('admin.index.reason.other') }))
-async function loadReports(more = false) {
-  rLoading.value = true; err.value = ''
-  try {
-    const r = await api('/admin/reports', { query: { status: rStatus.value, cursor: more ? rCursor.value : undefined } })
-    reports.value = more ? [...reports.value, ...r.data] : r.data; rCursor.value = r.next_cursor
-  } catch (e) { err.value = errMsg(e) } finally { rLoading.value = false }
-}
-const reportAct = ref<{ id: string; title: string; status: 'actioned' | 'dismissed' } | null>(null)
-const reportNote = ref(''), reportBusy = ref(false), reportErr = ref('')
-function openReport(r: any, status: 'actioned' | 'dismissed') {
-  if (reportBusy.value) return // 舊請求還在跑，避免它的錯誤落到新對話框
-  reportAct.value = { id: r.id, title: r.wishlist?.title ?? r.user?.display_name, status }; reportNote.value = ''; reportErr.value = ''
-}
-async function handleReport() {
-  if (!reportAct.value || reportBusy.value) return
-  const { id, status } = reportAct.value
-  reportBusy.value = true; reportErr.value = ''
-  try {
-    await api(`/admin/reports/${id}`, { method: 'PATCH', body: { status, note: reportNote.value.trim() || undefined } })
-    reportAct.value = null
-    await Promise.all([loadReports(), loadStats()])
-  } catch (e) { if (reportAct.value) reportErr.value = errMsg(e); else err.value = errMsg(e) } finally { reportBusy.value = false }
-}
-
 // 下架 / 恢復
 const mod = ref<{ id: string; title: string; hidden: boolean } | null>(null)
 const reason = ref(''), modBusy = ref(false), modErr = ref('')
@@ -54,7 +26,7 @@ async function doMod() {
     const hide = !mod.value!.hidden
     await api(`/admin/wishlists/${mod.value!.id}/moderation`, { method: 'PATCH', body: hide ? { moderation_status: 'hidden', reason: reason.value.trim() } : { moderation_status: 'ok' } })
     mod.value = null; msg.value = hide ? t('admin.index.mod.hidden') : t('admin.index.mod.restored')
-    await Promise.all([loadReports(), loadStats(), tab.value === 'lists' ? searchLists() : 0])
+    await Promise.all([loadStats(), tab.value === 'lists' ? searchLists() : 0])
   } catch (e) { modErr.value = errMsg(e) } finally { modBusy.value = false }
 }
 
@@ -125,7 +97,6 @@ async function loadFlags() {
     for (const k of ['read_only', 'staff_mfa_required'] as FlagKey[]) flags[k] = !!data.find((f: any) => f.key === k)?.value
   } catch (e) { flags.read_only = flags.staff_mfa_required = null; err.value = errMsg(e) }
 }
-watch(rStatus, () => loadReports())
 watch(tab, t => { if (t === 'flags') loadFlags() })
 const rqBusy = ref(false), rqMsg = ref('')
 async function requeue() {
@@ -133,7 +104,7 @@ async function requeue() {
   try { rqMsg.value = t('admin.index.requeued', { n: (await api('/admin/notifications/requeue', { method: 'POST' })).requeued }); await loadStats() }
   catch (e) { statsErr.value = errMsg(e) } finally { rqBusy.value = false }
 }
-onMounted(() => Promise.all([loadReports(), loadStats()]))
+onMounted(loadStats)
 </script>
 <template>
   <main class="c-page c-admin">
@@ -144,7 +115,7 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <div class="c-row c-mb"><h2 class="c-h2 c-grow c-m0">{{ $t('admin.index.overview') }}</h2><button class="c-btn small" :disabled="statsBusy" @click="loadStats">{{ statsBusy ? $t('admin.index.refreshing') : $t('admin.index.refreshStats') }}</button></div>
       <p v-if="statsErr" class="c-err" role="alert">{{ statsErr }}</p>
       <dl class="admin-stats k-kpis">
-        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0 }">{{ stats?.[key] ?? '–' }}</dd></div>
+        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0 }"><NuxtLink v-if="key === 'open_reports'" to="/admin/reports">{{ stats?.[key] ?? '–' }}</NuxtLink><template v-else>{{ stats?.[key] ?? '–' }}</template></dd></div>
       </dl>
       <details v-if="stats"><summary>{{ $t('admin.index.detailsSummary') }}</summary>
         <div v-for="(name, key) in { claims_by_status: $t('admin.index.claimsByStatus'), notifications_by_status: $t('admin.index.notificationsByStatus'), audit_last_7d: $t('admin.index.auditLast7d') }" :key="key" class="c-mt">
@@ -165,33 +136,14 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <NuxtLink to="/admin/relief-events" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.events') }}</span></NuxtLink>
       <NuxtLink to="/admin/audit" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.audit') }}</span></NuxtLink>
       <NuxtLink :to="stats?.disputed_topups > 0 ? '/admin/finance?tab=transactions&status=disputed' : '/admin/finance'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/reports" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.reports') }} <span class="c-badge" data-testid="todo-open_reports">{{ $t('admin.index.todo.open_reports', { n: stats?.open_reports ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/analytics" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.analytics') }}</span></NuxtLink>
     </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">
-      <button v-for="t in [['reports', $t('admin.index.tabs.reports')], ['lists', $t('admin.index.tabs.lists')], ['users', $t('admin.index.tabs.users')], ['flags', $t('admin.index.tabs.flags')]]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>
+      <button v-for="t in [['lists', $t('admin.index.tabs.lists')], ['users', $t('admin.index.tabs.users')], ['flags', $t('admin.index.tabs.flags')]]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>
     </nav>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
-
-    <section v-if="tab === 'reports'">
-      <label class="c-field"><span>{{ $t('admin.index.reports.status') }}</span><select v-model="rStatus"><option value="open">{{ $t('admin.index.reports.open') }}</option><option value="actioned">{{ $t('admin.index.reports.actioned') }}</option><option value="dismissed">{{ $t('admin.index.reports.dismissed') }}</option></select></label>
-      <p v-if="rLoading" class="c-mute">{{ $t('admin.index.loading') }}</p>
-      <p v-else-if="!reports.length" class="c-center c-mute">{{ rStatus === 'open' ? $t('admin.index.reports.emptyOpen') : $t('admin.index.reports.empty') }}</p>
-      <article v-for="r in reports" :key="r.id" class="c-card">
-        <div class="c-row"><strong class="c-grow">{{ REASON[r.reason] || r.reason }}</strong><CreatorStatusBadge :v="r.status" /></div>
-        <div v-if="r.user">{{ $t('admin.index.reports.user') }}<a :href="`/u/${r.user.handle || r.user.id}`" target="_blank" rel="noopener">{{ r.user.display_name }}</a></div>
-        <div v-else-if="r.wishlist">{{ $t('admin.index.reports.list') }}<a :href="`/s/${r.wishlist.slug}`" target="_blank" rel="noopener">{{ r.wishlist.title }}</a>（{{ r.wishlist.slug }}）</div>
-        <div v-if="r.detail" class="c-mute">{{ r.detail }}</div>
-        <p v-if="r.resolution_note" class="report-note"><strong>{{ $t('admin.index.reports.note') }}</strong><br>{{ r.resolution_note }}</p>
-        <div class="c-mute">{{ $t('admin.index.reports.meta', { time: new Date(r.created_at).toLocaleString(dl), reporter: r.reporter }) }}{{ r.item_id ? $t('admin.index.reports.onItem') : '' }}</div>
-        <div v-if="r.status === 'open'" class="c-row wrap c-mt">
-          <button class="c-btn danger c-grow" @click="openMod({ id: r.wishlist.id, title: r.wishlist.title, moderation_status: 'ok' })">{{ $t('admin.index.hide') }}</button>
-          <button class="c-btn c-grow" @click="openReport(r, 'actioned')">{{ $t('admin.index.reports.actioned') }}</button>
-          <button class="c-btn c-grow" @click="openReport(r, 'dismissed')">{{ $t('admin.index.reports.dismiss') }}</button>
-        </div>
-      </article>
-      <button v-if="rCursor" class="c-btn block" @click="loadReports(true)">{{ $t('admin.index.loadMore') }}</button>
-    </section>
 
     <section v-if="tab === 'lists'">
       <form class="c-row" @submit.prevent="searchLists()"><input v-model="lq" class="c-grow c-input" :placeholder="$t('admin.index.lists.placeholder')" :aria-label="$t('admin.index.lists.searchLabel')" :disabled="lBusy"><button class="c-btn primary" :disabled="lBusy">{{ lBusy ? $t('admin.index.searching') : $t('admin.index.search') }}</button></form>
@@ -242,9 +194,6 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p class="c-mute">{{ $t('admin.index.flags.auditNote') }}</p>
     </section>
 
-    <CreatorConfirm :open="!!reportAct" :title="reportAct?.status === 'dismissed' ? $t('admin.index.reports.dismiss') : $t('admin.index.reports.actioned')" :text="reportAct?.title" :busy="reportBusy" :error="reportErr" @close="reportAct = null" @ok="handleReport">
-      <label class="c-field"><span>{{ $t('admin.index.reports.noteLabel') }}</span><textarea v-model="reportNote" :disabled="reportBusy" maxlength="1000" rows="3" /></label>
-    </CreatorConfirm>
     <CreatorConfirm :open="!!mod" :title="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideTitle')" :text="$t('admin.index.mod.text', { title: mod?.title })" :ok="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideOk')" :danger="!mod?.hidden" :busy="modBusy" :disabled="!mod?.hidden && !reason.trim()" :error="modErr" @close="mod = null" @ok="doMod">
       <label v-if="mod && !mod.hidden" class="c-field"><span>{{ $t('admin.index.mod.reason') }}</span><input v-model="reason" maxlength="200"></label>
     </CreatorConfirm>
@@ -256,7 +205,6 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
 </template>
 
 <style scoped>
-.report-note{white-space:pre-wrap;overflow-wrap:anywhere}
 .admin-stats{margin:0 0 20px}
 .admin-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .admin-id{overflow-wrap:anywhere;font:500 12px var(--mono)}

@@ -96,6 +96,7 @@ async fn list_orders(
         q: None,
         status: None,
         moderation_status: None,
+        kind: None,
     });
     let rows: Vec<OrderRow> = sqlx::query_as(
         "SELECT po.id, po.fulfillment_type::text AS fulfillment_type, po.status::text AS status, i.id AS item_id, i.title AS item_title, i.product_url,

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import Orgs from '../app/pages/admin/orgs.vue'
 import Index from '../app/pages/admin/index.vue'
+import Reports from '../app/pages/admin/reports.vue'
 import Orders from '../app/pages/admin/orders.vue'
 import { ORDER_STATUS, orderActions, fmtPts, fmtTime } from '../app/utils/crowdfund'
 import { maskEmail } from '../app/utils/mask'
@@ -70,11 +71,10 @@ it('採購單只有點擊才取得收件資訊，隱藏後可重新查看', asyn
 
 it('檢舉結案對話框送出備註，已結案列表顯示原備註', async () => {
   api.mockImplementation(async (url: string, opts: any) => {
-    if (url === '/admin/stats') return { staff_mfa: 2 }
     if (opts?.method === 'PATCH') return {}
-    return { data: opts?.query?.status === 'open' ? [{ id: 'report', status: 'open', reason: 'other', wishlist: { id: 'w', slug: 'slug', title: 'List' } }] : [{ id: 'report', status: 'dismissed', reason: 'other', resolution_note: '查證後駁回', wishlist: { id: 'w', slug: 'slug', title: 'List' } }] }
+    return { data: opts?.query?.status === 'open' ? [{ id: 'report', status: 'open', reason: 'other', wishlist: { id: 'w', slug: 'slug', title: 'List', moderation_status: 'ok', owner: { id: 'o', handle: null, display_name: 'Own' } } }] : [{ id: 'report', status: 'dismissed', reason: 'other', resolution_note: '查證後駁回', wishlist: { id: 'w', slug: 'slug', title: 'List', moderation_status: 'ok', owner: { id: 'o', handle: null, display_name: 'Own' } } }] }
   })
-  const el = show(Index); await settle()
+  const el = show(Reports); await settle()
   ;[...el.querySelectorAll<HTMLButtonElement>('article button')].find(b => b.textContent?.includes('駁回'))!.click(); await settle()
   expect(el.querySelector('.confirm textarea')).not.toBeNull()
   await input(el, '.confirm textarea', '查證後駁回')
@@ -110,11 +110,10 @@ it('收件資訊失敗維持遮罩；切換篩選後忽略舊的明文回應', a
 it('檢舉結案送出中按 Esc：對話框關閉，失敗顯示在頁面，之後可再開', async () => {
   let fail!: (e: Error) => void
   api.mockImplementation((url: string, opts: any) => {
-    if (url === '/admin/stats') return Promise.resolve({ staff_mfa: 2 })
     if (opts?.method === 'PATCH') return new Promise((_, rej) => { fail = rej })
-    return Promise.resolve({ data: [{ id: 'report', status: 'open', reason: 'other', wishlist: { id: 'w', slug: 'slug', title: 'List' } }] })
+    return Promise.resolve({ data: [{ id: 'report', status: 'open', reason: 'other', wishlist: { id: 'w', slug: 'slug', title: 'List', moderation_status: 'ok', owner: { id: 'o', handle: null, display_name: 'Own' } } }] })
   })
-  const el = show(Index); await settle()
+  const el = show(Reports); await settle()
   const openIt = async () => { [...el.querySelectorAll<HTMLButtonElement>('article button')].find(b => b.textContent?.includes('駁回'))!.click(); await settle() }
   await openIt()
   el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
@@ -177,4 +176,36 @@ it('訂單切換篩選時，較慢回來的舊請求不會蓋掉新列表', asyn
   oldList({ data: [row('old', '待下單訂單', 'pending')], next_cursor: 'stale' }); await settle()
   expect(el.textContent).toContain('運送中訂單')
   expect(el.textContent).not.toContain('待下單訂單')
+})
+
+it('檢舉頁：下架清單需理由並呼叫下架端點；已下架或已停權的對象不顯示處置鈕', async () => {
+  const rows = [
+    { id: 'r1', status: 'open', reason: 'scam', reporter: 'guest', target_open_count: 3, wishlist: { id: 'w1', slug: 's1', title: '清單一', moderation_status: 'ok', owner: { id: 'o', handle: 'h', display_name: 'Own' } } },
+    { id: 'r2', status: 'open', reason: 'other', reporter: 'user', target_open_count: 1, wishlist: { id: 'w2', slug: 's2', title: '清單二', moderation_status: 'hidden', owner: { id: 'o', handle: null, display_name: 'Own' } } },
+    { id: 'r3', status: 'open', reason: 'other', reporter: 'user', target_open_count: 1, user: { id: 'u3', handle: null, display_name: '被停權者', suspended: true } },
+    { id: 'r4', status: 'open', reason: 'other', reporter: 'user', target_open_count: 1, user: { id: 'u4', handle: 'x', display_name: '使用者四', suspended: false } },
+  ]
+  api.mockImplementation(async (_u: string, opts: any) => opts?.method === 'PATCH' ? {} : { data: rows, next_cursor: null })
+  const el = show(Reports); await settle()
+  const cards = [...el.querySelectorAll('article')]
+  expect(cards[0].querySelector('[data-testid="more-open"]')?.textContent).toContain('3')
+  expect(cards[1].textContent).not.toContain('下架清單')
+  expect(cards[2].textContent).not.toContain('停權使用者')
+  const btn = (c: Element, t: string) => [...c.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes(t))!
+  btn(cards[0], '下架清單').click(); await settle()
+  expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
+  await input(el, '.confirm textarea', '詐騙')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/wishlists/w1/moderation', { method: 'PATCH', body: { moderation_status: 'hidden', reason: '詐騙' } })
+  btn(cards[3], '停權使用者').click(); await settle()
+  await input(el, '.confirm textarea', '騷擾')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/users/u4', { method: 'PATCH', body: { blocked: true, reason: '騷擾' } })
+})
+
+it('首頁待處理檢舉數連到檢舉頁', async () => {
+  api.mockImplementation(async (url: string) => url === '/admin/stats' ? { staff_mfa: 2, open_reports: 4 } : { data: [] })
+  const el = show(Index); await settle()
+  expect(el.querySelector('[data-testid="stat-open_reports"] a')?.getAttribute('href')).toBe('/admin/reports')
+  expect(el.querySelector('[data-testid="todo-open_reports"]')!.closest('a')!.getAttribute('href')).toBe('/admin/reports')
 })

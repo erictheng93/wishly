@@ -29,17 +29,15 @@
         "catalog": "Thương hiệu & sản phẩm",
         "orgs": "Org and permit review",
         "events": "Disaster events",
-        "finance": "Tài chính"
+        "finance": "Tài chính",
+        "reports": "Xử lý báo cáo"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
-        "reports": "Hàng đợi báo cáo",
         "lists": "Tìm danh sách",
         "users": "Người dùng",
         "flags": "Cờ hệ thống"
       },
-      "loading": "Đang tải…",
-      "loadMore": "Tải thêm",
       "search": "Tìm kiếm",
       "searching": "Đang tìm…",
       "all": "Tất cả",
@@ -48,28 +46,6 @@
       "normal": "Bình thường",
       "hidden": "Đã gỡ",
       "deleted": "Đã xóa",
-      "reports": {
-        "status": "Trạng thái",
-        "open": "Chờ xử lý",
-        "actioned": "Đã xử lý",
-        "dismissed": "Đã bác bỏ",
-        "dismiss": "Bác bỏ",
-        "emptyOpen": "Không có báo cáo chờ xử lý",
-        "empty": "Không có báo cáo",
-        "list": "Danh sách: ",
-        "meta": "{time}・Người báo cáo: {reporter}",
-        "onItem": "・về một món quà",
-        "note": "Ghi chú kết thúc",
-        "noteLabel": "Ghi chú kết thúc (không bắt buộc, tối đa 1.000 ký tự)",
-        "user": "Người dùng: "
-      },
-      "reason": {
-        "scam": "Nghi ngờ lừa đảo",
-        "inappropriate": "Nội dung không phù hợp",
-        "copyright": "Vi phạm bản quyền",
-        "personal_info": "Lộ thông tin cá nhân",
-        "other": "Khác"
-      },
       "lists": {
         "placeholder": "Slug hoặc tiền tố email người tạo",
         "searchLabel": "Tìm danh sách",
@@ -150,7 +126,8 @@
         "pending_orders": "Đơn chờ đặt {n}",
         "requested_refunds": "Hoàn tiền chờ duyệt {n}",
         "disputed_topups": "Tranh chấp {n}",
-        "open_debts": "Nợ chưa trả {n}"
+        "open_debts": "Nợ chưa trả {n}",
+        "open_reports": "{n} chờ xử lý"
       }
     },
     "audit": {
@@ -734,6 +711,52 @@
         "line_pay": "LINE Pay",
         "apple_pay": "Apple Pay"
       }
+    },
+    "reports": {
+      "status": "Trạng thái",
+      "open": "Chờ xử lý",
+      "actioned": "Đã xử lý",
+      "dismissed": "Đã bác bỏ",
+      "dismiss": "Bác bỏ",
+      "emptyOpen": "Không có báo cáo chờ xử lý",
+      "empty": "Không có báo cáo",
+      "note": "Ghi chú kết thúc",
+      "noteLabel": "Ghi chú kết thúc (không bắt buộc, tối đa 1.000 ký tự)",
+      "title": "Xử lý báo cáo",
+      "kindLabel": "Loại đối tượng",
+      "kinds": {
+        "all": "Tất cả",
+        "wishlist": "Danh sách",
+        "user": "Người dùng"
+      },
+      "stateHidden": "Đã gỡ",
+      "stateSuspended": "Đã khóa",
+      "stateOk": "Bình thường",
+      "moreOpen": "Đối tượng này có {n} báo cáo chờ xử lý",
+      "reporterTypes": {
+        "user": "Thành viên",
+        "guest": "Khách",
+        "anonymous": "Ẩn danh"
+      },
+      "markDone": "Đánh dấu đã xử lý (không xử phạt)",
+      "hideList": "Gỡ danh sách",
+      "suspendUser": "Khóa người dùng",
+      "owner": "Người tạo: ",
+      "hideText": "Gỡ \"{name}\". Các báo cáo chờ xử lý khác của cùng danh sách cũng sẽ được đánh dấu đã xử lý.",
+      "suspendText": "Khóa \"{name}\". Các báo cáo chờ xử lý khác của cùng người dùng cũng sẽ được đánh dấu đã xử lý.",
+      "hideReason": "Lý do gỡ (bắt buộc, hiển thị cho người tạo)",
+      "suspendReason": "Lý do khóa (bắt buộc)",
+      "doneHide": "Đã gỡ; báo cáo liên quan đã đóng",
+      "doneSuspend": "Đã khóa; báo cáo liên quan đã đóng",
+      "reason": {
+        "scam": "Nghi ngờ lừa đảo",
+        "inappropriate": "Nội dung không phù hợp",
+        "copyright": "Vi phạm bản quyền",
+        "personal_info": "Lộ thông tin cá nhân",
+        "other": "Khác"
+      },
+      "meta": "{time}・Người báo cáo: {reporter}",
+      "onItem": "・về một món quà"
     }
   }
 }
