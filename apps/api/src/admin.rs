@@ -77,6 +77,7 @@ pub struct PageQ {
     pub q: Option<String>,
     pub status: Option<String>,
     pub moderation_status: Option<String>,
+    pub kind: Option<String>,
 }
 
 pub fn limit(q: &PageQ) -> i64 {
@@ -334,6 +335,12 @@ async fn update_user(
         .bind(id).bind(new_staff).bind(new_blocked).fetch_one(&mut *tx).await?;
     if new_blocked || staff != new_staff {
         revoke_sessions(&mut tx, id).await?;
+    }
+    // 新停權：該使用者的待處理檢舉視為已處置。鎖序 users → content_reports；
+    // 與 reports::moderate 對稱（wishlists → content_reports），status = 'open' 不可省以免覆寫已駁回的檢舉
+    if new_blocked && !blocked {
+        sqlx::query("UPDATE content_reports SET status = 'actioned', handled_by = $2, handled_at = now(), resolution_note = $3 WHERE reported_user_id = $1 AND status = 'open'")
+            .bind(id).bind(sid).bind(&reason).execute(&mut *tx).await?;
     }
     // 新停權：該使用者公開清單的邊緣副本要清掉（內容已改回 404）
     let purge: Vec<String> = if new_blocked && !blocked {

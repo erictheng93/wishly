@@ -29,17 +29,15 @@
         "catalog": "精選商品與品牌",
         "orgs": "組織與許可審核",
         "events": "救災事件管理",
-        "finance": "金流後台"
+        "finance": "金流後台",
+        "reports": "檢舉處理"
       },
       "tabsLabel": "後台功能",
       "tabs": {
-        "reports": "檢舉佇列",
         "lists": "清單搜尋",
         "users": "使用者",
         "flags": "系統旗標"
       },
-      "loading": "載入中…",
-      "loadMore": "載入更多",
       "search": "搜尋",
       "searching": "搜尋中…",
       "all": "全部",
@@ -48,28 +46,6 @@
       "normal": "正常",
       "hidden": "已下架",
       "deleted": "已刪除",
-      "reports": {
-        "status": "狀態",
-        "open": "待處理",
-        "actioned": "已處理",
-        "dismissed": "已駁回",
-        "dismiss": "駁回",
-        "emptyOpen": "目前沒有待處理的檢舉",
-        "empty": "目前沒有檢舉",
-        "list": "清單：",
-        "meta": "{time}・檢舉者：{reporter}",
-        "onItem": "・針對品項",
-        "note": "結案備註",
-        "noteLabel": "結案備註（選填，最多 1000 字）",
-        "user": "使用者："
-      },
-      "reason": {
-        "scam": "疑似詐騙",
-        "inappropriate": "不當內容",
-        "copyright": "侵害著作權",
-        "personal_info": "洩漏個人資料",
-        "other": "其他"
-      },
       "lists": {
         "placeholder": "slug 或建立者 Email 前綴",
         "searchLabel": "搜尋清單",
@@ -150,7 +126,8 @@
         "pending_orders": "待下單 {n}",
         "requested_refunds": "待審退款 {n}",
         "disputed_topups": "爭議 {n}",
-        "open_debts": "欠款 {n}"
+        "open_debts": "欠款 {n}",
+        "open_reports": "待處理 {n}"
       }
     },
     "audit": {
@@ -734,6 +711,52 @@
         "line_pay": "LINE Pay",
         "apple_pay": "Apple Pay"
       }
+    },
+    "reports": {
+      "status": "狀態",
+      "open": "待處理",
+      "actioned": "已處理",
+      "dismissed": "已駁回",
+      "dismiss": "駁回",
+      "emptyOpen": "目前沒有待處理的檢舉",
+      "empty": "目前沒有檢舉",
+      "note": "結案備註",
+      "noteLabel": "結案備註（選填，最多 1000 字）",
+      "title": "檢舉處理",
+      "kindLabel": "對象類型",
+      "kinds": {
+        "all": "全部",
+        "wishlist": "清單",
+        "user": "使用者"
+      },
+      "stateHidden": "已下架",
+      "stateSuspended": "已停權",
+      "stateOk": "正常",
+      "moreOpen": "此對象共 {n} 筆未處理檢舉",
+      "reporterTypes": {
+        "user": "登入使用者",
+        "guest": "訪客",
+        "anonymous": "匿名"
+      },
+      "markDone": "標記已處理（不處置）",
+      "hideList": "下架清單",
+      "suspendUser": "停權使用者",
+      "owner": "建立者：",
+      "hideText": "下架「{name}」。同一清單其他未處理的檢舉也會一併標記為已處理。",
+      "suspendText": "停權「{name}」。同一使用者其他未處理的檢舉也會一併標記為已處理。",
+      "hideReason": "下架原因（必填，會顯示給建立者）",
+      "suspendReason": "停權原因（必填）",
+      "doneHide": "已下架，相關檢舉已結案",
+      "doneSuspend": "已停權，相關檢舉已結案",
+      "reason": {
+        "scam": "疑似詐騙",
+        "inappropriate": "不當內容",
+        "copyright": "侵害著作權",
+        "personal_info": "洩漏個人資料",
+        "other": "其他"
+      },
+      "meta": "{time}・檢舉者：{reporter}",
+      "onItem": "・針對品項"
     }
   }
 }

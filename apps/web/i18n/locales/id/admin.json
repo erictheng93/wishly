@@ -29,17 +29,15 @@
         "catalog": "Produk pilihan dan merek",
         "orgs": "Org and permit review",
         "events": "Disaster events",
-        "finance": "Keuangan"
+        "finance": "Keuangan",
+        "reports": "Penanganan laporan"
       },
       "tabsLabel": "Fitur panel admin",
       "tabs": {
-        "reports": "Antrean laporan",
         "lists": "Cari wishlist",
         "users": "Pengguna",
         "flags": "Flag sistem"
       },
-      "loading": "Memuat…",
-      "loadMore": "Muat lebih banyak",
       "search": "Cari",
       "searching": "Mencari…",
       "all": "Semua",
@@ -48,28 +46,6 @@
       "normal": "Normal",
       "hidden": "Diturunkan",
       "deleted": "Dihapus",
-      "reports": {
-        "status": "Status",
-        "open": "Menunggu",
-        "actioned": "Sudah ditangani",
-        "dismissed": "Ditolak",
-        "dismiss": "Tolak",
-        "emptyOpen": "Belum ada laporan yang menunggu",
-        "empty": "Belum ada laporan",
-        "list": "Wishlist: ",
-        "meta": "{time}・Pelapor: {reporter}",
-        "onItem": "・Pada barang",
-        "note": "Catatan penyelesaian",
-        "noteLabel": "Catatan penyelesaian (opsional, maksimal 1.000 karakter)",
-        "user": "Pengguna: "
-      },
-      "reason": {
-        "scam": "Diduga penipuan",
-        "inappropriate": "Konten tidak pantas",
-        "copyright": "Pelanggaran hak cipta",
-        "personal_info": "Membocorkan data pribadi",
-        "other": "Lainnya"
-      },
       "lists": {
         "placeholder": "slug atau awalan Email pemilik",
         "searchLabel": "Cari wishlist",
@@ -150,7 +126,8 @@
         "pending_orders": "Pesanan menunggu {n}",
         "requested_refunds": "Pengembalian diminta {n}",
         "disputed_topups": "Sengketa {n}",
-        "open_debts": "Utang terbuka {n}"
+        "open_debts": "Utang terbuka {n}",
+        "open_reports": "{n} menunggu"
       }
     },
     "audit": {
@@ -734,6 +711,52 @@
         "line_pay": "LINE Pay",
         "apple_pay": "Apple Pay"
       }
+    },
+    "reports": {
+      "status": "Status",
+      "open": "Menunggu",
+      "actioned": "Sudah ditangani",
+      "dismissed": "Ditolak",
+      "dismiss": "Tolak",
+      "emptyOpen": "Belum ada laporan yang menunggu",
+      "empty": "Belum ada laporan",
+      "note": "Catatan penyelesaian",
+      "noteLabel": "Catatan penyelesaian (opsional, maksimal 1.000 karakter)",
+      "title": "Penanganan laporan",
+      "kindLabel": "Jenis target",
+      "kinds": {
+        "all": "Semua",
+        "wishlist": "Wishlist",
+        "user": "Pengguna"
+      },
+      "stateHidden": "Sudah diturunkan",
+      "stateSuspended": "Dibekukan",
+      "stateOk": "Normal",
+      "moreOpen": "Target ini punya {n} laporan yang menunggu",
+      "reporterTypes": {
+        "user": "Anggota",
+        "guest": "Tamu",
+        "anonymous": "Anonim"
+      },
+      "markDone": "Tandai ditangani (tanpa tindakan)",
+      "hideList": "Turunkan wishlist",
+      "suspendUser": "Bekukan pengguna",
+      "owner": "Pemilik: ",
+      "hideText": "Turunkan \"{name}\". Laporan lain yang menunggu untuk wishlist yang sama juga akan ditandai sudah ditangani.",
+      "suspendText": "Bekukan \"{name}\". Laporan lain yang menunggu untuk pengguna yang sama juga akan ditandai sudah ditangani.",
+      "hideReason": "Alasan penurunan (wajib, ditampilkan kepada pemilik)",
+      "suspendReason": "Alasan pembekuan (wajib)",
+      "doneHide": "Sudah diturunkan; laporan terkait ditutup",
+      "doneSuspend": "Dibekukan; laporan terkait ditutup",
+      "reason": {
+        "scam": "Diduga penipuan",
+        "inappropriate": "Konten tidak pantas",
+        "copyright": "Pelanggaran hak cipta",
+        "personal_info": "Membocorkan data pribadi",
+        "other": "Lainnya"
+      },
+      "meta": "{time}・Pelapor: {reporter}",
+      "onItem": "・Pada barang"
     }
   }
 }
