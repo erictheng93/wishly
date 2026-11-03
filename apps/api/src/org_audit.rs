@@ -41,6 +41,7 @@ async fn list(
             "結束日期不可早於開始日期",
         ));
     }
+    // shortcut: OR 範圍條件無法走索引，資料量大時每頁可能掃大半張表；頁面變慢再改為寫入時記 org_id 欄位並建索引
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT a.id, jsonb_build_object('id',a.id,'action',a.action,'entity',a.entity,'entity_id',a.entity_id,

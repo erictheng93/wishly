@@ -18,3 +18,7 @@ CREATE TRIGGER audit_logs_no_truncate BEFORE TRUNCATE ON audit_logs
 -- 請求脈絡：由 middleware 帶入（背景工作沒有請求，維持 NULL）
 ALTER TABLE audit_logs ADD COLUMN request_id uuid, ADD COLUMN user_agent text;
 CREATE INDEX audit_logs_request_id ON audit_logs (request_id) WHERE request_id IS NOT NULL;
+
+-- 保留期清理（ratelimit::cleanup 每小時）只掃內容編輯類；條件須與清理的 IN 清單一致才用得到
+CREATE INDEX audit_logs_content_edit_created ON audit_logs (created_at)
+  WHERE action IN ('wishlist.create','wishlist.update','item.create','item.update','item.reorder','wishlist.allowed_users.update');

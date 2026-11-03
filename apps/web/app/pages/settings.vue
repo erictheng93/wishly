@@ -246,7 +246,7 @@ async function remove() {
         <ul class="identity-list">
           <li v-for="a in acts" :key="a.id" class="c-row">
             <span class="c-grow">{{ $t(activityLabelKey(a.action)) }}<template v-if="a.provider || a.method"> ({{ a.provider || a.method }})</template><br>
-              <small class="c-mute">{{ when(a.created_at) }}<template v-if="a.ip">・{{ a.ip }}</template></small></span>
+              <small class="c-mute">{{ when(a.created_at) }}<template v-if="a.user_agent">・{{ device(a.user_agent) }}</template><template v-if="a.ip">・{{ a.ip }}</template></small></span>
           </li>
         </ul>
         <p v-if="!acts.length && !actErr" class="c-mute">{{ $t('settings.activity.empty') }}</p>

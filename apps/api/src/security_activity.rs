@@ -1,6 +1,12 @@
 //! 帳號安全活動（GET /me/security-activity）：讓本人看到自己帳號近期的敏感事件，及早發現被盜用。
 //! 只讀 audit_logs；不回傳原始 diff，只白名單 method / provider；營運人員動作只露出動作與時間，不含身分與理由。
-use axum::{extract::{Query, State}, http::header, response::IntoResponse, routing::get, Json, Router};
+use axum::{
+    extract::{Query, State},
+    http::header,
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -19,7 +25,11 @@ struct Q {
 }
 
 // 本人動作白名單（auth.% 另以 LIKE 納入）。
-const OWN_ACTIONS: &[&str] = &["account.export", "account.absorb", "wishlist.shipping_address.update"];
+const OWN_ACTIONS: &[&str] = &[
+    "account.export",
+    "account.absorb",
+    "wishlist.shipping_address.update",
+];
 // 營運動作白名單；user.update 只在 blocked 狀態改變時才算（對應 account.suspended / restored），其餘（改 staff 權限）不外露。
 const STAFF_ACTIONS: &[&str] = &["user.mfa_reset", "user.recovery", "user.identity_unlink"];
 
@@ -29,13 +39,12 @@ async fn list(
     Query(q): Query<Q>,
 ) -> Result<impl IntoResponse, AppError> {
     let limit = q.limit.unwrap_or(20).clamp(1, 50);
-    // TODO(audit-infra): 合併後加 user_agent
     let rows: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', id, 'action', action, 'created_at', created_at, 'ip', ip_s,
-                  'method', method, 'provider', provider, 'actor_type', actor_type)
+                  'method', method, 'provider', provider, 'actor_type', actor_type, 'user_agent', ua)
          FROM (
            SELECT id, created_at, actor_type::text AS actor_type, action, host(ip) AS ip_s,
-                  diff->>'method' AS method, diff->>'provider' AS provider
+                  diff->>'method' AS method, diff->>'provider' AS provider, user_agent AS ua
              FROM audit_logs
             WHERE actor_type = 'user' AND actor_id = $1
               AND (action LIKE 'auth.%' OR action = ANY($2))
@@ -44,7 +53,7 @@ async fn list(
                   CASE WHEN action = 'user.update'
                        THEN CASE WHEN diff#>>'{after,blocked}' = 'true' THEN 'account.suspended' ELSE 'account.restored' END
                        ELSE action END,
-                  NULL, NULL, NULL
+                  NULL, NULL, NULL, NULL
              FROM audit_logs
             WHERE actor_type = 'staff' AND entity = 'users' AND entity_id = $1
               AND (action = ANY($3)
@@ -62,6 +71,13 @@ async fn list(
     .await?;
     let more = rows.len() as i64 > limit;
     let data: Vec<Value> = rows.into_iter().take(limit as usize).collect();
-    let next = if more { data.last().map(|r| r["id"].clone()) } else { None };
-    Ok(([(header::CACHE_CONTROL, "no-store")], Json(json!({ "data": data, "next_cursor": next }))))
+    let next = if more {
+        data.last().map(|r| r["id"].clone())
+    } else {
+        None
+    };
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(json!({ "data": data, "next_cursor": next })),
+    ))
 }
