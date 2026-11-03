@@ -1,9 +1,10 @@
 // 部署：Cloudflare Pages（docs D48，使用者基於成本選擇）
 // 原生殼（Tauri）建置：NUXT_NATIVE=1 nuxt generate → 純 SPA 靜態檔（無 SSR、無 service worker、不走 Cloudflare preset）
 const native = !!process.env.NUXT_NATIVE
+import { SCENE_LOCALES } from './app/utils/scenes'
 
 // 語系檔依功能區拆開（i18n/locales/<語系>/<區>.json，檔內最外層 key 即區名），各區獨立維護
-const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding']
+const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire']
 const loc = (code: string, language: string, name: string) => ({ code, language, name, files: AREAS.map(a => `${code}/${a}.json`) })
 
 export default defineNuxtConfig({
@@ -15,6 +16,14 @@ export default defineNuxtConfig({
     locales: [loc('zh-Hant', 'zh-Hant-TW', '繁體中文'), loc('en', 'en', 'English'), loc('vi', 'vi', 'Tiếng Việt'), loc('id', 'id', 'Bahasa Indonesia')],
     langDir: 'locales',
     detectBrowserLanguage: { useCookie: true, cookieKey: 'ws_locale', fallbackLocale: 'zh-Hant', redirectOn: 'root' },
+  },
+  // 情境落地頁的語系前綴網址（全站 no_prefix，只有這幾頁要讓 en / vi / id 被搜尋收錄）；頁面依 meta.lang 切語系
+  hooks: {
+    'pages:extend'(pages) {
+      const scene = pages.find(p => p.path === '/inspire/:scene()')
+      if (!scene) throw new Error('找不到 /inspire/:scene() 頁面')
+      for (const lang of SCENE_LOCALES) pages.push({ ...scene, name: `inspire-scene-${lang}`, path: `/${lang}/inspire/:scene()`, meta: { ...scene.meta, lang } })
+    },
   },
   compatibilityDate: '2026-10-01',
   ssr: !native,

@@ -1,0 +1,402 @@
+{
+  "inspire": {
+    "ui": {
+      "steps": "Build your list in three steps",
+      "ideas": "Gift ideas to add to your list",
+      "products": "Featured products",
+      "faq": "FAQ",
+      "others": "More gifting occasions"
+    },
+    "scenes": {
+      "birthday": {
+        "label": "Birthday",
+        "seoTitle": "Birthday Wishlist: Share What You Want With One Link {'|'} Wishly",
+        "seoDesc": "Not sure what to get for a birthday? Check their birthday wishlist first. Create a birthday wishlist on Wishly and share one link with friends. Claimed items are locked, so you never get duplicate gifts or have to awkwardly ask.",
+        "heading": "Birthday Wishlist: Let Your Friends Know What You Really Want",
+        "intro": [
+          "Around every birthday, the most common question is \"What do you want?\" The answer is usually \"anything is fine,\" so the giver guesses, and you end up with something you will never use, or two people buy the same gift.",
+          "Put what you want on a birthday wishlist first. Friends open the link and know exactly where to look, no more answering the same message one by one, and no awkwardness about asking.",
+          "On Wishly, an item is locked once a friend claims it, and everyone else can see that someone is already giving it, so nothing gets duplicated. Want to be surprised? Turn on surprise mode and you will not see who gave what."
+        ],
+        "steps": [
+          {
+            "t": "Create your birthday list",
+            "d": "Sign in and add a new list, for example \"My birthday wishes,\" then add what you want one item at a time. You can also add curated products from Gift inspiration in one tap."
+          },
+          {
+            "t": "Choose who can see it",
+            "d": "Pick Public, All friends, Selected friends or Only me. To keep the surprise, turn on surprise mode."
+          },
+          {
+            "t": "Share the link and let friends claim",
+            "d": "Copy the list link and send it to a group chat or in a message. Public lists can be viewed without signing in. For lists limited to friends or selected people, friends must sign in and be on the visible list. Claiming requires signing in, and a claimed item is locked."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Candles and home fragrance",
+            "d": "A wide price range and easy to choose, a good option when you are unsure of the budget."
+          },
+          {
+            "t": "Insulated bottles and tumblers",
+            "d": "Used every day. List your preferred size and color so nobody gets it wrong."
+          },
+          {
+            "t": "Headphones and Bluetooth speakers",
+            "d": "Models vary a lot, so picking the exact one yourself is the safest."
+          },
+          {
+            "t": "Skincare and body care",
+            "d": "Skin type and taste are personal. Listing what you would actually use is the most accurate."
+          },
+          {
+            "t": "Books and magazines",
+            "d": "Your to-read pile is probably long. Add it to the list and let friends choose freely."
+          },
+          {
+            "t": "Small kitchen appliances",
+            "d": "Coffee makers, air fryers and other things you want but hesitate to buy are perfect for friends to chip in on."
+          },
+          {
+            "t": "Sports and outdoor gear",
+            "d": "Size and use are specific, so spell them out and nobody has to guess."
+          },
+          {
+            "t": "Experience gifts",
+            "d": "A favorite restaurant, a class or an exhibition. Be sure to describe exactly what you would like to do."
+          },
+          {
+            "t": "Big-ticket dream items",
+            "d": "For pricier items, use wish crowdfunding so everyone can chip in with points."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Can I show my birthday list only to certain friends?",
+            "a": "Yes. A list can be Public, All friends, Selected friends or Close friends, or Only me. You can share it only with the people you want to invite."
+          },
+          {
+            "q": "I want a surprise. How come I can't see who gave what?",
+            "a": "Turn on surprise mode and set your birthday as the event date. Until then you only see how complete the list is, not who gave what, and the names unlock on the day. Friends still see that an item is claimed, so gifts are not duplicated."
+          },
+          {
+            "q": "What if a friend claims something and never gives it?",
+            "a": "Claims expire. A claim that is not completed in time is released automatically and the item opens up again for others, so it never stays stuck."
+          }
+        ]
+      },
+      "wedding": {
+        "label": "Wedding",
+        "seoTitle": "Wedding Registry and Wedding Gift List, No Duplicate Gifts {'|'} Wishly",
+        "seoDesc": "How do you set up a wedding registry? Build a wedding gift list on Wishly with the appliances, bedding and tableware you want. Guests browse and claim from one link, so there are no duplicate gifts and no awkward questions.",
+        "heading": "Wedding Registry: Get Wedding Gifts You Will Actually Use",
+        "intro": [
+          "When you are getting married, relatives and friends keep asking privately, \"What do you need?\" Couples feel shy about answering, and end up with three toasters, four dinner sets, or décor they cannot use, all of it a hassle to return.",
+          "Put what your new home really needs on a wedding registry. Guests open it and know what to give, with choices at every budget and no awkwardness on either side.",
+          "Claimed items are locked, so nothing is given twice. For pricey things like large appliances, set up wish crowdfunding so several guests can chip in with points and share the cost."
+        ],
+        "steps": [
+          {
+            "t": "List what your new home needs",
+            "d": "Sign in and create \"Our wedding registry,\" then add appliances, bedding, tableware and more. Include items from low to high prices so guests on any budget can pick."
+          },
+          {
+            "t": "Decide who can see it",
+            "d": "Make it Public, or limit it to friends, selected friends or close friends. To keep it a surprise, turn on surprise mode."
+          },
+          {
+            "t": "Send the link to your guests",
+            "d": "Paste it in the wedding group chat or add it to your e-invitation. Guests can view a public list without signing in, while lists limited to friends or selected people need a sign-in. Claiming only requires signing in, and the item is locked once claimed."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Large appliances",
+            "d": "Dishwashers, dryers, robot vacuums. High-priced, so a good fit for wish crowdfunding."
+          },
+          {
+            "t": "Sheets and bedding",
+            "d": "State the size and material up front so nobody buys something that does not fit your mattress."
+          },
+          {
+            "t": "Cookware and dinnerware sets",
+            "d": "The first things used in a new kitchen. List the material and quantity to avoid duplicates."
+          },
+          {
+            "t": "Coffee makers and small appliances",
+            "d": "Used all the time, and a specific model is one you will actually use."
+          },
+          {
+            "t": "Towels and bathroom essentials",
+            "d": "Affordable, a good pick for coworkers or friends who want to give something small."
+          },
+          {
+            "t": "Home fragrance and small décor",
+            "d": "Choose the style you like instead of receiving decorations that are not your taste."
+          },
+          {
+            "t": "Storage and home organization",
+            "d": "Practical but often overlooked, and you will need it soon after moving in."
+          },
+          {
+            "t": "Couple experiences and a honeymoon fund",
+            "d": "For example, part of your honeymoon trip, which guests can chip in on with wish crowdfunding."
+          },
+          {
+            "t": "Photo frames and albums",
+            "d": "Meaningful and easy to keep on budget, a good fit for older relatives or guests far away."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Can I put cash gifts on the list?",
+            "a": "No. Wishly does not handle cash gifts or collect money on your behalf. To let guests share the cost of a big item, use wish crowdfunding, where they chip in with platform points."
+          },
+          {
+            "q": "Where do points for wish crowdfunding come from?",
+            "a": "You can top up points yourself. Guests contribute points toward an item, and it only counts as complete once the goal is reached. Points are used within the platform and are not a cash gift."
+          },
+          {
+            "q": "Can older relatives who do not use smartphones see the list?",
+            "a": "Yes. A list is just a web link. If it is Public, no sign-in is needed to view it. If it is limited to friends or selected people, viewers must sign in and be on the visible list. Claiming an item always requires a member account."
+          }
+        ]
+      },
+      "baby": {
+        "label": "Baby",
+        "seoTitle": "Baby Registry and Baby Shower Gift List, Newborn Essentials in One Place {'|'} Wishly",
+        "seoDesc": "Expecting a baby? Build a baby registry and baby shower gift list on Wishly. List hospital bag items and baby essentials, and family and friends claim from one link, so you do not end up with ten identical swaddles.",
+        "heading": "Baby Registry and New Baby Gift List: Organize Newborn Essentials in One Place",
+        "intro": [
+          "Around the time a baby arrives, family and friends all want to help but do not know what the parents need. You often end up with piles of bottles, blankets and clothes, in sizes too small to wear or in brands and materials that do not suit you.",
+          "Put your hospital bag and newborn essentials on a baby registry first. Parents can note sizes, specs and preferences, and guests just pick from the list, with no repeated questions and no gifts you cannot use.",
+          "Claimed items are locked, so nothing is given twice. Consumables like diapers and clothing can be split across price points, while big-ticket items like strollers and car seats suit wish crowdfunding so everyone can chip in."
+        ],
+        "steps": [
+          {
+            "t": "Add what you need to the list",
+            "d": "Sign in and create a list, adding items in batches by hospital bag, clothing, bedding and on-the-go gear, with sizes and preferences in the notes. You can also pick baby gifts from Gift inspiration."
+          },
+          {
+            "t": "Choose who can see it",
+            "d": "Baby details are personal, so we suggest All friends or Selected friends or Close friends. If you do not want to share it, set it to Only me."
+          },
+          {
+            "t": "Share the link with family and friends",
+            "d": "Send it to grandparents, coworkers and friends. For lists limited to friends or selected people, guests must sign in and be on the visible list (only Public lists can be viewed without signing in). Claimed items are locked, and claims that are not completed in time are released automatically."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Newborn bodysuits",
+            "d": "State the age and size so nobody buys something too small to wear."
+          },
+          {
+            "t": "Swaddles and muslin cloths",
+            "d": "Used up fast and needed in quantity, so several people claiming different ones is never too many."
+          },
+          {
+            "t": "Bottles and sterilizing supplies",
+            "d": "Nipple flow and material matter, so list exact specs to be safe."
+          },
+          {
+            "t": "Diapers and wipes",
+            "d": "The most practical consumables, great for guests who want to give something small."
+          },
+          {
+            "t": "Baby bedding and sleep sacks",
+            "d": "Tied to sleep safety, so it is more reassuring for the parents to choose the style."
+          },
+          {
+            "t": "Baby wash and care products",
+            "d": "Babies have sensitive skin, so naming the exact product avoids a bad fit."
+          },
+          {
+            "t": "Baby carriers and stroller accessories",
+            "d": "Depends on your lifestyle, and parents know best what works for them."
+          },
+          {
+            "t": "Strollers and car seats",
+            "d": "High-priced, so a good fit for wish crowdfunding, where several guests chip in with points."
+          },
+          {
+            "t": "Baby keepsakes",
+            "d": "For example a growth album or hand and footprints, especially meaningful to receive for a new baby."
+          },
+          {
+            "t": "Postpartum care for mom",
+            "d": "Moms need looking after too. Add nursing supplies or comfortable loungewear."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Is a baby registry for the person receiving gifts or the one giving them?",
+            "a": "The parents create it to tell family and friends what they would like to receive. A Public list can be viewed by anyone with the link, while a list limited to friends or selected people needs a sign-in first. To give, sign in and claim an item. If you are the one giving, you can ask the parents for their list link."
+          },
+          {
+            "q": "Will my baby's information be made public?",
+            "a": "A list can be visible to All friends, Selected friends, Close friends or Only me. It does not have to be public, so you can share it only with the family and friends you trust."
+          },
+          {
+            "q": "Can I put hospital bag items on the list?",
+            "a": "Yes. Each hospital bag item can be added separately with its size or specs. Once someone claims it, the item is locked and nobody else will prepare it."
+          }
+        ]
+      },
+      "housewarming": {
+        "label": "Housewarming",
+        "seoTitle": "Housewarming Gift Ideas and Housewarming Registry, No Duplicate Gifts {'|'} Wishly",
+        "seoDesc": "Moving into a new home and wondering what housewarming gifts to ask for? Create a housewarming registry on Wishly with the appliances, storage and décor you need. Guests claim items from one link, so no duplicates and no guessing.",
+        "heading": "Housewarming Gift Ideas and Registry: See What Your New Home Needs at a Glance",
+        "intro": [
+          "When you move into a new place, friends and family want to give something but are not sure what you need. You can end up with décor that clashes with your style, or things you already own, and you can neither keep them nor easily return them.",
+          "Turn what your new home really needs into a housewarming registry. Everything from small items to appliances can go on it, with choices at every budget, and guests pick from the list while you set up your home the way you like.",
+          "Claimed items are locked, so nothing is given twice. For pricier things like a sofa or large appliances, use wish crowdfunding so a few friends can chip in with points and no one has to cover it all."
+        ],
+        "steps": [
+          {
+            "t": "Take stock of your new home",
+            "d": "Sign in and create a \"New home list,\" walk through each room, think about what is missing and add items one by one. You can also add housewarming picks from Gift inspiration in one tap."
+          },
+          {
+            "t": "Set who can see it",
+            "d": "New home details are personal, so choose All friends or Selected friends or Close friends. It does not need to be public."
+          },
+          {
+            "t": "Share the link with your housewarming invite",
+            "d": "Attach the list link to your housewarming invitation. For lists limited to friends or selected people, guests must sign in and be on the visible list (only Public lists can be viewed without signing in). Claimed items are locked, and claims not completed in time are released automatically."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Candles and diffusers",
+            "d": "Give your new home its own scent. Flexible prices, great for casual friends."
+          },
+          {
+            "t": "Plants and vases",
+            "d": "Note the light conditions and size so nobody buys a plant that will not survive."
+          },
+          {
+            "t": "Dinnerware and glass sets",
+            "d": "Ready to use as soon as you host friends in your new place."
+          },
+          {
+            "t": "Storage boxes and shelves",
+            "d": "Size decides whether it fits your space, so note the dimensions."
+          },
+          {
+            "t": "Lamps and mood lighting",
+            "d": "The style has to match, so picking it yourself is the most accurate."
+          },
+          {
+            "t": "Small appliances",
+            "d": "For example a toaster oven or robot vacuum, chosen to suit your space and habits."
+          },
+          {
+            "t": "Household tool kits",
+            "d": "Handy for assembly and everyday repairs, useful but easy to overlook."
+          },
+          {
+            "t": "Towels and home textiles",
+            "d": "You probably have color and material preferences, and listing them avoids misses."
+          },
+          {
+            "t": "Large furniture or appliances",
+            "d": "High-priced, so a good fit for wish crowdfunding, where guests chip in with points."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Does my housewarming list have to be public?",
+            "a": "No. A list can be Public, All friends, Selected friends or Close friends, or Only me. If your new home details are private, we suggest sharing it only with people you trust."
+          },
+          {
+            "q": "Can I ask everyone to chip in on a big item like a sofa?",
+            "a": "Yes, with wish crowdfunding, where several guests chip in with points. Points can be topped up. A list with crowdfunded items needs your shipping details first, and once the goal is met, Wishly buys the item and ships it to the address you gave, so you do not have to contact the store yourself."
+          },
+          {
+            "q": "Can friends see the list if they do not want to sign in?",
+            "a": "It depends on the list's visibility. A Public list can be viewed without signing in. A list visible to All friends, Selected friends or Close friends requires viewers to sign in and be on the visible list. Claiming an item always requires a member account."
+          }
+        ]
+      },
+      "christmas": {
+        "label": "Christmas",
+        "seoTitle": "Christmas Wishlist and Secret Santa Gift Ideas, One Link for All Your Wishes {'|'} Wishly",
+        "seoDesc": "Want to give the right gift this Christmas? Start with a Christmas wishlist. Organize your Secret Santa and gift exchange ideas on Wishly and share one link with family and friends. Claimed items are locked, so no duplicate gifts.",
+        "heading": "Christmas Wishlist: Organize Secret Santa and Your Own Wishes in One Place",
+        "intro": [
+          "Before Christmas, the office runs a gift exchange and family and friends want to swap small gifts, and the biggest worry is \"What does this person actually like?\" After all that guessing, you often hand over something generic, and the receiver can only politely say thank you.",
+          "Put what you want on a Christmas wishlist, and whoever draws your name can pick from it. There are clear options within the budget, so it is never awkward, nobody overspends or underspends, and your Secret Santa saves time on guessing.",
+          "Claimed items are locked, so nothing is given twice. If you want to keep the surprise when you receive gifts, turn on surprise mode so you cannot see who gave what. Unwrapping stays exciting, and friends will not give the same gift."
+        ],
+        "steps": [
+          {
+            "t": "Create your Christmas list",
+            "d": "Sign in and add a new list, adding what you want by price, and include a few at the usual gift exchange budgets. Gift inspiration has seasonal picks you can add in one tap."
+          },
+          {
+            "t": "Decide who can see it",
+            "d": "Choose Public, All friends, Selected friends or Only me. To keep the surprise, turn on surprise mode."
+          },
+          {
+            "t": "Share the link with everyone",
+            "d": "Paste it in a group chat or send it to your gift exchange partner. A public list can be viewed without signing in, while lists limited to friends or selected people need a sign-in. Sign in to claim, and the item is locked once claimed. Claims not completed in time are released automatically."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Hand warmers and cozy accessories",
+            "d": "Useful in winter, and prices easily fit a gift exchange budget."
+          },
+          {
+            "t": "Scented candles and diffusers",
+            "d": "The packaging feels festive and suits most people."
+          },
+          {
+            "t": "Mugs and insulated tumblers",
+            "d": "Used all the time, and picking the color and style first avoids misses."
+          },
+          {
+            "t": "Snack and drink gift sets",
+            "d": "A good fit for office exchanges. Note your flavor preferences."
+          },
+          {
+            "t": "Board games and party games",
+            "d": "Ready to play at a Christmas gathering and great for getting everyone talking."
+          },
+          {
+            "t": "Socks and blankets",
+            "d": "Affordable and warm, and the size works for almost anyone."
+          },
+          {
+            "t": "Books and stationery",
+            "d": "Books you want to read and notebooks you like often make a list. Add them for everyone to choose from."
+          },
+          {
+            "t": "Headphones and small tech accessories",
+            "d": "Specs vary a lot, so choosing the model yourself is the safest."
+          },
+          {
+            "t": "Christmas decorations and mini trees",
+            "d": "Decorate your home or desk and bring in some holiday spirit."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Can I use this list for my office gift exchange?",
+            "a": "Yes. Send the list link to whoever drew your name. If the list is Public, they can view it without signing in. If it is limited to friends, they must sign in and be your friend. Claiming always requires signing in. You can also include items at different prices to match the exchange budget."
+          },
+          {
+            "q": "Will I know who gave me a gift?",
+            "a": "By default, yes. To keep the surprise, turn on surprise mode and set an event date (for example December 25). Until that day you cannot see who gave what, and the names unlock on the day."
+          },
+          {
+            "q": "Can one list be shared with both family and friends?",
+            "a": "Yes. You can share one list with many people, and limit it to All friends, Selected friends or Close friends if you like. Once an item is claimed it is locked, so nobody gives it twice."
+          }
+        ]
+      }
+    }
+  }
+}

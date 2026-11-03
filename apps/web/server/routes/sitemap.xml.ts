@@ -1,5 +1,5 @@
 import { INDEX_MIN_ITEMS, sitemapXml } from '../../app/utils/seo'
-import { SCENES } from '../../app/utils/scenes'
+import { SCENE_LOCALES, SCENES, scenePath } from '../../app/utils/scenes'
 import { seoIndexable } from '../utils/seoIndexable'
 
 // shortcut: 最多抓 20 頁探索清單（約 480 份），超過時改由後端出 sitemap 索引分檔
@@ -30,5 +30,5 @@ export default defineEventHandler(async (event): Promise<string> => {
   const relief: string[] = status.orgs_enabled ? ['/e', '/org', ...events] : []
   setHeader(event, 'content-type', 'application/xml; charset=utf-8')
   setHeader(event, 'cache-control', 'public, max-age=3600')
-  return sitemapXml(siteUrl, ['/', '/explore', '/inspire', ...SCENES.map(s => `/inspire/${s.slug}`), '/brands', '/terms', '/privacy', ...relief, ...brands, ...lists])
+  return sitemapXml(siteUrl, ['/', '/explore', '/inspire', ...['zh-Hant', ...SCENE_LOCALES].flatMap(l => SCENES.map(s => scenePath(s.slug, l))), '/brands', '/terms', '/privacy', ...relief, ...brands, ...lists])
 })

@@ -1,11 +1,31 @@
 <script setup lang="ts">
-// 情境落地頁：接「生日禮物清單」這類搜尋（SSR）；文案在 utils/scenes.ts，精選商品沿用商品目錄的場合篩選
-const slug = String(useRoute().params.scene)
+// 情境落地頁：接「生日禮物清單」這類搜尋（SSR）；文案在 i18n/locales/*/inspire.json，精選商品沿用商品目錄的場合篩選
+// 語系前綴網址（/en|vi|id/inspire/{slug}）由 nuxt.config 的 pages:extend 產生，route.meta.lang 指定語系
+const route = useRoute()
+const slug = String(route.params.scene)
 const scene = sceneBySlug(slug)
 if (!scene) throw createError({ statusCode: 404, fatal: true })
+const { t, tm, rt, locale, setLocale } = useI18n()
+const lang = route.meta.lang as typeof locale.value | undefined
+if (lang && locale.value !== lang) await setLocale(lang)
+// 切換語系 → 換到該語系的網址，網址與內容一致（zh-Hant 回無前綴）
+watch(locale, l => navigateTo(scenePath(slug, l), { replace: true }))
+
+const k = `inspire.scenes.${slug}`
+const pairs = (key: string, a: string, b: string) => (tm(`${k}.${key}`) as any[]).map(x => ({ [a]: rt(x[a]), [b]: rt(x[b]) }))
+const c = computed(() => ({
+  label: t(`${k}.label`), heading: t(`${k}.heading`), seoDesc: t(`${k}.seoDesc`),
+  intro: (tm(`${k}.intro`) as any[]).map(x => rt(x)),
+  steps: pairs('steps', 't', 'd'), ideas: pairs('ideas', 't', 'd'), faq: pairs('faq', 'q', 'a') as { q: string, a: string }[],
+}))
+
 const { public: { siteUrl } } = useRuntimeConfig()
-useSeoMeta({ title: scene.seoTitle, description: scene.seoDesc, ogTitle: scene.heading, ogDescription: scene.seoDesc, ogType: 'article' })
-useHead({ script: [ldScript(faqLd(scene.faq)), ldScript(breadcrumbLd(siteUrl, [['選物靈感', '/inspire'], [scene.label, `/inspire/${slug}`]]))] })
+useSeoMeta({ title: () => t(`${k}.seoTitle`), description: () => c.value.seoDesc, ogTitle: () => c.value.heading, ogDescription: () => c.value.seoDesc, ogType: 'article' })
+const alt = (hreflang: string, l: string) => ({ key: `alt-${hreflang}`, rel: 'alternate' as const, hreflang, href: siteUrl + scenePath(slug, l) })
+useHead({
+  link: [alt('zh-Hant', 'zh-Hant'), ...SCENE_LOCALES.map(l => alt(l, l)), alt('x-default', 'zh-Hant')],
+  script: computed(() => [ldScript(faqLd(c.value.faq)), ldScript(breadcrumbLd(siteUrl, [[t('guest.inspire.heading'), '/inspire'], [c.value.label, scenePath(slug, locale.value)]]))]),
+})
 const { products } = scene.occasion
   ? await useCatalog(`scene-${slug}`, () => ({ recipient: '', occasion: scene.occasion!, budget: '' }))
   : { products: computed(() => []) }
@@ -15,37 +35,37 @@ const others = SCENES.filter(s => s.slug !== slug)
 <template>
   <GuestTop />
   <main class="g-wrap sc">
-    <nav class="x-idx" aria-label="breadcrumb"><NuxtLink to="/inspire">INSPIRE</NuxtLink><span>{{ scene!.label }}</span></nav>
-    <h1>{{ scene!.heading }}</h1>
-    <p v-for="(p, i) in scene!.intro" :key="i" class="sc-lead">{{ p }}</p>
+    <nav class="x-idx" aria-label="breadcrumb"><NuxtLink to="/inspire">INSPIRE</NuxtLink><span>{{ c.label }}</span></nav>
+    <h1>{{ c.heading }}</h1>
+    <p v-for="(p, i) in c.intro" :key="i" class="sc-lead">{{ p }}</p>
     <p class="sc-cta">
       <NuxtLink class="g-btn" to="/register">{{ $t('me.home.start') }}</NuxtLink>
       <NuxtLink v-if="scene!.demo" class="g-btn ghost" :to="`/s/${scene!.demo}`">{{ $t('me.home.seeDemo') }}</NuxtLink>
     </p>
 
     <section>
-      <h2>三步驟做好清單</h2>
-      <ol class="sc-steps"><li v-for="s in scene!.steps" :key="s.t"><strong>{{ s.t }}</strong><span>{{ s.d }}</span></li></ol>
+      <h2>{{ $t('inspire.ui.steps') }}</h2>
+      <ol class="sc-steps"><li v-for="s in c.steps" :key="s.t"><strong>{{ s.t }}</strong><span>{{ s.d }}</span></li></ol>
     </section>
 
     <section>
-      <h2>可以放進清單的禮物</h2>
-      <ul class="sc-ideas"><li v-for="s in scene!.ideas" :key="s.t"><strong>{{ s.t }}</strong><span>{{ s.d }}</span></li></ul>
+      <h2>{{ $t('inspire.ui.ideas') }}</h2>
+      <ul class="sc-ideas"><li v-for="s in c.ideas" :key="s.t"><strong>{{ s.t }}</strong><span>{{ s.d }}</span></li></ul>
     </section>
 
     <section v-if="products.length">
-      <h2>精選商品</h2>
+      <h2>{{ $t('inspire.ui.products') }}</h2>
       <GuestCatalogGrid :products="products" />
     </section>
 
     <section>
-      <h2>常見問題</h2>
-      <dl class="sc-faq"><template v-for="f in scene!.faq" :key="f.q"><dt>{{ f.q }}</dt><dd>{{ f.a }}</dd></template></dl>
+      <h2>{{ $t('inspire.ui.faq') }}</h2>
+      <dl class="sc-faq"><template v-for="f in c.faq" :key="f.q"><dt>{{ f.q }}</dt><dd>{{ f.a }}</dd></template></dl>
     </section>
 
     <section>
-      <h2>其他送禮情境</h2>
-      <p class="g-chips"><NuxtLink v-for="s in others" :key="s.slug" class="g-btn ghost sm" :to="`/inspire/${s.slug}`">{{ s.heading }}</NuxtLink></p>
+      <h2>{{ $t('inspire.ui.others') }}</h2>
+      <p class="g-chips"><NuxtLink v-for="s in others" :key="s.slug" class="g-btn ghost sm" :to="scenePath(s.slug, $i18n.locale)">{{ $t(`inspire.scenes.${s.slug}.heading`) }}</NuxtLink></p>
     </section>
   </main>
 </template>

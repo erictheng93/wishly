@@ -19,7 +19,7 @@ const groups = computed(() => [
   <main class="g-wrap">
     <p class="x-idx" aria-hidden="true"><span>INDEX / 020</span><span>CURATED CATALOG</span></p>
     <h1>{{ $t('guest.inspire.heading') }}</h1>
-    <nav class="g-chips x-scenes" :aria-label="$t('guest.inspire.scenes')"><NuxtLink v-for="s in SCENES" :key="s.slug" class="g-btn ghost sm" :to="`/inspire/${s.slug}`">{{ s.heading }}</NuxtLink></nav>
+    <nav class="g-chips x-scenes" :aria-label="$t('guest.inspire.scenes')"><NuxtLink v-for="s in SCENES" :key="s.slug" class="g-btn ghost sm" :to="scenePath(s.slug, $i18n.locale)">{{ $t(`inspire.scenes.${s.slug}.heading`) }}</NuxtLink></nav>
     <div class="x-filters">
     <template v-for="g in groups" :key="g.key">
       <div class="g-chips x-row" role="group" :aria-label="$t(`guest.inspire.${g.key}`)">
