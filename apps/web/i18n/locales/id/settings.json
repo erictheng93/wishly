@@ -163,6 +163,12 @@
         "wishlist_shipping_address_update": "Alamat pengiriman diperbarui",
         "other": "Aktivitas akun lainnya"
       }
+    },
+    "blocks": {
+      "title": "Pengguna yang diblokir",
+      "hint": "Orang yang diblokir tidak dapat melihat profil dan daftar terbatas Anda.",
+      "empty": "Anda belum memblokir siapa pun.",
+      "unblock": "Buka blokir"
     }
   }
 }

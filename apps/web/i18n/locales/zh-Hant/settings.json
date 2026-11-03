@@ -163,6 +163,12 @@
         "wishlist_shipping_address_update": "更新收件地址",
         "other": "其他帳號活動"
       }
+    },
+    "blocks": {
+      "title": "已封鎖的使用者",
+      "hint": "被封鎖的人看不到你的個人頁與限定清單。",
+      "empty": "目前沒有封鎖任何人。",
+      "unblock": "解除封鎖"
     }
   }
 }

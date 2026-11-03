@@ -64,6 +64,30 @@ async fn profile(
     .await?
     .ok_or(AppError::NotFound)?;
     let is_self = viewer == Some(uid);
+    // 封鎖：對方封鎖了我 → 404（不洩漏）；我封鎖對方 → 只回基本資料，relation = "blocked"
+    let mut i_blocked = false;
+    if let (Some(v), false) = (viewer, is_self) {
+        let (they, me): (bool, bool) = sqlx::query_as(
+            "SELECT EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2),
+                    EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1)",
+        )
+        .bind(uid)
+        .bind(v)
+        .fetch_one(&st.pool)
+        .await?;
+        if they {
+            return Err(AppError::NotFound);
+        }
+        i_blocked = me;
+    }
+    if i_blocked {
+        return Ok(Json(
+            json!({ "user": { "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": null,
+                              "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()) },
+                    "relation": "blocked", "request_id": null, "mutual": null,
+                    "wishlists": [], "donations": [] }),
+        ));
+    }
     let friend = match viewer {
         Some(v) => access::are_friends(&st.pool, uid, v).await?,
         None => false,
@@ -106,6 +130,7 @@ async fn profile(
                  SELECT u.id, u.handle, u.display_name, u.avatar_key, count(*) OVER ()
                    FROM a JOIN b USING (id) JOIN users u ON u.id = a.id
                   WHERE u.deleted_at IS NULL AND u.blocked_at IS NULL
+                    AND NOT EXISTS (SELECT 1 FROM user_blocks k WHERE (k.blocker_id = u.id AND k.blocked_id IN ($1, $2)) OR (k.blocked_id = u.id AND k.blocker_id IN ($1, $2)))
                   ORDER BY u.display_name, u.id LIMIT 3")
                 .bind(uid).bind(v).fetch_all(&st.pool).await?;
             let count = rows.first().map_or(0, |r| r.4);

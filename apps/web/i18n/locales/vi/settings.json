@@ -163,6 +163,12 @@
         "wishlist_shipping_address_update": "Cập nhật địa chỉ nhận hàng",
         "other": "Hoạt động tài khoản khác"
       }
+    },
+    "blocks": {
+      "title": "Người dùng đã chặn",
+      "hint": "Người bị chặn không thấy trang cá nhân và danh sách giới hạn của bạn.",
+      "empty": "Bạn chưa chặn ai.",
+      "unblock": "Bỏ chặn"
     }
   }
 }

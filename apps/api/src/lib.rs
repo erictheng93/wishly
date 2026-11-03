@@ -5,6 +5,7 @@ pub mod audit_ctx;
 pub mod auth;
 pub mod auth_ext;
 pub mod birthday;
+pub mod blocks;
 pub mod catalog;
 pub mod cdn;
 pub mod claims;
@@ -103,6 +104,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(security_activity::routes())
                 .merge(topup::routes())
                 .merge(friends::routes())
+                .merge(blocks::routes())
                 .merge(inspire::routes())
                 .merge(catalog::routes())
                 .merge(profiles::routes())

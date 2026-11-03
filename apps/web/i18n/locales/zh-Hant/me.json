@@ -298,7 +298,15 @@
       "unfriendText": "解除後對方不再看得到你的僅好友清單，之後可重新送出邀請。",
       "mutual": "共 {n} 位共同好友",
       "sent": "送出 {n} 份心意",
-      "createList": "建立第一份清單"
+      "createList": "建立第一份清單",
+      "block": "封鎖",
+      "report": "檢舉",
+      "blocked": "你已封鎖這位使用者",
+      "unblock": "解除封鎖",
+      "blockTitle": "封鎖 {name}？",
+      "blockText": "封鎖後對方將看不到你的個人頁與限定清單，你們的好友關係與申請會一併移除。之後可在設定中解除封鎖。",
+      "reportTitle": "檢舉 {name}",
+      "reportSent": "已收到檢舉，我們會盡快處理"
     },
     "topup": {
       "title": "儲值",

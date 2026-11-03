@@ -188,11 +188,12 @@ async fn create(
 }
 
 const REPORT_SQL: &str =
-    "SELECT r.id, jsonb_build_object('id', r.id, 'wishlist', jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title),
+    "SELECT r.id, jsonb_build_object('id', r.id, 'wishlist', CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title) END,
+       'user', CASE WHEN ru.id IS NULL THEN NULL ELSE jsonb_build_object('id', ru.id, 'handle', ru.handle, 'display_name', ru.display_name) END,
        'item_id', r.item_id, 'reason', r.reason::text, 'detail', r.detail, 'status', r.status::text,
        'reporter', CASE WHEN r.reporter_user_id IS NOT NULL THEN 'user' WHEN r.reporter_guest_id IS NOT NULL THEN 'guest' ELSE 'anonymous' END,
        'resolution_note', r.resolution_note, 'handled_at', r.handled_at, 'created_at', r.created_at)
-     FROM content_reports r JOIN wishlists w ON w.id = r.wishlist_id";
+     FROM content_reports r LEFT JOIN wishlists w ON w.id = r.wishlist_id LEFT JOIN users ru ON ru.id = r.reported_user_id";
 
 async fn list(
     State(st): State<AppState>,

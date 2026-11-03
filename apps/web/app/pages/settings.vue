@@ -43,6 +43,7 @@ onMounted(async () => { await fetchMe(true); name.value = user.value?.display_na
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
   loadSessions()
+  loadBlocks()
   loadActivity()
 })
 
@@ -99,6 +100,15 @@ async function loadActivity(more = false) {
 }
 async function loadSessions() {
   try { sessions.value = (await api('/me/sessions')).data } catch (e) { sessErr.value = errMsg(e) }
+}
+const blocks = ref<any[]>([]), blkBusy = ref(false), blkErr = ref('')
+async function loadBlocks() {
+  try { blocks.value = (await api('/me/blocks')).users } catch (e) { blkErr.value = errMsg(e) }
+}
+async function unblock(id: string) {
+  if (blkBusy.value) return
+  blkBusy.value = true; blkErr.value = ''
+  try { await api(`/users/${id}/block`, { method: 'DELETE' }); await loadBlocks() } catch (e) { blkErr.value = errMsg(e) } finally { blkBusy.value = false }
 }
 async function revokeSession(id?: string) {
   if (sessBusy.value) return
@@ -252,6 +262,18 @@ async function remove() {
         <p v-if="!acts.length && !actErr" class="c-mute">{{ $t('settings.activity.empty') }}</p>
         <button v-if="actNext" type="button" class="c-btn" @click="loadActivity(true)">{{ $t('settings.activity.more') }}</button>
         <p v-if="actErr" class="c-err" role="alert">{{ actErr }}</p>
+      </section>
+      <section class="c-card" aria-labelledby="blocks-title">
+        <h2 id="blocks-title" class="c-h2">{{ $t('settings.blocks.title') }}</h2>
+        <p class="c-mute">{{ $t('settings.blocks.hint') }}</p>
+        <ul class="identity-list">
+          <li v-for="b in blocks" :key="b.id" class="c-row">
+            <NuxtLink class="c-grow" :to="profilePath(b)">{{ b.display_name }}</NuxtLink>
+            <button type="button" class="c-btn" :disabled="blkBusy" @click="unblock(b.id)">{{ $t('settings.blocks.unblock') }}</button>
+          </li>
+        </ul>
+        <p v-if="!blocks.length && !blkErr" class="c-mute">{{ $t('settings.blocks.empty') }}</p>
+        <p v-if="blkErr" class="c-err" role="alert">{{ blkErr }}</p>
       </section>
       <section id="social" class="c-card">
         <h2 class="c-h2">{{ $t('settings.social.title') }}</h2>

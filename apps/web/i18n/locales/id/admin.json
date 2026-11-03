@@ -60,7 +60,8 @@
         "meta": "{time}・Pelapor: {reporter}",
         "onItem": "・Pada barang",
         "note": "Catatan penyelesaian",
-        "noteLabel": "Catatan penyelesaian (opsional, maksimal 1.000 karakter)"
+        "noteLabel": "Catatan penyelesaian (opsional, maksimal 1.000 karakter)",
+        "user": "Pengguna: "
       },
       "reason": {
         "scam": "Diduga penipuan",

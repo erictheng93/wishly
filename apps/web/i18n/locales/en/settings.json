@@ -163,6 +163,12 @@
         "wishlist_shipping_address_update": "Shipping address updated",
         "other": "Other account activity"
       }
+    },
+    "blocks": {
+      "title": "Blocked users",
+      "hint": "Blocked people can't see your profile or restricted lists.",
+      "empty": "You haven't blocked anyone.",
+      "unblock": "Unblock"
     }
   }
 }

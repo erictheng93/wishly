@@ -60,7 +60,8 @@
         "meta": "{time}・Reporter: {reporter}",
         "onItem": "・on an item",
         "note": "Resolution note",
-        "noteLabel": "Resolution note (optional, up to 1,000 characters)"
+        "noteLabel": "Resolution note (optional, up to 1,000 characters)",
+        "user": "User: "
       },
       "reason": {
         "scam": "Suspected scam",

@@ -60,7 +60,8 @@
         "meta": "{time}・檢舉者：{reporter}",
         "onItem": "・針對品項",
         "note": "結案備註",
-        "noteLabel": "結案備註（選填，最多 1000 字）"
+        "noteLabel": "結案備註（選填，最多 1000 字）",
+        "user": "使用者："
       },
       "reason": {
         "scam": "疑似詐騙",
