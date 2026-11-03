@@ -213,6 +213,19 @@
       "permitLabel": "Izin penggalangan",
       "permitExpiredOpt": "kedaluwarsa",
       "permitResumeHint": "Ganti ke izin yang berlaku agar lokasi yang dijeda bisa dilanjutkan"
+    },
+    "audit": {
+      "link": "Log audit",
+      "title": "Log audit",
+      "time": "Waktu",
+      "actor": "Pelaku",
+      "action": "Tindakan",
+      "entity": "Objek",
+      "more": "Muat lebih banyak",
+      "empty": "Belum ada catatan",
+      "staff": "Staf platform",
+      "system": "Sistem",
+      "a": {}
     }
   }
 }
