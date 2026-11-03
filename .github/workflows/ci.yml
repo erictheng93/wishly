@@ -129,6 +129,13 @@ jobs:
       mailpit:
         image: axllent/mailpit:v1.31.6@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
         ports: ["1025:1025", "8025:8025"]
+      # 圖片上傳（presign → 瀏覽器直傳 → confirm 去 EXIF）走真的物件儲存
+      minio:
+        image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
+        env: { MINIO_ROOT_USER: wishly, MINIO_ROOT_PASSWORD: wishly-secret }
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9000/minio/health/live" --health-interval 2s --health-retries 30
     defaults: { run: { working-directory: apps/web } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
