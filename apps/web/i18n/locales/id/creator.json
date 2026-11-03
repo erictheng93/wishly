@@ -11,6 +11,11 @@
         "title": "Atur nama tampilanmu",
         "body": "Teman-temanmu akan melihat nama ini. Saat ini nama diambil dari emailmu, sebaiknya ganti dengan nama yang mudah mereka kenali.",
         "link": "Ubah nama"
+      },
+      "handle": {
+        "title": "Atur nama pengguna untuk link profilmu",
+        "body": "Dengan nama pengguna, kamu punya link profil yang bisa dibagikan ke siapa saja, dan teman lebih mudah menemukanmu.",
+        "link": "Atur nama pengguna"
       }
     },
     "confirm": {

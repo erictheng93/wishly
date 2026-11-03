@@ -97,7 +97,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
         <section v-if="data.incoming.length" class="c-card">
           <h2 class="c-h2">{{ $t('me.friends.incoming') }}</h2>
           <div v-for="r in data.incoming" :key="r.id" class="c-row wrap c-mb">
-            <span class="c-grow"><strong>{{ r.user.display_name }}</strong><small v-if="r.user.handle" class="c-mute"> @{{ r.user.handle }}</small></span>
+            <span class="c-grow"><NuxtLink :to="profilePath(r.user)"><strong>{{ r.user.display_name }}</strong></NuxtLink><small v-if="r.user.handle" class="c-mute"> @{{ r.user.handle }}</small></span>
             <button class="c-btn primary" @click="accept(r)">{{ $t('me.friends.accept') }}</button>
             <button class="c-btn" @click="dropReq(r)">{{ $t('me.friends.decline') }}</button>
           </div>
@@ -108,8 +108,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
           <div v-for="b in feed.birthdays" :key="b.id" class="c-row c-mb">
             <span class="fr-date">{{ +b.birthday.slice(0, 2) }}/{{ +b.birthday.slice(3) }}</span>
             <span class="c-grow">
-              <NuxtLink v-if="b.handle" :to="`/u/${b.handle}`"><strong>{{ b.display_name }}</strong></NuxtLink>
-              <strong v-else>{{ b.display_name }}</strong>
+              <NuxtLink :to="profilePath(b)"><strong>{{ b.display_name }}</strong></NuxtLink>
               <span class="c-mute"> · {{ b.days ? $t('me.friends.bdIn', { n: b.days }, b.days) : $t('me.friends.bdToday') }}</span>
             </span>
           </div>
@@ -129,8 +128,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
           <div class="c-row fr-who">
             <span class="fr-ava" aria-hidden="true">{{ initial(e.owner.display_name) }}</span>
             <div class="c-grow">
-              <NuxtLink v-if="e.owner.handle" :to="`/u/${e.owner.handle}`"><strong>{{ e.owner.display_name }}</strong></NuxtLink>
-              <strong v-else>{{ e.owner.display_name }}</strong>
+              <NuxtLink :to="profilePath(e.owner)"><strong>{{ e.owner.display_name }}</strong></NuxtLink>
               <template v-if="e.kind === 'delivered'"> {{ $t('me.friends.delivered') }}</template>
               <template v-else-if="e.wishlist.is_new"> {{ $t('me.friends.newList') }}〈{{ e.wishlist.title }}〉</template>
               <template v-else> {{ $t('me.friends.added', { n: e.new_items }) }}〈{{ e.wishlist.title }}〉</template>
@@ -173,8 +171,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
               <img v-if="u.avatar_url" :src="u.avatar_url" alt="" class="fr-ava" loading="lazy">
               <span v-else class="fr-ava" aria-hidden="true">{{ initial(u.display_name) }}</span>
               <span class="c-grow fr-hit-t">
-                <NuxtLink v-if="u.handle && u.relation !== 'none'" :to="`/u/${u.handle}`"><strong>{{ parts(u.display_name)[0] }}<mark>{{ parts(u.display_name)[1] }}</mark>{{ parts(u.display_name)[2] }}</strong></NuxtLink>
-                <strong v-else>{{ parts(u.display_name)[0] }}<mark>{{ parts(u.display_name)[1] }}</mark>{{ parts(u.display_name)[2] }}</strong>
+                <NuxtLink :to="profilePath(u)"><strong>{{ parts(u.display_name)[0] }}<mark>{{ parts(u.display_name)[1] }}</mark>{{ parts(u.display_name)[2] }}</strong></NuxtLink>
                 <small v-if="u.handle" class="c-mute"> @{{ u.handle }}</small>
                 <span v-if="relText(u)" class="c-mute fr-hit-s">{{ relText(u) }}</span>
               </span>
@@ -207,7 +204,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
         <section v-if="data.outgoing.length" class="c-card">
           <h2 class="c-h2">{{ $t('me.friends.outgoing') }}</h2>
           <div v-for="r in data.outgoing" :key="r.id" class="c-row wrap c-mb">
-            <span class="c-grow"><strong>{{ r.user.display_name }}</strong><small v-if="r.user.handle" class="c-mute"> @{{ r.user.handle }}</small></span>
+            <span class="c-grow"><NuxtLink :to="profilePath(r.user)"><strong>{{ r.user.display_name }}</strong></NuxtLink><small v-if="r.user.handle" class="c-mute"> @{{ r.user.handle }}</small></span>
             <button class="c-btn" @click="dropReq(r)">{{ $t('me.friends.cancelInvite') }}</button>
           </div>
         </section>
@@ -217,8 +214,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
           <p v-if="!data.friends.length" class="c-mute">{{ $t('me.friends.none') }}</p>
           <div v-for="f in data.friends" :key="f.id" class="c-row wrap c-mb">
             <span class="c-grow">
-              <NuxtLink v-if="f.handle" :to="`/u/${f.handle}`"><strong>{{ f.display_name }}</strong></NuxtLink>
-              <strong v-else>{{ f.display_name }}</strong>
+              <NuxtLink :to="profilePath(f)"><strong>{{ f.display_name }}</strong></NuxtLink>
               <small v-if="f.handle" class="c-mute"> @{{ f.handle }}</small>
             </span>
             <button class="c-btn" @click="unfriend = f; ufErr = ''">{{ $t('me.friends.unfriend') }}</button>

@@ -11,6 +11,11 @@
         "title": "Đặt tên hiển thị của bạn",
         "body": "Bạn bè sẽ thấy tên này. Hiện tên được lấy từ Email của bạn, nên đổi sang tên mọi người dễ nhận ra.",
         "link": "Đổi tên"
+      },
+      "handle": {
+        "title": "Đặt tên tài khoản để có link trang cá nhân",
+        "body": "Khi có tên tài khoản, bạn sẽ có link trang cá nhân để chia sẻ với bất kỳ ai, bạn bè cũng dễ tìm thấy bạn hơn.",
+        "link": "Đặt tên tài khoản"
       }
     },
     "confirm": {

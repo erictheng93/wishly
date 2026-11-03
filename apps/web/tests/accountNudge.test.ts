@@ -44,7 +44,13 @@ it('matches the name the backend truncated to 50 characters', async () => {
 })
 
 it('stays hidden once the account has an email and its own name', async () => {
-  expect((await open({ ...prefixName, display_name: '小魏' })).querySelector('section')).toBeNull()
+  expect((await open({ ...prefixName, display_name: '小魏', handle: 'wei' })).querySelector('section')).toBeNull()
+})
+
+it('asks accounts without a handle to set one, linking to the social settings', async () => {
+  const el = await open({ ...prefixName, display_name: '小魏', handle: null })
+  expect(label(el)).toBe('設定帳號代號，擁有個人頁網址')
+  expect(el.querySelector('a')?.getAttribute('href')).toBe('/settings#social')
 })
 
 it('closing is remembered per account and per kind', async () => {
