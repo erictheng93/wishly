@@ -145,3 +145,128 @@ async fn profile_without_handle_is_reachable_by_user_id(pool: PgPool) {
         StatusCode::NOT_FOUND
     );
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn profile_avatar_request_id_and_mutual_friends(pool: PgPool) {
+    let TestUser {
+        id: owner,
+        token: owner_token,
+    } = user(&pool, "Owner").await;
+    let viewer = user(&pool, "Viewer").await;
+    let h = ck(&viewer.token);
+    let make_friends = |a: uuid::Uuid, b: uuid::Uuid| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES (LEAST($1::uuid,$2::uuid), GREATEST($1::uuid,$2::uuid))")
+                .bind(a).bind(b).execute(&pool).await.unwrap();
+        }
+    };
+    let get = |h: Vec<(&'static str, String)>| {
+        let pool = pool.clone();
+        async move { call(&pool, "GET", &format!("/users/{owner}"), &h, None).await }
+    };
+
+    // avatar_url：null / 有值
+    let p = get(h.clone()).await.2;
+    assert!(p["user"]["avatar_url"].is_null());
+    sqlx::query("UPDATE users SET avatar_key='avatars/00000000-0000-4000-8000-000000000001.webp' WHERE id=$1")
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(get(h.clone()).await.2["user"]["avatar_url"].is_string());
+
+    // none：request_id null；匿名需 handle，這裡用 id 的匿名是 404，故改設 handle
+    sqlx::query("UPDATE users SET handle='owner_x' WHERE id=$1")
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let p = get(h.clone()).await.2;
+    assert_eq!(
+        (p["relation"].as_str(), p["request_id"].is_null()),
+        (Some("none"), true)
+    );
+    let (_, _, anon) = call(&pool, "GET", "/users/owner_x", &[], None).await;
+    assert!(anon["request_id"].is_null() && anon["mutual"].is_null());
+
+    // outgoing / incoming 各回對應申請的 id
+    let out_id: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO friend_requests (from_user, to_user) VALUES ($1,$2) RETURNING id",
+    )
+    .bind(viewer.id)
+    .bind(owner)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let p = get(h.clone()).await.2;
+    assert_eq!(p["relation"], "outgoing");
+    assert_eq!(p["request_id"], json!(out_id));
+    sqlx::query("DELETE FROM friend_requests")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let in_id: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO friend_requests (from_user, to_user) VALUES ($1,$2) RETURNING id",
+    )
+    .bind(owner)
+    .bind(viewer.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let p = get(h.clone()).await.2;
+    assert_eq!(p["relation"], "incoming");
+    assert_eq!(p["request_id"], json!(in_id));
+    sqlx::query("DELETE FROM friend_requests")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // mutual：3 位共同好友 + 1 位只與本人是好友 + 1 位已刪除的共同好友
+    let mut shared = vec![];
+    for n in ["A", "B", "C", "D"] {
+        let u = user(&pool, &format!("Mutual {n}")).await.id;
+        make_friends(u, owner).await;
+        make_friends(u, viewer.id).await;
+        shared.push(u);
+    }
+    let only_owner = user(&pool, "Only Owner").await.id;
+    make_friends(only_owner, owner).await;
+    sqlx::query("UPDATE users SET deleted_at=now() WHERE id=$1")
+        .bind(shared[3])
+        .execute(&pool)
+        .await
+        .unwrap();
+    make_friends(viewer.id, owner).await;
+    let p = get(h.clone()).await.2;
+    assert_eq!(p["relation"], "friend");
+    assert!(p["request_id"].is_null());
+    assert_eq!(p["mutual"]["count"], 3);
+    let names: Vec<_> = p["mutual"]["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| u["display_name"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(names, ["Mutual A", "Mutual B", "Mutual C"]);
+    assert!(p["mutual"]["users"][0]["avatar_url"].is_null());
+
+    // 超過 3 位只取 3 位、count 為總數；本人與匿名為 null
+    let extra = user(&pool, "Mutual E").await.id;
+    make_friends(extra, owner).await;
+    make_friends(extra, viewer.id).await;
+    let p = get(h.clone()).await.2;
+    assert_eq!(
+        (
+            p["mutual"]["count"].clone(),
+            p["mutual"]["users"].as_array().unwrap().len()
+        ),
+        (json!(4), 3)
+    );
+    let own = call(&pool, "GET", "/users/owner_x", &ck(&owner_token), None)
+        .await
+        .2;
+    assert!(own["relation"] == "self" && own["mutual"].is_null());
+    let (_, _, anon) = call(&pool, "GET", "/users/owner_x", &[], None).await;
+    assert!(anon["mutual"].is_null());
+}
