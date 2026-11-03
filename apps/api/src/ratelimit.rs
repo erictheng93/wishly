@@ -72,6 +72,16 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     )
     .execute(pool)
     .await?;
+    // 稽核保留政策：只有「內容編輯」類一年後清除；金流、安全、刪除、封存、地址異動、營運操作永久保留。
+    // audit_logs 有只增不改的 trigger，須在同一交易內以 wishly.audit_purge 開啟 DELETE 例外。
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT set_config('wishly.audit_purge','on',true)")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM audit_logs WHERE created_at < now() - interval '365 days' AND action IN ('wishlist.create','wishlist.update','item.create','item.update','item.reorder','wishlist.allowed_users.update')")
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
     Ok(())
 }
 

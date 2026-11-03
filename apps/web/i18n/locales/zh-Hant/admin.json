@@ -159,6 +159,7 @@
         "action": "動作",
         "entity": "對象類型",
         "entityId": "對象 UUID",
+        "requestId": "請求 ID",
         "from": "開始日期",
         "to": "結束日期"
       },

@@ -159,6 +159,7 @@
         "action": "Action",
         "entity": "Entity type",
         "entityId": "Entity UUID",
+        "requestId": "Request ID",
         "from": "From date",
         "to": "To date"
       },
