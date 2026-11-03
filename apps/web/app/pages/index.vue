@@ -172,7 +172,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
           <h2>{{ $t('me.home.originTitle') }}</h2>
         </div>
         <div class="l-origin-body">
-          <p v-for="i in 3" :key="i">{{ $t(`me.home.origin.${i - 1}`) }}</p>
+          <p v-for="i in 3" :key="i"><span v-for="(line, j) in $t(`me.home.origin.${i - 1}`).split('\n')" :key="j">{{ line }}</span></p>
         </div>
       </section>
 
@@ -361,10 +361,11 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
 .l-feat:last-child{border-bottom:0}
 .l-feat-no{display:block;font:700 11px var(--mono);letter-spacing:.14em;color:var(--red-text);margin-bottom:22px}
 .l-feat h3{margin-top:0}
-.l-origin-body{font-size:clamp(17px,2.2vw,20px);line-height:1.9}
-.l-origin-body p{white-space:pre-line}
+.l-origin-body{font-size:clamp(17px,2.2vw,20px);line-height:1.8}
+.l-origin-body span{display:block;text-wrap:balance}
 .l-origin-body p+p{margin-top:16px}
-.l-origin-body p:first-child{font-size:clamp(19px,2.6vw,24px);line-height:1.6}
+.l-origin-body p:last-child{margin-top:32px;font-size:clamp(16px,2vw,18px);color:var(--mute)}
+.l-origin-body p:nth-child(2) span:last-child{font-size:clamp(19px,2.6vw,24px);font-weight:600;margin-top:4px}
 .l-faq-body{border-top:1px solid var(--ink-line)}
 .l-faq details{border-bottom:1px solid var(--line)}
 .l-faq summary{display:flex;align-items:center;justify-content:space-between;gap:16px;font-weight:800;font-size:18px;min-height:64px;list-style:none;cursor:pointer}
