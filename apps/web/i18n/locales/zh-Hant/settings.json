@@ -131,6 +131,38 @@
       "denied": "瀏覽器已封鎖通知。請到瀏覽器的網站設定，把本站的「通知」改為允許，再回來開啟。",
       "install": "iPhone / iPad 需要先把 Wishly 加入主畫面，再從主畫面開啟，才能開啟推播（Safari 分享按鈕 →「加入主畫面」）。",
       "failed": "無法開啟推播，請稍後再試。"
+    },
+    "activity": {
+      "title": "安全活動",
+      "hint": "你帳號近期的登入與敏感操作。若看到不是你做的，請立刻更改密碼並登出其他裝置。",
+      "empty": "目前沒有紀錄",
+      "more": "載入更多",
+      "a": {
+        "auth_login": "登入",
+        "auth_logout": "登出",
+        "auth_new_device": "新裝置登入",
+        "auth_password_changed": "變更密碼",
+        "auth_password_reset": "重設密碼",
+        "auth_mfa_enabled": "啟用兩步驟驗證",
+        "auth_mfa_verified": "通過兩步驟驗證",
+        "auth_mfa_recovery_used": "使用復原碼",
+        "auth_mfa_recovery_regenerated": "重新產生復原碼",
+        "auth_recovery_regenerated": "重新產生復原碼",
+        "auth_mfa_reset": "兩步驟驗證被營運重設",
+        "auth_session_revoked": "登出單一裝置",
+        "auth_sessions_revoked": "登出其他所有裝置",
+        "auth_identity_linked": "綁定登入方式",
+        "auth_identity_unlinked": "解除綁定登入方式",
+        "account_export": "匯出帳號資料",
+        "account_absorb": "合併帳號",
+        "account_suspended": "帳號被停權",
+        "account_restored": "帳號恢復",
+        "user_mfa_reset": "營運重設兩步驟驗證",
+        "user_recovery": "營運協助帳號復原",
+        "user_identity_unlink": "營運解除綁定登入方式",
+        "wishlist_shipping_address_update": "更新收件地址",
+        "other": "其他帳號活動"
+      }
     }
   }
 }

@@ -38,6 +38,7 @@ pub mod relief_events;
 pub mod reports;
 pub mod sealed;
 pub mod security;
+pub mod security_activity;
 pub mod session;
 pub mod share_views;
 pub mod support;
@@ -96,6 +97,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(uploads::routes())
                 .merge(auth::routes())
                 .merge(security::routes())
+                .merge(security_activity::routes())
                 .merge(topup::routes())
                 .merge(friends::routes())
                 .merge(inspire::routes())
