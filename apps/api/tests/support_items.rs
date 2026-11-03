@@ -90,7 +90,10 @@ async fn explore_keeps_list_with_only_support_items(pool: PgPool) {
         .iter()
         .find(|w| w["slug"] == list.slug.as_str())
         .expect("留在探索頁");
-    assert_eq!(l["item_count"], 1);
+    assert_eq!(
+        l["item_count"], 0,
+        "支持品項不計入（與分享頁 noindex、sitemap 同口徑）"
+    );
     assert_eq!(l["completion_pct"], 0);
 }
 
