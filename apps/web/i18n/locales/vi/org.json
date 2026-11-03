@@ -225,7 +225,38 @@
       "empty": "Chưa có bản ghi",
       "staff": "Nhân viên nền tảng",
       "system": "Hệ thống",
-      "a": {}
+      "a": {
+        "org_update": "Cập nhật tổ chức",
+        "org_create": "Tạo tổ chức",
+        "org_submit": "Gửi xét duyệt",
+        "org_withdraw": "Rút đơn đăng ký",
+        "org_review": "Nền tảng xét duyệt",
+        "org_member_update": "Cập nhật thành viên",
+        "org_invite_create": "Tạo lời mời",
+        "org_invite_cancel": "Hủy lời mời",
+        "org_invite_accept": "Chấp nhận lời mời",
+        "org_document_upload": "Tải lên tài liệu",
+        "org_document_download": "Tải xuống tài liệu",
+        "org_document_delete": "Xóa tài liệu",
+        "org_permit_create": "Thêm giấy phép",
+        "org_permit_apply": "Áp dụng giấy phép",
+        "permit_review": "Xét duyệt giấy phép",
+        "site_create": "Tạo điểm cứu trợ",
+        "receipt_create": "Ghi nhận hàng đã nhận",
+        "relief_event_create": "Tạo sự kiện",
+        "relief_event_edit": "Chỉnh sửa sự kiện",
+        "relief_event_merge": "Gộp sự kiện",
+        "relief_event_moderate": "Quản lý sự kiện",
+        "wishlist_create": "Tạo danh sách",
+        "wishlist_update": "Cập nhật danh sách",
+        "wishlist_archive": "Lưu trữ danh sách",
+        "wishlist_shipping_address_update": "Cập nhật thông tin nhận hàng",
+        "wishlist_allowed_users_update": "Cập nhật danh sách người xem",
+        "item_create": "Thêm món",
+        "item_update": "Cập nhật món",
+        "item_delete": "Xóa món",
+        "item_reorder": "Sắp xếp lại món"
+      }
     }
   }
 }

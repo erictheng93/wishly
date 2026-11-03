@@ -8,7 +8,8 @@ const id = useRoute().params.id as string
 const rows = ref<any[]>([])
 const next = ref<string | null>(null)
 const err = ref(''), busy = ref(false)
-const label = (a: string) => te(`org.audit.a.${a}`) ? t(`org.audit.a.${a}`) : a
+// i18n 路徑以點分層，動作代碼的點改底線才查得到
+const label = (a: string) => { const k = `org.audit.a.${a.replace(/\./g, '_')}`; return te(k) ? t(k) : a }
 const who = (r: any) => r.actor?.type === 'staff' ? t('org.audit.staff') : r.actor?.name || t('org.audit.system')
 async function load() {
   busy.value = true; err.value = ''
