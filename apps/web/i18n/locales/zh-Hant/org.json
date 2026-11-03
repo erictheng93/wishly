@@ -213,6 +213,45 @@
       "permitLabel": "勸募許可",
       "permitExpiredOpt": "已到期",
       "permitResumeHint": "改選有效的許可後，已暫停的據點即可恢復營運"
+    },
+    "audit": {
+      "link": "稽核紀錄",
+      "title": "稽核紀錄",
+      "time": "時間",
+      "actor": "操作者",
+      "action": "動作",
+      "entity": "對象",
+      "more": "載入更多",
+      "empty": "沒有紀錄",
+      "staff": "平台營運",
+      "system": "系統",
+      "a": {
+        "org.update": "更新組織資料",
+        "org.create": "建立組織",
+        "org.submit": "送出審核",
+        "org.withdraw": "撤回申請",
+        "org.review": "平台審核",
+        "org.member.update": "更新成員",
+        "org.invite.create": "建立邀請",
+        "org.invite.cancel": "取消邀請",
+        "org.invite.accept": "接受邀請",
+        "org.document.upload": "上傳文件",
+        "org.document.download": "下載文件",
+        "org.document.delete": "刪除文件",
+        "org.permit.create": "新增許可",
+        "org.permit.apply": "套用許可",
+        "permit.review": "許可審核",
+        "site.create": "建立據點",
+        "receipt.create": "登記實收",
+        "relief_event.create": "建立事件",
+        "relief_event.edit": "編輯事件",
+        "relief_event.merge": "合併事件",
+        "relief_event.moderate": "事件管理",
+        "wishlist.update": "更新清單",
+        "item.create": "新增品項",
+        "item.update": "更新品項",
+        "item.delete": "刪除品項"
+      }
     }
   }
 }

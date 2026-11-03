@@ -25,6 +25,7 @@ pub mod notify_jobs;
 pub mod onboarding;
 pub mod orders;
 pub mod org_admin;
+pub mod org_audit;
 pub mod org_members;
 pub mod org_receipts;
 pub mod org_sites;
@@ -88,6 +89,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(orders::routes())
                 .merge(orgs::routes())
                 .merge(org_admin::routes())
+                .merge(org_audit::routes())
                 .merge(org_members::routes())
                 .merge(org_receipts::routes())
                 .merge(relief_events::routes())
