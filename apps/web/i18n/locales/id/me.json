@@ -298,7 +298,15 @@
       "unfriendText": "Mereka tidak akan lagi melihat daftar khusus teman milikmu. Kamu bisa mengirim permintaan lagi nanti.",
       "mutual": "{n} teman bersama",
       "sent": "{n} hadiah terkirim",
-      "createList": "Buat daftar pertamamu"
+      "createList": "Buat daftar pertamamu",
+      "block": "Blokir",
+      "report": "Laporkan",
+      "blocked": "Anda telah memblokir pengguna ini",
+      "unblock": "Buka blokir",
+      "blockTitle": "Blokir {name}?",
+      "blockText": "Mereka tidak akan lagi melihat profil dan daftar terbatas Anda; pertemanan dan permintaan akan dihapus. Anda dapat membuka blokir di Pengaturan.",
+      "reportTitle": "Laporkan {name}",
+      "reportSent": "Laporan diterima. Kami akan segera menanganinya."
     },
     "topup": {
       "title": "Top up",

@@ -62,6 +62,21 @@ const accept = () => run(async () => { await api(`/friends/requests/${p.value.re
 const dropRequest = () => run(async () => { await api(`/friends/requests/${p.value.request_id}`, { method: 'DELETE' }); refreshReqCount() })
 const unfriending = ref(false)
 const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`, { method: 'DELETE' }); unfriending.value = false })
+const blocking = ref(false)
+const block = () => run(async () => { await api(`/users/${p.value.user.id}/block`, { method: 'POST' }); blocking.value = false })
+const unblock = () => run(() => api(`/users/${p.value.user.id}/block`, { method: 'DELETE' }))
+// 檢舉使用者：登入者專用，不走 Turnstile，原因選項沿用清單檢舉的文案
+const REASONS = ['scam', 'inappropriate', 'copyright', 'personal_info', 'other']
+const reporting = ref(false), rReason = ref('scam'), rDetail = ref(''), rBusy = ref(false), rErr = ref(''), rSent = ref(false)
+function openReport() { rReason.value = 'scam'; rDetail.value = ''; rErr.value = ''; reporting.value = true }
+async function sendReport() {
+  if (rBusy.value) return
+  rBusy.value = true; rErr.value = ''
+  try {
+    await api(`/users/${p.value.user.id}/reports`, { method: 'POST', body: { reason: rReason.value, detail: rDetail.value.trim() || undefined } })
+    reporting.value = false; rSent.value = true
+  } catch (e) { rErr.value = apiErrMsg(e as any) } finally { rBusy.value = false }
+}
 </script>
 <template>
   <main class="c-page"><ClientOnly>
@@ -82,6 +97,10 @@ const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`
         </p>
         <div class="c-row wrap">
         <NuxtLink v-if="p.relation === 'self'" to="/settings" class="c-btn">{{ $t('me.profile.editSettings') }}</NuxtLink>
+        <template v-else-if="p.relation === 'blocked'">
+          <span class="c-mute">{{ $t('me.profile.blocked') }}</span>
+          <button class="c-btn" :disabled="busy" @click="unblock">{{ $t('me.profile.unblock') }}</button>
+        </template>
         <template v-else-if="p.relation === 'friend'">
           <span class="c-badge active">{{ $t('me.profile.friend') }}</span>
           <button class="c-btn" :disabled="busy" @click="unfriending = true">{{ $t('me.profile.unfriend') }}</button>
@@ -96,9 +115,14 @@ const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`
         </template>
         <button v-else-if="p.relation === 'none'" class="c-btn primary" :disabled="busy" @click="add">{{ $t('me.profile.addFriend') }}</button>
         <NuxtLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="c-btn primary">{{ $t('me.profile.loginToAdd') }}</NuxtLink>
-        <button v-if="p.user.handle" class="c-btn" @click="share">{{ $t('me.profile.share') }}</button>
+        <button v-if="p.user.handle && p.relation !== 'blocked'" class="c-btn" @click="share">{{ $t('me.profile.share') }}</button>
         <span v-if="copied" class="c-mute" role="status">{{ $t('me.profile.copied') }}</span>
         </div>
+        <div v-if="user && !['self', 'anonymous', 'blocked'].includes(p.relation)" class="c-row wrap">
+          <button class="pf-quiet" :disabled="busy" @click="blocking = true">{{ $t('me.profile.block') }}</button>
+          <button class="pf-quiet" @click="openReport">{{ $t('me.profile.report') }}</button>
+        </div>
+        <p v-if="rSent" class="c-ok" role="status">{{ $t('me.profile.reportSent') }}</p>
         <p v-if="err" class="c-err" role="alert">{{ err }}</p>
       </section>
 
@@ -107,7 +131,7 @@ const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`
         <NuxtLink :to="`/s/${nextList.slug}`"><strong>{{ nextList.title }}</strong></NuxtLink>
       </section>
 
-      <section>
+      <section v-if="p.relation !== 'blocked'">
         <h2 class="c-h2 pf-sec"><span aria-hidden="true">01</span>{{ $t('me.profile.lists') }}</h2>
         <template v-if="!p.wishlists.length">
           <p class="c-mute">{{ $t('me.profile.noLists') }}</p>
@@ -128,7 +152,7 @@ const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`
         </article>
       </section>
 
-      <section>
+      <section v-if="p.relation !== 'blocked'">
         <h2 class="c-h2 pf-sec"><span aria-hidden="true">02</span>{{ $t('me.profile.donations') }}</h2>
         <p v-if="!p.donations.length" class="c-mute">{{ $t('me.profile.noDonations') }}</p>
         <component :is="p.relation === 'self' ? 'div' : 'details'" v-if="p.donations.length">
@@ -145,6 +169,20 @@ const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`
         </component>
       </section>
       <CreatorConfirm :open="unfriending" :title="$t('me.profile.unfriendTitle', { name: p.user.display_name })" :text="$t('me.profile.unfriendText')" :ok="$t('me.profile.unfriend')" danger :busy="busy" :error="err" @close="unfriending = false" @ok="unfriend" />
+      <CreatorConfirm :open="blocking" :title="$t('me.profile.blockTitle', { name: p.user.display_name })" :text="$t('me.profile.blockText')" :ok="$t('me.profile.block')" danger :busy="busy" :error="err" @close="blocking = false" @ok="block" />
+      <CreatorSheet :open="reporting" :title="$t('me.profile.reportTitle', { name: p.user.display_name })" @close="reporting = false">
+        <form @submit.prevent="sendReport">
+          <fieldset class="pf-fs"><legend class="c-mute">{{ $t('guest.report.reasonLegend') }}</legend>
+            <label v-for="v in REASONS" :key="v" class="c-row"><input v-model="rReason" type="radio" :value="v"> {{ $t('guest.report.reason.' + v) }}</label>
+          </fieldset>
+          <label class="c-field"><span>{{ $t('guest.report.detailLabel') }}</span><textarea v-model="rDetail" rows="3" maxlength="1000" :placeholder="$t('guest.report.placeholder')" /></label>
+          <p v-if="rErr" class="c-err" role="alert">{{ rErr }}</p>
+          <div class="c-row">
+            <button type="button" class="c-btn c-grow" @click="reporting = false">{{ $t('creator.confirm.cancel') }}</button>
+            <button class="c-btn primary c-grow" :disabled="rBusy">{{ rBusy ? $t('creator.confirm.busy') : $t('guest.report.send') }}</button>
+          </div>
+        </form>
+      </CreatorSheet>
     </template>
   </ClientOnly></main>
 </template>
@@ -162,6 +200,8 @@ const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`
 .pf-av-s{width:24px;height:24px;font-size:12px;margin-right:6px}
 .pf-next{border:1px solid var(--ink-line);border-left:3px solid var(--red);padding:14px 20px;margin:8px 0;background:var(--card);display:grid;gap:4px}
 .pf-next strong{font-size:20px}
+.pf-fs{border:0;padding:0;margin:8px 0;display:grid;gap:6px}
+.pf-quiet{background:none;border:0;padding:4px 0;font:inherit;font-size:13px;color:var(--mute);text-decoration:underline;cursor:pointer}
 .pf-sum{cursor:pointer;margin-bottom:8px}
 .pf-sec{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:32px 0 12px;padding-top:12px;border-top:1px solid var(--ink-line)}
 .pf-sec span{color:var(--red-text);margin-right:8px}

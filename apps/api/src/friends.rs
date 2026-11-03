@@ -47,6 +47,37 @@ fn pair(a: Uuid, b: Uuid) -> (Uuid, Uuid) {
     }
 }
 
+/// 好友配對的 advisory lock（交易結束自動釋放）。
+/// 鎖序規則：凡使用它的交易，一律**最先**取這把鎖，之後才能碰任何列鎖（friend_requests / friendships 等），
+/// 否則封鎖與申請 / 接受 / 邀請之間可能交錯而讓封鎖後仍留下好友關係。
+pub(crate) async fn lock_pair(ex: &mut sqlx::PgConnection, a: Uuid, b: Uuid) -> R<()> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('friend_pair:' || least($1::uuid, $2::uuid)::text || ':' || greatest($1::uuid, $2::uuid)::text, 0))")
+        .bind(a)
+        .bind(b)
+        .execute(&mut *ex)
+        .await?;
+    Ok(())
+}
+
+/// 測試用：模擬封鎖交易持有 pair lock（併發測試不能直接呼叫 pub(crate)）
+#[doc(hidden)]
+pub async fn lock_pair_for_test(ex: &mut sqlx::PgConnection, a: Uuid, b: Uuid) {
+    lock_pair(ex, a, b).await.unwrap();
+}
+
+/// 任一方向有封鎖（對稱）
+pub(crate) async fn blocked_between<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    a: Uuid,
+    b: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM user_blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1))")
+        .bind(a)
+        .bind(b)
+        .fetch_one(ex)
+        .await
+}
+
 /// 成為好友（冪等）；同時清掉雙方之間的待處理申請
 async fn befriend(ex: &mut sqlx::PgConnection, a: Uuid, b: Uuid) -> R<()> {
     let (x, y) = pair(a, b);
@@ -145,6 +176,11 @@ async fn request(
         return Ok((StatusCode::ACCEPTED, Json(json!({ "status": "friends" }))));
     }
     let mut tx = st.pool.begin().await?;
+    lock_pair(&mut tx, u.id, t).await?;
+    if blocked_between(&mut *tx, u.id, t).await? {
+        // 與找不到人同一個回應，不洩漏封鎖
+        return Err(AppError::problem(404, "USER_NOT_FOUND", "找不到這位使用者"));
+    }
     let reverse: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = $2)",
     )
@@ -206,6 +242,7 @@ async fn search(
                      OR (f.user_b = u.id AND f.user_a IN (SELECT id FROM mine))) AS mutual
            FROM users u
           WHERE u.deleted_at IS NULL AND u.blocked_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = $1))
             AND ((u.display_name NOT LIKE '%@%' AND u.display_name ILIKE $2 ESCAPE '\\')
                  OR lower(u.display_name) = $4 OR u.handle LIKE $3 ESCAPE '\\' OR u.email = $4)
           ORDER BY (u.handle = $5 OR u.email = $4) IS TRUE DESC, -- handle / email 為 NULL 時比較結果是 NULL，DESC 會排到最前
@@ -247,6 +284,18 @@ async fn accept(
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
     let mut tx = st.pool.begin().await?;
+    // 先不加鎖讀出對方，取 pair lock 後才鎖列（鎖序：pair lock 最先）
+    let peer: Uuid =
+        sqlx::query_scalar("SELECT from_user FROM friend_requests WHERE id = $1 AND to_user = $2")
+            .bind(id)
+            .bind(u.id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    lock_pair(&mut tx, u.id, peer).await?;
+    if blocked_between(&mut *tx, u.id, peer).await? {
+        return Err(AppError::NotFound);
+    }
     let from: Uuid = sqlx::query_scalar(
         "SELECT from_user FROM friend_requests WHERE id = $1 AND to_user = $2 FOR UPDATE",
     )
@@ -415,6 +464,10 @@ async fn invite_accept(
         return Err(AppError::problem(422, "SELF_INVITE", "不能接受自己的邀請"));
     }
     let mut tx = st.pool.begin().await?;
+    lock_pair(&mut tx, u.id, inviter).await?;
+    if blocked_between(&mut *tx, u.id, inviter).await? {
+        return Err(AppError::NotFound); // 與無效邀請同一個回應
+    }
     befriend(&mut tx, u.id, inviter).await?;
     let list = invite_list(&mut *tx, wid, inviter).await?;
     // 產品決定：接受 selected 清單的邀請即自動加入該清單名單

@@ -298,7 +298,15 @@
       "unfriendText": "Họ sẽ không còn thấy các danh sách chỉ dành cho bạn bè của bạn. Bạn có thể gửi lời mời lại sau.",
       "mutual": "{n} bạn chung",
       "sent": "Đã tặng {n} món quà",
-      "createList": "Tạo danh sách đầu tiên"
+      "createList": "Tạo danh sách đầu tiên",
+      "block": "Chặn",
+      "report": "Báo cáo",
+      "blocked": "Bạn đã chặn người dùng này",
+      "unblock": "Bỏ chặn",
+      "blockTitle": "Chặn {name}?",
+      "blockText": "Họ sẽ không còn thấy trang cá nhân và danh sách giới hạn của bạn; quan hệ bạn bè và lời mời sẽ bị xóa. Bạn có thể bỏ chặn trong Cài đặt.",
+      "reportTitle": "Báo cáo {name}",
+      "reportSent": "Đã nhận báo cáo. Chúng tôi sẽ xử lý sớm."
     },
     "topup": {
       "title": "Nạp điểm",

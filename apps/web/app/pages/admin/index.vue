@@ -31,7 +31,7 @@ const reportAct = ref<{ id: string; title: string; status: 'actioned' | 'dismiss
 const reportNote = ref(''), reportBusy = ref(false), reportErr = ref('')
 function openReport(r: any, status: 'actioned' | 'dismissed') {
   if (reportBusy.value) return // 舊請求還在跑，避免它的錯誤落到新對話框
-  reportAct.value = { id: r.id, title: r.wishlist.title, status }; reportNote.value = ''; reportErr.value = ''
+  reportAct.value = { id: r.id, title: r.wishlist?.title ?? r.user?.display_name, status }; reportNote.value = ''; reportErr.value = ''
 }
 async function handleReport() {
   if (!reportAct.value || reportBusy.value) return
@@ -179,7 +179,8 @@ onMounted(() => Promise.all([loadReports(), loadStats()]))
       <p v-else-if="!reports.length" class="c-center c-mute">{{ rStatus === 'open' ? $t('admin.index.reports.emptyOpen') : $t('admin.index.reports.empty') }}</p>
       <article v-for="r in reports" :key="r.id" class="c-card">
         <div class="c-row"><strong class="c-grow">{{ REASON[r.reason] || r.reason }}</strong><CreatorStatusBadge :v="r.status" /></div>
-        <div>{{ $t('admin.index.reports.list') }}<a :href="`/s/${r.wishlist.slug}`" target="_blank" rel="noopener">{{ r.wishlist.title }}</a>（{{ r.wishlist.slug }}）</div>
+        <div v-if="r.user">{{ $t('admin.index.reports.user') }}<a :href="`/u/${r.user.handle || r.user.id}`" target="_blank" rel="noopener">{{ r.user.display_name }}</a></div>
+        <div v-else-if="r.wishlist">{{ $t('admin.index.reports.list') }}<a :href="`/s/${r.wishlist.slug}`" target="_blank" rel="noopener">{{ r.wishlist.title }}</a>（{{ r.wishlist.slug }}）</div>
         <div v-if="r.detail" class="c-mute">{{ r.detail }}</div>
         <p v-if="r.resolution_note" class="report-note"><strong>{{ $t('admin.index.reports.note') }}</strong><br>{{ r.resolution_note }}</p>
         <div class="c-mute">{{ $t('admin.index.reports.meta', { time: new Date(r.created_at).toLocaleString(dl), reporter: r.reporter }) }}{{ r.item_id ? $t('admin.index.reports.onItem') : '' }}</div>

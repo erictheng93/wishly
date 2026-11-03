@@ -298,7 +298,15 @@
       "unfriendText": "They will no longer see your friends-only lists. You can send a new request later.",
       "mutual": "{n} mutual friend | {n} mutual friends",
       "sent": "{n} gifts sent",
-      "createList": "Create your first list"
+      "createList": "Create your first list",
+      "block": "Block",
+      "report": "Report",
+      "blocked": "You have blocked this user",
+      "unblock": "Unblock",
+      "blockTitle": "Block {name}?",
+      "blockText": "They will no longer see your profile or restricted lists, and any friendship or pending requests will be removed. You can unblock them in Settings.",
+      "reportTitle": "Report {name}",
+      "reportSent": "Report received. We'll review it soon."
     },
     "topup": {
       "title": "Top up",

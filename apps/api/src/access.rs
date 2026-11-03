@@ -52,6 +52,12 @@ pub async fn check_wishlist(
         return Ok(());
     }
     let deny = |code, detail| deny(pool, w, code, detail);
+    // 封鎖（任一方向）：受限清單一律 404，與 private 相同，不洩漏封鎖。public 清單走 CDN 快取，不在此處理
+    if let (Some(v), "friends" | "selected") = (viewer, w.visibility) {
+        if crate::friends::blocked_between(pool, w.owner_id, v).await? {
+            return Err(AppError::NotFound);
+        }
+    }
     match w.visibility {
         "public" => Ok(()),
         "private" => Err(AppError::NotFound),

@@ -60,7 +60,8 @@
         "meta": "{time}・Người báo cáo: {reporter}",
         "onItem": "・về một món quà",
         "note": "Ghi chú kết thúc",
-        "noteLabel": "Ghi chú kết thúc (không bắt buộc, tối đa 1.000 ký tự)"
+        "noteLabel": "Ghi chú kết thúc (không bắt buộc, tối đa 1.000 ký tự)",
+        "user": "Người dùng: "
       },
       "reason": {
         "scam": "Nghi ngờ lừa đảo",
