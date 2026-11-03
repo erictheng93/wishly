@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import UserMenu from '../app/components/creator/UserMenu.vue'
+import { profilePath } from '../app/utils/profile'
 import { mount } from './vueHarness'
 
 let mounted: ReturnType<typeof mount> | undefined
@@ -10,8 +11,8 @@ const route = reactive({ fullPath: '/dashboard' })
 beforeEach(() => {
   route.fullPath = '/dashboard'
   for (const [name, value] of Object.entries({
-    computed, onBeforeUnmount, onMounted, ref, useId, watch,
-    useRoute: () => route,
+    computed, onBeforeUnmount, onMounted, ref, useId, watch, profilePath,
+    profilePath, useRoute: () => route,
     useFriendRequests: () => ({ count: ref(0) }),
     useOrgMode: () => ({ current: ref(null), orgs: ref([]), switchTo: () => {} }),
     useAuth: () => ({ user: ref({ display_name: '小華', handle: 'hua', is_staff: true }), logout: vi.fn() }),

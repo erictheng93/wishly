@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineProps<{ title: string; back?: string }>()
 const { user } = useAuth()
+const myPage = computed(() => user.value ? profilePath(user.value) : '/settings')
 const { current, orgs } = useOrgMode()
 const orgName = computed(() => orgs.value.find(o => o.id === current.value)?.name)
 const { count, refresh } = useFriendRequests()
@@ -29,7 +30,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
   <nav v-if="user" class="c-rail" :aria-label="$t('common.mainMenu')">
     <NuxtLink to="/dashboard">{{ $t('common.myLists') }}</NuxtLink>
     <NuxtLink to="/friends">{{ $t('common.friends') }}<CreatorCountBadge :n="count" /></NuxtLink>
-    <NuxtLink v-if="user.handle" :to="`/u/${user.handle}`">{{ $t('common.profile') }}</NuxtLink>
+    <NuxtLink :to="myPage">{{ $t('common.profile') }}</NuxtLink>
     <NuxtLink to="/me/wallet">{{ $t('common.points') }}</NuxtLink>
     <NuxtLink to="/settings">{{ $t('common.settings') }}</NuxtLink>
     <NuxtLink v-if="user.is_staff" to="/admin">{{ $t('common.admin') }}</NuxtLink>

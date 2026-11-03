@@ -47,9 +47,18 @@ async fn profile(
     parts: Parts,
 ) -> Result<Json<Value>, AppError> {
     let viewer = access::viewer(&parts, &st).await?;
-    let (uid, name, bio, birthday, bv): (Uuid, String, Option<String>, Option<String>, String) = sqlx::query_as(
-        "SELECT id, display_name, bio, birthday, birthday_visibility::text FROM users WHERE handle = $1 AND deleted_at IS NULL AND blocked_at IS NULL",
+    // 沒設 handle 的人用 user id 進個人頁；handle 最長 30 字且不含 '-'，不會與 UUID 撞。
+    // 用 id 只給登入者看：handle 是本人選擇的對外網址，沒設的人不該有能匿名轉傳的個人頁
+    let by_id = Uuid::try_parse(&handle).ok();
+    if by_id.is_some() && viewer.is_none() {
+        return Err(AppError::NotFound);
+    }
+    #[allow(clippy::type_complexity)]
+    let (uid, handle, name, bio, birthday, bv): (Uuid, Option<String>, String, Option<String>, Option<String>, String) = sqlx::query_as(
+        "SELECT id, handle, display_name, bio, birthday, birthday_visibility::text FROM users
+          WHERE (id = $1 OR ($1 IS NULL AND handle = $2)) AND deleted_at IS NULL AND blocked_at IS NULL",
     )
+    .bind(by_id)
     .bind(handle.to_lowercase())
     .fetch_optional(&st.pool)
     .await?
@@ -138,7 +147,7 @@ async fn profile(
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
     Ok(Json(
-        json!({ "user": { "id": uid, "handle": handle.to_lowercase(), "display_name": name, "bio": bio, "birthday": birthday }, "relation": relation,
+        json!({ "user": { "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday }, "relation": relation,
                     "wishlists": wishlists, "donations": donations }),
     ))
 }

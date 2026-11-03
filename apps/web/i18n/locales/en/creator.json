@@ -11,6 +11,11 @@
         "title": "Choose your display name",
         "body": "Friends see this name. It currently comes from your email, so consider changing it to one they'll recognize.",
         "link": "Change name"
+      },
+      "handle": {
+        "title": "Pick a username for your profile link",
+        "body": "With a username, you get a profile link you can share with anyone, and friends can find you more easily.",
+        "link": "Set username"
       }
     },
     "confirm": {

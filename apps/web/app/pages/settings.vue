@@ -253,7 +253,7 @@ async function remove() {
         <button v-if="actNext" type="button" class="c-btn" @click="loadActivity(true)">{{ $t('settings.activity.more') }}</button>
         <p v-if="actErr" class="c-err" role="alert">{{ actErr }}</p>
       </section>
-      <section class="c-card">
+      <section id="social" class="c-card">
         <h2 class="c-h2">{{ $t('settings.social.title') }}</h2>
         <form @submit.prevent="saveSocial">
           <label class="c-field"><span>{{ $t('settings.social.handle') }}</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" :placeholder="$t('settings.social.handlePh')"></label>

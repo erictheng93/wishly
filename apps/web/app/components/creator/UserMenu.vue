@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { user, logout } = useAuth()
+const myPage = computed(() => user.value ? profilePath(user.value) : '/settings')
 const { count } = useFriendRequests()
 const { current, orgs, switchTo } = useOrgMode()
 const open = ref(false)
@@ -27,9 +28,9 @@ watch(() => useRoute().fullPath, () => { open.value = false })
   <div v-if="user" ref="root" class="um" @keydown.esc="dismiss" @focusout="focusout">
     <button ref="trigger" type="button" class="um-btn" :aria-label="`${name}，${$t('common.accountMenu')}${count > 0 ? `（${$t('common.friendRequests', { n: count })}）` : ''}`" :aria-expanded="open" :aria-controls="panelId" @click="open = !open"><span class="um-av">{{ name.slice(0, 1).toUpperCase() }}<i v-if="count > 0" class="um-dot" aria-hidden="true" /></span><span class="um-name">{{ name }}</span><span class="um-caret" aria-hidden="true">▾</span></button>
     <nav v-show="open" :id="panelId" class="um-pop" :aria-label="$t('common.accountMenu')">
-      <component :is="user.handle ? 'NuxtLink' : 'div'" :to="user.handle ? `/u/${user.handle}` : undefined" class="um-who">
+      <NuxtLink :to="myPage" class="um-who">
         <b>{{ user.display_name }}</b><small v-if="user.handle">@{{ user.handle }}</small>
-      </component>
+      </NuxtLink>
       <template v-if="orgs.length">
         <button type="button" :aria-pressed="current === null" @click="switchTo(null)">{{ $t('org.personal') }}</button>
         <button v-for="o in orgs" :key="o.id" type="button" :aria-pressed="current === o.id" @click="switchTo(o.id)">{{ o.name }}</button>

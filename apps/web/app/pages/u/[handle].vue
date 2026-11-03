@@ -14,9 +14,18 @@ useHead(() => ({ title: p.value ? t('me.profile.title', { name: p.value.user.dis
 // 匿名也要能看：不走 useApi 的 401 轉址，直接帶 cookie 呼叫
 async function load() {
   try { p.value = await $fetch(`${base}/users/${encodeURIComponent(handle)}`, { credentials: 'include', headers: nativeHeaders() }); state.value = 'ok' }
-  catch (e: any) { state.value = e.status === 404 || e.statusCode === 404 ? 'gone' : 'error' }
+  catch (e: any) {
+    const missing = e.status === 404 || e.statusCode === 404
+    // 用 id 的個人頁只給登入者（後端對匿名回 404），先導去登入
+    if (missing && !user.value && /^[0-9a-f-]{36}$/i.test(handle)) return navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+    state.value = missing ? 'gone' : 'error'
+  }
 }
-onMounted(async () => { await fetchMe(); await load() })
+onMounted(async () => {
+  await fetchMe(); await load()
+  // 用 id 進來但對方已設 handle：換成好分享的網址
+  if (p.value?.user.handle && p.value.user.handle !== handle.toLowerCase()) useRouter().replace(`/u/${p.value.user.handle}`)
+})
 
 async function run(f: () => Promise<any>) {
   busy.value = true; err.value = ''
@@ -40,10 +49,10 @@ const accept = () => run(async () => {
     <section v-else-if="state === 'error'" class="c-gone err"><span class="pf-kick" aria-hidden="true">PROFILE / ERR</span><p class="c-err c-gone-t" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></section>
     <template v-else>
       <section class="pf-hero">
-        <span class="pf-kick" aria-hidden="true">PROFILE / @{{ p.user.handle }}</span>
+        <span class="pf-kick" aria-hidden="true">PROFILE<template v-if="p.user.handle"> / @{{ p.user.handle }}</template></span>
         <div class="pf-av" aria-hidden="true">{{ (p.user.display_name || '?').slice(0, 1) }}</div>
         <h2 class="c-h2">{{ p.user.display_name }}</h2>
-        <p class="c-mute">@{{ p.user.handle }}<template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
+        <p v-if="p.user.handle || p.user.birthday" class="c-mute"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
         <p v-if="p.user.bio" style="white-space:pre-line">{{ p.user.bio }}</p>
         <p v-if="err" class="c-err" role="alert">{{ err }}</p>
         <NuxtLink v-if="p.relation === 'self'" to="/settings" class="c-btn">{{ $t('me.profile.editSettings') }}</NuxtLink>

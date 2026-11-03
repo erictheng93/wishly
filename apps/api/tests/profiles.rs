@@ -99,3 +99,49 @@ async fn deleted_account_profile_is_indistinguishable_from_missing_handle(pool: 
     );
     common::assert_all_reconciled(&pool).await;
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn profile_without_handle_is_reachable_by_user_id(pool: PgPool) {
+    let owner = user(&pool, "No Handle").await.id;
+    let h = ck(&user(&pool, "Viewer").await.token);
+    let get = |path: String, headers: Vec<(&'static str, String)>| {
+        let pool = pool.clone();
+        async move { call(&pool, "GET", &path, &headers, None).await }
+    };
+    // 未登入用 id 看不到（與不存在相同）
+    assert_eq!(
+        get(format!("/users/{owner}"), vec![]).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (status, _, profile) = get(format!("/users/{owner}"), h.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{profile}");
+    assert_eq!(profile["user"]["id"], json!(owner));
+    assert!(profile["user"]["handle"].is_null());
+    assert_eq!(profile["relation"], "none");
+
+    // 有 handle 的人用 id 也進得去，回傳真正的 handle
+    sqlx::query("UPDATE users SET handle='has_handle' WHERE id=$1")
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(format!("/users/{owner}"), h.clone()).await.2["user"]["handle"],
+        "has_handle"
+    );
+
+    // 停權帳號與不存在的 id 都是 404
+    sqlx::query("UPDATE users SET blocked_at=now() WHERE id=$1")
+        .bind(owner)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        get(format!("/users/{owner}"), h.clone()).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(format!("/users/{}", uuid::Uuid::new_v4()), h).await.0,
+        StatusCode::NOT_FOUND
+    );
+}
