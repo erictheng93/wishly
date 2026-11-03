@@ -95,8 +95,9 @@ async fn audit(
         Actor::Guest(g) => ("guest", g),
         Actor::User(u) => ("user", u),
     };
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ($1::actor_type, $2, $3, 'claims', $4, $5)")
-        .bind(t).bind(id).bind(action).bind(claim).bind(diff).execute(&mut **tx).await?;
+    let c = crate::audit_ctx::current();
+    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ($1::actor_type, $2, $3, 'claims', $4, $5, $6::inet, $7, $8)")
+        .bind(t).bind(id).bind(action).bind(claim).bind(diff).bind(c.ip).bind(c.request_id).bind(c.user_agent).execute(&mut **tx).await?;
     Ok(())
 }
 

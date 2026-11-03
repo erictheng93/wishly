@@ -86,8 +86,9 @@ pub async fn audit_user<'e>(
     id: Option<Uuid>,
     diff: Value,
 ) -> R<()> {
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('user', $1, $2, $3, $4, $5)")
-        .bind(user).bind(action).bind(entity).bind(id).bind(diff).execute(ex).await?;
+    let c = crate::audit_ctx::current();
+    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ('user', $1, $2, $3, $4, $5, $6::inet, $7, $8)")
+        .bind(user).bind(action).bind(entity).bind(id).bind(diff).bind(c.ip).bind(c.request_id).bind(c.user_agent).execute(ex).await?;
     Ok(())
 }
 

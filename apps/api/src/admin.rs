@@ -64,8 +64,9 @@ pub async fn audit<'e, E: sqlx::PgExecutor<'e>>(
     entity_id: Option<Uuid>,
     diff: Value,
 ) -> Result<(), AppError> {
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('staff', $1, $2, $3, $4, $5)")
-        .bind(staff).bind(action).bind(entity).bind(entity_id).bind(diff).execute(ex).await?;
+    let c = crate::audit_ctx::current();
+    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ('staff', $1, $2, $3, $4, $5, $6::inet, $7, $8)")
+        .bind(staff).bind(action).bind(entity).bind(entity_id).bind(diff).bind(c.ip).bind(c.request_id).bind(c.user_agent).execute(ex).await?;
     Ok(())
 }
 
@@ -501,6 +502,7 @@ struct AuditQ {
     entity_id: Option<Uuid>,
     from: Option<chrono::NaiveDate>,
     to: Option<chrono::NaiveDate>,
+    request_id: Option<Uuid>,
 }
 async fn list_audit_logs(
     State(st): State<AppState>,
@@ -516,14 +518,15 @@ async fn list_audit_logs(
     }
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
     let rows: Vec<(Uuid,Value)> = sqlx::query_as("SELECT a.id,jsonb_build_object('id',a.id,'actor_type',a.actor_type::text,'actor_id',a.actor_id,
-        'actor_name',u.display_name,'action',a.action,'entity',a.entity,'entity_id',a.entity_id,'diff',a.diff,'created_at',a.created_at)
+        'actor_name',u.display_name,'action',a.action,'entity',a.entity,'entity_id',a.entity_id,'diff',a.diff,'ip',host(a.ip),'request_id',a.request_id,'user_agent',a.user_agent,'created_at',a.created_at)
         FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id AND a.actor_type::text IN ('staff','user')
         WHERE ($1::uuid IS NULL OR a.id<$1) AND ($2::uuid IS NULL OR a.actor_id=$2)
           AND ($3::text IS NULL OR a.action=$3) AND ($4::text IS NULL OR a.entity=$4) AND ($5::uuid IS NULL OR a.entity_id=$5)
           AND ($6::date IS NULL OR a.created_at >= ($6::date::timestamp AT TIME ZONE 'Asia/Taipei'))
           AND ($7::date IS NULL OR a.created_at < (($7::date+1)::timestamp AT TIME ZONE 'Asia/Taipei'))
+          AND ($9::uuid IS NULL OR a.request_id=$9)
         ORDER BY a.id DESC LIMIT $8")
-        .bind(q.cursor).bind(q.actor_id).bind(&q.action).bind(&q.entity).bind(q.entity_id).bind(q.from).bind(q.to).bind(lim+1).fetch_all(&st.pool).await?;
+        .bind(q.cursor).bind(q.actor_id).bind(&q.action).bind(&q.entity).bind(q.entity_id).bind(q.from).bind(q.to).bind(lim+1).bind(q.request_id).fetch_all(&st.pool).await?;
     Ok(page(rows, lim))
 }
 

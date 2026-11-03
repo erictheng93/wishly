@@ -188,6 +188,47 @@ async fn enable_birthday(
     Ok(())
 }
 
+// ---------- 稽核 ----------
+/// 字串截到 200 字，避免長文整段進 audit_logs
+fn clip(v: Value) -> Value {
+    match v {
+        Value::String(s) if s.chars().count() > 200 => Value::String(s.chars().take(200).collect()),
+        v => v,
+    }
+}
+/// 兩份快照（JSON 物件）只留有變的欄位 → `{"changed": {k: {"before", "after"}}}`；沒變回 None（不寫稽核）
+fn audit_changed(before: &Value, after: &Value) -> Option<Value> {
+    let (b, a) = (before.as_object()?, after.as_object()?);
+    let ch: Map<String, Value> = a
+        .iter()
+        .filter(|(k, v)| b.get(*k) != Some(*v))
+        .map(|(k, v)| {
+            let old = b.get(k).cloned().unwrap_or(Value::Null);
+            (
+                k.clone(),
+                json!({ "before": clip(old), "after": clip(v.clone()) }),
+            )
+        })
+        .collect();
+    (!ch.is_empty()).then(|| json!({ "changed": ch }))
+}
+/// 清單可稽核欄位快照（不含收件資訊、據點地址）
+fn w_snap(w: &W) -> Value {
+    json!({ "title": w.title, "description": w.description, "cover_image_key": w.cover_image_key,
+        "cover_preset": w.cover_preset, "event_date": w.event_date, "visibility": w.visibility,
+        "show_claimer_names": w.show_claimer_names, "surprise_mode": w.surprise_mode,
+        "claim_ttl_hours": w.claim_ttl_hours, "status": w.status, "closes_at": w.closes_at,
+        "site_status": w.site_status, "event_id": w.event_id, "permit_id": w.permit_id })
+}
+fn i_snap(i: &I) -> Value {
+    json!({ "title": i.title, "description": i.description, "brand": i.brand, "spec": i.spec,
+        "image_key": i.image_key, "product_url": i.product_url, "unit_price_amount": i.unit_price_amount,
+        "priority": i.priority, "qty_needed": i.qty_needed, "funding_mode": i.funding_mode,
+        "target_points": i.target_points, "funding_deadline": i.funding_deadline,
+        "fulfillment_type": i.fulfillment_type, "price_snapshot_amount": i.price_snapshot_amount,
+        "category": i.category, "urgency": i.urgency })
+}
+
 // ---------- 清單 ----------
 #[derive(sqlx::FromRow)]
 pub(crate) struct W {
@@ -466,6 +507,8 @@ async fn create(u: CurrentUser, State(st): State<AppState>, Json(b): Json<Value>
                 if bday {
                     enable_birthday(&mut tx, id, u.id, true, vis).await?;
                 }
+                crate::orgs::audit_user(&mut *tx, u.id, "wishlist.create", "wishlists", Some(id),
+                    json!({ "after": { "title": clip(json!(title)), "type": ty, "visibility": vis } })).await?;
                 tx.commit().await?;
                 let w = load_owned(&st.pool, id, u.id).await?;
                 return Ok((
@@ -693,6 +736,7 @@ async fn update(
     let exp = expected(m)?;
     let relief = w.ty == "relief";
     let old_addr = w.site_address.clone();
+    let audit_before = w_snap(&w);
     let (old_permit, old_site_status, old_event) = (w.permit_id, w.site_status.clone(), w.event_id); // UPDATE 時比對：並行撤銷 / 下架 / 合併改過就當 stale
     apply_site_fields(&mut tx, m, &mut w, relief).await?;
     if let Some(v) = text(m, "title", 1, 100)? {
@@ -854,6 +898,10 @@ async fn update(
         .bind(reopening).bind(u.id).bind(&old_site_status).bind(old_event).execute(&mut *tx).await?;
     if res.rows_affected() == 0 {
         return Err(stale());
+    }
+    if let Some(d) = audit_changed(&audit_before, &w_snap(&w)) {
+        crate::orgs::audit_user(&mut *tx, u.id, "wishlist.update", "wishlists", Some(id), d)
+            .await?;
     }
     if old_status != "active" && w.status == "active" {
         crate::support::notify_targets(&mut tx, id).await?;
@@ -1089,6 +1137,17 @@ async fn archive(
         "WITH o AS (SELECT status::text AS s FROM wishlists WHERE id=$1 AND status<>'archived' FOR UPDATE)
          UPDATE wishlists SET status='archived', closed_at = coalesce(closed_at, now()) FROM o WHERE id=$1 RETURNING o.s")
         .bind(id).fetch_optional(&mut *tx).await?;
+    if was.is_some() {
+        crate::orgs::audit_user(
+            &mut *tx,
+            u.id,
+            "wishlist.archive",
+            "wishlists",
+            Some(id),
+            json!({ "before": { "title": clip(json!(w.title)) } }),
+        )
+        .await?;
+    }
     release_pledged(&mut tx, &[id]).await?;
     crate::dashboard::notify(&mut *tx, id).await?; // 即時連線收到後關閉
     if was.is_some_and(|s| s != "closed") {
@@ -1371,7 +1430,19 @@ async fn address_put(
         req("address", 5, 200)?,
     );
     check_phone(&phone, "/phone")?;
-    save_address(&st.pool, id, &name, &phone, &addr).await?;
+    let mut tx = st.pool.begin().await?;
+    save_address(&mut *tx, id, &name, &phone, &addr).await?;
+    // 收件資訊內容一律不進稽核
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "wishlist.shipping_address.update",
+        "wishlists",
+        Some(id),
+        json!({ "changed": true }),
+    )
+    .await?;
+    tx.commit().await?;
     Ok(Json(masked(&name, &phone, &addr)))
 }
 
@@ -1670,6 +1741,9 @@ async fn item_create(
     if mode == "support" && w.status == "active" {
         crate::support::notify_targets(&mut tx, wid).await?;
     }
+    crate::orgs::audit_user(&mut *tx, u.id, "item.create", "wishlist_items", Some(id),
+        json!({ "after": { "title": clip(json!(i.title)), "qty_needed": i.qty_needed, "price": i.unit_price_amount,
+            "funding_mode": i.funding_mode, "wishlist_id": wid } })).await?;
     tx.commit().await?;
     let row: I = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {ICOLS} FROM wishlist_items WHERE id=$1"
@@ -1833,6 +1907,7 @@ async fn item_update(
         )
     };
     let before = product(&i);
+    let audit_before = i_snap(&i);
     // Q13：捐助者看得到的內容（排序、圖片處理狀態不算）；同值重送不算修改
     let visible = |i: &I| {
         (
@@ -1885,6 +1960,10 @@ async fn item_update(
             Some((u, _)) if exp.is_some_and(|e| e != u) => stale(),
             _ => AppError::problem(409, "QTY_BELOW_CLAIMED", "qty_needed 不可小於已認領數量。"),
         });
+    }
+    if let Some(d) = audit_changed(&audit_before, &i_snap(&i)) {
+        crate::orgs::audit_user(&mut *tx, u.id, "item.update", "wishlist_items", Some(id), d)
+            .await?;
     }
     if changed {
         crate::notify::enqueue_item_changed(&mut *tx, id).await?;
@@ -2010,6 +2089,15 @@ async fn item_delete(
     sqlx::query("UPDATE wishlist_items SET deleted_at=now(),
                  qty_claimed=COALESCE((SELECT sum(qty) FROM claims WHERE item_id=$1 AND status IN ('reserved','purchased','delivered')),0),
                  pledged_points=0 WHERE id=$1").bind(id).execute(&mut *tx).await?;
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "item.delete",
+        "wishlist_items",
+        Some(id),
+        json!({ "before": { "title": clip(json!(item.title)) } }),
+    )
+    .await?;
     crate::dashboard::notify(&mut *tx, wid).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
@@ -2046,8 +2134,19 @@ async fn item_reorder(
             "item_ids 必須與清單現有品項完全一致",
         ));
     }
+    let mut tx = st.pool.begin().await?;
     sqlx::query("UPDATE wishlist_items i SET sort_order = t.ord::int * 10 FROM unnest($1::uuid[]) WITH ORDINALITY AS t(id, ord) WHERE i.id = t.id")
-        .bind(&r.item_ids).execute(&st.pool).await?;
+        .bind(&r.item_ids).execute(&mut *tx).await?;
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "item.reorder",
+        "wishlists",
+        Some(wid),
+        json!({ "count": r.item_ids.len() }),
+    )
+    .await?;
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -2108,6 +2207,11 @@ async fn allowed_put(
         return Err(AppError::problem(422, "NOT_FRIEND", "名單只能選擇你的好友"));
     }
     let mut tx = st.pool.begin().await?;
+    let old: Vec<Uuid> =
+        sqlx::query_scalar("SELECT user_id FROM wishlist_allowed_users WHERE wishlist_id = $1")
+            .bind(id)
+            .fetch_all(&mut *tx)
+            .await?;
     sqlx::query("DELETE FROM wishlist_allowed_users WHERE wishlist_id = $1")
         .bind(id)
         .execute(&mut *tx)
@@ -2118,6 +2222,19 @@ async fn allowed_put(
     .bind(id)
     .bind(&ids)
     .execute(&mut *tx)
+    .await?;
+    let (added, removed) = (
+        ids.iter().filter(|x| !old.contains(x)).count(),
+        old.iter().filter(|x| !ids.contains(x)).count(),
+    );
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "wishlist.allowed_users.update",
+        "wishlists",
+        Some(id),
+        json!({ "added": added, "removed": removed }),
+    )
     .await?;
     tx.commit().await?;
     allowed_list(&st.pool, id).await

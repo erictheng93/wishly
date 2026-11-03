@@ -41,8 +41,11 @@ pub(crate) async fn audit<'e, E: sqlx::PgExecutor<'e>>(
     ip: Option<&str>,
     diff: Value,
 ) -> Result<(), AppError> {
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip) VALUES ('user',$1,$2,$3,$4,$5,$6::inet)")
-        .bind(uid).bind(action).bind(entity).bind(entity_id).bind(diff).bind(ip).execute(ex).await?;
+    let c = crate::audit_ctx::current();
+    // 呼叫端明確給的 ip 優先，否則用請求脈絡
+    let ip = ip.map(str::to_owned).or(c.ip);
+    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ('user',$1,$2,$3,$4,$5,$6::inet,$7,$8)")
+        .bind(uid).bind(action).bind(entity).bind(entity_id).bind(diff).bind(ip).bind(c.request_id).bind(c.user_agent).execute(ex).await?;
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 pub mod access;
 pub mod account;
 pub mod admin;
+pub mod audit_ctx;
 pub mod auth;
 pub mod auth_ext;
 pub mod birthday;
@@ -24,6 +25,7 @@ pub mod notify_jobs;
 pub mod onboarding;
 pub mod orders;
 pub mod org_admin;
+pub mod org_audit;
 pub mod org_members;
 pub mod org_receipts;
 pub mod org_sites;
@@ -38,6 +40,7 @@ pub mod relief_events;
 pub mod reports;
 pub mod sealed;
 pub mod security;
+pub mod security_activity;
 pub mod session;
 pub mod share_views;
 pub mod support;
@@ -87,6 +90,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(orders::routes())
                 .merge(orgs::routes())
                 .merge(org_admin::routes())
+                .merge(org_audit::routes())
                 .merge(org_members::routes())
                 .merge(org_receipts::routes())
                 .merge(relief_events::routes())
@@ -96,6 +100,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(uploads::routes())
                 .merge(auth::routes())
                 .merge(security::routes())
+                .merge(security_activity::routes())
                 .merge(topup::routes())
                 .merge(friends::routes())
                 .merge(inspire::routes())
@@ -115,6 +120,7 @@ pub fn app(state: AppState) -> Router {
         .layer(cors())
         .layer(axum::middleware::map_response(problem_json))
         .layer(axum::middleware::map_response(security_headers))
+        .layer(axum::middleware::from_fn(audit_ctx::middleware))
         .with_state(state)
 }
 
@@ -216,6 +222,7 @@ fn cors() -> tower_http::cors::CorsLayer {
         .expose_headers([
             HeaderName::from_static("idempotency-replayed"),
             header::RETRY_AFTER,
+            HeaderName::from_static("x-request-id"),
         ])
 }
 

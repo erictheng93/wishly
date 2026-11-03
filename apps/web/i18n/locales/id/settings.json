@@ -131,6 +131,38 @@
       "denied": "Notifikasi diblokir di browser Anda. Buka pengaturan situs, ubah Notifikasi menjadi Izinkan untuk situs ini, lalu kembali dan aktifkan.",
       "install": "Di iPhone / iPad, tambahkan Wishly ke Layar Utama lalu buka dari sana untuk mengaktifkan push (tombol Bagikan Safari, lalu Tambah ke Layar Utama).",
       "failed": "Tidak dapat mengaktifkan push. Coba lagi nanti."
+    },
+    "activity": {
+      "title": "Aktivitas keamanan",
+      "hint": "Login dan tindakan sensitif terbaru di akun Anda. Jika bukan Anda, segera ganti kata sandi dan keluarkan perangkat lain.",
+      "empty": "Belum ada aktivitas",
+      "more": "Muat lagi",
+      "a": {
+        "auth_login": "Masuk",
+        "auth_logout": "Keluar",
+        "auth_new_device": "Masuk dari perangkat baru",
+        "auth_password_changed": "Kata sandi diubah",
+        "auth_password_reset": "Kata sandi direset",
+        "auth_mfa_enabled": "Verifikasi dua langkah diaktifkan",
+        "auth_mfa_verified": "Lolos verifikasi dua langkah",
+        "auth_mfa_recovery_used": "Kode pemulihan dipakai",
+        "auth_mfa_recovery_regenerated": "Kode pemulihan dibuat ulang",
+        "auth_recovery_regenerated": "Kode pemulihan dibuat ulang",
+        "auth_mfa_reset": "Verifikasi dua langkah direset staf",
+        "auth_session_revoked": "Keluar dari satu perangkat",
+        "auth_sessions_revoked": "Keluar dari semua perangkat lain",
+        "auth_identity_linked": "Metode login ditautkan",
+        "auth_identity_unlinked": "Tautan metode login dilepas",
+        "account_export": "Data akun diekspor",
+        "account_absorb": "Akun digabung",
+        "account_suspended": "Akun ditangguhkan",
+        "account_restored": "Akun dipulihkan",
+        "user_mfa_reset": "Staf mereset verifikasi dua langkah",
+        "user_recovery": "Staf membantu pemulihan akun",
+        "user_identity_unlink": "Staf melepas metode login",
+        "wishlist_shipping_address_update": "Alamat pengiriman diperbarui",
+        "other": "Aktivitas akun lainnya"
+      }
     }
   }
 }

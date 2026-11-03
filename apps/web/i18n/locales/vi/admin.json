@@ -159,6 +159,7 @@
         "action": "Thao tác",
         "entity": "Loại đối tượng",
         "entityId": "UUID đối tượng",
+        "requestId": "ID yêu cầu",
         "from": "Từ ngày",
         "to": "Đến ngày"
       },

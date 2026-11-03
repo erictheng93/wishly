@@ -213,6 +213,19 @@
       "permitLabel": "Giấy phép quyên góp",
       "permitExpiredOpt": "hết hạn",
       "permitResumeHint": "Chọn giấy phép còn hiệu lực để mở lại điểm đang tạm dừng"
+    },
+    "audit": {
+      "link": "Nhật ký kiểm tra",
+      "title": "Nhật ký kiểm tra",
+      "time": "Thời gian",
+      "actor": "Người thực hiện",
+      "action": "Hành động",
+      "entity": "Đối tượng",
+      "more": "Tải thêm",
+      "empty": "Chưa có bản ghi",
+      "staff": "Nhân viên nền tảng",
+      "system": "Hệ thống",
+      "a": {}
     }
   }
 }

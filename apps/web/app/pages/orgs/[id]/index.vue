@@ -70,6 +70,7 @@ async function applyPermit(pid: string) {
       </div>
       <nav class="c-row oh-nav">
         <NuxtLink v-if="role === 'owner'" :to="`/orgs/${id}/members`" class="c-btn">{{ $t('org.console.members') }}</NuxtLink>
+        <NuxtLink v-if="canEdit" :to="`/orgs/${id}/audit`" class="c-btn">{{ $t('org.audit.link') }}</NuxtLink>
       </nav>
 
       <section class="c-card oh-sec">
