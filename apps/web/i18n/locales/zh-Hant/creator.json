@@ -32,9 +32,9 @@
       "none": "無圖",
       "pick": "選擇圖片",
       "uploading": "上傳中…",
-      "done": "已上傳，圖片處理完成後才會公開顯示",
+      "done": "已上傳，位置等隱藏資訊（EXIF）已移除；處理完成後才會公開顯示",
       "retry": "重新上傳",
-      "hint": "限 JPG、PNG、WebP，5 MB 以內。上傳後會移除位置等隱藏資訊（EXIF），請勿上傳含個人資料的照片。"
+      "hint": "JPG・PNG・WebP，5 MB 以內，請勿含個人資料"
     },
     "itemSheet": {
       "titleEdit": "編輯品項",

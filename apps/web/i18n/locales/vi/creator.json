@@ -32,9 +32,9 @@
       "none": "Không có ảnh",
       "pick": "Chọn ảnh",
       "uploading": "Đang tải lên…",
-      "done": "Đã tải lên. Ảnh sẽ hiển thị công khai sau khi xử lý xong",
+      "done": "Đã tải lên. Đã xóa vị trí và dữ liệu ẩn (EXIF); ảnh sẽ hiển thị công khai sau khi xử lý xong",
       "retry": "Tải lại",
-      "hint": "Chỉ nhận JPG, PNG, WebP, tối đa 5 MB. Dữ liệu ẩn như vị trí (EXIF) sẽ bị xóa sau khi tải lên. Vui lòng không tải lên ảnh chứa thông tin cá nhân."
+      "hint": "JPG, PNG, WebP, tối đa 5 MB. Không chứa thông tin cá nhân."
     },
     "itemSheet": {
       "titleEdit": "Sửa món quà",

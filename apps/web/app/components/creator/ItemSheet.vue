@@ -78,12 +78,12 @@ async function save() {
 <template>
   <CreatorSheet :open="open" :title="item ? $t('creator.itemSheet.titleEdit') : $t('creator.itemSheet.titleNew')" @close="emit('close')">
     <form @submit.prevent="save">
-      <CreatorImageUploader v-if="!support" v-model="imageKey" purpose="item" :current-url="item?.image_url" @busy="upBusy = $event" />
       <label class="c-field"><span>{{ $t('creator.itemSheet.name') }}</span><input v-model="f.title" maxlength="120" :placeholder="$t('creator.itemSheet.namePh')" required></label>
       <template v-if="!support">
       <label class="c-field"><span>{{ $t('creator.itemSheet.brand') }}</span><input v-model="f.brand" maxlength="100"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.spec') }}</span><input v-model="f.spec" maxlength="200"></label>
       <label class="c-field"><span>{{ $t('creator.itemSheet.url') }}</span><input v-model="f.product_url" type="url" maxlength="2000" placeholder="https://"></label>
+      <CreatorImageUploader v-model="imageKey" purpose="item" :current-url="item?.image_url" @busy="upBusy = $event" />
       </template>
       <template v-if="relief">
         <label class="c-field"><span>{{ $t('org.relief.categoryLabel') }}</span>
