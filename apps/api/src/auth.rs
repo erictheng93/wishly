@@ -22,8 +22,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 const SESSION_DAYS: i64 = 30;
-/// cookie 活到 session 的絕對上限；實際是否有效以 DB expires_at（閒置續期）為準，故不必每次重設 cookie。
-const SESSION_MAX_DAYS: i64 = 90;
+/// cookie 活到 session 的絕對上限（須與 session.rs 續期 SQL 的 180 days 一致）；實際是否有效以 DB expires_at（閒置續期）為準，故不必每次重設 cookie。
+const SESSION_MAX_DAYS: i64 = 180;
 const OTP_TTL_SECS: i64 = 600;
 const OTP_MAX_ATTEMPTS: i16 = 5;
 
