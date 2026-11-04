@@ -538,3 +538,33 @@ async fn org_report_create_verified_only_dedupe_and_admin_output(pool: PgPool) {
     let both = sqlx::query("INSERT INTO content_reports (reported_org_id, reported_user_id, reason) VALUES ($1,$2,'scam')").bind(ver).bind(owner.id).execute(&pool).await;
     assert!(both.is_err());
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn org_live_sites_shown_before_revoke(pool: PgPool) {
+    let st = staff(&pool, "s").await;
+    let owner = user(&pool, "owner").await;
+    let o = common::org(&pool, owner.id, "verified").await;
+    let p = common::permit(&pool, o, "approved", 30).await;
+    let (ev, _) = common::event(&pool, o).await;
+    common::site(&pool, o, owner.id, ev, p, "active").await;
+    common::site(&pool, o, owner.id, ev, p, "draft").await;
+    report_org(&pool, o, None, "open").await;
+    let (_, _, b) = call(
+        &pool,
+        "GET",
+        "/admin/reports?kind=org",
+        &ck(&st.token),
+        None,
+    )
+    .await;
+    assert_eq!(b["data"][0]["org"]["live_sites"], json!(1), "{b}");
+    let (_, _, d) = call(
+        &pool,
+        "GET",
+        &format!("/admin/orgs/{o}"),
+        &ck(&st.token),
+        None,
+    )
+    .await;
+    assert_eq!(d["org"]["live_sites"], json!(1), "{d}");
+}

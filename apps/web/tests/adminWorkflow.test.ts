@@ -18,14 +18,14 @@ const stubs = {
   CreatorStatusBadge: { template: '<span />' },
   NuxtLink: { props: ['to'], setup: (p: any, { slots }: any) => () => h('a', { href: p.to }, slots.default?.()) },
   CreatorConfirm: {
-    props: ['open', 'title', 'error', 'disabled', 'busy'], emits: ['ok', 'close'],
-    setup: (p: any, { slots, emit }: any) => () => p.open ? h('div', { class: 'confirm' }, [p.title, p.error, slots.default?.(), h('button', { class: 'ok', disabled: p.disabled || p.busy, onClick: () => emit('ok') }, 'ok'), h('button', { class: 'esc', onClick: () => emit('close') }, 'esc')]) : null,
+    props: ['open', 'title', 'text', 'error', 'disabled', 'busy'], emits: ['ok', 'close'],
+    setup: (p: any, { slots, emit }: any) => () => p.open ? h('div', { class: 'confirm' }, [p.title, p.text, p.error, slots.default?.(), h('button', { class: 'ok', disabled: p.disabled || p.busy, onClick: () => emit('ok') }, 'ok'), h('button', { class: 'esc', onClick: () => emit('close') }, 'esc')]) : null,
   },
 }
 const settle = async () => { await flush(); await flush(); await nextTick() }
 function show(c: any) { const m = mount(c, {}, stubs, { fmtTime, fmtPts, ORDER_STATUS, orderActions, label: (m: any, k: string) => m[k] }); mounted.push(m); return m.el }
 beforeEach(() => {
-  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: null }), fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
+  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: null }), fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
   route.query = { view: 'rows' } // 檢舉頁預設依對象；既有逐筆測試明指檢視
 })
 afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset(); replace.mockReset() })
@@ -146,6 +146,19 @@ it('組織審核頁：網址 status 只接受已知值', async () => {
   api.mockClear(); route.query = { status: 'bogus' }
   show(Orgs); await settle()
   expect(api.mock.calls[0][1].query.status).toBe('pending')
+})
+
+it('組織審核頁：?open= 展開指定組織（不在目前頁也會以詳情補上），撤銷二次確認顯示上線據點數', async () => {
+  const org = { id: 'o2', display_name: 'Far', verification_status: 'verified', live_sites: 2 }
+  api.mockImplementation(async (url: string) => url === '/admin/orgs' ? { data: [] } : { org, documents: [], permits: [], members: [] })
+  route.query = { status: 'verified', open: 'o2' }
+  const el = show(Orgs); await settle(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/orgs/o2')
+  expect(el.querySelector('[data-org="o2"]')).not.toBeNull()
+  ;[...el.querySelectorAll<HTMLButtonElement>('article button')].at(-1)!.click(); await settle()
+  await input(el, '.confirm textarea', '假冒')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(el.querySelector('.confirm')!.textContent).toContain('2 個救災據點')
 })
 
 it('組織撤銷：後端拒絕理由格式時退回第一步，保留已輸入內容', async () => {
@@ -298,15 +311,15 @@ it('處置紀錄：展開才載入，顯示統計、近期檢舉與停權紀錄'
   expect(api.mock.calls.filter(([u]) => u.includes('moderation-history'))).toHaveLength(1)
 })
 
-it('組織檢舉：顯示組織與快照，撤銷組織送出與組織審核相同的 reject 請求', async () => {
-  api.mockImplementation(async (url: string, o: any) => o?.method === 'POST' ? {} : { data: [{ id: 'r', status: 'open', reason: 'scam', org: orgT, snapshot: { display_name: 'Helpers', slug: 'helpers', description: '簡介' } }] })
+it('組織檢舉：顯示組織、快照與上線據點數，撤銷改連到組織審核頁（不在檢舉頁直接撤銷）', async () => {
+  api.mockImplementation(async () => ({ data: [{ id: 'r', status: 'open', reason: 'scam', org: { ...orgT, live_sites: 3 }, snapshot: { display_name: 'Helpers', slug: 'helpers', description: '簡介' } }] }))
   const el = show(Reports); await settle()
   expect(el.querySelector('article a')!.getAttribute('href')).toBe('/o/helpers')
   expect(el.querySelector('[data-testid="org-snapshot"]')!.textContent).toContain('簡介')
+  expect(el.querySelector('[data-testid="org-live"]')!.textContent).toContain('3')
   expect(el.querySelector('[data-testid="hist-toggle"]')).toBeNull()
-  ;[...el.querySelectorAll<HTMLButtonElement>('article button')].find(b => b.textContent?.includes('撤銷組織'))!.click(); await settle()
-  expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
-  await input(el, '.confirm textarea', '資格不符')
-  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
-  expect(api).toHaveBeenCalledWith('/admin/orgs/org/review', { method: 'POST', body: { decision: 'reject', note: '資格不符' } })
+  expect([...el.querySelectorAll('article button')].some(b => b.textContent?.includes('撤銷組織'))).toBe(false)
+  const go = [...el.querySelectorAll('article a')].find(a => a.textContent?.includes('前往組織審核'))!
+  expect(go.getAttribute('href')).toContain('/admin/orgs')
+  expect(go.getAttribute('href')).toContain(`open=${orgT.id}`)
 })

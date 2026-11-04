@@ -553,7 +553,7 @@
         "needs_changes": "要求「{name}」補件？申請人會收到通知。",
         "reject": "將「{name}」退件？申請人 30 天後才能重新申請。",
         "revoke": "撤銷已通過的「{name}」？",
-        "revoke2": "再次確認：撤銷後「{name}」所有公開據點都會立即下架（改為草稿）。確定要撤銷？",
+        "revoke2": "再次確認：撤銷後「{name}」目前上線中的 {n} 個救災據點會立即下架（改為草稿），組織須 30 天後才能重新申請。確定要撤銷？",
         "permitApprove": "核准許可 {no}？",
         "permitReject": "將許可 {no} 退件？",
         "permitRevoke": "撤銷已核准的許可 {no}？使用此許可的上線據點會被暫停。"
@@ -790,10 +790,6 @@
       "viewReports": "查看 {n} 筆",
       "filterChip": "篩選：{name}",
       "clearFilter": "移除篩選",
-      "revokeOrg": "撤銷組織",
-      "revokeOrgText": "撤銷「{name}」的認證。這個組織其他未處理的檢舉也會一併結案。",
-      "revokeOrgReason": "撤銷原因（必填）",
-      "doneRevokeOrg": "已撤銷組織，相關檢舉已結案",
       "orgLabel": "組織",
       "orgStatus": {
         "pending": "審核中",
@@ -814,7 +810,9 @@
       "targetEmpty": "沒有符合的對象",
       "loadMore": "載入更多",
       "loading": "載入中…",
-      "noPii": "請勿填寫電話、地址、Email 等個人資料"
+      "noPii": "請勿填寫電話、地址、Email 等個人資料",
+      "goOrgReview": "前往組織審核",
+      "liveSites": "{n} 個救災據點上線中"
     }
   }
 }

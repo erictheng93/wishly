@@ -23,7 +23,17 @@ async function load(more = false) {
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
 }
 watch(status, () => { openId.value = null; load() })
-onMounted(() => load())
+onMounted(async () => { await load(); if (typeof qOpen === 'string') await openById(qOpen) })
+// 從檢舉後台連過來（?open=組織 id）：展開該組織；不在目前頁就以詳情補一列
+const qOpen = useRoute().query.open
+async function openById(id: string) {
+  let o = rows.value.find(r => r.id === id)
+  if (!o) {
+    try { o = (await api(`/admin/orgs/${id}`)).org; rows.value = [o, ...rows.value] } catch (e) { err.value = errMsg(e); return }
+  }
+  await toggle(o)
+  nextTick(() => document.querySelector(`[data-org="${id}"]`)?.scrollIntoView({ block: 'start' }))
+}
 
 // 詳情
 const openId = ref<string | null>(null), detail = ref<any>(null), dLoading = ref(false)
@@ -62,7 +72,7 @@ const title = computed(() => act.value ? t(`admin.orgs.${act.value.kind}Action.$
 const text = computed(() => {
   const a = act.value; if (!a) return ''
   if (a.kind === 'permit') return t(`admin.orgs.confirm.permit${a.decision === 'approve' ? 'Approve' : a.revoke ? 'Revoke' : 'Reject'}`, { no: a.name })
-  return t(`admin.orgs.confirm.${a.revoke && a.step === 2 ? 'revoke2' : actKey.value}`, { name: a.name })
+  return t(`admin.orgs.confirm.${a.revoke && a.step === 2 ? 'revoke2' : actKey.value}`, { name: a.name, n: detail.value?.org.live_sites ?? 0 })
 })
 async function submit() {
   const a = act.value!

@@ -553,7 +553,7 @@
         "needs_changes": "Ask \"{name}\" for changes? The applicant will be notified.",
         "reject": "Reject \"{name}\"? The applicant can reapply after 30 days.",
         "revoke": "Revoke the verified org \"{name}\"?",
-        "revoke2": "Confirm again: revoking takes all public sites of \"{name}\" down immediately (back to draft). Revoke?",
+        "revoke2": "Confirm again: revoking takes the {n} live relief site(s) of \"{name}\" down immediately (back to draft), and the organization can only reapply after 30 days. Revoke?",
         "permitApprove": "Approve permit {no}?",
         "permitReject": "Reject permit {no}?",
         "permitRevoke": "Revoke approved permit {no}? Live sites using this permit will be paused."
@@ -790,10 +790,6 @@
       "viewReports": "View {n}",
       "filterChip": "Filter: {name}",
       "clearFilter": "Remove filter",
-      "revokeOrg": "Revoke organization",
-      "revokeOrgText": "Revoke the verification of \"{name}\". Its other open reports will be closed too.",
-      "revokeOrgReason": "Reason for revoking (required)",
-      "doneRevokeOrg": "Organization revoked; related reports closed",
       "orgLabel": "Organization",
       "orgStatus": {
         "pending": "In review",
@@ -814,7 +810,9 @@
       "targetEmpty": "No matching targets",
       "loadMore": "Load more",
       "loading": "Loading…",
-      "noPii": "Don't include phone numbers, addresses, emails or other personal information"
+      "noPii": "Don't include phone numbers, addresses, emails or other personal information",
+      "goOrgReview": "Open organization review",
+      "liveSites": "{n} relief site(s) live"
     }
   }
 }
