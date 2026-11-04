@@ -553,7 +553,7 @@
         "needs_changes": "Ask \"{name}\" for changes? The applicant will be notified.",
         "reject": "Reject \"{name}\"? The applicant can reapply after 30 days.",
         "revoke": "Revoke the verified org \"{name}\"?",
-        "revoke2": "Confirm again: revoking takes all public sites of \"{name}\" down immediately (back to draft). Revoke?",
+        "revoke2": "Xác nhận lần nữa: thu hồi sẽ gỡ ngay {n} điểm cứu trợ đang hoạt động của \"{name}\" (về bản nháp), và tổ chức chỉ có thể nộp lại sau 30 ngày. Thu hồi?",
         "permitApprove": "Approve permit {no}?",
         "permitReject": "Reject permit {no}?",
         "permitRevoke": "Revoke approved permit {no}? Live sites using this permit will be paused."
@@ -790,10 +790,6 @@
       "viewReports": "Xem {n}",
       "filterChip": "Lọc: {name}",
       "clearFilter": "Bỏ bộ lọc",
-      "revokeOrg": "Thu hồi tổ chức",
-      "revokeOrgText": "Thu hồi xác minh của \"{name}\". Các báo cáo chưa xử lý khác của tổ chức này cũng sẽ được đóng.",
-      "revokeOrgReason": "Lý do thu hồi (bắt buộc)",
-      "doneRevokeOrg": "Đã thu hồi tổ chức, các báo cáo liên quan đã đóng",
       "orgLabel": "Tổ chức",
       "orgStatus": {
         "pending": "Đang xét duyệt",
@@ -814,7 +810,9 @@
       "targetEmpty": "Không có đối tượng phù hợp",
       "loadMore": "Tải thêm",
       "loading": "Đang tải…",
-      "noPii": "Không ghi số điện thoại, địa chỉ, email hay thông tin cá nhân khác"
+      "noPii": "Không ghi số điện thoại, địa chỉ, email hay thông tin cá nhân khác",
+      "goOrgReview": "Mở trang duyệt tổ chức",
+      "liveSites": "{n} điểm cứu trợ đang hoạt động"
     }
   }
 }

@@ -283,7 +283,8 @@ macro_rules! user_obj {
 }
 macro_rules! org_obj {
     () => {
-        "CASE WHEN og.id IS NULL THEN NULL ELSE jsonb_build_object('id', og.id, 'slug', og.slug::text, 'display_name', og.display_name, 'verification_status', og.verification_status) END"
+        "CASE WHEN og.id IS NULL THEN NULL ELSE jsonb_build_object('id', og.id, 'slug', og.slug::text, 'display_name', og.display_name, 'verification_status', og.verification_status,
+           'live_sites', (SELECT count(*) FROM wishlists lw WHERE lw.org_id = og.id AND lw.type = 'relief' AND lw.status = 'active' AND lw.deleted_at IS NULL)) END"
     };
 }
 

@@ -553,7 +553,7 @@
         "needs_changes": "Ask \"{name}\" for changes? The applicant will be notified.",
         "reject": "Reject \"{name}\"? The applicant can reapply after 30 days.",
         "revoke": "Revoke the verified org \"{name}\"?",
-        "revoke2": "Confirm again: revoking takes all public sites of \"{name}\" down immediately (back to draft). Revoke?",
+        "revoke2": "Konfirmasi lagi: pencabutan langsung menurunkan {n} lokasi bantuan aktif milik \"{name}\" (kembali ke draf), dan organisasi baru bisa mengajukan ulang setelah 30 hari. Cabut?",
         "permitApprove": "Approve permit {no}?",
         "permitReject": "Reject permit {no}?",
         "permitRevoke": "Revoke approved permit {no}? Live sites using this permit will be paused."
@@ -790,10 +790,6 @@
       "viewReports": "Lihat {n}",
       "filterChip": "Filter: {name}",
       "clearFilter": "Hapus filter",
-      "revokeOrg": "Cabut organisasi",
-      "revokeOrgText": "Cabut verifikasi \"{name}\". Laporan terbuka lainnya dari organisasi ini juga akan ditutup.",
-      "revokeOrgReason": "Alasan pencabutan (wajib)",
-      "doneRevokeOrg": "Organisasi dicabut, laporan terkait ditutup",
       "orgLabel": "Organisasi",
       "orgStatus": {
         "pending": "Ditinjau",
@@ -814,7 +810,9 @@
       "targetEmpty": "Tidak ada target yang cocok",
       "loadMore": "Muat lebih banyak",
       "loading": "Memuat…",
-      "noPii": "Jangan cantumkan nomor telepon, alamat, email, atau data pribadi lainnya"
+      "noPii": "Jangan cantumkan nomor telepon, alamat, email, atau data pribadi lainnya",
+      "goOrgReview": "Buka peninjauan organisasi",
+      "liveSites": "{n} lokasi bantuan aktif"
     }
   }
 }

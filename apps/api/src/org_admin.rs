@@ -75,6 +75,10 @@ async fn detail(
             .bind(id).fetch_optional(&st.pool).await?;
     let (mut org, enc) = row.ok_or_else(|| AppError::problem(404, "NOT_FOUND", "組織不存在"))?;
     org["contact_phone"] = json!(enc.as_deref().and_then(crate::sealed::open_str));
+    // 撤銷前讓 staff 看到影響：撤銷會把這些上線中的據點改回草稿
+    let live: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlists WHERE org_id = $1 AND type = 'relief' AND status = 'active' AND deleted_at IS NULL")
+        .bind(id).fetch_one(&st.pool).await?;
+    org["live_sites"] = json!(live);
     let documents: Value = sqlx::query_scalar("SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.created_at), '[]') FROM org_documents d WHERE org_id = $1")
         .bind(id).fetch_one(&st.pool).await?;
     let permits: Value = sqlx::query_scalar("SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at), '[]') FROM org_permits p WHERE org_id = $1")

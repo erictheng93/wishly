@@ -50,7 +50,7 @@ const ft = (v: string) => new Date(v).toLocaleString(dl.value)
 const openBy = computed(() => status.value === 'open' && shown.value === 'rows'
   ? { wishlist: rows.value.filter(r => r.wishlist).length, user: rows.value.filter(r => r.user).length, org: rows.value.filter(r => r.org).length } : null)
 
-type Act = { r: any; mode: 'dismissed' | 'actioned' | 'hide' | 'suspend' | 'restore' | 'unsuspend' | 'revokeOrg' }
+type Act = { r: any; mode: 'dismissed' | 'actioned' | 'hide' | 'suspend' | 'restore' | 'unsuspend' }
 const act = ref<Act | null>(null)
 const note = ref(''), busy = ref(false), actErr = ref('')
 const name = (r: any) => r.wishlist?.title ?? r.user?.display_name ?? r.org?.display_name ?? ''
@@ -59,9 +59,9 @@ function ask(r: any, mode: Act['mode']) {
   act.value = { r, mode }; note.value = ''; actErr.value = ''
 }
 const needReason = computed(() => !['actioned', 'dismissed'].includes(act.value?.mode ?? ''))
-const TITLE: Record<string, string> = { hide: 'hideList', suspend: 'suspendUser', restore: 'restoreList', unsuspend: 'unsuspendUser', revokeOrg: 'revokeOrg', actioned: 'markDone', dismissed: 'dismiss' }
-const TEXT: Record<string, string> = { hide: 'hideText', suspend: 'suspendText', restore: 'restoreText', unsuspend: 'unsuspendText', revokeOrg: 'revokeOrgText' }
-const DONE: Record<string, string> = { hide: 'doneHide', suspend: 'doneSuspend', restore: 'doneRestore', unsuspend: 'doneUnsuspend', revokeOrg: 'doneRevokeOrg' }
+const TITLE: Record<string, string> = { hide: 'hideList', suspend: 'suspendUser', restore: 'restoreList', unsuspend: 'unsuspendUser', actioned: 'markDone', dismissed: 'dismiss' }
+const TEXT: Record<string, string> = { hide: 'hideText', suspend: 'suspendText', restore: 'restoreText', unsuspend: 'unsuspendText' }
+const DONE: Record<string, string> = { hide: 'doneHide', suspend: 'doneSuspend', restore: 'doneRestore', unsuspend: 'doneUnsuspend' }
 const confirmTitle = computed(() => t(`admin.reports.${TITLE[act.value?.mode ?? 'dismissed']}`))
 const confirmText = computed(() => { const m = act.value?.mode ?? ''; return TEXT[m] ? t(`admin.reports.${TEXT[m]}`, { name: name(act.value!.r) }) : name(act.value?.r ?? {}) })
 async function submit() {
@@ -73,14 +73,13 @@ async function submit() {
     if (mode === 'hide') await api(`/admin/wishlists/${r.wishlist.id}/moderation`, { method: 'PATCH', body: { moderation_status: 'hidden', reason: text } })
     else if (mode === 'restore') await api(`/admin/wishlists/${r.wishlist.id}/moderation`, { method: 'PATCH', body: { moderation_status: 'ok', reason: text } })
     else if (mode === 'suspend' || mode === 'unsuspend') await api(`/admin/users/${r.user.id}`, { method: 'PATCH', body: { blocked: mode === 'suspend', reason: text } })
-    else if (mode === 'revokeOrg') await api(`/admin/orgs/${r.org.id}/review`, { method: 'POST', body: { decision: 'reject', note: text } }) // 同 admin/orgs 的撤銷；後端會一併結案該組織的檢舉
     else await api(`/admin/reports/${r.id}`, { method: 'PATCH', body: { status: mode, note: text || undefined } })
     act.value = null
     msg.value = DONE[mode] ? t(`admin.reports.${DONE[mode]}`) : ''
     await load()
   } catch (e) { if (act.value) actErr.value = errMsg(e); else err.value = errMsg(e) } finally { busy.value = false }
 }
-const reasonLabel = computed(() => ({ hide: 'hideReason', suspend: 'suspendReason', restore: 'restoreReason', unsuspend: 'unsuspendReason', revokeOrg: 'revokeOrgReason' } as Record<string, string>)[act.value?.mode ?? ''])
+const reasonLabel = computed(() => ({ hide: 'hideReason', suspend: 'suspendReason', restore: 'restoreReason', unsuspend: 'unsuspendReason' } as Record<string, string>)[act.value?.mode ?? ''])
 const itemTitle = (r: any) => r.item?.title ?? r.snapshot?.item?.title
 const SNAP_MAX = 10
 // 處置紀錄：展開才載入，以被檢舉使用者（或清單建立者）為鍵
@@ -144,6 +143,7 @@ const href = (r: any) => `/u/${(r.user ?? r.wishlist.owner).handle || (r.user ??
       <div v-else-if="r.org">
         {{ $t('admin.reports.orgLabel') }}：<a :href="`/o/${r.org.slug}`" target="_blank" rel="noopener">{{ r.org.display_name }}</a>
         <span class="c-badge" :class="{ hidden: r.org.verification_status !== 'verified' }">{{ $t(`admin.reports.orgStatus.${r.org.verification_status}`, r.org.verification_status) }}</span>
+        <span v-if="r.org.live_sites" class="c-mute" data-testid="org-live">{{ $t('admin.reports.liveSites', { n: r.org.live_sites }) }}</span>
       </div>
       <div v-if="r.detail" class="c-mute report-note">{{ r.detail }}</div>
       <p v-if="r.resolution_note" class="report-note"><strong>{{ $t('admin.reports.note') }}</strong><br>{{ r.resolution_note }}</p>
@@ -209,7 +209,8 @@ const href = (r: any) => `/u/${(r.user ?? r.wishlist.owner).handle || (r.user ??
       <div v-if="r.status === 'open'" class="c-row wrap c-mt">
         <button v-if="r.wishlist && r.wishlist.moderation_status !== 'hidden'" class="c-btn danger c-grow" @click="ask(r, 'hide')">{{ $t('admin.reports.hideList') }}</button>
         <button v-if="r.user && !r.user.suspended" class="c-btn danger c-grow" @click="ask(r, 'suspend')">{{ $t('admin.reports.suspendUser') }}</button>
-        <button v-if="r.org?.verification_status === 'verified'" class="c-btn danger c-grow" @click="ask(r, 'revokeOrg')">{{ $t('admin.reports.revokeOrg') }}</button>
+        <!-- 撤銷組織影響大（據點下架、30 天才能重新申請），只在組織審核頁做：那裡有二次確認與影響說明；後端撤銷時會一併結案這些檢舉 -->
+        <NuxtLink v-if="r.org" class="c-btn c-grow" :to="`/admin/orgs?status=${r.org.verification_status}&open=${r.org.id}`">{{ $t('admin.reports.goOrgReview') }}</NuxtLink>
         <button class="c-btn c-grow" @click="ask(r, 'actioned')">{{ $t('admin.reports.markDone') }}</button>
         <button class="c-btn c-grow" @click="ask(r, 'dismissed')">{{ $t('admin.reports.dismiss') }}</button>
       </div>
