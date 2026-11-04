@@ -813,7 +813,8 @@
       "suspendedMark": "Ditangguhkan",
       "targetEmpty": "Tidak ada target yang cocok",
       "loadMore": "Muat lebih banyak",
-      "loading": "Memuat…"
+      "loading": "Memuat…",
+      "noPii": "Jangan cantumkan nomor telepon, alamat, email, atau data pribadi lainnya"
     }
   }
 }

@@ -813,7 +813,8 @@
       "suspendedMark": "Suspended",
       "targetEmpty": "No matching targets",
       "loadMore": "Load more",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "noPii": "Don't include phone numbers, addresses, emails or other personal information"
     }
   }
 }

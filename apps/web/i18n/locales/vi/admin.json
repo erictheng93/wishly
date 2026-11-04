@@ -813,7 +813,8 @@
       "suspendedMark": "Đình chỉ",
       "targetEmpty": "Không có đối tượng phù hợp",
       "loadMore": "Tải thêm",
-      "loading": "Đang tải…"
+      "loading": "Đang tải…",
+      "noPii": "Không ghi số điện thoại, địa chỉ, email hay thông tin cá nhân khác"
     }
   }
 }

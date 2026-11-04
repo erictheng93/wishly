@@ -47,6 +47,20 @@ pub async fn allow<'e>(
     Ok(hit(pool, key, limit, window_secs).await?.0)
 }
 
+/// 檢舉保留政策：結案後只清快照與檢舉者描述（列本身留著，統計 / 處置紀錄靠 status、reason、時間）。
+/// 待處理一律不清（審查需要，也避免刪帳號規避）。結案後：personal_info 或對象已不存在（帳號刪除、清單封存 / 刪除）7 天、
+/// 駁回 30 天、已處置 365 天。帳號刪除時另於 account.rs 立即清掉已結案的。只動 status <> 'open' 的列，與結案路徑（只改 open 列）不重疊、不互鎖。
+pub const REPORT_RETENTION_SQL: &str = "UPDATE content_reports r SET snapshot = NULL, detail = NULL
+     WHERE r.status <> 'open' AND (r.snapshot IS NOT NULL OR r.detail IS NOT NULL)
+       AND r.handled_at < now() - CASE
+         WHEN r.reason = 'personal_info'
+           OR EXISTS (SELECT 1 FROM users u WHERE u.id = r.reported_user_id AND u.deleted_at IS NOT NULL)
+           OR EXISTS (SELECT 1 FROM wishlists w LEFT JOIN users o ON o.id = w.owner_id WHERE w.id = r.wishlist_id
+                        AND (w.deleted_at IS NOT NULL OR w.status = 'archived' OR o.deleted_at IS NOT NULL))
+           THEN interval '7 days'
+         WHEN r.status = 'dismissed' THEN interval '30 days'
+         ELSE interval '365 days' END";
+
 pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM idempotency_keys WHERE created_at < now() - interval '24 hours'")
         .execute(pool)
@@ -72,6 +86,7 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     )
     .execute(pool)
     .await?;
+    sqlx::query(REPORT_RETENTION_SQL).execute(pool).await?;
     // 稽核保留政策：只有「內容編輯」類一年後清除；金流、安全、刪除、封存、地址異動、營運操作永久保留。
     // audit_logs 有只增不改的 trigger，須在同一交易內以 wishly.audit_purge 開啟 DELETE 例外。
     let mut tx = pool.begin().await?;
