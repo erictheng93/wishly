@@ -22,17 +22,18 @@ test('檢舉與下架：訪客檢舉 → staff 後台下架 → 410 → 復原',
   })
 
   await test.step('staff 後台的檢舉佇列看得到這份清單', async () => {
-    await sp.goto('/admin')
-    const report = sp.getByRole('article').filter({ hasText: list.slug })
+    // 檢舉佇列在 /admin/reports（#142）；逐筆檢視才有處置按鈕（待處理預設依對象分組）
+    await sp.goto('/admin/reports?status=open&view=rows')
+    const report = sp.getByRole('article').filter({ hasText: list.title })
     await expect(report).toContainText('不當內容')
     await expect(report).toContainText('E2E 測試檢舉')
-    await expect(report).toContainText('檢舉者：anonymous')
-    await report.getByRole('button', { name: '下架' }).click()
-    const dlg = sp.getByRole('dialog')
-    await expect(dlg.getByRole('button', { name: '下架此清單' })).toBeDisabled() // 原因必填
+    await expect(report).toContainText('檢舉者：匿名')
+    await report.getByRole('button', { name: '下架清單' }).click()
+    const dlg = sp.getByRole('dialog').filter({ hasText: '下架原因' })
+    await expect(dlg.getByRole('button', { name: '下架清單' })).toBeDisabled() // 原因必填
     await dlg.getByLabel(/下架原因/).fill('E2E：違反條款')
-    await dlg.getByRole('button', { name: '下架此清單' }).click()
-    await expect(sp.getByText('已下架', { exact: true })).toBeVisible()
+    await dlg.getByRole('button', { name: '下架清單' }).click()
+    await expect(sp.getByText('已下架，相關檢舉已結案')).toBeVisible()
   })
 
   await test.step('/s/{slug} 回 410，顯示已下架、noindex、不洩漏標題', async () => {
@@ -54,6 +55,7 @@ test('檢舉與下架：訪客檢舉 → staff 後台下架 → 410 → 復原',
   })
 
   await test.step('staff 以清單搜尋恢復上架 → 公開頁恢復', async () => {
+    await sp.goto('/admin')
     await sp.getByRole('button', { name: '清單搜尋' }).click()
     await sp.getByLabel('搜尋清單').fill(list.slug)
     await sp.getByRole('button', { name: '搜尋', exact: true }).click()
