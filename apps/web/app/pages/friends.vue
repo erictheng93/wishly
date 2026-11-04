@@ -26,27 +26,58 @@ async function act(f: () => Promise<any>) {
   err.value = msg.value = ''
   try { await f(); await load() } catch (e) { err.value = msgOf(e) }
 }
-// 即時搜尋：debounce 後查全站；seq 丟棄過期回應
+// 即時搜尋（typeahead）：停止輸入 300ms 後才查全站（debounce）；同一字串不重查；seq 丟棄過期回應。
+// 排序（自己 → 好友 → 共同好友 → 陌生人）與模糊比對都在後端 GET /friends/search。
+// 好友申請只對搜尋結果中的使用者以 id 送出，不會拿輸入的文字盲目送申請。
 type Hit = { id: string, display_name: string, handle: string | null, avatar_url: string | null, relation: 'self' | 'friend' | 'outgoing' | 'incoming' | 'none', mutual: number }
-const q = ref(''), hits = ref<Hit[] | null>(null), searching = ref(false), rowBusy = ref('')
-let seq = 0, timer: ReturnType<typeof setTimeout> | undefined
+const SEARCH_DEBOUNCE_MS = 300
+const q = ref(''), hits = ref<Hit[] | null>(null), searching = ref(false), rowBusy = ref(''), active = ref(-1)
+let seq = 0, lastKey = '', timer: ReturnType<typeof setTimeout> | undefined
+const normKey = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase()
 watch(q, (v) => {
-  clearTimeout(timer); const key = v.trim(); const my = ++seq
+  const key = normKey(v)
+  if (key === lastKey && (hits.value || searching.value)) return // 只多打了空白 / 換大小寫
+  clearTimeout(timer); const my = ++seq; lastKey = key; active.value = -1
   if (!key) { hits.value = null; searching.value = false; return }
   searching.value = true
   timer = setTimeout(async () => {
     try { const r = await api('/friends/search', { query: { q: key } }); if (my === seq) { hits.value = r.users; err.value = '' } }
-    catch (e) { if (my === seq) { hits.value = null; err.value = msgOf(e) } }
+    catch (e) { if (my === seq) { hits.value = null; lastKey = ''; err.value = msgOf(e) } }
     finally { if (my === seq) searching.value = false }
-  }, 250)
+  }, SEARCH_DEBOUNCE_MS)
 })
 onBeforeUnmount(() => clearTimeout(timer))
 const relText = (u: Hit) => u.relation === 'none' ? (u.mutual ? t('me.friends.mutual', { n: u.mutual }, u.mutual) : '')
   : t({ self: 'me.friends.relSelf', friend: 'me.friends.relFriend', outgoing: 'me.friends.relOutgoing', incoming: 'me.friends.relIncoming' }[u.relation])
-// 比對到的片段加粗（不分大小寫）；以 index 切開，不用 v-html
+// 比對到的片段加底線（不分大小寫）：整串命中優先，否則標第一個命中的詞；以 index 切開，不用 v-html
 function parts(name: string) {
-  const k = q.value.trim().toLowerCase(), i = k ? name.toLowerCase().indexOf(k) : -1
-  return i < 0 ? [name, '', ''] : [name.slice(0, i), name.slice(i, i + k.length), name.slice(i + k.length)]
+  const k = normKey(q.value), low = name.toLowerCase()
+  const cands = k ? [k, ...k.split(' ').map(w => w.replace(/^@+/, '')).filter(Boolean)] : []
+  for (const w of cands) {
+    const i = low.indexOf(w)
+    if (i >= 0) return [name.slice(0, i), name.slice(i, i + w.length), name.slice(i + w.length)]
+  }
+  return [name, '', '']
+}
+// 鍵盤操作：↑↓ 移動、Enter 對選中的人加好友 / 接受邀請（其餘關係開個人頁）、Esc 清空。
+// 沒有選中任何結果時 Enter 不做事。
+function onKey(e: KeyboardEvent) {
+  const list = hits.value ?? []
+  if (e.key === 'Escape') { q.value = ''; return }
+  if (!list.length) return
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    const d = e.key === 'ArrowDown' ? 1 : -1
+    active.value = (active.value + d + list.length + (active.value < 0 && d < 0 ? 1 : 0)) % list.length
+    document.getElementById(`fr-hit-${active.value}`)?.scrollIntoView({ block: 'nearest' })
+  } else if (e.key === 'Enter') {
+    const u = list[active.value]
+    if (!u || searching.value || rowBusy.value) return
+    e.preventDefault()
+    if (u.relation === 'none') addHit(u)
+    else if (u.relation === 'incoming') acceptHit(u)
+    else navigateTo(profilePath(u))
+  }
 }
 async function addHit(u: Hit) {
   rowBusy.value = u.id; err.value = ''
@@ -163,11 +194,17 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
         <section class="c-card">
           <h2 class="c-h2">{{ $t('me.friends.addTitle') }}</h2>
           <label class="c-field"><span>{{ $t('me.friends.searchLabel') }}</span>
-            <input v-model="q" type="search" maxlength="120" autocomplete="off" aria-controls="fr-hits" :placeholder="$t('me.friends.searchPh')" @keydown.esc="q = ''">
+            <input
+              v-model="q" type="search" maxlength="120" autocomplete="off" spellcheck="false"
+              role="combobox" aria-autocomplete="list" aria-controls="fr-hits" aria-describedby="fr-hint"
+              :aria-expanded="!!hits?.length" :aria-activedescendant="active >= 0 ? `fr-hit-${active}` : undefined"
+              :placeholder="$t('me.friends.searchPh')" @keydown="onKey"
+            >
           </label>
           <p v-if="searching" class="c-mute c-m0" role="status">{{ $t('me.friends.searching') }}</p>
-          <ul v-if="hits?.length" id="fr-hits" class="fr-hits" :aria-label="$t('me.friends.searchResults')">
-            <li v-for="u in hits" :key="u.id" class="fr-hit">
+          <p v-else-if="hits?.length" id="fr-hint" class="c-mute c-m0 fr-hint">{{ $t('me.friends.searchHint') }}</p>
+          <ul v-if="hits?.length" id="fr-hits" class="fr-hits" role="listbox" :aria-label="$t('me.friends.searchResults')">
+            <li v-for="(u, i) in hits" :id="`fr-hit-${i}`" :key="u.id" class="fr-hit" role="option" :aria-selected="i === active" :class="{ on: i === active }" @mouseenter="active = i">
               <img v-if="u.avatar_url" :src="u.avatar_url" alt="" class="fr-ava" loading="lazy">
               <span v-else class="fr-ava" aria-hidden="true">{{ initial(u.display_name) }}</span>
               <span class="c-grow fr-hit-t">
@@ -233,8 +270,10 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 .fr-top .c-h2,.fr-side .c-h2{font-size:15px;font-family:var(--font)}
 .fr-side .c-card>form .c-btn,.fr-side .c-card>.c-btn{margin-right:8px}
 .fr-hits{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--ink-line)}
-.fr-hit{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.fr-hit{display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line)}
 .fr-hit .fr-ava{width:36px;height:36px;object-fit:cover}
+.fr-hit.on{background:var(--bg-alt);box-shadow:inset 3px 0 0 var(--red)}
+.fr-hint{font-size:12px}
 .fr-hit-t{min-width:0;overflow-wrap:anywhere}
 .fr-hit-s{display:block}
 .fr-hit mark{background:none;color:inherit;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}

@@ -206,8 +206,12 @@ struct SearchQuery {
     q: String,
 }
 
-/// 加好友的邊打邊搜：全站依名稱（包含）、handle（前綴）、Email（完全相符）找人；輸入 Email 時只做完全相符。
-/// 排序：完全相符 → 自己 / 好友 → 共同好友多者 → 名稱。
+/// 加好友的邊打邊搜（autocomplete）：全站依名稱、handle、Email 找人，不分大小寫。
+/// - 比對：以空白切詞，每個詞都要命中「名稱包含」或「handle 前綴」（`eric th` 找得到 Eric Theng）；
+///   另外名稱 / handle / Email 完全相符也算。輸入 Email（中間有 @）時只做完全相符。
+/// - 排序：自己 → 好友 → 共同好友多者 → 一般陌生人；同一層內依比對品質
+///   （完全相符 → 名稱或 handle 前綴 → 名稱中某個字的開頭 → 包含）再依名稱。
+/// - 最多 8 筆；完全相符者一定入選（先保證入選、再依上列排序），不會被前面的層級擠掉。
 // shortcut: ILIKE '%q%' 是全表掃描，使用者量大到搜尋變慢時再加 pg_trgm GIN 索引
 async fn search(
     u: CurrentUser,
@@ -215,7 +219,11 @@ async fn search(
     Query(p): Query<SearchQuery>,
 ) -> R<Json<Value>> {
     ratelimit::check(&st.pool, &format!("user_search:{}", u.id), 600, 3600).await?;
-    let q = p.q.trim().to_lowercase();
+    let q =
+        p.q.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase();
     if q.is_empty() || q.chars().count() > 100 {
         return Ok(Json(json!({ "users": [] })));
     }
@@ -228,33 +236,64 @@ async fn search(
     // 打的是 Email（中間有 @）就只做完全相符，不做部分比對，避免邊打邊試出別人的信箱。
     // 名稱含 @（多半是把信箱當名字）的人同理不參與部分比對，只有打出完整名稱才找得到。
     let partial = !(q.contains('@') && !q.starts_with('@'));
+    // 切詞；只剩 @ 的詞丟掉（否則 handle LIKE '%' 會命中所有人）。沒有可用的詞就只剩完全相符。
+    let tokens: Vec<String> = if partial {
+        q.split(' ')
+            .filter(|t| !t.trim_start_matches('@').is_empty())
+            .take(5)
+            .map(esc)
+            .collect()
+    } else {
+        vec![]
+    };
+    let tokens = (!tokens.is_empty()).then_some(tokens);
     #[allow(clippy::type_complexity)]
     let rows: Vec<(Uuid, String, Option<String>, Option<String>, String, i64)> = sqlx::query_as(
-        "WITH mine AS (SELECT CASE WHEN user_a = $1 THEN user_b ELSE user_a END AS id FROM friendships WHERE $1 IN (user_a, user_b))
-         SELECT u.id, u.display_name, u.handle, u.avatar_key,
-                CASE WHEN u.id = $1 THEN 'self'
-                     WHEN u.id IN (SELECT id FROM mine) THEN 'friend'
-                     WHEN EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = u.id) THEN 'outgoing'
-                     WHEN EXISTS (SELECT 1 FROM friend_requests WHERE from_user = u.id AND to_user = $1) THEN 'incoming'
-                     ELSE 'none' END AS relation,
-                (SELECT count(*) FROM friendships f
-                  WHERE (f.user_a = u.id AND f.user_b IN (SELECT id FROM mine))
-                     OR (f.user_b = u.id AND f.user_a IN (SELECT id FROM mine))) AS mutual
-           FROM users u
-          WHERE u.deleted_at IS NULL AND u.blocked_at IS NULL
-            AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = $1))
-            AND ((u.display_name NOT LIKE '%@%' AND u.display_name ILIKE $2 ESCAPE '\\')
-                 OR lower(u.display_name) = $4 OR u.handle LIKE $3 ESCAPE '\\' OR u.email = $4)
-          ORDER BY (u.handle = $5 OR u.email = $4) IS TRUE DESC, -- handle / email 為 NULL 時比較結果是 NULL，DESC 會排到最前
-                   (u.id = $1 OR u.id IN (SELECT id FROM mine)) DESC,
-                   mutual DESC, u.display_name
-          LIMIT 8",
+        "WITH mine AS (SELECT CASE WHEN user_a = $1 THEN user_b ELSE user_a END AS id FROM friendships WHERE $1 IN (user_a, user_b)),
+         cand AS (
+           SELECT u.id, u.display_name, u.handle, u.avatar_key,
+                  CASE WHEN u.id = $1 THEN 'self'
+                       WHEN u.id IN (SELECT id FROM mine) THEN 'friend'
+                       WHEN EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = u.id) THEN 'outgoing'
+                       WHEN EXISTS (SELECT 1 FROM friend_requests WHERE from_user = u.id AND to_user = $1) THEN 'incoming'
+                       ELSE 'none' END AS relation,
+                  (SELECT count(*) FROM friendships f
+                    WHERE (f.user_a = u.id AND f.user_b IN (SELECT id FROM mine))
+                       OR (f.user_b = u.id AND f.user_a IN (SELECT id FROM mine))) AS mutual,
+                  -- handle / email 為 NULL 時比較結果是 NULL，一律 COALESCE 成 false
+                  CASE WHEN COALESCE(u.handle = $4 OR u.email = $3 OR lower(u.display_name) = $3, false) THEN 0
+                       WHEN COALESCE((u.display_name NOT LIKE '%@%' AND lower(u.display_name) LIKE $5 ESCAPE '\\')
+                                     OR u.handle LIKE $6 ESCAPE '\\', false) THEN 1
+                       WHEN COALESCE(u.display_name NOT LIKE '%@%' AND lower(u.display_name) LIKE $7 ESCAPE '\\', false) THEN 2
+                       ELSE 3 END AS match_rank
+             FROM users u
+            WHERE u.deleted_at IS NULL AND u.blocked_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = $1))
+              AND (COALESCE(lower(u.display_name) = $3 OR u.handle = $4 OR u.email = $3, false)
+                   OR (COALESCE(cardinality($2::text[]), 0) > 0
+                       AND NOT EXISTS (SELECT 1 FROM unnest($2::text[]) t(tok)
+                                        WHERE NOT COALESCE((u.display_name NOT LIKE '%@%' AND u.display_name ILIKE '%' || tok || '%' ESCAPE '\\')
+                                                           OR u.handle LIKE ltrim(tok, '@') || '%' ESCAPE '\\', false))))
+         ),
+         ranked AS (
+           SELECT c.*, CASE WHEN relation = 'self' THEN 0 WHEN relation = 'friend' THEN 1 WHEN mutual > 0 THEN 2 ELSE 3 END AS tier
+             FROM cand c
+         ),
+         picked AS (
+           SELECT * FROM ranked
+            ORDER BY (match_rank = 0) DESC, tier, CASE WHEN tier = 2 THEN -mutual ELSE 0 END, match_rank, lower(display_name), id
+            LIMIT 8
+         )
+         SELECT id, display_name, handle, avatar_key, relation, mutual FROM picked
+          ORDER BY tier, CASE WHEN tier = 2 THEN -mutual ELSE 0 END, match_rank, lower(display_name), id",
     )
     .bind(u.id)
-    .bind(partial.then(|| format!("%{}%", esc(&q))))
-    .bind(partial.then(|| format!("{}%", esc(bare))))
+    .bind(tokens)
     .bind(&q)
     .bind(bare)
+    .bind(partial.then(|| format!("{}%", esc(&q))))
+    .bind(partial.then(|| format!("{}%", esc(bare))))
+    .bind(partial.then(|| format!("% {}%", esc(&q))))
     .fetch_all(&st.pool)
     .await?;
     let users: Vec<Value> = rows

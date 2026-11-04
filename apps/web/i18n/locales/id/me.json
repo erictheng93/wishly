@@ -211,6 +211,7 @@
       "searchLabel": "Cari orang",
       "searchPh": "Nama, {'@'}handle, atau email lengkap",
       "searchResults": "Hasil pencarian",
+      "searchHint": "Gunakan ↑↓ untuk memilih, Enter untuk menambah atau menerima",
       "searching": "Mencari…",
       "noMatch": "Tidak ada pengguna yang cocok",
       "relSelf": "Kamu",
