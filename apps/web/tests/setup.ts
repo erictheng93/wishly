@@ -1,6 +1,7 @@
 // 測試環境沒有 Nuxt：用 zh-Hant 語系檔提供 t / $t / useI18n / useNuxtApp().$i18n（直接賦值，不受 vi.unstubAllGlobals 影響）
 import { readdirSync, readFileSync } from 'node:fs'
 import { ref } from 'vue'
+import { localizedPath, stripLocale } from '../app/utils/localized'
 
 const dir = `${process.cwd()}/i18n/locales/zh-Hant/`
 const messages: Record<string, any> = {}
@@ -12,4 +13,4 @@ export const t = (key: string, params: Record<string, any> = {}): string => {
 }
 const te = (key: string) => typeof key.split('.').reduce((o: any, k) => o?.[k], messages) === 'string'
 const i18n = { t, te, locale: ref('zh-Hant') }
-Object.assign(globalThis, { useI18n: () => i18n, useNuxtApp: () => ({ $i18n: i18n }) })
+Object.assign(globalThis, { localizedPath, stripLocale, useI18n: () => i18n, useNuxtApp: () => ({ $i18n: i18n }) })

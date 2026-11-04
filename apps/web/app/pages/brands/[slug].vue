@@ -17,7 +17,7 @@ const { products, next, error: pErr, refresh: pRefresh, more, busy, moreErr } = 
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="notFound" class="g-center"><h1>{{ $t('guest.brands.notFound') }}</h1><NuxtLink to="/brands">{{ $t('guest.brands.back') }}</NuxtLink></div>
+    <div v-if="notFound" class="g-center"><h1>{{ $t('guest.brands.notFound') }}</h1><NuxtLink :to="localizedPath('/brands', $i18n.locale)">{{ $t('guest.brands.back') }}</NuxtLink></div>
     <div v-else-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="brand">
       <p class="x-idx" aria-hidden="true"><span>INDEX / 031</span><span>BRAND FILE</span></p>

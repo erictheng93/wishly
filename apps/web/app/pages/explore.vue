@@ -29,13 +29,13 @@ async function more() {
   <main class="g-wrap">
     <p class="x-idx" aria-hidden="true"><span>INDEX / 010</span><span>PUBLIC REGISTRY</span></p>
     <h1>{{ $t('guest.explore.heading') }}</h1>
-    <NuxtLink v-if="orgsOn" to="/e" class="g-banner x-relief"><b>{{ $t('guest.relief.banner') }}</b>・{{ $t('guest.relief.bannerBody') }}</NuxtLink>
+    <NuxtLink v-if="orgsOn" :to="localizedPath('/e', $i18n.locale)" class="g-banner x-relief"><b>{{ $t('guest.relief.banner') }}</b>・{{ $t('guest.relief.bannerBody') }}</NuxtLink>
     <div v-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.explore.empty') }}</div>
     <div v-else class="g-grid">
       <article v-for="(w, i) in list" :key="w.slug" class="g-card x-card">
         <div class="x-cv"><img class="x-cover" :src="coverSrc(w)" alt="" loading="lazy"><span class="x-no" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span></div>
-        <NuxtLink :to="`/s/${w.slug}`" class="x-title">{{ w.title }}</NuxtLink>
+        <NuxtLink :to="localizedPath(`/s/${w.slug}`, $i18n.locale)" class="x-title">{{ w.title }}</NuxtLink>
         <p class="g-mute">
           {{ typeLabel(w.type) }}・{{ $t('guest.explore.itemCount', { n: w.item_count }, w.item_count) }}<template v-if="w.event_date">・{{ w.event_date }}</template>
           <template v-if="w.owner?.display_name">{{ $t('guest.explore.by') }}

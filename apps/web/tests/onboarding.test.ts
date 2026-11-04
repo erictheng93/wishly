@@ -33,6 +33,7 @@ it('在該步驟的頁面才顯示「怎麼做」', () => {
   expect(onTourPage('publish', '/lists/w2/edit', null)).toBe(true)
   expect(onTourPage('give', '/s/abc')).toBe(true)
   expect(onTourPage('give', '/explore')).toBe(true)
+  expect(onTourPage('give', '/vi/s/abc')).toBe(true)
   expect(onTourPage('give', '/dashboard')).toBe(false)
 })
 

@@ -1,7 +1,7 @@
 // 部署：Cloudflare Pages（docs D48，使用者基於成本選擇）
 // 原生殼（Tauri）建置：NUXT_NATIVE=1 nuxt generate → 純 SPA 靜態檔（無 SSR、無 service worker、不走 Cloudflare preset）
 const native = !!process.env.NUXT_NATIVE
-import { SCENE_LOCALES } from './app/utils/scenes'
+import { isLocalizable, PREFIX_LOCALES } from './app/utils/localized'
 
 // 語系檔依功能區拆開（i18n/locales/<語系>/<區>.json，檔內最外層 key 即區名），各區獨立維護
 const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire']
@@ -17,12 +17,15 @@ export default defineNuxtConfig({
     langDir: 'locales',
     detectBrowserLanguage: { useCookie: true, cookieKey: 'ws_locale', fallbackLocale: 'zh-Hant', redirectOn: 'root' },
   },
-  // 情境落地頁的語系前綴網址（全站 no_prefix，只有這幾頁要讓 en / vi / id 被搜尋收錄）；頁面依 meta.lang 切語系
+  // 可收錄公開頁的語系前綴網址（全站 no_prefix，見 utils/localized.ts）；middleware/locale-prefix.global 依 meta.lang 切語系
   hooks: {
     'pages:extend'(pages) {
-      const scene = pages.find(p => p.path === '/inspire/:scene()')
-      if (!scene) throw new Error('找不到 /inspire/:scene() 頁面')
-      for (const lang of SCENE_LOCALES) pages.push({ ...scene, name: `inspire-scene-${lang}`, path: `/${lang}/inspire/:scene()`, meta: { ...scene.meta, lang } })
+      const src = pages.filter(p => isLocalizable(p.path.replace(/:[^/]+/g, 'x')))
+      if (src.length < 10) throw new Error(`可收錄頁面只找到 ${src.length} 個，路由命名可能變了`)
+      for (const p of src) {
+        if (p.children?.length) throw new Error(`${p.path} 有子路由，pages:extend 需要一併處理`)
+        for (const lang of PREFIX_LOCALES) pages.push({ ...p, name: `${p.name}___${lang}`, path: p.path === '/' ? `/${lang}` : `/${lang}${p.path}`, meta: { ...p.meta, lang } })
+      }
     },
   },
   compatibilityDate: '2026-10-01',

@@ -1,3 +1,4 @@
+import { stripLocale } from '~/utils/localized'
 // 新手導覽（D66）：個人資料 → 建立清單 → 加品項 → 發佈（受捐人）→ 捐助（捐助人）。
 // 步驟完成與否由後端從資料推導（GET /me/onboarding）；這裡只決定「目前步驟要帶去哪、在哪一頁顯示提示」
 export type TourStep = 'profile' | 'wishlist' | 'item' | 'publish' | 'give'
@@ -18,6 +19,7 @@ export function tourTarget(step: TourStep | null, wishlistId?: string | null): s
 
 /** 是否已在該步驟要操作的頁面（顯示「怎麼做」而非「前往」）；捐助在探索頁與任何分享頁都算 */
 export function onTourPage(step: TourStep | null, path: string, wishlistId?: string | null): boolean {
+  path = stripLocale(path) // 公開頁可能帶語系前綴（utils/localized.ts）
   if (step === 'give') return path === '/explore' || path.startsWith('/s/')
   if (step === 'item' || step === 'publish') return wishlistId ? path === `/lists/${wishlistId}/edit` : /^\/lists\/[^/]+\/edit$/.test(path)
   return path === tourTarget(step, wishlistId)

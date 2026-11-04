@@ -1,15 +1,9 @@
 <script setup lang="ts">
 // 情境落地頁：接「生日禮物清單」這類搜尋（SSR）；文案在 i18n/locales/*/inspire.json，精選商品沿用商品目錄的場合篩選
-// 語系前綴網址（/en|vi|id/inspire/{slug}）由 nuxt.config 的 pages:extend 產生，route.meta.lang 指定語系
-const route = useRoute()
-const slug = String(route.params.scene)
+const slug = String(useRoute().params.scene)
 const scene = sceneBySlug(slug)
 if (!scene) throw createError({ statusCode: 404, fatal: true })
-const { t, tm, rt, locale, setLocale } = useI18n()
-const lang = route.meta.lang as typeof locale.value | undefined
-if (lang && locale.value !== lang) await setLocale(lang)
-// 切換語系 → 換到該語系的網址，網址與內容一致（zh-Hant 回無前綴）
-watch(locale, l => navigateTo(scenePath(slug, l), { replace: true }))
+const { t, tm, rt, locale } = useI18n()
 
 const k = `inspire.scenes.${slug}`
 const pairs = (key: string, a: string, b: string) => (tm(`${k}.${key}`) as any[]).map(x => ({ [a]: rt(x[a]), [b]: rt(x[b]) }))
@@ -21,10 +15,8 @@ const c = computed(() => ({
 
 const { public: { siteUrl } } = useRuntimeConfig()
 useSeoMeta({ title: () => t(`${k}.seoTitle`), description: () => c.value.seoDesc, ogTitle: () => c.value.heading, ogDescription: () => c.value.seoDesc, ogType: 'article' })
-const alt = (hreflang: string, l: string) => ({ key: `alt-${hreflang}`, rel: 'alternate' as const, hreflang, href: siteUrl + scenePath(slug, l) })
 useHead({
-  link: [alt('zh-Hant', 'zh-Hant'), ...SCENE_LOCALES.map(l => alt(l, l)), alt('x-default', 'zh-Hant')],
-  script: computed(() => [ldScript(faqLd(c.value.faq)), ldScript(breadcrumbLd(siteUrl, [[t('guest.inspire.heading'), '/inspire'], [c.value.label, scenePath(slug, locale.value)]]))]),
+  script: computed(() => [ldScript(faqLd(c.value.faq)), ldScript(breadcrumbLd(siteUrl, [[t('guest.inspire.heading'), '/inspire'], [c.value.label, localizedPath(`/inspire/${slug}`, locale.value)]]))]),
 })
 const { products } = scene.occasion
   ? await useCatalog(`scene-${slug}`, () => ({ recipient: '', occasion: scene.occasion!, budget: '' }))
@@ -65,7 +57,7 @@ const others = SCENES.filter(s => s.slug !== slug)
 
     <section>
       <h2>{{ $t('inspire.ui.others') }}</h2>
-      <p class="g-chips"><NuxtLink v-for="s in others" :key="s.slug" class="g-btn ghost sm" :to="scenePath(s.slug, $i18n.locale)">{{ $t(`inspire.scenes.${s.slug}.heading`) }}</NuxtLink></p>
+      <p class="g-chips"><NuxtLink v-for="s in others" :key="s.slug" class="g-btn ghost sm" :to="localizedPath(`/inspire/${s.slug}`, $i18n.locale)">{{ $t(`inspire.scenes.${s.slug}.heading`) }}</NuxtLink></p>
     </section>
   </main>
 </template>

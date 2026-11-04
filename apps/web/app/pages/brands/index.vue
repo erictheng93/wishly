@@ -19,7 +19,7 @@ const brands = computed<any[]>(() => data.value?.brands ?? [])
         <span class="x-no" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span>
         <img v-if="b.logo_url" class="x-logo" :src="b.logo_url" alt="" loading="lazy">
         <div v-else class="x-logo x-ph" aria-hidden="true">{{ b.name.slice(0, 1) }}</div>
-        <NuxtLink :to="`/brands/${b.slug}`" class="x-title">{{ b.name }}</NuxtLink>
+        <NuxtLink :to="localizedPath(`/brands/${b.slug}`, $i18n.locale)" class="x-title">{{ b.name }}</NuxtLink>
         <p v-if="b.description" class="g-mute">{{ b.description }}</p>
       </article>
     </div>

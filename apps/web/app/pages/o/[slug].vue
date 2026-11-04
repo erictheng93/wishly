@@ -20,7 +20,7 @@ useSeoMeta({
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="notFound" class="c-nf"><h1>{{ $t('guest.relief.orgNotFound') }}</h1><NuxtLink to="/e">{{ $t('guest.relief.back') }}</NuxtLink></div>
+    <div v-if="notFound" class="c-nf"><h1>{{ $t('guest.relief.orgNotFound') }}</h1><NuxtLink :to="localizedPath('/e', $i18n.locale)">{{ $t('guest.relief.back') }}</NuxtLink></div>
     <div v-else-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="org">
       <header class="x-head">
@@ -41,8 +41,8 @@ useSeoMeta({
       <div v-else class="g-grid">
         <article v-for="(s, n) in org.sites" :key="s.slug" class="g-card">
           <span class="x-no" aria-hidden="true">SITE {{ String(n + 1).padStart(2, '0') }}</span>
-          <NuxtLink :to="`/s/${s.slug}`" class="x-title">{{ s.title }}</NuxtLink>
-          <p class="g-mute">{{ $t('guest.relief.event') }}：<NuxtLink :to="`/e/${s.event.slug}`">{{ s.event.name }}</NuxtLink></p>
+          <NuxtLink :to="localizedPath(`/s/${s.slug}`, $i18n.locale)" class="x-title">{{ s.title }}</NuxtLink>
+          <p class="g-mute">{{ $t('guest.relief.event') }}：<NuxtLink :to="localizedPath(`/e/${s.event.slug}`, $i18n.locale)">{{ s.event.name }}</NuxtLink></p>
           <p class="g-mute"><a :href="mapsUrl(s.site_address)" target="_blank" rel="noopener">{{ s.site_address }}</a></p>
         </article>
       </div>

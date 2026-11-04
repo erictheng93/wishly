@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { OCCASIONS } from '../app/utils/catalog'
-import { SCENE_LOCALES, SCENES, sceneBySlug, scenePath } from '../app/utils/scenes'
+import { SCENES, sceneBySlug } from '../app/utils/scenes'
+import { SEO_LOCALES } from '../app/utils/localized'
 import { breadcrumbLd } from '../app/utils/seo'
 
 const load = (l: string) => JSON.parse(readFileSync(new URL(`../i18n/locales/${l}/inspire.json`, import.meta.url), 'utf8')).inspire
@@ -17,7 +18,7 @@ it('情境落地頁結構：slug 唯一、場合對得上商品目錄', () => {
   expect(sceneBySlug('nope')).toBeUndefined()
 })
 
-it.each(['zh-Hant', ...SCENE_LOCALES])('%s 文案齊全、與繁中同結構、沒有未跳脫的 vue-i18n 特殊字元', (l) => {
+it.each(SEO_LOCALES)('%s 文案齊全、與繁中同結構、沒有未跳脫的 vue-i18n 特殊字元', (l) => {
   const m = load(l)
   expect(Object.keys(m.ui).sort()).toEqual(Object.keys(zh.ui).sort())
   expect(Object.keys(m.scenes).sort()).toEqual(SCENES.map(s => s.slug).sort())
@@ -34,11 +35,6 @@ it.each(['zh-Hant', ...SCENE_LOCALES])('%s 文案齊全、與繁中同結構、�
   // `|` 是複數分隔、`@` 是連結訊息、`{}` 是插值：只允許 {'|'}
   const leaves = (v: any): string[] => typeof v === 'string' ? [v] : Object.values(v).flatMap(leaves)
   for (const v of leaves(m)) expect(v.replaceAll(`{'|'}`, '')).not.toMatch(/[|@${}]/)
-})
-
-it('語系前綴網址：zh-Hant 無前綴', () => {
-  expect(scenePath('birthday', 'zh-Hant')).toBe('/inspire/birthday')
-  expect(scenePath('birthday', 'vi')).toBe('/vi/inspire/birthday')
 })
 
 it('麵包屑帶完整網址與順序', () => {

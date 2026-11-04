@@ -48,6 +48,7 @@ node mocks/server.mjs                      # 訪客端契約 mock，:8080（slug
 
 **前端**（`apps/web`）：
 - `/s/[slug]` 為 SSR 分享頁（LINE/FB 預覽）；創建者頁面（dashboard、lists、settings、admin、登入等）在 `nuxt.config.ts` 的 `routeRules` 設為 `ssr: false`（靠 cookie 驗證），新增創建者路由要加進該清單。
+- 多語系：i18n 為 `no_prefix`（語系存 cookie `ws_locale`），但可收錄的公開頁（`utils/localized.ts` 的 `LOCALIZABLE`：首頁、探索、靈感與情境頁、品牌、`/s`、`/e`、`/org`、`/o`、條款）另有 `/en|vi|id/...` 前綴網址：`nuxt.config` 的 `pages:extend` 複製路由並帶 `meta.lang`，`middleware/locale-prefix.global.ts` 切語系（會寫 cookie），`app.vue` 輸出 hreflang 並在切語言時換網址，sitemap 列出各語系。**新增公開頁要加進 `LOCALIZABLE` 與 sitemap**；公開頁之間的站內連結用 `localizedPath(path, locale)`，分享出去的網址（OG、複製連結）維持無前綴；比對 `route.path` 前先 `stripLocale`。情境頁文案在 `i18n/locales/*/inspire.json`。
 - API 在不同網域：`useApi()`（創建者，`credentials: 'include'`，把錯誤正規化為 `CreatorApiError`，401 自動導向登入）與 `useGuest()`（訪客權杖）。即時更新 `useWishlistEvents` 用 SSE，連續失敗 2 次改輪詢。
 - 原生殼（Tauri）：`npm run build:native`（`NUXT_NATIVE=1`，建置時常數 `__NATIVE__`）產出純 SPA。webview 跨站不送 cookie，所以登入帶 `X-Native-Client` 取 `session_token` 後走 `Authorization: Bearer`（`utils/native.ts`、後端 `session::session_token`）；`session_token` 只在請求 `Origin` 屬於 `NATIVE_ORIGINS` 時發出（`auth::native_client`），網頁 origin 拿不到；權杖存 OS keychain（`src-tauri` 的 `session_token_*` 指令），記憶體持有；CORS 來源由 `NATIVE_ORIGINS` 控制。新增直接 `$fetch` 的受保護請求要帶 `nativeHeaders()`。
 - 部署 Cloudflare Pages。`NUXT_DEMO` 與 `NUXT_PUBLIC_API_BASE` 是**建置時**變數：`npm run deploy`（正式）與 `deploy:demo`（只有 `/s/demo` 假資料，`server/routes/api/v1/public/...` 僅此時啟用，勿給真實使用者）；`wrangler.jsonc` 刻意不放 `vars`。

@@ -198,7 +198,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="gone" class="g-center"><span class="sx-code" aria-hidden="true">410</span><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-if="gone" class="g-center"><span class="sx-code" aria-hidden="true">410</span><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></div>
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
     <div v-else-if="forbidden" class="g-center">
         <span class="sx-code" aria-hidden="true">403</span>
@@ -211,16 +211,16 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
           <p v-if="friendErr" class="g-banner err" role="alert">{{ friendErr }}</p>
           <p v-if="gate.owner.handle"><NuxtLink class="g-link" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink></p>
         </template>
-      <p><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></p>
+      <p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
     <div v-else-if="failed && !data" class="g-center"><span class="sx-code" aria-hidden="true">ERR</span><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
-    <div v-else-if="!data" class="g-center"><span class="sx-code" aria-hidden="true">404</span><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink to="/">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-else-if="!data" class="g-center"><span class="sx-code" aria-hidden="true">404</span><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></div>
     <template v-else>
       <div class="g-banner g-nojs">{{ $t('guest.slug.noJs') }}</div>
       <div v-if="!online" class="g-banner">{{ $t('guest.slug.offline') }}</div>
       <div v-if="lineHint" class="g-banner">{{ $t('guest.slug.lineHint') }}<button class="g-link" @click="dismissHint">{{ $t('guest.slug.gotIt') }}</button></div>
       <div v-if="data.status === 'closed'" class="g-banner">{{ $t('guest.slug.closed') }}</div>
-      <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="`/s/${k}`" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
+      <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="localizedPath(`/s/${k}`, $i18n.locale)" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
       <section class="sx-hero">
         <div class="sx-cover"><img :src="coverSrc(data)" alt="" class="g-cover"><span class="sx-tag" aria-hidden="true">WISHLIST / {{ data.status === 'closed' ? 'CLOSED' : 'OPEN' }}</span></div>
         <div class="sx-main">
@@ -229,8 +229,8 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
             <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
           </p>
           <p v-if="data.org" class="g-mute">
-            <NuxtLink :to="`/o/${data.org.slug}`">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
-            <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="`/e/${data.event.slug}`">{{ data.event.name }}</NuxtLink></template>
+            <NuxtLink :to="localizedPath(`/o/${data.org.slug}`, $i18n.locale)">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
+            <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="localizedPath(`/e/${data.event.slug}`, $i18n.locale)">{{ data.event.name }}</NuxtLink></template>
           </p>
           <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
           <p v-if="data.description" class="sx-desc">{{ data.description }}</p>
@@ -261,8 +261,8 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <div class="g-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
         <button class="g-link" @click="reporting = true">{{ $t('guest.report.title') }}</button>
-        ・<NuxtLink to="/terms">{{ $t('guest.slug.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('guest.slug.privacy') }}</NuxtLink>
-        <p><NuxtLink to="/">{{ $t('guest.slug.madeWith') }}</NuxtLink></p>
+        ・<NuxtLink :to="localizedPath('/terms', $i18n.locale)">{{ $t('guest.slug.terms') }}</NuxtLink>・<NuxtLink :to="localizedPath('/privacy', $i18n.locale)">{{ $t('guest.slug.privacy') }}</NuxtLink>
+        <p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.slug.madeWith') }}</NuxtLink></p>
       </div>
     </template>
 

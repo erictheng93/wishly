@@ -73,7 +73,7 @@ async function submit() {
       <p class="g-mute">{{ $t('guest.fund.notice') }}</p>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}
         <NuxtLink v-if="needWallet" to="/me/wallet">{{ $t('guest.fund.viewWallet') }}</NuxtLink>
-        <NuxtLink v-if="needLogin" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.fund.relogin') }}</NuxtLink>
+        <NuxtLink v-if="needLogin" :to="{ path: '/login', query: { redirect: localizedPath(`/s/${slug}`, $i18n.locale) } }">{{ $t('guest.fund.relogin') }}</NuxtLink>
       </div>
       <button class="g-btn" :disabled="busy || !online">{{ !online ? $t('guest.fund.offline') : busy ? $t('guest.sending') : $t('guest.fund.confirm', { pts: valid ? $t('guest.pts', { n: fmtPts(points as number) }) : '' }) }}</button>
       <button type="button" class="g-link" @click="emit('close')">{{ $t('guest.cancel') }}</button>
