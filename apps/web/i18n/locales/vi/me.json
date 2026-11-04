@@ -211,6 +211,7 @@
       "searchLabel": "Tìm người dùng",
       "searchPh": "Tên, {'@'}handle hoặc email đầy đủ",
       "searchResults": "Kết quả tìm kiếm",
+      "searchHint": "Dùng ↑↓ để chọn, Enter để kết bạn hoặc chấp nhận",
       "searching": "Đang tìm…",
       "noMatch": "Không có người dùng phù hợp",
       "relSelf": "Bạn",

@@ -211,6 +211,7 @@
       "searchLabel": "Search people",
       "searchPh": "Name, {'@'}handle or full email",
       "searchResults": "Search results",
+      "searchHint": "Use ↑↓ to choose, Enter to add or accept",
       "searching": "Searching…",
       "noMatch": "No matching users",
       "relSelf": "You",

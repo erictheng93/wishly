@@ -211,6 +211,7 @@
       "searchLabel": "搜尋使用者",
       "searchPh": "輸入名稱、{'@'}代號或完整 Email",
       "searchResults": "搜尋結果",
+      "searchHint": "用 ↑↓ 選擇，Enter 加好友或接受邀請",
       "searching": "搜尋中…",
       "noMatch": "找不到符合的使用者",
       "relSelf": "你",
