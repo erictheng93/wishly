@@ -44,3 +44,21 @@ pub async fn middleware(
     }
     res
 }
+
+/// 稽核單筆寫入的共用入口：自動帶入請求脈絡（背景工作為 NULL）。
+#[allow(clippy::too_many_arguments)]
+pub async fn insert<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    actor_type: &str,
+    actor_id: Option<uuid::Uuid>,
+    action: &str,
+    entity: &str,
+    entity_id: Option<uuid::Uuid>,
+    diff: Option<serde_json::Value>,
+) -> Result<(), sqlx::Error> {
+    let c = current();
+    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent) VALUES ($1::actor_type, $2, $3, $4, $5, $6, $7::inet, $8, $9)")
+        .bind(actor_type).bind(actor_id).bind(action).bind(entity).bind(entity_id).bind(diff)
+        .bind(c.ip).bind(c.request_id).bind(c.user_agent).execute(ex).await?;
+    Ok(())
+}

@@ -276,7 +276,16 @@ async fn delete_me(
         .bind(gid)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('guest', $1, 'guest.delete', 'guests', $1)").bind(gid).execute(&mut *tx).await?;
+    crate::audit_ctx::insert(
+        &mut *tx,
+        "guest",
+        Some(gid),
+        "guest.delete",
+        "guests",
+        Some(gid),
+        None,
+    )
+    .await?;
     tx.commit().await?;
     Ok((
         StatusCode::NO_CONTENT,

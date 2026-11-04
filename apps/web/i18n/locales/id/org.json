@@ -225,7 +225,38 @@
       "empty": "Belum ada catatan",
       "staff": "Staf platform",
       "system": "Sistem",
-      "a": {}
+      "a": {
+        "org_update": "Memperbarui organisasi",
+        "org_create": "Membuat organisasi",
+        "org_submit": "Mengajukan peninjauan",
+        "org_withdraw": "Menarik pengajuan",
+        "org_review": "Peninjauan platform",
+        "org_member_update": "Memperbarui anggota",
+        "org_invite_create": "Membuat undangan",
+        "org_invite_cancel": "Membatalkan undangan",
+        "org_invite_accept": "Menerima undangan",
+        "org_document_upload": "Mengunggah dokumen",
+        "org_document_download": "Mengunduh dokumen",
+        "org_document_delete": "Menghapus dokumen",
+        "org_permit_create": "Menambahkan izin",
+        "org_permit_apply": "Menerapkan izin",
+        "permit_review": "Peninjauan izin",
+        "site_create": "Membuat posko",
+        "receipt_create": "Mencatat barang diterima",
+        "relief_event_create": "Membuat peristiwa",
+        "relief_event_edit": "Mengedit peristiwa",
+        "relief_event_merge": "Menggabungkan peristiwa",
+        "relief_event_moderate": "Moderasi peristiwa",
+        "wishlist_create": "Membuat daftar",
+        "wishlist_update": "Memperbarui daftar",
+        "wishlist_archive": "Mengarsipkan daftar",
+        "wishlist_shipping_address_update": "Memperbarui info pengiriman",
+        "wishlist_allowed_users_update": "Memperbarui daftar yang boleh melihat",
+        "item_create": "Menambahkan barang",
+        "item_update": "Memperbarui barang",
+        "item_delete": "Menghapus barang",
+        "item_reorder": "Mengurutkan ulang barang"
+      }
     }
   }
 }

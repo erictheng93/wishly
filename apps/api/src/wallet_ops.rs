@@ -141,8 +141,16 @@ async fn cash_refund_create(
     .bind(wallet)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff) VALUES ('user', $1, 'cash_refund.request', 'cash_refund_requests', $2, $3)")
-        .bind(user.id).bind(rid).bind(json!({ "amount": amount, "lot_allocations": alloc_json })).execute(&mut *tx).await?;
+    crate::audit_ctx::insert(
+        &mut *tx,
+        "user",
+        Some(user.id),
+        "cash_refund.request",
+        "cash_refund_requests",
+        Some(rid),
+        Some(json!({ "amount": amount, "lot_allocations": alloc_json })),
+    )
+    .await?;
     let resp = json!({
         "request": { "id": rid, "amount": amount, "status": "requested", "created_at": created_at, "completed_at": null },
         "wallet": { "balance": balance },
@@ -348,8 +356,16 @@ async fn debt_patch(
 // ================= 拒付（4.3s，D41）=================
 
 async fn system_audit(tx: &mut Tx<'_>, action: &str, topup: Uuid, diff: Value) -> R<()> {
-    sqlx::query("INSERT INTO audit_logs (actor_type, action, entity, entity_id, diff) VALUES ('system', $1, 'topups', $2, $3)")
-        .bind(action).bind(topup).bind(diff).execute(&mut **tx).await?;
+    crate::audit_ctx::insert(
+        &mut **tx,
+        "system",
+        None,
+        action,
+        "topups",
+        Some(topup),
+        Some(diff),
+    )
+    .await?;
     Ok(())
 }
 

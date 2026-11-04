@@ -28,6 +28,14 @@ describe('i18n 語系訊息', () => {
     expect(broken).toEqual([])
   })
 
+  // 路徑以點分層：鍵本身含點就永遠查不到（t() 直接回傳鍵名）；動作代碼當鍵要先把點換成底線
+  it('鍵名不含點', () => {
+    const dotted = (o: unknown, at: string): string[] => o && typeof o === 'object'
+      ? Object.entries(o).flatMap(([k, v]) => [...(k.includes('.') ? [`${at}.${k}`] : []), ...dotted(v, `${at}.${k}`)])
+      : []
+    expect(readdirSync(root).flatMap(l => readdirSync(join(root, l)).flatMap(f => dotted(JSON.parse(readFileSync(join(root, l, f), 'utf8')), `${l}/${f}`)))).toEqual([])
+  })
+
   // 刻意的複數「{n} item | {n} items」：每段都有插值才放行
   it('沒有未跳脫的 |（字面請寫 {\'|\'}）', () => {
     const stray = (v: string) => { const s = v.replaceAll("{'|'}", ''); return s.includes('|') && !s.split('|').every(p => p.includes('{')) }

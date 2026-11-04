@@ -154,7 +154,16 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     let notifications: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('id', id, 'kind', kind, 'title', inbox_title, 'link', inbox_link, 'body', inbox_body, 'category', inbox_category, 'created_at', inbox_at, 'read_at', read_at)
            FROM notifications WHERE user_id = $1 AND inbox_at IS NOT NULL ORDER BY inbox_at, id").bind(u.id).fetch_all(&st.pool).await?;
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.export', 'users', $1)").bind(u.id).execute(&st.pool).await?;
+    crate::audit_ctx::insert(
+        &st.pool,
+        "user",
+        Some(u.id),
+        "account.export",
+        "users",
+        Some(u.id),
+        None,
+    )
+    .await?;
     let now = chrono::Utc::now();
     let mut res = Json(json!({ "exported_at": now, "user": user, "identities": identities, "wishlists": wishlists, "claims": claims,
         "wallet": wallet, "ledger": ledger, "contributions": contributions, "notifications": notifications })).into_response();
@@ -383,15 +392,16 @@ async fn delete_me(
                                                                   // F-08：取消他人清單上的 reserved 捐助並回補（purchased / delivered 已履行，保留）。鎖序同 claims::apply：先 item（依 id）後 claim。
     sqlx::query("SELECT id FROM wishlist_items WHERE id IN (SELECT item_id FROM claims WHERE user_id = $1 AND status = 'reserved') ORDER BY id FOR UPDATE")
         .bind(id).execute(&mut *tx).await?;
+    let actx = crate::audit_ctx::current();
     let wids: Vec<Uuid> = sqlx::query_scalar(
         "WITH x AS (UPDATE claims SET status = 'cancelled', cancelled_at = now(), expires_at = NULL
                      WHERE user_id = $1 AND status = 'reserved' RETURNING id, item_id, qty),
          r AS (UPDATE wishlist_items i SET qty_claimed = i.qty_claimed - s.q
                 FROM (SELECT item_id, sum(qty)::int AS q FROM x GROUP BY item_id) s
                 WHERE i.id = s.item_id RETURNING i.wishlist_id),
-         a AS (INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff)
-                SELECT 'user'::actor_type, $1, 'claim.account_delete_cancel', 'claims', id, jsonb_build_object('qty', qty) FROM x)
-         SELECT DISTINCT wishlist_id FROM r").bind(id).fetch_all(&mut *tx).await?;
+         a AS (INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, diff, ip, request_id, user_agent)
+                SELECT 'user'::actor_type, $1, 'claim.account_delete_cancel', 'claims', id, jsonb_build_object('qty', qty), $2::inet, $3, $4 FROM x)
+         SELECT DISTINCT wishlist_id FROM r").bind(id).bind(actx.ip).bind(actx.request_id).bind(actx.user_agent).fetch_all(&mut *tx).await?;
     for w in wids {
         crate::dashboard::notify(&mut *tx, w).await?;
     }
@@ -428,8 +438,16 @@ async fn delete_me(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")
         .bind(id).fetch_one(&mut *tx).await?;
-    sqlx::query("INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id) VALUES ('user', $1, 'account.delete', 'users', $1)")
-        .bind(id).execute(&mut *tx).await?;
+    crate::audit_ctx::insert(
+        &mut *tx,
+        "user",
+        Some(id),
+        "account.delete",
+        "users",
+        Some(id),
+        None,
+    )
+    .await?;
     tx.commit().await?;
     crate::uploads::drain_soon(st.pool.clone()); // 要求已隨交易提交；COMMIT 後才刪：交易失敗不會留下指向已刪物件的資料
     crate::cdn::purge_wishlists(slugs); // 已封存為 private：邊緣快取的公開副本立即清掉

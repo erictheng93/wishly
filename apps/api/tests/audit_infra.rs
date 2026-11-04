@@ -118,3 +118,32 @@ async fn staff_action_records_request_context(pool: PgPool) {
     assert!(Uuid::parse_str(h["x-request-id"].to_str().unwrap()).is_ok());
     assert_ne!(h["x-request-id"], "not-a-uuid");
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn converted_raw_insert_records_request_context(pool: PgPool) {
+    let u = common::user(&pool, "exporter").await;
+    let (s, h, _) = common::call(
+        &pool,
+        "GET",
+        "/me/export",
+        &[
+            ("authorization", format!("Bearer {}", u.token)),
+            ("user-agent", "export-test/2.0".into()),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (rq, ua): (Option<Uuid>, Option<String>) = sqlx::query_as(
+        "SELECT request_id, user_agent FROM audit_logs WHERE action='account.export' AND actor_id=$1",
+    )
+    .bind(u.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        rq.map(|r| r.to_string()).as_deref(),
+        h["x-request-id"].to_str().ok()
+    );
+    assert_eq!(ua.as_deref(), Some("export-test/2.0"));
+}
