@@ -19,6 +19,7 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/orgs", get(list))
         .route("/admin/orgs/{id}", get(detail))
         .route("/admin/orgs/{id}/review", post(review))
+        .route("/admin/orgs/{id}/restore", post(restore))
         .route("/admin/permits/{id}/review", post(review_permit))
 }
 
@@ -53,7 +54,9 @@ async fn list(
     // status=pending_permits 為偽狀態：已通過、且有待審許可的組織；每列帶 pending_permits 數量
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT o.id, to_jsonb(o) - 'contact_phone_enc'
-                || jsonb_build_object('pending_permits', (SELECT count(*) FROM org_permits p WHERE p.org_id = o.id AND p.status = 'pending'))
+                || jsonb_build_object('pending_permits', (SELECT count(*) FROM org_permits p WHERE p.org_id = o.id AND p.status = 'pending'),
+                    'restorable_until', CASE WHEN o.verification_status = 'rejected' AND o.revoked_at > now() - interval '7 days' THEN o.revoked_at + interval '7 days' END,
+                    'revoke_paused_sites', (SELECT count(*) FROM wishlists w WHERE w.org_id = o.id AND w.revoke_paused_at IS NOT NULL))
            FROM organizations o
           WHERE o.verification_status <> 'draft'
             AND ($1::text IS NULL OR CASE WHEN $1 = 'pending_permits'
@@ -79,6 +82,12 @@ async fn detail(
     let live: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlists WHERE org_id = $1 AND type = 'relief' AND status = 'active' AND deleted_at IS NULL")
         .bind(id).fetch_one(&st.pool).await?;
     org["live_sites"] = json!(live);
+    let (until, paused): (Option<chrono::DateTime<chrono::Utc>>, i64) = sqlx::query_as(
+        "SELECT CASE WHEN o.verification_status = 'rejected' AND o.revoked_at > now() - interval '7 days' THEN o.revoked_at + interval '7 days' END,
+                (SELECT count(*) FROM wishlists w WHERE w.org_id = o.id AND w.revoke_paused_at IS NOT NULL) FROM organizations o WHERE o.id = $1")
+        .bind(id).fetch_one(&st.pool).await?;
+    org["restorable_until"] = json!(until);
+    org["revoke_paused_sites"] = json!(paused);
     let documents: Value = sqlx::query_scalar("SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.created_at), '[]') FROM org_documents d WHERE org_id = $1")
         .bind(id).fetch_one(&st.pool).await?;
     let permits: Value = sqlx::query_scalar("SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at), '[]') FROM org_permits p WHERE org_id = $1")
@@ -172,12 +181,23 @@ async fn review(
             ));
         }
     }
-    sqlx::query("UPDATE organizations SET verification_status = $2, review_note = $3, flagged_fields = $4,
+    sqlx::query(
+        "UPDATE organizations SET verification_status = $2, review_note = $3, flagged_fields = $4,
                    verified_at = CASE WHEN $2 = 'verified' THEN now() END,
-                   resubmit_after = CASE WHEN $2 = 'rejected' THEN now() + interval '30 days' END WHERE id = $1")
-        .bind(id).bind(new_status).bind(&b.note)
-        .bind(if new_status == "needs_changes" { flagged.clone() } else { vec![] })
-        .execute(&mut *tx).await?;
+                   resubmit_after = CASE WHEN $2 = 'rejected' THEN now() + interval '30 days' END,
+                   revoked_at = CASE WHEN $2 = 'rejected' AND $5 THEN now() END WHERE id = $1",
+    )
+    .bind(id)
+    .bind(new_status)
+    .bind(&b.note)
+    .bind(if new_status == "needs_changes" {
+        flagged.clone()
+    } else {
+        vec![]
+    })
+    .bind(status == "verified")
+    .execute(&mut *tx)
+    .await?;
     // 撤銷已驗證的組織：其待處理檢舉視為已處置。鎖序 organizations（上面 FOR UPDATE）→ content_reports；
     // status = 'open' 不可省，以免覆寫已駁回的檢舉
     if status == "verified" && new_status == "rejected" {
@@ -185,9 +205,14 @@ async fn review(
             .bind(id).bind(sid).bind(&b.note).fetch_all(&mut *tx).await?;
         crate::notify::enqueue_report_resolved(&mut *tx, &reporters, "actioned").await?;
     }
-    // 撤銷：已上線的救災據點降為草稿（觸發器只擋 status='active'，降級不受限）
+    // 重新核准：舊撤銷留下的標記作廢，以免日後另一次撤銷的恢復動到無關的草稿據點
+    if new_status == "verified" {
+        sqlx::query("UPDATE wishlists SET revoke_paused_at = NULL WHERE org_id = $1 AND revoke_paused_at IS NOT NULL")
+            .bind(id).execute(&mut *tx).await?;
+    }
+    // 撤銷：已上線的救災據點降為草稿（觸發器只擋 status='active'，降級不受限）；revoke_paused_at 標記供 7 天內恢復
     let slugs: Vec<String> = if status == "verified" {
-        let down: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug, id")
+        let down: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET status = 'draft', revoke_paused_at = now() WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug, id")
             .bind(id).fetch_all(&mut *tx).await?;
         crate::notify::enqueue_site_paused(&mut *tx, &down.iter().map(|p| p.1).collect::<Vec<_>>())
             .await?;
@@ -226,6 +251,102 @@ async fn review(
 struct PermitReview {
     decision: String,
     note: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Restore {
+    reason: Option<String>,
+}
+
+/// 撤銷後 7 天內恢復認證。鎖序 organizations（FOR UPDATE）→ relief_events（FOR SHARE，依 id）→ wishlists，與 review / 據點上線一致。
+/// 事件在撤銷時只清快取、未被改動，故無需還原。撤銷時關閉的檢舉維持已處置；review_note 清空（原撤銷理由留在稽核紀錄）。
+/// 據點只在組織已 verified、許可仍有效、事件仍可用時回到 active（SQL 先篩，trigger 不會中止交易）；其餘維持草稿並回報 skipped。
+async fn restore(
+    Staff(sid): Staff,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Restore>,
+) -> Result<Json<Value>, AppError> {
+    let reason = crate::validate::optional_note(b.reason.as_deref(), "/reason", 500)?
+        .ok_or_else(|| AppError::invalid("/reason", "REQUIRED", "恢復認證必須填原因"))?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
+    let (status, display_name, org_slug, window_ok, revoked): (String, String, String, bool, bool) = sqlx::query_as(
+        "SELECT verification_status, display_name, slug::text, COALESCE(revoked_at > now() - interval '7 days', false), revoked_at IS NOT NULL
+           FROM organizations WHERE id = $1 FOR UPDATE")
+        .bind(id).fetch_optional(&mut *tx).await?
+        .ok_or_else(|| AppError::problem(404, "NOT_FOUND", "組織不存在"))?;
+    if status != "rejected" || !revoked {
+        return Err(AppError::problem(
+            409,
+            "RESTORE_NOT_ALLOWED",
+            "此組織不是被撤銷的狀態，不能恢復認證",
+        ));
+    }
+    if !window_ok {
+        return Err(AppError::problem(
+            409,
+            "RESTORE_NOT_ALLOWED",
+            "撤銷已超過 7 天，不能恢復認證",
+        ));
+    }
+    sqlx::query("UPDATE organizations SET verification_status = 'verified', verified_at = now(), resubmit_after = NULL, revoked_at = NULL, review_note = NULL, flagged_fields = '{}' WHERE id = $1")
+        .bind(id).execute(&mut *tx).await?;
+    sqlx::query("SELECT id FROM relief_events WHERE id IN (SELECT event_id FROM wishlists WHERE org_id = $1 AND revoke_paused_at IS NOT NULL) ORDER BY id FOR SHARE")
+        .bind(id).fetch_all(&mut *tx).await?;
+    // 候選據點與判定；必須仍是草稿（撤銷後創建者無法改動，保險起見仍檢查）
+    let cands: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
+        "SELECT w.id, w.slug::text,
+                CASE WHEN w.deleted_at IS NOT NULL OR w.status <> 'draft' THEN 'not_draft'
+                     WHEN NOT EXISTS (SELECT 1 FROM org_permits p WHERE p.id = w.permit_id AND p.org_id = w.org_id AND p.status = 'approved'
+                                      AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN p.valid_from AND p.valid_to) THEN 'permit_invalid'
+                     WHEN NOT EXISTS (SELECT 1 FROM relief_events e WHERE e.id = w.event_id AND e.merged_into IS NULL AND e.moderation_status::text <> 'hidden') THEN 'event_unavailable'
+                END
+           FROM wishlists w WHERE w.org_id = $1 AND w.type = 'relief' AND w.revoke_paused_at IS NOT NULL ORDER BY w.id FOR UPDATE OF w")
+        .bind(id).fetch_all(&mut *tx).await?;
+    let ok: Vec<Uuid> = cands
+        .iter()
+        .filter(|c| c.2.is_none())
+        .map(|c| c.0)
+        .collect();
+    sqlx::query("UPDATE wishlists SET status = 'active' WHERE id = ANY($1) AND revoke_paused_at IS NOT NULL AND status = 'draft'")
+        .bind(&ok).execute(&mut *tx).await?;
+    sqlx::query("UPDATE wishlists SET revoke_paused_at = NULL WHERE org_id = $1 AND revoke_paused_at IS NOT NULL")
+        .bind(id).execute(&mut *tx).await?;
+    let restored: Vec<String> = cands
+        .iter()
+        .filter(|c| c.2.is_none())
+        .map(|c| c.1.trim().to_string())
+        .collect();
+    let skipped: Vec<Value> = cands
+        .iter()
+        .filter_map(|c| {
+            c.2.as_ref()
+                .map(|r| json!({ "slug": c.1.trim(), "reason": r }))
+        })
+        .collect();
+    // 沿用 org.review（decision=verified）通知 owner；備註帶恢復原因
+    crate::notify::enqueue_org_owners(&mut *tx, id, "org.review",
+        json!({"org_id": id, "display_name": display_name, "decision": "verified", "note": reason, "revoked": false})).await?;
+    audit(
+        &mut *tx,
+        sid,
+        "org.restore",
+        "organizations",
+        Some(id),
+        json!({ "reason": reason, "restored": restored.len(), "skipped": skipped.len() }),
+    )
+    .await?;
+    let ev: Vec<String> = sqlx::query_scalar("SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.id = ANY($1)")
+        .bind(&ok).fetch_all(&mut *tx).await?;
+    tx.commit().await?;
+    if !restored.is_empty() {
+        crate::cdn::purge_wishlists(restored.clone());
+        crate::cdn::purge_events(ev);
+    }
+    crate::cdn::purge_org(org_slug);
+    Ok(Json(
+        json!({ "org": { "id": id, "verification_status": "verified" }, "restored": restored, "skipped": skipped }),
+    ))
 }
 
 async fn review_permit(

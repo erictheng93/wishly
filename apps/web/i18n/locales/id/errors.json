@@ -159,6 +159,7 @@
       "birthday_notify_LIST_PRIVATE": "Daftar pribadi tidak dapat mengirim notifikasi ulang tahun.",
       "birthday_notify_NOT_PERSONAL": "Daftar organisasi dan titik bantuan tidak dapat mengirim notifikasi ulang tahun."
     },
-    "ADDRESS_UNAVAILABLE": "Informasi penerima sementara tidak tersedia. Coba lagi nanti."
+    "ADDRESS_UNAVAILABLE": "Informasi penerima sementara tidak tersedia. Coba lagi nanti.",
+    "RESTORE_NOT_ALLOWED": "Organisasi ini tidak dapat dipulihkan (tidak dicabut, atau sudah lewat 7 hari)"
   }
 }

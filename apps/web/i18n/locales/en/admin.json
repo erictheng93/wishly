@@ -566,7 +566,22 @@
         "permits": "Fundraising permits"
       },
       "flagRequired": "Select at least one field",
-      "noteRequired": "Rejection / revocation reason (required)"
+      "noteRequired": "Rejection / revocation reason (required)",
+      "restore": {
+        "notice": "Revoked. Verification can be restored until {date}",
+        "button": "Restore verification",
+        "expired": "Revoked more than 7 days ago; the organization must reapply",
+        "reason": "Reason for restoring (required)",
+        "reasonRequired": "Enter a reason for restoring",
+        "noPii": "Don't include phone numbers, addresses, emails or other personal information",
+        "confirm": "The organization returns to verified. Of the {n} relief sites taken down by the revocation, those with a valid permit go live again.",
+        "done": "Verification restored: {n} sites back online",
+        "skip": {
+          "permit_invalid": "Permit is no longer valid; upload a new permit and restore the site manually",
+          "event_unavailable": "Its relief event was merged or taken down; move the site to an active event and restore it manually",
+          "not_draft": "The site was changed after revocation (no longer a draft), so it was not brought back automatically"
+        }
+      }
     },
     "events": {
       "title": "Disaster events",

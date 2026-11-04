@@ -566,7 +566,22 @@
         "permits": "Fundraising permits"
       },
       "flagRequired": "Select at least one field",
-      "noteRequired": "Lý do từ chối / thu hồi (bắt buộc)"
+      "noteRequired": "Lý do từ chối / thu hồi (bắt buộc)",
+      "restore": {
+        "notice": "Đã thu hồi. Có thể khôi phục xác minh đến {date}",
+        "button": "Khôi phục xác minh",
+        "expired": "Đã thu hồi quá 7 ngày; tổ chức phải đăng ký lại",
+        "reason": "Lý do khôi phục (bắt buộc)",
+        "reasonRequired": "Vui lòng nhập lý do khôi phục",
+        "noPii": "Không ghi số điện thoại, địa chỉ, email hay thông tin cá nhân khác",
+        "confirm": "Tổ chức trở lại trạng thái đã xác minh. Trong {n} điểm cứu trợ bị gỡ do thu hồi, các điểm có giấy phép còn hiệu lực sẽ hoạt động trở lại.",
+        "done": "Đã khôi phục xác minh: {n} điểm hoạt động trở lại",
+        "skip": {
+          "permit_invalid": "Giấy phép đã hết hiệu lực; hãy tải giấy phép mới và khôi phục điểm thủ công",
+          "event_unavailable": "Sự kiện cứu trợ đã bị gộp hoặc gỡ; hãy chuyển điểm sang sự kiện còn hiệu lực rồi khôi phục thủ công",
+          "not_draft": "Điểm đã bị thay đổi sau khi thu hồi (không còn là bản nháp) nên không tự động hoạt động lại"
+        }
+      }
     },
     "events": {
       "title": "Disaster events",

@@ -67,21 +67,21 @@ async fn retention_rules(pool: PgPool) {
 
     // 待處理不論多舊都留
     assert_eq!(kept(&pool, open_old).await, (true, true, "open".into()));
-    assert_eq!(kept(&pool, dismissed_29).await.0, true);
+    assert!(kept(&pool, dismissed_29).await.0);
     assert_eq!(
         kept(&pool, dismissed_31).await,
         (false, false, "dismissed".into())
     );
-    assert_eq!(kept(&pool, actioned_364).await.0, true);
+    assert!(kept(&pool, actioned_364).await.0);
     assert_eq!(
         kept(&pool, actioned_366).await,
         (false, false, "actioned".into())
     );
-    assert_eq!(kept(&pool, pi_6).await.0, true);
-    assert_eq!(kept(&pool, pi_8).await.0, false);
+    assert!(kept(&pool, pi_6).await.0);
+    assert!(!kept(&pool, pi_8).await.0);
     // 對象已封存：比照 7 天
-    assert_eq!(kept(&pool, archived_6).await.0, true);
-    assert_eq!(kept(&pool, archived_8).await.0, false);
+    assert!(kept(&pool, archived_6).await.0);
+    assert!(!kept(&pool, archived_8).await.0);
     // 列本身保留（統計與處置紀錄靠它）
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM content_reports")
         .fetch_one(&pool)
@@ -136,5 +136,5 @@ async fn account_deletion_clears_closed_reports_now(pool: PgPool) {
     );
     // 待處理的留給審查（刪帳號不能讓證據消失）
     assert_eq!(kept(&pool, open_user).await, (true, true, "open".into()));
-    assert_eq!(kept(&pool, unrelated).await.0, true);
+    assert!(kept(&pool, unrelated).await.0);
 }

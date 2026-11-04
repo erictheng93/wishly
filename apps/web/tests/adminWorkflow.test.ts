@@ -161,6 +161,49 @@ it('組織審核頁：?open= 展開指定組織（不在目前頁也會以詳情
   expect(el.querySelector('.confirm')!.textContent).toContain('2 個救災據點')
 })
 
+const future = new Date(Date.now() + 3 * 864e5).toISOString()
+async function restoreSetup(org: any, restore?: any) {
+  api.mockImplementation(async (url: string, opt?: any) => {
+    if (url === '/admin/orgs') return { data: [org] }
+    if (url.endsWith('/restore')) { if (restore instanceof Error) throw restore; return restore }
+    return { org, documents: [], permits: [], members: [] }
+  })
+  const el = show(Orgs); await settle()
+  el.querySelector<HTMLButtonElement>('article button')!.click(); await settle()
+  return el
+}
+
+it('恢復認證：期限內才有按鈕，理由必填，送出後顯示結果與略過原因', async () => {
+  const org = { id: 'org', display_name: 'Org', verification_status: 'rejected', revoked_at: 'x', restorable_until: future, revoke_paused_sites: 3 }
+  const el = await restoreSetup(org, { org: { id: 'org' }, restored: ['a', 'b'], skipped: [{ slug: 'c', reason: 'permit_invalid' }, { slug: 'd', reason: 'weird' }] })
+  expect(el.querySelector('[data-restore]')!.textContent).toContain('可於')
+  el.querySelector<HTMLButtonElement>('[data-restore] button')!.click(); await settle()
+  expect(el.querySelector('.confirm')!.textContent).toContain('3 個救災據點')
+  expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
+  await input(el, '.confirm textarea', '誤判')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/orgs/org/restore', { method: 'POST', body: { reason: '誤判' } })
+  const t = el.textContent!
+  expect(t).toContain('已恢復認證：2 個據點重新上線')
+  expect(t).toContain('c：許可已失效，需重新上傳許可後手動恢復')
+  expect(t).toContain('d：weird')
+})
+
+it('恢復認證：超過期限只顯示說明、沒有按鈕', async () => {
+  const el = await restoreSetup({ id: 'org', display_name: 'Org', verification_status: 'rejected', revoked_at: 'x', restorable_until: null })
+  expect(el.querySelector('[data-restore]')).toBeNull()
+  expect(el.querySelector('[data-restore-expired]')!.textContent).toContain('超過 7 天')
+})
+
+it('恢復認證：409 顯示伺服器訊息並保留對話框', async () => {
+  const org = { id: 'org', display_name: 'Org', verification_status: 'rejected', revoked_at: 'x', restorable_until: future }
+  const el = await restoreSetup(org, new Error('已超過可恢復期限'))
+  el.querySelector<HTMLButtonElement>('[data-restore] button')!.click(); await settle()
+  await input(el, '.confirm textarea', '誤判')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(el.querySelector('.confirm')!.textContent).toContain('已超過可恢復期限')
+})
+
 it('組織撤銷：後端拒絕理由格式時退回第一步，保留已輸入內容', async () => {
   const org = { id: 'org', display_name: 'Org', verification_status: 'verified' }
   api.mockImplementation(async (url: string) => {
