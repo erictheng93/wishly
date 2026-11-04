@@ -159,6 +159,7 @@
       "birthday_notify_LIST_PRIVATE": "Private lists can't send birthday notifications.",
       "birthday_notify_NOT_PERSONAL": "Organization and relief-site lists can't send birthday notifications."
     },
-    "ADDRESS_UNAVAILABLE": "Shipping details are temporarily unavailable. Please try again later."
+    "ADDRESS_UNAVAILABLE": "Shipping details are temporarily unavailable. Please try again later.",
+    "RESTORE_NOT_ALLOWED": "This organization can't be restored (it wasn't revoked, or the 7-day window has passed)"
   }
 }

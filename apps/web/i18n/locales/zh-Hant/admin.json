@@ -566,7 +566,22 @@
         "permits": "勸募許可"
       },
       "flagRequired": "請至少勾選一個欄位",
-      "noteRequired": "退件／撤銷原因（必填）"
+      "noteRequired": "退件／撤銷原因（必填）",
+      "restore": {
+        "notice": "已撤銷・可於 {date} 前恢復認證",
+        "button": "恢復認證",
+        "expired": "撤銷已超過 7 天，需由組織重新申請",
+        "reason": "恢復原因（必填）",
+        "reasonRequired": "請填寫恢復原因",
+        "noPii": "請勿填寫電話、地址、Email 等個人資料",
+        "confirm": "恢復後組織回到已認證；因撤銷而下架的 {n} 個救災據點中，許可仍有效者會重新上線。",
+        "done": "已恢復認證：{n} 個據點重新上線",
+        "skip": {
+          "permit_invalid": "許可已失效，需重新上傳許可後手動恢復",
+          "event_unavailable": "所屬救災事件已合併或下架，需改掛到有效事件後手動恢復",
+          "not_draft": "據點狀態已被變更（不是草稿），未自動上線"
+        }
+      }
     },
     "events": {
       "title": "救災事件管理",

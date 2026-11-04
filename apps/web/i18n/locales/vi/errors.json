@@ -159,6 +159,7 @@
       "birthday_notify_LIST_PRIVATE": "Danh sách riêng tư không thể gửi thông báo sinh nhật.",
       "birthday_notify_NOT_PERSONAL": "Danh sách của tổ chức và điểm cứu trợ không thể gửi thông báo sinh nhật."
     },
-    "ADDRESS_UNAVAILABLE": "Tạm thời không thể đọc thông tin nhận hàng. Vui lòng thử lại sau."
+    "ADDRESS_UNAVAILABLE": "Tạm thời không thể đọc thông tin nhận hàng. Vui lòng thử lại sau.",
+    "RESTORE_NOT_ALLOWED": "Không thể khôi phục xác minh cho tổ chức này (không bị thu hồi hoặc đã quá 7 ngày)"
   }
 }

@@ -566,7 +566,22 @@
         "permits": "Fundraising permits"
       },
       "flagRequired": "Select at least one field",
-      "noteRequired": "Alasan penolakan / pencabutan (wajib)"
+      "noteRequired": "Alasan penolakan / pencabutan (wajib)",
+      "restore": {
+        "notice": "Dicabut. Verifikasi dapat dipulihkan hingga {date}",
+        "button": "Pulihkan verifikasi",
+        "expired": "Pencabutan sudah lebih dari 7 hari; organisasi harus mengajukan ulang",
+        "reason": "Alasan pemulihan (wajib)",
+        "reasonRequired": "Isi alasan pemulihan",
+        "noPii": "Jangan cantumkan nomor telepon, alamat, email, atau data pribadi lainnya",
+        "confirm": "Organisasi kembali terverifikasi. Dari {n} lokasi bantuan yang diturunkan karena pencabutan, yang izinnya masih berlaku akan tayang kembali.",
+        "done": "Verifikasi dipulihkan: {n} lokasi tayang kembali",
+        "skip": {
+          "permit_invalid": "Izin tidak lagi berlaku; unggah izin baru lalu pulihkan lokasi secara manual",
+          "event_unavailable": "Peristiwa bantuannya telah digabung atau diturunkan; pindahkan lokasi ke peristiwa aktif lalu pulihkan secara manual",
+          "not_draft": "Lokasi diubah setelah pencabutan (bukan draf lagi), jadi tidak diaktifkan otomatis"
+        }
+      }
     },
     "events": {
       "title": "Disaster events",

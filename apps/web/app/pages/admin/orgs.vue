@@ -2,7 +2,7 @@
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 公益組織與勸募許可審核：組織 pending → 核准 / 補件 / 退件；已通過者退件即撤銷（據點下架，二次確認）；許可可核准 / 退件，已核准者退件即撤銷（據點暫停）
 definePageMeta({ middleware: 'staff' })
-const { t } = useI18n()
+const { t, te } = useI18n()
 useHead({ title: () => t('admin.orgs.title') })
 const { api } = useApi()
 const STATUSES = ['pending', 'pending_permits', 'needs_changes', 'verified', 'rejected']
@@ -92,6 +92,22 @@ async function submit() {
     else aerr.value = errMsg(e)
   } finally { busy.value = false }
 }
+
+// 恢復認證：撤銷後 7 天內（restorable_until 未到）可恢復；理由必填
+const restoring = ref(false), rNote = ref(''), rBusy = ref(false), rErr = ref('')
+const restoreRes = ref<{ restored: number, skipped: { slug: string, reason: string }[] } | null>(null)
+const canRestore = (o: any) => !!o.restorable_until && new Date(o.restorable_until).getTime() > Date.now()
+const skipReason = (r: string) => te(`admin.orgs.restore.skip.${r}`) ? t(`admin.orgs.restore.skip.${r}`) : r
+function openRestore() { rNote.value = ''; rErr.value = ''; restoring.value = true }
+async function submitRestore() {
+  if (!rNote.value.trim()) { rErr.value = t('admin.orgs.restore.reasonRequired'); return }
+  rBusy.value = true; rErr.value = ''
+  try {
+    const r = await api(`/admin/orgs/${openId.value}/restore`, { method: 'POST', body: { reason: rNote.value.trim() } })
+    restoring.value = false; restoreRes.value = { restored: r.restored?.length ?? 0, skipped: r.skipped ?? [] }; msg.value = ''
+    await load(); if (openId.value && rows.value.some(x => x.id === openId.value)) await reloadDetail(); else openId.value = null
+  } catch (e) { rErr.value = errMsg(e) } finally { rBusy.value = false } // 409（逾期或未撤銷）顯示伺服器訊息
+}
 </script>
 <template>
   <main class="c-page c-admin">
@@ -104,6 +120,10 @@ async function submit() {
     </label>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('admin.orgs.retry') }}</button></p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
+    <div v-if="restoreRes" class="c-ok" role="status">
+      <p>{{ $t('admin.orgs.restore.done', { n: restoreRes.restored }) }}</p>
+      <ul v-if="restoreRes.skipped.length"><li v-for="s in restoreRes.skipped" :key="s.slug">{{ s.slug }}：{{ skipReason(s.reason) }}</li></ul>
+    </div>
     <p v-if="loading && !rows.length" class="c-mute" role="status">{{ $t('admin.orgs.loading') }}</p>
     <p v-else-if="!rows.length && !err" class="c-center c-mute">{{ $t('admin.orgs.empty') }}</p>
     <article v-for="o in rows" :key="o.id" class="c-card" :data-org="o.id">
@@ -145,6 +165,12 @@ async function submit() {
           <h3>{{ $t('admin.orgs.members') }}</h3>
           <div v-for="m in detail.members" :key="m.user_id" class="c-mute">{{ m.display_name }} · {{ $t(`org.members.r.${m.role}`, m.role) }}</div>
 
+          <div v-if="canRestore(detail.org)" class="c-card c-mt" data-restore>
+            <p><strong>{{ $t('admin.orgs.restore.notice', { date: fmtTime(detail.org.restorable_until) }) }}</strong></p>
+            <button class="c-btn primary block" @click="openRestore">{{ $t('admin.orgs.restore.button') }}</button>
+          </div>
+          <p v-else-if="detail.org.revoked_at" class="c-mute c-mt" data-restore-expired>{{ $t('admin.orgs.restore.expired') }}</p>
+
           <div v-if="['pending', 'verified'].includes(detail.org.verification_status)" class="c-row wrap c-mt">
             <template v-if="detail.org.verification_status === 'pending'">
               <button class="c-btn c-grow primary" @click="open('org', detail.org, 'approve')">{{ $t('admin.orgs.orgAction.approve') }}</button>
@@ -166,6 +192,9 @@ async function submit() {
         <label class="c-field"><span>{{ $t(act.decision === 'reject' ? 'admin.orgs.noteRequired' : 'admin.orgs.noteLabel') }}</span><textarea v-model="note" :required="act.decision === 'reject'" maxlength="500" rows="3" /></label>
       </template>
       <p v-else class="ao-note"><strong>{{ $t('admin.orgs.reviewNote') }}</strong><br>{{ note }}</p>
+    </CreatorConfirm>
+    <CreatorConfirm :open="restoring" :title="$t('admin.orgs.restore.button')" :text="$t('admin.orgs.restore.confirm', { n: detail?.org.revoke_paused_sites ?? 0 })" :ok="$t('admin.orgs.restore.button')" :busy="rBusy" :disabled="!rNote.trim()" :error="rErr" @close="restoring = false" @ok="submitRestore">
+      <label class="c-field"><span>{{ $t('admin.orgs.restore.reason') }}</span><textarea v-model="rNote" required maxlength="500" rows="3" :placeholder="$t('admin.orgs.restore.noPii')" /></label>
     </CreatorConfirm>
   </main>
 </template>
