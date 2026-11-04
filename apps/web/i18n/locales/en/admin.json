@@ -756,7 +756,27 @@
         "other": "Other"
       },
       "meta": "{time}・Reporter: {reporter}",
-      "onItem": "・on an item"
+      "onItem": "・on an item",
+      "snapshot": "Content when reported",
+      "snapshotNote": "This is the content at the time of the report and may differ from what is live now; use the link above to see the current page.",
+      "snapshotNone": "(Older report, no snapshot)",
+      "snapshotItems": "List items ({n})",
+      "snapshotMore": "+{n} more",
+      "snapshotReported": "Reported item",
+      "snapshotCover": "Cover",
+      "restoreList": "Restore list",
+      "restoreText": "Restore \"{name}\" to public.",
+      "restoreReason": "Reason for restoring (required)",
+      "doneRestore": "List restored",
+      "unsuspendUser": "Lift suspension",
+      "unsuspendText": "Lift the suspension of \"{name}\".",
+      "unsuspendReason": "Reason for lifting (required)",
+      "doneUnsuspend": "Suspension lifted",
+      "reporterStats": "This reporter: {total} reports, {dismissed} dismissed",
+      "reporterFlag": "Often dismissed",
+      "reporterLabel": "Reporter account: ",
+      "itemLabel": "Item: {title}",
+      "itemDeleted": " (deleted)"
     }
   }
 }

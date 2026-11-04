@@ -756,7 +756,27 @@
         "other": "其他"
       },
       "meta": "{time}・檢舉者：{reporter}",
-      "onItem": "・針對品項"
+      "onItem": "・針對品項",
+      "snapshot": "檢舉當時內容",
+      "snapshotNote": "以下為檢舉送出當下的內容，可能與目前內容不同；請點上方連結查看現況。",
+      "snapshotNone": "（舊檢舉，無快照）",
+      "snapshotItems": "清單品項（{n}）",
+      "snapshotMore": "＋{n} 項",
+      "snapshotReported": "被檢舉品項",
+      "snapshotCover": "封面",
+      "restoreList": "恢復清單",
+      "restoreText": "恢復「{name}」上架。",
+      "restoreReason": "恢復原因（必填）",
+      "doneRestore": "已恢復上架",
+      "unsuspendUser": "解除停權",
+      "unsuspendText": "解除「{name}」的停權。",
+      "unsuspendReason": "解除原因（必填）",
+      "doneUnsuspend": "已解除停權",
+      "reporterStats": "此檢舉者共 {total} 筆，駁回 {dismissed} 筆",
+      "reporterFlag": "常被駁回",
+      "reporterLabel": "檢舉者帳號：",
+      "itemLabel": "品項：{title}",
+      "itemDeleted": "（已刪除）"
     }
   }
 }

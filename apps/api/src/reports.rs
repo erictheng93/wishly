@@ -176,9 +176,18 @@ async fn create(
         // 匿名檢舉者以 IP 近似「同一檢舉者」：同清單 24 小時 1 筆
         ratelimit::check(&st.pool, &format!("report_wl:{wid}:{ip}"), 1, 86400).await?;
     }
-    let id: Uuid = sqlx::query_scalar(
-        "INSERT INTO content_reports (wishlist_id, item_id, reason, detail, reporter_user_id, reporter_guest_id)
-         VALUES ($1, $2, $3::report_reason, $4, $5, $6) RETURNING id")
+    // 快照與 INSERT 同一句（單次往返）；只存圖片 key，輸出時才換 URL（見 snapshot_urls）。items 最多 50 筆。
+    const ITEM_SNAP: &str = "jsonb_build_object('id', i.id, 'title', i.title, 'description', i.description, 'product_url', i.product_url,
+        'image_key', CASE WHEN i.image_status = 'ready' THEN i.image_key END)";
+    let id: Uuid = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "INSERT INTO content_reports (wishlist_id, item_id, reason, detail, reporter_user_id, reporter_guest_id, snapshot)
+         SELECT $1, $2, $3::report_reason, $4, $5, $6,
+           jsonb_build_object('title', w.title, 'description', w.description,
+             'cover_image_key', CASE WHEN w.cover_image_status = 'ready' THEN w.cover_image_key END,
+             'items', COALESCE((SELECT jsonb_agg({ITEM_SNAP} ORDER BY i.sort_order, i.id)
+                 FROM (SELECT * FROM wishlist_items WHERE wishlist_id = w.id AND deleted_at IS NULL ORDER BY sort_order, id LIMIT 50) i), '[]'::jsonb),
+             'item', (SELECT {ITEM_SNAP} FROM wishlist_items i WHERE i.id = $2 AND i.wishlist_id = w.id))
+         FROM wishlists w WHERE w.id = $1 RETURNING id")))
         .bind(wid).bind(b.item_id).bind(&b.reason).bind(&detail).bind(user).bind(guest).fetch_one(&st.pool).await?;
     Ok((
         StatusCode::CREATED,
@@ -194,11 +203,50 @@ const REPORT_SQL: &str =
        'user', CASE WHEN ru.id IS NULL THEN NULL ELSE jsonb_build_object('id', ru.id, 'handle', ru.handle, 'display_name', ru.display_name, 'suspended', ru.blocked_at IS NOT NULL) END,
        'target_open_count', (SELECT count(*) FROM content_reports o WHERE o.status = 'open'
           AND ((r.wishlist_id IS NOT NULL AND o.wishlist_id = r.wishlist_id) OR (r.reported_user_id IS NOT NULL AND o.reported_user_id = r.reported_user_id))),
-       'item_id', r.item_id, 'reason', r.reason::text, 'detail', r.detail, 'status', r.status::text,
+       'item_id', r.item_id,
+       'item', CASE WHEN it.id IS NULL THEN NULL ELSE jsonb_build_object('id', it.id, 'title', it.title, 'deleted', it.deleted_at IS NOT NULL) END,
+       'snapshot', r.snapshot,
+       'reporter_user', CASE WHEN rp.id IS NULL THEN NULL ELSE jsonb_build_object('id', rp.id, 'handle', rp.handle, 'display_name', rp.display_name) END,
+       'reporter_stats', CASE WHEN r.reporter_user_id IS NULL AND r.reporter_guest_id IS NULL THEN NULL ELSE
+          (SELECT jsonb_build_object('total', count(*), 'dismissed', count(*) FILTER (WHERE s.status = 'dismissed')) FROM content_reports s
+            WHERE (r.reporter_user_id IS NOT NULL AND s.reporter_user_id = r.reporter_user_id)
+               OR (r.reporter_guest_id IS NOT NULL AND s.reporter_guest_id = r.reporter_guest_id)) END,
+       'reason', r.reason::text, 'detail', r.detail, 'status', r.status::text,
        'reporter', CASE WHEN r.reporter_user_id IS NOT NULL THEN 'user' WHEN r.reporter_guest_id IS NOT NULL THEN 'guest' ELSE 'anonymous' END,
        'resolution_note', r.resolution_note, 'handled_at', r.handled_at, 'created_at', r.created_at)
      FROM content_reports r LEFT JOIN wishlists w ON w.id = r.wishlist_id LEFT JOIN users ru ON ru.id = r.reported_user_id
-     LEFT JOIN users ow ON ow.id = w.owner_id";
+     LEFT JOIN users ow ON ow.id = w.owner_id LEFT JOIN users rp ON rp.id = r.reporter_user_id
+     LEFT JOIN wishlist_items it ON it.id = r.item_id AND it.wishlist_id = r.wishlist_id";
+
+/// 快照只存 key；staff 輸出換成可開啟的 URL（圖片皆在公開 bucket，用既有 helper）。
+/// shortcut: 被取代 / 刪除的舊圖物件若已從 bucket 清掉，URL 會 404（沒有另建簽章機制），需要時再保留圖檔。
+fn snapshot_urls(v: &mut Value) {
+    fn conv(o: &mut Value, key: &str, url: &str, f: impl Fn(&str) -> Option<String>) {
+        if let Some(m) = o.as_object_mut() {
+            let k = m.remove(key).and_then(|k| k.as_str().map(String::from));
+            m.insert(
+                url.into(),
+                k.and_then(|k| f(&k)).map_or(Value::Null, Value::from),
+            );
+        }
+    }
+    let ready = |k: &str| crate::public::image_url(Some(k), "ready");
+    let Some(s) = v.get_mut("snapshot").filter(|s| s.is_object()) else {
+        return;
+    };
+    conv(s, "cover_image_key", "cover_image_url", ready);
+    conv(s, "avatar_key", "avatar_url", |k| {
+        crate::uploads::avatar_url(Some(k))
+    });
+    if let Some(items) = s.get_mut("items").and_then(Value::as_array_mut) {
+        for i in items {
+            conv(i, "image_key", "image_url", ready);
+        }
+    }
+    if let Some(i) = s.get_mut("item") {
+        conv(i, "image_key", "image_url", ready);
+    }
+}
 
 async fn list(
     State(st): State<AppState>,
@@ -223,6 +271,13 @@ async fn list(
            AND ($4::text IS NULL OR ($4 = 'wishlist' AND r.wishlist_id IS NOT NULL) OR ($4 = 'user' AND r.reported_user_id IS NOT NULL))
          ORDER BY r.id LIMIT $3")))
         .bind(status).bind(q.cursor).bind(limit(&q) + 1).bind(q.kind.as_deref()).fetch_all(&st.pool).await?;
+    let rows = rows
+        .into_iter()
+        .map(|(id, mut v)| {
+            snapshot_urls(&mut v);
+            (id, v)
+        })
+        .collect();
     Ok(page(rows, limit(&q)))
 }
 
@@ -271,12 +326,13 @@ async fn handle(
         json!({ "status": b.status, "note": note }),
     )
     .await?;
-    let (_, v): (Uuid, Value) =
+    let (_, mut v): (Uuid, Value) =
         sqlx::query_as(sqlx::AssertSqlSafe(format!("{REPORT_SQL} WHERE r.id = $1")))
             .bind(id)
             .fetch_one(&mut *tx)
             .await?;
     tx.commit().await?;
+    snapshot_urls(&mut v);
     Ok(Json(v))
 }
 
