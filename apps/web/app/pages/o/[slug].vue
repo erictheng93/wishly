@@ -29,7 +29,7 @@ useSeoMeta({
         <div>
           <span class="x-kicker" aria-hidden="true">ORG / VERIFIED</span>
           <h1>{{ org.display_name }}<span class="g-badge">{{ $t('guest.relief.verified') }}</span></h1>
-          <p v-if="org.intro">{{ org.intro }}</p>
+          <p v-if="org.intro" style="white-space:pre-line">{{ org.intro }}</p>
           <p class="g-mute">
             <a v-if="org.website" class="x-nw" :href="org.website" target="_blank" rel="noopener nofollow">{{ $t('guest.relief.website') }}</a>
             <template v-if="org.public_email"> ・ <a class="x-nw" :href="`mailto:${org.public_email}`">{{ org.public_email }}</a></template>

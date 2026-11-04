@@ -307,7 +307,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 .sx-tag::before{content:"";display:inline-block;width:7px;height:7px;background:var(--red);margin-right:8px}
 .sx-main h1{margin:0 0 12px;font-weight:900;font-size:clamp(30px,6vw,46px);text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
 .sx-meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
-.sx-desc{margin:14px 0 0;line-height:1.75;max-width:38em}
+.sx-desc{margin:14px 0 0;line-height:1.75;max-width:38em;white-space:pre-line;overflow-wrap:anywhere}
 .sx-gauge{border:1px solid var(--ink-line);padding:16px 18px 0;background:var(--card);align-self:start}
 .sx-big{display:flex;align-items:baseline;gap:4px;line-height:.9;color:var(--fg)}
 .sx-big b{font:900 clamp(72px,18vw,120px)/.9 var(--font);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
