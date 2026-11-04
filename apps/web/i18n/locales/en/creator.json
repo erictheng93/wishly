@@ -32,9 +32,9 @@
       "none": "No image",
       "pick": "Choose image",
       "uploading": "Uploading…",
-      "done": "Uploaded. The image will appear publicly once processing is done",
+      "done": "Uploaded. Location and other hidden data (EXIF) removed; the image appears publicly once processed",
       "retry": "Upload again",
-      "hint": "JPG, PNG or WebP, up to 5 MB. Hidden data such as location (EXIF) is removed after upload. Please do not upload photos containing personal information."
+      "hint": "JPG, PNG or WebP, up to 5 MB. No personal information, please."
     },
     "itemSheet": {
       "titleEdit": "Edit item",

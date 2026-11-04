@@ -32,9 +32,9 @@
       "none": "Tanpa gambar",
       "pick": "Pilih gambar",
       "uploading": "Mengunggah…",
-      "done": "Sudah diunggah, gambar baru tampil publik setelah selesai diproses",
+      "done": "Sudah diunggah. Lokasi dan info tersembunyi (EXIF) dihapus; gambar tampil publik setelah selesai diproses",
       "retry": "Unggah ulang",
-      "hint": "Hanya JPG, PNG, WebP, maksimal 5 MB. Setelah diunggah, info tersembunyi seperti lokasi (EXIF) akan dihapus; jangan unggah foto yang berisi data pribadi."
+      "hint": "JPG, PNG, WebP, maks. 5 MB. Jangan berisi data pribadi."
     },
     "itemSheet": {
       "titleEdit": "Edit barang",
