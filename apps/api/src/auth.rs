@@ -204,10 +204,12 @@ pub(crate) async fn upsert_identity_in_tx(
             };
             (
                 sqlx::query_scalar(
-                    "INSERT INTO users (display_name,email) VALUES ($1,$2) RETURNING id",
+                    "INSERT INTO users (display_name,email,locale) VALUES ($1,$2,$3) RETURNING id",
                 )
                 .bind(dn)
                 .bind(email)
+                // 通知語言只在開戶時取一次（前端帶介面語言的 Accept-Language），之後只能在設定頁改
+                .bind(crate::notify::request_lang().code())
                 .fetch_one(&mut **tx)
                 .await?,
                 true,

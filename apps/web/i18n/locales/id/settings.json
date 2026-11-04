@@ -122,7 +122,9 @@
       "social": "Sosial dan ulang tahun",
       "socialHint": "Aktivitas teman, pengingat ulang tahun teman, dan pengingat sebelum ulang tahun Anda untuk menyiapkan daftar.",
       "inbox": "Dalam aplikasi",
-      "email": "Email"
+      "email": "Email",
+      "lang": "Bahasa notifikasi",
+      "langHint": "Bahasa untuk notifikasi di aplikasi dan email, diatur terpisah dari bahasa situs."
     },
     "push": {
       "title": "Notifikasi push",

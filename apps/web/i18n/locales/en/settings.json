@@ -122,7 +122,9 @@
       "social": "Social and birthdays",
       "socialHint": "Friend activity, friends' birthday reminders, and a reminder before your own birthday to set up a list.",
       "inbox": "In-app",
-      "email": "Email"
+      "email": "Email",
+      "lang": "Notification language",
+      "langHint": "Language for in-app notifications and emails, set separately from the site language."
     },
     "push": {
       "title": "Push notifications",

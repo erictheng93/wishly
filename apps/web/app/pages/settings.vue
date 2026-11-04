@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
-const { t, locale } = useI18n()
+const { t, locale, locales } = useI18n()
 useHead({ title: () => t('settings.title') })
 const { api } = useApi()
 const { user, fetchMe, logout, oauth } = useAuth()
@@ -140,6 +140,12 @@ const nBusy = ref(false), nErr = ref('')
 async function setMailPref(key: 'email_gifts' | 'email_social' | 'inbox_gifts' | 'inbox_social', on: boolean) {
   nBusy.value = true; nErr.value = ''
   try { user.value = await api('/me', { method: 'PATCH', body: { notification_prefs: { [key]: on } } }) } catch (e: any) { nErr.value = apiErrMsg(e) } finally { nBusy.value = false }
+}
+// 通知語言（users.locale，後端寄信 / 站內信用）與介面語言分開；值用後端的 zh-TW / en / vi / id
+const notifyLangs = computed(() => locales.value.map((l: any) => ({ code: l.code === 'zh-Hant' ? 'zh-TW' : l.code, name: l.name ?? l.code })))
+async function setNotifyLang(v: string) {
+  nBusy.value = true; nErr.value = ''
+  try { user.value = await api('/me', { method: 'PATCH', body: { locale: v } }) } catch (e: any) { nErr.value = apiErrMsg(e) } finally { nBusy.value = false }
 }
 async function saveSocial() {
   hMsg.value = hErr.value = ''
@@ -306,6 +312,10 @@ async function remove() {
           <p class="st-notify-t"><span :id="`nt-${k}`">{{ $t(`settings.notify.${k}`) }}</span><small class="c-mute">{{ $t(`settings.notify.${k}Hint`) }}</small></p>
           <label v-for="ch in (['inbox', 'email'] as const)" :key="ch" class="c-switch"><input type="checkbox" :checked="k === 'account' || user?.notification_prefs?.[`${ch}_${k}`] !== false" :aria-label="`${$t(`settings.notify.${k}`)} ${$t(`settings.notify.${ch}`)}`" :disabled="k === 'account' || nBusy" @change="setMailPref(`${ch}_${k}` as any, ($event.target as HTMLInputElement).checked)"><span>{{ $t(`settings.notify.${ch}`) }}</span></label>
         </div>
+        <label class="c-field st-notify"><span>{{ $t('settings.notify.lang') }}</span>
+          <select :value="user?.locale" :disabled="nBusy" @change="setNotifyLang(($event.target as HTMLSelectElement).value)"><option v-for="l in notifyLangs" :key="l.code" :value="l.code">{{ l.name }}</option></select>
+          <small class="c-mute">{{ $t('settings.notify.langHint') }}</small>
+        </label>
         <p v-if="nErr" class="c-err" role="alert">{{ nErr }}</p>
       </section>
       <CreatorPushToggle />

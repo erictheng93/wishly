@@ -122,7 +122,9 @@
       "social": "Xã hội và sinh nhật",
       "socialHint": "Hoạt động của bạn bè, nhắc sinh nhật bạn bè và nhắc trước sinh nhật của bạn để lập danh sách.",
       "inbox": "Trong ứng dụng",
-      "email": "Email"
+      "email": "Email",
+      "lang": "Ngôn ngữ thông báo",
+      "langHint": "Ngôn ngữ dùng cho thông báo trong ứng dụng và email, cài đặt riêng với ngôn ngữ giao diện."
     },
     "push": {
       "title": "Thông báo đẩy",
