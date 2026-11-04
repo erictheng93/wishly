@@ -45,8 +45,11 @@ async fn public_site_includes_org_and_event(pool: PgPool) {
         .unwrap();
     assert_eq!(
         v["org"],
-        json!({"slug": os, "display_name": "測試協會", "verified": true})
+        json!({"slug": os, "display_name": "測試協會", "verified": true,
+               "public_email": "org@example.com", "public_phone": null})
     );
+    assert_eq!(v["permit"]["permit_no"], "P-1", "{v}");
+    assert!(v["permit"]["valid_to"].is_string(), "{v}");
     assert_eq!(v["event"], json!({"slug": e.1, "name": "測試事件"}));
     assert_eq!(
         (v["site_address"].as_str(), v["site_status"].as_str()),

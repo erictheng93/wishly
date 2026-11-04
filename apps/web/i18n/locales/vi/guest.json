@@ -340,6 +340,8 @@
       "verified": "Tổ chức đã xác minh",
       "event": "Sự kiện",
       "address": "Địa chỉ nhận hàng",
+      "contact": "Liên hệ",
+      "permit": "Giấy phép gây quỹ: {no} ({from} – {to})",
       "by": "Tổ chức: ",
       "paused": "Điểm này đang tạm ngừng nhận hàng, tạm thời không thể đăng ký.",
       "closedSite": "Điểm này đã ngừng nhận hàng.",
