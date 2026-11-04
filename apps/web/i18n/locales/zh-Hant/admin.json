@@ -727,7 +727,8 @@
       "kinds": {
         "all": "全部",
         "wishlist": "清單",
-        "user": "使用者"
+        "user": "使用者",
+        "org": "組織"
       },
       "stateHidden": "已下架",
       "stateSuspended": "已停權",
@@ -776,7 +777,43 @@
       "reporterFlag": "常被駁回",
       "reporterLabel": "檢舉者帳號：",
       "itemLabel": "品項：{title}",
-      "itemDeleted": "（已刪除）"
+      "itemDeleted": "（已刪除）",
+      "viewLabel": "檢視",
+      "viewTargets": "依對象",
+      "viewRows": "逐筆",
+      "reasonFilter": "原因",
+      "reasonAll": "全部原因",
+      "from": "起始日",
+      "to": "結束日",
+      "reasonsLabel": "原因：",
+      "firstLatest": "首次 {first}・最近 {latest}",
+      "viewReports": "查看 {n} 筆",
+      "filterChip": "篩選：{name}",
+      "clearFilter": "移除篩選",
+      "revokeOrg": "撤銷組織",
+      "revokeOrgText": "撤銷「{name}」的認證。這個組織其他未處理的檢舉也會一併結案。",
+      "revokeOrgReason": "撤銷原因（必填）",
+      "doneRevokeOrg": "已撤銷組織，相關檢舉已結案",
+      "orgLabel": "組織",
+      "orgStatus": {
+        "pending": "審核中",
+        "pending_permits": "待許可",
+        "needs_changes": "待補件",
+        "verified": "已認證",
+        "rejected": "已退件"
+      },
+      "history": "處置紀錄",
+      "historyOwner": "建立者處置紀錄",
+      "historyCounts": "共 {total} 筆（待處理 {open}・已處理 {actioned}・已駁回 {dismissed}）",
+      "historyRecent": "近期檢舉",
+      "historySusp": "停權紀錄",
+      "historyNone": "沒有紀錄",
+      "historyUser": "使用者本人",
+      "historyStaff": "操作者：{name}",
+      "suspendedMark": "停權",
+      "targetEmpty": "沒有符合的對象",
+      "loadMore": "載入更多",
+      "loading": "載入中…"
     }
   }
 }

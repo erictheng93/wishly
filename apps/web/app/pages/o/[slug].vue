@@ -6,6 +6,7 @@ const slug = String(useRoute().params.slug)
 const { data: org, error, refresh } = await useAsyncData(`org-${slug}`, () => $fetch<any>(`${apiBase}/api/v1/public/orgs/${encodeURIComponent(slug)}`))
 const notFound = computed(() => (error.value as any)?.statusCode === 404 || (error.value as any)?.status === 404)
 if (notFound.value && import.meta.server) setResponseStatus(useRequestEvent()!, 404)
+const reporting = ref(false), toast = ref('') // 只在使用者點擊後才掛 sheet，SSR 不讀 cookie
 const origin = useRequestURL().origin
 useHead({ script: () => org.value ? [ldScript(orgLd(siteUrl, slug, org.value))] : [] })
 useSeoMeta({
@@ -46,8 +47,11 @@ useSeoMeta({
           <p class="g-mute"><a :href="mapsUrl(s.site_address)" target="_blank" rel="noopener">{{ s.site_address }}</a></p>
         </article>
       </div>
+      <div class="g-foot"><button class="g-link" @click="reporting = true">{{ $t('guest.report.orgTitle') }}</button></div>
+      <GuestReportSheet v-if="reporting" :slug="slug" kind="org" @close="reporting = false" @sent="reporting = false; toast = $t('guest.report.sent')" />
     </template>
   </main>
+  <div v-if="toast" class="g-banner g-toast" role="status" @click="toast = ''">{{ toast }}</div>
 </template>
 
 <style scoped>

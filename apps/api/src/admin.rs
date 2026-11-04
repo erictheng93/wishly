@@ -339,8 +339,9 @@ async fn update_user(
     // 新停權：該使用者的待處理檢舉視為已處置。鎖序 users → content_reports；
     // 與 reports::moderate 對稱（wishlists → content_reports），status = 'open' 不可省以免覆寫已駁回的檢舉
     if new_blocked && !blocked {
-        sqlx::query("UPDATE content_reports SET status = 'actioned', handled_by = $2, handled_at = now(), resolution_note = $3 WHERE reported_user_id = $1 AND status = 'open'")
-            .bind(id).bind(sid).bind(&reason).execute(&mut *tx).await?;
+        let reporters: Vec<Option<Uuid>> = sqlx::query_scalar("UPDATE content_reports SET status = 'actioned', handled_by = $2, handled_at = now(), resolution_note = $3 WHERE reported_user_id = $1 AND status = 'open' RETURNING reporter_user_id")
+            .bind(id).bind(sid).bind(&reason).fetch_all(&mut *tx).await?;
+        crate::notify::enqueue_report_resolved(&mut *tx, &reporters, "actioned").await?;
     }
     // 新停權：該使用者公開清單的邊緣副本要清掉（內容已改回 404）
     let purge: Vec<String> = if new_blocked && !blocked {

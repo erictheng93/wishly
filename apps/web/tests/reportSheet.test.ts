@@ -146,3 +146,14 @@ it('cancel closes the report without sending anything', async () => {
   expect(api).not.toHaveBeenCalled()
   expect(sent).not.toHaveBeenCalled()
 })
+
+it('kind=org posts to the org endpoint without item_id', async () => {
+  vi.stubGlobal('useRuntimeConfig', () => ({ public: { turnstileSiteKey: '' } }))
+  api.mockResolvedValue({})
+  mounted = mount(ReportSheet, { slug: 'helpers', kind: 'org', onSent: sent, onClose: close }, { GuestDialog })
+  await flush()
+  await submit(mounted.el); await flush()
+  expect(api).toHaveBeenCalledWith('/public/orgs/helpers/reports', { method: 'POST', body: { reason: 'scam', detail: null, turnstile_token: 'dev-bypass' } })
+  expect(sent).toHaveBeenCalled()
+  expect(mounted.el.textContent).toContain('檢舉此組織')
+})

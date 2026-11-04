@@ -727,7 +727,8 @@
       "kinds": {
         "all": "All",
         "wishlist": "Lists",
-        "user": "Users"
+        "user": "Users",
+        "org": "Organization"
       },
       "stateHidden": "Hidden",
       "stateSuspended": "Suspended",
@@ -776,7 +777,43 @@
       "reporterFlag": "Often dismissed",
       "reporterLabel": "Reporter account: ",
       "itemLabel": "Item: {title}",
-      "itemDeleted": " (deleted)"
+      "itemDeleted": " (deleted)",
+      "viewLabel": "View",
+      "viewTargets": "By target",
+      "viewRows": "Per report",
+      "reasonFilter": "Reason",
+      "reasonAll": "All reasons",
+      "from": "From",
+      "to": "To",
+      "reasonsLabel": "Reasons: ",
+      "firstLatest": "First {first} · latest {latest}",
+      "viewReports": "View {n}",
+      "filterChip": "Filter: {name}",
+      "clearFilter": "Remove filter",
+      "revokeOrg": "Revoke organization",
+      "revokeOrgText": "Revoke the verification of \"{name}\". Its other open reports will be closed too.",
+      "revokeOrgReason": "Reason for revoking (required)",
+      "doneRevokeOrg": "Organization revoked; related reports closed",
+      "orgLabel": "Organization",
+      "orgStatus": {
+        "pending": "In review",
+        "pending_permits": "Awaiting permits",
+        "needs_changes": "Needs changes",
+        "verified": "Verified",
+        "rejected": "Rejected"
+      },
+      "history": "Moderation history",
+      "historyOwner": "Owner moderation history",
+      "historyCounts": "{total} in total ({open} open · {actioned} actioned · {dismissed} dismissed)",
+      "historyRecent": "Recent reports",
+      "historySusp": "Suspensions",
+      "historyNone": "No records",
+      "historyUser": "The user",
+      "historyStaff": "By {name}",
+      "suspendedMark": "Suspended",
+      "targetEmpty": "No matching targets",
+      "loadMore": "Load more",
+      "loading": "Loading…"
     }
   }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-const props = defineProps<{ slug: string }>()
+const props = defineProps<{ slug: string, kind?: 'wishlist' | 'org' }>() // kind=org 檢舉組織（無 item_id）
 const emit = defineEmits<{ close: [], sent: [] }>()
 const { api } = useGuest()
 const { t, locale } = useI18n()
@@ -42,7 +42,8 @@ async function submit() {
   if (!token.value) { msg.value = t('guest.turnstile.required'); return }
   busy.value = true; msg.value = ''
   try {
-    await api(`/public/wishlists/${props.slug}/reports`, { method: 'POST', body: { reason: reason.value, detail: detail.value || null, item_id: null, turnstile_token: token.value } })
+    const org = props.kind === 'org'
+    await api(org ? `/public/orgs/${props.slug}/reports` : `/public/wishlists/${props.slug}/reports`, { method: 'POST', body: { reason: reason.value, detail: detail.value || null, ...(org ? {} : { item_id: null }), turnstile_token: token.value } })
     emit('sent')
   } catch (e: any) { const r = reportErrMsg(e); msg.value = r.msg; if (r.resetCaptcha && siteKey) reset() } finally { busy.value = false }
 }
@@ -50,7 +51,7 @@ async function submit() {
 <template>
   <GuestDialog labelledby="report-title" :dirty="!!detail" @close="emit('close')">
     <form class="g-sheet" @submit.prevent="submit">
-      <div id="report-title" class="g-title">{{ $t('guest.report.title') }}</div>
+      <div id="report-title" class="g-title">{{ $t(kind === 'org' ? 'guest.report.orgTitle' : 'guest.report.title') }}</div>
       <fieldset class="g-fieldset"><legend class="g-mute">{{ $t('guest.report.reasonLegend') }}</legend>
         <label v-for="v in reasons" :key="v" class="g-radio">
           <input v-model="reason" type="radio" :value="v"> {{ $t('guest.report.reason.' + v) }}</label>

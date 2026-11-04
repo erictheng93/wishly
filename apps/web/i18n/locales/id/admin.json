@@ -727,7 +727,8 @@
       "kinds": {
         "all": "Semua",
         "wishlist": "Wishlist",
-        "user": "Pengguna"
+        "user": "Pengguna",
+        "org": "Organisasi"
       },
       "stateHidden": "Sudah diturunkan",
       "stateSuspended": "Dibekukan",
@@ -776,7 +777,43 @@
       "reporterFlag": "Sering ditolak",
       "reporterLabel": "Akun pelapor: ",
       "itemLabel": "Barang: {title}",
-      "itemDeleted": " (dihapus)"
+      "itemDeleted": " (dihapus)",
+      "viewLabel": "Tampilan",
+      "viewTargets": "Per target",
+      "viewRows": "Per laporan",
+      "reasonFilter": "Alasan",
+      "reasonAll": "Semua alasan",
+      "from": "Dari",
+      "to": "Sampai",
+      "reasonsLabel": "Alasan: ",
+      "firstLatest": "Pertama {first} · terbaru {latest}",
+      "viewReports": "Lihat {n}",
+      "filterChip": "Filter: {name}",
+      "clearFilter": "Hapus filter",
+      "revokeOrg": "Cabut organisasi",
+      "revokeOrgText": "Cabut verifikasi \"{name}\". Laporan terbuka lainnya dari organisasi ini juga akan ditutup.",
+      "revokeOrgReason": "Alasan pencabutan (wajib)",
+      "doneRevokeOrg": "Organisasi dicabut, laporan terkait ditutup",
+      "orgLabel": "Organisasi",
+      "orgStatus": {
+        "pending": "Ditinjau",
+        "pending_permits": "Menunggu izin",
+        "needs_changes": "Perlu perbaikan",
+        "verified": "Terverifikasi",
+        "rejected": "Ditolak"
+      },
+      "history": "Riwayat penanganan",
+      "historyOwner": "Riwayat penanganan pemilik",
+      "historyCounts": "Total {total} ({open} terbuka · {actioned} ditangani · {dismissed} ditolak)",
+      "historyRecent": "Laporan terbaru",
+      "historySusp": "Riwayat penangguhan",
+      "historyNone": "Tidak ada catatan",
+      "historyUser": "Pengguna itu sendiri",
+      "historyStaff": "Oleh {name}",
+      "suspendedMark": "Ditangguhkan",
+      "targetEmpty": "Tidak ada target yang cocok",
+      "loadMore": "Muat lebih banyak",
+      "loading": "Memuat…"
     }
   }
 }

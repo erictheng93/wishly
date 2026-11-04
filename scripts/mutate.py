@@ -22,6 +22,7 @@ CASES = {
     "cdn-private": (API + "wishlists.rs", "update", "crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);", "", "cdn_invalidation", CDN_TEST),
     "cdn-archive": (API + "wishlists.rs", "archive", "crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);", "", "cdn_invalidation", CDN_TEST),
     "user-suspend-reports-open-only": (API + "admin.rs", "update_user", "WHERE reported_user_id = $1 AND status = 'open'", "WHERE reported_user_id = $1", "report_console", "suspending_user_actions_only_their_open_reports"),
+    "org-reject-reports-open-only": (API + "org_admin.rs", "review", "WHERE reported_org_id = $1 AND status = 'open'", "WHERE reported_org_id = $1", "report_review", "org_reject_closes_only_open_reports_and_notifies"),
     "cdn-hidden": (API + "reports.rs", "moderate", "crate::cdn::purge_wishlists(vec![slug.clone()]);", "", "cdn_invalidation", CDN_TEST),
     "cdn-account-delete": (API + "account.rs", "delete_me", "crate::cdn::purge_wishlists(slugs);", "", "account_deletion", "account_delete_purges_public_lists_after_commit"),
     "cdn-org-revoke": (API + "org_admin.rs", "review", "crate::cdn::purge_wishlists(slugs.iter().map(|s| s.trim().to_string()).collect());", "", "org_review", "revoke_demotes_active_sites_and_purges"),
@@ -130,6 +131,7 @@ for name, function, condition in [
 FAILURE_MARKERS = {name: "CDN purge missing for wishlist" for name in CASES if name.startswith("cdn-")}
 FAILURE_MARKERS.update({
     "user-suspend-reports-open-only": "已駁回的檢舉不可被停權覆寫",
+    "org-reject-reports-open-only": "已駁回的檢舉不可被撤銷組織覆寫",
     "absorb-skip-locked": "不可等待對方的列鎖",
     "absorb-wallet-lock": "入帳進行中不可併入",
     "grant-recheck-after-wallet-lock": "已刪帳號不可被入點",

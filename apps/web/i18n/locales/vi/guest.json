@@ -107,7 +107,8 @@
       "placeholder": "Hãy mô tả vấn đề bạn thấy",
       "send": "Gửi báo cáo",
       "note": "Không cần đăng nhập. Chúng tôi sẽ xem xét thủ công và không cho người tạo biết ai đã báo cáo.",
-      "sent": "Đã nhận báo cáo, chúng tôi sẽ xử lý sớm"
+      "sent": "Đã nhận báo cáo, chúng tôi sẽ xử lý sớm",
+      "orgTitle": "Báo cáo tổ chức này"
     },
     "explore": {
       "seoTitle": "Khám phá danh sách công khai {'|'} Wishly",

@@ -41,6 +41,24 @@ pub async fn enqueue<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
+/// 檢舉結案回饋給登入的檢舉者（訪客 / 匿名無帳號，略過）。payload 只有 outcome；同一人只發一則。
+pub async fn enqueue_report_resolved<'e, E: sqlx::PgExecutor<'e>>(
+    ex: E,
+    reporters: &[Option<Uuid>],
+    outcome: &str,
+) -> Result<(), sqlx::Error> {
+    let ids: Vec<Uuid> = reporters.iter().flatten().copied().collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
+    sqlx::query(
+        "INSERT INTO notifications (user_id, channel, kind, payload)
+         SELECT DISTINCT u.id, 'email'::notification_channel, 'report.resolved', jsonb_build_object('outcome', $2::text)
+           FROM users u WHERE u.id = ANY($1) AND u.deleted_at IS NULL")
+        .bind(&ids).bind(outcome).execute(ex).await?;
+    Ok(())
+}
+
 /// 會員認領確認：站內立即出現；email 由 worker 延後 10 分鐘（`EMAIL_HOLD_MINUTES`），讓連續認領合併成一封。
 pub async fn enqueue_claim_confirmation<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
@@ -310,6 +328,7 @@ pub fn category(kind: &str) -> Category {
             "staff.digest"
                 | "cash_refund.updated"
                 | "wishlist.moderated"
+                | "report.resolved"
                 | "order.failed"
                 | "order.partial_refund"
                 | "funding.expired"
@@ -356,7 +375,8 @@ pub fn email_tier(kind: &str) -> EmailTier {
         | "item.reopened"
         | "claim.cancelled_by_donor"
         | "topup.expired"
-        | "wishlist.supported" => EmailTier::InAppOnly,
+        | "wishlist.supported"
+        | "report.resolved" => EmailTier::InAppOnly,
         "claim.purchase_reminder"
         | "claim.list_closed"
         | "claim.cancelled_by_owner"
@@ -419,6 +439,7 @@ pub const KINDS: &[&str] = &[
     "wallet.unfrozen",
     "wallet.chargeback",
     "wishlist.moderated",
+    "report.resolved",
     "account.suspended",
     "account.restored",
     "staff.digest",
@@ -469,6 +490,7 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
         | "auth.recovery_regenerated"
         | "account.suspended"
         | "account.restored" => "/settings".into(),
+        "report.resolved" => "/me/notifications".into(),
         "auth.mfa_reset" | "staff.digest" => "/admin".into(),
         "org.permit_revoked"
         | "org.permit_rejected"
@@ -1740,6 +1762,17 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("Ulang tahunmu sudah dekat. Buat wishlist ulang tahun dan beri tahu teman-temanmu.\n{base}/lists/new\n"),
             ),
         ),
+        "report.resolved" => {
+            let done = payload["outcome"].as_str() == Some("actioned");
+            (
+                l.pick("【Wishly】你的檢舉有結果了".into(), "[Wishly] Update on your report".into(), "[Wishly] Báo cáo của bạn đã có kết quả".into(), "[Wishly] Laporanmu sudah ditinjau".into()),
+                if done {
+                    l.pick("你的檢舉已處理，我們已採取行動。\n".into(), "Your report has been handled, and we have taken action.\n".into(), "Báo cáo của bạn đã được xử lý và chúng tôi đã có hành động.\n".into(), "Laporanmu sudah ditangani dan kami sudah mengambil tindakan.\n".into())
+                } else {
+                    l.pick("你的檢舉已審核，未發現違反規範。\n".into(), "Your report has been reviewed, and we found no violation of our rules.\n".into(), "Báo cáo của bạn đã được xem xét, chúng tôi không phát hiện vi phạm quy định.\n".into(), "Laporanmu sudah ditinjau dan kami tidak menemukan pelanggaran aturan.\n".into())
+                },
+            )
+        }
         "wishlist.supported" => {
             let who = payload["supporter_name"].as_str().unwrap_or_default();
             (
@@ -1872,6 +1905,7 @@ mod tests {
             "topup.credited",
             "cash_refund.updated",
             "wishlist.moderated",
+            "report.resolved",
             "order.failed",
             "order.partial_refund",
             "funding.expired",
@@ -1953,6 +1987,7 @@ mod tests {
             "claim.cancelled_by_donor",
             "topup.expired",
             "wishlist.supported",
+            "report.resolved",
         ] {
             assert_eq!(email_tier(k), InAppOnly, "{k}");
         }
