@@ -107,7 +107,8 @@
       "placeholder": "Jelaskan masalah yang kamu lihat",
       "send": "Kirim laporan",
       "note": "Tidak perlu masuk. Laporan ditinjau secara manual, dan pemilik tidak akan diberi tahu siapa pelapornya.",
-      "sent": "Laporan diterima, kami akan segera menanganinya"
+      "sent": "Laporan diterima, kami akan segera menanganinya",
+      "orgTitle": "Laporkan organisasi ini"
     },
     "explore": {
       "seoTitle": "Jelajahi wishlist publik {'|'} Wishly",

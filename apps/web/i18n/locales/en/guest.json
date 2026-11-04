@@ -107,7 +107,8 @@
       "placeholder": "Describe the problem you saw",
       "send": "Submit report",
       "note": "No sign-in needed. Reports are reviewed by a person, and the creator is never told who reported.",
-      "sent": "Report received. We will look into it soon."
+      "sent": "Report received. We will look into it soon.",
+      "orgTitle": "Report this organization"
     },
     "explore": {
       "seoTitle": "Explore public lists {'|'} Wishly",

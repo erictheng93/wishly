@@ -48,7 +48,9 @@
 
 ### 第四級：會員不寄，只留站內（`InAppOnly`）
 
-`claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`、`wishlist.supported`。
+`claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`、`wishlist.supported`、`report.resolved`。
+
+`report.resolved`（檢舉結案回饋）只發給登入的檢舉者，訪客與匿名檢舉者不通知；歸類為帳號類（不可關閉站內）、只留站內。payload 只有 `outcome`（`actioned` / `dismissed`），不含被檢舉對象、被檢舉者身分或 staff 備註；同一次批次結案（下架清單、停權使用者、撤銷組織）每位檢舉者只收一則。
 
 送禮進度 `claim.item_changed`、`crowdfund.funded`、`order.shipped`、`owner.funded`、`owner.shipped`（2026-11 起，`PushOnly`）：會員不寄 Email，但**仍會推播**，時機與合併同第三級。打開 App 就看得到，錯過也沒有損失；品項修改有時效，所以保留推播。送達與訂單失敗仍寄 Email。
 

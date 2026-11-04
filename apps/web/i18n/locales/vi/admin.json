@@ -727,7 +727,8 @@
       "kinds": {
         "all": "Tất cả",
         "wishlist": "Danh sách",
-        "user": "Người dùng"
+        "user": "Người dùng",
+        "org": "Tổ chức"
       },
       "stateHidden": "Đã gỡ",
       "stateSuspended": "Đã khóa",
@@ -776,7 +777,43 @@
       "reporterFlag": "Hay bị bác bỏ",
       "reporterLabel": "Tài khoản người báo cáo: ",
       "itemLabel": "Món quà: {title}",
-      "itemDeleted": " (đã xóa)"
+      "itemDeleted": " (đã xóa)",
+      "viewLabel": "Xem",
+      "viewTargets": "Theo đối tượng",
+      "viewRows": "Từng báo cáo",
+      "reasonFilter": "Lý do",
+      "reasonAll": "Mọi lý do",
+      "from": "Từ ngày",
+      "to": "Đến ngày",
+      "reasonsLabel": "Lý do: ",
+      "firstLatest": "Đầu tiên {first} · gần nhất {latest}",
+      "viewReports": "Xem {n}",
+      "filterChip": "Lọc: {name}",
+      "clearFilter": "Bỏ bộ lọc",
+      "revokeOrg": "Thu hồi tổ chức",
+      "revokeOrgText": "Thu hồi xác minh của \"{name}\". Các báo cáo chưa xử lý khác của tổ chức này cũng sẽ được đóng.",
+      "revokeOrgReason": "Lý do thu hồi (bắt buộc)",
+      "doneRevokeOrg": "Đã thu hồi tổ chức, các báo cáo liên quan đã đóng",
+      "orgLabel": "Tổ chức",
+      "orgStatus": {
+        "pending": "Đang xét duyệt",
+        "pending_permits": "Chờ giấy phép",
+        "needs_changes": "Cần bổ sung",
+        "verified": "Đã xác minh",
+        "rejected": "Bị từ chối"
+      },
+      "history": "Lịch sử xử lý",
+      "historyOwner": "Lịch sử xử lý của chủ danh sách",
+      "historyCounts": "Tổng {total} ({open} chưa xử lý · {actioned} đã xử lý · {dismissed} đã bác bỏ)",
+      "historyRecent": "Báo cáo gần đây",
+      "historySusp": "Lịch sử đình chỉ",
+      "historyNone": "Không có bản ghi",
+      "historyUser": "Chính người dùng",
+      "historyStaff": "Bởi {name}",
+      "suspendedMark": "Đình chỉ",
+      "targetEmpty": "Không có đối tượng phù hợp",
+      "loadMore": "Tải thêm",
+      "loading": "Đang tải…"
     }
   }
 }

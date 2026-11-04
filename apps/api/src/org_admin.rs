@@ -174,6 +174,13 @@ async fn review(
         .bind(id).bind(new_status).bind(&b.note)
         .bind(if new_status == "needs_changes" { flagged.clone() } else { vec![] })
         .execute(&mut *tx).await?;
+    // 撤銷已驗證的組織：其待處理檢舉視為已處置。鎖序 organizations（上面 FOR UPDATE）→ content_reports；
+    // status = 'open' 不可省，以免覆寫已駁回的檢舉
+    if status == "verified" && new_status == "rejected" {
+        let reporters: Vec<Option<Uuid>> = sqlx::query_scalar("UPDATE content_reports SET status = 'actioned', handled_by = $2, handled_at = now(), resolution_note = $3 WHERE reported_org_id = $1 AND status = 'open' RETURNING reporter_user_id")
+            .bind(id).bind(sid).bind(&b.note).fetch_all(&mut *tx).await?;
+        crate::notify::enqueue_report_resolved(&mut *tx, &reporters, "actioned").await?;
+    }
     // 撤銷：已上線的救災據點降為草稿（觸發器只擋 status='active'，降級不受限）
     let slugs: Vec<String> = if status == "verified" {
         let down: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET status = 'draft' WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug, id")

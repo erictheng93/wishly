@@ -11,6 +11,7 @@ import { flush, input, mount } from './vueHarness'
 
 const api = vi.fn()
 const route = { query: {} as Record<string, any> }
+const replace = vi.fn()
 const mounted: ReturnType<typeof mount>[] = []
 const stubs = {
   CreatorHeader: { template: '<header><slot /></header>' },
@@ -24,10 +25,10 @@ const stubs = {
 const settle = async () => { await flush(); await flush(); await nextTick() }
 function show(c: any) { const m = mount(c, {}, stubs, { fmtTime, fmtPts, ORDER_STATUS, orderActions, label: (m: any, k: string) => m[k] }); mounted.push(m); return m.el }
 beforeEach(() => {
-  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: null }), fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route })) vi.stubGlobal(k, v)
-  route.query = {}
+  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: null }), fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
+  route.query = { view: 'rows' } // 檢舉頁預設依對象；既有逐筆測試明指檢視
 })
-afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset() })
+afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset(); replace.mockReset() })
 
 it('組織撤銷先填理由，第二次確認保留理由；許可直接下載對應文件', async () => {
   const org = { id: 'org', display_name: 'Org', verification_status: 'verified' }
@@ -245,4 +246,67 @@ it('檢舉頁：快照、檢舉者統計與旗標、品項名稱；已結案仍�
   el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
   expect(api).toHaveBeenCalledWith('/admin/users/u2', { method: 'PATCH', body: { blocked: false, reason: '申訴成立' } })
   expect(btn(cards[2], '解除停權')).toBeUndefined()
+})
+
+const wl = { id: 'w', slug: 'slug', title: 'List', moderation_status: 'ok', owner: { id: 'own', handle: null, display_name: 'Own' } }
+const orgT = { id: 'org', slug: 'helpers', display_name: 'Helpers', verification_status: 'verified' }
+
+it('檢舉頁預設依對象：顯示筆數與原因，查看 N 筆帶對象篩選切到逐筆，可移除', async () => {
+  route.query = {}
+  api.mockImplementation(async (url: string, o: any) => url === '/admin/reports/targets'
+    ? { data: [{ kind: 'wishlist', wishlist: wl, count: 3, reasons: ['scam', 'other'], first_at: '2026-11-01T00:00:00Z', latest_at: '2026-11-02T00:00:00Z' }, { kind: 'org', org: orgT, count: 2, reasons: ['scam'], first_at: '2026-11-01T00:00:00Z', latest_at: '2026-11-02T00:00:00Z' }], next_offset: null }
+    : { data: [], next_cursor: null })
+  const el = show(Reports); await settle()
+  expect(api.mock.calls[0]![0]).toBe('/admin/reports/targets')
+  expect(el.textContent).toContain('疑似詐騙、其他')
+  expect(el.querySelector('[data-testid="target"] a')!.getAttribute('href')).toBe('/s/slug')
+  el.querySelectorAll<HTMLButtonElement>('[data-testid="drill"]')[1]!.click(); await settle()
+  expect(api).toHaveBeenLastCalledWith('/admin/reports', { query: expect.objectContaining({ status: 'open', org_id: 'org' }) })
+  expect(replace).toHaveBeenLastCalledWith({ query: expect.objectContaining({ view: 'rows', target_kind: 'org', target_id: 'org' }) })
+  expect(el.querySelector('[data-testid="target-chip"]')?.textContent).toContain('Helpers')
+  el.querySelector<HTMLButtonElement>('[data-testid="chip-clear"]')!.click(); await settle()
+  expect(el.querySelector('[data-testid="target-chip"]')).toBeNull()
+  expect(api.mock.calls.at(-1)![1].query.org_id).toBeUndefined()
+})
+
+it('檢舉頁篩選從網址還原，變更後寫回網址並用於請求；分頁用 next_offset', async () => {
+  route.query = { view: 'targets', reason: 'scam', from: '2026-11-01' }
+  api.mockImplementation(async (_u: string, o: any) => ({ data: [{ kind: 'user', user: { id: 'u', handle: 'h', display_name: 'U', suspended: true }, count: 1, reasons: ['scam'], first_at: '2026-11-01T00:00:00Z', latest_at: '2026-11-01T00:00:00Z' }], next_offset: o.query.offset ? null : 50 }))
+  const el = show(Reports); await settle()
+  expect(api.mock.calls[0]![1].query).toMatchObject({ reason: 'scam', from: '2026-11-01', to: undefined })
+  expect(el.querySelector<HTMLSelectElement>('[data-testid="f-reason"]')!.value).toBe('scam')
+  await input(el, '[data-testid="f-to"]', '2026-11-03'); await settle()
+  expect(replace).toHaveBeenLastCalledWith({ query: expect.objectContaining({ reason: 'scam', from: '2026-11-01', to: '2026-11-03' }) })
+  expect(api.mock.calls.at(-1)![1].query.to).toBe('2026-11-03')
+  ;[...el.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('載入更多'))!.click(); await settle()
+  expect(api.mock.calls.at(-1)![1].query.offset).toBe(50)
+  expect(el.querySelectorAll('[data-testid="target"]')).toHaveLength(2)
+})
+
+it('處置紀錄：展開才載入，顯示統計、近期檢舉與停權紀錄', async () => {
+  api.mockImplementation(async (url: string) => url === '/admin/users/own/moderation-history'
+    ? { counts: { total: 5, open: 1, actioned: 3, dismissed: 1 }, recent: [{ id: 'x', target: 'wishlist', wishlist: { id: 'w', slug: 'old', title: '舊清單' }, reason: 'scam', status: 'actioned', created_at: '2026-10-01T00:00:00Z' }], suspensions: [{ at: '2026-10-02T00:00:00Z', blocked: true, reason: '詐騙', staff: { id: 's', display_name: '小編' } }] }
+    : { data: [{ id: 'report', status: 'open', reason: 'other', wishlist: wl }] })
+  const el = show(Reports); await settle()
+  expect(api.mock.calls.some(([u]) => u.includes('moderation-history'))).toBe(false)
+  el.querySelector<HTMLButtonElement>('[data-testid="hist-toggle"]')!.click(); await settle()
+  expect(el.querySelector('[data-testid="hist-counts"]')!.textContent).toContain('共 5 筆（待處理 1・已處理 3・已駁回 1）')
+  expect(el.querySelector('[data-testid="hist"] a')!.getAttribute('href')).toBe('/s/old')
+  expect(el.querySelector('[data-testid="hist"]')!.textContent).toMatch(/停權・詐騙・操作者：小編/)
+  el.querySelector<HTMLButtonElement>('[data-testid="hist-toggle"]')!.click(); await settle()
+  el.querySelector<HTMLButtonElement>('[data-testid="hist-toggle"]')!.click(); await settle()
+  expect(api.mock.calls.filter(([u]) => u.includes('moderation-history'))).toHaveLength(1)
+})
+
+it('組織檢舉：顯示組織與快照，撤銷組織送出與組織審核相同的 reject 請求', async () => {
+  api.mockImplementation(async (url: string, o: any) => o?.method === 'POST' ? {} : { data: [{ id: 'r', status: 'open', reason: 'scam', org: orgT, snapshot: { display_name: 'Helpers', slug: 'helpers', description: '簡介' } }] })
+  const el = show(Reports); await settle()
+  expect(el.querySelector('article a')!.getAttribute('href')).toBe('/o/helpers')
+  expect(el.querySelector('[data-testid="org-snapshot"]')!.textContent).toContain('簡介')
+  expect(el.querySelector('[data-testid="hist-toggle"]')).toBeNull()
+  ;[...el.querySelectorAll<HTMLButtonElement>('article button')].find(b => b.textContent?.includes('撤銷組織'))!.click(); await settle()
+  expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
+  await input(el, '.confirm textarea', '資格不符')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/orgs/org/review', { method: 'POST', body: { decision: 'reject', note: '資格不符' } })
 })
