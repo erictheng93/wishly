@@ -160,8 +160,10 @@ async fn report(
     }
     ratelimit::check(&st.pool, &format!("user_report:{}", u.id), 10, 3600).await?;
     let rid: Uuid = sqlx::query_scalar(
-        "INSERT INTO content_reports (reported_user_id, reason, detail, reporter_user_id)
-         VALUES ($1, $2::report_reason, $3, $4) RETURNING id",
+        "INSERT INTO content_reports (reported_user_id, reason, detail, reporter_user_id, snapshot)
+         SELECT $1, $2::report_reason, $3, $4,
+           jsonb_build_object('display_name', display_name, 'handle', handle, 'bio', bio, 'avatar_key', avatar_key)
+         FROM users WHERE id = $1 RETURNING id",
     )
     .bind(id)
     .bind(&b.reason)

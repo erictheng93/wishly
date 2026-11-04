@@ -209,3 +209,40 @@ it('首頁待處理檢舉數連到檢舉頁', async () => {
   expect(el.querySelector('[data-testid="stat-open_reports"] a')?.getAttribute('href')).toBe('/admin/reports')
   expect(el.querySelector('[data-testid="todo-open_reports"]')!.closest('a')!.getAttribute('href')).toBe('/admin/reports')
 })
+
+it('檢舉頁：快照、檢舉者統計與旗標、品項名稱；已結案仍可恢復清單／解除停權', async () => {
+  const items = Array.from({ length: 12 }, (_, i) => ({ id: `i${i}`, title: `品${i}`, description: null, product_url: null, image_url: null }))
+  const rows = [
+    { id: 'a', status: 'actioned', reason: 'scam', reporter: 'user', target_open_count: 0, item_id: 'i1', item: { id: 'i1', title: '現名', deleted: true },
+      reporter_user: { id: 'ru', handle: 'rep', display_name: '檢舉人' }, reporter_stats: { total: 4, dismissed: 3 },
+      snapshot: { title: '當時標題', description: null, cover_image_url: null, items, item: items[1] },
+      wishlist: { id: 'w1', slug: 's1', title: '清單一', moderation_status: 'hidden', owner: { id: 'o', handle: 'h', display_name: 'Own' } } },
+    { id: 'b', status: 'dismissed', reason: 'other', reporter: 'user', target_open_count: 0, snapshot: null, reporter_user: null, reporter_stats: null,
+      user: { id: 'u2', handle: null, display_name: '被停權者', suspended: true } },
+    { id: 'c', status: 'open', reason: 'other', reporter: 'user', target_open_count: 1, reporter_user: { id: 'r2', handle: null, display_name: '乙' }, reporter_stats: { total: 10, dismissed: 1 },
+      snapshot: { display_name: '舊名', handle: 'old', bio: '舊簡介', avatar_url: null }, user: { id: 'u3', handle: null, display_name: '新名', suspended: false } },
+  ]
+  api.mockImplementation(async (_u: string, opts: any) => opts?.method === 'PATCH' ? {} : { data: rows, next_cursor: null })
+  const el = show(Reports); await settle()
+  const cards = [...el.querySelectorAll('article')]
+  expect(cards[0].textContent).toContain('品項：現名（已刪除）')
+  expect(cards[0].textContent).toContain('此檢舉者共 4 筆，駁回 3 筆')
+  expect(cards[0].querySelector('a[href="/u/rep"]')).not.toBeNull()
+  expect(cards[0].querySelector('[data-testid="reporter-flag"]')).not.toBeNull()
+  expect(cards[0].querySelector('[data-testid="snapshot-item"]')!.textContent).toContain('品1')
+  expect(cards[0].textContent).toContain('＋2 項')
+  expect(cards[1].textContent).toContain('（舊檢舉，無快照）')
+  expect(cards[2].textContent).toContain('舊簡介')
+  expect(cards[2].querySelector('[data-testid="reporter-flag"]')).toBeNull()
+  const btn = (c: Element, t: string) => [...c.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes(t))!
+  btn(cards[0], '恢復清單').click(); await settle()
+  expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
+  await input(el, '.confirm textarea', '誤判')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/wishlists/w1/moderation', { method: 'PATCH', body: { moderation_status: 'ok', reason: '誤判' } })
+  btn(cards[1], '解除停權').click(); await settle()
+  await input(el, '.confirm textarea', '申訴成立')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/users/u2', { method: 'PATCH', body: { blocked: false, reason: '申訴成立' } })
+  expect(btn(cards[2], '解除停權')).toBeUndefined()
+})

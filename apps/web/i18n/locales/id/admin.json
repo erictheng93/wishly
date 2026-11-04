@@ -756,7 +756,27 @@
         "other": "Lainnya"
       },
       "meta": "{time}・Pelapor: {reporter}",
-      "onItem": "・Pada barang"
+      "onItem": "・Pada barang",
+      "snapshot": "Konten saat dilaporkan",
+      "snapshotNote": "Ini konten saat laporan dikirim dan bisa berbeda dari yang tampil sekarang; gunakan tautan di atas untuk melihat halaman terkini.",
+      "snapshotNone": "(Laporan lama, tanpa snapshot)",
+      "snapshotItems": "Barang dalam daftar ({n})",
+      "snapshotMore": "+{n} lagi",
+      "snapshotReported": "Barang yang dilaporkan",
+      "snapshotCover": "Sampul",
+      "restoreList": "Pulihkan daftar",
+      "restoreText": "Pulihkan \"{name}\" ke publik.",
+      "restoreReason": "Alasan memulihkan (wajib)",
+      "doneRestore": "Daftar dipulihkan",
+      "unsuspendUser": "Cabut penangguhan",
+      "unsuspendText": "Cabut penangguhan \"{name}\".",
+      "unsuspendReason": "Alasan mencabut (wajib)",
+      "doneUnsuspend": "Penangguhan dicabut",
+      "reporterStats": "Pelapor ini: {total} laporan, {dismissed} ditolak",
+      "reporterFlag": "Sering ditolak",
+      "reporterLabel": "Akun pelapor: ",
+      "itemLabel": "Barang: {title}",
+      "itemDeleted": " (dihapus)"
     }
   }
 }

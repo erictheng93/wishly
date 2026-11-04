@@ -756,7 +756,27 @@
         "other": "Khác"
       },
       "meta": "{time}・Người báo cáo: {reporter}",
-      "onItem": "・về một món quà"
+      "onItem": "・về một món quà",
+      "snapshot": "Nội dung lúc báo cáo",
+      "snapshotNote": "Đây là nội dung tại thời điểm báo cáo, có thể khác với hiện tại; dùng liên kết phía trên để xem trang hiện tại.",
+      "snapshotNone": "(Báo cáo cũ, không có ảnh chụp)",
+      "snapshotItems": "Món quà trong danh sách ({n})",
+      "snapshotMore": "+{n} món nữa",
+      "snapshotReported": "Món quà bị báo cáo",
+      "snapshotCover": "Ảnh bìa",
+      "restoreList": "Khôi phục danh sách",
+      "restoreText": "Khôi phục \"{name}\" công khai.",
+      "restoreReason": "Lý do khôi phục (bắt buộc)",
+      "doneRestore": "Đã khôi phục danh sách",
+      "unsuspendUser": "Gỡ đình chỉ",
+      "unsuspendText": "Gỡ đình chỉ của \"{name}\".",
+      "unsuspendReason": "Lý do gỡ (bắt buộc)",
+      "doneUnsuspend": "Đã gỡ đình chỉ",
+      "reporterStats": "Người báo cáo này: {total} báo cáo, {dismissed} bị bác bỏ",
+      "reporterFlag": "Hay bị bác bỏ",
+      "reporterLabel": "Tài khoản người báo cáo: ",
+      "itemLabel": "Món quà: {title}",
+      "itemDeleted": " (đã xóa)"
     }
   }
 }
