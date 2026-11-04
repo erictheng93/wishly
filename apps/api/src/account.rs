@@ -434,6 +434,10 @@ async fn delete_me(
     .await?;
     sqlx::query("UPDATE wishlist_items SET image_key=NULL, image_status='none' WHERE wishlist_id IN (SELECT id FROM wishlists WHERE owner_id=$1 AND org_id IS NULL)")
         .bind(id).execute(&mut *tx).await?;
+    // 已結案、關於本人或其個人清單的檢舉：快照與檢舉描述立即清掉（待處理的留到結案後 7 天，見 ratelimit::REPORT_RETENTION_SQL）
+    sqlx::query("UPDATE content_reports SET snapshot = NULL, detail = NULL WHERE status <> 'open'
+                   AND (reported_user_id = $1 OR wishlist_id IN (SELECT id FROM wishlists WHERE owner_id = $1 AND org_id IS NULL))")
+        .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")

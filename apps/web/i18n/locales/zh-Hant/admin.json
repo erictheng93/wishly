@@ -813,7 +813,8 @@
       "suspendedMark": "停權",
       "targetEmpty": "沒有符合的對象",
       "loadMore": "載入更多",
-      "loading": "載入中…"
+      "loading": "載入中…",
+      "noPii": "請勿填寫電話、地址、Email 等個人資料"
     }
   }
 }

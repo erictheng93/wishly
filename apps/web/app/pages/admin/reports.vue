@@ -221,8 +221,8 @@ const href = (r: any) => `/u/${(r.user ?? r.wishlist.owner).handle || (r.user ??
     <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">{{ $t('admin.reports.loadMore') }}</button>
 
     <CreatorConfirm :open="!!act" :title="confirmTitle" :text="confirmText" :ok="confirmTitle" :danger="needReason" :busy="busy" :disabled="needReason && !note.trim()" :error="actErr" @close="act = null" @ok="submit">
-      <label v-if="needReason" class="c-field"><span>{{ $t(`admin.reports.${reasonLabel}`) }}</span><textarea v-model="note" :disabled="busy" maxlength="200" rows="3" /></label>
-      <label v-else class="c-field"><span>{{ $t('admin.reports.noteLabel') }}</span><textarea v-model="note" :disabled="busy" maxlength="1000" rows="3" /></label>
+      <label v-if="needReason" class="c-field"><span>{{ $t(`admin.reports.${reasonLabel}`) }}</span><textarea v-model="note" :disabled="busy" maxlength="200" rows="3" :placeholder="$t('admin.reports.noPii')" /></label>
+      <label v-else class="c-field"><span>{{ $t('admin.reports.noteLabel') }}</span><textarea v-model="note" :disabled="busy" maxlength="1000" rows="3" :placeholder="$t('admin.reports.noPii')" /></label>
     </CreatorConfirm>
   </main>
 </template>
