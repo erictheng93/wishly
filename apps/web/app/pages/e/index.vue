@@ -29,7 +29,7 @@ async function more() {
     <div v-else class="g-grid">
       <article v-for="(e, n) in list" :key="e.slug" class="g-card">
         <span class="x-no" aria-hidden="true">No.{{ String(n + 1).padStart(2, '0') }}</span>
-        <NuxtLink :to="`/e/${e.slug}`" class="x-title">{{ e.name }}</NuxtLink>
+        <NuxtLink :to="localizedPath(`/e/${e.slug}`, $i18n.locale)" class="x-title">{{ e.name }}</NuxtLink>
         <p class="g-mute">
           {{ $t('org.relief.hazard.' + e.hazard_type) }}・{{ e.counties.join('、') }}<template v-if="e.occurred_on">・{{ e.occurred_on }}</template>
         </p>

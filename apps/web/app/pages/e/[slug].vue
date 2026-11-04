@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // 救援事件頁：事件資訊 + 各據點與缺口數字（SSR；公開 API 不帶 cookie）
 const { public: { apiBase, siteUrl } } = useRuntimeConfig()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const slug = String(useRoute().params.slug)
 const { data, error, refresh } = await useAsyncData(`relief-event-${slug}`, () => $fetch<any>(`${apiBase}/api/v1/public/relief-events/${encodeURIComponent(slug)}`))
 // 事件已合併：永久轉址到最終事件
-if (data.value?.merged_into) await navigateTo(`/e/${data.value.merged_into}`, { redirectCode: 301 })
+if (data.value?.merged_into) await navigateTo(localizedPath(`/e/${data.value.merged_into}`, locale.value), { redirectCode: 301 })
 const ev = computed(() => data.value?.event)
 const sites = computed<any[]>(() => data.value?.sites ?? [])
 const notFound = computed(() => (error.value as any)?.statusCode === 404 || (error.value as any)?.status === 404)
@@ -24,7 +24,7 @@ useSeoMeta({
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="notFound" class="c-nf"><h1>{{ $t('guest.relief.eventNotFound') }}</h1><NuxtLink to="/e">{{ $t('guest.relief.back') }}</NuxtLink></div>
+    <div v-if="notFound" class="c-nf"><h1>{{ $t('guest.relief.eventNotFound') }}</h1><NuxtLink :to="localizedPath('/e', $i18n.locale)">{{ $t('guest.relief.back') }}</NuxtLink></div>
     <div v-else-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="ev">
       <span class="x-kicker" aria-hidden="true">RELIEF / EVENT</span>
@@ -37,8 +37,8 @@ useSeoMeta({
       <div v-else class="g-grid">
         <article v-for="(s, n) in sites" :key="s.slug" class="g-card">
           <span class="x-no" aria-hidden="true">SITE {{ String(n + 1).padStart(2, '0') }}</span>
-          <NuxtLink :to="`/s/${s.slug}`" class="x-title">{{ s.title }}</NuxtLink>
-          <p class="g-mute"><NuxtLink :to="`/o/${s.org.slug}`">{{ s.org.display_name }}</NuxtLink><span class="g-badge">{{ $t('guest.relief.verified') }}</span></p>
+          <NuxtLink :to="localizedPath(`/s/${s.slug}`, $i18n.locale)" class="x-title">{{ s.title }}</NuxtLink>
+          <p class="g-mute"><NuxtLink :to="localizedPath(`/o/${s.org.slug}`, $i18n.locale)">{{ s.org.display_name }}</NuxtLink><span class="g-badge">{{ $t('guest.relief.verified') }}</span></p>
           <p class="g-mute"><a :href="mapsUrl(s.site_address)" target="_blank" rel="noopener">{{ s.site_address }}</a></p>
           <p>
             <span class="g-badge critical x-crit">{{ $t('guest.relief.critical', { n: s.needs.critical }) }}</span>

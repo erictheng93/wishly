@@ -62,7 +62,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
         <div v-else class="x-img x-ph" aria-hidden="true">{{ (p.brand?.name || p.title).slice(0, 1) }}</div>
         <span class="x-no" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span>
       </div>
-      <p v-if="p.brand" class="g-mute"><NuxtLink :to="`/brands/${p.brand.slug}`">{{ p.brand.name }}</NuxtLink></p>
+      <p v-if="p.brand" class="g-mute"><NuxtLink :to="localizedPath(`/brands/${p.brand.slug}`, $i18n.locale)">{{ p.brand.name }}</NuxtLink></p>
       <strong class="x-title">{{ p.title }}</strong>
       <p v-if="p.spec" class="g-mute">{{ p.spec }}</p>
       <p v-if="p.price_amount != null" class="x-price">NT${{ p.price_amount.toLocaleString('en-US') }}</p>
@@ -96,7 +96,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
             <p class="g-mute">{{ w.wishlist.title }}</p>
             <p class="g-mute">{{ w.item.open ? $t('guest.inspire.left', { n: wishLeft(w.item) }) : $t('guest.inspire.done') }}</p>
           </div>
-          <NuxtLink v-if="w.item.open" :to="`/s/${w.wishlist.slug}?item=${w.item.id}`" class="g-btn sm">{{ $t('guest.inspire.gift') }}</NuxtLink>
+          <NuxtLink v-if="w.item.open" :to="localizedPath(`/s/${w.wishlist.slug}`, $i18n.locale) + `?item=${w.item.id}`" class="g-btn sm">{{ $t('guest.inspire.gift') }}</NuxtLink>
           <button v-else class="g-btn sm" disabled>{{ $t('guest.inspire.done') }}</button>
         </li>
       </ul>

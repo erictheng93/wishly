@@ -84,7 +84,7 @@ async function submit() {
       <div v-if="errs.note" class="g-field-err">{{ errs.note }}</div>
       <!-- 放在留言欄之後：GuestDialog 會把初始焦點給第一個 input -->
       <label v-if="!editing" class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.claim.anon') }}</label>
-      <p class="g-mute">{{ $t('guest.claim.notice') }}<NuxtLink to="/privacy#collect" target="_blank">{{ $t('guest.claim.privacyLink') }}</NuxtLink><span class="g-nowrap">{{ $t('guest.claim.noCheck') }}</span></p>
+      <p class="g-mute">{{ $t('guest.claim.notice') }}<NuxtLink :to="localizedPath('/privacy', $i18n.locale) + '#collect'" target="_blank">{{ $t('guest.claim.privacyLink') }}</NuxtLink><span class="g-nowrap">{{ $t('guest.claim.noCheck') }}</span></p>
       <button class="g-btn" :disabled="busy || !online">{{ !online ? $t('guest.claim.offline') : busy ? $t('guest.sending') : editing ? $t('guest.claim.save') : $t('guest.claim.confirm') }}</button>
       <button type="button" class="g-link" @click="emit('close')">{{ $t('guest.cancel') }}</button>
     </form>

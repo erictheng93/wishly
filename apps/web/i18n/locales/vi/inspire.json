@@ -1,0 +1,402 @@
+{
+  "inspire": {
+    "ui": {
+      "steps": "Lập danh sách trong ba bước",
+      "ideas": "Món quà có thể đưa vào danh sách",
+      "products": "Sản phẩm tuyển chọn",
+      "faq": "Câu hỏi thường gặp",
+      "others": "Các dịp tặng quà khác"
+    },
+    "scenes": {
+      "birthday": {
+        "label": "Sinh nhật",
+        "seoTitle": "Cách lập danh sách quà sinh nhật: chia sẻ danh sách ước nguyện sinh nhật chỉ bằng một liên kết {'|'} Wishly",
+        "seoDesc": "Muốn chọn đúng quà sinh nhật, hãy xem danh sách ước nguyện của người nhận. Lập danh sách quà sinh nhật trên Wishly, chia sẻ cho bạn bè bằng một liên kết; món nào đã có người nhận tặng sẽ bị khóa nên bạn không bị tặng trùng, cũng không phải ngại ngần nói ra điều mình muốn.",
+        "heading": "Danh sách quà sinh nhật: để bạn bè xem danh sách ước nguyện của bạn",
+        "intro": [
+          "Mỗi dịp gần sinh nhật, câu hỏi quen thuộc nhất là \"Bạn muốn quà gì?\". Người được hỏi trả lời \"gì cũng được\", người hỏi đành đoán mò, rồi hoặc tặng món không dùng đến, hoặc tặng trùng với người khác.",
+          "Hãy gom những món bạn muốn thành một danh sách ước nguyện sinh nhật. Bạn bè mở liên kết là biết nên tặng gì, không cần nhắn tin trả lời từng người, và bạn cũng không phải ngại khi nói ra mong muốn của mình.",
+          "Trên Wishly, món nào được bạn bè nhận tặng sẽ bị khóa, những người khác thấy đã có người tặng nên sẽ không tặng trùng. Muốn có chút bất ngờ, bạn có thể bật chế độ bất ngờ để không biết ai tặng gì."
+        ],
+        "steps": [
+          {
+            "t": "Tạo danh sách sinh nhật",
+            "d": "Đăng nhập rồi tạo danh sách mới, đặt tên như \"Điều ước sinh nhật của tôi\", sau đó thêm từng món bạn muốn. Bạn cũng có thể vào Gợi ý quà tặng chọn sản phẩm tuyển chọn và thêm chỉ với một chạm."
+          },
+          {
+            "t": "Chọn ai được xem",
+            "d": "Tùy nhu cầu, chọn công khai, tất cả bạn bè, bạn bè được chọn hoặc chỉ mình tôi. Muốn giữ sự bất ngờ thì bật chế độ bất ngờ."
+          },
+          {
+            "t": "Chia sẻ liên kết và chờ bạn bè nhận tặng",
+            "d": "Sao chép liên kết danh sách rồi gửi vào nhóm chat hoặc nhắn riêng. Danh sách công khai xem không cần đăng nhập; với danh sách chỉ dành cho bạn bè hoặc người được chọn, bạn bè phải đăng nhập và nằm trong danh sách được xem. Muốn nhận tặng thì cần đăng nhập, sau khi nhận tặng món đó sẽ bị khóa."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Nến thơm và tinh dầu",
+            "d": "Khoảng giá rộng, dễ chọn, phù hợp khi bạn chưa rõ ngân sách của người tặng."
+          },
+          {
+            "t": "Bình giữ nhiệt và bình nước mang theo",
+            "d": "Dùng hằng ngày, ghi rõ dung tích và màu bạn thích sẽ khó bị tặng nhầm."
+          },
+          {
+            "t": "Tai nghe và loa Bluetooth",
+            "d": "Thông số chênh lệch nhiều, tự chọn sẵn mẫu là chắc nhất."
+          },
+          {
+            "t": "Chăm sóc da và cơ thể",
+            "d": "Loại da và sở thích rất riêng, liệt kê đúng sản phẩm muốn dùng là chuẩn nhất."
+          },
+          {
+            "t": "Sách và tạp chí",
+            "d": "Sách muốn đọc thường có cả một danh sách dài, đưa vào để bạn bè thoải mái chọn."
+          },
+          {
+            "t": "Đồ gia dụng nhỏ cho nhà bếp",
+            "d": "Máy pha cà phê, nồi chiên không dầu là những món muốn mua mà tiếc tiền, rất hợp để bạn bè góp quà chung."
+          },
+          {
+            "t": "Đồ thể thao và dã ngoại",
+            "d": "Kích cỡ và công dụng rõ ràng, ghi cụ thể là không cần đoán."
+          },
+          {
+            "t": "Quà trải nghiệm",
+            "d": "Ví dụ nhà hàng, khóa học hay triển lãm bạn thích, nhớ ghi rõ nội dung muốn đi trong phần mô tả."
+          },
+          {
+            "t": "Món ước mơ giá cao",
+            "d": "Món giá cao có thể mở góp quà chung để mọi người cùng góp bằng điểm."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Danh sách quà sinh nhật có thể chỉ cho một số bạn xem không?",
+            "a": "Được. Danh sách có bốn mức hiển thị: công khai, tất cả bạn bè, bạn bè được chọn hoặc bạn thân, và chỉ mình tôi. Bạn có thể chỉ mở cho những người mình muốn mời, không cần để ai cũng thấy."
+          },
+          {
+            "q": "Tôi muốn bất ngờ, làm sao để không biết ai tặng gì?",
+            "a": "Bật chế độ bất ngờ và đặt ngày sinh nhật làm ngày sự kiện. Trước ngày sự kiện bạn chỉ thấy tiến độ hoàn thành, không thấy ai tặng gì; danh sách sẽ mở khóa vào đúng ngày sinh nhật. Bạn bè vẫn thấy món nào đã có người nhận tặng nên sẽ không tặng trùng."
+          },
+          {
+            "q": "Bạn đã nhận tặng nhưng mãi không tặng thì sao?",
+            "a": "Lượt nhận tặng có thời hạn. Quá hạn mà chưa hoàn tất, lượt nhận tặng sẽ tự động được nhả ra và món quà mở lại cho người khác, không bị kẹt mãi."
+          }
+        ]
+      },
+      "wedding": {
+        "label": "Đám cưới",
+        "seoTitle": "Danh sách quà cưới và đăng ký quà cưới, tặng quà tân hôn không trùng {'|'} Wishly",
+        "seoDesc": "Lập danh sách quà cưới thế nào? Dùng Wishly để đăng ký quà cưới: cô dâu chú rể liệt kê đồ gia dụng, chăn ga, bộ chén đĩa muốn có, người thân bạn bè mở một liên kết là xem và nhận tặng được. Quà tân hôn không bị trùng, cũng không còn ngại ngần.",
+        "heading": "Danh sách quà cưới: đăng ký quà cưới để quà tân hôn vừa đúng ý",
+        "intro": [
+          "Khi chuẩn bị cưới, người thân bạn bè hay nhắn riêng hỏi \"hai bạn còn thiếu gì\", cô dâu chú rể ngại không dám nói, cuối cùng nhận ba cái lò nướng, bốn bộ chén đĩa hoặc cả đống đồ trang trí không dùng đến, đổi trả thì phiền.",
+          "Hãy gom những thứ ngôi nhà mới thật sự cần thành danh sách quà cưới, theo kiểu đăng ký quà cưới. Mọi người mở ra là biết nên tặng gì, ngân sách cao thấp đều có lựa chọn, hai bên cũng không ngượng.",
+          "Món nào được nhận tặng sẽ bị khóa, không bị tặng trùng. Những món giá cao như đồ điện lớn có thể đặt thành góp quà chung, để nhiều người thân cùng góp bằng điểm, tấm lòng cũng được chia sẻ."
+        ],
+        "steps": [
+          {
+            "t": "Liệt kê nhu cầu cho nhà mới",
+            "d": "Đăng nhập rồi tạo \"Danh sách quà cưới của chúng tôi\", thêm từng món như đồ điện, chăn ga, chén đĩa. Nên có đủ mức giá từ thấp đến cao để người thân với ngân sách khác nhau dễ chọn."
+          },
+          {
+            "t": "Quyết định ai được xem",
+            "d": "Có thể chọn công khai, hoặc chỉ cho bạn bè, bạn bè được chọn hay bạn thân xem. Muốn giữ bất ngờ thì bật chế độ bất ngờ."
+          },
+          {
+            "t": "Gửi liên kết cho người thân",
+            "d": "Dán liên kết vào nhóm đám cưới hoặc đính kèm thiệp mời điện tử. Danh sách công khai xem không cần đăng nhập, danh sách giới hạn cho bạn bè hoặc người được chọn thì phải đăng nhập mới xem được; khi nhận tặng chỉ cần đăng nhập, sau đó món đó bị khóa."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Đồ điện gia dụng lớn",
+            "d": "Máy rửa chén, máy sấy quần áo, robot hút bụi giá cao, rất hợp để mở góp quà chung."
+          },
+          {
+            "t": "Ga giường và chăn gối",
+            "d": "Ghi rõ kích cỡ và chất liệu trước để tránh mua phải loại không vừa nệm."
+          },
+          {
+            "t": "Bộ nồi chảo và bộ chén đĩa",
+            "d": "Dùng ngay khi nhà mới bắt đầu nấu nướng, ghi rõ chất liệu và số lượng sẽ không bị trùng."
+          },
+          {
+            "t": "Máy pha cà phê và đồ gia dụng nhỏ",
+            "d": "Dùng thường xuyên, chỉ định đúng mẫu thì nhận được mới thật sự dùng tới."
+          },
+          {
+            "t": "Khăn tắm và đồ phòng tắm",
+            "d": "Giá dễ chịu, hợp với đồng nghiệp hoặc bạn bè muốn tặng món nhỏ."
+          },
+          {
+            "t": "Nến thơm và đồ trang trí nhỏ",
+            "d": "Tự chọn phong cách mình thích, tốt hơn nhận đồ trang trí không hợp gu."
+          },
+          {
+            "t": "Đồ lưu trữ và vật dụng gia đình",
+            "d": "Thiết thực nhưng hay bị bỏ quên, dọn vào nhà mới là cần ngay."
+          },
+          {
+            "t": "Trải nghiệm cho cặp đôi và quỹ du lịch",
+            "d": "Ví dụ một phần chuyến tuần trăng mật, có thể dùng góp quà chung để mọi người cùng góp."
+          },
+          {
+            "t": "Khung ảnh và album kỷ niệm",
+            "d": "Có ý nghĩa kỷ niệm và dễ kiểm soát ngân sách, hợp với người lớn tuổi hoặc họ hàng ở xa."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Có thể ghi tiền mừng không?",
+            "a": "Không. Wishly không xử lý tiền mặt hay tiền mừng, cũng không nhận hộ khoản tiền nào. Muốn mọi người cùng tặng món lớn, hãy dùng góp quà chung để người thân cùng góp bằng điểm trong nền tảng."
+          },
+          {
+            "q": "Điểm trong góp quà chung lấy từ đâu?",
+            "a": "Bạn có thể tự nạp điểm, người thân dùng điểm góp cho món quà, đạt mục tiêu mới tính là hoàn thành. Điểm chỉ dùng trong nền tảng, không phải tiền mừng bằng tiền mặt."
+          },
+          {
+            "q": "Người lớn tuổi không rành điện thoại có xem được danh sách không?",
+            "a": "Được. Danh sách chỉ là một đường dẫn; khi đặt công khai, xem không cần đăng nhập, mở ra là thấy. Danh sách giới hạn cho bạn bè hoặc người được chọn thì phải đăng nhập và nằm trong danh sách được xem. Khi nhận tặng món nào thì đều cần đăng nhập thành viên."
+          }
+        ]
+      },
+      "baby": {
+        "label": "Đầy tháng",
+        "seoTitle": "Danh sách quà đầy tháng và quà cho em bé sơ sinh, liệt kê đồ đi sinh trong một lần {'|'} Wishly",
+        "seoDesc": "Chuẩn bị đón em bé, hãy dùng Wishly lập danh sách quà đầy tháng và quà cho trẻ sơ sinh: liệt kê từng món đồ đi sinh và đồ cho bé, người thân chỉ cần một liên kết để nhận tặng, tránh nhận mười chiếc khăn quấn giống nhau, bố mẹ nhẹ nhàng hơn nhiều.",
+        "heading": "Danh sách quà đầy tháng và quà sơ sinh: gom đồ đi sinh và đồ cho bé trong một lần",
+        "intro": [
+          "Trước và sau khi em bé chào đời, người thân ai cũng muốn gửi chút tấm lòng nhưng không biết bố mẹ thiếu gì. Kết quả thường là nhận về cả đống bình sữa, khăn quấn, quần áo, cỡ quá nhỏ mặc không kịp, hoặc thương hiệu và chất liệu không hợp.",
+          "Hãy gom đồ đi sinh và đồ sơ sinh thành danh sách quà đầy tháng, bố mẹ ghi rõ cỡ, thông số và sở thích, người thân cứ theo đó chọn, không cần hỏi từng người, cũng không sợ nhận món không dùng được.",
+          "Món nào được nhận tặng sẽ bị khóa, không bị tặng trùng. Những món tiêu hao như tã, quần áo có thể chia theo nhiều mức giá, còn món giá cao như xe đẩy, ghế ngồi ô tô thì hợp để dùng góp quà chung, nhờ mọi người cùng góp."
+        ],
+        "steps": [
+          {
+            "t": "Đưa những món cần thiết vào danh sách",
+            "d": "Đăng nhập, tạo danh sách rồi thêm theo từng nhóm: đồ đi sinh, quần áo, chăn gối, đồ mang đi ra ngoài, và ghi cỡ cùng sở thích vào phần mô tả. Bạn cũng có thể chọn sản phẩm quà đầy tháng tuyển chọn trong Gợi ý quà tặng."
+          },
+          {
+            "t": "Chọn phạm vi hiển thị",
+            "d": "Thông tin về em bé khá riêng tư, nên chọn tất cả bạn bè, hoặc bạn bè được chọn, bạn thân được xem; không muốn công khai thì cũng có thể để chỉ mình tôi."
+          },
+          {
+            "t": "Chia sẻ liên kết cho người thân",
+            "d": "Gửi cho ông bà, đồng nghiệp và bạn bè. Với danh sách chỉ dành cho bạn bè hoặc người được chọn, người thân phải đăng nhập và nằm trong danh sách được xem (chỉ danh sách công khai mới xem không cần đăng nhập); nhận tặng xong món đó bị khóa, quá hạn chưa hoàn tất sẽ tự động nhả ra."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Bộ đồ liền thân sơ sinh",
+            "d": "Ghi rõ tháng tuổi và cỡ trước để tránh mua phải kiểu quá nhỏ không mặc được."
+          },
+          {
+            "t": "Khăn quấn và khăn xô",
+            "d": "Mau hết, dùng nhiều, nhiều người nhận tặng riêng cũng không thừa."
+          },
+          {
+            "t": "Bình sữa và đồ tiệt trùng",
+            "d": "Đường kính núm vú và chất liệu có sở thích riêng, liệt kê rõ thông số là chắc nhất."
+          },
+          {
+            "t": "Tã và khăn ướt",
+            "d": "Đồ tiêu hao thiết thực nhất, rất hợp với người thân muốn tặng món nhỏ."
+          },
+          {
+            "t": "Chăn gối và túi ngủ cho bé",
+            "d": "Liên quan đến an toàn giấc ngủ, bố mẹ tự chọn kiểu trước sẽ yên tâm hơn."
+          },
+          {
+            "t": "Đồ tắm gội và vệ sinh",
+            "d": "Da bé nhạy cảm, chỉ định đúng sản phẩm để tránh dùng không hợp."
+          },
+          {
+            "t": "Địu em bé và phụ kiện xe đẩy",
+            "d": "Chọn theo lối sống, bố mẹ tự quyết là hợp dùng nhất."
+          },
+          {
+            "t": "Xe đẩy và ghế ngồi ô tô",
+            "d": "Giá cao, hợp để mở góp quà chung, nhiều người thân cùng góp bằng điểm."
+          },
+          {
+            "t": "Quà lưu niệm cho bé",
+            "d": "Ví dụ album ảnh lớn lên hoặc dấu chân dấu tay, nhận vào dịp đầy tháng đặc biệt ý nghĩa."
+          },
+          {
+            "t": "Đồ chăm sóc mẹ sau sinh",
+            "d": "Mẹ cũng cần được chăm sóc, có thể thêm đồ cho con bú hoặc đồ mặc ở nhà thoải mái."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Danh sách quà đầy tháng dành cho người nhận quà hay người tặng quà?",
+            "a": "Danh sách do bố mẹ tạo để cho người thân biết mình muốn nhận gì. Danh sách công khai thì mở liên kết là xem được, danh sách giới hạn cho bạn bè hoặc người được chọn thì phải đăng nhập trước; khi muốn tặng thì đăng nhập để nhận tặng món. Nếu bạn là người tặng, cũng có thể xin bố mẹ liên kết danh sách."
+          },
+          {
+            "q": "Thông tin về em bé có bị công khai không?",
+            "a": "Danh sách có thể chọn hiển thị cho tất cả bạn bè, bạn bè được chọn, bạn thân hoặc chỉ mình tôi, không nhất thiết phải công khai. Bạn có thể chỉ cho người nhà và bạn bè đáng tin cậy xem."
+          },
+          {
+            "q": "Có thể đưa đồ đi sinh vào danh sách không?",
+            "a": "Được. Từng món trong đồ đi sinh đều có thể thêm riêng, ghi thêm cỡ hoặc thông số, người thân nhận tặng xong món đó sẽ bị khóa, không ai chuẩn bị trùng."
+          }
+        ]
+      },
+      "housewarming": {
+        "label": "Tân gia",
+        "seoTitle": "Quà tân gia tặng gì? Danh sách quà tân gia giúp người thân không tặng trùng {'|'} Wishly",
+        "seoDesc": "Chuyển nhà mới, muốn biết tặng quà tân gia gì? Dùng Wishly lập danh sách quà tân gia, liệt kê đồ điện, đồ lưu trữ, đồ trang trí nhà mới cần, người thân chỉ cần một liên kết để nhận tặng, không tặng trùng cũng không phải đoán ý, tân gia nhẹ nhàng hơn.",
+        "heading": "Quà tân gia và danh sách quà tân gia: nhà mới thiếu gì nhìn một lần là rõ",
+        "intro": [
+          "Dọn về nhà mới, bạn bè và người lớn đều muốn tặng gì đó nhưng thường không rõ bạn thật sự thiếu gì. Cuối cùng có thể nhận đồ trang trí không hợp phong cách, hoặc món nhà đã có, nhận cũng dở mà trả cũng dở.",
+          "Hãy gom những thứ nhà mới thật sự cần thành danh sách quà tân gia, từ đồ nhỏ đến đồ điện đều có thể đưa vào, ngân sách cao thấp đều có lựa chọn, người thân cứ theo đó chọn, còn bạn có thể bày trí ngôi nhà theo ý thích.",
+          "Món nào được nhận tặng sẽ bị khóa, không bị tặng trùng. Món giá cao như sofa hay đồ điện lớn có thể đặt thành góp quà chung, để vài người bạn dùng điểm cùng tặng, một người không phải gánh hết."
+        ],
+        "steps": [
+          {
+            "t": "Kiểm kê nhu cầu nhà mới",
+            "d": "Đăng nhập rồi tạo \"Danh sách nhà mới\", đi qua từng phòng nghĩ xem thiếu gì rồi thêm từng món. Bạn cũng có thể thêm chỉ với một chạm từ sản phẩm tân gia tuyển chọn trong Gợi ý quà tặng."
+          },
+          {
+            "t": "Thiết lập mức hiển thị",
+            "d": "Thông tin nhà mới khá riêng tư, có thể chọn tất cả bạn bè, hoặc bạn bè được chọn, bạn thân được xem, không cần công khai với mọi người."
+          },
+          {
+            "t": "Chia sẻ liên kết để mời tân gia",
+            "d": "Đính kèm liên kết danh sách vào lời mời tân gia. Với danh sách chỉ dành cho bạn bè hoặc người được chọn, người thân phải đăng nhập và nằm trong danh sách được xem (chỉ danh sách công khai mới xem không cần đăng nhập); nhận tặng xong món đó bị khóa, quá hạn chưa hoàn tất sẽ tự động nhả ra."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Nến thơm và tinh dầu khuếch tán",
+            "d": "Cho nhà mới mùi hương riêng, giá linh hoạt, hợp với bạn bè thông thường."
+          },
+          {
+            "t": "Cây cảnh và bình hoa",
+            "d": "Ghi rõ điều kiện ánh sáng và kích thước để không mua phải cây không sống nổi."
+          },
+          {
+            "t": "Chén đĩa và bộ ly",
+            "d": "Dùng được ngay khi mời bạn bè đến chơi nhà mới."
+          },
+          {
+            "t": "Hộp và kệ lưu trữ",
+            "d": "Kích thước quyết định có đặt vừa chỗ không, nên ghi rõ thông số."
+          },
+          {
+            "t": "Đèn và đèn trang trí nhỏ",
+            "d": "Cần hợp phong cách, tự chọn sẵn kiểu là chuẩn nhất."
+          },
+          {
+            "t": "Đồ điện gia dụng nhỏ",
+            "d": "Ví dụ lò nướng, robot hút bụi, chọn theo không gian và thói quen của nhà mới."
+          },
+          {
+            "t": "Bộ dụng cụ gia đình",
+            "d": "Dùng khi lắp ráp và sửa chữa hằng ngày, thiết thực nhưng dễ bị bỏ quên."
+          },
+          {
+            "t": "Khăn tắm và đồ vải trong nhà",
+            "d": "Màu sắc và chất liệu có sở thích riêng, liệt kê ra sẽ đỡ bị tặng nhầm."
+          },
+          {
+            "t": "Nội thất hoặc đồ điện lớn",
+            "d": "Giá cao, hợp để mở góp quà chung, người thân cùng góp bằng điểm."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Danh sách quà tân gia nhất định phải công khai không?",
+            "a": "Không. Danh sách có các mức hiển thị: công khai, tất cả bạn bè, bạn bè được chọn hoặc bạn thân, và chỉ mình tôi. Nếu thông tin nhà mới khá riêng tư, nên chỉ cho người đáng tin xem."
+          },
+          {
+            "q": "Có thể nhờ mọi người cùng tặng món lớn như sofa không?",
+            "a": "Có thể dùng góp quà chung, để nhiều người thân cùng góp bằng điểm. Điểm có thể nạp. Danh sách có món góp quà chung cần điền thông tin nhận hàng trước; khi đủ mục tiêu, Wishly sẽ mua hộ và gửi đến địa chỉ bạn đã điền, bạn không phải tự liên hệ cửa hàng."
+          },
+          {
+            "q": "Bạn bè không muốn đăng nhập thành viên thì còn xem được danh sách không?",
+            "a": "Còn tùy mức hiển thị của danh sách. Khi đặt công khai, xem không cần đăng nhập; danh sách cho tất cả bạn bè, bạn bè được chọn hoặc bạn thân thì bạn bè phải đăng nhập và nằm trong danh sách được xem. Nhận tặng món nào cũng đều cần đăng nhập thành viên."
+          }
+        ]
+      },
+      "christmas": {
+        "label": "Giáng sinh",
+        "seoTitle": "Danh sách quà Giáng sinh và trao đổi quà, gom mọi điều ước trong một liên kết {'|'} Wishly",
+        "seoDesc": "Giáng sinh muốn tặng đúng quà, hãy lập danh sách quà Giáng sinh trước. Dùng Wishly gom ý tưởng trao đổi quà và điều ước cá nhân, chia sẻ cho gia đình bạn bè bằng một liên kết, món đã nhận tặng sẽ bị khóa nên không nhận quà trùng, mùa lễ nhẹ nhàng hơn.",
+        "heading": "Danh sách quà Giáng sinh: gom ý tưởng trao đổi quà và điều ước của gia đình bạn bè",
+        "intro": [
+          "Trước Giáng sinh, công ty tổ chức trao đổi quà, gia đình bạn bè cũng muốn tặng nhau món nhỏ, nỗi lo lớn nhất là \"người ta thật sự thích gì\". Đoán mãi rồi vẫn tặng món chẳng có gì đặc biệt, người nhận cũng chỉ biết lịch sự nói cảm ơn.",
+          "Hãy làm những thứ bạn muốn thành danh sách quà Giáng sinh, người trao đổi quà với bạn cứ theo đó chọn, trong ngân sách có lựa chọn rõ ràng, không ngượng, không tặng thừa hay thiếu, người bốc trúng bạn cũng đỡ mất công đoán.",
+          "Món nào được nhận tặng sẽ bị khóa, không bị tặng trùng. Nếu muốn giữ bất ngờ khi nhận quà, bạn có thể bật chế độ bất ngờ để không biết ai tặng gì, lúc mở quà vẫn đầy háo hức, bạn bè với nhau cũng không tặng trùng món."
+        ],
+        "steps": [
+          {
+            "t": "Tạo danh sách Giáng sinh",
+            "d": "Đăng nhập rồi tạo danh sách mới, thêm những món bạn muốn theo mức giá, cũng có thể thêm vài món ở các mức ngân sách thường gặp khi trao đổi quà. Gợi ý quà tặng có sản phẩm dịp lễ tuyển chọn để thêm chỉ với một chạm."
+          },
+          {
+            "t": "Quyết định ai được xem",
+            "d": "Có thể chọn công khai, tất cả bạn bè, bạn bè được chọn hoặc chỉ mình tôi. Muốn giữ bất ngờ thì bật chế độ bất ngờ."
+          },
+          {
+            "t": "Chia sẻ liên kết cho mọi người",
+            "d": "Dán liên kết vào nhóm chat hoặc gửi cho người trao đổi quà với bạn. Danh sách công khai xem không cần đăng nhập, danh sách giới hạn cho bạn bè hoặc người được chọn thì phải đăng nhập mới xem được; khi nhận tặng thì đăng nhập, sau đó món đó bị khóa, quá hạn chưa hoàn tất sẽ tự động nhả ra."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Đồ giữ ấm tay và đồ ấm nhỏ",
+            "d": "Thiết thực vào mùa đông, giá dễ nằm trong ngân sách trao đổi quà."
+          },
+          {
+            "t": "Nến thơm và tinh dầu khuếch tán",
+            "d": "Bao bì mang không khí lễ hội, hợp với đa số mọi người."
+          },
+          {
+            "t": "Cốc sứ và bình giữ nhiệt",
+            "d": "Dùng hằng ngày, chọn sẵn màu và kiểu sẽ ít bị tặng nhầm."
+          },
+          {
+            "t": "Hộp quà bánh kẹo và đồ uống",
+            "d": "Hợp để trao đổi quà ở văn phòng, nhớ ghi rõ khẩu vị ưa thích."
+          },
+          {
+            "t": "Board game và trò chơi tiệc",
+            "d": "Tiệc Giáng sinh có thể chơi ngay, tăng thêm sự tương tác."
+          },
+          {
+            "t": "Tất và chăn mềm",
+            "d": "Giá phải chăng mà ấm áp, kích cỡ dễ hợp với nhiều đối tượng."
+          },
+          {
+            "t": "Sách và văn phòng phẩm",
+            "d": "Sách muốn đọc và sổ tay yêu thích thường có cả danh sách, đưa vào để mọi người chọn."
+          },
+          {
+            "t": "Tai nghe và phụ kiện công nghệ nhỏ",
+            "d": "Thông số chênh lệch nhiều, tự chọn sẵn mẫu là chắc nhất."
+          },
+          {
+            "t": "Đồ trang trí Giáng sinh và cây thông nhỏ",
+            "d": "Trang trí nhà hoặc bàn làm việc, tạo không khí lễ hội."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Trao đổi quà ở công ty có dùng danh sách này được không?",
+            "a": "Được. Gửi liên kết danh sách cho người bốc trúng bạn; danh sách công khai thì họ xem không cần đăng nhập, còn giới hạn cho bạn bè thì phải đăng nhập và là bạn của bạn; khi nhận tặng đều cần đăng nhập. Bạn cũng có thể đưa vào danh sách các món ở nhiều mức giá để hợp với ngân sách trao đổi quà."
+          },
+          {
+            "q": "Khi nhận quà có biết ai tặng không?",
+            "a": "Mặc định là bạn sẽ thấy. Nếu muốn giữ bất ngờ, hãy bật chế độ bất ngờ và đặt ngày sự kiện (ví dụ 25 tháng 12); trước ngày sự kiện bạn không thấy ai tặng gì, danh sách mở khóa vào đúng ngày đó."
+          },
+          {
+            "q": "Một danh sách có thể dùng chung cho gia đình và bạn bè không?",
+            "a": "Được. Cùng một danh sách chia sẻ cho nhiều người, cũng có thể giới hạn cho tất cả bạn bè, bạn bè được chọn hoặc bạn thân xem tùy nhu cầu. Mỗi món sau khi được nhận tặng sẽ bị khóa, không ai tặng trùng."
+          }
+        ]
+      }
+    }
+  }
+}

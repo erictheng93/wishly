@@ -1,9 +1,10 @@
 // 部署：Cloudflare Pages（docs D48，使用者基於成本選擇）
 // 原生殼（Tauri）建置：NUXT_NATIVE=1 nuxt generate → 純 SPA 靜態檔（無 SSR、無 service worker、不走 Cloudflare preset）
 const native = !!process.env.NUXT_NATIVE
+import { isLocalizable, PREFIX_LOCALES } from './app/utils/localized'
 
 // 語系檔依功能區拆開（i18n/locales/<語系>/<區>.json，檔內最外層 key 即區名），各區獨立維護
-const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding']
+const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire']
 const loc = (code: string, language: string, name: string) => ({ code, language, name, files: AREAS.map(a => `${code}/${a}.json`) })
 
 export default defineNuxtConfig({
@@ -15,6 +16,17 @@ export default defineNuxtConfig({
     locales: [loc('zh-Hant', 'zh-Hant-TW', '繁體中文'), loc('en', 'en', 'English'), loc('vi', 'vi', 'Tiếng Việt'), loc('id', 'id', 'Bahasa Indonesia')],
     langDir: 'locales',
     detectBrowserLanguage: { useCookie: true, cookieKey: 'ws_locale', fallbackLocale: 'zh-Hant', redirectOn: 'root' },
+  },
+  // 可收錄公開頁的語系前綴網址（全站 no_prefix，見 utils/localized.ts）；middleware/locale-prefix.global 依 meta.lang 切語系
+  hooks: {
+    'pages:extend'(pages) {
+      const src = pages.filter(p => isLocalizable(p.path.replace(/:[^/]+/g, 'x')))
+      if (src.length < 10) throw new Error(`可收錄頁面只找到 ${src.length} 個，路由命名可能變了`)
+      for (const p of src) {
+        if (p.children?.length) throw new Error(`${p.path} 有子路由，pages:extend 需要一併處理`)
+        for (const lang of PREFIX_LOCALES) pages.push({ ...p, name: `${p.name}___${lang}`, path: p.path === '/' ? `/${lang}` : `/${lang}${p.path}`, meta: { ...p.meta, lang } })
+      }
+    },
   },
   compatibilityDate: '2026-10-01',
   ssr: !native,

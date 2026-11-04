@@ -21,7 +21,7 @@ const idx = computed(() => String(props.index ?? 0).padStart(2, '0'))
         <div><dt>{{ $t('guest.support.qty') }}</dt><dd class="g-num">{{ sp.qty }}</dd></div>
       </dl>
       <div class="g-actions">
-        <NuxtLink v-if="canGo" class="g-btn sm" :to="`/s/${target.slug}?via=${item.id}`">{{ $t('guest.support.go') }}</NuxtLink>
+        <NuxtLink v-if="canGo" class="g-btn sm" :to="localizedPath(`/s/${target.slug}`, $i18n.locale) + `?via=${item.id}`">{{ $t('guest.support.go') }}</NuxtLink>
         <span v-else-if="sp.ended" class="g-mute">{{ $t('guest.support.ended') }}</span>
       </div>
     </div>

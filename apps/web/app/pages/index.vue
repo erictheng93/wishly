@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const { user, loaded, fetchMe } = useAuth()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 // SSR 拿不到 ws_session（在 API 網域），先依 ws_hint 猜：猜已登入就直接畫個人版骨架，/me 回來再確認
 const hint = useAuthHint()
 const signedIn = computed(() => loaded.value ? !!user.value : !!hint.value)
@@ -42,6 +42,7 @@ useSeoMeta({
 const scenes = computed(() => (['gift', 'birthday', 'wedding'] as const).map(k => ({ k: t(`me.home.scenes.${k}.k`), slug: { gift: 'demogift00', birthday: 'demobirth0', wedding: 'demowedd00' }[k], t: t(`me.home.scenes.${k}.t`), d: t(`me.home.scenes.${k}.d`) })))
 const steps = computed(() => [1, 2, 3].map(i => ({ n: `0${i}`, t: t(`me.home.steps.${i}.t`), d: t(`me.home.steps.${i}.d`) }))) // 語系檔的步驟 key 為 1–3
 const feats = computed(() => [0, 1, 2, 3].map(i => ({ t: t(`me.home.feats.${i}.t`), d: t(`me.home.feats.${i}.d`) })))
+const lp = (p: string) => { const [path = '/', hash] = p.split('#'); return localizedPath(path, locale.value) + (hash ? '#' + hash : '') }
 const links = [['/explore', 'explore'], ['/inspire', 'inspire'], ['/brands', 'brands'], ['/#scenes', 'seeDemo']] as const
 const faq = computed(() => [0, 1, 2].map(i => ({ q: t(`me.home.faq.${i}.q`), a: t(`me.home.faq.${i}.a`) })))
 const { public: { siteUrl } } = useRuntimeConfig()
@@ -54,7 +55,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
       <div class="l-in">
         <b class="l-logo">WISHLY</b>
         <nav>
-          <NuxtLink v-for="[to, k] in links" :key="to" :to="to" class="l-nav-link">{{ $t(`me.home.${k}`) }}</NuxtLink>
+          <NuxtLink v-for="[to, k] in links" :key="to" :to="lp(to)" class="l-nav-link">{{ $t(`me.home.${k}`) }}</NuxtLink>
           <span class="l-tools"><LocaleSwitch /><ThemeToggle /></span>
           <!-- 登入狀態未確定前先佔位，避免 SSR 的未登入按鈕閃一下又變；有 ws_hint 時只有晶片要等 -->
           <template v-if="signedIn">
@@ -72,7 +73,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
     </header>
     <!-- 窄螢幕的導覽列：頁首放不下時四個入口移到這一列（不 sticky，隨頁面捲走，頁首維持 52px） -->
     <nav class="l-local">
-      <div><NuxtLink v-for="[to, k] in links" :key="to" :to="to">{{ $t(`me.home.${k}`) }}</NuxtLink></div>
+      <div><NuxtLink v-for="[to, k] in links" :key="to" :to="lp(to)">{{ $t(`me.home.${k}`) }}</NuxtLink></div>
     </nav>
 
     <main>
@@ -90,7 +91,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
           </div>
           <div class="l-cta">
             <NuxtLink to="/dashboard" class="g-btn">{{ $t('me.home.myLists') }}</NuxtLink>
-            <NuxtLink to="/explore" class="g-btn ghost">{{ $t('me.home.ctaExplore') }}</NuxtLink>
+            <NuxtLink :to="localizedPath('/explore', $i18n.locale)" class="g-btn ghost">{{ $t('me.home.ctaExplore') }}</NuxtLink>
           </div>
         </div>
         <div v-else class="l-hero-copy">
@@ -101,8 +102,8 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
           <p class="l-sub">{{ $t('me.home.sub') }}</p>
           <div class="l-cta">
             <NuxtLink :to="cta.to" class="g-btn">{{ cta.text }}</NuxtLink>
-            <NuxtLink to="/explore" class="g-btn ghost">{{ $t('me.home.ctaExplore') }}</NuxtLink>
-            <NuxtLink to="/#scenes" class="g-btn ghost">{{ $t('me.home.ctaDemo') }}</NuxtLink>
+            <NuxtLink :to="localizedPath('/explore', $i18n.locale)" class="g-btn ghost">{{ $t('me.home.ctaExplore') }}</NuxtLink>
+            <NuxtLink :to="localizedPath('/', $i18n.locale) + '#scenes'" class="g-btn ghost">{{ $t('me.home.ctaDemo') }}</NuxtLink>
           </div>
         </div>
 
@@ -188,7 +189,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
               <span class="l-tag">{{ s.k }}</span>
               <h3>{{ s.t }}</h3>
               <p>{{ s.d }}</p>
-              <NuxtLink :to="`/s/${s.slug}`" class="l-more">{{ $t('me.home.sceneMore', { k: s.k }) }}</NuxtLink>
+              <NuxtLink :to="localizedPath(`/s/${s.slug}`, $i18n.locale)" class="l-more">{{ $t('me.home.sceneMore', { k: s.k }) }}</NuxtLink>
             </article>
           </div>
         </div>
@@ -250,7 +251,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
     <footer class="l-foot">
       <div class="l-in l-foot-row">
         <span>© 2026 Eric Vrataski · Wishly</span>
-        <span><NuxtLink to="/terms">{{ $t('me.home.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('me.home.privacy') }}</NuxtLink>・<SupportLink /></span>
+        <span><NuxtLink :to="localizedPath('/terms', $i18n.locale)">{{ $t('me.home.terms') }}</NuxtLink>・<NuxtLink :to="localizedPath('/privacy', $i18n.locale)">{{ $t('me.home.privacy') }}</NuxtLink>・<SupportLink /></span>
       </div>
       <div class="l-word" aria-hidden="true">WISHLY</div>
     </footer>

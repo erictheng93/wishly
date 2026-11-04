@@ -1,0 +1,402 @@
+{
+  "inspire": {
+    "ui": {
+      "steps": "Bikin wishlist dalam tiga langkah",
+      "ideas": "Ide hadiah untuk masuk wishlist",
+      "products": "Produk pilihan",
+      "faq": "Pertanyaan yang sering diajukan",
+      "others": "Momen memberi hadiah lainnya"
+    },
+    "scenes": {
+      "birthday": {
+        "label": "Ulang tahun",
+        "seoTitle": "Daftar Kado Ulang Tahun: Wishlist Ulang Tahun Cukup Satu Tautan {'|'} Wishly",
+        "seoDesc": "Mau kasih kado ulang tahun yang tepat? Lihat dulu wishlist ulang tahun si dia. Buat daftar kado ulang tahun di Wishly, bagikan lewat satu tautan, barang yang sudah diklaim langsung terkunci sehingga tidak ada kado kembar, dan kamu tidak perlu sungkan minta.",
+        "heading": "Daftar kado ulang tahun: serahkan wishlist-mu ke teman",
+        "intro": [
+          "Menjelang ulang tahun, pertanyaan yang paling sering muncul adalah \"Kamu mau kado apa?\". Yang ditanya jawab \"apa aja deh\", yang bertanya akhirnya menebak-nebak, dan hasilnya kadang tidak terpakai atau malah kembar dengan kado teman lain.",
+          "Kumpulkan barang yang kamu mau jadi satu wishlist ulang tahun. Teman cukup membuka tautannya dan langsung tahu arahnya, tanpa perlu kamu balas chat satu per satu, dan kamu tidak perlu sungkan bilang mau apa.",
+          "Di Wishly, barang yang sudah diklaim teman akan terkunci, jadi yang lain bisa lihat bahwa sudah ada yang mau memberi dan tidak akan ada kado kembar. Kalau mau kejutan, nyalakan mode kejutan supaya kamu tidak bisa melihat siapa memberi apa."
+        ],
+        "steps": [
+          {
+            "t": "Buat wishlist ulang tahun",
+            "d": "Masuk, tambahkan wishlist baru dengan nama seperti \"Wishlist Ulang Tahunku\", lalu masukkan barang yang kamu mau satu per satu. Kamu juga bisa memilih produk pilihan dari Inspirasi hadiah dan menambahkannya dengan sekali klik."
+          },
+          {
+            "t": "Atur siapa yang bisa melihat",
+            "d": "Pilih Publik, Semua teman, Teman tertentu, atau Pribadi (hanya kamu). Kalau mau kejutan, aktifkan mode kejutan."
+          },
+          {
+            "t": "Bagikan tautan dan tunggu klaim dari teman",
+            "d": "Salin tautan wishlist lalu kirim ke grup atau chat pribadi. Wishlist publik bisa dilihat tanpa login. Untuk wishlist yang dibatasi ke teman atau orang tertentu, temanmu harus login dan masuk dalam daftar yang boleh melihat. Untuk mengklaim barang perlu login, dan setelah diklaim barangnya terkunci."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Lilin dan pewangi ruangan",
+            "d": "Rentang harganya luas dan mudah dipilih, cocok kalau kamu belum tahu anggaran si penerima."
+          },
+          {
+            "t": "Botol minum dan tumbler",
+            "d": "Terpakai setiap hari. Cantumkan ukuran dan warna favorit supaya tidak salah beli."
+          },
+          {
+            "t": "Headphone dan speaker Bluetooth",
+            "d": "Spesifikasinya beragam, jadi paling aman kalau kamu sudah menentukan modelnya."
+          },
+          {
+            "t": "Skincare dan perawatan tubuh",
+            "d": "Jenis kulit dan selera sangat personal, cantumkan produk yang memang ingin kamu pakai."
+          },
+          {
+            "t": "Buku dan majalah",
+            "d": "Biasanya daftar bacaan yang mau dibeli panjang, masukkan saja supaya teman bebas memilih."
+          },
+          {
+            "t": "Peralatan dapur kecil",
+            "d": "Mesin kopi atau air fryer yang ingin dibeli tapi sayang uangnya, cocok untuk patungan bareng teman."
+          },
+          {
+            "t": "Perlengkapan olahraga dan outdoor",
+            "d": "Ukuran dan fungsinya jelas, tulis dengan rinci supaya tidak perlu menebak."
+          },
+          {
+            "t": "Kado pengalaman",
+            "d": "Misalnya makan di restoran favorit, kelas, atau pameran. Jelaskan dengan detail apa yang ingin kamu datangi."
+          },
+          {
+            "t": "Barang impian yang mahal",
+            "d": "Barang berharga tinggi bisa dijadikan patungan, jadi semua orang bisa ikut menyumbang Poin."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Bisakah wishlist ulang tahun hanya dilihat teman tertentu?",
+            "a": "Bisa. Ada empat pilihan: Publik, Semua teman, Teman tertentu atau Teman dekat, dan Pribadi (hanya kamu). Kamu bisa membukanya hanya untuk orang yang ingin kamu undang."
+          },
+          {
+            "q": "Aku mau kejutan, bagaimana caranya supaya tidak tahu siapa memberi apa?",
+            "a": "Aktifkan mode kejutan dan atur hari ulang tahun sebagai tanggal acara. Sebelum hari acara kamu hanya melihat progres, tidak melihat siapa memberi apa, dan daftarnya terbuka di hari ulang tahun. Antar teman tetap terlihat bahwa barang sudah diklaim, jadi tidak akan ada kado kembar."
+          },
+          {
+            "q": "Bagaimana kalau teman sudah mengklaim tapi tidak kunjung memberi?",
+            "a": "Klaim punya batas waktu. Klaim yang tidak diselesaikan sampai lewat batas akan dilepas otomatis, dan barangnya dibuka lagi untuk orang lain, jadi tidak akan tertahan terus."
+          }
+        ]
+      },
+      "wedding": {
+        "label": "Pernikahan",
+        "seoTitle": "Wishlist Kado Pernikahan: Daftar Kado untuk Pengantin Baru, Anti Kembar {'|'} Wishly",
+        "seoDesc": "Bagaimana membuat wishlist kado pernikahan? Dengan Wishly, pengantin bisa menyusun daftar kado berisi peralatan rumah, sprei, dan perlengkapan makan. Keluarga dan teman cukup buka satu tautan untuk memilih dan mengklaim, kado tidak kembar, dan tidak perlu sungkan minta.",
+        "heading": "Wishlist kado pernikahan: daftar kado agar hadiah pengantin baru pas",
+        "intro": [
+          "Saat menyiapkan pernikahan, keluarga dan teman sering bertanya diam-diam \"Kalian kurang apa?\". Pengantin sungkan menjawab, dan akhirnya menerima tiga oven, empat set peralatan makan, atau pajangan yang tidak terpakai, yang repot untuk ditukar atau dikembalikan.",
+          "Susun dulu barang yang benar-benar dibutuhkan di rumah baru menjadi wishlist kado pernikahan, seperti daftar kado pada umumnya. Keluarga dan teman yang membukanya langsung tahu harus memberi apa, ada pilihan untuk berbagai anggaran, dan tidak ada yang canggung.",
+          "Barang yang diklaim akan terkunci, jadi tidak akan ada kado kembar. Barang mahal seperti peralatan rumah besar bisa dijadikan patungan, sehingga beberapa orang bisa menyumbang Poin bersama dan beban pemberian jadi lebih ringan."
+        ],
+        "steps": [
+          {
+            "t": "Daftar kebutuhan rumah baru",
+            "d": "Masuk lalu buat \"Wishlist Pernikahan Kami\", dan tambahkan peralatan rumah, sprei, perlengkapan makan, dan lainnya satu per satu. Sertakan barang dari harga murah sampai mahal agar mudah dipilih tamu dengan anggaran berbeda."
+          },
+          {
+            "t": "Tentukan siapa yang bisa melihat",
+            "d": "Bisa dibuat Publik, atau dibatasi hanya untuk teman, Teman tertentu, atau Teman dekat. Kalau mau kejutan, nyalakan mode kejutan."
+          },
+          {
+            "t": "Kirim tautan ke keluarga dan teman",
+            "d": "Tempel tautan di grup pernikahan atau sertakan di undangan digital. Wishlist publik bisa dilihat tanpa login, sedangkan wishlist untuk teman atau orang tertentu perlu login. Untuk mengklaim cukup login, dan setelah diklaim barangnya terkunci."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Peralatan rumah besar",
+            "d": "Mesin cuci piring, pengering pakaian, robot penyedot debu. Harganya tinggi, cocok dijadikan patungan."
+          },
+          {
+            "t": "Sprei dan perlengkapan tidur",
+            "d": "Tulis ukuran dan bahan dengan jelas agar tidak salah beli yang tidak cocok dengan kasur."
+          },
+          {
+            "t": "Set panci dan peralatan makan",
+            "d": "Yang pertama dipakai saat mulai masak di rumah baru. Tulis bahan dan jumlahnya agar tidak dobel."
+          },
+          {
+            "t": "Mesin kopi dan peralatan dapur kecil",
+            "d": "Sering dipakai, dan model yang ditentukan sendiri lebih pasti terpakai."
+          },
+          {
+            "t": "Handuk dan perlengkapan kamar mandi",
+            "d": "Harganya terjangkau, cocok untuk rekan kerja atau teman yang ingin memberi hadiah kecil."
+          },
+          {
+            "t": "Pewangi ruangan dan pajangan kecil",
+            "d": "Memilih gaya yang kalian suka lebih baik daripada menerima dekorasi yang kurang cocok."
+          },
+          {
+            "t": "Perlengkapan penyimpanan dan barang rumah tangga",
+            "d": "Praktis tapi sering terlewat, dan akan segera dibutuhkan setelah pindah ke rumah baru."
+          },
+          {
+            "t": "Pengalaman berdua dan dana bulan madu",
+            "d": "Misalnya sebagian biaya perjalanan bulan madu, yang bisa dibuat patungan agar semua orang ikut menyumbang."
+          },
+          {
+            "t": "Bingkai foto dan album kenangan",
+            "d": "Penuh makna dan mudah disesuaikan dengan anggaran, cocok untuk orang tua atau kerabat jauh."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Bolehkah menaruh amplop uang atau kado berupa uang tunai?",
+            "a": "Tidak. Wishly tidak memproses uang tunai dan tidak menerima titipan dana. Kalau mau teman-teman patungan untuk barang besar, gunakan patungan, di mana keluarga dan teman menyumbang dengan Poin platform."
+          },
+          {
+            "q": "Dari mana Poin untuk patungan?",
+            "a": "Poin bisa kamu top up sendiri. Keluarga dan teman memberi Poin untuk sebuah barang, dan barang dianggap selesai setelah target tercapai. Poin hanya dipakai di dalam platform dan tidak sama dengan uang tunai."
+          },
+          {
+            "q": "Apakah orang tua yang tidak terbiasa memakai ponsel tetap bisa melihat wishlist?",
+            "a": "Bisa. Wishlist hanyalah sebuah alamat web. Kalau diatur Publik, siapa pun bisa membukanya tanpa login. Kalau dibatasi untuk teman atau orang tertentu, mereka harus login dan masuk dalam daftar yang boleh melihat. Untuk mengklaim barang, tetap perlu login sebagai anggota."
+          }
+        ]
+      },
+      "baby": {
+        "label": "Bayi baru lahir",
+        "seoTitle": "Kado Bayi Baru Lahir: Wishlist Perlengkapan Bayi dan Hadiah Kelahiran {'|'} Wishly",
+        "seoDesc": "Sambut kelahiran si kecil dengan wishlist kado bayi baru lahir di Wishly. Daftarkan perlengkapan persalinan dan keperluan bayi satu per satu, keluarga dan teman cukup buka satu tautan untuk mengklaim, tidak akan menerima sepuluh bedong yang sama, dan orang tua jadi lebih tenang.",
+        "heading": "Daftar kado bayi baru lahir: perlengkapan persalinan dan keperluan si kecil dalam satu tempat",
+        "intro": [
+          "Menjelang dan sesudah bayi lahir, keluarga dan teman ingin menunjukkan perhatian tapi tidak tahu apa yang dibutuhkan orang tua. Hasilnya sering berupa botol susu, bedong, dan baju yang menumpuk, ukurannya terlalu kecil sehingga tak sempat dipakai, atau merek dan bahannya kurang cocok.",
+          "Susun perlengkapan persalinan dan keperluan bayi baru lahir menjadi wishlist kado kelahiran. Orang tua bisa menuliskan ukuran, spesifikasi, dan preferensi dengan jelas, jadi keluarga dan teman tinggal memilih tanpa perlu bertanya satu per satu, dan tidak khawatir memberi barang yang tidak terpakai.",
+          "Barang yang diklaim akan terkunci, jadi tidak akan ada kado kembar. Kebutuhan habis pakai seperti popok dan baju bisa dibagi ke beberapa rentang harga, sedangkan barang mahal seperti stroller dan car seat cocok dijadikan patungan agar semua orang bisa ikut menyumbang."
+        ],
+        "steps": [
+          {
+            "t": "Masukkan barang yang dibutuhkan ke wishlist",
+            "d": "Masuk lalu buat wishlist, tambahkan barang bertahap sesuai kategori seperti perlengkapan persalinan, pakaian, perlengkapan tidur, dan perlengkapan keluar rumah, dan tulis ukuran serta preferensi di deskripsi. Kamu juga bisa memilih produk pilihan untuk bayi baru lahir dari Inspirasi hadiah."
+          },
+          {
+            "t": "Pilih siapa yang bisa melihat",
+            "d": "Informasi bayi bersifat pribadi, jadi sebaiknya pilih Semua teman, Teman tertentu, atau Teman dekat. Kalau tidak mau dibuka ke siapa pun, bisa juga diatur Pribadi (hanya kamu)."
+          },
+          {
+            "t": "Bagikan tautan ke keluarga dan teman",
+            "d": "Kirim ke orang tua, rekan kerja, dan teman. Untuk wishlist yang dibatasi ke teman atau orang tertentu, mereka harus login dan masuk dalam daftar yang boleh melihat (hanya wishlist publik yang bisa dilihat tanpa login). Barang yang diklaim akan terkunci, dan klaim yang tidak diselesaikan sampai lewat batas akan dilepas otomatis."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Jumper dan baju bayi baru lahir",
+            "d": "Tulis usia dalam bulan dan ukurannya dengan jelas agar tidak dapat baju yang terlalu kecil dan tak sempat dipakai."
+          },
+          {
+            "t": "Bedong dan kain muslin",
+            "d": "Cepat habis dan dipakai banyak, jadi diklaim oleh beberapa orang pun tidak akan berlebihan."
+          },
+          {
+            "t": "Botol susu dan perlengkapan sterilisasi",
+            "d": "Ukuran lubang dot dan bahan punya preferensi, jadi paling aman kalau spesifikasinya dicantumkan."
+          },
+          {
+            "t": "Popok dan tisu basah",
+            "d": "Kebutuhan paling praktis, cocok untuk keluarga dan teman yang ingin memberi hadiah kecil."
+          },
+          {
+            "t": "Perlengkapan tidur bayi dan sleeping bag",
+            "d": "Berkaitan dengan keselamatan tidur, jadi lebih tenang kalau orang tua yang memilih modelnya."
+          },
+          {
+            "t": "Sabun dan perlengkapan mandi bayi",
+            "d": "Kulit bayi sensitif, menentukan produknya membantu menghindari yang tidak cocok."
+          },
+          {
+            "t": "Gendongan dan aksesori stroller",
+            "d": "Sesuai gaya hidup, paling cocok kalau orang tua yang menentukan sendiri."
+          },
+          {
+            "t": "Stroller dan car seat",
+            "d": "Harganya tinggi, cocok dijadikan patungan agar beberapa keluarga dan teman bisa menyumbang Poin bersama."
+          },
+          {
+            "t": "Kenang-kenangan bayi",
+            "d": "Misalnya album tumbuh kembang atau cetakan tangan dan kaki, yang akan sangat bermakna saat diterima di hari kelahiran atau syukuran bayi."
+          },
+          {
+            "t": "Perlengkapan perawatan ibu pascamelahirkan",
+            "d": "Ibu juga perlu dirawat, bisa dimasukkan perlengkapan menyusui atau baju rumah yang nyaman."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Wishlist kado bayi baru lahir ini untuk penerima atau untuk pemberi?",
+            "a": "Wishlist dibuat oleh orang tua untuk memberi tahu keluarga dan teman apa yang ingin diterima. Wishlist publik bisa dibuka lewat tautan, sedangkan wishlist untuk teman atau orang tertentu perlu login dulu. Saat ingin memberi, login lalu klaim barangnya. Kalau kamu pihak pemberi, kamu juga bisa meminta tautan wishlist dari orang tuanya."
+          },
+          {
+            "q": "Apakah data bayi akan terlihat publik?",
+            "a": "Wishlist bisa dibuat untuk Semua teman, Teman tertentu, Teman dekat, atau Pribadi (hanya kamu), jadi tidak harus publik. Kamu bisa membukanya hanya untuk keluarga dan teman yang dipercaya."
+          },
+          {
+            "q": "Bisakah perlengkapan persalinan dimasukkan ke wishlist?",
+            "a": "Bisa. Setiap barang perlengkapan persalinan bisa ditambahkan satu per satu beserta ukuran atau spesifikasinya. Setelah diklaim, barangnya terkunci sehingga tidak ada yang menyiapkan barang yang sama."
+          }
+        ]
+      },
+      "housewarming": {
+        "label": "Pindahan rumah",
+        "seoTitle": "Kado Pindahan Rumah: Wishlist Syukuran Rumah Baru Anti Kembar {'|'} Wishly",
+        "seoDesc": "Bingung kasih kado pindahan rumah apa? Buat wishlist kado rumah baru di Wishly berisi peralatan rumah, penyimpanan, dan dekorasi yang dibutuhkan. Keluarga dan teman klaim lewat satu tautan, kado tidak kembar, tidak perlu menebak selera, dan syukuran rumah baru jadi lebih ringan.",
+        "heading": "Kado pindahan rumah dan wishlist syukuran: lihat sekilas apa yang kurang di rumah baru",
+        "intro": [
+          "Saat pindah ke rumah baru, teman dan orang tua ingin memberi sesuatu tapi sering tidak tahu apa yang sebenarnya kamu butuhkan. Akhirnya bisa saja kamu menerima pajangan yang tidak sesuai gaya, atau barang yang sudah ada di rumah, mau dipakai tidak bisa, mau dikembalikan juga sungkan.",
+          "Buat dulu wishlist kado rumah baru berisi barang yang benar-benar dibutuhkan, dari barang kecil sampai peralatan rumah, dengan pilihan untuk berbagai anggaran. Keluarga dan teman tinggal memilih, dan kamu bisa menata rumah sesuai selera.",
+          "Barang yang diklaim akan terkunci, jadi tidak akan ada kado kembar. Barang mahal seperti sofa atau peralatan rumah besar bisa dijadikan patungan, jadi beberapa teman menyumbang Poin bersama dan tidak ada satu orang yang menanggung semuanya."
+        ],
+        "steps": [
+          {
+            "t": "Cek kebutuhan rumah baru",
+            "d": "Masuk lalu buat \"Wishlist Rumah Baru\", keliling tiap ruangan dan pikirkan apa yang kurang, lalu tambahkan satu per satu. Kamu juga bisa menambahkan produk pilihan untuk rumah baru dari Inspirasi hadiah dengan sekali klik."
+          },
+          {
+            "t": "Atur siapa yang bisa melihat",
+            "d": "Informasi rumah baru bersifat pribadi, jadi bisa dipilih untuk Semua teman, Teman tertentu, atau Teman dekat, tidak perlu dibuka ke semua orang."
+          },
+          {
+            "t": "Bagikan tautan untuk mengundang syukuran",
+            "d": "Sertakan tautan wishlist di undangan syukuran rumah baru. Untuk wishlist yang dibatasi ke teman atau orang tertentu, mereka harus login dan masuk dalam daftar yang boleh melihat (hanya wishlist publik yang bisa dilihat tanpa login). Barang yang diklaim akan terkunci, dan klaim yang tidak diselesaikan akan dilepas otomatis."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Pewangi ruangan dan diffuser",
+            "d": "Memberi aroma khas untuk rumah baru, harganya fleksibel dan cocok untuk teman biasa."
+          },
+          {
+            "t": "Tanaman dan pot",
+            "d": "Tulis kondisi cahaya dan ukurannya dengan jelas agar tidak mendapat tanaman yang sulit hidup."
+          },
+          {
+            "t": "Peralatan makan dan set gelas",
+            "d": "Langsung terpakai saat menjamu teman di rumah baru."
+          },
+          {
+            "t": "Kotak dan rak penyimpanan",
+            "d": "Ukuran menentukan muat tidaknya di ruangan, sebaiknya cantumkan spesifikasinya."
+          },
+          {
+            "t": "Lampu dan lampu hias",
+            "d": "Gayanya harus cocok, jadi paling pas kalau kamu memilih modelnya sendiri."
+          },
+          {
+            "t": "Peralatan elektronik kecil",
+            "d": "Misalnya oven listrik atau robot penyedot debu, sesuaikan dengan ruang dan kebiasaan di rumah baru."
+          },
+          {
+            "t": "Set perkakas rumah",
+            "d": "Berguna untuk merakit dan perbaikan sehari-hari, praktis tapi sering terlupakan."
+          },
+          {
+            "t": "Handuk dan tekstil rumah",
+            "d": "Warna dan bahan punya preferensi, menuliskannya mengurangi risiko salah pilih."
+          },
+          {
+            "t": "Furnitur atau peralatan rumah besar",
+            "d": "Harganya tinggi, cocok dijadikan patungan agar keluarga dan teman menyumbang Poin bersama."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Apakah wishlist rumah baru harus dibuat publik?",
+            "a": "Tidak harus. Pilihan visibilitasnya adalah Publik, Semua teman, Teman tertentu atau Teman dekat, dan Pribadi (hanya kamu). Kalau informasi rumah barumu bersifat pribadi, sebaiknya hanya bagikan ke orang yang kamu percaya."
+          },
+          {
+            "q": "Bisakah teman-teman patungan untuk barang besar seperti sofa?",
+            "a": "Bisa lewat patungan, di mana beberapa keluarga dan teman menyumbang dengan Poin. Poin bisa di-top up. Wishlist yang memuat barang patungan perlu diisi dulu informasi penerimanya. Setelah target terkumpul, Wishly yang membelikan dan mengirimkannya ke alamat yang kamu isi, jadi kamu tidak perlu menghubungi toko sendiri."
+          },
+          {
+            "q": "Kalau teman tidak mau login, apakah masih bisa melihat wishlist?",
+            "a": "Tergantung visibilitas wishlist. Kalau Publik, bisa dilihat tanpa login. Untuk wishlist Semua teman, Teman tertentu, atau Teman dekat, teman harus login dan masuk dalam daftar yang boleh melihat. Untuk mengklaim barang, selalu perlu login sebagai anggota."
+          }
+        ]
+      },
+      "christmas": {
+        "label": "Natal",
+        "seoTitle": "Daftar Kado Natal dan Tukar Kado: Semua Wishlist dalam Satu Tautan {'|'} Wishly",
+        "seoDesc": "Mau kasih kado Natal yang tepat? Buat dulu daftar kado Natal. Susun ide tukar kado dan wishlist pribadimu di Wishly, bagikan satu tautan ke keluarga dan teman, barang yang diklaim langsung terkunci sehingga tidak ada kado kembar, dan perayaan jadi lebih santai.",
+        "heading": "Daftar kado Natal: susun ide tukar kado dan wishlist keluarga serta teman",
+        "intro": [
+          "Menjelang Natal, kantor mengadakan tukar kado, dan keluarga serta teman juga ingin saling memberi hadiah kecil. Kebingungan terbesarnya adalah \"sebenarnya dia suka apa?\". Setelah lama menebak, sering kali yang diberikan tetap kado biasa saja, dan penerimanya hanya bisa bilang terima kasih dengan sopan.",
+          "Jadikan barang yang kamu mau sebagai daftar kado Natal. Orang yang menukar kado denganmu bisa memilih sesuai anggaran, ada pilihan yang jelas, tidak canggung, tidak kelebihan atau kekurangan, dan yang mendapat namamu tidak perlu pusing menebak.",
+          "Barang yang diklaim akan terkunci, jadi tidak akan ada kado kembar. Kalau mau tetap ada kejutan saat menerima kado, aktifkan mode kejutan supaya kamu tidak bisa melihat siapa memberi apa. Membuka kado jadi tetap seru, dan antar teman tidak akan memberi hal yang sama."
+        ],
+        "steps": [
+          {
+            "t": "Buat wishlist Natal",
+            "d": "Masuk dan tambahkan wishlist baru, masukkan barang yang kamu mau menurut kisaran harga, dan siapkan beberapa pilihan untuk anggaran tukar kado yang umum. Inspirasi hadiah punya produk pilihan musim perayaan yang bisa ditambahkan dengan sekali klik."
+          },
+          {
+            "t": "Tentukan siapa yang bisa melihat",
+            "d": "Pilih Publik, Semua teman, Teman tertentu, atau Pribadi (hanya kamu). Kalau mau kejutan, aktifkan mode kejutan."
+          },
+          {
+            "t": "Bagikan tautan ke semua orang",
+            "d": "Tempel tautan di grup atau kirim ke orang yang menukar kado denganmu. Wishlist publik bisa dilihat tanpa login, sedangkan yang dibatasi ke teman atau orang tertentu perlu login. Klaim juga perlu login, dan barang yang diklaim terkunci, lalu dilepas otomatis kalau tidak diselesaikan sampai lewat batas."
+          }
+        ],
+        "ideas": [
+          {
+            "t": "Penghangat tangan dan barang hangat",
+            "d": "Berguna di musim dingin, dan harganya mudah masuk anggaran tukar kado."
+          },
+          {
+            "t": "Lilin aromaterapi dan diffuser",
+            "d": "Kemasannya terasa meriah, cocok untuk kebanyakan orang."
+          },
+          {
+            "t": "Mug dan tumbler",
+            "d": "Terpakai setiap hari, dan kalau warna serta modelnya sudah dipilih, risiko salahnya kecil."
+          },
+          {
+            "t": "Parsel camilan dan minuman",
+            "d": "Cocok untuk tukar kado di kantor, tulis dengan jelas preferensi rasanya."
+          },
+          {
+            "t": "Board game dan permainan pesta",
+            "d": "Bisa langsung dimainkan di acara Natal dan menambah keseruan."
+          },
+          {
+            "t": "Kaus kaki dan selimut",
+            "d": "Murah tapi hangat, ukurannya mudah cocok untuk berbagai penerima."
+          },
+          {
+            "t": "Buku dan alat tulis",
+            "d": "Buku yang ingin dibaca dan buku catatan favorit biasanya ada daftarnya, masukkan agar semua bisa memilih."
+          },
+          {
+            "t": "Headphone dan aksesori gadget kecil",
+            "d": "Spesifikasinya beragam, paling aman kalau kamu sudah menentukan modelnya."
+          },
+          {
+            "t": "Dekorasi Natal dan pohon Natal mini",
+            "d": "Untuk menghias rumah atau meja kerja dan menciptakan suasana perayaan."
+          }
+        ],
+        "faq": [
+          {
+            "q": "Bisakah daftar ini dipakai untuk tukar kado di kantor?",
+            "a": "Bisa. Kirim tautan wishlist ke orang yang mendapat namamu. Kalau wishlist Publik, mereka bisa membukanya tanpa login. Kalau hanya untuk teman, mereka harus login dan menjadi temanmu. Untuk mengklaim tetap perlu login. Kamu juga bisa memasukkan barang di berbagai kisaran harga agar sesuai anggaran tukar kado."
+          },
+          {
+            "q": "Apakah aku akan tahu siapa yang memberi kado?",
+            "a": "Secara default kamu akan melihatnya. Kalau mau kejutan, aktifkan mode kejutan dan atur tanggal acara (misalnya 25 Desember). Sebelum tanggal acara kamu tidak bisa melihat siapa memberi apa, dan daftarnya terbuka di hari itu."
+          },
+          {
+            "q": "Bisakah satu wishlist dipakai untuk keluarga dan teman sekaligus?",
+            "a": "Bisa. Satu wishlist dapat dibagikan ke banyak orang, dan bisa dibatasi untuk Semua teman, Teman tertentu, atau Teman dekat jika perlu. Setiap barang yang diklaim langsung terkunci, jadi tidak ada yang memberi hal yang sama."
+          }
+        ]
+      }
+    }
+  }
+}

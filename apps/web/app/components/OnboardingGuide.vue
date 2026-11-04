@@ -8,7 +8,7 @@ const hidden = computed(() => route.path === '/welcome' || route.path.startsWith
 const cur = computed(() => state.value?.current ?? null)
 const total = TOUR_STEPS.length
 const n = computed(() => cur.value ? TOUR_STEPS.indexOf(cur.value) + 1 : total)
-const here = computed(() => onTourPage(cur.value, route.path, state.value?.wishlist_id))
+const here = computed(() => onTourPage(cur.value, stripLocale(route.path), state.value?.wishlist_id))
 const target = computed(() => tourTarget(cur.value, state.value?.wishlist_id))
 async function close() {
   busy.value = true
@@ -34,7 +34,7 @@ watch(() => route.fullPath, () => refresh())
       <p class="tour-text">{{ $t('onboarding.done.body') }}</p>
     </template>
     <div class="tour-act">
-      <NuxtLink v-if="cur && !here" :to="target" class="c-btn small primary">{{ $t(`onboarding.steps.${cur}.cta`) }}</NuxtLink>
+      <NuxtLink v-if="cur && !here" :to="localizedPath(target, $i18n.locale)" class="c-btn small primary">{{ $t(`onboarding.steps.${cur}.cta`) }}</NuxtLink>
       <button v-if="!cur" type="button" class="c-btn small primary" :disabled="busy" @click="close">{{ $t('onboarding.done.finish') }}</button>
       <NuxtLink to="/welcome" class="c-btn small">{{ $t('onboarding.guide.overview') }}</NuxtLink>
       <button v-if="cur" type="button" class="c-btn small plain tour-skip" :disabled="busy" @click="close">{{ $t('onboarding.skip') }}</button>
