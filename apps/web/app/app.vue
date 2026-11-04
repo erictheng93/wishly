@@ -17,16 +17,12 @@ useHead({
   // manifest 依語系：zh-Hant 為預設檔，其餘 manifest.<code>.webmanifest（id 皆為 "/"，不會被當成不同 App）；key 讓切語系時取代而非重複
   link: [{ key: 'manifest', rel: 'manifest', href: computed(() => locale.value === 'zh-Hant' ? '/manifest.webmanifest' : `/manifest.${locale.value}.webmanifest`) }],
 })
-// 可收錄公開頁（utils/localized.ts）：輸出各語系 hreflang；切換語系時換到該語系網址，讓網址與內容一致
+// 可收錄公開頁（utils/localized.ts）：輸出各語系 hreflang（切換語系換網址在 LocaleSwitch）
 const base = computed(() => stripLocale(route.path))
 useHead({
   link: computed(() => isLocalizable(base.value)
     ? [...SEO_LOCALES, 'x-default'].map(h => ({ key: `alt-${h}`, rel: 'alternate' as const, hreflang: h, href: siteUrl + localizedPath(base.value, h === 'x-default' ? 'zh-Hant' : h) }))
     : []),
-})
-watch(locale, (l) => {
-  const to = localizedPath(route.path, l)
-  if (isLocalizable(base.value) && to !== route.path) navigateTo({ path: to, query: route.query, hash: route.hash }, { replace: true })
 })
 </script>
 <template>

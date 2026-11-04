@@ -27,12 +27,12 @@ const others = SCENES.filter(s => s.slug !== slug)
 <template>
   <GuestTop />
   <main class="g-wrap sc">
-    <nav class="x-idx" aria-label="breadcrumb"><NuxtLink to="/inspire">INSPIRE</NuxtLink><span>{{ c.label }}</span></nav>
+    <nav class="x-idx" aria-label="breadcrumb"><NuxtLink :to="localizedPath('/inspire', locale)">INSPIRE</NuxtLink><span>{{ c.label }}</span></nav>
     <h1>{{ c.heading }}</h1>
     <p v-for="(p, i) in c.intro" :key="i" class="sc-lead">{{ p }}</p>
     <p class="sc-cta">
       <NuxtLink class="g-btn" to="/register">{{ $t('me.home.start') }}</NuxtLink>
-      <NuxtLink v-if="scene!.demo" class="g-btn ghost" :to="`/s/${scene!.demo}`">{{ $t('me.home.seeDemo') }}</NuxtLink>
+      <NuxtLink v-if="scene!.demo" class="g-btn ghost" :to="localizedPath(`/s/${scene!.demo}`, locale)">{{ $t('me.home.seeDemo') }}</NuxtLink>
     </p>
 
     <section>

@@ -5,6 +5,8 @@ describe('parseListSlug', () => {
   it('解析連結與純代稱', () => {
     expect(parseListSlug('https://wishly.tw/s/abc123?x=1')).toBe('abc123')
     expect(parseListSlug('  abc123 ')).toBe('abc123')
+    expect(parseListSlug('https://wishly.tw/en/s/abc123')).toBe('abc123')
+    expect(parseListSlug('https://wishly.tw/fr/s/abc123')).toBeNull()
     expect(parseListSlug('https://evil.test/x y')).toBeNull()
     expect(parseListSlug('')).toBeNull()
   })
