@@ -129,12 +129,16 @@ test('個人頁 /u/{handle}：公開 / 僅好友清單依身分可見；捐助�
 
   // 捐助紀錄在 donor 的個人頁
   await anon.goto(`/u/${donor.handle}`)
+  // 他人看捐助紀錄預設收合（#139），先展開
+  await anon.getByText(/送出 \d+ 份心意/).click()
   const don = anon.locator('article', { hasText: '公開禮' })
   await expect(don).toContainText(two.title)
-  await expect(don.getByRole('link')).toHaveCount(1) // 公開清單給連結
+  await expect(don.getByRole('link', { name: two.title })).toHaveAttribute('href', `/s/${two.slug}`) // 公開清單給連結
+  await expect(don.getByRole('link', { name: /送給/ })).toHaveAttribute('href', `/u/${owner.handle}`) // 受贈者有 handle 就連到個人頁
   await expect(anon.getByText('私人禮')).toHaveCount(0)
   const ps = await pageFor(browser, stranger)
   await ps.goto(`/u/${donor.handle}`)
+  await ps.getByText(/送出 \d+ 份心意/).click()
   await expect(ps.getByText('公開禮')).toBeVisible()
   await expect(ps.getByText('私人禮')).toHaveCount(0)
   // 本人看得到自己的私人捐助
