@@ -118,7 +118,7 @@ http.createServer(async (req, res) => {
     if (m[1] === 'relief' || m[1] === 'relief2') {
       const site = reliefSites.find(x => x.slug === m[1]), list = reliefItems.map(view)
       return send(res, 200, { slug: m[1], type: 'relief', status: 'active', title: site.title, description: null, cover_image_url: null, cover_preset: 'gift', event_date: null, id: 'w9', owner: null, surprise_mode: false, claimers_visible: false,
-        org: { ...reliefOrg, verified: true }, event: { slug: quake.slug, name: quake.name }, site_address: site.site_address, site_status: 'active',
+        org: { ...reliefOrg, verified: true, public_email: 'help@example.org', public_phone: '03-1234567' }, permit: { permit_no: '衛部救字第 1150000001 號', valid_from: '2026-10-01', valid_to: '2027-03-31' }, event: { slug: quake.slug, name: quake.name }, site_address: site.site_address, site_status: 'active',
         completion: { item_count: list.length, fulfilled_count: 0, completion_pct: 20 }, items: list, updated_at: new Date().toISOString() })
     }
     if (!['demo', 'closed', 'sseoff'].includes(m[1])) return err(res, 404, 'NOT_FOUND', '找不到')

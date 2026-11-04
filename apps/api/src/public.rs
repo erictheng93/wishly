@@ -437,9 +437,14 @@ mod relief {
         body: &mut Value,
     ) -> Result<(), AppError> {
         let v: Value = sqlx::query_scalar(
-            "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', o.verification_status = 'verified'),
+            // 聯絡方式與許可公開給捐助者（資訊透明）；verified 組織的 public_* 只在補正時可改，permit 換掉會動 updated_at
+            "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', o.verification_status = 'verified',
+                           'public_email', o.public_email, 'public_phone', o.public_phone),
+                    'permit', CASE WHEN p.id IS NULL THEN NULL ELSE jsonb_build_object('permit_no', p.permit_no, 'valid_from', p.valid_from, 'valid_to', p.valid_to) END,
                     'site_address', w.site_address, 'site_status', w.site_status)
-               FROM wishlists w JOIN organizations o ON o.id = w.org_id WHERE w.id = $1")
+               FROM wishlists w JOIN organizations o ON o.id = w.org_id
+               LEFT JOIN org_permits p ON p.id = w.permit_id AND p.status = 'approved'
+              WHERE w.id = $1")
             .bind(id).fetch_one(pool).await?;
         // 事件：已合併就沿 merged_into 走到最終事件（最多 10 跳）；下架 / 找不到為 null
         let event: Option<Value> = sqlx::query_scalar(

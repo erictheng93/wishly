@@ -340,6 +340,8 @@
       "verified": "已驗證組織",
       "event": "所屬事件",
       "address": "收件地址",
+      "contact": "聯絡組織",
+      "permit": "勸募許可：{no}（{from} 至 {to}）",
       "by": "組織：",
       "paused": "此據點目前暫停收件，暫時無法認捐。",
       "closedSite": "此據點已結束收件，無法認捐。",

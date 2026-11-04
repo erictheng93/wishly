@@ -233,6 +233,8 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
             <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="localizedPath(`/e/${data.event.slug}`, $i18n.locale)">{{ data.event.name }}</NuxtLink></template>
           </p>
           <p v-if="data.site_address" class="g-mute">{{ $t('guest.relief.address') }}：<a :href="mapsUrl(data.site_address)" target="_blank" rel="noopener">{{ data.site_address }}</a></p>
+          <p v-if="data.org?.public_email || data.org?.public_phone" class="g-mute">{{ $t('guest.relief.contact') }}：<a v-if="data.org.public_email" :href="`mailto:${data.org.public_email}`">{{ data.org.public_email }}</a><template v-if="data.org.public_email && data.org.public_phone"> ・ </template><a v-if="data.org.public_phone" :href="`tel:${data.org.public_phone}`">{{ data.org.public_phone }}</a></p>
+          <p v-if="data.permit" class="g-mute">{{ $t('guest.relief.permit', { no: data.permit.permit_no, from: data.permit.valid_from, to: data.permit.valid_to }) }}</p>
           <p v-if="data.description" class="sx-desc">{{ data.description }}</p>
         </div>
         <aside v-if="data.completion.item_count" class="sx-gauge">

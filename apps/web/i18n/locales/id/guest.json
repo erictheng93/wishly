@@ -340,6 +340,8 @@
       "verified": "Organisasi terverifikasi",
       "event": "Peristiwa",
       "address": "Alamat penerimaan",
+      "contact": "Kontak",
+      "permit": "Izin penggalangan dana: {no} ({from} – {to})",
       "by": "Organisasi: ",
       "paused": "Lokasi ini menghentikan sementara penerimaan. Donasi belum tersedia.",
       "closedSite": "Lokasi ini sudah berhenti menerima donasi.",

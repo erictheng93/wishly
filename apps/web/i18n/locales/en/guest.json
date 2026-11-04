@@ -340,6 +340,8 @@
       "verified": "Verified organization",
       "event": "Event",
       "address": "Drop-off address",
+      "contact": "Contact",
+      "permit": "Fundraising permit: {no} ({from} – {to})",
       "by": "Organization: ",
       "paused": "This site has paused intake. Pledging is unavailable for now.",
       "closedSite": "This site has stopped accepting donations.",
