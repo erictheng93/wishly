@@ -52,14 +52,14 @@ async fn purge_body(cfg: &Config, body: &serde_json::Value) -> Result<(), String
 
 /// 背景清除（不阻塞回應），每批最多 100 個 URL；失敗重試 3 次（1s、4s、16s）後只記 log。
 /// ponytail: 程序重啟會遺失尚未成功的清除；圖片可能保留到快取過期，需保證送達時改成 DB 佇列。
-fn purge_urls(cfg: Config, field: &'static str, urls: Vec<String>) {
+fn purge_urls(cfg: &'static Config, field: &'static str, urls: Vec<String>) {
     if urls.is_empty() || cfg.cf_zone_id.is_none() || cfg.cf_purge_token.is_none() {
         return;
     }
     tokio::spawn(async move {
         for batch in urls.chunks(100) {
             for (i, wait) in [1u64, 4, 16, 0].into_iter().enumerate() {
-                match purge_body(&cfg, &serde_json::json!({ (field): batch })).await {
+                match purge_body(cfg, &serde_json::json!({ (field): batch })).await {
                     Ok(()) => break,
                     Err(e) if wait == 0 => {
                         tracing::error!(error = %e, ?batch, "CDN 清除失敗，已放棄")
@@ -76,7 +76,7 @@ fn purge_urls(cfg: Config, field: &'static str, urls: Vec<String>) {
 
 pub fn purge_wishlists(slugs: Vec<String>) {
     let cfg = crate::config::get();
-    let urls = slugs.iter().map(|s| public_url(&cfg, s)).collect();
+    let urls = slugs.iter().map(|s| public_url(cfg, s)).collect();
     purge_urls(cfg, "files", urls);
 }
 

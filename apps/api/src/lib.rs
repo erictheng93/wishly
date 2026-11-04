@@ -53,6 +53,40 @@ pub mod wallet_ops;
 pub mod wishlists;
 
 use axum::{response::IntoResponse, Router};
+
+/// system_flags.read_only 的程序內快取（每個寫入請求與 /public/status 都要讀）。
+/// `config.micro_cache` 開時快取 1 秒；本程序經 admin 改旗標時立即失效，多實例時其他實例最多晚 1 秒生效。
+pub mod flags {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    static RO: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+    const TTL: Duration = Duration::from_secs(1);
+
+    pub async fn read_only(pool: &sqlx::PgPool) -> Result<bool, sqlx::Error> {
+        let cache = crate::config::get().micro_cache;
+        if cache {
+            if let Some((at, v)) = *RO.lock().unwrap() {
+                if at.elapsed() < TTL {
+                    return Ok(v);
+                }
+            }
+        }
+        let v: Option<serde_json::Value> =
+            sqlx::query_scalar("SELECT value FROM system_flags WHERE key = 'read_only'")
+                .fetch_optional(pool)
+                .await?;
+        let v = v.and_then(|v| v.as_bool()) == Some(true);
+        if cache {
+            *RO.lock().unwrap() = Some((Instant::now(), v));
+        }
+        Ok(v)
+    }
+
+    /// admin 改 system_flags 後呼叫
+    pub fn invalidate() {
+        *RO.lock().unwrap() = None;
+    }
+}
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -293,14 +327,9 @@ async fn read_only(
                 | "/api/v1/unsubscribe"
         );
     if !safe {
-        match sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT value FROM system_flags WHERE key = 'read_only'",
-        )
-        .fetch_optional(&st.pool)
-        .await
-        {
-            Ok(v) if v.as_ref().and_then(|v| v.as_bool()) != Some(true) => {}
-            Ok(_) => {
+        match flags::read_only(&st.pool).await {
+            Ok(false) => {}
+            Ok(true) => {
                 return error::AppError::Problem {
                     status: 503,
                     code: "READ_ONLY_MODE",

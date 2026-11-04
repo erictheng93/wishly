@@ -601,6 +601,7 @@ async fn set_flag(
     )
     .await?;
     tx.commit().await?;
+    crate::flags::invalidate();
     tracing::warn!(key = %key, value = %v, "system flag changed");
     Ok(Json(
         json!({ "key": key, "value": v, "updated_at": updated_at }),

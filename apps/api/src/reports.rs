@@ -154,7 +154,7 @@ async fn create_org(
         return Err(AppError::NotFound);
     }
     let oid: Uuid = sqlx::query_scalar(
-        "SELECT id FROM organizations WHERE slug = $1 AND verification_status = 'verified'",
+        "SELECT id FROM organizations WHERE slug = $1::bpchar AND verification_status = 'verified'",
     )
     .bind(&slug)
     .fetch_optional(&st.pool)
@@ -174,9 +174,9 @@ async fn create_org(
                 .into_response());
         }
     }
-    let ip = crate::config::client_ip(&parts, &crate::config::get());
+    let ip = crate::config::client_ip(&parts, crate::config::get());
     ratelimit::check(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
-    verify_turnstile(&crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
+    verify_turnstile(crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
     if user.is_none() && guest.is_none() {
         ratelimit::check(&st.pool, &format!("report_org:{oid}:{ip}"), 1, 86400).await?;
     }
@@ -206,7 +206,7 @@ async fn create(
     }
     let w: Option<(Uuid, String, Uuid, String)> = sqlx::query_as(
         "SELECT id, moderation_status::text, owner_id, visibility::text FROM wishlists
-         WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')",
+         WHERE slug = $1::bpchar AND deleted_at IS NULL AND status IN ('active', 'closed')",
     )
     .bind(&slug)
     .fetch_optional(&st.pool)
@@ -241,9 +241,9 @@ async fn create(
                 .into_response());
         }
     }
-    let ip = crate::config::client_ip(&parts, &crate::config::get());
+    let ip = crate::config::client_ip(&parts, crate::config::get());
     ratelimit::check(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
-    verify_turnstile(&crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
+    verify_turnstile(crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
     if user.is_none() && guest.is_none() {
         // 匿名檢舉者以 IP 近似「同一檢舉者」：同清單 24 小時 1 筆
         ratelimit::check(&st.pool, &format!("report_wl:{wid}:{ip}"), 1, 86400).await?;
