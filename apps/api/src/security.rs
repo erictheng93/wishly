@@ -250,6 +250,11 @@ async fn new_recovery_codes(st: &AppState, uid: Uuid) -> Result<Vec<String>, App
     let codes: Vec<String> = (0..RECOVERY_CODES).map(|_| recovery_code()).collect();
     let hashes: Vec<Vec<u8>> = codes.iter().map(|c| recovery_hash(c)).collect();
     let mut tx = st.pool.begin().await?;
+    // 同一使用者並行重產要排隊：否則兩邊都只刪到舊碼、各自插入，留下兩組有效碼
+    sqlx::query("SELECT 1 FROM users WHERE id=$1 FOR UPDATE")
+        .bind(uid)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM totp_recovery_codes WHERE user_id=$1")
         .bind(uid)
         .execute(&mut *tx)

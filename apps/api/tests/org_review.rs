@@ -335,6 +335,13 @@ async fn revoke_approved_permit_pauses_sites(pool: PgPool) {
     let p = common::permit(&pool, o, "approved", 30).await;
     let (ev, _) = common::event(&pool, o).await;
     let site = common::site(&pool, o, owner, ev, p, "active").await;
+    // 已暫停的據點仍公開顯示許可：撤銷後 updated_at 要變（ETag 失效）並 purge
+    let idle = common::site(&pool, o, owner, ev, p, "active").await;
+    sqlx::query("UPDATE wishlists SET site_status='paused', updated_at = now() - interval '1 day' WHERE id=$1")
+        .bind(idle.id)
+        .execute(&pool)
+        .await
+        .unwrap();
     let (s, _, b) = call(
         &pool,
         "POST",
@@ -351,6 +358,18 @@ async fn revoke_approved_permit_pauses_sites(pool: PgPool) {
         .unwrap();
     assert_eq!(ss, "paused");
     cdn.wait_for(&site.slug).await;
+    cdn.wait_for(&idle.slug).await;
+    let touched: bool = sqlx::query_scalar(
+        "SELECT updated_at > now() - interval '1 minute' FROM wishlists WHERE id=$1",
+    )
+    .bind(idle.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        touched,
+        "已暫停據點的 updated_at 沒更新，ETag 會卡住撤銷前的許可"
+    );
     let os: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1")
         .bind(o)
         .fetch_one(&pool)

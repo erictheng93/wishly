@@ -617,3 +617,40 @@ async fn enforcement_flag_needs_two_ready_staff_and_regenerate_needs_verified_se
         1
     );
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn regenerate_recovery_waits_on_user_row_lock(pool: PgPool) {
+    let a = common::staff(&pool, "a").await;
+    sqlx::query("UPDATE users SET totp_secret='\\x00', totp_enabled_at=now() WHERE id=$1")
+        .bind(a.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // 模擬另一個並行重產持有使用者列鎖：這邊必須等它結束才刪舊碼，否則兩組碼會同時有效
+    let mut fx = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *fx)
+        .await
+        .unwrap();
+    // FOR KEY SHARE 只和 FOR UPDATE 衝突：session 驗證等一般 UPDATE users 不會被擋，才測得出這把鎖
+    sqlx::query("SELECT 1 FROM users WHERE id=$1 FOR KEY SHARE")
+        .bind(a.id)
+        .execute(&mut *fx)
+        .await
+        .unwrap();
+    let req = tokio::spawn({
+        let pool = pool.clone();
+        let tok = a.token.clone();
+        async move { call(&pool, "POST", "/auth/mfa/recovery-codes", &ck(&tok), None).await }
+    });
+    common::wait_for_blocked(&pool, pid, 1).await;
+    fx.commit().await.unwrap();
+    let r = req.await.unwrap();
+    assert_eq!(r.0, 200, "{:?}", r.2);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM totp_recovery_codes WHERE user_id=$1")
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 10);
+}

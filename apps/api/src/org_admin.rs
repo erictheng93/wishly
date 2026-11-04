@@ -397,7 +397,10 @@ async fn review_permit(
     let slugs: Vec<String> = if status == "approved" {
         let paused: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET site_status = 'paused' WHERE permit_id = $1 AND type = 'relief' AND site_status = 'active' RETURNING slug, id")
             .bind(id).fetch_all(&mut *tx).await?;
-        let slugs: Vec<String> = paused.iter().map(|p| p.0.clone()).collect();
+        // 已暫停的據點也會公開顯示許可：碰 updated_at 讓 ETag 失效，並一起 purge
+        let others: Vec<String> = sqlx::query_scalar("UPDATE wishlists SET updated_at = now() WHERE permit_id = $1 AND type = 'relief' AND site_status <> 'active' RETURNING slug")
+            .bind(id).fetch_all(&mut *tx).await?;
+        let slugs: Vec<String> = paused.iter().map(|p| p.0.clone()).chain(others).collect();
         crate::notify::enqueue_site_paused(
             &mut *tx,
             &paused.iter().map(|p| p.1).collect::<Vec<_>>(),
