@@ -567,7 +567,52 @@ async fn admin_unlink_clears_provider_email_and_notifies_user(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
     assert_eq!(body["code"], "LAST_IDENTITY");
+    let self_rows: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE action='auth.identity_unlinked'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        self_rows, 0,
+        "營運代為解除只記 user.identity_unlink，不冒充本人"
+    );
     common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn admin_search_audit_masks_email_and_phone(pool: PgPool) {
+    let (sid, staff, _) = email_user(&pool, true, "staff").await;
+    for (path, q, want) in [
+        ("/admin/users", "alice@example.com", "a***@example.com"),
+        ("/admin/users", "0912-345-678", "***678"),
+        ("/admin/users", "小明", "小明"),
+        ("/admin/wallets", "bob@example.com", "b***@example.com"),
+    ] {
+        let (s, _, b) = call(
+            &pool,
+            "GET",
+            &format!("{path}?q={}", urlencoding(q)),
+            &[("authorization", format!("Bearer {staff}"))],
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{b}");
+        let got: String = sqlx::query_scalar("SELECT diff->>'q' FROM audit_logs WHERE actor_id=$1 AND action='admin.search' ORDER BY id DESC LIMIT 1")
+            .bind(sid).fetch_one(&pool).await.unwrap();
+        assert_eq!(got, want);
+    }
+}
+
+fn urlencoding(s: &str) -> String {
+    s.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-._".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect()
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

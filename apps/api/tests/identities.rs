@@ -785,6 +785,11 @@ async fn self_unlink_revokes_other_sessions_only_on_success(pool: PgPool) {
         200
     );
     assert_eq!(
+        identity_audits(&pool, id, "auth.identity_unlinked", "line").await,
+        1,
+        "失敗的 409 不留稽核，成功的只記一筆"
+    );
+    assert_eq!(
         common::call(&pool, "GET", "/me", &common::ck(other), None)
             .await
             .0,
@@ -803,6 +808,11 @@ async fn self_unlink_revokes_other_sessions_only_on_success(pool: PgPool) {
         200
     );
     common::assert_all_reconciled(&pool).await;
+}
+
+async fn identity_audits(pool: &PgPool, uid: Uuid, action: &str, provider: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE actor_type='user' AND actor_id=$1 AND action=$2 AND diff->>'provider'=$3")
+        .bind(uid).bind(action).bind(provider).fetch_one(pool).await.unwrap()
 }
 
 async fn link_email(pool: &PgPool, token: &str, email: &str) -> (StatusCode, Value) {
@@ -910,6 +920,36 @@ async fn email_link_absorbs_blank_account_and_keeps_its_password(pool: PgPool) {
     let audited: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM audit_logs WHERE action='account.absorb' AND actor_id=$1 AND entity_id=$2)")
         .bind(id).bind(other).fetch_one(&pool).await.unwrap();
     assert!(audited);
+    assert_eq!(
+        identity_audits(&pool, id, "auth.identity_linked", "email").await,
+        1
+    );
+    common::assert_all_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn login_auto_link_is_audited(pool: PgPool) {
+    let common::TestUser { id, token: _ } = provider_user(&pool, "line").await;
+    sqlx::query("UPDATE users SET email='contact@example.com' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO otp_challenges (email,code_hash,expires_at) VALUES ('contact@example.com',$1,now()+interval '10 minutes')").bind(code_hash("123456","dev-pepper")).execute(&pool).await.unwrap();
+    let (s, _, b) = common::call(
+        &pool,
+        "POST",
+        "/auth/otp/verify",
+        &[],
+        Some(json!({"email":"contact@example.com","code":"123456"})),
+    )
+    .await;
+    assert_eq!(s, 200, "{b}");
+    assert_eq!(b["user"]["id"], id.to_string());
+    assert_eq!(
+        identity_audits(&pool, id, "auth.identity_linked", "email").await,
+        1
+    );
     common::assert_all_reconciled(&pool).await;
 }
 

@@ -147,6 +147,7 @@
         "auth_password_reset": "Đặt lại mật khẩu",
         "auth_mfa_enabled": "Bật xác minh hai bước",
         "auth_mfa_verified": "Đã qua xác minh hai bước",
+        "auth_mfa_failed": "Mã xác minh hai bước không đúng",
         "auth_mfa_recovery_used": "Dùng mã khôi phục",
         "auth_mfa_recovery_regenerated": "Tạo lại mã khôi phục",
         "auth_recovery_regenerated": "Tạo lại mã khôi phục",

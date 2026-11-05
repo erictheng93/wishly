@@ -253,6 +253,16 @@ pub(crate) async fn upsert_identity_in_tx(
                 contact.as_deref().or(email),
             )
             .await?;
+            crate::security::audit(
+                &mut **tx,
+                id,
+                "auth.identity_linked",
+                "users",
+                id,
+                None,
+                json!({ "provider": provider }),
+            )
+            .await?;
         }
     }
     Ok((id, is_new))

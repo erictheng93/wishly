@@ -147,6 +147,7 @@
         "auth_password_reset": "重設密碼",
         "auth_mfa_enabled": "啟用兩步驟驗證",
         "auth_mfa_verified": "通過兩步驟驗證",
+        "auth_mfa_failed": "兩步驟驗證碼錯誤",
         "auth_mfa_recovery_used": "使用復原碼",
         "auth_mfa_recovery_regenerated": "重新產生復原碼",
         "auth_recovery_regenerated": "重新產生復原碼",

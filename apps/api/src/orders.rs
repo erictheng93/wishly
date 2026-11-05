@@ -419,7 +419,7 @@ async fn list_wallets(
             "admin.search",
             "point_wallets",
             None,
-            json!({ "q": s }),
+            json!({ "q": crate::admin::mask_search(s) }),
         )
         .await?;
     }

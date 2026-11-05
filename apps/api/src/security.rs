@@ -139,6 +139,30 @@ async fn accept_code(st: &AppState, uid: Uuid, code: &str, pending: bool) -> Res
     }
 }
 
+fn is_code_invalid(e: &AppError) -> bool {
+    matches!(
+        e,
+        AppError::Problem {
+            code: "MFA_CODE_INVALID",
+            ..
+        }
+    )
+}
+
+/// 驗證碼錯誤才記（限流擋下的不記：每 5 分鐘最多 5 筆，避免灌爆稽核表）
+async fn mfa_failed(st: &AppState, u: &CurrentUser, ip: &str) -> Result<(), AppError> {
+    audit(
+        &st.pool,
+        u.id,
+        "auth.mfa_failed",
+        "sessions",
+        u.session_id,
+        inet(ip).as_deref(),
+        json!({}),
+    )
+    .await
+}
+
 async fn mark_session(
     st: &AppState,
     u: &CurrentUser,
@@ -316,7 +340,12 @@ async fn mfa_verify(
 ) -> Result<StatusCode, AppError> {
     let code = r.code.trim();
     if code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit()) {
-        accept_code(&st, u.id, code, false).await?;
+        if let Err(e) = accept_code(&st, u.id, code, false).await {
+            if is_code_invalid(&e) {
+                mfa_failed(&st, &u, &ip).await?;
+            }
+            return Err(e);
+        }
         mark_session(&st, &u, &ip, "auth.mfa_verified").await?;
         return Ok(StatusCode::NO_CONTENT);
     }
@@ -331,6 +360,7 @@ async fn mfa_verify(
     .await?
     .rows_affected();
     if n != 1 {
+        mfa_failed(&st, &u, &ip).await?;
         return Err(code_invalid());
     }
     mark_session(&st, &u, &ip, "auth.mfa_recovery_used").await?;

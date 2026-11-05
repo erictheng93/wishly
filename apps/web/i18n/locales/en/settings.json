@@ -147,6 +147,7 @@
         "auth_password_reset": "Password reset",
         "auth_mfa_enabled": "Two-step verification enabled",
         "auth_mfa_verified": "Two-step verification passed",
+        "auth_mfa_failed": "Two-step verification code rejected",
         "auth_mfa_recovery_used": "Recovery code used",
         "auth_mfa_recovery_regenerated": "Recovery codes regenerated",
         "auth_recovery_regenerated": "Recovery codes regenerated",
