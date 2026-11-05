@@ -29,6 +29,9 @@ pub async fn viewer(parts: &Parts, st: &AppState) -> Result<Option<Uuid>, AppErr
     let Some(tok) = crate::session::session_token(&parts.headers) else {
         return Ok(None);
     };
+    if let Some(id) = crate::session::cached_user(&tok) {
+        return Ok(Some(id));
+    }
     Ok(sqlx::query_scalar(
         "SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.deleted_at IS NULL AND u.blocked_at IS NULL")
