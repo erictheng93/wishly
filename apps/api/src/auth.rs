@@ -46,10 +46,10 @@ pub(crate) fn env(k: &str, d: &str) -> String {
     std::env::var(k).unwrap_or_else(|_| d.to_string())
 }
 fn pepper() -> String {
-    crate::config::get().otp_pepper
+    crate::config::get().otp_pepper.clone()
 }
 pub(crate) fn app_url() -> String {
-    crate::config::get().app_url
+    crate::config::get().app_url.clone()
 }
 pub(crate) fn secure() -> &'static str {
     crate::config::get().secure_cookie()
@@ -300,7 +300,7 @@ async fn send_mail(to: String, code: String, subject: String, lang: crate::notif
     // 驗證碼不進 DB 佇列（不落明文）；在 10 分鐘效期內就地重試，涵蓋 SMTP / API 短暫失敗。
     for (i, wait) in [0u64, 5, 30].into_iter().enumerate() {
         tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
-        match crate::notify::send_mail(&crate::config::get(), &to, &subject, &body).await {
+        match crate::notify::send_mail(crate::config::get(), &to, &subject, &body).await {
             Ok(()) => return,
             Err(e) => tracing::error!(error = %e, attempt = i + 1, "send otp mail failed"),
         }
@@ -436,7 +436,7 @@ pub(crate) async fn require_captcha(
     turnstile_token: Option<&str>,
     ip: &str,
 ) -> Result<(), AppError> {
-    match crate::reports::verify_turnstile(&crate::config::get(), turnstile_token, ip).await {
+    match crate::reports::verify_turnstile(crate::config::get(), turnstile_token, ip).await {
         Err(AppError::Problem { status: 403, .. }) => Err(AppError::problem(
             403,
             "CAPTCHA_REQUIRED",
@@ -642,37 +642,49 @@ async fn logout(
         .into_response())
 }
 
+#[derive(sqlx::FromRow)]
+struct UserJsonRow {
+    display_name: String,
+    email: Option<String>,
+    avatar_key: Option<String>,
+    is_staff: bool,
+    notification_prefs: Value,
+    handle: Option<String>,
+    dcv: String,
+    bio: Option<String>,
+    birthday: Option<String>,
+    bv: String,
+    locale: String,
+    onboarding_done: bool,
+    mfa_enabled: bool,
+    has_password: bool,
+    idents: Vec<String>,
+    orgs: Value,
+}
+
+/// GET /me 等共用的使用者 JSON。單一查詢（原本 5 次往返）：/me 是最常被呼叫的登入端點。
 pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError> {
-    let (dn, email, avatar, staff, prefs, handle, dcv): (String, Option<String>, Option<String>, bool, Value, Option<String>, String) =
-        sqlx::query_as("SELECT display_name, email, avatar_key, is_staff, notification_prefs, handle, default_claim_visibility::text FROM users WHERE id=$1 AND deleted_at IS NULL")
-            .bind(id).fetch_optional(pool).await?.ok_or(AppError::Unauthorized)?;
-    let (bio, birthday, bv, locale, onboarding_done): (Option<String>, Option<String>, String, String, bool) =
-        sqlx::query_as(
-            "SELECT bio, birthday, birthday_visibility::text, locale, onboarding_done_at IS NOT NULL FROM users WHERE id=$1",
-        )
-        .bind(id)
-        .fetch_one(pool)
-        .await?;
-    let (mfa_enabled, has_password): (bool, bool) = sqlx::query_as(
-        "SELECT totp_enabled_at IS NOT NULL, EXISTS(SELECT 1 FROM auth_identities i WHERE i.user_id=$1 AND i.provider='email' AND i.password_hash IS NOT NULL)
-         FROM users WHERE id=$1")
-        .bind(id).fetch_one(pool).await?;
-    let idents: Vec<String> = sqlx::query_scalar(
-        "SELECT provider::text FROM auth_identities WHERE user_id=$1 ORDER BY created_at",
+    let r: UserJsonRow = sqlx::query_as(
+        "SELECT u.display_name, u.email, u.avatar_key, u.is_staff, u.notification_prefs, u.handle,
+                u.default_claim_visibility::text AS dcv, u.bio, u.birthday, u.birthday_visibility::text AS bv, u.locale,
+                u.onboarding_done_at IS NOT NULL AS onboarding_done, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
+                EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'email' AND i.password_hash IS NOT NULL) AS has_password,
+                ARRAY(SELECT provider::text FROM auth_identities WHERE user_id = u.id ORDER BY created_at) AS idents,
+                COALESCE((SELECT jsonb_agg(jsonb_build_object('id', o.id, 'name', o.display_name, 'role', m.role::text,
+                                                              'verification_status', o.verification_status) ORDER BY o.created_at)
+                            FROM org_members m JOIN organizations o ON o.id = m.org_id
+                           WHERE m.user_id = u.id AND m.disabled_at IS NULL), '[]'::jsonb) AS orgs
+           FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL",
     )
     .bind(id)
-    .fetch_all(pool)
-    .await?;
-    let avatar_url = crate::uploads::avatar_url(avatar.as_deref());
-    let orgs: Vec<Value> = sqlx::query_as::<_, (Uuid, String, String, String)>(
-        "SELECT o.id, o.display_name, m.role::text, o.verification_status FROM org_members m JOIN organizations o ON o.id = m.org_id
-         WHERE m.user_id = $1 AND m.disabled_at IS NULL ORDER BY o.created_at")
-        .bind(id).fetch_all(pool).await?
-        .into_iter().map(|(i, n, r, v)| json!({"id": i, "name": n, "role": r, "verification_status": v})).collect();
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::Unauthorized)?;
+    let avatar_url = crate::uploads::avatar_url(r.avatar_key.as_deref());
     Ok(
-        json!({ "id": id, "display_name": dn, "email": email, "avatar_url": avatar_url, "is_staff": staff,
-               "notification_prefs": prefs, "handle": handle, "default_claim_visibility": dcv, "bio": bio, "birthday": birthday, "birthday_visibility": bv, "locale": locale, "mfa_enabled": mfa_enabled, "has_password": has_password, "onboarding_done": onboarding_done, "identities": idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
-               "orgs": orgs }),
+        json!({ "id": id, "display_name": r.display_name, "email": r.email, "avatar_url": avatar_url, "is_staff": r.is_staff,
+               "notification_prefs": r.notification_prefs, "handle": r.handle, "default_claim_visibility": r.dcv, "bio": r.bio, "birthday": r.birthday, "birthday_visibility": r.bv, "locale": r.locale, "mfa_enabled": r.mfa_enabled, "has_password": r.has_password, "onboarding_done": r.onboarding_done, "identities": r.idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
+               "orgs": r.orgs }),
     )
 }
 

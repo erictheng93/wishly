@@ -35,6 +35,10 @@ pub struct Config {
     pub ecpay: Option<Ecpay>,
     /// 公益組織 / 救災功能總開關（ORGS_ENABLED，僅 `true` / `1` 為開）；dev/test 恆開，production 預設關，關閉時相關路由回 404
     pub orgs_enabled: bool,
+    /// 程序內短暫快取（MICRO_CACHE，預設開；`0` / `false` 關閉）：探索頁 10 秒（與 CDN s-maxage 相同）、
+    /// system_flags.read_only 1 秒（本程序改旗標時立即失效）。低規主機上省下每個請求的 DB 往返。
+    /// 只有經 `from_env` 的正式程序會開；`Config::dev()`（測試 fallback）為關，測試才看得到剛寫入的資料。
+    pub micro_cache: bool,
     /// Web Push（push.rs）：VAPID_PRIVATE_KEY + VAPID_SUBJECT 都設才啟用；None = 推播關閉（不影響啟動）
     pub vapid: Option<crate::push::Vapid>,
     /// 僅測試程式會設為 true（放行本機 mock endpoint）；任何環境變數都不會設它
@@ -106,8 +110,11 @@ pub fn init(c: Config) {
 
 /// 已 init 則回該設定；否則（僅測試 / examples 等未經 main 的情況）回 dev 設定。
 /// 正式程序一定經 main 的 init，所以此 fallback 不會在 production 生效。
-pub fn get() -> Config {
-    CONFIG.get().cloned().unwrap_or_else(Config::dev)
+/// 回傳參照（每個請求會呼叫多次，不能每次複製整份設定）。未 init 的 fallback 只建一次並快取在另一個 static，
+/// 不占用 CONFIG，之後的 `init`（測試自訂設定）仍會生效。
+pub fn get() -> &'static Config {
+    static DEV: OnceLock<Config> = OnceLock::new();
+    CONFIG.get().unwrap_or_else(|| DEV.get_or_init(Config::dev))
 }
 
 fn key32(b64: &str) -> Option<[u8; 32]> {
@@ -177,6 +184,7 @@ impl Config {
                 true,
             )),
             orgs_enabled: true,
+            micro_cache: false,
             vapid: None,
             push_allow_loopback: false,
         }
@@ -188,6 +196,7 @@ impl Config {
 
     pub fn try_from_env() -> Result<Config, String> {
         let mut c = Config::dev();
+        c.micro_cache = !matches!(var("MICRO_CACHE").as_deref(), Some("0" | "false"));
         c.vapid = crate::push::Vapid::from_env(var("VAPID_PRIVATE_KEY"), var("VAPID_SUBJECT"))?;
         match var("APP_ENV").as_deref() {
             Some("dev") | Some("test") => return Ok(c),

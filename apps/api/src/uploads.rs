@@ -156,8 +156,8 @@ impl S3 {
         }
     }
     /// 讀全域 Config
-    pub fn get() -> S3 {
-        crate::config::get().s3
+    pub fn get() -> &'static S3 {
+        &crate::config::get().s3
     }
     pub fn public_url(&self, key: &str) -> String {
         format!("{}/{}", self.public_base.trim_end_matches('/'), key)

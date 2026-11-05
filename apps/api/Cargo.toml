@@ -32,6 +32,8 @@ chacha20poly1305 = "0.10"
 p256 = { version = "0.14", features = ["ecdh", "ecdsa"] }
 hkdf = "0.12"
 aes-gcm = "0.10"
+# 低規主機：glibc malloc 在 JSON 序列化的大量小配置上占 API 約 15% CPU，且長時間運行碎片化較重
+mimalloc = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
@@ -42,3 +44,8 @@ http-body-util = "0.1"
 opt-level = 3
 [profile.dev.package.blake2]
 opt-level = 3
+
+# 正式映像（低規 VPS）：整體最佳化，換取每請求 CPU；只影響 release（CI 測試 / 覆蓋率走 dev profile）
+[profile.release]
+lto = "fat"
+codegen-units = 1

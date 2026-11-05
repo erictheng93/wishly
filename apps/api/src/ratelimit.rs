@@ -47,6 +47,30 @@ pub async fn allow<'e>(
     Ok(hit(pool, key, limit, window_secs).await?.0)
 }
 
+/// 程序內固定視窗限流（不寫 DB）：只用於「超限就略過副作用」的高頻、低風險場景（分享頁瀏覽紀錄）。
+/// 與 `allow` 同口徑（視窗起點對齊 epoch），但計數只在本程序：重啟歸零、多實例時各算各的。
+/// 低規主機上每次瀏覽省下兩次 upsert（與其 WAL、索引與 autovacuum 成本），IP 也不再落到 rate_limits。
+pub fn allow_local(key: &str, limit: u32, window_secs: u64) -> bool {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    static M: Mutex<Option<HashMap<String, (u64, u32)>>> = Mutex::new(None);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let win = now / window_secs.max(1);
+    let mut g = M.lock().unwrap();
+    let m = g.get_or_insert_with(HashMap::new);
+    if m.len() > 100_000 {
+        m.retain(|_, (w, _)| *w == win); // 鍵含 IP，舊視窗的直接丟掉
+    }
+    let e = m.entry(key.to_string()).or_insert((win, 0));
+    if e.0 != win {
+        *e = (win, 0);
+    }
+    e.1 = e.1.saturating_add(1);
+    e.1 <= limit
+}
+
 /// 檢舉保留政策：結案後只清快照與檢舉者描述（列本身留著，統計 / 處置紀錄靠 status、reason、時間）。
 /// 待處理一律不清（審查需要，也避免刪帳號規避）。結案後：personal_info 或對象已不存在（帳號刪除、清單封存 / 刪除）7 天、
 /// 駁回 30 天、已處置 365 天。帳號刪除時另於 account.rs 立即清掉已結案的。只動 status <> 'open' 的列，與結案路徑（只改 open 列）不重疊、不互鎖。
@@ -166,6 +190,20 @@ impl<S: Send + Sync> axum::extract::FromRequestParts<S> for Peer {
         parts: &mut axum::http::request::Parts,
         _: &S,
     ) -> Result<Self, Self::Rejection> {
-        Ok(Peer(crate::config::client_ip(parts, &crate::config::get())))
+        Ok(Peer(crate::config::client_ip(parts, crate::config::get())))
+    }
+}
+
+#[cfg(test)]
+mod local_tests {
+    use super::allow_local;
+
+    #[test]
+    fn allow_local_counts_per_key() {
+        // 視窗 1 天：測試期間不會跨視窗
+        let k = format!("t:{}", uuid::Uuid::new_v4());
+        assert!((0..3).all(|_| allow_local(&k, 3, 86_400)));
+        assert!(!allow_local(&k, 3, 86_400));
+        assert!(allow_local(&format!("{k}:other"), 3, 86_400));
     }
 }

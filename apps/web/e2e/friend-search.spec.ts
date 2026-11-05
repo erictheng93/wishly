@@ -13,7 +13,7 @@ test('依名字搜尋使用者並送出好友邀請，對方收到申請', async
   const page = await ctx.newPage()
   await page.goto('/friends'); await hydrated(page)
 
-  const box = page.getByRole('searchbox', { name: '搜尋使用者' })
+  const box = page.getByRole('combobox', { name: '搜尋使用者' }) // #158 起輸入框為 combobox（鍵盤選取建議）
   await box.fill(`${tag} 小`)
   const add = page.getByRole('button', { name: `加好友 ${target.name}` })
   await add.click()

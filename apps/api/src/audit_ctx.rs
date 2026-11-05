@@ -29,7 +29,7 @@ pub async fn middleware(
         .unwrap_or_else(uuid::Uuid::new_v4);
     let ctx = Ctx {
         request_id: Some(request_id),
-        ip: crate::security::inet(&crate::config::client_ip(&parts, &crate::config::get())),
+        ip: crate::security::inet(&crate::config::client_ip(&parts, crate::config::get())),
         user_agent: parts
             .headers
             .get(axum::http::header::USER_AGENT)

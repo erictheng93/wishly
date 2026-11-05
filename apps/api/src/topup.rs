@@ -58,6 +58,7 @@ pub fn routes() -> Router<AppState> {
 fn ecpay() -> Result<Ecpay, AppError> {
     config::get()
         .ecpay
+        .clone()
         .ok_or_else(|| AppError::problem(503, "TOPUP_DISABLED", "儲值功能尚未開放"))
 }
 

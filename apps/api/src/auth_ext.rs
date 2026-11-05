@@ -303,7 +303,7 @@ async fn login(
 ) -> Result<Response, AppError> {
     let email = r.email.trim().to_lowercase();
     let headers = parts.headers.clone();
-    let ip = crate::config::client_ip(&parts, &crate::config::get());
+    let ip = crate::config::client_ip(&parts, crate::config::get());
     // 已鎖定的流量只讀，不寫入失敗紀錄或全站計數
     let counts = login_failure_counts(&st.pool, &email, &ip).await?;
     if login_locked(counts) {

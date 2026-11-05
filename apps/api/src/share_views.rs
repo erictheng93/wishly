@@ -108,8 +108,9 @@ async fn record(
     }
     // 超限仍回 204 但不寫入：每 IP 60/分，另對單一清單全域 600/分（擋分散來源灌水）。
     // 已被灌入的髒資料不會自動清除（紀錄永久保存），需人工查詢處理。
-    if !crate::ratelimit::allow(&st.pool, &format!("share_view:{}", ip_key(addr)), 60, 60).await?
-        || !crate::ratelimit::allow(&st.pool, &format!("share_view_slug:{slug}"), 600, 60).await?
+    // 計數在程序內（ratelimit::allow_local）：重啟歸零、多實例各算各的；這只擋灌水，不是安全邊界。
+    if !crate::ratelimit::allow_local(&format!("share_view:{}", ip_key(addr)), 60, 60)
+        || !crate::ratelimit::allow_local(&format!("share_view_slug:{slug}"), 600, 60)
     {
         return Ok(StatusCode::NO_CONTENT);
     }
@@ -127,9 +128,13 @@ async fn record(
         crate::config::get().trusted_proxy_cloudflare,
     );
     let ua: String = ua.chars().take(512).collect();
+    // 效能（分享頁每次瀏覽都打）：寫入只有單一敘述，並以 set_config(..., true) 讓這個隱含交易非同步 commit：不等 WAL fsync（低規主機磁碟 fsync 是寫入瓶頸），
+    // 代價是主機當機（非程式崩潰）時最近約 0.6 秒的瀏覽紀錄可能遺失，資料一致性不受影響。業務寫入不可比照。
     sqlx::query(
         "INSERT INTO share_views (wishlist_id, visitor_id, ip, country, city, device, user_agent, referrer_host)
-         SELECT id, $2, $3::inet, $4, $5, $6, $7, $8 FROM wishlists WHERE slug = $1::char(10) AND deleted_at IS NULL",
+         SELECT w.id, $2, $3::inet, $4, $5, $6, $7, $8
+           FROM wishlists w, (SELECT set_config('synchronous_commit', 'off', true)) lazy
+          WHERE w.slug = $1::bpchar AND w.deleted_at IS NULL",
     )
     .bind(&slug)
     .bind(visitor_id)

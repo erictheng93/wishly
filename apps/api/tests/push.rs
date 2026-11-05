@@ -334,7 +334,7 @@ async fn pushes_encrypted_payload_without_body(pool: PgPool) {
     let auth = h["authorization"].to_str().unwrap();
     assert!(auth.starts_with("vapid t="), "{auth}");
     let cfg = wishly_api::config::get();
-    assert!(auth.ends_with(&format!(", k={}", cfg.vapid.unwrap().public_key)));
+    assert!(auth.ends_with(&format!(", k={}", cfg.vapid.as_ref().unwrap().public_key)));
     assert_eq!(h["content-encoding"], "aes128gcm");
     assert_eq!(h["ttl"], "86400");
     let jwt = auth

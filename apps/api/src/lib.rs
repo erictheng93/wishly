@@ -53,6 +53,49 @@ pub mod wallet_ops;
 pub mod wishlists;
 
 use axum::{response::IntoResponse, Router};
+
+/// system_flags.read_only 的程序內快取（每個寫入請求與 /public/status 都要讀）。
+/// `config.micro_cache` 開時快取 1 秒；本程序經 admin 改旗標時立即失效，多實例時其他實例最多晚 1 秒生效。
+pub mod flags {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    /// (失效世代, 快取值)。查詢前記下世代，寫回時世代已變就丟棄：
+    /// 否則在 admin commit 前讀到舊值的請求，會在 `invalidate` 之後把舊值寫回、再撐 1 秒。
+    static RO: Mutex<(u64, Option<(Instant, bool)>)> = Mutex::new((0, None));
+    const TTL: Duration = Duration::from_secs(1);
+
+    pub async fn read_only(pool: &sqlx::PgPool) -> Result<bool, sqlx::Error> {
+        let cache = crate::config::get().micro_cache;
+        let gen = {
+            let g = RO.lock().unwrap();
+            if let (true, Some((at, v))) = (cache, g.1) {
+                if at.elapsed() < TTL {
+                    return Ok(v);
+                }
+            }
+            g.0
+        };
+        let v: Option<serde_json::Value> =
+            sqlx::query_scalar("SELECT value FROM system_flags WHERE key = 'read_only'")
+                .fetch_optional(pool)
+                .await?;
+        let v = v.and_then(|v| v.as_bool()) == Some(true);
+        if cache {
+            let mut g = RO.lock().unwrap();
+            if g.0 == gen {
+                g.1 = Some((Instant::now(), v));
+            }
+        }
+        Ok(v)
+    }
+
+    /// admin 改 system_flags 並 commit 後呼叫：清掉快取，並讓失效前已開始的查詢不能寫回
+    pub fn invalidate() {
+        let mut g = RO.lock().unwrap();
+        g.0 = g.0.wrapping_add(1);
+        g.1 = None;
+    }
+}
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -293,14 +336,9 @@ async fn read_only(
                 | "/api/v1/unsubscribe"
         );
     if !safe {
-        match sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT value FROM system_flags WHERE key = 'read_only'",
-        )
-        .fetch_optional(&st.pool)
-        .await
-        {
-            Ok(v) if v.as_ref().and_then(|v| v.as_bool()) != Some(true) => {}
-            Ok(_) => {
+        match flags::read_only(&st.pool).await {
+            Ok(false) => {}
+            Ok(true) => {
                 return error::AppError::Problem {
                     status: 503,
                     code: "READ_ONLY_MODE",

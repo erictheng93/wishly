@@ -52,7 +52,9 @@ pub async fn notify<'e, E: sqlx::PgExecutor<'e>>(
 // ---------- SSE ----------
 
 /// 匿名 SSE 連線上限：全域與每個來源 IP（超過就拒絕，避免耗盡 DB pool / 記憶體）。
-const MAX_SSE_TOTAL: usize = 2000;
+/// 實測（1 vCPU / 1 GB，mimalloc）：3300 條 SSE + 同數量 keep-alive 連線時 API RSS 約 45 MB（每條約 10 KB），
+/// 連線本身不占 DB 連線；2000 會先於 CPU 成為同時在線人數的上限，故放寬到 5000（最壞約 50 MB）。
+const MAX_SSE_TOTAL: usize = 5000;
 const MAX_SSE_PER_IP: u32 = 16;
 static SSE_TOTAL: Semaphore = Semaphore::const_new(MAX_SSE_TOTAL);
 /// 自上次回報以來被拒絕的公開 SSE 連線數（`sse_stats` 每小時寫進 log）
@@ -280,10 +282,10 @@ async fn events(
     Path(slug): Path<String>,
     parts: Parts,
 ) -> Result<Response, AppError> {
-    let slot = SseSlot::acquire(crate::config::client_ip(&parts, &crate::config::get()))?;
+    let slot = SseSlot::acquire(crate::config::client_ip(&parts, crate::config::get()))?;
     let w: Option<(Uuid, String, Uuid, String)> = sqlx::query_as(
         "SELECT id, moderation_status::text, owner_id, visibility::text FROM wishlists
-          WHERE slug = $1 AND deleted_at IS NULL AND status IN ('active', 'closed')
+          WHERE slug = $1::bpchar AND deleted_at IS NULL AND status IN ('active', 'closed')
             AND NOT EXISTS (SELECT 1 FROM users WHERE id = owner_id AND blocked_at IS NOT NULL)",
     )
     .bind(&slug)

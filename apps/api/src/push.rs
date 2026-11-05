@@ -147,7 +147,7 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn push_config() -> Json<Value> {
-    Json(json!({ "public_key": config::get().vapid.map(|v| v.public_key) }))
+    Json(json!({ "public_key": config::get().vapid.as_ref().map(|v| v.public_key.clone()) }))
 }
 
 #[derive(Deserialize)]

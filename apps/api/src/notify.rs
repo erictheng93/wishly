@@ -961,7 +961,7 @@ async fn deliver(pool: &PgPool, o: Outbound) -> Result<(), sqlx::Error> {
         body,
         attempts,
     } = o;
-    match send_mail(&crate::config::get(), &to, &subject, &body).await {
+    match send_mail(crate::config::get(), &to, &subject, &body).await {
         Ok(()) => {
             sqlx::query("UPDATE notifications SET status = 'sent', sent_at = now(), last_error = NULL WHERE id = $1").bind(id).execute(pool).await?;
         }
@@ -1068,7 +1068,7 @@ fn taipei(payload: &Value, key: &str) -> Option<String> {
 
 pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (String, String) {
     let l = lang;
-    let app = crate::config::get().app_url;
+    let app = crate::config::get().app_url.clone();
     if kind == "auth.password_changed" {
         return (
             l.pick("【Wishly】密碼已變更".into(), "[Wishly] Your password was changed".into(), "[Wishly] Mật khẩu đã được thay đổi".into(), "[Wishly] Kata sandi kamu sudah diubah".into()),

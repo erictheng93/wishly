@@ -1396,7 +1396,7 @@ async fn topup_queries_are_owner_only_newest_first_with_limit(pool: PgPool) {
 /// 跨網域前端（Pages）要能讀到 429 的 Retry-After，CORS 必須公開該標頭
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn cors_exposes_retry_after(pool: PgPool) {
-    let origin = wishly_api::config::get().app_url;
+    let origin = wishly_api::config::get().app_url.clone();
     let (_, h, _) = call(
         &pool,
         "GET",

@@ -30,7 +30,7 @@ fn err(code: &'static str, detail: &'static str) -> AppError {
 pub async fn resolve_target(tx: &mut Tx<'_>, slug: &str, uid: Uuid) -> Result<Uuid, AppError> {
     let row: Option<(Uuid, bool)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.id, can_manage_wishlist(w.owner_id, w.org_id, $2) FROM wishlists w
-         JOIN users o ON o.id = w.owner_id WHERE w.slug = $1 AND {TARGET_LIVE_SQL}"
+         JOIN users o ON o.id = w.owner_id WHERE w.slug = $1::bpchar AND {TARGET_LIVE_SQL}"
     )))
     .bind(slug)
     .bind(uid)

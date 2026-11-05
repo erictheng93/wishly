@@ -28,11 +28,7 @@ pub fn routes() -> Router<AppState> {
 
 /// 唯讀維護中就讓前端先掛橫幅，訪客不必填完表單才被 503 擋下。
 async fn status(State(st): State<AppState>) -> Result<Response, AppError> {
-    let v: Option<Value> =
-        sqlx::query_scalar("SELECT value FROM system_flags WHERE key = 'read_only'")
-            .fetch_optional(&st.pool)
-            .await?;
-    let read_only = v.and_then(|v| v.as_bool()) == Some(true);
+    let read_only = crate::flags::read_only(&st.pool).await?;
     let cfg = crate::config::get();
     // 儲值可用的付款方式（設定是靜態的，可隨 CDN 快取）；未設綠界憑證則為空
     let topup_methods: Vec<&str> = cfg.ecpay.as_ref().map_or(vec![], |e| {
@@ -81,9 +77,10 @@ async fn explore(
     axum::extract::Query(q): axum::extract::Query<ExploreQ>,
 ) -> Result<Response, AppError> {
     let page = q.page.unwrap_or(1).clamp(1, 100);
-    let ty = match q.r#type.as_deref() {
+    let ty: Option<&'static str> = match q.r#type.as_deref() {
         None | Some("") => None,
-        Some(t @ ("registry" | "relief")) => Some(t),
+        Some("registry") => Some("registry"),
+        Some("relief") => Some("relief"),
         _ => {
             return Err(AppError::invalid(
                 "/type",
@@ -92,6 +89,66 @@ async fn explore(
             ))
         }
     };
+    // 探索頁對所有訪客都一樣（不讀 cookie）：程序內快取與 CDN 的 s-maxage 同為 10 秒，
+    // 沒有 CDN 擋在前面（或 CDN 未命中）時，同一頁 10 秒內只查一次 DB。
+    let body = explore_cache::get_or(page, ty, || explore_body(&st, page, ty)).await?;
+    Ok((
+        [
+            (
+                header::CACHE_CONTROL,
+                "public, s-maxage=10, stale-while-revalidate=60",
+            ),
+            (header::CONTENT_TYPE, "application/json"),
+        ],
+        body,
+    )
+        .into_response())
+}
+
+mod explore_cache {
+    use axum::body::Bytes;
+    use std::{
+        collections::HashMap,
+        sync::Mutex,
+        time::{Duration, Instant},
+    };
+    type Key = (i64, Option<&'static str>);
+    static CACHE: Mutex<Option<HashMap<Key, (Instant, Bytes)>>> = Mutex::new(None);
+
+    pub async fn get_or<F, Fut, E>(page: i64, ty: Option<&'static str>, f: F) -> Result<Bytes, E>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<Bytes, E>>,
+    {
+        let ttl = Duration::from_secs(10);
+        if !crate::config::get().micro_cache {
+            return f().await;
+        }
+        let key = (page, ty);
+        if let Some((at, b)) = CACHE
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .get(&key)
+        {
+            if at.elapsed() < ttl {
+                return Ok(b.clone());
+            }
+        }
+        let b = f().await?;
+        let mut g = CACHE.lock().unwrap();
+        let m = g.get_or_insert_with(HashMap::new);
+        m.retain(|_, (at, _)| at.elapsed() < ttl); // 鍵最多 100 頁 × 3 種，順手清掉過期的
+        m.insert(key, (Instant::now(), b.clone()));
+        Ok(b)
+    }
+}
+
+async fn explore_body(
+    st: &AppState,
+    page: i64,
+    ty: Option<&'static str>,
+) -> Result<axum::body::Bytes, AppError> {
     let rows: Vec<ExploreRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.slug::text, w.title, w.type::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
                 o.display_name, o.handle,
@@ -113,14 +170,11 @@ async fn explore(
     let wishlists: Vec<Value> = rows.into_iter().take(EXPLORE_PAGE as usize).map(|(slug, title, ty, ck, cs, cp, ev, on, oh, n, got, need)| json!({
         "slug": slug, "title": title, "type": ty, "cover_image_url": image_url(ck.as_deref(), &cs), "cover_preset": cp, "event_date": ev,
         "owner": { "display_name": on, "handle": oh }, "item_count": n, "completion_pct": crate::wishlists::completion_pct(got, need) })).collect();
-    Ok((
-        [(
-            header::CACHE_CONTROL,
-            "public, s-maxage=10, stale-while-revalidate=60",
-        )],
-        Json(json!({ "wishlists": wishlists, "next_page": more.then_some(page + 1) })),
+    Ok(serde_json::to_vec(
+        &json!({ "wishlists": wishlists, "next_page": more.then_some(page + 1) }),
     )
-        .into_response())
+    .expect("serialize explore")
+    .into())
 }
 
 pub fn image_url(key: Option<&str>, status: &str) -> Option<String> {
@@ -149,6 +203,8 @@ struct W {
     owner_name: String,
     locked: bool,
     updated_at: DateTime<Utc>,
+    /// 含支持品項（成果數字不隨 updated_at 變動，不能用 ETag）
+    has_support: bool,
 }
 
 #[derive(FromRow)]
@@ -211,9 +267,10 @@ async fn render(
                 w.cover_image_status::text AS cover_image_status, w.cover_preset, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
                 w.owner_id, u.display_name AS owner_name,
                 surprise_locked(w.surprise_mode, w.event_date) AS locked,
-                GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at
+                GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at,
+                EXISTS (SELECT 1 FROM wishlist_items WHERE wishlist_id = w.id AND deleted_at IS NULL AND funding_mode = 'support') AS has_support
          FROM wishlists w JOIN users u ON u.id = w.owner_id
-         WHERE w.slug = $1 AND w.deleted_at IS NULL AND u.blocked_at IS NULL")
+         WHERE w.slug = $1::bpchar AND w.deleted_at IS NULL AND u.blocked_at IS NULL")
         .bind(slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
     if w.status == "draft" || w.status == "archived" {
         return Err(AppError::NotFound);
@@ -242,13 +299,7 @@ async fn render(
         if w.locked { "-l" } else { "" }
     );
     // 含支持品項的公開清單：成果數字不隨清單 updated_at 變動，不能用 ETag 做 304（先判斷、不讀 cookie）
-    let has_support = !restricted
-        && sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS (SELECT 1 FROM wishlist_items WHERE wishlist_id = $1 AND deleted_at IS NULL AND funding_mode = 'support')",
-        )
-        .bind(w.id)
-        .fetch_one(&st.pool)
-        .await?;
+    let has_support = !restricted && w.has_support;
     let cache = [(
         header::CACHE_CONTROL,
         if restricted {
@@ -500,7 +551,7 @@ mod relief {
         let mut seen = vec![slug.clone()];
         let ev: (Uuid, String, Option<String>, String) = loop {
             let r: (Uuid, String, Option<String>, String) = sqlx::query_as(
-                "SELECT e.id, e.slug::text, m.slug::text, e.moderation_status::text FROM relief_events e LEFT JOIN relief_events m ON m.id = e.merged_into WHERE e.slug = $1")
+                "SELECT e.id, e.slug::text, m.slug::text, e.moderation_status::text FROM relief_events e LEFT JOIN relief_events m ON m.id = e.merged_into WHERE e.slug = $1::bpchar")
                 .bind(&cur).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
             match r.2.clone() {
                 Some(next) if seen.len() <= 10 && !seen.contains(&next) => {
@@ -558,7 +609,7 @@ mod relief {
         let (id, mut v): (Uuid, Value) = sqlx::query_as(
             "SELECT id, jsonb_build_object('slug', slug, 'display_name', display_name, 'intro', intro, 'website', website,
                     'public_email', public_email, 'public_phone', public_phone, 'logo_key', logo_key)
-               FROM organizations WHERE slug = $1 AND verification_status = 'verified'")
+               FROM organizations WHERE slug = $1::bpchar AND verification_status = 'verified'")
             .bind(&slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
         let key = v["logo_key"].take();
         v["logo"] = json!(key
