@@ -320,7 +320,8 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
   .l-local{display:block;border-bottom:1px solid var(--line);background:var(--bg)}
   .l-local>div{display:flex;overflow-x:auto;scrollbar-width:none;padding:0 32px 0 var(--pad);-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
   .l-local>div::-webkit-scrollbar{display:none}
-  .l-local a{flex:none;display:inline-flex;align-items:center;min-height:44px;padding:0 12px;color:var(--fg);font:700 13px var(--mono);letter-spacing:.08em;white-space:nowrap}
+  /* 導覽是文字不是資料：用內文字型（等寬字在越南文、英文下太寬，第四個入口會被切掉） */
+  .l-local a{flex:none;display:inline-flex;align-items:center;min-height:44px;padding:0 10px;color:var(--fg);font:700 13px var(--font);letter-spacing:.02em;white-space:nowrap}
   .l-local a:first-child{padding-left:0}}
 .l h2{font-size:clamp(28px,5vw,48px);line-height:1.1;letter-spacing:-.025em;margin:0;text-align:left}
 .l h3{font-size:18px;margin:8px 0}
