@@ -69,6 +69,8 @@ export default defineNuxtConfig({
       script: [{ innerHTML: "try{var t=localStorage.getItem('ws_theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;else if(t!=='auto')document.documentElement.dataset.theme='light'}catch(e){document.documentElement.dataset.theme='light'}", tagPriority: 'critical' }],
       link: [
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+        // 拉丁主字型預載（標題、數字一進頁就用得到）；等寬與擴充分片按需載入
+        { rel: 'preload', href: '/fonts/archivo-latin.woff2', as: 'font', type: 'font/woff2', crossorigin: '' },
       ],
     },
   },

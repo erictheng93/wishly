@@ -68,7 +68,6 @@
       "confirm": "Xác nhận tài trợ {pts}"
     },
     "card": {
-      "thumb": "Ảnh",
       "priority": "Ưu tiên: {level}",
       "prio": {
         "high": "Cao",

@@ -68,7 +68,6 @@
       "confirm": "Konfirmasi patungan {pts}"
     },
     "card": {
-      "thumb": "Gbr",
       "priority": "Prioritas {level}",
       "prio": {
         "high": "Tinggi",

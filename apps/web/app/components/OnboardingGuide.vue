@@ -42,17 +42,22 @@ watch(() => route.fullPath, () => refresh())
   </aside>
 </template>
 <style scoped>
-/* 標本籤樣式：墨色細框、左側紅色訊號條、等寬小標 */
-.tour{position:relative;margin:0 0 16px;padding:12px 14px 12px 18px;border:1px solid var(--ink-line);background:var(--card);animation:rise .4s var(--ease) both}
-.tour::before{content:'';position:absolute;inset:-1px auto -1px -1px;width:4px;background:var(--stripe)}
-.tour-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+/* 安靜的細線條帶：不用彩色側條；桌面文字在左、動作在右，高度約減半 */
+.tour{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;margin:0 0 20px;padding:14px 16px;border:1px solid var(--line);background:var(--bg-alt)}
+.tour-top{display:flex;align-items:center;gap:14px;margin-bottom:2px}
 .tour-tag{font:600 11px/1.4 var(--mono);letter-spacing:.12em;color:var(--red-text);text-transform:uppercase}
 .tour-pips{display:flex;gap:4px}
 .tour-pips i{width:18px;height:6px;background:var(--hatch),var(--bg-alt);outline:1px solid var(--line);outline-offset:-1px}
 .tour-pips i.on{background:var(--fg);outline-color:var(--fg)}
 .tour-pips i.cur{background:var(--stripe);outline-color:var(--red)}
-.tour-title{display:block;font-size:16px;line-height:1.4}
-.tour-text{margin:4px 0 0;font-size:14px;line-height:1.6;color:var(--mute)}
-.tour-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.tour-title{display:block;font-size:15px;line-height:1.4}
+.tour-text{margin:0;font-size:13px;line-height:1.6;color:var(--mute)}
+.tour-text a{display:inline-flex;align-items:center;min-height:44px;color:var(--fg);text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
+.tour-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
 .tour-skip{margin-left:auto;font-size:13px;color:var(--mute)}
+@media (min-width:768px){
+  .tour{grid-template-columns:minmax(0,1fr) auto;column-gap:32px;align-items:center}
+  .tour>.tour-act{grid-column:2;grid-row:1/span 4;margin:0}
+  .tour-skip{margin-left:0}
+}
 </style>

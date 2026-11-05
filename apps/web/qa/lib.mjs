@@ -48,9 +48,10 @@ export async function registerUser({ name, tag = 'u', staff = false } = {}) {
   const api = await apiCtx()
   let r = await api.post('auth/register', { data: { email, password: PASSWORD, display_name: display } })
   if (!r.ok()) throw new Error('register ' + r.status() + await r.text())
+  const { challenge_id } = await r.json()
   const m = await waitForMail(email)
   const code = m.text.match(/(\d{6})/)[1]
-  r = await api.post('auth/register/verify', { data: { email, code } })
+  r = await api.post('auth/register/verify', { data: { email, code, challenge_id } })
   if (!r.ok()) throw new Error('verify ' + r.status() + await r.text())
   if (staff) sql(`UPDATE users SET is_staff = true WHERE email = '${q(email)}'`)
   return { email, password: PASSWORD, name: display, api }

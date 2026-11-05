@@ -29,7 +29,6 @@
       "uploadFail": "Upload failed",
       "cover": "Cover image (optional)",
       "item": "Image (optional)",
-      "none": "No image",
       "pick": "Choose image",
       "uploading": "Uploading…",
       "done": "Uploaded. Location and other hidden data (EXIF) removed; the image appears publicly once processed",

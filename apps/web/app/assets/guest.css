@@ -12,6 +12,8 @@
 .g-nav a{position:relative;padding:0 12px;font-size:14px;font-weight:700;letter-spacing:.04em}
 .g-nav a::after{content:"";position:absolute;left:12px;right:12px;bottom:8px;height:2px;background:var(--red);transform:scaleX(0);transform-origin:left;transition:transform var(--t) var(--ease)}
 .g-nav a.router-link-active::after{transform:none}
+/* 平板以上：品牌與工具對齊內容欄，不貼視窗兩端 */
+@media (min-width:768px){.g-top{padding-inline:max(20px,calc((100% - var(--g-w)) / 2 + 20px))}}
 .g-tools{display:flex;align-items:center;margin-left:8px;padding-left:8px;border-left:1px solid var(--line)}
 .g-wrap h1{font-size:clamp(30px,5.4vw,52px);line-height:1.08;letter-spacing:-.02em;margin:28px 0 12px}
 .g-mute{color:var(--mute);font-size:13px;line-height:1.6;letter-spacing:.02em;overflow-wrap:anywhere}
@@ -43,9 +45,13 @@
 .g-btn:disabled{opacity:.35;cursor:not-allowed}
 .g-btn.block{display:flex;width:100%}
 .g-link{background:none;border:0;color:var(--fg);cursor:pointer;font:inherit;font-size:14px;letter-spacing:.02em;padding:0 4px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;text-decoration:underline;text-decoration-color:var(--red);text-decoration-thickness:1px;text-underline-offset:4px}
-.g-banner{padding:12px 16px;border:1px solid var(--line);box-shadow:inset 3px 0 var(--red);background:var(--card);color:var(--fg);font-size:14px;margin:12px 0}
-.g-banner.err{background:var(--bad-bg);color:var(--bad)}
-.g-banner.ok{background:var(--ok-bg);color:var(--ok);box-shadow:inset 3px 0 var(--ok)}
+/* 提示框不用 >1px 的彩色左邊條：整圈 1px 訊號色細框，左上一顆 7px 訊號方塊 */
+.g-banner{position:relative;padding:12px 16px 12px 32px;border:1px solid var(--line);background:var(--bg-alt);color:var(--fg);font-size:14px;margin:12px 0}
+.g-banner::before{content:"";position:absolute;left:14px;top:calc(12px + .8em - 3px);width:7px;height:7px;background:var(--red)}
+.g-banner.err{border-color:color-mix(in srgb,var(--bad) 35%,transparent);background:var(--bad-bg);color:var(--bad)}
+.g-banner.err::before{background:var(--bad)}
+.g-banner.ok{border-color:color-mix(in srgb,var(--ok) 35%,transparent);background:var(--ok-bg);color:var(--fg)}
+.g-banner.ok::before{background:var(--ok)}
 .g-toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;max-width:528px;margin:auto;z-index:60;background:var(--fg);color:var(--bg);border-color:var(--fg);animation:rise .3s var(--ease)}
 .g-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--line);margin-right:8px;vertical-align:1px}
 .g-dot.on{background:var(--ok);box-shadow:0 0 0 0 var(--ok);animation:pulse 2s infinite}

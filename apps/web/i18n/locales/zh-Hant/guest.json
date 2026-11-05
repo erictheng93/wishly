@@ -68,7 +68,6 @@
       "confirm": "確認贊助 {pts}"
     },
     "card": {
-      "thumb": "圖",
       "priority": "優先度 {level}",
       "prio": {
         "high": "高",
