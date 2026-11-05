@@ -268,12 +268,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: tags
-        # main 連推時較舊 commit 的測試可能較晚跑完：只有仍是 main 最新 commit 才移動 latest，避免倒退。
+        # main 連推時較舊 commit 的測試可能較晚跑完：只有 main 最新 commit 與本 commit 在 API 相關檔案上完全相同時才移動 latest，
+        # 避免倒退；之後只合併文件／前端（不發佈）時仍會移動，不會讓 latest 停在舊版。判斷規則與 changes job 相同。
         run: |
           image=ghcr.io/erictheng93/wishly-api
+          git fetch -q --depth=1 origin main
+          newer=$(git diff --name-only "$GITHUB_SHA" FETCH_HEAD | grep -vE '^(docs|design)/|\.md$|^apps/web/' || true)
           { echo "tags<<EOF"; echo "$image:$GITHUB_SHA"
-            [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA" ] && echo "$image:latest"
+            [ -z "$newer" ] && echo "$image:latest"
             echo EOF; } >> "$GITHUB_OUTPUT"
+          [ -z "$newer" ] || printf '::notice::main 已有較新的 API 變更，不移動 latest：\n%s\n' "$newer"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
