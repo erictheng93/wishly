@@ -74,12 +74,12 @@ onMounted(async () => {
         <p class="c-mute">{{ $t('onboarding.welcome.lead') }}</p>
         <div class="wl-roles">
           <div class="wl-role" :class="{ on: stepDone('publish') }">
-            <span class="x-tag">ROLE / 01<b v-if="stepDone('publish')">・{{ $t('onboarding.welcome.roleDone') }}</b></span>
+            <b v-if="stepDone('publish')" class="wl-done">{{ $t('onboarding.welcome.roleDone') }}</b>
             <strong>{{ $t('onboarding.welcome.roleReceiver') }}</strong>
             <small class="c-mute">{{ $t('onboarding.welcome.roleReceiverBody') }}</small>
           </div>
           <div class="wl-role" :class="{ on: stepDone('give') }">
-            <span class="x-tag">ROLE / 02<b v-if="stepDone('give')">・{{ $t('onboarding.welcome.roleDone') }}</b></span>
+            <b v-if="stepDone('give')" class="wl-done">{{ $t('onboarding.welcome.roleDone') }}</b>
             <strong>{{ $t('onboarding.welcome.roleGiver') }}</strong>
             <small class="c-mute">{{ $t('onboarding.welcome.roleGiverBody') }}</small>
           </div>
@@ -108,9 +108,9 @@ onMounted(async () => {
               </div>
               <p class="c-mute">{{ $t('onboarding.welcome.profileHint') }}</p>
               <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-              <button class="c-btn primary block" :disabled="busy || hBad">{{ busy ? $t('onboarding.welcome.profileSaving') : $t('onboarding.welcome.profileSave') }}</button>
+              <button class="c-btn primary" :disabled="busy || hBad">{{ busy ? $t('onboarding.welcome.profileSaving') : $t('onboarding.welcome.profileSave') }}</button>
             </form>
-            <NuxtLink v-else :to="tourTarget(s.key, state.wishlist_id)" class="c-btn primary block">{{ $t(`onboarding.steps.${s.key}.cta`) }}</NuxtLink>
+            <NuxtLink v-else :to="tourTarget(s.key, state.wishlist_id)" class="c-btn primary">{{ $t(`onboarding.steps.${s.key}.cta`) }}</NuxtLink>
           </div>
         </li>
       </ol>
@@ -119,7 +119,7 @@ onMounted(async () => {
         <h2 class="c-h2">{{ $t('onboarding.done.title') }}</h2>
         <p class="c-mute">{{ $t('onboarding.done.body') }}</p>
         <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-        <button type="button" class="c-btn primary block" :disabled="busy" @click="skip">{{ $t('onboarding.done.finish') }}</button>
+        <button type="button" class="c-btn primary" :disabled="busy" @click="skip">{{ $t('onboarding.done.finish') }}</button>
       </section>
       <p v-else class="wl-skip c-mute">{{ $t('onboarding.welcome.skipLead') }}
         <button type="button" class="c-btn small plain" :disabled="busy" @click="skip">{{ $t('onboarding.welcome.skipBtn') }}</button>
@@ -132,9 +132,10 @@ onMounted(async () => {
 .wl-intro{margin:0 0 20px;animation:rise .5s var(--ease) both}
 .wl-hello{margin:0 0 6px;font-size:20px;font-weight:800}
 .wl-roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.wl-role{display:grid;gap:4px;padding:12px;border:1px solid var(--line);background:var(--card)}
+.wl-role{position:relative;display:grid;gap:4px;padding:12px;border:1px solid var(--line);background:var(--card)}
 .wl-role.on{border-color:var(--ink-line)}
-.wl-role .x-tag b{color:var(--ok)}
+.wl-role.on strong{padding-right:5em}
+.wl-done{position:absolute;top:12px;right:12px;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--ok)}
 .wl-role strong{font-size:16px}
 .wl-steps{list-style:none;margin:0 0 16px;padding:0;border-top:1px solid var(--ink-line)}
 .wl-step{border-bottom:1px solid var(--line)}

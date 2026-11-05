@@ -46,7 +46,7 @@ const OPEN = computed(() => {
         <dl class="k-kpis">
           <div v-for="x in LIAB" :key="x[0]">
             <dt>{{ $t(`admin.finance.risk.liab.${x[0]}`) }}</dt>
-            <dd class="money">{{ money(x[1]) }}</dd>
+            <dd class="money" :class="{ 'is-zero': !x[1] }">{{ money(x[1]) }}</dd>
           </div>
         </dl>
       </section>
@@ -57,17 +57,17 @@ const OPEN = computed(() => {
         <dl class="k-kpis">
           <div :title="$t('admin.finance.risk.lossRateDef')">
             <dt>{{ $t('admin.finance.risk.lossRate') }}</dt>
-            <dd>{{ fmtRate(data.loss_rate) }}</dd>
-            <small class="c-mute">{{ $t('admin.finance.risk.lossRateDef') }}</small>
+            <dd :class="{ 'is-zero': !data.loss_rate }">{{ fmtRate(data.loss_rate) }}</dd>
+            <small class="c-mute fin-def">{{ $t('admin.finance.risk.lossRateDef') }}</small>
           </div>
           <div>
             <dt>{{ $t('admin.finance.risk.refunds') }}</dt>
-            <dd class="money">{{ money(data.refunds.amount) }}</dd>
+            <dd class="money" :class="{ 'is-zero': !data.refunds.amount }">{{ money(data.refunds.amount) }}</dd>
             <small class="c-mute">{{ $t('admin.finance.risk.cnt', { n: fmtCount(data.refunds.count) }) }}</small>
           </div>
           <div>
             <dt>{{ $t('admin.finance.risk.chargebacks') }}</dt>
-            <dd class="money">{{ money(data.chargebacks.amount) }}</dd>
+            <dd class="money" :class="{ 'is-zero': !data.chargebacks.amount }">{{ money(data.chargebacks.amount) }}</dd>
             <small class="c-mute">{{ $t('admin.finance.risk.cnt', { n: fmtCount(data.chargebacks.count) }) }}</small>
           </div>
         </dl>
@@ -98,13 +98,13 @@ const OPEN = computed(() => {
         <dl class="k-kpis">
           <div v-for="x in OPEN" :key="x.k">
             <dt>{{ $t(`admin.finance.risk.${x.k}`) }}</dt>
-            <dd :class="{ hot: x.k !== 'invoices' && x.count > 0 }">{{ fmtCount(x.count) }}</dd>
+            <dd :class="{ hot: x.k !== 'invoices' && x.count > 0, 'is-zero': !x.count }">{{ fmtCount(x.count) }}</dd>
             <small class="c-mute">{{ money(x.amount) }}</small>
             <small v-if="x.k === 'invoices'" class="c-mute fin-note">{{ $t('admin.finance.risk.invoicesNote') }}</small>
           </div>
           <div>
             <dt>{{ $t('admin.finance.risk.frozen') }}</dt>
-            <dd>{{ fmtCount(data.frozen_wallets) }}</dd>
+            <dd :class="{ 'is-zero': !data.frozen_wallets }">{{ fmtCount(data.frozen_wallets) }}</dd>
           </div>
         </dl>
         <p class="c-row wrap">

@@ -203,9 +203,9 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 .ap-stepof span{white-space:nowrap}
 .ap-stepof span:not(:last-child)::after{content:"/" / "";margin:0 8px;color:var(--line)}
 .ap-of{flex:0 0 100%;font-style:normal}
-.ap-note{padding:16px 18px;border-color:var(--ink-line);box-shadow:inset 4px 0 var(--red);line-height:1.65}
+.ap-note{padding:16px 18px;border:1px solid var(--line);line-height:1.65}
 .ap-note br{display:none}
-.ap-note strong{display:block;margin-bottom:4px;font-size:15px}
+.ap-note strong{display:block;margin-bottom:4px;font-size:14px}
 .ap-loading{display:grid;gap:14px;padding:28px 0;font:600 12px var(--mono);letter-spacing:.14em;color:var(--mute)}
 .ap-loading i{display:block;height:8px;max-width:240px;background:var(--stripe);background-size:28px 28px;animation:none}
 .ap-st-tag{display:flex;align-items:center;gap:8px;margin:0 0 14px;font:700 11px var(--mono);letter-spacing:.18em;color:var(--mute)}

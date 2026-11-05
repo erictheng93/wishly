@@ -32,7 +32,7 @@ const scenes = {
     ['edit-closed', `/lists/${seed.closed.id}/edit`],
     ['edit-surprise', `/lists/${seed.surprise.id}/edit`],
     ['edit-itemsheet', `/lists/${seed.active.id}/edit`, async page => { await page.getByRole('button', { name: '編輯', exact: true }).first().click(); await page.waitForTimeout(300) }],
-    ['edit-itemsheet-new', `/lists/${seed.active.id}/edit`, async page => { await page.getByRole('button', { name: '＋ 新增品項' }).click(); await page.waitForTimeout(300) }],
+    ['edit-itemsheet-new', `/lists/${seed.active.id}/edit`, async page => { await page.getByRole('button', { name: '新增品項' }).click(); await page.waitForTimeout(300) }],
     ['edit-delconfirm', `/lists/${seed.active.id}/edit`, async page => { await page.getByRole('button', { name: '刪除' }).first().click(); await page.waitForTimeout(300) }],
     ['edit-share', `/lists/${seed.active.id}/edit`, async page => { await page.getByRole('button', { name: '分享' }).click(); await page.waitForTimeout(300) }],
     ['progress-active', `/lists/${seed.active.id}/progress`],

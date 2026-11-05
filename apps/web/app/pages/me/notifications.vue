@@ -58,3 +58,9 @@ onMounted(() => load())
     </template>
   </main>
 </template>
+<style scoped>
+/* 未讀點與時間對齊第一行，不垂直置中在多行內文旁 */
+.c-inbox button{align-items:flex-start;padding:14px 12px}
+.c-inbox .dot{margin-top:.6em}
+.c-inbox time{margin-top:.35em}
+</style>

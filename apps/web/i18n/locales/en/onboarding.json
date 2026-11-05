@@ -5,7 +5,7 @@
       "aria": "Getting started",
       "tag": "Getting started {n} / {total}",
       "overview": "Tour overview",
-      "friendsLink": "Or browse your friends' lists →"
+      "friendsLink": "Or browse your friends' lists"
     },
     "steps": {
       "profile": {
@@ -23,7 +23,7 @@
       "item": {
         "title": "Add the things you want",
         "body": "Your list is ready. Now add the things you'd love to receive.",
-        "here": "Tap \"+ Add item\". Paste a product link to fill in the name and image automatically, then set the quantity and notes.",
+        "here": "Tap \"Add item\". Paste a product link to fill in the name and image automatically, then set the quantity and notes.",
         "cta": "Go add items"
       },
       "publish": {

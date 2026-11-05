@@ -186,8 +186,6 @@ async function sendReport() {
   </ClientOnly></main>
 </template>
 
-<style>
-</style>
 <style scoped>
 .pf-kick{display:block;margin:0 0 8px;font:700 12px var(--mono);letter-spacing:.04em;color:var(--mute)}
 .pf-hero{border-bottom:1px solid var(--ink-line);padding:32px 0 24px;margin:0;display:grid;grid-template-columns:72px minmax(0,1fr);gap:2px 16px;align-items:center}

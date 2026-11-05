@@ -38,7 +38,7 @@ test('儀表板：整張卡片點進編輯頁，卡內按鈕各自運作，封�
     await card.getByRole('button', { name: '取消封存' }).click()
     await expect(card).toHaveCount(0)
     await expect(page.getByText('沒有已封存的清單')).toBeVisible()
-    await page.getByRole('button', { name: '← 返回我的清單' }).click()
+    await page.getByRole('button', { name: '返回我的清單' }).click()
     await expect(card.getByText('已結束')).toBeVisible()
     await expect(card.getByRole('button', { name: '封存' })).toBeVisible()
   })

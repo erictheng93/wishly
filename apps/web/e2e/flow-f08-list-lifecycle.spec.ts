@@ -43,11 +43,11 @@ test('結束 → 重新開放 → 封存 → 取消封存；結束與封存時�
   await settings.click()
   await page.getByRole('button', { name: '結束清單' }).click()
   await expect(page.getByText('清單已結束，品項無法修改。')).toBeVisible()
-  await expect(page.getByRole('button', { name: '＋ 新增品項' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '新增品項' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '上移' })).toHaveCount(0)
   await expect(share).toBeVisible() // 結束的清單公開頁仍可看（唯讀）
   await page.getByRole('button', { name: '重新開放' }).click()
-  await expect(page.getByRole('button', { name: '＋ 新增品項' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '新增品項' })).toBeVisible()
 
   await page.goto('/dashboard')
   await page.locator('.c-card', { hasText: list.title }).getByRole('button', { name: '封存' }).click()

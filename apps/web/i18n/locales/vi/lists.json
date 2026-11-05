@@ -33,22 +33,29 @@
       "showNames": "Hiện biệt danh người tặng cho khách khác",
       "showNamesHint": "Mặc định tắt",
       "creating": "Đang tạo…",
-      "submit": "Tạo và thêm món quà"
+      "submit": "Tạo và thêm món quà",
+      "sec": {
+        "basics": "Thông tin cơ bản",
+        "cover": "Ảnh bìa",
+        "dates": "Ngày",
+        "rules": "Quy tắc",
+        "access": "Ai có thể xem"
+      }
     },
     "dashboard": {
       "title": "Danh sách của tôi",
       "empty": "Chưa có danh sách nào. Hãy tạo danh sách đầu tiên!",
-      "create": "+ Tạo danh sách",
+      "create": "Tạo danh sách",
       "completion": "Hoàn thành {pct}% ({done} / {total})",
       "hidden": "Danh sách này đã bị gỡ{reason}. Trang công khai hiện không truy cập được và chia sẻ đã bị tắt. Nếu có nhầm lẫn, vui lòng liên hệ hỗ trợ để khiếu nại.",
       "archive": "Lưu trữ",
       "loadMore": "Tải thêm",
-      "newFab": "+ Mới",
+      "newFab": "Mới",
       "archiveTitle": "Lưu trữ danh sách",
       "archiveText": "Sau khi lưu trữ \"{title}\", trang công khai sẽ ngừng hoạt động ngay và bạn bè không thể mở nữa. Các món đã có người nhận tặng vẫn được giữ; điểm tài trợ cho các món gây quỹ chưa đạt mục tiêu sẽ được hoàn lại hết vào ví người tài trợ và không được khôi phục nếu bỏ lưu trữ. Bạn có thể bỏ lưu trữ sau trong \"Danh sách đã lưu trữ\".",
       "archiveOk": "Xác nhận lưu trữ",
       "showArchived": "Danh sách đã lưu trữ",
-      "backToLists": "← Quay lại danh sách của tôi",
+      "backToLists": "Quay lại danh sách của tôi",
       "archivedEmpty": "Không có danh sách đã lưu trữ",
       "unarchive": "Bỏ lưu trữ"
     },
@@ -73,7 +80,7 @@
       "up": "Chuyển lên",
       "down": "Chuyển xuống",
       "delete": "Xóa",
-      "addItem": "+ Thêm món quà",
+      "addItem": "Thêm món quà",
       "shipSummary": "Thông tin nhận hàng (cho góp quỹ điều ước)",
       "filled": "Đã điền",
       "settings": "Cài đặt danh sách",

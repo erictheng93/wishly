@@ -122,7 +122,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
               <div class="g-bar" role="img" :aria-label="`${w.completion?.completion_pct ?? 0}%`"><i :style="{ width: `${w.completion?.completion_pct ?? 0}%` }" /></div>
             </li>
           </ul>
-          <NuxtLink to="/lists/new" class="l-mine-new">{{ $t('lists.dashboard.create') }}</NuxtLink>
+          <NuxtLink to="/lists/new" class="l-mine-new"><UiIcon name="plus" :size="14" />{{ $t('lists.dashboard.create') }}</NuxtLink>
           <div class="l-bc" aria-hidden="true"><Code39Barcode value="WISHLY0001" /><span>WISHLY-0001</span></div>
         </div>
         <!-- 假卡片：純示意，不取後端資料；做成「標本籤」：吊孔、編號、條碼 -->

@@ -81,7 +81,7 @@ async function reallocate() {
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
     <template v-if="wallet">
       <section class="x-ink w-hero">
-        <div class="x-tag" aria-hidden="true"><span><b>POINT WALLET</b></span><span>1 PT = NT$1</span></div>
+        <div class="x-tag" aria-hidden="true"><span><b>POINT WALLET</b></span></div>
         <strong class="c-big x-num">{{ fmtPts(wallet.balance) }}</strong>
         <p class="x-cap">{{ $t('me.wallet.available') }}<span v-if="wallet.status === 'frozen'" class="c-badge frozen">{{ $t('me.wallet.frozen') }}</span></p>
         <div class="x-ruler" aria-hidden="true"><i :style="{ width: Math.max(heldPct, 2) + '%' }" /></div>
@@ -97,7 +97,7 @@ async function reallocate() {
         <p class="c-mute c-small w-plat">{{ $t('me.wallet.issuedByPlatform') }}</p>
       </section>
 
-      <h2 class="c-h2 x-h" data-n="01">{{ $t('me.wallet.myPledges') }}</h2>
+      <h2 class="c-h2 x-h">{{ $t('me.wallet.myPledges') }}</h2>
       <p v-if="!contribs.length" class="x-empty">{{ $t('me.wallet.noPledges') }}</p>
       <article v-for="r in contribs" :key="r.contribution.id" class="c-card w-pledge">
         <div class="c-row">
@@ -127,7 +127,7 @@ async function reallocate() {
       </article>
       <button v-if="cCursor" class="c-btn block c-mb16" @click="more(() => loadContribs(true))">{{ $t('me.wallet.loadMore') }}</button>
 
-      <h2 class="c-h2 x-h" data-n="02">{{ $t('me.wallet.ledger') }}</h2>
+      <h2 class="c-h2 x-h">{{ $t('me.wallet.ledger') }}</h2>
       <p v-if="!ledger.length" class="x-empty">{{ $t('me.wallet.noLedger') }}</p>
       <section v-else class="w-ledger">
         <ul class="x-rows">
@@ -150,6 +150,7 @@ async function reallocate() {
   </main>
 </template>
 <style scoped>
+.w-hero .x-num{font-size:clamp(56px,10vw,104px)}
 .w-hero .c-badge{margin-left:10px;vertical-align:2px}
 .w-held{margin:0 0 4px;font:600 12px/1.5 var(--mono);letter-spacing:.04em}
 .w-act{margin:18px 0 14px}

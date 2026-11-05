@@ -27,7 +27,7 @@ watch(() => route.fullPath, () => refresh())
     <template v-if="cur">
       <strong class="tour-title">{{ $t(`onboarding.steps.${cur}.title`) }}</strong>
       <p class="tour-text">{{ here ? $t(`onboarding.steps.${cur}.here`) : $t(`onboarding.steps.${cur}.body`) }}</p>
-      <p v-if="cur === 'give'" class="tour-text"><NuxtLink to="/friends">{{ $t('onboarding.guide.friendsLink') }}</NuxtLink></p>
+      <p v-if="cur === 'give'" class="tour-text"><NuxtLink to="/friends">{{ $t('onboarding.guide.friendsLink') }}<UiIcon name="arrow-right" :size="14" /></NuxtLink></p>
     </template>
     <template v-else>
       <strong class="tour-title">{{ $t('onboarding.done.title') }}</strong>
@@ -52,7 +52,7 @@ watch(() => route.fullPath, () => refresh())
 .tour-pips i.cur{background:var(--stripe);outline-color:var(--red)}
 .tour-title{display:block;font-size:15px;line-height:1.4}
 .tour-text{margin:0;font-size:13px;line-height:1.6;color:var(--mute)}
-.tour-text a{display:inline-flex;align-items:center;min-height:44px;color:var(--fg);text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
+.tour-text a{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--fg);text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
 .tour-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
 .tour-skip{margin-left:auto;font-size:13px;color:var(--mute)}
 @media (min-width:768px){

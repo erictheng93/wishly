@@ -66,8 +66,8 @@ const toggle = (list: string[], v: string) => { const i = list.indexOf(v); i < 0
 <template>
   <main class="c-page c-admin">
     <CreatorHeader :title="$t('admin.catalog.title')" back="/admin" />
-    <div class="c-row wrap c-mb" role="group" :aria-label="$t('admin.catalog.tabsLabel')">
-      <button v-for="k in (['brands', 'products'] as const)" :key="k" class="c-btn c-grow" :class="{ primary: tab === k }" :aria-pressed="tab === k" @click="tab = k">{{ $t(`admin.catalog.tab.${k}`) }}</button>
+    <div class="k-seg" role="group" :aria-label="$t('admin.catalog.tabsLabel')">
+      <button v-for="k in (['brands', 'products'] as const)" :key="k" class="c-btn" :class="{ on: tab === k }" :aria-pressed="tab === k" @click="tab = k">{{ $t(`admin.catalog.tab.${k}`) }}</button>
     </div>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>

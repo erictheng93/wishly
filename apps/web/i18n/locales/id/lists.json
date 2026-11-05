@@ -33,22 +33,29 @@
       "showNames": "Tampilkan nama panggilan pemberi hadiah ke pengunjung lain",
       "showNamesHint": "Nonaktif secara default",
       "creating": "Membuat…",
-      "submit": "Buat dan tambah barang"
+      "submit": "Buat dan tambah barang",
+      "sec": {
+        "basics": "Info dasar",
+        "cover": "Sampul",
+        "dates": "Tanggal",
+        "rules": "Aturan",
+        "access": "Siapa yang bisa melihat"
+      }
     },
     "dashboard": {
       "title": "Wishlist saya",
       "empty": "Belum ada wishlist, buat yang pertama",
-      "create": "＋ Buat wishlist",
+      "create": "Buat wishlist",
       "completion": "Terpenuhi {pct}% ({done} / {total})",
       "hidden": "Wishlist ini telah diturunkan{reason}. Halaman publik tidak bisa dibuka dan berbagi dinonaktifkan. Jika ini keliru, hubungi layanan pelanggan untuk mengajukan banding.",
       "archive": "Arsipkan",
       "loadMore": "Muat lebih banyak",
-      "newFab": "＋ Baru",
+      "newFab": "Baru",
       "archiveTitle": "Arsipkan wishlist",
       "archiveText": "Setelah \"{title}\" diarsipkan, halaman publik langsung tidak berlaku dan teman tidak bisa membukanya lagi. Hadiah yang sudah diklaim tetap tersimpan; untuk barang patungan yang belum mencapai target, seluruh poin patungan dikembalikan ke dompet peserta patungan dan tidak akan dipulihkan walau pengarsipan dibatalkan. Setelah diarsipkan, kamu bisa membatalkan pengarsipan di \"Wishlist yang diarsipkan\".",
       "archiveOk": "Konfirmasi arsip",
       "showArchived": "Wishlist yang diarsipkan",
-      "backToLists": "← Kembali ke wishlist saya",
+      "backToLists": "Kembali ke wishlist saya",
       "archivedEmpty": "Tidak ada wishlist yang diarsipkan",
       "unarchive": "Batalkan arsip"
     },
@@ -73,7 +80,7 @@
       "up": "Naikkan",
       "down": "Turunkan",
       "delete": "Hapus",
-      "addItem": "＋ Tambah barang",
+      "addItem": "Tambah barang",
       "shipSummary": "Alamat pengiriman (untuk patungan)",
       "filled": "Sudah diisi",
       "settings": "Pengaturan wishlist",

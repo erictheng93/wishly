@@ -22,10 +22,10 @@ const KPIS = computed(() => {
   const d = data.value
   if (!d) return []
   return [
-    ['payers', fmtCount(d.payers)],
-    ['firstTime', fmtCount(d.first_time)],
-    ['repeat', fmtRate(d.repeat_rate)],
-    ['avg', money(perPayer(d.gross, d.payers))],
+    ['payers', fmtCount(d.payers), d.payers],
+    ['firstTime', fmtCount(d.first_time), d.first_time],
+    ['repeat', fmtRate(d.repeat_rate), d.repeat_rate],
+    ['avg', money(perPayer(d.gross, d.payers)), d.gross],
   ]
 })
 const BUCKETS = computed(() => {
@@ -46,8 +46,8 @@ const BUCKETS = computed(() => {
         <dl v-else class="k-kpis">
           <div v-for="k in KPIS" :key="k[0]" :title="$t(`admin.finance.payers.${k[0]}Def`)">
             <dt>{{ $t(`admin.finance.payers.${k[0]}`) }}</dt>
-            <dd :class="{ money: k[0] === 'avg' }">{{ k[1] }}</dd>
-            <small class="c-mute">{{ $t(`admin.finance.payers.${k[0]}Def`) }}</small>
+            <dd :class="{ money: k[0] === 'avg', 'is-zero': !k[2] }">{{ k[1] }}</dd>
+            <small class="c-mute fin-def">{{ $t(`admin.finance.payers.${k[0]}Def`) }}</small>
           </div>
         </dl>
       </section>

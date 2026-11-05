@@ -29,7 +29,7 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
   })
 
   await test.step('建立清單', async () => {
-    await page.getByRole('link', { name: '＋ 建立清單' }).click()
+    await page.getByRole('link', { name: '建立清單' }).click()
     // 類型只剩「心願清單」（禮物登記已合併）
     await expect(page.getByRole('radio', { name: '心願清單' })).toBeChecked()
     await expect(page.getByRole('radio', { name: '禮物登記' })).toHaveCount(0)
@@ -42,7 +42,7 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
   })
 
   await test.step('新增品項', async () => {
-    await page.getByRole('button', { name: '＋ 新增品項' }).click()
+    await page.getByRole('button', { name: '新增品項' }).click()
     const sheet = page.getByRole('dialog')
     await sheet.getByLabel('名稱（必填）').fill('奶瓶')
     await sheet.getByLabel(/需要數量/).fill('2')
