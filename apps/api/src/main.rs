@@ -36,6 +36,7 @@ async fn main() {
         .await
         .expect("migrate");
     let listener = tokio::net::TcpListener::bind(bind).await.unwrap();
+    wishly_api::session::spawn_cache_listener(pool.clone());
     wishly_api::notify::spawn_worker(pool.clone());
     wishly_api::ratelimit::spawn_cleanup(pool.clone());
     wishly_api::relief_events::spawn_permit_expiry(pool.clone());

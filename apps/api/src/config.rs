@@ -39,6 +39,10 @@ pub struct Config {
     /// system_flags.read_only 1 秒（本程序改旗標時立即失效）。低規主機上省下每個請求的 DB 往返。
     /// 只有經 `from_env` 的正式程序會開；`Config::dev()`（測試 fallback）為關，測試才看得到剛寫入的資料。
     pub micro_cache: bool,
+    /// session 驗證快取（SESSION_CACHE，預設開；`0` / `false` 關閉）：成功的登入驗證在程序內快取最多 30 秒，
+    /// 撤銷 / 停權 / MFA 等變更由 DB trigger 經 LISTEN 立即清空（session.rs::cache）。
+    /// `Config::dev()`（測試 fallback）為關。
+    pub session_cache: bool,
     /// Web Push（push.rs）：VAPID_PRIVATE_KEY + VAPID_SUBJECT 都設才啟用；None = 推播關閉（不影響啟動）
     pub vapid: Option<crate::push::Vapid>,
     /// 僅測試程式會設為 true（放行本機 mock endpoint）；任何環境變數都不會設它
@@ -185,6 +189,7 @@ impl Config {
             )),
             orgs_enabled: true,
             micro_cache: false,
+            session_cache: false,
             vapid: None,
             push_allow_loopback: false,
         }
@@ -197,6 +202,7 @@ impl Config {
     pub fn try_from_env() -> Result<Config, String> {
         let mut c = Config::dev();
         c.micro_cache = !matches!(var("MICRO_CACHE").as_deref(), Some("0" | "false"));
+        c.session_cache = !matches!(var("SESSION_CACHE").as_deref(), Some("0" | "false"));
         c.vapid = crate::push::Vapid::from_env(var("VAPID_PRIVATE_KEY"), var("VAPID_SUBJECT"))?;
         match var("APP_ENV").as_deref() {
             Some("dev") | Some("test") => return Ok(c),
