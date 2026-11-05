@@ -89,8 +89,12 @@ jobs:
       MAILPIT_API_BASE: http://localhost:8025
       # nextest 跨測試 binary 平行（cargo test 是一個 binary 跑完才換下一個）；測試數與 cargo test 相同。
       COVERAGE_RUNNER: nextest
+      # 測試多半在等資料庫，執行緒開到核心數兩倍。
+      NEXTEST_TEST_THREADS: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # 用完即丟的 CI 資料庫不需要耐久性：每個測試都建新庫跑完整 migration（DDL 密集），關掉 fsync 快約三成。
+      - run: docker exec ${{ job.services.db.id }} sh -c 'for k in fsync synchronous_commit full_page_writes; do psql -U wishly -c "ALTER SYSTEM SET $k = off"; done; psql -U wishly -c "SELECT pg_reload_conf()"'
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
         with: { components: llvm-tools-preview }
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -128,6 +132,8 @@ jobs:
       MAILPIT_API_BASE: http://localhost:8025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # 用完即丟的 CI 資料庫不需要耐久性：每個測試都建新庫跑完整 migration（DDL 密集），關掉 fsync 快約三成。
+      - run: docker exec ${{ job.services.db.id }} sh -c 'for k in fsync synchronous_commit full_page_writes; do psql -U wishly -c "ALTER SYSTEM SET $k = off"; done; psql -U wishly -c "SELECT pg_reload_conf()"'
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' && matrix.shard == 1 }}" }
@@ -216,6 +222,8 @@ jobs:
     defaults: { run: { working-directory: apps/web } }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # 用完即丟的 CI 資料庫不需要耐久性：每個測試都建新庫跑完整 migration（DDL 密集），關掉 fsync 快約三成。
+      - run: docker exec ${{ job.services.db.id }} sh -c 'for k in fsync synchronous_commit full_page_writes; do psql -U wishly -c "ALTER SYSTEM SET $k = off"; done; psql -U wishly -c "SELECT pg_reload_conf()"'
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' && matrix.shard == 1 }}" }
