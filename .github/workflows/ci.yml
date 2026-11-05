@@ -55,7 +55,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
         with: { components: "rustfmt, clippy" }
       - run: cargo fmt --manifest-path apps/api/Cargo.toml --check
-      - run: python3 scripts/test_coverage.py && python3 scripts/test_mutate.py
+      - run: python3 scripts/test_coverage.py && python3 scripts/test_mutate.py && python3 scripts/test_autodeploy.py
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with: { tool: "cargo-audit@0.22.2" }
       - run: sh scripts/audit-api.sh
