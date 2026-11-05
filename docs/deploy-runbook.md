@@ -7,14 +7,28 @@
 | 部分 | 位置 | 怎麼更新 |
 |---|---|---|
 | 前端 | Cloudflare Pages（`wishly-web`，`https://wishly.tw`） | 本機執行 `npm run deploy`（§2） |
-| 後端 | Linode 東京 VPS，Dokploy 管理，經 Cloudflare Tunnel（`https://api.wishly.tw`） | CI 推映像 → 手動在 Dokploy 重新部署（§1） |
+| 後端 | Linode 東京 VPS，Dokploy 管理，經 Cloudflare Tunnel（`https://api.wishly.tw`） | CI 推映像 → VPS 每分鐘偵測 `latest` 變動並自動部署（§1） |
 | 資料庫 | 同一台 VPS，Dokploy 的 `db` 服務 | 隨後端啟動自動套用 `db/migrations`（§3） |
 
 ## 1. 後端
 
+**自動部署（2026-11 起）**：合併到 main → CI 全綠 → `publish-image` 推 `:<sha>` 並移動 `:latest` → VPS 上的 `wishly-autodeploy.timer` 每分鐘查 GHCR，`latest` 的 digest 一變就呼叫本機 Dokploy `POST /api/application.deploy`。GitHub 不持有任何 VPS 或 Dokploy 憑證，Dokploy 也維持不對外。所以平常只需做下面的第 1、5、6 步確認；第 2–4 步是自動部署失效或暫停時的手動做法。
+
+- **看紀錄**：`journalctl -u wishly-autodeploy -n 50`（每次部署印出新舊 digest）；`systemctl list-timers wishly-autodeploy.timer`。
+- **暫停**（例如資料庫維護）：`systemctl stop wishly-autodeploy.timer`；恢復：`systemctl start wishly-autodeploy.timer`（恢復後若 `latest` 已變會立即部署）。
+- **回滾**：先暫停 timer，再在 Dokploy 把映像改成 `ghcr.io/erictheng93/wishly-api:<舊 SHA>` 並 Deploy；修好後把映像改回 `:latest` 再恢復 timer。暫停期間 Dokploy 釘在舊 SHA 時，timer 觸發的部署也只會重部署那個 SHA。
+- **安裝 / 換憑證**：建立 `/etc/wishly-autodeploy.env`（root 600）：
+  ```sh
+  GHCR_USER=erictheng93
+  GHCR_TOKEN=ghp_…            # 只需 read:packages；可沿用 Dokploy 拉映像的 PAT，到期日同樣記在 docs/TODO.md
+  DOKPLOY_API_KEY=…           # Dokploy Profile → API/CLI 產生，設到期日，專給這支腳本用（可單獨撤銷）
+  DOKPLOY_APP_ID=…            # GET /api/project.all 找 api（wishly-api-qyob9a）的 applicationId
+  ```
+  然後把 `scripts/vps/wishly-autodeploy.sh` 與 `autodeploy-install.sh` 複製到 VPS 同一目錄，以 root 執行 `bash autodeploy-install.sh`。第一次執行只記錄目前的 `latest`、不部署；憑證錯誤會在這一步就失敗。PAT 或 API 金鑰過期時 `journalctl` 會出現 401/403，部署停在舊版但執行中的容器不受影響。
+
 1. **推到 main，等 CI。** `git push` 後，到 `https://github.com/erictheng93/wishly/actions` 看最新一次 `ci`。
    - `publish-image` 必須是綠色（它需要 `api`、`image`、`web`、`e2e` 全綠）。
-2. **確認映像版本。** 到 `https://github.com/erictheng93?tab=packages` → `wishly-api`，確認 `latest` 旁的 commit SHA 就是你要部署的 commit（與 `git log` 對照）。只改文件或只改前端的 commit 不會發佈映像，所以 `latest` 對應的是最近一個動到 API 的 commit。映像是 Private，需登入 GitHub。
+2. **（手動時）確認映像版本。** 到 `https://github.com/erictheng93?tab=packages` → `wishly-api`，確認 `latest` 旁的 commit SHA 就是你要部署的 commit（與 `git log` 對照）。只改文件或只改前端的 commit 不會發佈映像，所以 `latest` 對應的是最近一個動到 API 的 commit。映像是 Private，需登入 GitHub。
 3. **開隧道進 Dokploy。** 管理介面不對外：
    ```sh
    ssh -L 3001:localhost:3000 <VPS>
