@@ -6,9 +6,65 @@ on:
   schedule:
     # Recheck the advisory database weekly even when the lockfile is unchanged.
     - cron: "0 1 * * 1"
+# PR 連推只跑最新一次；main 每個 commit 各自一組（group 含 sha），不會互相取消。
+# PR job 只碰 runner 內的 service container 與 artifact，不推映像、不寫外部服務、不存快取，中途取消不留髒資料。
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  # CI 不需要 debuginfo：編譯、連結與快取都小一截；覆蓋率靠 coverage mapping，不受影響。
+  CARGO_PROFILE_DEV_DEBUG: 0
 jobs:
-  api:
-    if: github.event_name != 'schedule'
+  changes:
+    # 不用 workflow 層的 paths 過濾：整個 workflow 不跑時，必要檢查會卡在 Expected。
+    # 改由這裡判斷、各 job 以 if 跳過，最後由 ci-ok 彙總（branch protection 只需要求 ci-ok）。
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: { contents: read, pull-requests: read }
+    outputs:
+      api: ${{ steps.f.outputs.api }}
+      web: ${{ steps.f.outputs.web }}
+    steps:
+      - id: f
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # 取不到完整清單（排程、新分支、超過 API 上限）就全跑。
+          case "$EVENT" in
+            pull_request) files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename') || files=__all__
+              [ "$(printf '%s\n' "$files" | wc -l)" -lt 3000 ] || files=__all__ ;;
+            push) files=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA" \
+              --jq 'if (.files | length) < 300 then .files[].filename else "__all__" end') || files=__all__ ;;
+            *) files=__all__ ;;
+          esac
+          # 純文件不跑；歸屬不明的檔案（scripts/、.github/、根目錄設定）兩邊都跑。
+          code=$(printf '%s\n' "$files" | grep -vE '^$|^(docs|design)/|\.md$' || true)
+          has() { [ -n "$code" ] && printf '%s\n' "$code" | grep -qvE "$1"; }
+          if has '^apps/web/'; then echo api=true; else echo api=false; fi >> "$GITHUB_OUTPUT"
+          if has '^(apps/api|db)/'; then echo web=true; else echo web=false; fi >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"; printf '%s\n' "$files" | head -50
+  api-lint:
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
+        with: { components: "rustfmt, clippy" }
+      - run: cargo fmt --manifest-path apps/api/Cargo.toml --check
+      - run: python3 scripts/test_coverage.py && python3 scripts/test_mutate.py
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with: { tool: "cargo-audit@0.22.2" }
+      - run: sh scripts/audit-api.sh
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' }}" }
+      - run: cargo clippy --manifest-path apps/api/Cargo.toml --all-targets -- -D warnings
+  api-test:
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     services:
       db:
@@ -31,18 +87,16 @@ jobs:
       APP_ENV: dev
       SMTP_HOST: localhost
       MAILPIT_API_BASE: http://localhost:8025
+      # nextest 跨測試 binary 平行（cargo test 是一個 binary 跑完才換下一個）；測試數與 cargo test 相同。
+      COVERAGE_RUNNER: nextest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
-        with: { components: rustfmt, clippy, llvm-tools-preview }
+        with: { components: llvm-tools-preview }
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with: { workspaces: apps/api }
-      - run: cargo fmt --manifest-path apps/api/Cargo.toml --check
-      - run: cargo clippy --manifest-path apps/api/Cargo.toml --all-targets -- -D warnings
+        with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' }}" }
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
-        with: { tool: "cargo-llvm-cov@0.9.1,cargo-audit@0.22.2" }
-      - run: sh scripts/audit-api.sh
-      - run: python3 scripts/test_coverage.py
+        with: { tool: "cargo-llvm-cov@0.9.1,cargo-nextest@0.9.149" }
       - run: sh scripts/coverage-api.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -50,9 +104,13 @@ jobs:
           name: api-coverage
           path: apps/api/target/coverage.json
   mutate:
-    # 突變測試（約 18 分鐘）量測的是測試強度，不擋 publish-image；失敗仍會讓 run 標紅。
-    if: github.event_name != 'schedule'
+    # 突變測試量測的是測試強度，不擋 publish-image；失敗仍會讓 run 標紅。依 mutate.py 的順序連續切片分到多台機器。
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] }
     services:
       db:
         image: postgis/postgis:16-3.6@sha256:bdd9351e706076260ac21552cd9c1bed01582e69a902b1b5843f83fa0b4c5a9c
@@ -72,23 +130,36 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with: { workspaces: apps/api }
-      - run: python3 scripts/test_mutate.py
+        with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' && matrix.shard == 1 }}" }
       - run: scripts/mutate.sh all
+        env:
+          MUTATION_SHARD: ${{ matrix.shard }}/10
+          # 每個 mutant 只改一個函式又改回來：incremental 讓重編從約 20 秒降到數秒（rust-cache 預設關掉它）。
+          CARGO_INCREMENTAL: 1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: api-mutations
+          name: api-mutations-${{ matrix.shard }}
           path: apps/api/target/mutations/
   image:
-    # 只驗證 Dockerfile 能建置（不 push）；build context 必須是 repo 根目錄。
-    if: github.event_name != 'schedule'
+    # 驗證 Dockerfile 能建置（不 push）；build context 必須是 repo 根目錄。只有 main 寫入映像層快取。
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker build -f apps/api/Dockerfile -t wishly-api:ci .
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
   web:
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: github.event_name != 'schedule' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
@@ -106,6 +177,8 @@ jobs:
           path: apps/web/coverage/
   web-audit:
     # 每週排程也會跑：沒有 push 時仍能發現新公告（含 overrides 換成 fork 的 braces／node-forge，npm audit 以名稱＋版本比對）
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
@@ -115,10 +188,14 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run audit:security
   e2e:
-    if: github.event_name != 'schedule'
-    # Playwright 端對端測試（見 README「測試」）：真實的 API + Web + Postgres + Mailpit
+    # Playwright 端對端測試（見 README「測試」）：真實的 API + Web + Postgres + Mailpit。分兩台機器跑。
+    needs: changes
+    if: github.event_name != 'schedule' && (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2] }
     services:
       db:
         image: postgis/postgis:16-3.6@sha256:bdd9351e706076260ac21552cd9c1bed01582e69a902b1b5843f83fa0b4c5a9c
@@ -141,43 +218,63 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with: { workspaces: apps/api }
+        with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' && matrix.shard == 1 }}" }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 24, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
-      # e2e/support/psql.mjs 用 psql 重建 wishly_e2e 資料庫
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # e2e/support/psql.mjs 用 psql 重建 wishly_e2e 資料庫（runner 映像通常已內建）
+      - run: command -v psql || { sudo apt-get update && sudo apt-get install -y postgresql-client; }
       - run: npx playwright install --with-deps chromium
-      # 啟動 API / Web 由 playwright.config.ts 的 webServer 負責（cargo build + 重置資料庫 + nuxt build）
-      - run: npm run e2e
+      # 啟動 API / Web 由 playwright.config.ts 的 webServer 負責（cargo build + 重置資料庫 + nuxt build）。
+      # admin 依賴其他 project（會切全站唯讀），直接 --shard 會全部落在第一片；所以只切其他三個，admin 在第二台最後單獨跑。
+      - run: npx playwright test --project=desktop-chromium --project=mobile --project=tablet --shard=${{ matrix.shard }}/2
+      - if: matrix.shard == 2
+        run: npx playwright test --project=admin --no-deps
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+  ci-ok:
+    # 唯一需要設為 required 的檢查：被跳過（純文件）視為通過，任何失敗或取消視為失敗。
+    if: always() && github.event_name != 'schedule'
+    needs: [changes, api-lint, api-test, mutate, image, web, web-audit, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo ok
   publish-image:
     # main 的測試全綠後才推 GHCR（映像維持 Private；標籤為 commit SHA，Dokploy 以 SHA 部署與回滾）。
-    # Dokploy 拉映像需用 GitHub PAT 登入 GHCR（見 docs/deploy-runbook.md）。
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [api, image, web, e2e]
+    # Dokploy 拉映像需用 GitHub PAT 登入 GHCR（見 docs/deploy-runbook.md）。純文件的 commit 不發佈（映像內容不變）。
+    # 只改 API 時 web 會被跳過，所以不能用預設的「needs 全成功」，改為明確排除失敗與取消。
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.api == 'true'
+      && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    needs: [changes, api-lint, api-test, image, web, e2e]
     runs-on: ubuntu-latest
     permissions: { contents: read, packages: write }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: tags
+        # main 連推時較舊 commit 的測試可能較晚跑完：只有仍是 main 最新 commit 才移動 latest，避免倒退。
+        run: |
+          image=ghcr.io/erictheng93/wishly-api
+          { echo "tags<<EOF"; echo "$image:$GITHUB_SHA"
+            [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA" ] && echo "$image:latest"
+            echo EOF; } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      # image job 已在同一 commit 寫入映像層快取，這裡應全數命中，只做推送。
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: apps/api/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: |
-            ghcr.io/erictheng93/wishly-api:${{ github.sha }}
-            ghcr.io/erictheng93/wishly-api:latest
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max

@@ -14,7 +14,7 @@
 
 1. **推到 main，等 CI。** `git push` 後，到 `https://github.com/erictheng93/wishly/actions` 看最新一次 `ci`。
    - `publish-image` 必須是綠色（它需要 `api`、`image`、`web`、`e2e` 全綠）。
-2. **確認映像版本。** 到 `https://github.com/erictheng93?tab=packages` → `wishly-api`，確認 `latest` 旁的 commit SHA 就是你要部署的 commit（與 `git log` 對照）。映像是 Private，需登入 GitHub。
+2. **確認映像版本。** 到 `https://github.com/erictheng93?tab=packages` → `wishly-api`，確認 `latest` 旁的 commit SHA 就是你要部署的 commit（與 `git log` 對照）。只改文件或只改前端的 commit 不會發佈映像，所以 `latest` 對應的是最近一個動到 API 的 commit。映像是 Private，需登入 GitHub。
 3. **開隧道進 Dokploy。** 管理介面不對外：
    ```sh
    ssh -L 3001:localhost:3000 <VPS>

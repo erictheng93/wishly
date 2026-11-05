@@ -73,7 +73,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 後端一般測試也會驗證真實 SMTP 寄送，請先啟動 `docker compose up -d db mailpit`。`scripts/cargo.sh` 已設定容器連到宿主的 SMTP 與 Mailpit API；直接跑 cargo 預設使用 localhost。
 
-CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。`web-audit` job 執行 `npm run audit:security`（原始 `npm audit --audit-level=high`，不設例外，保留 exit code 與完整 JSON），每週一排程也會重查。歷史範圍、更新基準流程及 mutation 證據記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）；現行依賴修補政策以[安全 fork 說明](apps/web/patches/README.md)為準。
+CI 會執行 Rust fmt／clippy（warnings 視為錯誤）、依賴 audit 與覆蓋率檢查。前端用 `npm run test:coverage`；API 用 `sh scripts/coverage-api.sh`，門檻為已量測基準減 0.5 個百分點，基準不自動下調。Rust 固定 1.99.0、cargo-llvm-cov 固定 0.9.1、cargo-audit 固定 0.22.2；覆蓋率工具版本不符會拒絕。`web-audit` job 執行 `npm run audit:security`（原始 `npm audit --audit-level=high`，不設例外，保留 exit code 與完整 JSON），每週一排程也會重查。純文件（`docs/`、`design/`、`*.md`）的變更會跳過其餘 job，只動前端或只動 API 時也只跑相關的 job；branch protection 只需把彙總 job `ci-ok` 設為必要檢查（被跳過的 job 視為通過）。API 測試在 CI 用 cargo-nextest（`COVERAGE_RUNNER=nextest`），突變測試以 `MUTATION_SHARD=i/n` 分到 10 台機器。歷史範圍、更新基準流程及 mutation 證據記錄於 `git show 5c13bb9:docs/qa/test-gaps-audit.md`（文件已移除）；現行依賴修補政策以[安全 fork 說明](apps/web/patches/README.md)為準。
 
 刪除已覆蓋的程式碼也會改變覆蓋率的分子與分母；若比例低於基準減 0.5pp，API gate 會變紅。刻意調整測試範圍或程式碼時，請重新量測並同步更新 baseline，勿將此結果視為 flaky。
 

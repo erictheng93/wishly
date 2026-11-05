@@ -364,6 +364,16 @@ def run(name, output):
     return result["result"] == "killed"
 
 
+def shard(names, spec):
+    """MUTATION_SHARD=i/n（1 起算）取第 i 段連續切片；連續切讓同一測試 binary 的 mutant 留在同台機器，少重編。"""
+    if not spec:
+        return names
+    index, count = map(int, spec.split("/"))
+    if not 1 <= index <= count:
+        raise ValueError(f"MUTATION_SHARD must be i/n with 1 <= i <= n: {spec}")
+    return names[(index - 1) * len(names) // count:index * len(names) // count]
+
+
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in {*CASES, "--list", "all"}:
         print("Usage: scripts/mutate.sh <name|all|--list>", file=sys.stderr)
@@ -381,7 +391,7 @@ def main():
         except BlockingIOError:
             print("Another mutation run is active", file=sys.stderr)
             return 2
-        names = list(CASES) if sys.argv[1] == "all" else [sys.argv[1]]
+        names = shard(list(CASES), os.environ.get("MUTATION_SHARD")) if sys.argv[1] == "all" else [sys.argv[1]]
         return 0 if all([run(name, output) for name in names]) else 1
 
 

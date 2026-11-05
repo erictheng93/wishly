@@ -21,3 +21,4 @@ apps/web/npm-audit.json
 
 # superpowers 腦力激盪工具的本機狀態（含 token / pid）
 .superpowers/
+__pycache__/
