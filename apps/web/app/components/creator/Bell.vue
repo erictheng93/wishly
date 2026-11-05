@@ -53,7 +53,7 @@ watch(() => route.fullPath, () => { open.value = false })
 <style>
 /* 站內通知鈴鐺：方形、細線；未讀徽章用訊號紅。創建者頁（c-head）與訪客頁（g-top）共用，樣式隨元件載入 */
 .c-bell{position:relative;display:inline-block}
-.c-head .c-bell{margin-left:auto}.c-head .c-bell~.um{margin-left:0}
+.c-head .c-bell~.um{margin-left:0}
 .c-bell .c-bell-btn{position:relative;display:inline-grid;place-items:center;width:44px;height:44px;padding:0;border:0;background:none;color:var(--fg);cursor:pointer}
 .c-bell-n{position:absolute;top:6px;right:2px;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;background:var(--red);color:#fff;font:700 10px/16px var(--mono);text-align:center}
 .c-bell-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:340px;max-width:calc(100vw - 16px);background:var(--card);border:1px solid var(--ink-line);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line);animation:rise .22s var(--ease);white-space:normal}

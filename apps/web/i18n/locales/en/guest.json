@@ -68,7 +68,6 @@
       "confirm": "Confirm contribution {pts}"
     },
     "card": {
-      "thumb": "Img",
       "priority": "Priority: {level}",
       "prio": {
         "high": "High",

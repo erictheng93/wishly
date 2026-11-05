@@ -195,7 +195,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         <span class="ed-n" aria-hidden="true">{{ String(k + 1).padStart(2, '0') }}</span>
         <div class="c-row">
           <img v-if="i.image_url" class="c-thumb" :src="i.image_url" alt="">
-          <div v-else class="c-thumb">{{ i.image_status === 'pending' ? $t('lists.edit.processing') : $t('creator.image.none') }}</div>
+          <div v-else-if="i.image_status === 'pending'" class="c-thumb">{{ $t('lists.edit.processing') }}</div>
+          <div v-else class="c-thumb is-empty" aria-hidden="true" />
           <div class="c-grow">
             <strong>{{ i.title }}</strong>
             <div v-if="i.funding_mode === 'support'" class="c-mute">{{ $t('lists.edit.supportLine', { name: i.support?.target?.title ?? $t('lists.edit.supportEnded'), points: i.support?.points ?? '–', qty: i.support?.qty ?? '–' }) }}{{ $t('lists.edit.priority', { p: prio(i.priority) }) }}</div>

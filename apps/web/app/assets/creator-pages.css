@@ -2,7 +2,7 @@
    語彙：墨色區塊、等寬索引籤、編輯式區塊標題、儀表數字、標本籤 */
 /* 區塊標題：索引編號＋標題＋墨色底線（取代紅方塊） */
 .c-page .x-h{display:flex;align-items:baseline;gap:12px;margin:44px 0 16px;padding:0 0 10px;border-bottom:1px solid var(--ink-line);font-size:20px;line-height:1.2;letter-spacing:-.005em}
-.c-page .x-h::before{content:attr(data-n);flex:none;width:auto;height:auto;background:none;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text)}
+/* 區塊編號（data-n）不顯示：01/02 沒有資訊；data-n 留在模板供日後移除 */
 /* 等寬小標籤列：兩端對齊、細底線 */
 .x-tag{display:flex;align-items:center;justify-content:space-between;gap:12px;font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 .x-tag b{color:var(--fg);font-weight:600}

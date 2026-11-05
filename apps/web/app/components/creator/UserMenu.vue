@@ -26,7 +26,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
 </script>
 <template>
   <div v-if="user" ref="root" class="um" @keydown.esc="dismiss" @focusout="focusout">
-    <button ref="trigger" type="button" class="um-btn" :aria-label="`${name}，${$t('common.accountMenu')}${count > 0 ? `（${$t('common.friendRequests', { n: count })}）` : ''}`" :aria-expanded="open" :aria-controls="panelId" @click="open = !open"><span class="um-av">{{ name.slice(0, 1).toUpperCase() }}<i v-if="count > 0" class="um-dot" aria-hidden="true" /></span><span class="um-name">{{ name }}</span><span class="um-caret" aria-hidden="true">▾</span></button>
+    <button ref="trigger" type="button" class="um-btn" :aria-label="`${name}，${$t('common.accountMenu')}${count > 0 ? `（${$t('common.friendRequests', { n: count })}）` : ''}`" :aria-expanded="open" :aria-controls="panelId" @click="open = !open"><span class="um-av">{{ name.slice(0, 1).toUpperCase() }}<i v-if="count > 0" class="um-dot" aria-hidden="true" /></span><span class="um-name">{{ name }}</span><UiIcon name="chevron-down" :size="12" class="um-caret" /></button>
     <nav v-show="open" :id="panelId" class="um-pop" :aria-label="$t('common.accountMenu')">
       <NuxtLink :to="myPage" class="um-who">
         <b>{{ user.display_name }}</b><small v-if="user.handle">@{{ user.handle }}</small>
@@ -50,7 +50,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
 .um-btn[aria-expanded=true]{border-color:var(--ink-line);background:var(--bg-alt)}
 .um-av{position:relative;flex:none;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:700 13px/1 var(--mono)}
 .um-name{max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.um-caret{color:var(--mute);font-size:10px;transition:transform var(--t) var(--ease)}
+.um-caret{color:var(--mute);transition:transform var(--t) var(--ease)}
 .um-btn[aria-expanded=true] .um-caret{transform:rotate(180deg)}
 @media (max-width:479px){.um-name{max-width:3em}.um-caret{display:none}.c-head .um .um-btn{padding:0 7px}}
 .um-dot{position:absolute;top:-4px;right:-4px;width:9px;height:9px;background:var(--red);border:2px solid var(--bg,#fff);box-sizing:content-box}
@@ -59,7 +59,8 @@ watch(() => useRoute().fullPath, () => { open.value = false })
 .um-pop>a>span{display:inline-flex;align-items:center}
 .um-who{padding:10px 16px;border-top:0;border-bottom:1px solid var(--ink-line);background:var(--bg-alt)}
 .um-who b{font-size:15px}
-.um-pop>button[aria-pressed=true]{color:var(--red-text);box-shadow:inset 3px 0 var(--red)}
+.um-pop>button[aria-pressed=true]{flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;font-weight:800}
+.um-pop>button[aria-pressed=true]::before{content:"";width:6px;height:6px;background:var(--red)}
 .um-pop>button:last-child{color:var(--mute);font-weight:600}
 .um-who small{font:500 11px/1.4 var(--mono);letter-spacing:.06em;color:var(--mute)}
 @media (hover:hover) and (pointer:fine){

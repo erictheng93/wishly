@@ -12,7 +12,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
 <template>
   <li :id="`item-${item.id}`" class="g-card g-item" :class="{ full }">
     <img v-if="item.image_url" class="g-thumb" :src="item.image_url" alt="" loading="lazy">
-    <div v-else class="g-thumb">{{ $t('guest.card.thumb') }}</div>
+    <div v-else class="g-thumb is-empty" aria-hidden="true" />
     <div class="g-body">
       <div v-if="index" class="ic-head" aria-hidden="true"><span>No.{{ idx }}</span><span class="ic-pct" :class="{ done: full }">{{ pctShow }}%</span></div>
       <div class="g-title">{{ item.title }}<span v-if="item.priority && !item.urgency" class="g-badge" :class="item.priority">{{ $t('guest.card.priority', { level: $t('guest.card.prio.' + item.priority) }) }}</span><template v-if="item.urgency"><span class="g-badge">{{ $t('org.relief.category.' + item.category) }}</span><span class="g-badge" :class="item.urgency">{{ $t('org.relief.urgency.' + item.urgency) }}</span></template><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>

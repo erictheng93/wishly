@@ -11,7 +11,7 @@ const idx = computed(() => String(props.index ?? 0).padStart(2, '0'))
 <template>
   <li :id="`item-${item.id}`" class="g-card g-item sp-card" :class="{ full: sp.ended }">
     <img v-if="target" class="g-thumb" :src="coverSrc(target)" alt="" loading="lazy">
-    <div v-else class="g-thumb">{{ $t('guest.card.thumb') }}</div>
+    <div v-else class="g-thumb is-empty" aria-hidden="true" />
     <div class="g-body">
       <div class="sp-kind"><span v-if="index" aria-hidden="true">No.{{ idx }}　</span>{{ $t('guest.support.kind') }}</div>
       <div class="g-title">{{ item.title }}</div>

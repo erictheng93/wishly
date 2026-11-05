@@ -6,14 +6,15 @@
 .c-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-height:56px;position:sticky;top:0;z-index:20;margin:0 -20px;padding:env(safe-area-inset-top) 20px 0;-webkit-backdrop-filter:saturate(1.6) blur(14px);backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid transparent;border-image:var(--bar-bg) fill 0/0/0 100vmax} /* border-image 外擴讓底色與線條滿版，但不產生橫向捲動 */
 .c-brand{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin-right:auto;padding-right:8px;color:var(--fg);font-weight:900;font-size:15px;letter-spacing:.22em;text-transform:uppercase}
 .c-brand::before{content:"";width:10px;height:10px;background:var(--red)}
-/* 頁面標題：從頁首移到內文，編輯式大標＋等寬索引籤 */
-.c-title{margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
-.c-title small{display:block;margin-bottom:6px;font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--red-text)}
-.c-page .c-title h1{font-size:clamp(28px,5vw,40px);line-height:1.1;letter-spacing:-.015em;overflow-wrap:anywhere}
+/* 頁面標題：從頁首移到內文，編輯式大標；底下細線＋48px 紅短線（不再有「WISHLY / X」索引籤，它只是重複品牌與網址） */
+.c-title{position:relative;margin:40px 0 28px;padding-bottom:20px;border-bottom:1px solid var(--line);animation:rise .5s var(--ease) both}
+.c-title::after{content:"";position:absolute;left:0;bottom:-1px;width:48px;height:2px;background:var(--red)}
+.c-page .c-title h1{font-size:clamp(30px,4.6vw,44px);font-weight:800;line-height:1.08;letter-spacing:-.025em;overflow-wrap:anywhere}
+/* 越南文疊加聲調符號（ệ、ở）在 1.08 行高下會頂到上一行：放寬 */
+html:lang(vi) .c-page .c-title h1{line-height:1.22}
 .c-card{position:relative;background:var(--card);border:1px solid var(--line);padding:18px;margin:0 0 12px;transition:border-color var(--t) var(--ease),transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .c-card.bad{border-color:var(--bad);background:var(--bad-bg);box-shadow:inset 0 2px var(--bad)}
-.c-card>h2:first-child,.c-h2{font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px}
-.c-card>h2:first-child::before,.c-h2::before{content:"";flex:none;width:8px;height:8px;background:var(--red)}
+.c-card>h2:first-child,.c-h2{font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px} /* 不加紅方塊：紅方塊只留給品牌字標 */
 .c-row{display:flex;gap:8px;align-items:center}
 .c-row.wrap{flex-wrap:wrap}
 .c-mt{margin-top:8px}.c-mt12{margin-top:12px}.c-mb{margin-bottom:12px}.c-mb16{margin-bottom:16px}.c-m0{margin:0}
@@ -22,13 +23,13 @@
 .c-small{font-size:12px}
 .c-err{color:var(--bad);font-size:14px;margin:4px 0}
 .c-ok{color:var(--ok);font-size:14px}
-/* 按鈕：次要為墨線框，主要為紅底；hover 有位移陰影的「按壓」手感 */
-.c-btn,a.c-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;min-width:44px;padding:0 16px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg);font:inherit;font-size:14px;font-weight:700;letter-spacing:.06em;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap;transition:background var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease),opacity var(--t) var(--ease)}
+/* 按鈕：次要為細灰框（hover 才轉墨色，畫面上不再滿是互搶的黑框），主要為紅底；hover 有位移陰影的「按壓」手感 */
+.c-btn,a.c-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;min-width:44px;padding:0 16px;border:1px solid color-mix(in srgb,var(--fg) 26%,transparent);background:var(--card);color:var(--fg);font:inherit;font-size:14px;font-weight:700;letter-spacing:.06em;text-decoration:none;cursor:pointer;box-sizing:border-box;white-space:nowrap;transition:background var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease),opacity var(--t) var(--ease)}
 .c-row.wrap>.c-btn.c-grow{flex:1 1 auto}
 .c-btn.primary,a.c-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);padding:0 22px;letter-spacing:.08em}
 .c-btn.primary:active{background:var(--accent-press);border-color:var(--accent-press)}
 .c-btn:not([disabled]):active{transform:translate(1px,1px)}
-.c-btn.danger,a.c-btn.danger{color:var(--bad);border-color:var(--line)}
+.c-btn.danger,a.c-btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
 .c-btn.block{display:flex;width:100%}
 .c-btn.plain{border-color:transparent;background:transparent}
 .c-btn.small{min-height:44px;font-size:12px;padding:0 12px}
@@ -37,6 +38,9 @@
 .c-field{display:block;margin:0 0 18px}
 .c-field>span,.c-lbl{display:block;font:600 11px/1.4 var(--mono);letter-spacing:.12em;color:var(--mute);margin-bottom:8px}
 .c-field input,.c-field select,.c-field textarea,.c-input{width:100%;box-sizing:border-box;min-height:48px;padding:12px 14px;border:1px solid var(--line);border-bottom-color:var(--ink-line);background:var(--bg-alt);color:var(--fg);font:inherit;transition:border-color var(--t) var(--ease),background var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+/* 被元件樣式蓋掉邊框時會露出瀏覽器預設 2px inset（像凹槽雙線）：用較高權重統一回 1px 細框、下緣墨線 */
+.c-field :is(input:not([type=checkbox]):not([type=radio]),select,textarea),.c-input{border:1px solid var(--line);border-bottom-color:var(--ink-line)}
+.c-field :is(input:not([type=checkbox]):not([type=radio]),select,textarea):focus,.c-input:focus{border-color:var(--red)}
 .c-field input:focus,.c-field select:focus,.c-field textarea:focus,.c-input:focus,.c-otp input:focus{outline:0;border-color:var(--red);background-color:var(--card);box-shadow:0 0 0 1px var(--red),4px 4px 0 var(--bad-bg)}
 .c-field select,select.c-input{appearance:none;padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat}
 .c-field ::placeholder,.c-input::placeholder{color:var(--mute);opacity:.7}
@@ -63,6 +67,7 @@ fieldset.c-field>label.c-row{min-height:44px;gap:12px;cursor:pointer}
 .c-badge::before{content:"";width:6px;height:6px;background:currentColor;opacity:.9}
 .c-badge.active,.c-badge.delivered,.c-badge.ready{color:var(--ok);border-color:currentColor}
 .c-badge.hidden,.c-badge.rejected,.c-badge.cancelled{color:var(--bad);border-color:currentColor}
+.c-thumb.is-empty,.g-thumb.is-empty{background:var(--thumb-empty)}
 .c-thumb{width:60px;height:60px;background:var(--bg-alt);object-fit:cover;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--mute);text-align:center;overflow:hidden;outline:1px solid var(--line);outline-offset:-1px}
 /* 進度條：空槽是細斜線、已達成是警示斜紋，載入時由左展開 */
 .c-bar{height:8px;background:var(--hatch),var(--bg-alt);overflow:hidden}
@@ -78,7 +83,7 @@ dialog.c-sheet::backdrop{background:var(--scrim);-webkit-backdrop-filter:blur(2p
 dialog.c-sheet h2{margin:0 0 18px;font-size:22px;line-height:1.2}
 /* 分頁：底線式，目前分頁為墨色粗底線 */
 .c-tabs{display:flex;gap:0;margin:0 0 20px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
-.c-tabs .c-btn{border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;color:var(--mute);font-size:14px;padding:0 14px}
+.c-tabs .c-btn{border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;color:var(--mute);font-size:14px;padding:0 14px;letter-spacing:.02em}
 .c-tabs .c-btn.on{border-bottom-color:var(--red);background:transparent;color:var(--fg)}
 .c-otp{display:flex;gap:6px;justify-content:center;margin:0 0 18px}
 .c-otp input{flex:1 1 0;min-width:0;max-width:56px;box-sizing:border-box;padding:0;height:60px;text-align:center;font:800 26px var(--mono);border:1px solid var(--line);border-bottom:2px solid var(--ink-line);background:var(--bg-alt);color:var(--fg)}
@@ -95,7 +100,10 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-row+.c-bar{margin-top:10px}
 /* 顯示／隱藏鈕疊在輸入框內右側，密碼欄與其他欄同寬 */
 .c-pw{position:relative}.c-pw input{padding-right:72px}.c-pw .c-btn{position:absolute;top:0;right:0;bottom:0;border:0;background:transparent;color:var(--mute)}
-.c-ok{color:var(--fg);border:1px solid var(--line);box-shadow:inset 3px 0 var(--ok);background:var(--ok-bg);padding:12px 16px;margin:0 0 16px;font-size:14px}
+/* 提示框不用 >1px 的彩色左邊條：整圈 1px 訊號色細框，左上一顆 7px 訊號方塊 */
+.c-ok{position:relative;color:var(--fg);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);background:var(--ok-bg);padding:12px 16px 12px 32px;margin:0 0 16px;font-size:14px}
+.c-ok::before,.c-errbox::before,.c-auth p.c-err[role=alert]::before,.c-page>p.c-err[role=alert]::before{content:"";position:absolute;left:14px;top:calc(12px + .8em - 3px);width:7px;height:7px;background:var(--ok)}
+.c-errbox::before,.c-auth p.c-err[role=alert]::before,.c-page>p.c-err[role=alert]::before{background:var(--bad)}
 /* 登入 / 註冊 / 忘記密碼：表單收成 400px 單欄，平板以上成置中卡片，不隨 --c-w 拉寬 */
 .c-auth{max-width:400px;margin:8px auto 0}
 .c-auth-lead{margin:0 0 24px;line-height:1.7;text-wrap:pretty}
@@ -104,7 +112,7 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-auth-foot{margin:24px 0 0;text-align:center;font-size:14px;color:var(--mute)}
 /* 登入／註冊／忘記密碼 */
 /* 表單／操作錯誤框：左紅條、淡紅底，不再是貼著按鈕的裸紅字 */
-.c-errbox,.c-auth p.c-err[role=alert]{margin:16px 0;padding:12px 16px;border:1px solid var(--line);box-shadow:inset 3px 0 var(--bad);background:var(--bad-bg);font-size:14px;line-height:1.6;text-align:left;overflow-wrap:anywhere}
+.c-errbox,.c-auth p.c-err[role=alert]{position:relative;margin:16px 0;padding:12px 16px 12px 32px;border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);background:var(--bad-bg);font-size:14px;line-height:1.6;text-align:left;overflow-wrap:anywhere}
 .c-auth p.c-err[role=alert]{margin:4px 0 14px}
 .c-auth>p:not([class]){margin:0 0 20px;font-size:14px;line-height:1.7;color:var(--mute);text-wrap:pretty}
 .c-auth .c-center.c-m0 a{font-size:14px;font-weight:700;color:var(--red-text)}
@@ -112,7 +120,7 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-gone{display:grid;gap:10px;justify-items:start;margin:16px 0 8px;padding:28px 20px;border:1px dashed var(--ink-line);background:var(--hatch),var(--card)}
 .c-gone p{margin:0}
 .c-gone-t{font-size:clamp(20px,4.6vw,26px);font-weight:900;line-height:1.25;letter-spacing:-.01em}
-.c-gone.err{border-style:solid;border-left:3px solid var(--bad);background:var(--bad-bg)}
+.c-gone.err{border-style:solid;border-color:color-mix(in srgb,var(--bad) 35%,transparent);background:var(--bad-bg)}
 /* 公開頁（組織／救災事件）的找不到與載入失敗：靠左大標＋等寬籤，返回鈕 48px */
 .c-nf{display:flex;flex-direction:column;align-items:flex-start;gap:14px;max-width:34em;padding:clamp(40px,10vw,96px) 0}
 .c-nf:not(.err)::before{content:"404 / NOT FOUND" / "";padding-left:16px;font:700 11px var(--mono);letter-spacing:.18em;color:var(--red-text);background:linear-gradient(var(--red),var(--red)) 0 50%/8px 8px no-repeat}
@@ -131,6 +139,7 @@ dialog.c-sheet:focus-visible{outline:0}
 }
 @media (min-width:768px){
   .c-page:has(>.c-auth) .c-title{text-align:center;border-bottom:0;margin-bottom:0}
+  .c-page:has(>.c-auth) .c-title::after{left:50%;margin-left:-24px}
   .c-auth{margin-top:min(4vh,40px);padding:40px;border:1px solid var(--ink-line);background:var(--card)}
 }
 .c-file{position:relative;overflow:hidden}
@@ -159,12 +168,12 @@ dialog.c-sheet:focus-visible{outline:0}
 /* 頁首內的按鈕：無框，hover 才出底色，讓品牌字標當主角 */
 .c-head .c-btn:not(.primary){border-color:transparent;background:transparent}
 /* 帳號選單靠右展開：頁首換行時晶片也要貼右，選單才不會超出左邊 */
-.c-head .um{margin-left:auto}
 .c-head .c-brand~.um{margin-left:0}
 /* 手機頁首擠：身分晶片只留頭像，名字在桌面與首頁才顯示 */
 @media (max-width:479px){.c-head .um-name,.c-head .um-caret{display:none}.c-head .um .um-btn{padding:0}
-  /* 窄手機：字標收成紅方塊省空間，多數頁首一列放得下；動作多的頁（編輯頁）仍可換行，不得橫向溢出 */
-  .c-head{gap:2px}.c-brand{font-size:0;gap:0;padding-right:0;margin-right:0}.c-head .c-brand~.um{margin-left:auto}.c-brand::before{width:16px;height:16px}}
+  /* 窄手機：保留 WISHLY 字標（只剩紅方塊時頁首很空洞）；頁首另有狀態徽章或動作鈕（編輯、進度頁）才收成紅方塊，維持一列 */
+  .c-head{gap:2px}.c-brand{font-size:14px;letter-spacing:.18em}
+  .c-head:has(>.c-badge,>.c-btn:not(.c-back)) .c-brand{font-size:0;gap:0;padding-right:0}.c-head:has(>.c-badge,>.c-btn:not(.c-back)) .c-brand::before{width:16px;height:16px}}
 @media (max-width:359px){.c-head .c-btn{padding:0 6px;letter-spacing:0;font-size:13px;min-width:0}.c-brand{font-size:0;gap:0}.c-brand::before{width:14px;height:14px}}
 /* 進場：卡片依序浮起（前 8 張） */
 .c-grid>.c-card,.c-page>.c-card,.c-list>li{animation:rise .5s var(--ease) both}
@@ -189,12 +198,14 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-rail{display:none}
 @media (min-width:1280px){
   :root{--c-w:900px}
-  .c-rail{display:flex;flex-direction:column;position:fixed;top:calc(var(--head-h) + 28px);left:max(16px,calc(50% - var(--c-w) / 2 - 212px));width:176px;z-index:5;counter-reset:rail}
-  .c-rail::before{content:"MENU" / "";font:600 11px var(--mono);letter-spacing:.2em;color:var(--mute);padding:0 0 10px 14px;border-bottom:1px solid var(--ink-line)}
-  .c-rail a{position:relative;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;color:var(--fg);font-weight:700;font-size:15px;border-bottom:1px solid var(--line);counter-increment:rail;transition:color var(--t) var(--ease),padding var(--t) var(--ease)}
-  .c-rail a::before{content:counter(rail,decimal-leading-zero) / "";font:500 11px var(--mono);color:var(--mute);letter-spacing:.06em}
-  .c-rail a.router-link-active{color:var(--red-text);box-shadow:inset 3px 0 var(--red)}
-  .c-rail a.router-link-active::before{color:var(--red-text)}
+  .c-rail{display:flex;flex-direction:column;position:fixed;top:calc(var(--head-h) + 28px);left:max(16px,calc(50% - var(--c-w) / 2 - 212px));width:176px;z-index:5;border-top:1px solid var(--ink-line)}
+  /* 不加「MENU」與 01–05 編號（沒有資訊）；目前位置＝紅色短線＋粗墨字 */
+  .c-rail a{position:relative;display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;color:var(--mute);font-weight:600;font-size:15px;border-bottom:1px solid var(--line);transition:color var(--t) var(--ease)}
+  .c-rail a::before{content:"";flex:none;width:0;height:2px;margin-right:-10px;background:var(--red);transition:width var(--t) var(--ease),margin var(--t) var(--ease)}
+  .c-rail a.router-link-active{color:var(--fg);font-weight:800}
+  .c-rail a.router-link-active::before{width:14px;margin-right:0}
+  /* 頁首內容與側欄同一條左邊界：品牌字標對齊選單文字 */
+  .c-page:has(.c-rail)>.c-head{margin-left:calc(-212px - 20px);padding-left:34px}
   .c-btn.c-nav-dup,a.c-btn.c-nav-dup{display:none} /* 需高於 a.c-btn 的 display */
   .c-fab{right:calc(50% - var(--c-w) / 2 - 28px);translate:100% 0} /* 浮動鈕移到內容欄右側留白，不蓋住卡片 */
 }
@@ -204,7 +215,8 @@ dialog.c-sheet:focus-visible{outline:0}
   .c-btn.primary:not([disabled]):hover{background:var(--accent-press);border-color:var(--accent-press);color:var(--accent-fg);box-shadow:3px 3px 0 var(--fg);transform:translate(-1px,-1px)}
   .c-btn.danger:not([disabled]):hover{background:var(--bad);border-color:var(--bad);color:#fff}
   .c-btn.plain:hover,.c-head .c-btn:not(.primary):not([disabled]):hover{background:var(--bg-alt);color:var(--fg);border-color:transparent}
-  .c-rail a:hover{padding-left:20px;color:var(--red-text)}
+  .c-rail a:hover{color:var(--fg)}
+  .c-rail a:not(.router-link-active):hover::before{width:8px;margin-right:0}
   .c-tabs .c-btn:not([disabled]):hover{background:transparent;color:var(--fg);border-color:transparent;border-bottom-color:var(--fg)}
   .c-tabs .c-btn.on:hover{border-bottom-color:var(--red)}
   .c-seg label:hover input:not(:checked)+span{background:var(--bg-alt)}
@@ -228,14 +240,14 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-page th{text-align:left;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:10px 8px;border-bottom:1px solid var(--ink-line)}
 .c-page td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 /* 頁面層級錯誤橫幅（載入失敗＋重試）：墨線框＋左側紅條，文字與按鈕分列，窄螢幕按鈕不擠在字尾 */
-.c-page>p.c-err[role=alert]{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:0 0 16px;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--bad);background:var(--bad-bg);line-height:1.6}
+.c-page>p.c-err[role=alert]{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;position:relative;margin:0 0 16px;padding:14px 16px 14px 32px;border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);background:var(--bad-bg);line-height:1.6}
 .c-page>p.c-err[role=alert]>.c-btn{margin-left:auto}
 @media (max-width:479px){.c-page>p.c-err[role=alert]>.c-btn{width:100%;margin-left:0}}
 /* 頁面層級載入列：斜線底＋等寬字，取代孤零零的一行灰字 */
-.c-page>p.c-mute[role=status]{display:flex;align-items:center;gap:10px;min-height:72px;margin:0 0 16px;padding:0 16px;border:1px solid var(--line);border-left:3px solid var(--ink-line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
+.c-page>p.c-mute[role=status]{display:flex;align-items:center;gap:10px;min-height:72px;margin:0 0 16px;padding:0 16px;border:1px solid var(--line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.08em}
 /* 窄手機：頁首狀態徽章與動作鈕再收緊，英文等較長字串也維持單列 */
 @media (max-width:479px){
-  .c-head{gap:0}.c-head .c-brand{margin-right:0}.c-head .c-brand::before{margin-right:6px}
+  .c-head{gap:0}
   .c-head .c-badge{padding:0 6px;gap:4px;font-size:10px;letter-spacing:.02em}.c-head .c-badge::before{display:none}
   .c-head .c-btn{min-width:0;padding:0 8px;letter-spacing:0}.c-head .c-btn.c-back{padding:0 6px}
   .c-head .locale-switch{font-size:11px;letter-spacing:0;margin:0}.c-head .um .um-btn{min-width:44px}

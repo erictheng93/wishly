@@ -54,7 +54,7 @@ function pick(ev: Event) {
     <span>{{ purpose === 'cover' ? $t('creator.image.cover') : $t('creator.image.item') }}</span>
     <div class="c-row">
       <img v-if="preview || currentUrl" class="c-thumb" :src="preview || currentUrl!" alt="">
-      <div v-else class="c-thumb">{{ $t('creator.image.none') }}</div>
+      <div v-else class="c-thumb is-empty" aria-hidden="true" />
       <div class="c-grow">
         <label class="c-btn c-file" :aria-disabled="state === 'uploading'">
           {{ $t('creator.image.pick') }}
@@ -70,6 +70,6 @@ function pick(ev: Event) {
 </template>
 <style scoped>
 .c-thumb{width:72px;height:72px}
-div.c-thumb:not(img){border:1px dashed var(--mute);background:var(--hatch),var(--bg-alt);font:600 10px/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+div.c-thumb:not(img){border:1px dashed var(--mute)}
 .c-file{align-self:flex-start}
 </style>
