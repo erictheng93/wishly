@@ -80,22 +80,21 @@ async function sendReport() {
 </script>
 <template>
   <main class="c-page"><ClientOnly>
-    <CreatorHeader :title="p ? p.user.display_name : $t('me.profile.page')" :back="user ? '/friends' : '/'" />
+    <CreatorHeader :title="p ? p.user.display_name : $t('me.profile.page')" :back="user ? '/friends' : '/'" :no-title="!!p" />
     <p v-if="state === 'loading'" class="c-mute" role="status">{{ $t('me.loading') }}</p>
-    <section v-else-if="state === 'gone'" class="c-gone"><span class="pf-kick" aria-hidden="true">PROFILE / 404</span><p class="c-gone-t">{{ $t('me.profile.gone') }}</p></section>
-    <section v-else-if="state === 'error'" class="c-gone err"><span class="pf-kick" aria-hidden="true">PROFILE / ERR</span><p class="c-err c-gone-t" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></section>
+    <section v-else-if="state === 'gone'" class="c-gone"><p class="c-gone-t">{{ $t('me.profile.gone') }}</p></section>
+    <section v-else-if="state === 'error'" class="c-gone err"><p class="c-err c-gone-t" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></section>
     <template v-else>
       <section class="pf-hero">
-        <span class="pf-kick" aria-hidden="true">PROFILE<template v-if="p.user.handle"> / @{{ p.user.handle }}</template></span>
         <div class="pf-av" aria-hidden="true"><img v-if="p.user.avatar_url" :src="p.user.avatar_url" alt="" class="pf-img"><template v-else>{{ (p.user.display_name || '?').slice(0, 1) }}</template></div>
-        <h2 class="c-h2">{{ p.user.display_name }}</h2>
-        <p v-if="p.user.handle || p.user.birthday" class="c-mute"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
-        <p v-if="p.user.bio" style="white-space:pre-line">{{ p.user.bio }}</p>
+        <h1 class="c-h2">{{ p.user.display_name }}</h1>
+        <p v-if="p.user.handle || p.user.birthday" class="c-mute pf-handle"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
+        <p v-if="p.user.bio" class="pf-bio">{{ p.user.bio }}</p>
         <p v-if="p.mutual?.count" class="c-mute c-row wrap">
           <NuxtLink v-for="m in p.mutual.users" :key="m.id" :to="profilePath(m)" class="c-row"><span class="pf-av pf-av-s" aria-hidden="true"><img v-if="m.avatar_url" :src="m.avatar_url" alt="" class="pf-img"><template v-else>{{ (m.display_name || '?').slice(0, 1) }}</template></span>{{ m.display_name }}</NuxtLink>
           <span>{{ $t('me.profile.mutual', { n: p.mutual.count }, p.mutual.count) }}</span>
         </p>
-        <div class="c-row wrap">
+        <div class="c-row wrap pf-act">
         <NuxtLink v-if="p.relation === 'self'" to="/settings" class="c-btn">{{ $t('me.profile.editSettings') }}</NuxtLink>
         <template v-else-if="p.relation === 'blocked'">
           <span class="c-mute">{{ $t('me.profile.blocked') }}</span>
@@ -132,7 +131,7 @@ async function sendReport() {
       </section>
 
       <section v-if="p.relation !== 'blocked'">
-        <h2 class="c-h2 pf-sec"><span aria-hidden="true">01</span>{{ $t('me.profile.lists') }}</h2>
+        <h2 class="c-h2 pf-sec">{{ $t('me.profile.lists') }}</h2>
         <template v-if="!p.wishlists.length">
           <p class="c-mute">{{ $t('me.profile.noLists') }}</p>
           <NuxtLink v-if="p.relation === 'self'" to="/lists/new" class="c-btn primary">{{ $t('me.profile.createList') }}</NuxtLink>
@@ -153,7 +152,7 @@ async function sendReport() {
       </section>
 
       <section v-if="p.relation !== 'blocked'">
-        <h2 class="c-h2 pf-sec"><span aria-hidden="true">02</span>{{ $t('me.profile.donations') }}</h2>
+        <h2 class="c-h2 pf-sec">{{ $t('me.profile.donations') }}</h2>
         <p v-if="!p.donations.length" class="c-mute">{{ $t('me.profile.noDonations') }}</p>
         <component :is="p.relation === 'self' ? 'div' : 'details'" v-if="p.donations.length">
           <summary v-if="p.relation !== 'self'" class="c-mute pf-sum">{{ $t('me.profile.sent', { n: p.donations.length }) }}</summary>
@@ -187,24 +186,33 @@ async function sendReport() {
   </ClientOnly></main>
 </template>
 
+<style>
+</style>
 <style scoped>
-.pf-kick{display:block;margin:0 0 8px;font:700 11px var(--mono);letter-spacing:.16em;color:var(--mute)}
-.pf-kick::before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:8px}
-.pf-hero{border:1px solid var(--ink-line);border-top:3px solid var(--red);padding:24px 20px;margin:16px 0 8px;display:grid;gap:10px;justify-items:start;background:var(--card)}
-.pf-hero .c-h2{font-size:clamp(28px,6vw,40px);font-weight:900;letter-spacing:-.02em;margin:0;line-height:1.1}
-.pf-hero p{margin:0}
-.pf-hero .c-h2::before{display:none}
-.pf-av{width:64px;height:64px;display:grid;place-items:center;background:var(--fg);color:var(--bg);font:900 28px var(--font)}
+.pf-kick{display:block;margin:0 0 8px;font:700 12px var(--mono);letter-spacing:.04em;color:var(--mute)}
+.pf-hero{border-bottom:1px solid var(--ink-line);padding:32px 0 24px;margin:0;display:grid;grid-template-columns:72px minmax(0,1fr);gap:2px 16px;align-items:center}
+.pf-hero>*{grid-column:1/-1}
+.pf-hero>.pf-av{grid-row:1/3;grid-column:1;width:72px;height:72px;font-size:32px}
+.pf-hero>.c-h2{grid-row:1;grid-column:2;align-self:end;font-size:clamp(28px,7vw,40px);font-weight:900;letter-spacing:-.02em;margin:0;line-height:1.1}
+html:lang(vi) .pf-hero>.c-h2{line-height:1.2}
+.pf-hero>.c-h2::before{display:none}
+.pf-hero>p{margin:0}
+.pf-hero>.pf-handle{grid-row:2;grid-column:2;align-self:start;font:500 13px var(--mono);letter-spacing:.04em}
+.pf-bio{white-space:pre-line;margin-top:12px!important}
+.pf-hero>.c-row{margin-top:14px}
+.pf-hero>.pf-act{margin-top:18px}
+.pf-av{display:grid;place-items:center;background:var(--fg);color:var(--bg);font:900 28px var(--font);overflow:hidden}
 .pf-img{width:100%;height:100%;object-fit:cover}
-.pf-av{overflow:hidden}
 .pf-av-s{width:24px;height:24px;font-size:12px;margin-right:6px}
-.pf-next{border:1px solid var(--ink-line);border-left:3px solid var(--red);padding:14px 20px;margin:8px 0;background:var(--card);display:grid;gap:4px}
-.pf-next strong{font-size:20px}
+.pf-next{border:1px solid var(--line);padding:14px 16px;margin:20px 0 0;background:var(--bg-alt);display:grid;gap:4px}
+.pf-next strong{font-size:20px;letter-spacing:-.01em}
 .pf-fs{border:0;padding:0;margin:8px 0;display:grid;gap:6px}
 .pf-quiet{background:none;border:0;padding:4px 0;font:inherit;font-size:13px;color:var(--mute);text-decoration:underline;cursor:pointer}
 .pf-sum{cursor:pointer;margin-bottom:8px}
-.pf-sec{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:32px 0 12px;padding-top:12px;border-top:1px solid var(--ink-line)}
-.pf-sec span{color:var(--red-text);margin-right:8px}
-.pf-card{border-top:2px solid var(--ink-line)!important;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
-@media (hover:hover){.pf-card:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line)}}
+.pf-sec{font:800 16px/1.3 var(--font);letter-spacing:0;text-transform:none;margin:40px 0 4px}
+.pf-card{border:0!important;border-bottom:1px solid var(--line)!important;background:none;padding:14px 0;margin:0;box-shadow:none}
+.pf-card .c-thumb{width:64px;height:64px}
+.pf-card strong{font-size:17px}
+@media (hover:hover){.pf-card:hover{background:var(--bg-alt)}}
+.pf-sec~p.c-mute{padding:16px 0;border-bottom:1px solid var(--line);margin:0}
 </style>

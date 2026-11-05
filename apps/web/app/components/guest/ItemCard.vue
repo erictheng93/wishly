@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
-const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean, loginTo?: any, siteOff?: boolean, index?: number }>() // loginTo 有值 = 未登入，認捐鈕改為前往登入
+const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean, loginTo?: any, siteOff?: boolean }>() // loginTo 有值 = 未登入，認捐鈕改為前往登入
 defineEmits<{ claim: [], fund: [], ack: [] }>()
 const crowd = computed(() => props.item.funding_mode === 'crowdfund')
 const ds = computed(() => deriveDisplayStatus(props.item) ?? '')
-const idx = computed(() => String(props.index ?? 0).padStart(2, '0'))
-const pctShow = computed(() => Math.round(props.item.progress_percent ?? 0))
 const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fully_claimed)
 // image_status 非 ready 時 API 不給 image_url，顯示灰色佔位
 </script>
@@ -14,8 +12,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
     <img v-if="item.image_url" class="g-thumb" :src="item.image_url" alt="" loading="lazy">
     <div v-else class="g-thumb is-empty" aria-hidden="true" />
     <div class="g-body">
-      <div v-if="index" class="ic-head" aria-hidden="true"><span>No.{{ idx }}</span><span class="ic-pct" :class="{ done: full }">{{ pctShow }}%</span></div>
-      <div class="g-title">{{ item.title }}<span v-if="item.priority && !item.urgency" class="g-badge" :class="item.priority">{{ $t('guest.card.priority', { level: $t('guest.card.prio.' + item.priority) }) }}</span><template v-if="item.urgency"><span class="g-badge">{{ $t('org.relief.category.' + item.category) }}</span><span class="g-badge" :class="item.urgency">{{ $t('org.relief.urgency.' + item.urgency) }}</span></template><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>
+      <div class="g-title">{{ item.title }}<span v-if="item.priority === 'high' && !item.urgency" class="g-badge high">{{ $t('guest.card.priority', { level: $t('guest.card.prio.high') }) }}</span><template v-if="item.urgency"><span class="g-badge">{{ $t('org.relief.category.' + item.category) }}</span><span class="g-badge" :class="item.urgency">{{ $t('org.relief.urgency.' + item.urgency) }}</span></template><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>
       <div v-if="item.brand || item.spec" class="g-mute">{{ [item.brand, item.spec].filter(Boolean).join('・') }}</div>
       <template v-if="crowd">
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent ?? 0" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: (item.progress_percent ?? 0) + '%' }" /></div>
@@ -38,7 +35,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
         </template>
         <button v-else-if="mine && !closed" class="g-btn ghost sm js-claim" :disabled="!online || siteOff" @click="$emit('claim')">{{ $t('guest.card.editMine') }}</button>
         <span v-else-if="full" class="g-mute">{{ $t('guest.card.fullClaimed') }}</span>
-        <NuxtLink v-else-if="!closed && loginTo && !siteOff" class="g-btn sm" :to="loginTo">{{ $t('guest.card.loginClaim') }}</NuxtLink>
+        <NuxtLink v-else-if="!closed && loginTo && !siteOff" class="g-btn ghost sm" :to="loginTo">{{ $t('guest.card.loginClaim') }}</NuxtLink>
         <button v-else-if="!closed" class="g-btn sm js-claim" :disabled="!online || siteOff" @click="$emit('claim')">{{ $t('guest.card.claimBtn') }}</button>
         <a v-if="item.product_url && !masked" :href="item.product_url" target="_blank" rel="noopener nofollow" class="g-link">{{ $t('guest.card.productLink') }}</a>
       </div>
@@ -47,12 +44,5 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
 </template>
 
 <style scoped>
-.ic-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font:700 11px var(--mono);letter-spacing:.14em;color:var(--mute)}
-.ic-head span:first-child::before{content:"";display:inline-block;width:6px;height:6px;background:var(--ink-line);margin-right:7px;vertical-align:1px}
-.ic-pct{font-size:13px;color:var(--fg);letter-spacing:.04em}
-.ic-pct.done{color:var(--ok)}
-.g-item{border-top:2px solid var(--ink-line)}
-.g-item.full{border-top-color:var(--line)}
-.g-title{letter-spacing:-.01em}
 .g-thumb{align-self:flex-start}
 </style>

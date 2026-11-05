@@ -28,15 +28,12 @@
       "demoAria": "Example wishlist: three items, one already claimed",
       "demoTitle": "Annie's birthday wishes",
       "demoCount": "3 items",
-      "demoThumb1": "Coffee",
       "demoItem1": "Pour-over coffee set",
       "demoTop": "Top wish",
       "demoBy": "Kai will give this",
-      "demoThumb2": "Headphones",
       "demoItem2": "Noise-cancelling headphones",
       "demoRaised": "Raised $4,800",
       "demoGoal": "/ $8,000",
-      "demoThumb3": "Book",
       "demoItem3": "The Design of Everyday Things",
       "demoGive": "I'll get it",
       "scenesTitle": "Three occasions, one kind of list",
@@ -57,7 +54,7 @@
           "d": "List appliances, tableware and household goods. Once a guest claims an item, it is locked right away."
         }
       },
-      "sceneMore": "See the {k} example →",
+      "sceneMore": "See the {k} example",
       "originTitle": "Why I built this",
       "origin": [
         "Every time we give a gift, we’re torn between “Will they like it?” and “Do I really need this?”\nBecause it’s awkward to ask, and because we can’t be sure what the other person lacks,\nthe thought behind a gift too often ends up a burden piled in a corner.\nThe trouble with gift-giving is simply a missing bridge to keep wishes in sync,\nwhich creates an “information asymmetry between supply and demand.”",

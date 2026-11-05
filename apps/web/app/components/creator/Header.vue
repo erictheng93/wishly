@@ -1,5 +1,6 @@
 <script setup lang="ts">
-defineProps<{ title: string; back?: string }>()
+// noTitle：頁面自己有 h1（例如個人頁 hero）時不輸出 .c-title，避免同名 h1 重複
+defineProps<{ title: string; back?: string; noTitle?: boolean }>()
 const { user } = useAuth()
 const myPage = computed(() => user.value ? profilePath(user.value) : '/settings')
 const { current, orgs } = useOrgMode()
@@ -22,7 +23,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
     <CreatorBell /><CreatorUserMenu />
   </header>
   <!-- 頁面標題移出 sticky 頁首：編輯式大標，頁首只留品牌與動作 -->
-  <div class="c-title"><h1>{{ title }}</h1></div>
+  <div v-if="!noTitle" class="c-title"><h1>{{ title }}</h1></div>
   <OnboardingGuide />
   <!-- 桌面（≥1280）側欄：取代各頁重複的導覽按鈕 -->
   <nav v-if="user" class="c-rail" :aria-label="$t('common.mainMenu')">

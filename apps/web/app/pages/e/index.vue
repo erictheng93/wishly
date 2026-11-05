@@ -22,13 +22,11 @@ async function more() {
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <span class="x-kicker" aria-hidden="true">RELIEF / EVENTS</span>
     <h1>{{ $t('guest.relief.heading') }}</h1>
     <div v-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <div v-else-if="!list.length" class="g-center g-mute">{{ $t('guest.relief.empty') }}</div>
     <div v-else class="g-grid">
-      <article v-for="(e, n) in list" :key="e.slug" class="g-card">
-        <span class="x-no" aria-hidden="true">No.{{ String(n + 1).padStart(2, '0') }}</span>
+      <article v-for="e in list" :key="e.slug" class="g-card">
         <NuxtLink :to="localizedPath(`/e/${e.slug}`, $i18n.locale)" class="x-title">{{ e.name }}</NuxtLink>
         <p class="g-mute">
           {{ $t('org.relief.hazard.' + e.hazard_type) }}・{{ e.counties.join('、') }}<template v-if="e.occurred_on">・{{ e.occurred_on }}</template>
@@ -43,16 +41,13 @@ async function more() {
 </template>
 
 <style scoped>
-.x-kicker{display:block;margin:28px 0 0;font:700 11px var(--mono);letter-spacing:.16em;color:var(--mute)}
-.x-kicker::before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:8px}
-.x-kicker+h1{margin-top:8px}
-.g-grid .g-card{border-top:2px solid var(--ink-line);padding:14px 16px 16px;display:flex;flex-direction:column;animation:rise .5s var(--ease) both}
-.x-no{font:700 11px var(--mono);letter-spacing:.14em;color:var(--mute)}
+.g-wrap h1{position:relative;margin:44px 0 16px;padding-bottom:18px;border-bottom:1px solid var(--line);font-weight:900;letter-spacing:-.03em}
+.g-wrap h1::after{content:"";position:absolute;left:0;bottom:-1px;width:48px;height:2px;background:var(--red)}
+html:lang(vi) .g-wrap h1{line-height:1.22}
+.g-grid .g-card{padding:14px 16px 16px;display:flex;flex-direction:column;animation:rise .5s var(--ease) both}
 .x-title{display:block;font-weight:800;font-size:19px;line-height:1.35;letter-spacing:-.01em;color:var(--fg);text-decoration:none;overflow-wrap:anywhere;padding:6px 0 4px;background:linear-gradient(var(--red),var(--red)) 0 100%/0 2px no-repeat;transition:background-size var(--t) var(--ease)}
 .x-title:hover{background-size:100% 2px}
-.x-crit{margin-left:0}
-.x-head{display:flex;gap:16px;align-items:center;margin:8px 0 20px;padding-bottom:20px;border-bottom:1px solid var(--ink-line)}
-.x-head h1{margin:0 0 6px}
-.x-logo{flex:none;width:80px;height:80px;object-fit:contain;border:1px solid var(--line);padding:6px;background:var(--card)}
-h2.x-h2{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:28px 0 14px;padding-top:12px;border-top:1px solid var(--ink-line)}
+/* 空狀態：虛線斜線底的標本盒，頂端一枚線條圖釘 */
+.g-center.g-mute{display:grid;justify-items:center;gap:14px;margin:28px 0 0;padding:52px 20px;border:1px dashed var(--ink-line);background:var(--hatch),var(--card);font-size:14px;color:var(--mute);text-align:center}
+.g-center.g-mute::before{content:"";width:34px;height:34px;background:var(--fg);-webkit-mask:var(--pin) center/contain no-repeat;mask:var(--pin) center/contain no-repeat;--pin:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.2' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.900 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.500' r='2.500'/%3E%3C/svg%3E")}
 </style>

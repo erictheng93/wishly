@@ -70,9 +70,7 @@
     "card": {
       "priority": "Priority: {level}",
       "prio": {
-        "high": "High",
-        "medium": "Medium",
-        "low": "Low"
+        "high": "High"
       },
       "raised": "Raised",
       "leftPts": " · {n} pts to go",
@@ -180,6 +178,7 @@
       "maskedBanner": "You are viewing as the creator. You can see each item's progress, but not who gave what until it unlocks.",
       "surpriseHint": "This is a surprise list: the creator can't see who gave what until the event day, so please keep it a secret",
       "completion": "{pct}% complete · {done} / {total} items",
+      "stillOpen": "Still open",
       "empty": "The creator is still preparing this list. Check back later.",
       "loginHint": "Giving a gift or contributing requires signing in.",
       "login": "Sign in",

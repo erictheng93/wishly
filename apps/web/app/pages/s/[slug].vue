@@ -198,9 +198,9 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div v-if="gone" class="g-center"><span class="sx-code" aria-hidden="true">410</span><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-if="gone" class="g-center sx-state"><span class="sx-code" aria-hidden="true">410</span><h1>{{ $t('guest.slug.titleGone') }}</h1><p class="g-mute">{{ $t('guest.slug.goneBody') }}</p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></div>
     <div v-else-if="hold(st) || checking" class="g-center g-mute" role="status">{{ $t('guest.loading') }}</div>
-    <div v-else-if="forbidden" class="g-center">
+    <div v-else-if="forbidden" class="g-center sx-state">
         <span class="sx-code" aria-hidden="true">403</span>
         <h1>{{ gate.code === 'LOGIN_REQUIRED' ? $t('guest.slug.loginRequired') : $t('guest.slug.noPermission') }}</h1>
         <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
@@ -213,8 +213,8 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         </template>
       <p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></p>
     </div>
-    <div v-else-if="failed && !data" class="g-center"><span class="sx-code" aria-hidden="true">ERR</span><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
-    <div v-else-if="!data" class="g-center"><span class="sx-code" aria-hidden="true">404</span><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></div>
+    <div v-else-if="failed && !data" class="g-center sx-state"><span class="sx-code" aria-hidden="true">ERR</span><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="reload()">{{ $t('guest.reload') }}</button></div>
+    <div v-else-if="!data" class="g-center sx-state"><span class="sx-code" aria-hidden="true">404</span><h1>{{ $t('guest.slug.titleNotFound') }}</h1><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.home') }}</NuxtLink></div>
     <template v-else>
       <div class="g-banner g-nojs">{{ $t('guest.slug.noJs') }}</div>
       <div v-if="!online" class="g-banner">{{ $t('guest.slug.offline') }}</div>
@@ -222,7 +222,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       <div v-if="data.status === 'closed'" class="g-banner">{{ $t('guest.slug.closed') }}</div>
       <nav v-if="demos.length" class="g-demos" :aria-label="$t('guest.slug.demosAria')">{{ $t('guest.slug.demosLabel') }}<NuxtLink v-for="[k, label] in demos" :key="k" :to="localizedPath(`/s/${k}`, $i18n.locale)" :aria-current="k === slug ? 'page' : undefined">{{ label }}</NuxtLink></nav>
       <section class="sx-hero">
-        <div class="sx-cover"><img :src="coverSrc(data)" alt="" class="g-cover"><span class="sx-tag" aria-hidden="true">WISHLIST / {{ data.status === 'closed' ? 'CLOSED' : 'OPEN' }}</span></div>
+        <div class="sx-cover"><img :src="coverSrc(data)" alt="" class="g-cover"></div>
         <div class="sx-main">
           <h1>{{ data.title }}</h1>
           <p class="g-mute sx-meta">
@@ -241,29 +241,27 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
           <div class="sx-big" aria-hidden="true"><b>{{ pct }}</b><span>%</span></div>
           <div class="g-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: pct + '%' }" /></div>
           <div class="g-mute sx-cap">{{ $t('guest.slug.completion', { pct, done: data.completion.fulfilled_count, total: data.completion.item_count }) }}</div>
-          <dl class="sx-stats" aria-hidden="true">
-            <div><dt>ITEMS</dt><dd>{{ String(data.completion.item_count).padStart(2, '0') }}</dd></div>
-            <div><dt>DONE</dt><dd>{{ String(data.completion.fulfilled_count).padStart(2, '0') }}</dd></div>
-            <div><dt>OPEN</dt><dd>{{ String(Math.max(0, data.completion.item_count - data.completion.fulfilled_count)).padStart(2, '0') }}</dd></div>
+          <dl class="sx-stats">
+            <div><dt>{{ $t('guest.slug.stillOpen') }}</dt><dd>{{ Math.max(0, data.completion.item_count - data.completion.fulfilled_count) }}</dd></div>
           </dl>
         </aside>
       </section>
       <div v-if="siteOff && !closed" class="g-banner" role="status">{{ data.site_status === 'closed' ? $t('guest.relief.closedSite') : $t('guest.relief.paused') }}</div>
       <div v-if="masked" class="g-banner">{{ $t('guest.slug.maskedBanner') }}</div>
-      <p v-else-if="data.surprise_locked" class="g-mute">{{ $t('guest.slug.surpriseHint') }}</p>
+      <p v-else-if="data.surprise_locked" class="g-mute sx-note">{{ $t('guest.slug.surpriseHint') }}</p>
       <p v-if="!items.length" class="sx-empty g-mute">{{ $t('guest.slug.empty') }}</p>
-      <p v-if="loginTo && items.length && !closed" class="g-mute">{{ $t('guest.slug.loginHint') }}<NuxtLink :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
+      <p v-if="loginTo && items.length && !closed" class="g-mute sx-login">{{ $t('guest.slug.loginHint') }}<NuxtLink class="sx-login-btn" :to="loginTo">{{ $t('guest.slug.login') }}</NuxtLink></p>
       <ul class="c-list g-grid">
-        <template v-for="(it, n) in sorted" :key="it.id">
-          <GuestSupportCard v-if="it.funding_mode === 'support'" :index="n + 1" :item="it" :closed="closed || siteOff" />
-          <GuestItemCard v-else :index="n + 1" :item="it" :mine="myClaims[it.id] ?? null" :masked="masked"
+        <template v-for="it in sorted" :key="it.id">
+          <GuestSupportCard v-if="it.funding_mode === 'support'" :item="it" :closed="closed || siteOff" />
+          <GuestItemCard v-else :item="it" :mine="myClaims[it.id] ?? null" :masked="masked"
             :closed="closed" :site-off="siteOff" :online="online" :login-to="loginTo" @claim="openClaim(it)" @fund="onFund(it)" @ack="ackChange(it.id)" />
         </template>
       </ul>
-      <div class="g-foot">
+      <div class="g-foot sx-foot">
         <div><span class="g-dot" :class="{ on: mode !== 'connecting' }" />{{ liveLabel(mode) }}</div>
         <button class="g-link" @click="reporting = true">{{ $t('guest.report.title') }}</button>
-        ・<NuxtLink :to="localizedPath('/terms', $i18n.locale)">{{ $t('guest.slug.terms') }}</NuxtLink>・<NuxtLink :to="localizedPath('/privacy', $i18n.locale)">{{ $t('guest.slug.privacy') }}</NuxtLink>
+        <NuxtLink :to="localizedPath('/terms', $i18n.locale)">{{ $t('guest.slug.terms') }}</NuxtLink><NuxtLink :to="localizedPath('/privacy', $i18n.locale)">{{ $t('guest.slug.privacy') }}</NuxtLink>
         <p><NuxtLink :to="localizedPath('/', $i18n.locale)">{{ $t('guest.slug.madeWith') }}</NuxtLink></p>
       </div>
     </template>
@@ -299,32 +297,53 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 
 <style>
 /* 不用 scoped：SSR 的 <h1> 不能帶 data-v 屬性（爬蟲與 e2e 以原始 HTML 驗證標題）；選擇器一律 sx- 前綴 */
-.sx-code{display:block;font:900 clamp(96px,26vw,200px)/.85 var(--mono);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:2px var(--ink-line);background:var(--hatch);-webkit-background-clip:text;background-clip:text;margin-bottom:20px}
+/* 404 / 403 / 410 / ERR 大字：斜線填色＋空心描邊 */
+.sx-code{display:block;font:900 clamp(96px,26vw,200px)/.85 var(--mono);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:2px var(--ink-line);background:repeating-linear-gradient(-45deg,var(--ink-line) 0 1.5px,transparent 1.5px 7px);-webkit-background-clip:text;background-clip:text;margin-bottom:20px}
+.sx-state .sx-code{margin-inline:auto;font-size:clamp(80px,22vw,160px)}
+.sx-state{padding:64px 0 96px}
+.sx-state>a{display:inline-flex;align-items:center;min-height:48px;margin-top:24px;padding:0 28px;border:1px solid var(--ink-line);font-weight:700;letter-spacing:.06em;color:var(--fg);text-decoration:none}
+.sx-state>a:hover{background:var(--fg);color:var(--bg);box-shadow:3px 3px 0 var(--red)}
 .sx-empty{margin:28px 0;padding:40px 20px;text-align:center;border:1px dashed var(--ink-line);background:var(--hatch),var(--card);font:500 13px/1.7 var(--mono);letter-spacing:.06em}
-.g-center .sx-code{margin-inline:auto;font-size:clamp(80px,22vw,160px)}
-.sx-hero{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;margin-top:20px;padding-bottom:28px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
+/* 封面：預設禮盒完整呈現（contain），手機 2:1、桌面 3.4:1 */
+.sx-hero{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:20px;padding-bottom:8px;animation:rise .5s var(--ease) both}
 .sx-cover{position:relative}
-.sx-cover .g-cover{margin-top:0;max-height:none;aspect-ratio:16/9}
-.sx-tag{position:absolute;left:0;bottom:0;padding:5px 10px;background:var(--bg);color:var(--fg);font:700 11px/1.2 var(--mono);letter-spacing:.14em;border-top:1px solid var(--ink-line);border-right:1px solid var(--ink-line)}
-.sx-tag::before{content:"";display:inline-block;width:7px;height:7px;background:var(--red);margin-right:8px}
-.sx-main h1{margin:0 0 12px;font-weight:900;font-size:clamp(30px,6vw,46px);text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
-.sx-meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
+.sx-cover .g-cover{margin-top:0;max-height:none;aspect-ratio:2/1}
+.sx-cover .g-cover[src$=".svg"]{object-fit:contain;background:var(--hatch),var(--bg-alt)}
+.sx-main h1{margin:0 0 12px;font-weight:900;font-size:clamp(30px,7vw,48px);line-height:1.1;letter-spacing:-.03em;text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
+html:lang(en) .sx-main h1,html:lang(id) .sx-main h1{line-height:1.12}
+html:lang(vi) .sx-main h1{line-height:1.2}
+.sx-meta{margin:0;font-size:12px;font-family:var(--mono);letter-spacing:.06em}
 .sx-desc{margin:14px 0 0;line-height:1.75;max-width:38em;white-space:pre-line;overflow-wrap:anywhere}
-.sx-gauge{border:1px solid var(--ink-line);padding:16px 18px 0;background:var(--card);align-self:start}
-.sx-big{display:flex;align-items:baseline;gap:4px;line-height:.9;color:var(--fg)}
-.sx-big b{font:900 clamp(72px,18vw,120px)/.9 var(--font);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
-.sx-big span{font:800 28px var(--mono);color:var(--red-text)}
-.sx-gauge .g-bar{height:12px;margin:14px 0 10px}
-.sx-cap{font-family:var(--mono);font-size:12px;letter-spacing:.04em}
-.sx-stats{display:grid;grid-template-columns:repeat(3,1fr);margin:14px -18px 0;border-top:1px solid var(--ink-line)}
-.sx-stats div{padding:10px 18px;border-left:1px solid var(--line)}
-.sx-stats div:first-child{border-left:0}
-.sx-stats dt{font:600 10px var(--mono);letter-spacing:.16em;color:var(--mute)}
-.sx-stats dd{margin:2px 0 0;font:800 24px var(--mono);font-variant-numeric:tabular-nums}
-@media (min-width:900px){
-  .sx-hero{grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"cover cover" "main gauge";gap:28px}
-  .sx-cover{grid-area:cover}.sx-main{grid-area:main}.sx-gauge{grid-area:gauge}
+/* 完成度：數字與 % 同基線；紅色只留給進度條；右側只有「還可以送」一格 */
+.sx-gauge{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"big stats" "bar bar" "cap cap";column-gap:24px;align-items:end;align-self:start;border-top:1px solid var(--ink-line);padding:18px 0 0}
+.sx-big{grid-area:big;display:flex;align-items:baseline;gap:2px;line-height:1;color:var(--fg)}
+.sx-big b{font:900 clamp(56px,16vw,72px)/.9 var(--font);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.sx-big span{font:800 22px/1 var(--font);color:var(--mute)}
+.sx-stats{grid-area:stats;margin:0;padding-bottom:6px}
+.sx-stats dt{font:700 12px/1.4 var(--font);letter-spacing:.02em;color:var(--mute)}
+.sx-stats dd{margin:2px 0 0;font:800 24px var(--font);font-variant-numeric:tabular-nums}
+.sx-gauge .g-bar{grid-area:bar;height:10px;margin:14px 0 10px}
+.sx-cap{grid-area:cap;margin:0;font-size:12px;font-family:var(--mono);letter-spacing:.04em}
+/* 登入提示：頁面唯一的紅色主要動作；驚喜說明是規則框 */
+.sx-login{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 16px;margin:20px 0 4px;font-size:14px;color:var(--fg)}
+.sx-login-btn{display:inline-flex;align-items:center;min-height:44px;padding:0 22px;background:var(--accent);color:var(--accent-fg)!important;font-weight:700;letter-spacing:.06em;text-decoration:none!important}
+.sx-login-btn:hover{background:var(--accent-press);box-shadow:3px 3px 0 var(--fg)}
+.sx-note{margin:16px 0 4px;padding:12px 14px;border:1px solid var(--line);background:var(--hatch),var(--bg-alt);color:var(--fg);font-size:14px;line-height:1.7}
+/* 頁尾：狀態、連結同一列，「用 Wishly 建立…」獨立成一條出口 */
+.g-foot.sx-foot{display:flex;flex-wrap:wrap;align-items:center;gap:0 20px;margin-top:48px;padding-top:8px;border-top:1px solid var(--line);text-align:left;font:inherit;letter-spacing:.04em}
+.sx-foot>div:first-child{flex:1 1 100%;display:flex;align-items:center;min-height:36px;margin-top:4px;font-size:12px;color:var(--mute)}
+.sx-foot a,.sx-foot .g-link{font-size:12px;text-decoration:none;padding:0;color:var(--mute)}
+.sx-foot a:hover,.sx-foot .g-link:hover{color:var(--fg);text-decoration:underline;text-decoration-color:var(--red)}
+.sx-foot>p{flex:1 1 100%;margin:20px 0 0;font:600 13px var(--font);letter-spacing:.02em}
+.sx-foot>p a{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 14px;border:1px solid var(--ink-line);color:var(--fg);font-size:13px}
+.sx-foot>p a::after{content:"";width:18px;height:18px;background:currentColor;-webkit-mask:var(--arrow) center/contain no-repeat;mask:var(--arrow) center/contain no-repeat;transition:transform var(--t) var(--ease);--arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='square'%3E%3Cpath d='M4 12h15M13 6l6 6-6 6'/%3E%3C/svg%3E")}
+.sx-foot>p a:hover{background:var(--fg);color:var(--bg);text-decoration:none}
+.sx-foot>p a:hover::after{transform:translateX(3px)}
+@media (min-width:768px){
+  .sx-hero{grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"cover cover" "main gauge";gap:24px 40px}
+  .sx-cover{grid-area:cover}.sx-main{grid-area:main}.sx-gauge{grid-area:gauge;align-self:end}
   .sx-cover .g-cover{aspect-ratio:21/8}
+  .sx-cover .g-cover[src$=".svg"]{aspect-ratio:3.4/1}
 }
-@media (max-width:899px){.sx-main{order:1}.sx-gauge{order:2}}
+@media (max-width:767px){.sx-main{order:1}.sx-gauge{order:2}}
 </style>
