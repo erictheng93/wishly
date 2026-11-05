@@ -22,10 +22,9 @@ async function accept() {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.invite.title')" back="/dashboard" />
     <p v-if="state === 'loading'" class="c-mute" role="status">{{ $t('auth.invite.loading') }}</p>
-    <section v-else-if="state === 'gone'" class="c-gone"><span class="pf-kick" aria-hidden="true">INVITE / 404</span><p class="c-gone-t">{{ $t('auth.invite.gone') }}</p><p class="c-mute">{{ $t('auth.invite.goneHint') }}</p></section>
-    <section v-else-if="state === 'error'" class="c-gone err"><span class="pf-kick" aria-hidden="true">INVITE / ERR</span><p class="c-err c-gone-t" role="alert">{{ $t('auth.invite.loadFail') }}</p></section>
+    <section v-else-if="state === 'gone'" class="c-gone"><p class="c-gone-t">{{ $t('auth.invite.gone') }}</p><p class="c-mute">{{ $t('auth.invite.goneHint') }}</p></section>
+    <section v-else-if="state === 'error'" class="c-gone err"><p class="c-err c-gone-t" role="alert">{{ $t('auth.invite.loadFail') }}</p></section>
     <section v-else class="pf-hero">
-      <span class="pf-kick" aria-hidden="true">INVITE / FRIEND</span>
       <h2 class="c-h2">{{ list ? $t('auth.invite.invitesList', { name: inviter.display_name, title: list.title }) : $t('auth.invite.invites', { name: inviter.display_name }) }}</h2>
       <p v-if="inviter.handle" class="c-mute">@{{ inviter.handle }}</p>
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
@@ -36,11 +35,10 @@ async function accept() {
 </template>
 
 <style scoped>
-.pf-kick{display:block;margin:0 0 8px;font:700 11px var(--mono);letter-spacing:.16em;color:var(--mute)}
-.pf-kick::before{content:"";display:inline-block;width:8px;height:8px;background:var(--red);margin-right:8px}
 .pf-hero{border:1px solid var(--ink-line);border-top:3px solid var(--red);padding:24px 20px;margin:16px 0 8px;display:grid;gap:10px;justify-items:start;background:var(--card)}
 .pf-hero .c-h2{font-size:clamp(28px,6vw,40px);font-weight:900;letter-spacing:-.02em;margin:0;line-height:1.1}
 .pf-hero p{margin:0}
+.c-gone{padding:32px 22px;margin-top:8px}
 .pf-hero .c-h2::before{display:none}
 .pf-av{width:64px;height:64px;display:grid;place-items:center;background:var(--fg);color:var(--bg);font:900 28px var(--font)}
 .pf-sec{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:32px 0 12px;padding-top:12px;border-top:1px solid var(--ink-line)}

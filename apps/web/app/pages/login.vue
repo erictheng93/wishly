@@ -59,12 +59,11 @@ async function social(provider: 'google' | 'line') {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.login.title')" back="/" />
     <div class="c-auth">
-      <CreatorAuthTag left="No.001" right="Member access" />
-      <p class="c-mute c-auth-lead">{{ $t('auth.login.note') }}</p>
+      <p class="c-auth-lead">{{ $t('auth.login.note') }}</p>
       <p v-if="okMsg" class="c-ok" role="status">{{ okMsg }}</p>
       <!-- 社群登入不寄信，放在 Email 前面 -->
-      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')">{{ $t('auth.login.line') }}</button>
-      <button type="button" class="c-btn block" :disabled="busy" @click="social('google')">{{ $t('auth.login.google') }}</button>
+      <button type="button" class="c-btn block c-mb" :disabled="busy" @click="social('line')"><UiIcon name="line" :size="18" />{{ $t('auth.login.line') }}</button>
+      <button type="button" class="c-btn block" :disabled="busy" @click="social('google')"><UiIcon name="google" :size="18" />{{ $t('auth.login.google') }}</button>
       <p class="c-or">{{ $t('auth.login.or') }}</p>
       <CreatorCodeLogin v-if="useCode" :email="email" @done="navigateTo(redirect)" />
       <form v-else @submit.prevent="submit">
@@ -76,7 +75,7 @@ async function social(provider: 'google' | 'line') {
         <p v-if="noPwHint" class="c-mute">{{ $t('auth.login.noPasswordHint') }}</p>
         <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('auth.login.busy') : $t('auth.login.title') }}</button>
       </form>
-      <button type="button" class="c-btn block c-mt12" :disabled="busy" @click="toggleCode">{{ useCode ? $t('auth.login.usePassword') : $t('auth.login.useCode') }}</button>
+      <button type="button" class="c-btn block c-mt12" :disabled="busy" @click="toggleCode"><UiIcon name="mail" :size="18" />{{ useCode ? $t('auth.login.usePassword') : $t('auth.login.useCode') }}</button>
       <p class="c-auth-foot">{{ $t('auth.login.noAccount') }}<NuxtLink :to="{ path: '/register', query: q }">{{ $t('auth.login.register') }}</NuxtLink></p>
       <p v-if="orgsOn" class="c-center c-m0"><NuxtLink to="/org">{{ $t('org.loginHint') }}</NuxtLink></p>
     </div>

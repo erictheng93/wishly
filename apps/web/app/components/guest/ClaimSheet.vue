@@ -67,9 +67,9 @@ async function submit() {
           <div class="g-mute">{{ $t('guest.claim.remaining', { n: item.qty_remaining }) }}</div></div>
       </div>
       <div class="g-step">
-        <button type="button" :aria-label="$t('guest.claim.dec')" :disabled="busy || qty <= 1" @click="qty--">－</button>
+        <button type="button" :aria-label="$t('guest.claim.dec')" :disabled="busy || qty <= 1" @click="qty--"><UiIcon name="minus" :size="20" /></button>
         <b>{{ qty }}</b>
-        <button type="button" :aria-label="$t('guest.claim.inc')" :disabled="busy || qty >= max" @click="qty++">＋</button>
+        <button type="button" :aria-label="$t('guest.claim.inc')" :disabled="busy || qty >= max" @click="qty++"><UiIcon name="plus" :size="20" /></button>
       </div>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
       <template v-if="!editing">

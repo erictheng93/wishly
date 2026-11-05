@@ -28,15 +28,12 @@
       "demoAria": "Danh sách ước nguyện mẫu: ba món, trong đó một món đã có người tặng",
       "demoTitle": "Điều ước sinh nhật của An",
       "demoCount": "3 món",
-      "demoThumb1": "Cà phê",
       "demoItem1": "Bộ pha cà phê phin",
       "demoTop": "Muốn nhất",
       "demoBy": "Khải sẽ tặng",
-      "demoThumb2": "Tai nghe",
       "demoItem2": "Tai nghe chống ồn",
       "demoRaised": "Đã góp $4,800",
       "demoGoal": "/ $8,000",
-      "demoThumb3": "Sách",
       "demoItem3": "Thiết kế của những điều thường ngày",
       "demoGive": "Tôi tặng",
       "scenesTitle": "Ba dịp, cùng một danh sách",
@@ -57,7 +54,7 @@
           "d": "Liệt kê đồ điện gia dụng, bát đĩa, vật dụng hằng ngày. Khách đăng ký tặng xong là món đó được khóa ngay."
         }
       },
-      "sceneMore": "Xem ví dụ {k} →",
+      "sceneMore": "Xem ví dụ {k}",
       "originTitle": "Vì sao có Wishly",
       "origin": [
         "Mỗi lần tặng quà, ta lại giằng co giữa “Họ có thích không?” và “Mình có thật sự cần món này không?”\nVì ngại mở lời, vì không chắc người kia đang thiếu gì,\ntấm lòng nhiều khi hóa thành gánh nặng chất trong góc nhà.\nChuyện tặng quà thật ra chỉ thiếu một nhịp cầu để đồng bộ điều ước,\nnên mới sinh ra “bất cân xứng thông tin giữa cung và cầu”.",

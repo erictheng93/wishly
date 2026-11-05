@@ -7,6 +7,7 @@ const { data, error, refresh } = await useAsyncData(`brand-${slug}`, () => $fetc
 const brand = computed(() => data.value?.brand)
 const notFound = computed(() => (error.value as any)?.statusCode === 404 || (error.value as any)?.status === 404)
 if (notFound.value && import.meta.server) setResponseStatus(useRequestEvent()!, 404)
+// 行銷頁內容欄放寬到 1200（頁首跟著 --g-w 對齊）；head 標籤隨頁面卸載，不外洩到其他頁
 useSeoMeta({
   title: () => brand.value ? t('guest.brands.brandTitle', { name: brand.value.name }) : t('guest.brands.heading'),
   description: () => brand.value?.description || t('guest.brands.seoDesc'),
@@ -16,11 +17,10 @@ const { products, next, error: pErr, refresh: pRefresh, more, busy, moreErr } = 
 
 <template>
   <GuestTop />
-  <main class="g-wrap">
+  <main class="g-wrap g-wide">
     <div v-if="notFound" class="g-center"><h1>{{ $t('guest.brands.notFound') }}</h1><NuxtLink :to="localizedPath('/brands', $i18n.locale)">{{ $t('guest.brands.back') }}</NuxtLink></div>
     <div v-else-if="error" class="g-center"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="brand">
-      <p class="x-idx" aria-hidden="true"><span>INDEX / 031</span><span>BRAND FILE</span></p>
       <header class="x-head">
         <img v-if="brand.logo_url" class="x-logo" :src="brand.logo_url" alt="" loading="lazy">
         <div v-else class="x-logo x-ph" aria-hidden="true">{{ brand.name.slice(0, 1) }}</div>
@@ -42,8 +42,6 @@ const { products, next, error: pErr, refresh: pRefresh, more, busy, moreErr } = 
 </template>
 
 <style scoped>
-.x-idx{display:flex;justify-content:space-between;gap:16px;margin:28px 0 0;padding-bottom:12px;border-bottom:1px solid var(--ink-line);font:600 11px/1.4 var(--mono);letter-spacing:.16em;color:var(--mute)}
-.x-idx span:first-child{color:var(--red-text)}
 .x-head{display:flex;gap:20px;align-items:center;margin:20px 0 32px;padding-bottom:24px;border-bottom:1px solid var(--line)}
 .x-head h1{margin:0 0 6px;font-size:clamp(34px,7vw,64px);font-weight:900;letter-spacing:-.04em}
 .x-head a{display:inline-flex;align-items:center;min-height:44px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:5px}

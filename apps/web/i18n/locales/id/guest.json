@@ -70,9 +70,7 @@
     "card": {
       "priority": "Prioritas {level}",
       "prio": {
-        "high": "Tinggi",
-        "medium": "Sedang",
-        "low": "Rendah"
+        "high": "Tinggi"
       },
       "raised": "Terkumpul",
       "leftPts": " ・ Kurang {n} poin",
@@ -180,6 +178,7 @@
       "maskedBanner": "Kamu melihat sebagai pemilik: sebelum dibuka, kamu bisa melihat progres tiap barang, tapi tidak tahu siapa yang memberi.",
       "surpriseHint": "Ini wishlist kejutan: sebelum hari acara, pemilik tidak bisa melihat siapa memberi apa, jangan bocorkan dulu ya",
       "completion": "Selesai {pct}% ・ {done} / {total} barang",
+      "stillOpen": "Masih bisa diberi",
       "empty": "Pemilik masih menyiapkan wishlist, kembali lagi nanti",
       "loginHint": "Kasih hadiah atau ikut patungan perlu masuk sebagai anggota.",
       "login": "Masuk",

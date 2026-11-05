@@ -22,7 +22,7 @@ html:lang(vi) .g-wrap h1{line-height:1.22} /* 越南文聲調符號需要行高 
 .g-cover[src$='.svg']{object-fit:contain;background:var(--bg-alt)}
 .g-cover{width:100%;aspect-ratio:21/8;max-height:320px;object-fit:cover;margin-top:20px;display:block;outline:1px solid var(--line);outline-offset:-1px}
 /* 品項卡：細線框、無左紅條；hover 時墨框＋位移陰影 */
-.g-card{position:relative;background:var(--card);border:1px solid var(--line);padding:16px;margin:12px 0;transition:border-color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease)}
+.g-card{position:relative;background:var(--card);border:1px solid var(--line);padding:14px;margin:12px 0;transition:border-color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease)}
 .g-item{display:flex;gap:16px;list-style:none;animation:rise .5s var(--ease) both}
 .g-grid>.g-item:nth-child(2){animation-delay:.05s}.g-grid>.g-item:nth-child(3){animation-delay:.1s}.g-grid>.g-item:nth-child(4){animation-delay:.15s}.g-grid>.g-item:nth-child(n+5){animation-delay:.2s}
 .g-item.full{opacity:1;background:var(--hatch),var(--card)}
@@ -30,8 +30,8 @@ html:lang(vi) .g-wrap h1{line-height:1.22} /* 越南文聲調符號需要行高 
 .g-item.g-hl{outline:2px solid var(--red);outline-offset:3px}
 .g-thumb{width:88px;height:88px;background:var(--bg-alt);object-fit:cover;flex:none;display:grid;place-items:center;font:600 11px var(--mono);letter-spacing:.1em;color:var(--mute);outline:1px solid var(--line);outline-offset:-1px}
 .g-body{flex:1;min-width:0;display:flex;flex-direction:column}
-.g-title{font-weight:800;font-size:18px;line-height:1.35;word-break:break-word}
-.g-bar{height:8px;background:var(--hatch),var(--bg-alt);overflow:hidden;margin:10px 0 8px}
+.g-title{font-weight:800;font-size:17px;line-height:1.35;letter-spacing:-.01em;word-break:break-word}
+.g-bar{height:6px;background:var(--hatch),var(--bg-alt);overflow:hidden;margin:10px 0 8px}
 .g-bar>i{display:block;height:100%;background:var(--stripe);transform-origin:left;animation:fill 1s var(--ease) both}
 .g-num{color:var(--fg);font-weight:800}
 .g-badge{display:inline-flex;align-items:center;gap:5px;font:600 11px/20px var(--mono);padding:0 7px;border:1px solid var(--line);color:var(--mute);margin-left:8px;letter-spacing:.06em;vertical-align:3px;white-space:nowrap}
@@ -58,7 +58,7 @@ html:lang(vi) .g-wrap h1{line-height:1.22} /* 越南文聲調符號需要行高 
 .g-dot.on{background:var(--ok);box-shadow:0 0 0 0 var(--ok);animation:pulse 2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 50%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
 .g-mask{position:fixed;inset:0;background:var(--scrim);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade var(--t) var(--ease)}
-.g-sheet{background:var(--card);box-shadow:inset 0 3px 0 var(--red);width:100%;max-width:560px;max-height:92vh;max-height:92dvh;overflow:auto;padding:28px 20px calc(24px + env(safe-area-inset-bottom));box-sizing:border-box;animation:rise .32s var(--ease)}
+.g-sheet{background:var(--card);width:100%;max-width:560px;max-height:92vh;max-height:92dvh;overflow:auto;padding:28px 20px calc(24px + env(safe-area-inset-bottom));box-sizing:border-box;animation:rise .32s var(--ease)}
 .g-sheet.center{text-align:center}
 .g-sheet h1{font-size:26px;line-height:1.2;margin:8px 0 12px}
 .g-sheet h1.ok{color:var(--ok)}
@@ -75,11 +75,12 @@ html:lang(vi) .g-wrap h1{line-height:1.22} /* 越南文聲調符號需要行高 
 .g-inline input{flex:1;min-width:0;font:inherit;font-size:16px;min-height:48px;padding:10px 14px;border:1px solid var(--line);border-bottom-color:var(--ink-line);background:var(--bg-alt);color:var(--fg);box-sizing:border-box}
 .g-vis{display:block;margin-top:6px}
 .g-actions{margin-top:auto;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.g-actions .g-link{font-size:13px;color:var(--mute)}
 .g-h2{font-size:18px;margin:0 0 10px}
 .g-step{display:flex;align-items:center;gap:0;justify-content:center;margin:18px 0;border:1px solid var(--ink-line);width:max-content;margin-inline:auto}
-.g-step button{width:52px;height:52px;border:0;background:var(--card);color:var(--fg);font-size:22px;font-weight:700;cursor:pointer;transition:background var(--t) var(--ease)}
+.g-step button{display:grid;place-items:center;width:52px;height:52px;border:0;background:var(--card);color:var(--fg);cursor:pointer;transition:background var(--t) var(--ease)}
 .g-step button:disabled{opacity:.3}
-.g-step b{font:800 32px var(--mono);color:var(--fg);min-width:80px;text-align:center;align-self:stretch;display:grid;place-items:center;border-inline:1px solid var(--line)}
+.g-step b{font:800 32px var(--font);color:var(--fg);min-width:80px;text-align:center;align-self:stretch;display:grid;place-items:center;border-inline:1px solid var(--line)}
 .g-foot a,.g-center a,.g-sheet p a{display:inline-flex;align-items:center;min-height:44px;padding:0 6px}
 .g-sheet select,.g-card select{min-height:44px;box-sizing:border-box;font:inherit;padding:0 10px;border:1px solid var(--ink-line);background:var(--card);color:var(--fg)}
 .g-wrap summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:700}
@@ -115,7 +116,7 @@ dialog.g-dialog:focus-visible{outline:0}
   .g-grid>.g-card{margin:0}
   .g-mask{align-items:center}
   dialog.g-dialog{margin:auto}
-  .g-sheet{border:1px solid var(--ink-line);box-shadow:inset 0 3px 0 var(--red),10px 10px 0 color-mix(in srgb,var(--fg) 14%,transparent);padding:32px}
+  .g-sheet{border:1px solid var(--ink-line);box-shadow:10px 10px 0 color-mix(in srgb,var(--fg) 14%,transparent);padding:32px}
 }
 /* 桌面滑鼠 hover：僅在有 hover 的精準指標裝置生效 */
 @media (hover:hover) and (pointer:fine){
@@ -125,7 +126,7 @@ dialog.g-dialog:focus-visible{outline:0}
   .g-step button:not(:disabled):hover{background:var(--bg-alt)}
   .g-nav a:hover::after{transform:none}
   .g-link:hover,.g-foot a:hover,.g-wrap summary:hover{color:var(--red-text)}
-  .g-card.g-item:not(.full):hover{border-color:var(--ink-line);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line);transform:translate(-2px,-2px)}
+  .g-card.g-item:not(.full):hover{border-color:var(--ink-line);box-shadow:4px 4px 0 var(--bg-alt),4px 4px 0 1px var(--ink-line)}
 }
 /* 橫放手機等短視窗：頂欄不固定 */
 @media (max-height:500px) and (orientation:landscape){ .g-top{position:static} }
@@ -143,3 +144,42 @@ dialog.g-dialog:focus-visible{outline:0}
   .g-wrap h1{margin-top:20px}
   .g-thumb{width:72px;height:72px}
 }
+
+/* ================= 認捐面板（ClaimSheet / FundSheet / ReportSheet）：全站最關鍵的互動 ================= */
+dialog.g-dialog:focus-visible,dialog.g-dialog .g-sheet:focus-visible{outline:0}
+dialog.g-dialog .g-sheet{border:1px solid var(--ink-line);box-shadow:8px 8px 0 color-mix(in srgb,var(--fg) 14%,transparent);padding:28px 24px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+@media (min-width:768px){dialog.g-dialog .g-sheet{padding:32px 36px}}
+/* 品項標頭：縮圖＋名稱；下方一條墨線把「送什麼」與「怎麼送」分成兩組 */
+dialog.g-dialog .g-sheet>.g-item{align-items:center;gap:14px;padding:0 0 18px;margin:0 0 20px;border:0;border-bottom:1px solid var(--ink-line);background:none;animation:none}
+dialog.g-dialog .g-sheet>.g-item .g-thumb{width:64px;height:64px}
+dialog.g-dialog .g-sheet>.g-item .g-title{font-size:19px;line-height:1.35}
+dialog.g-dialog .g-sheet>.g-item .g-mute{margin-top:4px;font-size:13px}
+/* 數量：整列步進器，數字是主角 */
+dialog.g-dialog .g-sheet .g-step{width:100%;margin:0 0 14px;justify-content:space-between}
+dialog.g-dialog .g-sheet .g-step button{flex:0 0 56px;height:56px}
+dialog.g-dialog .g-sheet .g-step b{flex:1;font:800 36px var(--font)}
+/* 身分列：一行灰字壓在步進器下 */
+dialog.g-dialog .g-sheet .g-step+p.g-mute{margin:0 0 4px;padding-bottom:16px;border-bottom:1px solid var(--line);font-size:13px}
+/* 欄位：標籤用一般字、輸入框 1px 細框＋墨色底線、選單自畫箭頭 */
+dialog.g-dialog .g-sheet label:not(.g-radio){margin:20px 0 8px;font:700 13px/1.4 var(--font);letter-spacing:.02em;color:var(--fg)}
+dialog.g-dialog .g-sheet :is(input,textarea):not([type=checkbox],[type=radio]),dialog.g-dialog .g-sheet select{border:1px solid var(--line);border-bottom-color:var(--ink-line);background-color:var(--card);min-height:48px}
+dialog.g-dialog .g-sheet select{appearance:none;width:100%;padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+dialog.g-dialog .g-sheet :is(input,textarea,select):focus-visible{border-color:var(--red);outline:0}
+/* 匿名：平的勾選列，勾選後框線轉墨色 */
+dialog.g-dialog .g-sheet label.g-radio{display:flex;gap:12px;align-items:center;margin:16px 0 0!important;padding:12px 14px;box-sizing:border-box;min-height:48px;font-size:14px!important;line-height:1.5;background:none;border:1px solid var(--line);cursor:pointer}
+dialog.g-dialog .g-sheet label.g-radio:has(:checked){border-color:var(--ink-line);background:var(--bg-alt)}
+/* 告知：小字降權，連結保留紅底線 */
+dialog.g-dialog .g-sheet p.g-mute:not(.g-step+p){margin:16px 0 4px;font-size:12px;line-height:1.7}
+dialog.g-dialog .g-sheet p a{display:inline;min-height:0;padding:0;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px;color:var(--fg);white-space:nowrap}
+/* 動作：確定要送是面板唯一的紅色，取消為安靜文字鈕 */
+dialog.g-dialog .g-sheet>.g-btn{min-height:52px;margin-top:12px;font-size:16px}
+dialog.g-dialog .g-sheet>.g-link{margin-top:4px;color:var(--mute);text-decoration-color:var(--line)}
+dialog.g-dialog .g-sheet .g-banner{margin:12px 0}
+/* 行銷頁（探索、靈感、品牌）放寬內容欄到 1200；頁首也用 --g-w，會一起對齊 */
+@media (min-width:768px){:root:has(main.g-wide){--g-w:1200px}}
+/* 空狀態：一排空櫥窗（斜線＝空槽），頂端警示斜紋當遮陽棚，底下一條慢慢補滿的進度 */
+.g-shelf{text-align:left;padding:48px 0 24px;font-size:17px;line-height:1.7}
+.g-shelf::before{content:"";display:block;height:clamp(150px,22vw,280px);margin-bottom:40px;border-bottom:1px solid var(--ink-line);background-image:linear-gradient(90deg,transparent calc(25% - 7px),var(--bg) 0 calc(25% + 7px),transparent 0 calc(50% - 7px),var(--bg) 0 calc(50% + 7px),transparent 0 calc(75% - 7px),var(--bg) 0 calc(75% + 7px),transparent 0),var(--stripe),var(--hatch);background-size:auto,100% 12px,auto;background-repeat:no-repeat,no-repeat,repeat}
+.g-shelf::after{content:"";display:block;width:min(320px,100%);height:8px;margin-top:32px;background:linear-gradient(var(--red) 0 0) 0 0/38% 100% no-repeat,var(--hatch),var(--bg-alt);animation:g-shelf-load 2.2s .3s var(--ease) both}
+@keyframes g-shelf-load{from{background-size:0 100%,auto,auto}}
+.g-shelf-t{display:block;font-size:clamp(28px,3.6vw,44px);font-weight:900;letter-spacing:-.02em;line-height:1.15;color:var(--fg);margin-bottom:12px}

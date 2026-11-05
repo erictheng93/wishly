@@ -133,7 +133,7 @@ const support = (over: Record<string, any> = {}) => ({ id: 'it1', title: '幫基
   support: { ended: false, target: { slug: 'org-1', title: '震災物資', cover_image_url: null, cover_preset: 'gift', owner_name: '家園基金會' }, points: 12000, qty: 85, ...over } })
 function supportCard(item: any, closed = false) {
   const NuxtLink = defineComponent({ props: ['to'], setup: (p, { slots }) => () => h('a', { href: p.to }, slots.default?.()) })
-  mounted = mount(SupportCard, { item, closed, index: 1 }, { NuxtLink }, { fmtPts, coverSrc: (w: any) => w.cover_image_url ?? '/covers/gift.svg' })
+  mounted = mount(SupportCard, { item, closed }, { NuxtLink }, { fmtPts, coverSrc: (w: any) => w.cover_image_url ?? '/covers/gift.svg' })
   return mounted.el
 }
 it('support card shows both numbers with labels and links with via', () => {

@@ -46,7 +46,6 @@ async function verify() {
   <main class="c-page">
     <CreatorHeader :title="$t('auth.register.title')" back="/login" />
     <div class="c-auth">
-      <CreatorAuthTag left="No.002" right="Register" :step="step === 'form' ? 1 : 2" :of="2" />
       <form v-if="step === 'form'" @submit.prevent="send">
         <label class="c-field"><span>{{ $t('auth.register.displayName') }}</span><input v-model="name" type="text" autocomplete="nickname" maxlength="50" required></label>
         <label class="c-field"><span>Email</span><input v-model="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
@@ -57,8 +56,8 @@ async function verify() {
       </form>
       <template v-if="step === 'form' && !isNative()">
         <p class="c-or">{{ $t('auth.register.or') }}</p>
-        <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)">{{ $t('auth.register.google') }}</button>
-        <button type="button" class="c-btn block" @click="oauth('line', redirect)">{{ $t('auth.register.line') }}</button>
+        <button type="button" class="c-btn block c-mb" @click="oauth('google', redirect)"><UiIcon name="google" :size="18" />{{ $t('auth.register.google') }}</button>
+        <button type="button" class="c-btn block" @click="oauth('line', redirect)"><UiIcon name="line" :size="18" />{{ $t('auth.register.line') }}</button>
       </template>
       <p v-if="step === 'form'" class="c-auth-foot">{{ $t('auth.register.haveAccount') }}<NuxtLink :to="{ path: '/login', query: route.query.redirect ? { redirect } : {} }">{{ $t('auth.register.login') }}</NuxtLink></p>
       <template v-if="step === 'otp'">

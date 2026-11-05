@@ -28,15 +28,12 @@
       "demoAria": "Contoh wishlist: tiga barang, salah satunya sudah ada yang kasih",
       "demoTitle": "Wishlist ulang tahun An",
       "demoCount": "3 barang",
-      "demoThumb1": "Mesin kopi",
       "demoItem1": "Set kopi seduh manual",
       "demoTop": "Paling diinginkan",
       "demoBy": "Kai yang kasih",
-      "demoThumb2": "Headphone",
       "demoItem2": "Headphone noise cancelling",
       "demoRaised": "Terkumpul $4,800",
       "demoGoal": "/ $8,000",
-      "demoThumb3": "Buku",
       "demoItem3": "The Design of Everyday Things",
       "demoGive": "Aku yang kasih",
       "scenesTitle": "Tiga situasi, satu wishlist yang sama",
@@ -57,7 +54,7 @@
           "d": "Elektronik, peralatan makan, dan kebutuhan sehari-hari semua dicantumkan. Begitu tamu mengklaim, barangnya langsung terkunci."
         }
       },
-      "sceneMore": "Lihat contoh {k} →",
+      "sceneMore": "Lihat contoh {k}",
       "originTitle": "Awal mula",
       "origin": [
         "Setiap kali memberi hadiah, kita selalu bimbang antara “Apakah dia akan suka?” dan “Apakah aku benar-benar butuh ini?”\nKarena sungkan bertanya, karena tidak yakin apa yang dibutuhkan,\nniat baik sering berakhir jadi beban yang menumpuk di sudut ruangan.\nMasalah memberi hadiah sebenarnya hanya kurang jembatan untuk menyinkronkan keinginan,\nsehingga muncul “asimetri informasi antara kebutuhan dan pemberian”.",
