@@ -193,7 +193,7 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
         <input v-for="(v, k) in pay.fields" :key="k" type="hidden" :name="String(k)" :value="v">
       </form>
 
-      <h2 class="c-h2 x-h" data-n="01">{{ $t('me.topup.history') }}</h2>
+      <h2 class="c-h2 x-h">{{ $t('me.topup.history') }}</h2>
       <p v-if="loading" class="c-mute" role="status">{{ $t('me.loading') }}</p>
       <p v-if="listErr" class="c-err" role="alert">{{ listErr }} <button class="c-btn" @click="manualRefresh">{{ $t('me.retry') }}</button></p>
       <p v-if="!loading && !topups.length && !listErr" class="x-empty">{{ $t('me.topup.empty') }}</p>
@@ -238,8 +238,8 @@ const methodDeadline = (m: string) => t(m === 'card' ? 'me.topup.deadlineCard' :
 .tp-form .c-btn.primary.tp-q{box-shadow:4px 4px 0 var(--fg)}
 .tp-method{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:44px;margin:0 0 8px;padding:14px;border:1px solid var(--line);cursor:pointer;transition:border-color var(--t) var(--ease),background var(--t) var(--ease)}
 .tp-method input{flex:none;width:20px;height:20px;min-height:0;margin:2px 0 0;accent-color:var(--red)}
-.tp-method:has(input:checked){border-color:var(--ink-line);background:var(--bg-alt);box-shadow:inset 3px 0 var(--red)}
+.tp-method:has(input:checked){border-color:var(--ink-line);background:var(--bg-alt);box-shadow:inset 0 0 0 1px var(--ink-line)}
 .tp-method:has(input:focus-visible){outline:2px solid var(--red);outline-offset:2px}
-.tp-sum{background:var(--bg-alt);border-style:dashed}
+.tp-sum{border:0;border-top:1px solid var(--ink-line);background:none;padding-inline:0}
 .tp-sum p[data-testid]{font:700 18px var(--mono)}
 </style>

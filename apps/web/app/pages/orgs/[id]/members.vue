@@ -93,11 +93,10 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
 </template>
 
 <style scoped>
-.f-sec{padding:0;border-top:2px solid var(--ink-line);margin-bottom:24px}
-.f-sec>*{margin-left:18px;margin-right:18px}
-.f-sec>.c-h2{margin:0 0 18px;padding:14px 18px;background:var(--bg-alt);border-bottom:1px solid var(--line)}
-.f-sec>.c-h2~*:last-child{margin-bottom:18px}
-.m-list{list-style:none;padding:0;margin:0 18px!important;display:block}
+.f-sec{border:0;border-top:1px solid var(--ink-line);background:transparent;padding:0;margin:0 0 32px}
+.f-sec>.c-h2{margin:0;padding:14px 0 12px;border-bottom:1px solid var(--line);font-size:16px;font-weight:800}
+.f-sec>.c-mute{margin:14px 0 0}
+.m-list{list-style:none;padding:0;margin:0;display:block}
 .m-list select{appearance:none;padding-right:34px!important;background-image:linear-gradient(45deg,transparent 50%,var(--fg) 50%),linear-gradient(135deg,var(--fg) 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px;background-repeat:no-repeat;min-height:44px;box-sizing:border-box;font:inherit;font-size:14px;padding:0 10px;border:1px solid var(--ink-line);background-color:var(--card);color:var(--fg)}
 .m-list li{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);min-height:56px}
 .m-list li:last-child{border-bottom:0}
@@ -110,9 +109,9 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
 .m-list li>strong{overflow-wrap:anywhere;min-width:0}
 .m-list li>.c-btn{min-height:44px}
 .m-list li>strong+span:not(.c-mute)+.c-btn{margin-left:auto}
-.m-form{display:grid;grid-template-columns:1fr;gap:0 20px}
+.m-form{display:grid;grid-template-columns:1fr;gap:0 20px;margin:16px 0 0}
 .m-form>.c-btn{justify-self:start}
-@media (min-width:768px){.m-form{grid-template-columns:2fr 1fr 1fr}.m-form>.c-btn{grid-column:1/-1}}
+@media (min-width:900px){.m-form{grid-template-columns:2fr 1fr 1fr;align-items:end}.m-form>.c-btn{grid-column:1/-1}}
 .m-link{margin-top:20px;padding:16px;border:1px dashed var(--ink-line);background:var(--hatch),var(--bg-alt)}
 .m-link input{width:100%;box-sizing:border-box;min-height:48px;margin:8px 0 12px;padding:0 12px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:500 13px var(--mono)}
 </style>

@@ -62,9 +62,9 @@ const profile = computed(() => {
 <template>
   <main class="c-page c-admin">
     <CreatorHeader :title="$t('admin.analytics.title')" back="/admin" />
-    <div class="c-row wrap c-mb an-range">
-      <div class="c-row c-grow" role="group" :aria-label="$t('admin.analytics.rangeLabel')">
-        <button v-for="n in RANGES" :key="n" class="c-btn c-grow" :class="{ on: days === n }" :aria-pressed="days === n" :disabled="busy" @click="days = n">{{ $t('admin.analytics.days', { n }) }}</button>
+    <div class="an-range">
+      <div class="k-seg" role="group" :aria-label="$t('admin.analytics.rangeLabel')">
+        <button v-for="n in RANGES" :key="n" class="c-btn" :class="{ on: days === n }" :aria-pressed="days === n" :disabled="busy" @click="days = n">{{ $t('admin.analytics.days', { n }) }}</button>
       </div>
       <button class="c-btn" :disabled="busy" @click="load">{{ busy ? $t('admin.analytics.refreshing') : $t('admin.analytics.refresh') }}</button>
     </div>
@@ -76,7 +76,7 @@ const profile = computed(() => {
       <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
       <section class="c-card an-kpi-card" :aria-label="$t('admin.analytics.overview')">
         <dl class="an-tiles k-kpis">
-          <div v-for="t in TILES" :key="t[0]"><dt>{{ t[0] }}</dt><dd>{{ fmtCount(t[1]) }}</dd></div>
+          <div v-for="t in TILES" :key="t[0]"><dt>{{ t[0] }}</dt><dd :class="{ 'is-zero': !t[1] }">{{ fmtCount(t[1]) }}</dd></div>
         </dl>
       </section>
 
@@ -121,11 +121,11 @@ const profile = computed(() => {
       <section class="c-card" :aria-label="$t('admin.analytics.claimsTrust')">
         <h2 class="c-h2">{{ $t('admin.analytics.claimsTrust') }}</h2>
         <dl class="an-tiles k-kpis">
-          <div><dt>{{ $t('admin.analytics.reports') }}</dt><dd>{{ fmtCount(data.trust.reports) }}</dd></div>
-          <div><dt>{{ $t('admin.analytics.loginFailures') }}</dt><dd>{{ fmtCount(data.trust.login_failures) }}</dd></div>
-          <div><dt>{{ $t('admin.analytics.pwaPrompted') }}</dt><dd>{{ fmtCount(data.pwa.prompted) }}</dd></div>
-          <div><dt>{{ $t('admin.analytics.pwaInstalled') }}</dt><dd>{{ fmtCount(data.pwa.installed) }}</dd></div>
-          <div><dt>{{ $t('admin.analytics.pwaRate') }}</dt><dd>{{ data.pwa.prompted ? `${Math.round(data.pwa.installed / data.pwa.prompted * 100)}%` : '—' }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.reports') }}</dt><dd :class="{ 'is-zero': !data.trust.reports }">{{ fmtCount(data.trust.reports) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.loginFailures') }}</dt><dd :class="{ 'is-zero': !data.trust.login_failures }">{{ fmtCount(data.trust.login_failures) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.pwaPrompted') }}</dt><dd :class="{ 'is-zero': !data.pwa.prompted }">{{ fmtCount(data.pwa.prompted) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.pwaInstalled') }}</dt><dd :class="{ 'is-zero': !data.pwa.installed }">{{ fmtCount(data.pwa.installed) }}</dd></div>
+          <div><dt>{{ $t('admin.analytics.pwaRate') }}</dt><dd :class="{ 'is-zero': !data.pwa.installed }">{{ data.pwa.prompted ? `${Math.round(data.pwa.installed / data.pwa.prompted * 100)}%` : '—' }}</dd></div>
         </dl>
         <template v-for="g in groups.slice(0, 2)" :key="g[0]">
           <h3 class="an-h3">{{ g[0] }}</h3>
@@ -146,7 +146,7 @@ const profile = computed(() => {
           <span class="an-track"><span class="an-bar" :style="{ width: (data.profile.users ? p[1] / data.profile.users * 100 : 0) + '%' }" /></span>
           <span class="an-v">{{ pct(p[1], data.profile.users) }}<small class="c-mute"> {{ fmtCount(p[1]) }}</small></span>
         </div>
-        <dl class="an-tiles k-kpis c-mt"><div><dt>{{ $t('admin.analytics.upcoming') }}</dt><dd>{{ fmtCount(data.profile.upcoming_birthdays_30d) }}</dd></div></dl>
+        <dl class="an-tiles k-kpis c-mt"><div><dt>{{ $t('admin.analytics.upcoming') }}</dt><dd :class="{ 'is-zero': !data.profile.upcoming_birthdays_30d }">{{ fmtCount(data.profile.upcoming_birthdays_30d) }}</dd></div></dl>
         <h3 class="an-h3">{{ $t('admin.analytics.birthdayMonth') }}</h3>
         <div class="an-cols" role="img" :aria-label="$t('admin.analytics.monthAria')">
           <div v-for="m in months" :key="m.key" class="an-col" :title="$t('admin.analytics.monthTitle', { month: m.label, n: fmtCount(m.v) })">
@@ -178,9 +178,8 @@ const profile = computed(() => {
   </main>
 </template>
 <style scoped>
-.an-tiles{margin:0;grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
-.an-kpi-card{padding:0!important;border-top:2px solid var(--ink-line)}
-.an-kpi-card .k-kpis{border-top:0;border-left:0}
+.an-tiles{margin:0;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:900px){.an-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .an-multi{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
 .an-fig{margin:0;padding:14px 16px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
 .an-fig figcaption{display:flex;flex-direction:column;gap:2px;font-size:14px}

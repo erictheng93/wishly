@@ -32,7 +32,7 @@ async function submit() {
   <main class="c-page">
     <CreatorHeader :title="$t('lists.new.pageTitle')" back="/dashboard" />
     <form class="ln" @submit.prevent="submit">
-      <section class="ln-sec" data-n="01 / BASICS"><div class="ln-body">
+      <section class="ln-sec"><h2 class="ln-h">1　{{ $t('lists.new.sec.basics') }}</h2><div class="ln-body">
       <div class="c-field"><span>{{ $t('lists.new.type') }}</span>
         <!-- 類型決定行為（relief 需據點、組織），目前只開放 personal；開放新類型時在此加選項 -->
         <div class="c-seg">
@@ -42,20 +42,20 @@ async function submit() {
       <label class="c-field"><span>{{ $t('lists.new.title', { n: f.title.length }) }}</span><input v-model="f.title" maxlength="100" required :placeholder="$t('lists.new.titlePh')"></label>
       <label class="c-field"><span>{{ $t('lists.new.desc') }}</span><textarea v-model="f.description" rows="2" maxlength="300" /></label>
       </div></section>
-      <section class="ln-sec" data-n="02 / COVER"><div class="ln-body">
+      <section class="ln-sec"><h2 class="ln-h">2　{{ $t('lists.new.sec.cover') }}</h2><div class="ln-body">
       <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="cover" @busy="upBusy = $event" />
       </div></section>
-      <section class="ln-sec" data-n="03 / DATES"><div class="ln-body">
+      <section class="ln-sec"><h2 class="ln-h">3　{{ $t('lists.new.sec.dates') }}</h2><div class="ln-body">
       <label class="c-field"><span>{{ $t('lists.new.event') }}</span><input v-model="f.event_date" type="date" :min="today"></label>
       <label class="c-field"><span>{{ $t('lists.new.closes') }}</span><input v-model="f.closes_at" type="datetime-local" :min="nowLocal"></label>
       <p v-if="dateErr" class="c-err" role="alert">{{ dateErr }}</p>
       <CreatorTtlPicker v-model="f.claim_ttl_hours" />
       </div></section>
-      <section class="ln-sec" data-n="04 / RULES"><div class="ln-body">
+      <section class="ln-sec"><h2 class="ln-h">4　{{ $t('lists.new.sec.rules') }}</h2><div class="ln-body">
       <label class="c-switch"><input v-model="f.surprise_mode" type="checkbox"><span>{{ $t('lists.new.surprise') }}<br><small class="c-mute">{{ $t('lists.new.surpriseHint') }}</small></span></label>
       <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>{{ $t('lists.new.showNames') }}<br><small class="c-mute">{{ $t('lists.new.showNamesHint') }}</small></span></label>
       </div></section>
-      <section class="ln-sec" data-n="05 / ACCESS"><div class="ln-body">
+      <section class="ln-sec"><h2 class="ln-h">5　{{ $t('lists.new.sec.access') }}</h2><div class="ln-body">
       <CreatorVisibilityPicker v-model:visibility="f.visibility" v-model:users="allowed" />
       <CreatorBirthdayNotify v-model="f.birthday_notify" :visibility="f.visibility" />
       </div></section>
@@ -68,13 +68,14 @@ async function submit() {
 </template>
 <style scoped>
 .ln-sec{display:block;padding:20px 0 6px;border-top:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
-.ln-sec::before{content:attr(data-n);display:block;margin-bottom:16px;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text)}
+.ln-h{margin:0 0 16px;font-size:14px;font-weight:700;line-height:1.3;letter-spacing:.04em;color:var(--red-text)}
 .ln-sec:first-of-type{border-top:0;padding-top:4px}
 .ln-sec:nth-of-type(2){animation-delay:.05s}.ln-sec:nth-of-type(3){animation-delay:.1s}.ln-sec:nth-of-type(4){animation-delay:.15s}
 .ln-go{padding-top:20px;border-top:1px solid var(--ink-line);margin-top:8px}
 @media (min-width:768px){
   .ln-sec{display:grid;grid-template-columns:180px minmax(0,1fr);gap:0 40px}
-  .ln-body{max-width:560px}
+  .ln-body{max-width:560px;grid-column:2}
+  .ln-h{grid-column:1}
 }
 .ln-body .c-switch{align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);margin:0}
 .ln-body .c-switch input{margin-top:3px}

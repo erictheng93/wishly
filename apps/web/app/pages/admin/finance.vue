@@ -17,10 +17,8 @@ const setTab = (k: FinanceTab) => router.replace({ query: { tab: k } })
     <nav class="c-tabs" :aria-label="$t('admin.finance.tabsLabel')">
       <button v-for="k in TABS" :key="k" class="c-btn" :class="{ on: tab === k }" :aria-current="tab === k ? 'page' : undefined" @click="setTab(k)">{{ $t(`admin.finance.tabs.${k}`) }}</button>
     </nav>
-    <div v-if="tab !== 'transactions'" class="c-row wrap c-mb an-range">
-      <div class="c-row c-grow" role="group" :aria-label="$t('admin.finance.rangeLabel')">
-        <button v-for="n in RANGES" :key="n" class="c-btn c-grow" :class="{ on: days === n }" :aria-pressed="days === n" @click="days = n">{{ n === 1 ? $t('admin.finance.today') : $t('admin.finance.days', { n }) }}</button>
-      </div>
+    <div v-if="tab !== 'transactions'" class="k-seg" role="group" :aria-label="$t('admin.finance.rangeLabel')">
+      <button v-for="n in RANGES" :key="n" class="c-btn" :class="{ on: days === n }" :aria-pressed="days === n" @click="days = n">{{ n === 1 ? $t('admin.finance.today') : $t('admin.finance.days', { n }) }}</button>
     </div>
     <FinanceOverview v-if="tab === 'overview'" :days="days" />
     <FinancePayers v-else-if="tab === 'payers'" :days="days" />

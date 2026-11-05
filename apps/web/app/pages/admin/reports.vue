@@ -107,14 +107,14 @@ const href = (r: any) => `/u/${(r.user ?? r.wishlist.owner).handle || (r.user ??
     </div>
     <div class="c-row wrap c-mt">
       <span class="c-mute">{{ $t('admin.reports.viewLabel') }}</span>
-      <button class="c-btn" :class="{ primary: view === 'targets' }" :aria-pressed="view === 'targets'" data-testid="view-targets" @click="tgt = null; view = 'targets'">{{ $t('admin.reports.viewTargets') }}</button>
-      <button class="c-btn" :class="{ primary: view === 'rows' }" :aria-pressed="view === 'rows'" data-testid="view-rows" @click="view = 'rows'">{{ $t('admin.reports.viewRows') }}</button>
+      <span class="k-seg" role="group" :aria-label="$t('admin.reports.viewLabel')"><button class="c-btn" :class="{ on: view === 'targets' }" :aria-pressed="view === 'targets'" data-testid="view-targets" @click="tgt = null; view = 'targets'">{{ $t('admin.reports.viewTargets') }}</button>
+      <button class="c-btn" :class="{ on: view === 'rows' }" :aria-pressed="view === 'rows'" data-testid="view-rows" @click="view = 'rows'">{{ $t('admin.reports.viewRows') }}</button></span>
       <span v-if="tgt" class="c-badge" data-testid="target-chip">{{ $t('admin.reports.filterChip', { name: tgt.label }) }} <button class="g-link" :aria-label="$t('admin.reports.clearFilter')" data-testid="chip-clear" @click="tgt = null">×</button></span>
     </div>
     <dl v-if="openBy" class="k-kpis c-mt" data-testid="report-kpis">
-      <div><dt>{{ $t('admin.reports.kinds.wishlist') }}</dt><dd>{{ openBy.wishlist }}{{ cursor ? '+' : '' }}</dd></div>
-      <div><dt>{{ $t('admin.reports.kinds.user') }}</dt><dd>{{ openBy.user }}{{ cursor ? '+' : '' }}</dd></div>
-      <div><dt>{{ $t('admin.reports.kinds.org') }}</dt><dd>{{ openBy.org }}{{ cursor ? '+' : '' }}</dd></div>
+      <div><dt>{{ $t('admin.reports.kinds.wishlist') }}</dt><dd :class="{ 'is-zero': !openBy.wishlist }">{{ openBy.wishlist }}{{ cursor ? '+' : '' }}</dd></div>
+      <div><dt>{{ $t('admin.reports.kinds.user') }}</dt><dd :class="{ 'is-zero': !openBy.user }">{{ openBy.user }}{{ cursor ? '+' : '' }}</dd></div>
+      <div><dt>{{ $t('admin.reports.kinds.org') }}</dt><dd :class="{ 'is-zero': !openBy.org }">{{ openBy.org }}{{ cursor ? '+' : '' }}</dd></div>
     </dl>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>

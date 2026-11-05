@@ -73,13 +73,12 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
 <template>
   <main class="c-page">
     <CreatorHeader :title="w?.title ? $t('lists.progress.headerTitle', { title: w.title }) : $t('lists.progress.pageTitle')" :back="`/lists/${id}/edit`">
-      <button class="c-btn" :aria-label="$t('lists.progress.refresh')" @click="load">↻</button>
+      <button class="c-btn" :aria-label="$t('lists.progress.refresh')" @click="load"><UiIcon name="refresh" :size="18" /></button>
     </CreatorHeader>
     <p v-if="loading" class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load">{{ $t('lists.common.retry') }}</button></p>
     <template v-if="d">
       <section class="x-ink pg-hero">
-        <div class="x-tag" aria-hidden="true"><span><i class="x-dot" />{{ status === 'live' ? 'LIVE' : 'SNAPSHOT' }}</span><span>OVERALL</span></div>
         <div class="c-big x-num">{{ pct }}<small>%</small></div>
         <div class="c-bar" role="progressbar" :aria-valuenow="pct" aria-valuemin="0" aria-valuemax="100" :aria-label="$t('lists.progress.overall')"><i :style="{ width: pct + '%' }" /></div>
         <p class="c-mute">{{ $t('lists.progress.complete', { done: d.totals.fulfilled_count, total: d.totals.item_count }) }}{{ $t('lists.progress.qtyPart', { claimed: d.totals.qty_claimed, needed: d.totals.qty_needed }) }}</p>
@@ -98,7 +97,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
       <p v-else-if="!locked && !d.totals.qty_claimed && !d.totals.pledged_points" class="x-empty">{{ $t('lists.progress.nobody') }}</p>
       <p v-if="claimErr" class="c-err" role="alert">{{ claimErr }}</p>
 
-      <h2 class="c-h2 x-h" data-n="ITEMS">{{ $t('lists.progress.itemsTitle') }}</h2>
+      <h2 class="c-h2 x-h">{{ $t('lists.progress.itemsTitle') }}</h2>
       <article v-for="(i, n) in d.items" :key="i.item_id" class="c-card pg-item">
         <span class="pg-n" aria-hidden="true">{{ String(Number(n) + 1).padStart(2, '0') }}</span>
         <template v-if="i.funding_mode === 'support'">
@@ -172,6 +171,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
   </main>
 </template>
 <style scoped>
+.pg-hero .x-num{margin-top:4px}
 .pg-hero .x-num small{font-size:.4em;letter-spacing:0;margin-left:4px;color:var(--red)}
 .pg-hero .c-bar{height:12px;background:repeating-linear-gradient(-45deg,color-mix(in srgb,var(--xi-fg) 38%,transparent) 0 1px,transparent 1px 7px),color-mix(in srgb,var(--xi-fg) 14%,transparent)}
 .pg-hero .c-mute{margin:10px 0 0;font:600 12px/1.6 var(--mono);letter-spacing:.03em}

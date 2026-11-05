@@ -44,6 +44,7 @@ onMounted(load)
 </template>
 
 <style scoped>
+main>.c-mute{padding:28px 16px;text-align:center;border:1px dashed var(--line);background:var(--hatch);font:500 12px var(--mono);letter-spacing:.04em}
 .au-wrap{overflow-x:auto;margin-bottom:16px}
 .au-t{width:100%;border-collapse:collapse;font-size:14px}
 .au-t th{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;text-align:left;padding:10px 12px;border-bottom:2px solid var(--ink-line);background:var(--bg-alt)}

@@ -123,7 +123,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
     <CreatorHeader :title="$t('common.friends')" back="/dashboard" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="loading" class="c-mute" role="status">{{ $t('me.loading') }}</p>
-    <div v-else class="fr">
+    <div v-else class="fr" :class="{ 'fr-lonely': feed && !feed.events.length }">
       <div class="fr-top">
         <section v-if="data.incoming.length" class="c-card">
           <h2 class="c-h2">{{ $t('me.friends.incoming') }}</h2>
@@ -147,7 +147,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
       </div>
 
       <section class="fr-feed" :aria-labelledby="'fr-feed-h'">
-        <h2 id="fr-feed-h" class="c-h2 x-h" data-n="FEED">{{ $t('me.friends.feedTitle') }}</h2>
+        <h2 id="fr-feed-h" class="c-h2 x-h">{{ $t('me.friends.feedTitle') }}</h2>
         <p v-if="feedErr" class="c-err" role="alert">{{ feedErr }}</p>
         <p v-else-if="!feed" class="c-mute" role="status">{{ $t('me.loading') }}</p>
         <div v-else-if="!data.friends.length" class="c-mask">
@@ -266,6 +266,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 /* 手機：邀請 / 生日 → 動態 → 加好友與名單；桌面 ≥1100：動態在左，其餘疊在右欄 */
 .fr{display:flex;flex-direction:column}
 .fr-feed{margin-bottom:12px}
+.fr-side .c-card>.c-field:last-child{margin-bottom:0}
 .fr-feed .x-h{margin-top:0}
 .fr-top .c-h2,.fr-side .c-h2{font-size:15px;font-family:var(--font)}
 .fr-side .c-card>form .c-btn,.fr-side .c-card>.c-btn{margin-right:8px}
@@ -291,5 +292,12 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
 @media (min-width:1100px){
   .fr{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"feed top" "feed side";grid-template-rows:auto 1fr;gap:0 24px;align-items:start}
   .fr-feed{grid-area:feed}.fr-top{grid-area:top}.fr-side{grid-area:side}
+}
+/* 動態區只有空狀態時，桌面不留一整欄空白：空狀態橫跨整列，下方的卡 2 欄 */
+@media (min-width:768px){
+  .fr.fr-lonely{display:grid;grid-template:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+  .fr-lonely .fr-feed{grid-area:auto;grid-column:1/-1;order:-1;margin:0}
+  .fr-lonely :is(.fr-top,.fr-side){display:contents}
+  .fr-lonely .c-card{margin:0}
 }
 </style>

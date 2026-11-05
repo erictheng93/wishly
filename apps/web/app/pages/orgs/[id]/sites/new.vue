@@ -55,7 +55,8 @@ async function submit() {
 </template>
 
 <style scoped>
-.fm{padding:24px clamp(18px,3vw,32px) 12px;border-top:2px solid var(--ink-line);margin-bottom:20px}
+.fm{padding:20px;border-top:2px solid var(--ink-line);margin-bottom:20px}
+.fm .c-btn.primary{width:fit-content;min-width:160px}
 .fm-grid{display:grid;grid-template-columns:1fr;gap:0 24px}
 .fm-grid>.c-field:has(textarea),.fm-grid>fieldset,.fm-grid>.fm-wide{grid-column:1/-1}
 @media (min-width:768px){.fm-grid{grid-template-columns:1fr 1fr}}

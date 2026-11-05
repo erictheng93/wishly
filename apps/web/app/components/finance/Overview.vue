@@ -40,7 +40,7 @@ const KPIS = computed(() => {
   ]
   return rows.map(([key, cur, prev, isMoney]) => {
     const d = cur == null || prev == null ? null : delta(cur, prev)
-    return { key, value: isMoney ? money(cur) : fmtCount(cur ?? undefined), prev: isMoney ? money(prev) : fmtCount(prev ?? undefined), d: d == null ? null : Math.round(d), isMoney }
+    return { key, zero: !cur, value: isMoney ? money(cur) : fmtCount(cur ?? undefined), prev: isMoney ? money(prev) : fmtCount(prev ?? undefined), d: d == null ? null : Math.round(d), isMoney }
   })
 })
 const W = 200, H = 48
@@ -64,7 +64,7 @@ const chart = computed(() => {
           <NuxtLink v-for="x in TODO" :key="x.k" :to="x.to" class="fin-todo">
             <dl>
               <dt>{{ $t(`admin.finance.todo.${x.k}`) }}</dt>
-              <dd :class="{ hot: x.count > 0 }">{{ fmtCount(x.count) }}</dd>
+              <dd :class="{ hot: x.count > 0, 'is-zero': !x.count }">{{ fmtCount(x.count) }}</dd>
             </dl>
             <small class="c-mute">{{ money(x.amount) }}</small>
           </NuxtLink>
@@ -77,7 +77,7 @@ const chart = computed(() => {
         <dl class="k-kpis">
           <div v-for="k in KPIS" :key="k.key" :title="$t(`admin.finance.kpi.${k.key}Def`)">
             <dt>{{ $t(`admin.finance.kpi.${k.key}`) }}</dt>
-            <dd :class="{ money: k.isMoney }">{{ k.value }}</dd>
+            <dd :class="{ money: k.isMoney, 'is-zero': k.zero }">{{ k.value }}</dd>
             <small class="c-mute fin-cmp">{{ k.d == null ? $t('admin.finance.kpi.noPrev') : $t('admin.finance.kpi.vsPrev', { pct: (k.d > 0 ? '+' : '') + k.d + '%' }) }}・{{ k.prev }}</small>
             <small class="c-mute fin-def">{{ $t(`admin.finance.kpi.${k.key}Def`) }}</small>
           </div>
@@ -110,7 +110,7 @@ const chart = computed(() => {
 .fin-todo dl{margin:0}
 .fin-todo small{display:block}
 .fin-one{font:900 28px/1.2 var(--mono);margin:8px 0 0}
-.fin-todo dt{font:600 11px/1.4 var(--mono);letter-spacing:.06em!important;overflow-wrap:normal;word-break:normal;text-transform:uppercase;color:var(--mute);margin:0}
+.fin-todo dt{font:600 11px/1.4 var(--mono);letter-spacing:.06em!important;overflow-wrap:normal;word-break:normal;color:var(--mute);margin:0}
 .fin-todo dd{margin:8px 0 4px;font-size:clamp(30px,4.4vw,44px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
 .fin-todo dd.hot{color:var(--red-text)}
 .fin-cmp,.fin-def{display:block;margin-top:6px;font:500 11px/1.5 var(--mono)}

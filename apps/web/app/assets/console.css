@@ -1,23 +1,20 @@
-/* 營運後台「實驗室控制台」共用樣式（僅 admin/* 頁面以 <style src> 引入；不動共用 creator.css）
-   記錄卡 = 帶索引編號的台帳列；表單篩選 = 整齊的工具列；KPI = 大數字＋等寬標籤。 */
-.c-admin{counter-reset:k}
+/* 營運後台「實驗室控制台」共用樣式（admin/* 頁面 import）
+   記錄卡 = 細線台帳列；表單篩選 = 整齊的工具列；KPI = 單層格線＋數字；期間／二選一 = .k-seg 分段控制。 */
 .c-admin .c-title{margin-bottom:20px}
 
 /* ── 台帳記錄卡 ───────────────────────── */
-.c-admin article.c-card{counter-increment:k;padding:0;border:1px solid var(--line);border-top:2px solid var(--ink-line);margin:0 0 14px;overflow:hidden}
-.c-admin article.c-card>*{margin-left:18px;margin-right:18px}
+.c-admin article.c-card{padding:0;border:1px solid var(--line);border-top:1px solid var(--ink-line);margin:0 0 12px;overflow:hidden}
+.c-admin article.c-card>*{margin-left:16px;margin-right:16px}
 .c-admin article.c-card>*+*{margin-top:8px;margin-bottom:0}
-.c-admin article.c-card>:first-child{margin:0;padding:11px 18px;background:var(--bg-alt);border-bottom:1px solid var(--line);min-height:48px;box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
-.c-admin article.c-card>:first-child::before{content:counter(k,decimal-leading-zero) / "";flex:none;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text);padding-right:10px;margin-right:2px;border-right:1px solid var(--line)}
-@supports not (content:"" / ""){.c-admin article.c-card>:first-child::before{content:counter(k,decimal-leading-zero)}}
-.c-admin article.c-card>:first-child strong{font-size:16px}
+.c-admin article.c-card>:first-child{margin:0;padding:10px 16px;background:var(--bg-alt);border-bottom:1px solid var(--line);min-height:44px;box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.c-admin article.c-card>:first-child strong{font-size:15px}
 .c-admin article.c-card>:nth-child(2){margin-top:14px}
 .c-admin article.c-card>:last-child{margin-bottom:18px}
 .c-admin article.c-card>:first-child:last-child{margin-bottom:0}
 .c-admin article.c-card.bad{box-shadow:none;background:var(--card);border-top-color:var(--bad)}
 .c-admin article.c-card.bad>:first-child{background:var(--bad-bg)}
 /* 動作列：細線隔開，貼底成列 */
-.c-admin article.c-card>.c-row.wrap:last-child:not(:first-child){padding-top:14px;border-top:1px solid var(--line);margin-top:14px}
+.c-admin article.c-card>.c-row.wrap:last-child:not(:first-child){padding-top:14px;border-top:1px solid var(--line);margin-top:14px;justify-content:flex-start}
 .c-admin article.c-card .c-btn.small{min-height:44px}
 .c-admin article.c-card>.c-dl{margin-top:10px;margin-bottom:0}
 .c-admin article.c-card p{margin-top:8px;margin-bottom:0}
@@ -29,7 +26,7 @@
 @media (min-width:900px){
   .c-admin article.c-card>.c-dl{grid-template-columns:max-content minmax(0,1fr) max-content minmax(0,1fr)}
 }
-.c-admin .c-sub{margin-left:18px;margin-right:18px;border-top:1px solid var(--line);padding-top:12px}
+.c-admin .c-sub{margin-left:16px;margin-right:16px;border-top:1px solid var(--line);padding-top:12px}
 .c-admin code{font:500 12px var(--mono);background:var(--bg-alt);padding:1px 6px;border:1px solid var(--line)}
 .c-admin article.c-card>.c-mute{font-size:13px}
 .c-admin article.c-card a:not(.c-btn){text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
@@ -39,7 +36,6 @@
 .c-admin .c-field select:focus{background-color:var(--card)}
 .c-admin .c-field.c-narrow{max-width:280px}
 .c-admin .c-filters,.c-admin .audit-filters,.c-admin .admin-filters{padding:16px 16px 0;border:1px solid var(--line);background:var(--card);margin:0 0 16px;position:relative}
-.c-admin .c-filters::before,.c-admin .admin-filters::before,.c-admin .audit-filters::before{content:"FILTER" / "";position:absolute;top:-7px;left:12px;padding:0 6px;background:var(--bg);font:600 10px/14px var(--mono);letter-spacing:.2em;color:var(--mute)}
 .c-admin form.c-row{margin-bottom:12px}
 .c-admin form.c-row .c-input{min-width:0}
 
@@ -48,11 +44,12 @@
 .c-admin .c-ok{margin:0 0 14px}
 .c-admin p.c-center.c-mute{padding:36px 16px;border:1px dashed var(--line);background:var(--hatch);font:500 12px/1.6 var(--mono);letter-spacing:.08em}
 .c-admin p.c-mute[role=status]{font:500 12px/1.6 var(--mono);letter-spacing:.1em;display:flex;align-items:center;justify-content:center;gap:10px;min-height:96px;padding:20px 16px;border:1px dashed var(--line);background:var(--hatch);color:var(--mute);text-align:center}
-.c-admin p.c-mute[role=status]::before{content:"" / "";width:8px;height:8px;background:var(--red);flex:none}
-.c-admin .c-btn.block{margin-top:6px}
+.c-admin .c-btn.block{margin-top:6px;width:fit-content;min-width:160px}
+.c-admin article.c-card .c-btn.primary.c-grow,.c-admin article.c-card .c-row>.c-btn.c-grow{flex:0 0 auto;width:auto}
+.c-admin article.c-card b{font-variant-numeric:tabular-nums}
 
-/* ── 分頁：等寬 ─────────────────────── */
-.c-admin .c-tabs .c-btn{flex:0 0 auto;white-space:nowrap;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+/* ── 分頁：一般字 ─────────────────────── */
+.c-admin .c-tabs .c-btn{flex:0 0 auto;white-space:nowrap;font-size:14px;letter-spacing:.02em}
 .c-admin .c-tabs .c-btn.on{font-weight:700}
 
 /* ── 徽章：後台狀態一致 ───────────────── */
@@ -62,22 +59,33 @@
 .c-admin .c-badge.written_off,.c-admin .c-badge.revoked,.c-admin .c-badge.lost,.c-admin .c-badge.chargeback{color:var(--bad);border-color:currentColor}
 
 /* ── KPI 磚（index / analytics 共用 class） ─ */
-.k-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));margin:0;border-top:1px solid var(--ink-line);border-left:1px solid var(--line)}
-.k-kpis>div{padding:14px 16px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
-.k-kpis dt{font:600 11px/1.4 var(--mono)!important;letter-spacing:.12em!important;text-transform:uppercase;color:var(--mute)!important;margin:0}
-.k-kpis dd{margin:8px 0 0!important;font-size:clamp(30px,4.4vw,44px)!important;font-weight:900!important;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
+.k-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));background:var(--card);margin:0;border-top:1px solid var(--ink-line);border-left:1px solid var(--line)}
+.k-kpis>div,.k-kpis>a{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.k-kpis dt{font:600 11px/1.4 var(--mono)!important;letter-spacing:.06em!important;color:var(--mute)!important;margin:0}
+.k-kpis dd{margin:8px 0 0!important;font-size:clamp(26px,2.6vw,34px)!important;font-weight:800!important;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
 .k-kpis dd.hot{color:var(--red-text)}
+.k-kpis dd.is-zero{color:var(--mute);font-weight:600!important}
+.k-kpis dd.is-zero a{color:inherit}
+/* 奇數格在手機最後一格橫跨 */
+@media (max-width:719px){.k-kpis>:last-child:nth-child(odd){grid-column:1/-1}}
 /* 金額：單行不換行，字級隨格寬縮 */
-.k-kpis dd.money{font-size:clamp(20px,2.6vw,30px)!important;white-space:nowrap;letter-spacing:-.04em}
+.k-kpis dd.money{font-size:clamp(22px,2.2vw,28px)!important;white-space:nowrap;letter-spacing:-.04em}
 
 /* 展開的詳情（組織審核）：小節標題＋巢狀許可卡 */
-.c-admin article h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.c-admin article .c-card{margin:8px 0;padding:14px;border-left:3px solid var(--ink-line)}
+.c-admin article h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.c-admin article .c-card{border:0;border-top:1px solid var(--line);background:transparent;padding:12px 0;margin:0}
 .c-admin>.c-btn.block{margin-bottom:16px}
 
-/* 數據分析與金流後台共用：區間按鈕、SVG 折線、長條列 */
-.an-range .c-btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:800}
-.an-range .c-btn.on::before{content:"";width:6px;height:6px;background:var(--red)}
+/* 分段控制（期間、品牌／商品切換共用）：相連細框、選中填墨，手機撐滿一列 */
+.k-seg{display:inline-flex;margin:0 0 14px}
+.k-seg .c-btn{flex:0 0 auto;min-height:44px;min-width:56px;padding:0 16px;font-size:13px;font-weight:600;background:var(--card);color:var(--fg);border-color:color-mix(in srgb,var(--fg) 26%,transparent)}
+.k-seg .c-btn+.c-btn{margin-left:-1px}
+.k-seg .c-btn.on,.k-seg .c-btn[aria-pressed=true]{position:relative;z-index:1;background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:800}
+.an-range{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:20px}
+.an-range .k-seg{margin:0}
+@media (max-width:520px){.k-seg{display:flex;width:100%}.k-seg .c-btn{flex:1 1 0;min-width:0;padding:0 4px}.an-range .k-seg{flex:1 0 100%}}
+
+/* 數據分析與金流後台共用：SVG 折線、長條列 */
 .an-svg{width:100%;height:72px;display:block;margin-top:10px}
 .an-axis{stroke:var(--ink-line);stroke-width:1}
 .an-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3}
@@ -95,9 +103,10 @@
 /* 金流後台表格：外層橫向捲動，手機不撐破版面 */
 .fin-scroll{overflow-x:auto}
 .fin-table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums}
-.fin-table th,.fin-table td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.fin-table th,.fin-table td{text-align:right;padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 .fin-table th:first-child,.fin-table td:first-child{text-align:left}
-.fin-table th{font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.fin-table tbody tr:hover{background:var(--bg-alt)}
+.fin-table th{border-bottom-color:var(--ink-line);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
 .fin-table a{color:inherit;text-decoration:underline}
 .fin-table td{vertical-align:top}
 .fin-table td small{display:block;margin-top:2px;font-size:11px;white-space:normal;overflow-wrap:anywhere}
@@ -112,14 +121,47 @@
 .c-admin article.c-card>:first-child .c-badge{white-space:nowrap;flex:none}
 .c-admin article.c-card>:first-child time{flex:none;margin-left:auto;font:500 12px var(--mono);letter-spacing:.02em}
 /* 展開摘要（稽核 diff）：可點區 ≥44px、等寬小標籤 */
-.c-admin article details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);border-top:1px solid var(--line)}
+.c-admin article details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font:700 12px var(--font);letter-spacing:.04em;color:var(--mute);border-top:1px solid var(--line);list-style:none}
+.c-admin article details>summary::-webkit-details-marker{display:none}
+.c-admin article details>summary::before{content:"";width:7px;height:7px;margin-right:10px;border:solid currentColor;border-width:1.5px 1.5px 0 0;transform:rotate(45deg)}
+.c-admin article details[open]>summary::before{transform:rotate(135deg)}
 .c-admin article details>summary:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .c-admin article details[open]>summary{color:var(--fg)}
 /* 兩步驟驗證提示：訊息與動作成列，連結有足夠點擊區 */
-.c-admin>p.c-card[role=status]{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--red);line-height:1.7;font-size:14px}
+.c-admin>p.c-card[role=status]{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:10px 14px;margin-bottom:10px;border:1px solid var(--line);line-height:1.7;font-size:13px}
+.c-admin>p.c-card.c-err{border-color:var(--bad)}
 .c-admin>p.c-card[role=status] a{display:inline-flex;align-items:center;min-height:44px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
 /* 系統旗標開關：核取方塊對齊首行文字 */
 .c-admin .c-switch{align-items:flex-start;gap:14px;padding:6px 0;margin:0 0 12px}
 .c-admin .c-switch input{flex:none;margin:2px 0 0}
 .c-admin .c-switch span{flex:1;min-width:0;line-height:1.6}
 .c-admin .c-switch small{display:block;margin-top:4px;line-height:1.6}
+
+/* ── 區塊：含數據的 section 不再是卡片，改成「墨線＋小標」，KPI 格自己是唯一容器 ── */
+.c-admin section.c-card[aria-label]{background:transparent;border:0;border-top:1px solid var(--ink-line);padding:14px 0 0;margin:0 0 36px}
+.c-admin section.c-card[aria-label]>.c-h2,.c-admin section.c-card[aria-label]>.c-row>.c-h2{font-size:16px;font-weight:800;margin:0 0 4px;letter-spacing:0}
+.c-admin section.c-card[aria-label]>.c-mute{font-size:13px;line-height:1.6;margin:0 0 14px;max-width:64ch}
+.c-admin section.c-card[aria-label]>.c-row.c-mb{margin-bottom:10px;align-items:center}
+.c-admin section.c-card[aria-label] details{margin-top:12px}
+.c-admin section.an-kpi-card{border-top:0;padding-top:0;margin-bottom:28px}
+.c-admin section details>summary{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font:700 13px var(--font);color:var(--fg);list-style:none}
+.c-admin section details>summary::-webkit-details-marker{display:none}
+.c-admin section details>summary::before{content:"";width:7px;height:7px;border:solid currentColor;border-width:1.5px 1.5px 0 0;transform:rotate(45deg);transition:transform var(--t) var(--ease)}
+.c-admin section details[open]>summary::before{transform:rotate(135deg)}
+/* KPI 說明完整顯示（不截斷）；零值灰化由模板 .is-zero 控制 */
+.c-admin .fin-cmp{margin-top:8px;color:var(--mute)}
+.c-admin .fin-def{font-size:12px;line-height:1.5;color:var(--mute)}
+/* 空狀態：淡斜線框，不搶戲 */
+.c-admin p.c-center.c-mute{padding:28px 16px}
+.c-admin section.c-card[aria-label]>p.c-mute:last-child:not(:first-of-type){max-width:none;padding:20px 16px;border:1px dashed var(--line);background:var(--hatch);font:500 12px var(--mono);letter-spacing:.04em}
+/* 輸入框：統一 1px 細線，下緣墨線 */
+.c-admin .c-field input:not([type=checkbox],[type=radio],[type=file]),.c-admin .c-input,.c-admin textarea{border:1px solid color-mix(in srgb,var(--fg) 26%,transparent);border-bottom-color:var(--ink-line)}
+/* 表格與長串 */
+.c-admin .fin-scroll{border:1px solid var(--line);background:var(--card)}
+.c-admin .fin-scroll .fin-table{margin:0}
+.c-admin .an-fig,.c-admin .an-row .an-l{min-width:0}
+.c-admin .an-v small{font-variant-numeric:tabular-nums}
+.c-admin>.c-btn.block{display:flex}
+/* 拉丁語系（en / vi / id）：徽章不用等寬大寫加寬字距，否則窄螢幕擠成多行 */
+.c-admin .c-badge:lang(en),.c-admin .c-badge:lang(vi),.c-admin .c-badge:lang(id){text-transform:none;letter-spacing:.02em;font-family:var(--font);font-weight:600}
+.c-row>.k-seg{margin:0}

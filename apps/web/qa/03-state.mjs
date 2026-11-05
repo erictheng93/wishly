@@ -135,7 +135,7 @@ await step('S4', async () => {
     if (kind === 'archived') await U.api.delete(`wishlists/${T.id}`)
     await openSettings(page); await page.getByLabel('清單名稱').first().fill('改' + kind); await page.getByRole('button', { name: '儲存設定' }).click(); await page.waitForTimeout(1000)
     const m1 = (await page.locator('.c-err, [role=alert], .c-ok, [role=status]').allInnerTexts()).join('|')
-    await page.getByRole('button', { name: '＋ 新增品項' }).click().catch(() => {}); await page.waitForTimeout(300)
+    await page.getByRole('button', { name: '新增品項' }).click().catch(() => {}); await page.waitForTimeout(300)
     await page.getByLabel('名稱（必填）').first().fill('新增的品項').catch(() => {}); await page.getByRole('button', { name: '儲存品項' }).click().catch(() => {}); await page.waitForTimeout(1000)
     const m2 = (await page.locator('.c-err, [role=alert]').allInnerTexts()).join('|')
     await page.screenshot({ path: `${OUT}/shots/s4__owner-${kind}.png` })

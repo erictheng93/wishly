@@ -45,7 +45,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   const op = await pageAs(browser, owner)
   await op.goto(`/lists/${list.id}/edit`)
   const fillCrowdfund = async () => {
-    await op.getByRole('button', { name: '＋ 新增品項' }).click()
+    await op.getByRole('button', { name: '新增品項' }).click()
     await op.getByLabel('名稱（必填）').fill('嬰兒推車')
     await op.getByLabel('心願眾籌').check()
     await op.getByLabel(/目標點數/).fill('1000')

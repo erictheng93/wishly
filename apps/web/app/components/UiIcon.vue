@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 全站線條圖示：取代 ‹ ☀ ▾ ＋ → 等 Unicode 字元（各平台字形、粗細不一，螢幕閱讀器還會念出「左箭頭」）。
 // 一律 1.5px 線寬、currentColor、裝飾用（aria-hidden）；按鈕的名稱由按鈕自己的文字或 aria-label 提供。
-type IconName = 'back' | 'chevron-down' | 'arrow-right' | 'arrow-up' | 'arrow-down' | 'plus' | 'minus' | 'sun' | 'moon' | 'auto' | 'line' | 'google' | 'mail'
+type IconName = 'back' | 'chevron-down' | 'arrow-right' | 'arrow-up' | 'arrow-down' | 'plus' | 'minus' | 'sun' | 'moon' | 'auto' | 'line' | 'google' | 'mail' | 'refresh'
 const props = withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 20 })
 const PATHS: Record<IconName, string> = {
   back: 'M15 5l-7 7 7 7',
@@ -11,6 +11,7 @@ const PATHS: Record<IconName, string> = {
   'arrow-down': 'M12 4v16M6 14l6 6 6-6',
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
+  refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4',
   // 第三方登入：單色線條示意，不用官方彩色標誌
   line: 'M4 5h16v11H10l-4 3.5V16H4z',
   google: 'M19.5 12H12M19.5 12a7.5 7.5 0 1 1-2.2-5.3',

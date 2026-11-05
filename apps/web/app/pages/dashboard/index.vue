@@ -28,7 +28,6 @@ async function unarchive(w: any) {
   catch (e) { err.value = errMsg(e) }
 }
 function toggleArchived() { archived.value = !archived.value; list.value = []; load() }
-const pad = (n: number) => String(n).padStart(2, '0')
 const pctOf = (w: any) => Math.max(0, Math.min(100, Number(w.completion?.completion_pct ?? 0)))
 // 新手導覽：剛註冊、什麼都還沒做時先帶去導覽頁（每個分頁工作階段一次，按返回不會一直被拉回去）
 const tour = useOnboarding()
@@ -42,12 +41,16 @@ onMounted(async () => {
 </script>
 <template>
   <main class="c-page">
-    <CreatorHeader :title="archived ? $t('lists.dashboard.showArchived') : $t('lists.dashboard.title')" />
+    <CreatorHeader :title="archived ? $t('lists.dashboard.showArchived') : $t('lists.dashboard.title')">
+      <!-- 標題列動作（桌面）；手機的新建仍是右下浮動鈕 -->
+      <template #title-actions>
+        <div class="dsh-acts">
+          <button class="c-btn small" @click="toggleArchived"><UiIcon v-if="archived" name="back" :size="16" />{{ archived ? $t('lists.dashboard.backToLists') : $t('lists.dashboard.showArchived') }}</button>
+          <NuxtLink v-if="list.length && !archived" to="/lists/new" class="c-btn primary dsh-new"><UiIcon name="plus" :size="16" />{{ $t('lists.dashboard.newFab') }}</NuxtLink>
+        </div>
+      </template>
+    </CreatorHeader>
     <CreatorAccountNudge />
-    <div class="dsh-bar">
-      <span class="x-idx" aria-hidden="true">INDEX / {{ pad(list.length) }}</span>
-      <button class="c-btn small" @click="toggleArchived">{{ archived ? $t('lists.dashboard.backToLists') : $t('lists.dashboard.showArchived') }}</button>
-    </div>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('lists.common.retry') }}</button></p>
     <template v-else-if="loading && !list.length">
       <p class="c-mute" role="status">{{ $t('lists.common.loading') }}</p>
@@ -58,18 +61,13 @@ onMounted(async () => {
       <span class="dsh-zero" aria-hidden="true">00</span>
       <div class="dsh-ghost" aria-hidden="true"><i /><b /><b /><em /></div>
       <p class="c-m0">{{ $t('lists.dashboard.empty') }}</p>
-      <NuxtLink to="/lists/new" class="c-btn primary c-mt12">{{ $t('lists.dashboard.create') }}</NuxtLink>
+      <NuxtLink to="/lists/new" class="c-btn primary c-mt12"><UiIcon name="plus" :size="16" />{{ $t('lists.dashboard.create') }}</NuxtLink>
     </div>
     <div class="c-grid dsh-grid">
-    <article v-for="(w, k) in list" :key="w.id" class="c-card link dsh" :class="{ bad: w.moderation_status === 'hidden' }">
-      <div class="dsh-top x-tag"><span aria-hidden="true">No.{{ pad(k + 1) }}</span><CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" /></div>
-      <div class="dsh-main">
-        <img class="c-thumb dsh-cover" :src="coverSrc(w)" alt="">
-        <div class="c-grow">
-          <NuxtLink :to="`/lists/${w.id}/edit`" class="c-stretch dsh-title"><strong>{{ w.title }}</strong></NuxtLink>
-          <div class="c-mute dsh-kind">{{ $t('lists.common.personal') }}</div>
-        </div>
-      </div>
+    <article v-for="w in list" :key="w.id" class="c-card link dsh" :class="{ bad: w.moderation_status === 'hidden' }">
+      <img class="c-thumb dsh-cover" :src="coverSrc(w)" alt="">
+      <NuxtLink :to="`/lists/${w.id}/edit`" class="c-stretch dsh-title"><strong>{{ w.title }}</strong></NuxtLink>
+      <div class="dsh-meta-row"><span class="c-mute dsh-kind">{{ $t('lists.common.personal') }}</span><CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" /></div>
       <div v-if="w.completion?.item_count" class="dsh-gauge">
         <b class="dsh-pct" aria-hidden="true">{{ pctOf(w) }}<small>%</small></b>
         <div class="dsh-gc">
@@ -89,32 +87,37 @@ onMounted(async () => {
     </article>
     </div>
     <button v-if="cursor" class="c-btn block dsh-more" :disabled="loading" @click="load(true)">{{ $t('lists.dashboard.loadMore') }}</button>
-    <NuxtLink v-if="list.length && !archived" to="/lists/new" class="c-btn primary c-fab">{{ $t('lists.dashboard.newFab') }}</NuxtLink>
+    <NuxtLink v-if="list.length && !archived" to="/lists/new" class="c-btn primary c-fab dsh-fab"><UiIcon name="plus" :size="16" />{{ $t('lists.dashboard.newFab') }}</NuxtLink>
     <CreatorConfirm :open="!!del" :title="$t('lists.dashboard.archiveTitle')" :text="$t('lists.dashboard.archiveText', { title: del?.title })" :ok="$t('lists.dashboard.archiveOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
   </main>
 </template>
 <style scoped>
-.dsh-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}
-.dsh-bar .c-btn{border-color:var(--line);font-size:13px}
+/* 標題列：h1 ｜ 已封存的清單 ｜ 新建（CreatorHeader 的 title-actions slot） */
+.dsh-acts{display:flex;align-items:center;gap:8px;flex:none}
+.dsh-acts .c-btn{font-size:13px}
+.dsh-acts .c-btn:not(.primary){border-color:var(--line)}
+.dsh-new{display:none!important}
+@media (min-width:768px){.dsh-new{display:inline-flex!important}.dsh-fab{display:none!important}}
 .dsh-grid{margin-bottom:16px}
-/* 標本檔案卡：編號條 → 封面＋標題 → 大完成率＋斜紋進度 → 動作 */
-.dsh{padding:0;display:flex;flex-direction:column;overflow:hidden}
-.dsh-top{padding:10px 14px;border-bottom:1px solid var(--ink-line);background:var(--bg-alt)}
-.dsh-main{display:flex;gap:14px;align-items:flex-start;padding:14px 14px 0}
-.dsh .dsh-cover{width:84px;height:84px;background:var(--bg-alt);outline:1px solid var(--line);outline-offset:-1px;object-fit:cover}
+/* 清單卡：封面｜標題＋（類型・狀態）；下方進度線、操作列 */
+.dsh{display:grid;grid-template-columns:72px minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:14px;align-content:start;padding:16px;overflow:hidden}
+.dsh .dsh-cover{grid-column:1;grid-row:1/3;width:72px;height:72px;background:var(--bg-alt);outline:1px solid var(--line);outline-offset:-1px;object-fit:cover}
 .dsh .dsh-cover[src$='.svg']{object-fit:contain}
-.dsh-title{align-items:flex-start!important}
-.dsh-title strong{font-size:18px;line-height:1.3;font-weight:800;letter-spacing:-.005em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.dsh-kind{margin-top:2px;font:600 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase}
-.dsh-gauge{display:flex;align-items:flex-end;gap:14px;margin:16px 14px 0;padding-top:14px;border-top:1px dashed var(--line)}
-.dsh-pct{flex:none;font-size:54px;line-height:.85;font-weight:900;letter-spacing:-.05em;font-variant-numeric:tabular-nums;color:var(--fg)}
-.dsh-pct small{font-size:20px;letter-spacing:0;margin-left:2px;color:var(--red-text)}
-.dsh-gc{flex:1;min-width:0;padding-bottom:2px}
-.dsh .dsh-prog{height:10px;margin:0 0 8px}
+.dsh-title{grid-column:2;grid-row:1;align-self:start;margin-bottom:4px;align-items:flex-start!important}
+.dsh-title strong{font-size:17px;line-height:1.3;font-weight:800;letter-spacing:-.005em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dsh-meta-row{grid-column:2;grid-row:2;align-self:center;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.dsh-kind{font:600 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.dsh-gauge{grid-column:1/-1;display:flex;align-items:center;gap:12px;margin:16px 0 0;padding-top:14px;border-top:1px dashed var(--line)}
+.dsh-pct{flex:none;min-width:3.2ch;font-size:26px;line-height:1;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
+.dsh-pct small{font-size:13px;letter-spacing:0;margin-left:2px;color:var(--red-text)}
+.dsh-gc{flex:1;min-width:0}
+.dsh .dsh-prog{height:6px;margin:0 0 6px}
 .dsh-meta{font:500 11px/1.4 var(--mono);letter-spacing:.04em}
-.dsh .c-err{margin:12px 14px 0}
-.dsh-act{margin:16px 14px 14px;margin-top:auto;padding-top:16px}
-.dsh.bad .dsh-top{background:var(--bad-bg)}
+.dsh .c-err{grid-column:1/-1;margin:12px 0 0}
+.dsh-act{grid-column:1/-1;margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line);gap:8px}
+.dsh-act .c-btn.c-grow{flex:none}
+.dsh-act .c-btn.danger{margin-left:auto;border-color:transparent;color:var(--mute);font-weight:600}
+@media (hover:hover) and (pointer:fine){.dsh-act .c-btn.danger:not([disabled]):hover{background:var(--bad);color:#fff;border-color:var(--bad)}}
 .dsh-more{margin:0 0 16px}
 /* 空狀態：虛線斜線框、巨大 00、幽靈卡片 */
 .dsh-empty{padding:44px 20px 40px;margin-top:4px}
@@ -126,5 +129,4 @@ onMounted(async () => {
 .dsh-skel .c-card{min-height:210px;display:grid;align-content:start;gap:12px}
 .dsh-skel i{display:block;height:14px;background:var(--hatch),var(--bg-alt)}
 .dsh-skel i:first-child{height:40px}
-@media (max-width:767px){.dsh .dsh-cover{width:72px;height:72px}.dsh-pct{font-size:48px}}
 </style>

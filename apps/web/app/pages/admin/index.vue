@@ -108,14 +108,14 @@ onMounted(loadStats)
 </script>
 <template>
   <main class="c-page c-admin">
-    <CreatorHeader :title="$t('admin.index.title')" back="/dashboard"><span class="c-badge">STAFF</span></CreatorHeader>
+    <CreatorHeader :title="$t('admin.index.title')" back="/dashboard"><span class="c-badge admin-staff c-head-row">STAFF</span></CreatorHeader>
     <p v-if="me && !me.mfa_enabled" class="c-card" role="status">{{ $t('admin.index.mfaHint') }}<NuxtLink to="/admin/mfa">{{ $t('admin.index.mfaSetup') }}</NuxtLink></p>
     <p v-if="stats && Number(stats.staff_mfa) < 2" class="c-card c-err" role="status" data-testid="staff-mfa-low">{{ $t('admin.index.staffMfaLow') }}</p>
     <section class="c-card" :aria-label="$t('admin.index.statsLabel')">
       <div class="c-row c-mb"><h2 class="c-h2 c-grow c-m0">{{ $t('admin.index.overview') }}</h2><button class="c-btn small" :disabled="statsBusy" @click="loadStats">{{ statsBusy ? $t('admin.index.refreshing') : $t('admin.index.refreshStats') }}</button></div>
       <p v-if="statsErr" class="c-err" role="alert">{{ statsErr }}</p>
       <dl class="admin-stats k-kpis">
-        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0 }"><NuxtLink v-if="key === 'open_reports'" to="/admin/reports">{{ stats?.[key] ?? '–' }}</NuxtLink><template v-else>{{ stats?.[key] ?? '–' }}</template></dd></div>
+        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0, 'is-zero': !Number(stats?.[key]) }"><NuxtLink v-if="key === 'open_reports'" to="/admin/reports">{{ stats?.[key] ?? '–' }}</NuxtLink><template v-else>{{ stats?.[key] ?? '–' }}</template></dd></div>
       </dl>
       <details v-if="stats"><summary>{{ $t('admin.index.detailsSummary') }}</summary>
         <div v-for="(name, key) in { claims_by_status: $t('admin.index.claimsByStatus'), notifications_by_status: $t('admin.index.notificationsByStatus'), audit_last_7d: $t('admin.index.auditLast7d') }" :key="key" class="c-mt">
@@ -208,14 +208,14 @@ onMounted(loadStats)
 .admin-stats{margin:0 0 20px}
 .admin-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .admin-id{overflow-wrap:anywhere;font:500 12px var(--mono)}
-/* 功能索引：編號磚，紅色只在 hover / 目前位置 */
-.k-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 24px;border-top:1px solid var(--ink-line);border-left:1px solid var(--line);counter-reset:kn}
-.k-nav .c-btn{counter-increment:kn;justify-content:flex-start;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:12px 14px;gap:8px;font-size:14px;letter-spacing:.03em;white-space:normal;text-align:left;background:var(--card);position:relative}
+/* 功能索引：2 欄、奇數最後一格跨整列；箭頭用 CSS 畫的細 chevron，紅色只在 hover */
+.k-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 24px;border-top:1px solid var(--ink-line);border-left:1px solid var(--line)}
+.k-nav .c-btn:last-child:nth-child(odd){grid-column:1/-1}
+.k-nav .c-btn{justify-content:flex-start;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:12px 14px;gap:8px;font-size:14px;font-weight:600;letter-spacing:.03em;white-space:normal;text-align:left;background:var(--card);position:relative}
 .k-nav-content{flex:1;min-width:0;overflow-wrap:anywhere}
-.k-nav-content .c-badge{display:table;max-width:100%;margin-top:6px;white-space:normal}
-.k-nav .c-btn::before{content:counter(kn,decimal-leading-zero) / "";font:600 11px var(--mono);color:var(--red-text);letter-spacing:.08em;flex:none}
-.k-nav .c-btn::after{content:"\2192" / "";margin-left:auto;font-family:var(--mono);color:var(--mute);transition:transform var(--t) var(--ease)}
-@media (min-width:768px){.k-nav{grid-template-columns:repeat(5,minmax(0,1fr))}}
-@media (hover:hover) and (pointer:fine){.k-nav .c-btn:hover::after{transform:translateX(4px);color:inherit}.k-nav .c-btn:hover::before{color:inherit}}
+.k-nav-content .c-badge{display:table;max-width:100%;margin-top:6px;white-space:normal;font-size:11px}
+.k-nav .c-btn::after{content:"";flex:none;width:7px;height:7px;margin-left:auto;border:solid var(--mute);border-width:1.5px 1.5px 0 0;transform:rotate(45deg)}
+@media (hover:hover) and (pointer:fine){.k-nav .c-btn:hover{background:var(--bg-alt)}.k-nav .c-btn:hover::after{border-color:var(--red)}}
+/* STAFF 身分：窄手機放到頁首下方細列（同組織身分做法），不擠帳號鈕 */
+@media (max-width:479px){.admin-staff{order:99;flex-basis:100%;border:0;border-top:1px solid var(--line);background:transparent;padding:0;margin:0 -20px;padding:0 20px;line-height:28px}}
 </style>
-

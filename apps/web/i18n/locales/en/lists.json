@@ -33,22 +33,29 @@
       "showNames": "Show giver nicknames to other visitors",
       "showNamesHint": "Off by default",
       "creating": "Creating…",
-      "submit": "Create and add items"
+      "submit": "Create and add items",
+      "sec": {
+        "basics": "Basics",
+        "cover": "Cover",
+        "dates": "Dates",
+        "rules": "Rules",
+        "access": "Who can see"
+      }
     },
     "dashboard": {
       "title": "My lists",
       "empty": "No lists yet. Create your first one!",
-      "create": "+ Create list",
+      "create": "Create list",
       "completion": "{pct}% complete ({done} / {total})",
       "hidden": "This list has been taken down{reason}. Its public page is unavailable and sharing is disabled. If this was a mistake, please contact support to appeal.",
       "archive": "Archive",
       "loadMore": "Load more",
-      "newFab": "+ New",
+      "newFab": "New",
       "archiveTitle": "Archive list",
       "archiveText": "After archiving \"{title}\", its public page stops working right away and friends can no longer open it. Existing claimed gifts are kept; points contributed to crowdfunded items that haven't reached their goal are refunded to the contributors' wallets and won't come back if you unarchive. You can unarchive it later from \"Archived lists\".",
       "archiveOk": "Confirm archive",
       "showArchived": "Archived lists",
-      "backToLists": "← Back to my lists",
+      "backToLists": "Back to my lists",
       "archivedEmpty": "No archived lists",
       "unarchive": "Unarchive"
     },
@@ -73,7 +80,7 @@
       "up": "Move up",
       "down": "Move down",
       "delete": "Delete",
-      "addItem": "+ Add item",
+      "addItem": "Add item",
       "shipSummary": "Shipping info (for wish crowdfunding)",
       "filled": "Filled in",
       "settings": "List settings",

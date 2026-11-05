@@ -61,7 +61,7 @@ const wipe = () => {
 <template>
   <GuestTop />
   <main class="g-wrap">
-    <div class="cl-head"><small aria-hidden="true">WISHLY / CLAIMS</small><h1>{{ $t('me.claims.title') }}</h1></div>
+    <div class="cl-head"><h1>{{ $t('me.claims.title') }}</h1></div>
     <div v-if="recoverFailed" class="g-banner err" role="alert">{{ $t('me.claims.recoverFailed') }}</div>
     <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
     <p v-if="state === 'loading'" class="g-mute cl-loading" role="status">{{ $t('me.loading') }}</p>
@@ -76,8 +76,8 @@ const wipe = () => {
         <template v-if="!editing"><b>{{ guest.display_name }}</b>{{ guest.is_user ? $t('me.claims.signedIn') : $t('me.claims.thisDevice') }}<button v-if="!guest.is_user" class="g-link" @click="editing = true">{{ $t('me.claims.editNick') }}</button></template>
         <form v-else class="g-inline" @submit.prevent="saveNick"><input v-model="nick" maxlength="30" required :aria-label="$t('me.claims.nick')"><button class="g-btn sm">{{ $t('me.claims.save') }}</button></form>
       </div>
-      <section v-for="(g, gi) in groups" :key="g.w.slug" class="cl-group">
-        <h2 class="g-h2 cl-h2" :data-n="String(gi + 1).padStart(2, '0')"><NuxtLink :to="`/s/${g.w.slug}`">{{ g.w.title }}</NuxtLink></h2>
+      <section v-for="g in groups" :key="g.w.slug" class="cl-group">
+        <h2 class="g-h2 cl-h2"><NuxtLink :to="`/s/${g.w.slug}`">{{ g.w.title }}</NuxtLink></h2>
         <div v-for="r in g.list" :key="r.claim.id" class="g-card g-item">
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
@@ -105,16 +105,17 @@ const wipe = () => {
   </main>
 </template>
 <style scoped>
-.cl-head{margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
-.cl-head small{display:block;margin-bottom:6px;font:600 11px/1 var(--mono);letter-spacing:.16em;color:var(--red-text)}
-.cl-head h1{margin:0}
+.cl-head{position:relative;margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--line);animation:rise .5s var(--ease) both}
+.cl-head::after{content:"";position:absolute;left:0;bottom:-1px;width:48px;height:2px;background:var(--red)}
+.cl-head h1{margin:0;font-size:clamp(30px,4.6vw,44px);font-weight:800;letter-spacing:-.025em;line-height:1.08}
+html:lang(vi) .cl-head h1{line-height:1.22}
 .cl-state{display:grid;justify-items:center;gap:10px;margin:8px 0 0;padding:44px 20px;text-align:center;border:1px dashed var(--line);background:var(--hatch)}
 .cl-state p{margin:0;max-width:34em;line-height:1.7;text-wrap:balance}
-.cl-state.bad{border:1px solid var(--line);border-left:3px solid var(--bad);background:var(--bad-bg)}
-.cl-loading{display:flex;align-items:center;min-height:72px;margin:0;padding:0 16px;border:1px solid var(--line);border-left:3px solid var(--ink-line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
+.cl-state.bad{border:1px solid var(--bad);background:var(--bad-bg)}
+.cl-loading{display:flex;align-items:center;min-height:72px;margin:0;padding:0 16px;border:1px solid var(--line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
 .cl-group{margin-top:36px}
-.cl-h2{display:flex;align-items:baseline;gap:12px;margin:0 0 6px;padding-bottom:10px;border-bottom:1px solid var(--ink-line);font-size:20px}
-.cl-h2::before{content:attr(data-n);font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--red-text)}
+.cl-h2{display:flex;align-items:baseline;margin:0 0 6px;padding-bottom:10px;border-bottom:1px solid var(--ink-line);font-size:20px}
+.cl-group .g-vis select{min-height:44px;padding:0 10px;border:1px solid var(--line);border-bottom-color:var(--ink-line);background:var(--bg-alt);color:var(--fg);font:inherit}
 .cl-h2 a{display:inline-flex;align-items:center;min-height:44px}
 .cl-group .g-item{margin:0;border-width:0 0 1px;border-color:var(--line);padding:16px 0}
 .cl-group .g-thumb{width:80px;height:80px}

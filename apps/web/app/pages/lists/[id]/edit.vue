@@ -207,16 +207,16 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
             <div v-if="i.image_status === 'rejected'" class="c-err">{{ $t('lists.edit.imgRejected') }}</div>
           </div>
         </div>
-        <div v-if="!closed" class="c-row wrap c-mt ed-act">
-          <button class="c-btn" :disabled="k === 0" :aria-label="$t('lists.edit.up')" @click="move(k, -1)">↑</button>
-          <button class="c-btn" :disabled="k === items.length - 1" :aria-label="$t('lists.edit.down')" @click="move(k, 1)">↓</button>
-          <button class="c-btn c-grow" @click="openItem(i)">{{ $t('lists.common.edit') }}</button>
+        <div v-if="!closed" class="c-row c-mt ed-act">
+          <button class="c-btn" :disabled="k === 0" :aria-label="$t('lists.edit.up')" @click="move(k, -1)"><UiIcon name="arrow-up" :size="18" /></button>
+          <button class="c-btn" :disabled="k === items.length - 1" :aria-label="$t('lists.edit.down')" @click="move(k, 1)"><UiIcon name="arrow-down" :size="18" /></button>
+          <button class="c-btn ed-edit" @click="openItem(i)">{{ $t('lists.common.edit') }}</button>
           <button v-if="relief" class="c-btn" @click="openReceipt(i)">{{ $t('org.relief.receiptBtn') }}</button>
           <button class="c-btn danger" @click="del = { ...i }; delErr = ''">{{ $t('lists.edit.delete') }}</button>
         </div>
       </article>
       </div>
-      <button v-if="!closed" class="c-btn block c-mb16 ed-add" @click="openItem()">{{ $t('lists.edit.addItem') }}</button>
+      <button v-if="!closed" class="c-btn block c-mb16 ed-add" @click="openItem()"><UiIcon name="plus" :size="16" />{{ $t('lists.edit.addItem') }}</button>
       </div>
       <aside>
 
@@ -232,13 +232,13 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         </label>
       </section>
       <details v-if="!relief" ref="addrEl" class="c-card ed-side" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
-        <summary>{{ $t('lists.edit.shipSummary') }}<span v-if="w.has_shipping_address" class="c-badge active">{{ $t('lists.edit.filled') }}</span></summary>
+        <summary>{{ $t('lists.edit.shipSummary') }}<span v-if="w.has_shipping_address" class="c-badge active">{{ $t('lists.edit.filled') }}</span><UiIcon class="ed-plus" name="plus" :size="18" /></summary>
         <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
       </details>
 
       <!-- 封存後只能取消封存（後端拒絕其他修改），不顯示設定與分享 -->
       <details v-if="w.status !== 'archived'" class="c-card ed-side">
-        <summary>{{ $t('lists.edit.settings') }}</summary>
+        <summary>{{ $t('lists.edit.settings') }}<UiIcon class="ed-plus" name="plus" :size="18" /></summary>
         <form id="ed-settings" class="c-mt12" @submit.prevent="saveMeta">
           <label class="c-field"><span>{{ $t('lists.edit.name') }}</span><input v-model="meta.title" maxlength="100" required></label>
           <label class="c-field"><span>{{ $t('lists.edit.desc') }}</span><textarea v-model="meta.description" rows="2" /></label>
@@ -309,16 +309,21 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 </template>
 <style scoped>
 .ed-item{padding:16px 16px 14px 16px}
-.ed-n{position:absolute;top:0;right:0;padding:6px 10px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute);background:var(--bg-alt)}
+.ed-n{position:absolute;top:14px;right:16px;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute)}
 .ed-item .c-thumb{width:72px;height:72px}
 .ed-item .c-grow strong{font-size:17px;line-height:1.3;display:block;padding-right:36px}
-.ed-act{padding-top:12px;border-top:1px dashed var(--line);margin-top:14px}
+.ed-act{flex-wrap:nowrap;gap:8px;padding-top:12px;border-top:1px dashed var(--line);margin-top:14px}
+/* ↑ ↓ 併成一組方塊靠左；編輯／刪除靠右、不撐滿；刪除無框紅字 */
+.ed-act>.c-btn:nth-child(-n+2){flex:none;width:44px;padding:0}
+.ed-act>.c-btn:nth-child(2){margin-left:-9px}
+.ed-act>.ed-edit{margin-left:auto}
+.ed-act>.c-btn.danger{border-color:transparent;font-weight:600}
 .ed-add{margin-top:16px;border-style:dashed;min-height:52px;background:var(--bg-alt)}
 .ed-side{padding:0 18px}
 .ed-side>summary{justify-content:space-between;font-size:15px;letter-spacing:.02em;list-style:none}
 .ed-side>summary::-webkit-details-marker{display:none}
-.ed-side>summary::after{content:"+" / "";font:500 22px/1 var(--mono);color:var(--red-text);transition:transform var(--t) var(--ease)}
-.ed-side[open]>summary::after{transform:rotate(45deg)}
+.ed-plus{flex:none;margin-left:auto;color:var(--red-text);transition:transform var(--t) var(--ease)}
+.ed-side[open]>summary .ed-plus{transform:rotate(45deg)}
 .ed-side[open]{border-color:var(--ink-line);padding-bottom:18px}
 .ed-side[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
 @media (max-width:767px){.ed-item .c-thumb{width:60px;height:60px}}

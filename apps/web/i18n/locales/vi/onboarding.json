@@ -5,7 +5,7 @@
       "aria": "Hướng dẫn bắt đầu",
       "tag": "Hướng dẫn {n} / {total}",
       "overview": "Tổng quan hướng dẫn",
-      "friendsLink": "Hoặc xem danh sách của bạn bè →"
+      "friendsLink": "Hoặc xem danh sách của bạn bè"
     },
     "steps": {
       "profile": {
@@ -23,7 +23,7 @@
       "item": {
         "title": "Thêm món bạn muốn",
         "body": "Danh sách đã sẵn sàng, giờ hãy thêm những món bạn muốn nhận.",
-        "here": "Bấm \"+ Thêm món quà\". Dán liên kết sản phẩm để tự điền tên và hình, rồi nhập số lượng và ghi chú.",
+        "here": "Bấm \"Thêm món quà\". Dán liên kết sản phẩm để tự điền tên và hình, rồi nhập số lượng và ghi chú.",
         "cta": "Đi thêm món quà"
       },
       "publish": {

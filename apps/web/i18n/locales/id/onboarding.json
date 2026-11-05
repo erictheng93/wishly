@@ -5,7 +5,7 @@
       "aria": "Panduan memulai",
       "tag": "Panduan {n} / {total}",
       "overview": "Ringkasan panduan",
-      "friendsLink": "Atau lihat daftar teman →"
+      "friendsLink": "Atau lihat daftar teman"
     },
     "steps": {
       "profile": {
@@ -23,7 +23,7 @@
       "item": {
         "title": "Tambahkan barang yang kamu mau",
         "body": "Daftarmu sudah jadi. Sekarang masukkan barang yang ingin kamu terima.",
-        "here": "Ketuk \"＋ Tambah barang\". Tempel tautan produk untuk mengisi nama dan gambar otomatis, lalu isi jumlah dan catatan.",
+        "here": "Ketuk \"Tambah barang\". Tempel tautan produk untuk mengisi nama dan gambar otomatis, lalu isi jumlah dan catatan.",
         "cta": "Tambah barang"
       },
       "publish": {

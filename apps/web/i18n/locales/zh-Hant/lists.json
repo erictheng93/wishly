@@ -33,22 +33,29 @@
       "showNames": "顯示送禮者暱稱給其他訪客",
       "showNamesHint": "預設關閉",
       "creating": "建立中…",
-      "submit": "建立並新增品項"
+      "submit": "建立並新增品項",
+      "sec": {
+        "basics": "基本資料",
+        "cover": "封面",
+        "dates": "日期",
+        "rules": "規則",
+        "access": "誰可以看"
+      }
     },
     "dashboard": {
       "title": "我的清單",
       "empty": "還沒有清單，建立第一份吧",
-      "create": "＋ 建立清單",
+      "create": "建立清單",
       "completion": "完成度 {pct}%（{done} / {total}）",
       "hidden": "這份清單已被下架{reason}。公開頁目前無法瀏覽，分享已停用。若有誤判請聯絡客服申訴。",
       "archive": "封存",
       "loadMore": "載入更多",
-      "newFab": "＋ 新建",
+      "newFab": "新建",
       "archiveTitle": "封存清單",
       "archiveText": "封存「{title}」後，公開頁會立即失效，朋友無法再開啟。已認領的禮物會保留；眾籌品項尚未達標的贊助點數會全數退回贊助者錢包，之後取消封存也不會恢復。封存後可在「已封存的清單」取消封存。",
       "archiveOk": "確認封存",
       "showArchived": "已封存的清單",
-      "backToLists": "← 返回我的清單",
+      "backToLists": "返回我的清單",
       "archivedEmpty": "沒有已封存的清單",
       "unarchive": "取消封存"
     },
@@ -73,7 +80,7 @@
       "up": "上移",
       "down": "下移",
       "delete": "刪除",
-      "addItem": "＋ 新增品項",
+      "addItem": "新增品項",
       "shipSummary": "收件資訊（心願眾籌用）",
       "filled": "已填寫",
       "settings": "清單設定",

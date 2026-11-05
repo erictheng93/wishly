@@ -23,7 +23,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
     <CreatorBell /><CreatorUserMenu />
   </header>
   <!-- 頁面標題移出 sticky 頁首：編輯式大標，頁首只留品牌與動作 -->
-  <div v-if="!noTitle" class="c-title"><h1>{{ title }}</h1></div>
+  <div v-if="!noTitle" class="c-title" :class="{ 'has-acts': $slots['title-actions'] }"><h1>{{ title }}</h1><slot name="title-actions" /></div>
   <OnboardingGuide />
   <!-- 桌面（≥1280）側欄：取代各頁重複的導覽按鈕 -->
   <nav v-if="user" class="c-rail" :aria-label="$t('common.mainMenu')">
@@ -46,4 +46,7 @@ watch(() => [route.fullPath, user.value?.id], () => { if (user.value) refresh() 
 </style>
 <style>
 .c-back{margin-left:-10px}
+/* 標題列動作（title-actions slot）：與 h1 同列靠右 */
+.c-title.has-acts{display:flex;align-items:center;gap:12px}
+.c-title.has-acts h1{flex:1;min-width:0}
 </style>

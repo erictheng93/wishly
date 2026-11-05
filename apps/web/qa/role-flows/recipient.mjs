@@ -70,7 +70,7 @@ async function uiCreateList(page, o) {
 }
 /** 在編輯頁新增品項。o: title,brand,spec,url,qty,price,prio(高/中/低),crowd{target,deadline,ref},image */
 async function uiAddItem(page, o) {
-  await page.getByRole('button', { name: '＋ 新增品項' }).click()
+  await page.getByRole('button', { name: '新增品項' }).click()
   const d = page.getByRole('dialog', { name: '新增品項' })
   await d.getByLabel('名稱（必填）').fill(o.title)
   if (o.brand) await d.getByLabel('品牌（選填）').fill(o.brand)
@@ -148,7 +148,7 @@ await run.step('R-02', '註冊（UI）：密碼太短、錯誤 OTP、正確 OTP 
 
 await run.step('R-03', '首次登入導覽：dashboard 空狀態引導、頁首選單、側欄', async ({ note }) => {
   await expect(page.getByText('還沒有清單，建立第一份吧')).toBeVisible()
-  await expect(page.getByRole('link', { name: '＋ 建立清單' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '建立清單' })).toBeVisible()
   const welcome = await page.getByText(/歡迎|導覽|教學|開始使用/).count()
   note(`空狀態 CTA「＋ 建立清單」可見；歡迎／導覽／教學文字數量 = ${welcome}`)
   await page.getByRole('button', { name: /帳號選單/ }).click()
@@ -242,7 +242,7 @@ await run.step('R-07', '新增數量制品項（品牌／規格／連結／價�
   await saveItem(page, d)
   await expect(itemCard(page, '尿布')).toContainText('優先度中')
   note('三個品項建立；預設優先度＝中；清單頁依序顯示')
-  await page.getByRole('button', { name: '＋ 新增品項' }).click()
+  await page.getByRole('button', { name: '新增品項' }).click()
   const d2 = page.getByRole('dialog', { name: '新增品項' })
   await d2.getByRole('button', { name: '儲存品項' }).click()
   note('空白名稱送出：HTML required 擋下（dialog 仍開）= ' + await d2.isVisible())
@@ -282,7 +282,7 @@ await run.step('R-09', '新增眾籌品項：未填收件資訊被擋 → 填寫
   await saveItem(page, d)
   await expect(itemCard(page, '嬰兒推車')).toContainText('心願眾籌 0 / 3,000 點')
   // 目標點數 0 / 負數
-  await page.getByRole('button', { name: '＋ 新增品項' }).click()
+  await page.getByRole('button', { name: '新增品項' }).click()
   const d3 = page.getByRole('dialog', { name: '新增品項' })
   await d3.getByLabel('名稱（必填）').fill('負目標')
   await d3.getByRole('radio', { name: '心願眾籌' }).check()
@@ -1033,7 +1033,7 @@ await run.step('R-41', '結束清單 → 分享頁顯示已結束、捐助者不
   await page.getByText('清單設定', { exact: true }).click()
   await page.getByRole('button', { name: '結束清單' }).click()
   await expect(page.getByText('清單已結束，品項無法修改。')).toBeVisible()
-  for (const n of ['＋ 新增品項', '上移', '編輯']) await expect(page.getByRole('button', { name: n })).toHaveCount(0)
+  for (const n of ['新增品項', '上移', '編輯']) await expect(page.getByRole('button', { name: n })).toHaveCount(0)
   note('結束後新增／排序／編輯／刪除按鈕全部消失')
   const anon = await newPage(); await anon.goto(`/s/${S.slugF}`); await hydrated(anon)
   await expect(anon.getByText('這份清單已結束')).toBeVisible().catch(() => {})
@@ -1043,7 +1043,7 @@ await run.step('R-41', '結束清單 → 分享頁顯示已結束、捐助者不
   note(`結束後捐助者認捐 API → ${r.status()} ${(await r.text()).slice(0, 120)}`)
   expect(r.ok()).toBe(false)
   await page.getByRole('button', { name: '重新開放' }).click()
-  await expect(page.getByRole('button', { name: '＋ 新增品項' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '新增品項' })).toBeVisible()
   const r2 = await S.donorA.api.post(`items/${S.itemF}/claims`, { data: { qty: 1 }, headers: { 'Idempotency-Key': randomUUID() } })
   note('重新開放後認捐 → ' + r2.status()); expect(r2.ok()).toBe(true)
 }, { page })
@@ -1081,7 +1081,7 @@ await run.step('R-43', '封存清單（dashboard）→ 已封存列表 → 公�
   await expect(page.locator('.c-card', { hasText: S.titleF })).toBeVisible()
   await page.locator('.c-card', { hasText: S.titleF }).getByRole('button', { name: '取消封存' }).click()
   await expect(page.locator('.c-card', { hasText: S.titleF })).toHaveCount(0)
-  await page.getByRole('button', { name: '← 返回我的清單' }).click()
+  await page.getByRole('button', { name: '返回我的清單' }).click()
   const card = page.locator('.c-card', { hasText: S.titleF })
   await expect(card).toBeVisible(); note('取消封存後狀態：' + (await card.locator('.c-badge').first().innerText()))
   await expect(card).toContainText('已結束')

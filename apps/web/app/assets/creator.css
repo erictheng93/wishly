@@ -179,9 +179,10 @@ dialog.c-sheet:focus-visible{outline:0}
 .c-head .c-brand~.um{margin-left:0}
 /* 手機頁首擠：身分晶片只留頭像，名字在桌面與首頁才顯示 */
 @media (max-width:479px){.c-head .um-name,.c-head .um-caret{display:none}.c-head .um .um-btn{padding:0}
-  /* 窄手機：保留 WISHLY 字標（只剩紅方塊時頁首很空洞）；頁首另有狀態徽章或動作鈕（編輯、進度頁）才收成紅方塊，維持一列 */
+  /* 窄手機：保留 WISHLY 字標（只剩紅方塊時頁首很空洞）；頁首另有狀態徽章或動作鈕（編輯、進度頁）才收成紅方塊，維持一列。
+     .c-head-row：自己換到頁首下方細列的徽章（例：後台 STAFF），不佔第一列，不觸發收合 */
   .c-head{gap:2px}.c-brand{font-size:14px;letter-spacing:.18em}
-  .c-head:has(>.c-badge,>.c-btn:not(.c-back)) .c-brand{font-size:0;gap:0;padding-right:0}.c-head:has(>.c-badge,>.c-btn:not(.c-back)) .c-brand::before{width:16px;height:16px}}
+  .c-head:has(>.c-badge:not(.c-head-row),>.c-btn:not(.c-back)) .c-brand{font-size:0;gap:0;padding-right:0}.c-head:has(>.c-badge:not(.c-head-row),>.c-btn:not(.c-back)) .c-brand::before{width:16px;height:16px}}
 @media (max-width:359px){.c-head .c-btn{padding:0 6px;letter-spacing:0;font-size:13px;min-width:0}.c-brand{font-size:0;gap:0}.c-brand::before{width:14px;height:14px}}
 /* 進場：卡片依序浮起（前 8 張） */
 .c-grid>.c-card,.c-page>.c-card,.c-list>li{animation:rise .5s var(--ease) both}

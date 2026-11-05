@@ -352,6 +352,7 @@ async function remove() {
 
 <style scoped>
 .st-notify{padding:8px 0;border-top:1px solid var(--line)}.st-notify-t{display:flex;flex-direction:column;margin:0 0 4px;font-weight:700}.st-notify-t small{font-weight:400;line-height:1.6}
+.st-notify>small{display:block;margin-top:6px}
 .st-notify .c-switch{display:inline-flex;margin-right:20px}
 .st-kv{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px}
 .st-kv>span{flex:0 0 100%;font:600 11px/1.6 var(--mono);letter-spacing:.1em}
@@ -360,14 +361,11 @@ async function remove() {
 .identity-list li { padding-block: .5rem; border-bottom: 1px solid var(--line); }
 .identity-list li:last-child { border-bottom: 0; }
 /* 編輯式設定頁：無框區塊，墨色頂線；桌面為「標題欄 ／ 內容欄」兩欄 */
-.x-set { counter-reset: sec; }
-.x-set > .c-card { counter-increment: sec; border: 0; border-top: 1px solid var(--ink-line); background: transparent; padding: 22px 0 28px; margin: 0; }
+.x-set > .c-card { border: 0; border-top: 1px solid var(--ink-line); background: transparent; padding: 22px 0 28px; margin: 0; }
 .x-set > .c-card:first-of-type { border-top: 0; padding-top: 6px; } /* 標題下已有墨線，第一區不再重複 */
 .x-set > .c-card > h2:first-child { display: block; font-size: 20px; margin: 0 0 16px; }
-.x-set > .c-card > h2:first-child::before { content: counter(sec, decimal-leading-zero) / ""; display: block; width: auto; height: auto; background: none; margin-bottom: 8px; font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--red-text); }
 .x-set > .c-card.bad { background: var(--bad-bg); border-top-color: var(--bad); padding-inline: 20px; box-shadow: none; margin-top: 8px; }
 .x-set > .c-card.bad > h2:first-child { color: var(--bad); }
-.x-set > .c-card:has(> .c-btn.block) { counter-increment: none; }
 .x-set > .c-card > p.c-mute:first-of-type { margin-top: 0; }
 @media (min-width: 768px) {
   .x-set > .c-card { display: grid; grid-template-columns: 200px minmax(0, 1fr); column-gap: 40px; align-items: start; }
