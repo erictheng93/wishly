@@ -16,6 +16,7 @@
 @media (min-width:768px){.g-top{padding-inline:max(20px,calc((100% - var(--g-w)) / 2 + 20px))}}
 .g-tools{display:flex;align-items:center;margin-left:8px;padding-left:8px;border-left:1px solid var(--line)}
 .g-wrap h1{font-size:clamp(30px,5.4vw,52px);line-height:1.08;letter-spacing:-.02em;margin:28px 0 12px}
+html:lang(vi) .g-wrap h1{line-height:1.22} /* 越南文聲調符號需要行高 */
 .g-mute{color:var(--mute);font-size:13px;line-height:1.6;letter-spacing:.02em;overflow-wrap:anywhere}
 .g-mute a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
 .g-cover[src$='.svg']{object-fit:contain;background:var(--bg-alt)}
