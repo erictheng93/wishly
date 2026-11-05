@@ -38,8 +38,10 @@ export const options = {
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
 }
 
-// 401（訪客的 /me）與 409（品項已被認捐完）是正常業務回應，不算錯誤
-http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 401, 409))
+// 預設只有 2xx / 3xx 算成功；預期的業務回應只在個別請求放寬（訪客 /me 的 401、捐助撞到品項已滿的 409），
+// 會員請求若因 session 失效等原因回 401 仍算錯誤，不會被當成「正常」而掩蓋。
+const OK_ANON_401 = http.expectedStatuses({ min: 200, max: 399 }, 401)
+const OK_CLAIM_409 = http.expectedStatuses({ min: 200, max: 399 }, 409)
 
 const t0 = Date.now()
 const rampMs = parseDur(RAMP)
@@ -59,13 +61,15 @@ function hdr(extra) {
     'Origin': 'http://localhost:3000',
   }, extra || {})
 }
-function get(path, tag, extra) {
-  return http.get(BASE + path, { headers: hdr(extra), tags: { name: tag, phase: phase() } })
+function get(path, tag, extra, cb) {
+  const p = { headers: hdr(extra), tags: { name: tag, phase: phase() } }
+  if (cb) p.responseCallback = cb
+  return http.get(BASE + path, p)
 }
-function send(method, path, body, tag, extra) {
-  return http.request(method, BASE + path, body == null ? null : JSON.stringify(body), {
-    headers: hdr(Object.assign({ 'Content-Type': 'application/json' }, extra)), tags: { name: tag, phase: phase() },
-  })
+function send(method, path, body, tag, extra, cb) {
+  const p = { headers: hdr(Object.assign({ 'Content-Type': 'application/json' }, extra)), tags: { name: tag, phase: phase() } }
+  if (cb) p.responseCallback = cb
+  return http.request(method, BASE + path, body == null ? null : JSON.stringify(body), p)
 }
 
 // ---- 訪客：打開別人分享的連結、逛探索頁 ----
@@ -80,7 +84,7 @@ function visitor() {
     if (et) etags[s] = et
     get(`/public/wishlists/${s}`, 'GET /public/wishlists/:slug (etag)', et ? { 'If-None-Match': et } : {})
     get('/public/status', 'GET /public/status')
-    get('/me', 'GET /me (anon)')
+    get('/me', 'GET /me (anon)', null, OK_ANON_401)
     send('POST', `/public/wishlists/${s}/views`, {}, 'POST /views')
   })
   think()
@@ -103,8 +107,9 @@ function member() {
     get('/friends/requests/count', 'GET /friends/requests/count', auth)
     get('/me/notifications?limit=20', 'GET /me/notifications', auth)
     const r = get('/wishlists?limit=20&status=draft,active,closed', 'GET /wishlists', auth)
-    check(r, { 'wishlists 200': (x) => x.status === 200 })
-    try { lists = r.json('wishlists') } catch (_) { lists = null }
+    // GET /wishlists 回 { data: [...], next_cursor }
+    try { lists = r.json('data') } catch (_) { lists = null }
+    check(r, { 'wishlists 200 且非空': (x) => x.status === 200 && Array.isArray(lists) && lists.length > 0 })
   })
   think()
   if (lists && lists.length) {
@@ -132,7 +137,7 @@ function member() {
       const it = open[rnd(0, open.length - 1)]
       let claimId
       group('claim', () => {
-        const r = send('POST', `/items/${it.id}/claims`, { qty: 1 }, 'POST /items/:id/claims', Object.assign({ 'Idempotency-Key': uuidv4() }, auth))
+        const r = send('POST', `/items/${it.id}/claims`, { qty: 1 }, 'POST /items/:id/claims', Object.assign({ 'Idempotency-Key': uuidv4() }, auth), OK_CLAIM_409)
         check(r, { 'claim 201/409': (x) => x.status === 201 || x.status === 409 })
         if (r.status === 201) claimId = r.json('claim.id')
       })

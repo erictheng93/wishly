@@ -59,32 +59,41 @@ use axum::{response::IntoResponse, Router};
 pub mod flags {
     use std::sync::Mutex;
     use std::time::{Duration, Instant};
-    static RO: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+    /// (失效世代, 快取值)。查詢前記下世代，寫回時世代已變就丟棄：
+    /// 否則在 admin commit 前讀到舊值的請求，會在 `invalidate` 之後把舊值寫回、再撐 1 秒。
+    static RO: Mutex<(u64, Option<(Instant, bool)>)> = Mutex::new((0, None));
     const TTL: Duration = Duration::from_secs(1);
 
     pub async fn read_only(pool: &sqlx::PgPool) -> Result<bool, sqlx::Error> {
         let cache = crate::config::get().micro_cache;
-        if cache {
-            if let Some((at, v)) = *RO.lock().unwrap() {
+        let gen = {
+            let g = RO.lock().unwrap();
+            if let (true, Some((at, v))) = (cache, g.1) {
                 if at.elapsed() < TTL {
                     return Ok(v);
                 }
             }
-        }
+            g.0
+        };
         let v: Option<serde_json::Value> =
             sqlx::query_scalar("SELECT value FROM system_flags WHERE key = 'read_only'")
                 .fetch_optional(pool)
                 .await?;
         let v = v.and_then(|v| v.as_bool()) == Some(true);
         if cache {
-            *RO.lock().unwrap() = Some((Instant::now(), v));
+            let mut g = RO.lock().unwrap();
+            if g.0 == gen {
+                g.1 = Some((Instant::now(), v));
+            }
         }
         Ok(v)
     }
 
-    /// admin 改 system_flags 後呼叫
+    /// admin 改 system_flags 並 commit 後呼叫：清掉快取，並讓失效前已開始的查詢不能寫回
     pub fn invalidate() {
-        *RO.lock().unwrap() = None;
+        let mut g = RO.lock().unwrap();
+        g.0 = g.0.wrapping_add(1);
+        g.1 = None;
     }
 }
 use sqlx::PgPool;
