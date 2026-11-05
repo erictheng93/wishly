@@ -56,6 +56,20 @@ pub fn require_staff(u: &CurrentUser) -> Result<(), AppError> {
     }
 }
 
+/// admin.search 稽核用：搜尋字常是 Email / 電話，diff 不放個資（契約 t-audit_logs），只留可辨識的輪廓
+pub(crate) fn mask_search(s: &str) -> String {
+    if let Some((local, domain)) = s.split_once('@') {
+        let head: String = local.chars().take(1).collect();
+        return format!("{head}***@{domain}").chars().take(80).collect();
+    }
+    let n = s.chars().count();
+    if s.chars().filter(char::is_ascii_digit).count() >= 6 {
+        let tail: String = s.chars().skip(n.saturating_sub(3)).collect();
+        return format!("***{tail}");
+    }
+    s.chars().take(80).collect()
+}
+
 pub async fn audit<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
     staff: Uuid,
@@ -137,7 +151,7 @@ async fn list_wishlists(
             "admin.search",
             "wishlists",
             None,
-            json!({ "q": s }),
+            json!({ "q": mask_search(s) }),
         )
         .await?;
     }
@@ -199,7 +213,7 @@ async fn list_users(
             "admin.search",
             "users",
             None,
-            json!({ "q": s }),
+            json!({ "q": mask_search(s) }),
         )
         .await?;
     }

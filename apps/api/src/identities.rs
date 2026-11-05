@@ -182,6 +182,16 @@ pub(crate) async fn link(
         .await?;
     let to = contact.as_deref().or(email);
     notify(&mut tx, id, "auth.identity_linked", provider, to).await?;
+    crate::security::audit(
+        &mut *tx,
+        id,
+        "auth.identity_linked",
+        "users",
+        id,
+        None,
+        json!({ "provider": provider }),
+    )
+    .await?;
     tx.commit().await?;
     crate::uploads::delete_objects(pool.clone(), media); // COMMIT 後才刪
     Ok(())
@@ -381,6 +391,17 @@ async fn unlink(
     let hash = session_hash(&headers)?;
     let contact = lock_user(&mut tx, u.id, &hash).await?;
     unlink_locked(&mut tx, u.id, &provider, contact.as_deref()).await?;
+    // 營運代為解除另記 user.identity_unlink（admin.rs），這裡只記本人操作
+    crate::security::audit(
+        &mut *tx,
+        u.id,
+        "auth.identity_unlinked",
+        "users",
+        u.id,
+        None,
+        json!({ "provider": provider }),
+    )
+    .await?;
     sqlx::query("UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND token_hash<>$2 AND revoked_at IS NULL")
         .bind(u.id).bind(&hash).execute(&mut *tx).await?;
     tx.commit().await?;

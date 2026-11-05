@@ -131,6 +131,7 @@ async fn staff_totp_soft_then_enforced(pool: PgPool) {
     )
     .await;
     assert_eq!(r.2["code"], "MFA_CODE_INVALID", "同一時間步不得重放");
+    assert_eq!(audit_count(&pool, s.id, "auth.mfa_failed").await, 1);
     let r = call(
         &pool,
         "POST",
@@ -524,6 +525,11 @@ async fn recovery_codes_unlock_once_and_reset_clears_them(pool: PgPool) {
     )
     .await;
     assert_eq!(r.2["code"], "MFA_CODE_INVALID");
+    assert_eq!(
+        audit_count(&pool, s.id, "auth.mfa_failed").await,
+        2,
+        "用過的與亂打的備用碼各記一筆"
+    );
     // 另一位營運人員重設後，舊備用碼全部失效
     let s2 = common::staff(&pool, "ops2").await;
     let r = call(

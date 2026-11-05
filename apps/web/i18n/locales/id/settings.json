@@ -147,6 +147,7 @@
         "auth_password_reset": "Kata sandi direset",
         "auth_mfa_enabled": "Verifikasi dua langkah diaktifkan",
         "auth_mfa_verified": "Lolos verifikasi dua langkah",
+        "auth_mfa_failed": "Kode verifikasi dua langkah salah",
         "auth_mfa_recovery_used": "Kode pemulihan dipakai",
         "auth_mfa_recovery_regenerated": "Kode pemulihan dibuat ulang",
         "auth_recovery_regenerated": "Kode pemulihan dibuat ulang",
