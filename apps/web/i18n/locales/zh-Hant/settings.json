@@ -122,7 +122,9 @@
       "social": "社交與生日",
       "socialHint": "好友動態，以及好友生日提醒、自己生日前提醒你開清單。",
       "inbox": "站內",
-      "email": "Email"
+      "email": "Email",
+      "lang": "通知語言",
+      "langHint": "站內通知與 Email 使用的語言，與網頁介面語言分開設定。"
     },
     "push": {
       "title": "推播通知",

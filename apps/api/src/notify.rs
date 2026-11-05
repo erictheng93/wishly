@@ -995,7 +995,8 @@ fn at_str(l: Lang, at: Option<String>) -> String {
     }
 }
 
-/// 信件語言。DB `users.locale` 與 Accept-Language 都以 zh-TW / en / vi 為準，其他值一律退回繁中。
+/// 信件語言。DB `users.locale` 與 Accept-Language 都以 zh-TW / en / vi / id 為準，其他值一律退回繁中。
+/// `users.locale` 只在開戶（auth.rs）與設定頁 PATCH /me 寫入，介面語言不同步過來。
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Lang {
     #[default]

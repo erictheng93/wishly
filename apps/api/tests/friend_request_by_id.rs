@@ -205,3 +205,94 @@ async fn search_never_reveals_email_by_partial_match(pool: PgPool) {
     // 一般名稱照樣可部分比對
     assert_eq!(search(&pool, &me.token, "tin").await.len(), 1);
 }
+
+fn names(r: &[Value]) -> Vec<&str> {
+    r.iter()
+        .map(|u| u["display_name"].as_str().unwrap())
+        .collect()
+}
+
+async fn set_handle(pool: &PgPool, id: Uuid, h: &str) {
+    sqlx::query("UPDATE users SET handle = $2 WHERE id = $1")
+        .bind(id)
+        .bind(h)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+/// 排序層級：自己 → 好友 → 共同好友多者 → 陌生人；同層依比對品質（完全 → 前綴 → 字首 → 包含）
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn search_ranks_self_friend_mutual_stranger(pool: PgPool) {
+    let me = user(&pool, "Amy Chen").await;
+    let fr = user(&pool, "Zoe Amy").await; // 好友，比對只是「字首」也排在陌生人前
+    let m1 = user(&pool, "Pal").await;
+    let m2 = user(&pool, "Pal2").await;
+    let two = user(&pool, "Lamya").await; // 兩位共同好友（包含命中）
+    let one = user(&pool, "Amy Lin").await; // 一位共同好友（前綴命中）
+    let s_contains = user(&pool, "Kamy").await;
+    let s_word = user(&pool, "Lee Amy").await;
+    let s_prefix = user(&pool, "amya").await;
+    befriend(&pool, me.id, fr.id).await;
+    befriend(&pool, me.id, m1.id).await;
+    befriend(&pool, me.id, m2.id).await;
+    befriend(&pool, two.id, m1.id).await;
+    befriend(&pool, two.id, m2.id).await;
+    befriend(&pool, one.id, m1.id).await;
+    let _ = (s_contains, s_word, s_prefix);
+
+    let r = search(&pool, &me.token, "AMY").await; // 不分大小寫
+    assert_eq!(
+        names(&r),
+        ["Amy Chen", "Zoe Amy", "Lamya", "Amy Lin", "amya", "Lee Amy", "Kamy"],
+        "{r:?}"
+    );
+    assert_eq!(r[0]["relation"], "self");
+    assert_eq!(r[1]["relation"], "friend");
+    assert_eq!(
+        (r[2]["mutual"].clone(), r[3]["mutual"].clone()),
+        (json!(2), json!(1))
+    );
+}
+
+/// 多詞：每個詞都要命中名稱（包含）或 handle（前綴），順序不拘
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn search_matches_every_word(pool: PgPool) {
+    let me = user(&pool, "Me").await;
+    let a = user(&pool, "Eric Theng").await;
+    let b = user(&pool, "Eric Wu").await;
+    set_handle(&pool, b.id, "ericwu").await;
+    let _ = a;
+    assert_eq!(
+        names(&search(&pool, &me.token, "eric%20th").await),
+        ["Eric Theng"]
+    );
+    assert_eq!(
+        names(&search(&pool, &me.token, "theng%20%20ERIC").await),
+        ["Eric Theng"]
+    );
+    // handle 前綴可與名稱詞混用；只有 @ 的詞忽略
+    assert_eq!(
+        names(&search(&pool, &me.token, "%40ericw%20eric%20%40").await),
+        ["Eric Wu"]
+    );
+    // 只打 @ 不能列出所有有 handle 的人
+    assert!(search(&pool, &me.token, "%40").await.is_empty());
+    assert!(search(&pool, &me.token, "eric%20zzz").await.is_empty());
+}
+
+/// handle 完全相符的陌生人一定入選，不會被 8 筆好友擠掉；入選後仍依層級排序
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn search_exact_handle_survives_limit(pool: PgPool) {
+    let me = user(&pool, "Me").await;
+    for i in 0..9 {
+        let f = user(&pool, &format!("Bob {i}")).await;
+        befriend(&pool, me.id, f.id).await;
+    }
+    let target = user(&pool, "Someone").await;
+    set_handle(&pool, target.id, "bob").await;
+    let r = search(&pool, &me.token, "bob").await;
+    assert_eq!(r.len(), 8, "{r:?}");
+    assert_eq!(r[7]["id"], json!(target.id), "{r:?}");
+    assert!(r[..7].iter().all(|u| u["relation"] == "friend"));
+}

@@ -16,10 +16,7 @@ export function useAuth() {
       user.value = null
       if (e?.status === 401 || e?.code === 'ACCOUNT_BLOCKED') hint.value = null // 網路錯誤不清：只是暫時連不上
     }
-    // 以目前介面語言為準，讓後端寄信（通知、安全通知）用同一種語言
-    const cur = useNuxtApp().$i18n.locale.value
-    const want = cur === 'zh-Hant' ? 'zh-TW' : cur
-    if (user.value?.locale && user.value.locale !== want) api('/me', { method: 'PATCH', body: { locale: want }, noRedirect: true }).then((u) => { user.value = u }).catch(() => {})
+    // 通知語言（users.locale）只在設定頁明確修改：介面語言是裝置上的偏好，/vi、/id 前綴網址也會切換，不可默默改寄信語言
     loaded.value = true
     return user.value
   }

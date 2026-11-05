@@ -482,3 +482,51 @@ async fn hard_ceiling_is_20_per_hour(pool: PgPool) {
     .await;
     assert_eq!(st, StatusCode::TOO_MANY_REQUESTS);
 }
+
+/// 通知語言只在開戶時取 Accept-Language；之後用別的語言登入不會改（介面語言不可默默改寄信語言）
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn locale_set_at_signup_only(pool: PgPool) {
+    let app = test_app(&pool);
+    let email = format!("otp-lang-{}@example.com", Uuid::new_v4());
+    let login = |lang: &'static str| {
+        let (app, pool, email) = (app.clone(), pool.clone(), email.clone());
+        async move {
+            let hdr = [("accept-language", lang.to_string())];
+            let (st, _, b) = call_app(
+                &app,
+                "POST",
+                "/auth/otp/request",
+                &hdr,
+                Some(json!({ "email": email })),
+            )
+            .await;
+            assert_eq!(st, 202, "{b}");
+            let code = recover_code(&pool, &email).await;
+            let (st, _, b) = call_app(
+                &app,
+                "POST",
+                "/auth/otp/verify",
+                &hdr,
+                Some(json!({ "email": email, "code": code, "challenge_id": b["challenge_id"] })),
+            )
+            .await;
+            assert_eq!(st, 200, "{b}");
+            sqlx::query_scalar::<_, String>("SELECT locale FROM users WHERE email=$1")
+                .bind(&email)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    assert_eq!(login("id-ID,id;q=0.9").await, "id");
+    // 跳過 60 秒重送冷卻
+    sqlx::query("DELETE FROM otp_challenges")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM rate_limits")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(login("en-US,en;q=0.9").await, "id");
+}
