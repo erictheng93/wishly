@@ -109,12 +109,13 @@ jobs:
           path: apps/api/target/coverage.json
   mutate:
     # 突變測試量測的是測試強度，不擋 publish-image；失敗仍會讓 run 標紅。依 mutate.py 的順序連續切片分到多台機器。
+    # 8 片：單片約 4–5 分鐘仍短於 api-test，整個 run 17 個 job，留空間給同時跑的另一個 PR（免費方案上限 20）。
     needs: changes
     if: github.event_name != 'schedule' && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] }
+      matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8] }
     services:
       db:
         image: postgis/postgis:16-3.6@sha256:bdd9351e706076260ac21552cd9c1bed01582e69a902b1b5843f83fa0b4c5a9c
@@ -139,7 +140,7 @@ jobs:
         with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' && matrix.shard == 1 }}" }
       - run: scripts/mutate.sh all
         env:
-          MUTATION_SHARD: ${{ matrix.shard }}/10
+          MUTATION_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           # 每個 mutant 只改一個函式又改回來：incremental 讓重編從約 20 秒降到數秒（rust-cache 預設關掉它）。
           CARGO_INCREMENTAL: 1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
