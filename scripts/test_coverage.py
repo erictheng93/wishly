@@ -10,7 +10,7 @@ import unittest
 
 
 class CoverageScriptTests(unittest.TestCase):
-    def run_script(self, rust_version="1.99.0", cov_version="0.9.1"):
+    def run_script(self, rust_version="1.99.0", cov_version="0.9.1", runner=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -42,6 +42,9 @@ else:
             log = root / "cargo-args.json"
             env = dict(os.environ, PATH=f"{root / 'bin'}:{os.environ['PATH']}",
                        TEST_RUST_VERSION=rust_version, TEST_COV_VERSION=cov_version, TEST_CARGO_LOG=str(log))
+            env.pop("COVERAGE_RUNNER", None)
+            if runner:
+                env["COVERAGE_RUNNER"] = runner
             result = subprocess.run(["sh", str(root / "scripts/coverage-api.sh")], env=env,
                                     text=True, capture_output=True)
             arguments = json.loads(log.read_text()) if log.exists() else None
@@ -55,6 +58,12 @@ else:
                                ("--fail-under-regions", 66.16666666666667)]:
             self.assertAlmostEqual(float(arguments[arguments.index(flag) + 1]), expected, places=10)
         self.assertEqual(arguments[arguments.index("--output-path") + 1], "apps/api/target/coverage.json")
+
+    def test_nextest_runner_is_inserted_as_llvm_cov_subcommand(self):
+        result, arguments = self.run_script(runner="nextest")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(arguments[:4], ["llvm-cov", "nextest", "--manifest-path", "apps/api/Cargo.toml"])
+        self.assertIn("--fail-under-regions", arguments)
 
     def test_toolchain_mismatch_refuses_to_run_coverage(self):
         for rust, cov in [("1.98.0", "0.9.1"), ("1.99.0", "0.9.0")]:

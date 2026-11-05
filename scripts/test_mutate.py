@@ -116,5 +116,17 @@ class MutatorTests(unittest.TestCase):
         self.exercise("semantic violation", interrupted=True)
 
 
+class ShardTests(unittest.TestCase):
+    def test_shards_cover_every_case_once_in_order(self):
+        names = list(mutator.CASES)
+        for count in (1, 3, 8, len(names) + 2):
+            parts = [mutator.shard(names, f"{i}/{count}") for i in range(1, count + 1)]
+            self.assertEqual(sum(parts, []), names)
+        self.assertEqual(mutator.shard(names, None), names)
+        for bad in ("0/4", "5/4"):
+            with self.assertRaises(ValueError):
+                mutator.shard(names, bad)
+
+
 if __name__ == "__main__":
     unittest.main()

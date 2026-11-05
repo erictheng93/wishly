@@ -26,7 +26,9 @@ print(*floors)
 PY
 )
 set -- $coverage_floors
-cargo llvm-cov --manifest-path apps/api/Cargo.toml \
+# COVERAGE_RUNNER=nextest（CI）跨測試 binary 平行；未設時走 cargo test。
+# shellcheck disable=SC2086
+cargo llvm-cov ${COVERAGE_RUNNER:-} --manifest-path apps/api/Cargo.toml \
   --json --summary-only --ignore-filename-regex '/(tests|examples)/' \
   --output-path apps/api/target/coverage.json \
   --fail-under-lines "$1" --fail-under-functions "$2" --fail-under-regions "$3"
