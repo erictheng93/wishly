@@ -11,7 +11,8 @@ PGSOCK=${PGSOCK:-/tmp/wishly-pgsock}
 export DATABASE_URL=${DATABASE_URL:-postgres://wishly:wishly@localhost/wishly?host=$PGSOCK}
 export DB_POOL_MAX=${DB_POOL_MAX:-5}
 export SMTP_HOST=127.0.0.1 SMTP_PORT=1025
-pkill -f 'target/release/wishly-api' 2>/dev/null || true
+# 只比對不帶參數的 API 行程（任何路徑 / 檔名的 wishly-api*），不會誤殺本腳本
+pkill -f '^[^ ]*wishly-api[^ ]*$' 2>/dev/null || true
 sleep 0.5
 # 先把自己放進 cgroup 再 exec：程式啟動時就只看得到 1 顆 CPU（tokio 依此決定 worker 數），與真正的 1 vCPU 主機一致
 sh -c 'for c in cpu cpuacct cpuset memory; do
