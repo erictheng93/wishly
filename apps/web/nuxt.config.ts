@@ -4,7 +4,7 @@ const native = !!process.env.NUXT_NATIVE
 import { isLocalizable, PREFIX_LOCALES } from './app/utils/localized'
 
 // 語系檔依功能區拆開（i18n/locales/<語系>/<區>.json，檔內最外層 key 即區名），各區獨立維護
-const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire']
+const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire', 'interests']
 const loc = (code: string, language: string, name: string) => ({ code, language, name, files: AREAS.map(a => `${code}/${a}.json`) })
 
 export default defineNuxtConfig({

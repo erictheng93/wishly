@@ -178,6 +178,69 @@
       "hint": "Bạn thân mở được các danh sách chỉ dành cho bạn thân. Đã chọn {n}.",
       "add": "Thêm vào bạn thân",
       "remove": "Bỏ khỏi bạn thân"
+    },
+    "pc": {
+      "vis": {
+        "public": "Công khai",
+        "friends": "Bạn bè",
+        "close": "Bạn thân",
+        "private": "Không hiển thị (chỉ mình tôi)"
+      },
+      "showOn": "Hiển thị trên trang cá nhân",
+      "up": "Lên",
+      "down": "Xuống",
+      "remove": "Xóa",
+      "add": "Thêm",
+      "ap": {
+        "title": "Giao diện trang cá nhân",
+        "bio": "Giới thiệu (hiển thị trên trang cá nhân, tùy chọn)",
+        "links": "Liên kết",
+        "linkTitle": "Tên liên kết",
+        "linkUrl": "URL https://",
+        "linkHidden": "Ẩn trên trang cá nhân",
+        "copyPage": "Sao chép URL trang liên kết",
+        "copied": "Đã sao chép",
+        "needHandle": "Hãy đặt tên tài khoản ở trên trước để có URL trang liên kết",
+        "linksMax": "Tối đa 10 liên kết",
+        "pageUrl": "Trang liên kết: "
+      },
+      "gp": {
+        "title": "Sở thích quà tặng và mối quan tâm",
+        "likes": "Thứ tôi thích",
+        "dislikes": "Thứ tôi không muốn nhận",
+        "ph": "VD: sô-cô-la đen",
+        "max": "Tối đa 20 mục",
+        "interests": "Thẻ sở thích",
+        "count": "Đã chọn {n} / {max}",
+        "interestsVis": "Hiển thị sở thích cho"
+      },
+      "dt": {
+        "title": "Ngày quan trọng",
+        "hint": "Thêm ngày kỷ niệm, lễ tết. Bạn bè nhận nhắc nhở trong ứng dụng trước 7 ngày.",
+        "name": "Tên (VD: kỷ niệm ngày cưới)",
+        "month": "Tháng",
+        "day": "Ngày",
+        "recurring": "Lặp lại hàng năm",
+        "year": "Năm",
+        "yearHint": "Ngày chỉ diễn ra một lần cần có năm",
+        "empty": "Chưa có ngày quan trọng",
+        "max": "Tối đa 20 ngày",
+        "past": "Đã qua"
+      },
+      "pv": {
+        "title": "Thông tin riêng tư",
+        "hint": "Địa chỉ và tuổi không bao giờ công khai; bạn chọn ai được xem trên trang cá nhân.",
+        "age": "Tuổi",
+        "birthYear": "Năm sinh (chỉ hiển thị tuổi, không hiển thị năm)",
+        "shipTitle": "Địa chỉ nhận hàng mặc định",
+        "recipient": "Người nhận",
+        "phone": "Điện thoại",
+        "address": "Địa chỉ",
+        "keepHint": "Đã lưu. Muốn đổi, hãy nhập lại đầy đủ; nội dung gốc không còn hiển thị.",
+        "homeTitle": "Địa chỉ nhà",
+        "noneSaved": "Chưa đặt",
+        "clear": "Xóa"
+      }
     }
   }
 }
