@@ -201,9 +201,10 @@ async fn profile(
         "kind": kind, "item_title": it, "qty": qty, "points": points, "status": status, "created_at": at,
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
+    let links = crate::user_links::visible(&st.pool, uid).await?;
     Ok(Json(
         json!({ "user": { "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday,
-                              "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()) },
+                              "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()), "links": links },
                     "relation": relation, "request_id": request_id, "mutual": mutual,
                     "wishlists": wishlists, "donations": donations }),
     ))

@@ -48,6 +48,7 @@ pub mod share_views;
 pub mod support;
 pub mod topup;
 pub mod uploads;
+pub mod user_links;
 pub mod validate;
 pub mod wallet;
 pub mod wallet_ops;
@@ -123,6 +124,7 @@ pub fn app(state: AppState) -> Router {
             Router::new()
                 .merge(public::routes())
                 .merge(share_views::routes())
+                .merge(user_links::routes())
                 .merge(guest::routes())
                 .merge(claims::routes())
                 .merge(contributions::routes())
