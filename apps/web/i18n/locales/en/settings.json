@@ -187,6 +187,9 @@
         "private": "Not shown (only me)"
       },
       "showOn": "Show on profile",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
       "up": "Move up",
       "down": "Move down",
       "remove": "Remove",
