@@ -5,6 +5,7 @@ export const useAuthHint = () => useCookie<boolean | null>('ws_hint', { maxAge: 
 export function useAuth() {
   const user = useState<any>('auth-user', () => null)
   const loaded = useState<boolean>('auth-loaded', () => false)
+  const lastFetch = useState<number>('auth-fetched-at', () => 0)
   const { api, base } = useApi()
   async function fetchMe(force = false) {
     if (loaded.value && !force) return user.value
@@ -17,9 +18,11 @@ export function useAuth() {
       if (e?.status === 401 || e?.code === 'ACCOUNT_BLOCKED') hint.value = null // 網路錯誤不清：只是暫時連不上
     }
     // 通知語言（users.locale）只在設定頁明確修改：介面語言是裝置上的偏好，/vi、/id 前綴網址也會切換，不可默默改寄信語言
-    loaded.value = true
+    loaded.value = true; lastFetch.value = Date.now()
     return user.value
   }
+  // 剛抓過（如 auth middleware）就不再重抓；供頁面進入時避免連續兩次 GET /me
+  const fetchMeFresh = (maxAgeMs = 5000) => fetchMe(Date.now() - lastFetch.value > maxAgeMs)
   async function logout(redirect?: string) {
     const hint = useAuthHint() // await 之前取：useCookie 需要 Nuxt context
     await dropPush(api) // 共用裝置：先退訂，下一位使用者才不會收到前一位的通知（需趁 session 還在）
@@ -61,5 +64,5 @@ export function useAuth() {
     }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
-  return { oauth, user, loaded, fetchMe, logout, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }
+  return { oauth, user, loaded, fetchMe, fetchMeFresh, logout, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }
 }

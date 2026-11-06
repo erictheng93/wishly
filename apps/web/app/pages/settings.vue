@@ -4,7 +4,7 @@ definePageMeta({ middleware: 'auth' })
 const { t, locale, locales } = useI18n()
 useHead({ title: () => t('settings.title') })
 const { api } = useApi()
-const { user, fetchMe, logout, oauth } = useAuth()
+const { user, fetchMeFresh, logout, oauth } = useAuth()
 const route = useRoute()
 const providers = [{ provider: 'email', label: 'Email' }, { provider: 'google', label: 'Google' }, { provider: 'line', label: 'LINE' }] as const
 const linked = computed(() => new Set<string>((user.value?.identities ?? []).map((i: any) => i.provider)))
@@ -38,7 +38,7 @@ async function linkOAuth(p: (typeof providers)[number]) {
   } finally { identityBusy.value = false }
 }
 const ready = ref(false) // GET /me 回來並填好表單前不渲染，免得使用者先輸入的內容被覆寫
-onMounted(async () => { try { await fetchMe(true) } catch { /* 保留舊的 user */ } name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
+onMounted(async () => { try { await fetchMeFresh() } catch { /* 保留舊的 user */ } name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
   ;[bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
   identityErr.value = linkError(String(route.query.error))
   const label = providers.find(p => p.provider === route.query.linked)?.label
