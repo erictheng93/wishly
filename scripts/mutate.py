@@ -65,6 +65,7 @@ CASES = {
     "cash-refund-reject-once": (API + "wallet_ops.rs", "cash_refund_patch", "ELSE status IN ('requested', 'processing') END", "ELSE true END", "wallet_ops", "concurrent_rejections_restore_points_once"),
     "wallet-debt-state-guard": (API + "wallet_ops.rs", "debt_patch", "WHERE id = $1 AND status = 'open'", "WHERE id = $1", "wallet_ops", "charge_back_recovers_remaining_lot_records_debt_and_is_idempotent"),
     "debt-offset-settled-guard": (API + "points.rs", "offset_charged_back", "d.status IN ('open', 'written_off')", "true", "wallet_ops", "settled_debt_lets_returned_points_credit_normally"),
+    "user-date-sent-on-conflict": (API + "user_dates.rs", "date_tick_at", "ON CONFLICT DO NOTHING RETURNING date_id", "RETURNING date_id", "user_dates", "idempotent_same_year"),
     "birthday-friend-once": (API + "birthday.rs", "birthday_tick_at", "VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING wishlist_id", "VALUES ($1, $2) ON CONFLICT (wishlist_id, year) DO UPDATE SET year = EXCLUDED.year RETURNING wishlist_id", "birthday_notify", "tick_recipients_and_idempotency"),
     "birthday-nudge-once": (API + "birthday.rs", "birthday_tick_at", "WHERE id = $1 AND birthday_nudged_year IS DISTINCT FROM $2 RETURNING id", "WHERE id = $1 RETURNING id", "birthday_notify", "nudge_rules"),
     "debt-offset-return-path": (API + "points.rs", "return_to_allocations", "running = offset_charged_back(tx, wallet_id, lot, take, running).await?;", "let _ = offset_charged_back;", "wallet_ops", "withdrawn_pledge_after_charge_back_offsets_debt_instead_of_reviving_points"),
@@ -139,6 +140,7 @@ FAILURE_MARKERS = {name: "CDN purge missing for wishlist" for name in CASES if n
 FAILURE_MARKERS.update({
     "user-suspend-reports-open-only": "已駁回的檢舉不可被停權覆寫",
     "org-reject-reports-open-only": "已駁回的檢舉不可被撤銷組織覆寫",
+    "user-date-sent-on-conflict": "同年重跑不可重複排入",
     "absorb-skip-locked": "不可等待對方的列鎖",
     "absorb-wallet-lock": "入帳進行中不可併入",
     "grant-recheck-after-wallet-lock": "已刪帳號不可被入點",

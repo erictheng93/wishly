@@ -160,7 +160,10 @@ async fn idempotent_same_year(pool: PgPool) {
     befriend(&pool, o.id, f.id).await;
     add(&pool, o.id, "05-20", None, true, "friends").await;
     assert_eq!(tick(&pool, day(5, 14)).await, 1);
-    assert_eq!(tick(&pool, day(5, 14)).await, 0);
+    let again = wishly_api::user_dates::date_tick_at(&pool, day(5, 14))
+        .await
+        .expect("同年重跑不可重複排入");
+    assert_eq!(again, 0);
     assert_eq!(tick(&pool, day(5, 15)).await, 0);
 }
 
@@ -289,4 +292,24 @@ async fn worker_writes_inbox_for_visible_date(pool: PgPool) {
     .await
     .unwrap();
     assert!(t.contains("結婚紀念日") && l.starts_with("/u/"), "{t} {l}");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn account_delete_removes_dates(pool: PgPool) {
+    let o = user(&pool, "O").await;
+    add(&pool, o.id, "05-20", None, true, "friends").await;
+    let (s, _, _) = call(
+        &pool,
+        "DELETE",
+        "/me",
+        &ck(&o.token),
+        Some(json!({"confirm": "DELETE"})),
+    )
+    .await;
+    assert!(s.is_success(), "{s}");
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM user_dates")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
 }
