@@ -1,6 +1,10 @@
 //! 金流後台（唯讀）：指標定義見 docs/superpowers/specs/2026-10-31-finance-dashboard-design.md「指標定義」。
 //! 金額一律來自 `topups`（人工發放不算營收）；日界線 Asia/Taipei；統計不排除營運／demo／已刪除用戶。
-use crate::{admin::Staff, error::AppError, AppState};
+use crate::{
+    admin::{Staff, FINANCE},
+    error::AppError,
+    AppState,
+};
 use axum::{
     extract::{Query, State},
     http::{header, StatusCode},
@@ -61,7 +65,11 @@ pub fn json_resp(body: &Value) -> Response {
         .unwrap()
 }
 
-async fn overview(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>) -> R<Response> {
+async fn overview(
+    State(st): State<AppState>,
+    _s: Staff<FINANCE>,
+    Query(q): Query<DaysQ>,
+) -> R<Response> {
     let days = parse_days(&q)?;
     let sql = format!(
         "WITH {RANGE_CTE},
@@ -99,7 +107,11 @@ async fn overview(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>)
 }
 
 /// 付費用戶：以錢包為單位，金額與筆數只算區間內。
-async fn payers(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>) -> R<Response> {
+async fn payers(
+    State(st): State<AppState>,
+    _s: Staff<FINANCE>,
+    Query(q): Query<DaysQ>,
+) -> R<Response> {
     let days = parse_days(&q)?;
     let sql = format!(
         "WITH {RANGE_CTE},
@@ -140,7 +152,11 @@ async fn payers(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>) -
 }
 
 /// 渠道比較：固定四種渠道必出現，line_pay / apple_pay 有資料才出現。
-async fn channels(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>) -> R<Response> {
+async fn channels(
+    State(st): State<AppState>,
+    _s: Staff<FINANCE>,
+    Query(q): Query<DaysQ>,
+) -> R<Response> {
     let days = parse_days(&q)?;
     let sql = format!(
         "WITH {RANGE_CTE},
@@ -168,7 +184,11 @@ async fn channels(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>)
 }
 
 /// 風險與負債：負債 = 未使用點數（餘額，依批次拆分）+ 認捐中（已自餘額扣除，不重複）。
-async fn risk(State(st): State<AppState>, _s: Staff, Query(q): Query<DaysQ>) -> R<Response> {
+async fn risk(
+    State(st): State<AppState>,
+    _s: Staff<FINANCE>,
+    Query(q): Query<DaysQ>,
+) -> R<Response> {
     let days = parse_days(&q)?;
     let sql = format!(
         "WITH {RANGE_CTE},

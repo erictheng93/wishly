@@ -2,7 +2,7 @@
 import { reporterSuspicious } from '~/utils/reporter'
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 檢舉處理：檢閱被檢舉的清單與使用者，駁回、標記已處理，或直接下架／停權。
-definePageMeta({ middleware: 'staff' })
+definePageMeta({ middleware: 'staff', staffRole: 'moderator' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('admin.reports.title') })
 const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))

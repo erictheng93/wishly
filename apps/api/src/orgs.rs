@@ -567,6 +567,7 @@ async fn download(
     if !member_ok {
         if u.is_staff {
             crate::admin::require_staff(&u)?;
+            crate::admin::require_role(&u, crate::admin::MODERATOR)?;
         } else if role.is_some() {
             return Err(AppError::problem(
                 403,

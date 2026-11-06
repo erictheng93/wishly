@@ -1296,7 +1296,7 @@ async fn account_delete_vs_own_claim_never_deadlocks_or_leaves_active_claim(pool
         ),
     );
     common::wait_until("account deletion waiting on user or wishlist",|| async {
-        sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%SELECT is_staff FROM users%' OR query LIKE '%UPDATE wishlists SET status = ''archived''%'))")
+        sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%ANY(staff_roles) FROM users%' OR query LIKE '%UPDATE wishlists SET status = ''archived''%'))")
             .fetch_one(&pool).await.unwrap()
     }).await;
     gate.commit().await.unwrap();
@@ -1350,7 +1350,7 @@ async fn account_delete_vs_own_pledge_checks_actor_before_wishlist(pool: PgPool)
         ),
     );
     common::wait_until("account deletion waiting on user or wishlist",|| async {
-        sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%SELECT is_staff FROM users%' OR query LIKE '%UPDATE wishlists SET status = ''archived''%'))")
+        sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%ANY(staff_roles) FROM users%' OR query LIKE '%UPDATE wishlists SET status = ''archived''%'))")
             .fetch_one(&pool).await.unwrap()
     }).await;
     gate.commit().await.unwrap();
@@ -1420,7 +1420,7 @@ async fn account_delete_vs_user_claim_locks_owner_before_notification_fk(pool: P
         ),
     );
     common::wait_until("owner deletion waiting on user or wishlist",|| async {
-        sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%SELECT is_staff FROM users%' OR query LIKE '%UPDATE wishlists SET status = ''archived''%'))")
+        sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%ANY(staff_roles) FROM users%' OR query LIKE '%UPDATE wishlists SET status = ''archived''%'))")
             .fetch_one(&pool).await.unwrap()
     }).await;
     gate.commit().await.unwrap();
@@ -1465,7 +1465,7 @@ async fn deleted_actor_cannot_create_claim_on_another_users_active_list(pool: Pg
             Some(json!({"confirm":"DELETE"})),
         ),
     );
-    blocked(&pool, pid, "SELECT is_staff FROM users", 1).await;
+    blocked(&pool, pid, "ANY(staff_roles) FROM users", 1).await;
     // Authentication has succeeded while the actor still exists, but deletion
     // wins before the transaction's actor lock. The locked read must revalidate.
     let c = send(

@@ -255,12 +255,13 @@ async fn delete_me(
     let id = u.id;
     let mut tx = crate::uploads::media_tx(&st.pool, id).await?;
     crate::admin::lock_staff_changes(&mut tx).await?;
-    let staff: bool = sqlx::query_scalar("SELECT is_staff FROM users WHERE id=$1 FOR UPDATE")
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
-    if staff {
-        crate::admin::protect_last_staff(&mut tx, id).await?;
+    let admin: bool =
+        sqlx::query_scalar("SELECT 'admin' = ANY(staff_roles) FROM users WHERE id=$1 FOR UPDATE")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
+    if admin {
+        crate::admin::protect_last_admin(&mut tx, id).await?;
     }
     // P2-A：還有進行中的認捐（pledged）或點數餘額就不能刪帳號（否則點數會憑空消失）。先鎖錢包，與認捐 / 營運發點互斥。
     // captured（已達標、採購中）的認捐不擋：點數已花出，帳號匿名化後 donor_name 一併去識別。

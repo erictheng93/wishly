@@ -1,7 +1,7 @@
 //! 營運後台（P2-A）：採購單佇列 / 狀態推進（admin/orders）與人工發點 / 凍結（admin/wallets）。全部限 STAFF。
 //! 點數異動一律走 `points::post` / `release` / `refund_partial`；鎖序：清單（FOR SHARE）→ 錢包 → 品項 → 採購單 / 認捐。
 use crate::{
-    admin::{audit, limit, page, PageQ, Staff},
+    admin::{audit, limit, page, PageQ, Staff, FINANCE},
     error::AppError,
     idempotency, points, AppState,
 };
@@ -74,7 +74,7 @@ struct OrderRow {
 
 async fn list_orders(
     State(st): State<AppState>,
-    Staff(_): Staff,
+    Staff(_): Staff<FINANCE>,
     Query(q): Query<OrdQ>,
 ) -> R<Response> {
     if q.status.as_deref().is_some_and(|s| !STATUSES.contains(&s)) {
@@ -139,7 +139,7 @@ async fn list_orders(
 /// 明確查看收件資訊才解密並寫稽核；明文不進稽核紀錄。
 async fn view_address(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Path(id): Path<Uuid>,
 ) -> R<Response> {
     let (item_id, snapshot): (Uuid, Vec<u8>) = sqlx::query_as(
@@ -202,7 +202,7 @@ fn opt_text(m: &Map<String, Value>, k: &str, max: usize) -> R<Option<String>> {
 
 async fn patch_order(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {
@@ -402,7 +402,7 @@ impl WalletRow {
 /// GET /admin/wallets?q=：以 email / 暱稱 / user id 搜尋使用者，連同錢包（沒有錢包 = id null、餘額 0）
 async fn list_wallets(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Query(q): Query<PageQ>,
 ) -> R<Response> {
     if q.status
@@ -457,7 +457,7 @@ fn reason_of(b: &Value) -> R<String> {
 /// Idempotency-Key 必填：占位與入帳同一交易，重放回原回應並帶 Idempotency-Replayed。
 async fn grant(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     headers: HeaderMap,
     body: Bytes,
 ) -> R<Response> {
@@ -574,7 +574,7 @@ async fn grant(
 /// PATCH /admin/wallets/{id}：凍結 / 解凍（凍結後使用者不能再認捐；退點仍會入帳）
 async fn set_wallet_status(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {

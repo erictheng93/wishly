@@ -1,6 +1,7 @@
 {
   "admin": {
     "index": {
+      "roles": { "label": "Vai trò nhân viên", "admin": "Quản trị viên", "finance": "Tài chính", "moderator": "Kiểm duyệt", "support": "Hỗ trợ" },
       "title": "Bảng điều khiển vận hành",
       "statsLabel": "Thống kê vận hành",
       "overview": "Tổng quan",
@@ -76,8 +77,7 @@
         "sep": ", ",
         "unblock": "Mở khóa",
         "block": "Khóa",
-        "unsetStaff": "Gỡ staff",
-        "setStaff": "Đặt làm staff",
+        "editRoles": "Sửa vai trò",
         "unlink": "Hủy liên kết {provider}",
         "recovery": "Gửi email khôi phục",
         "resetMfa": "Đặt lại xác minh hai bước",

@@ -61,7 +61,7 @@ cd apps/web && npm install && npm run dev         # http://localhost:3000
 
 `/admin` 提供統計、檢舉、清單與使用者管理、唯讀旗標；`/admin/orders` 為採購佇列、`/admin/wallets` 為點數管理、`/admin/audit` 可查詢稽核紀錄；`/admin/cash-refunds` 為現金退款審核、`/admin/wallet-debts` 為拒付欠款結案、`/admin/finance` 為金流後台（總覽、交易明細、付費用戶、渠道、風險與負債；儲值單的拒付爭議處理在交易明細分頁，舊路徑 `/admin/topups` 會導向）。使用者端現金退款在 `/me/refund`（由 `/me/wallet` 進入，只有儲值購買的點數可退）。
 
-- 第一位 staff 需由資料庫設定 `users.is_staff = true`；之後可在後台設為／取消 staff。最後一位有效 staff 不可被停權、降權或自行刪帳號。
+- 營運角色（`users.staff_roles`，可多選）：`admin`（全部，含營運人員管理、系統旗標、MFA 重設）、`finance`（金流 / 儲值 / 退款 / 錢包 / 訂單）、`moderator`（檢舉、下架、組織 / 許可審核、救災事件、品牌商品）、`support`（只有共用的唯讀查詢）。第一位須由資料庫設定 `UPDATE users SET staff_roles = '{admin}' WHERE email = '…'`；之後由 admin 在後台勾選角色。只設 `is_staff = true`（舊寫法）會自動得到 admin，加同事請改用後台或指定 `staff_roles`。最後一位有效 admin 不可被停權、降權或自行刪帳號。
 - 停權、staff 變更與營運解除綁定會撤銷現有登入；解鎖後需重新登入。停權保留清單、捐助與帳務紀錄，不會自動下架清單。
 - 使用者支援 Email、名稱、handle、UUID 查詢，以及登入來源／帳號狀態篩選。停權、staff 變更、解除綁定與復原協助必須填寫原因並留下稽核。
 - 解除 LINE／Google 綁定至少須保留一種登入方式，並更新聯絡 Email、寄送安全通知。復原協助僅向既有已驗證 Email 寄送密碼重設驗證信；無 Email 帳號須另行核驗身分，後台不能直接換綁。

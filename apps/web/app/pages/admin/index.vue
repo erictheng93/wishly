@@ -6,6 +6,9 @@ useHead({ title: () => t('admin.index.title') })
 const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
 const { api } = useApi()
 const { user: me } = useAuth()
+const isAdmin = computed(() => hasStaffRole(me.value, 'admin'))
+const canFinance = computed(() => hasStaffRole(me.value, 'finance'))
+const canMod = computed(() => hasStaffRole(me.value, 'moderator'))
 const tab = ref<'lists' | 'users' | 'flags'>('lists')
 const err = ref(''), msg = ref('')
 
@@ -56,9 +59,10 @@ async function searchUsers(more = false) {
 }
 watch([uq, uStatus, uProvider], () => { uCursor.value = null })
 const userAct = ref<{ user: any; kind: string; title: string; provider?: string } | null>(null)
+const userRoles = ref<string[]>([])
 const userReason = ref(''), userBusy = ref(false), userErr = ref('')
 function askUser(user: any, kind: string, title: string, provider?: string) {
-  userAct.value = { user, kind, title, provider }; userReason.value = ''; userErr.value = ''
+  userAct.value = { user, kind, title, provider }; userRoles.value = [...(user.staff_roles || [])]; userReason.value = ''; userErr.value = ''
 }
 async function doUser() {
   if (userBusy.value || !userAct.value) return
@@ -68,7 +72,7 @@ async function doUser() {
     const path = `/admin/users/${user.id}`
     const body: any = { reason: userReason.value.trim() }
     if (kind === 'blocked') body.blocked = !user.blocked
-    if (kind === 'staff') body.is_staff = !user.is_staff
+    if (kind === 'staff') body.staff_roles = STAFF_ROLES.filter(x => userRoles.value.includes(x))
     await api(kind === 'unlink' ? `${path}/identities/${provider}` : kind === 'recovery' ? `${path}/recovery` : kind === 'mfa' ? `${path}/mfa` : path,
       { method: kind === 'unlink' || kind === 'mfa' ? 'DELETE' : kind === 'recovery' ? 'POST' : 'PATCH', body })
     userAct.value = null; msg.value = kind === 'recovery' ? t('admin.index.userAct.recoverySent') : t('admin.index.userAct.done', { title })
@@ -115,32 +119,32 @@ onMounted(loadStats)
       <div class="c-row c-mb"><h2 class="c-h2 c-grow c-m0">{{ $t('admin.index.overview') }}</h2><button class="c-btn small" :disabled="statsBusy" @click="loadStats">{{ statsBusy ? $t('admin.index.refreshing') : $t('admin.index.refreshStats') }}</button></div>
       <p v-if="statsErr" class="c-err" role="alert">{{ statsErr }}</p>
       <dl class="admin-stats k-kpis">
-        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0, 'is-zero': !Number(stats?.[key]) }"><NuxtLink v-if="key === 'open_reports'" to="/admin/reports">{{ stats?.[key] ?? '–' }}</NuxtLink><template v-else>{{ stats?.[key] ?? '–' }}</template></dd></div>
+        <div v-for="(name, key) in STAT" :key="key"><dt>{{ name }}</dt><dd :data-testid="`stat-${key}`" :class="{ hot: key === 'open_reports' && Number(stats?.[key]) > 0, 'is-zero': !Number(stats?.[key]) }"><NuxtLink v-if="key === 'open_reports' && canMod" to="/admin/reports">{{ stats?.[key] ?? '–' }}</NuxtLink><template v-else>{{ stats?.[key] ?? '–' }}</template></dd></div>
       </dl>
       <details v-if="stats"><summary>{{ $t('admin.index.detailsSummary') }}</summary>
         <div v-for="(name, key) in { claims_by_status: $t('admin.index.claimsByStatus'), notifications_by_status: $t('admin.index.notificationsByStatus'), audit_last_7d: $t('admin.index.auditLast7d') }" :key="key" class="c-mt">
           <strong>{{ name }}</strong><ul><li v-for="(count, status) in stats[key]" :key="status">{{ $t('admin.index.statusCount', { status, count }) }}</li></ul>
           <p v-if="!Object.keys(stats[key] || {}).length" class="c-mute">{{ $t('admin.index.noRecords') }}</p>
-          <button v-if="key === 'notifications_by_status' && Number(stats[key]?.failed) > 0" class="c-btn small" :disabled="rqBusy" @click="requeue">{{ $t('admin.index.requeue') }}</button>
+          <button v-if="isAdmin && key === 'notifications_by_status' && Number(stats[key]?.failed) > 0" class="c-btn small" :disabled="rqBusy" @click="requeue">{{ $t('admin.index.requeue') }}</button>
           <span v-if="key === 'notifications_by_status' && rqMsg" class="c-mute" role="status"> {{ rqMsg }}</span>
         </div>
       </details>
     </section>
     <nav class="k-nav" aria-label="Admin">
-      <NuxtLink to="/admin/orders" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orders') }} <span class="c-badge" data-testid="todo-pending_orders">{{ $t('admin.index.todo.pending_orders', { n: stats?.pending_orders ?? '–' }) }}</span></span></NuxtLink>
-      <NuxtLink to="/admin/wallets" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.wallets') }}</span></NuxtLink>
-      <NuxtLink to="/admin/cash-refunds" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.cashRefunds') }} <span class="c-badge" data-testid="todo-requested_refunds">{{ $t('admin.index.todo.requested_refunds', { n: stats?.requested_refunds ?? '–' }) }}</span></span></NuxtLink>
-      <NuxtLink to="/admin/wallet-debts" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.walletDebts') }} <span class="c-badge" data-testid="todo-open_debts">{{ $t('admin.index.todo.open_debts', { n: stats?.open_debts ?? '–' }) }}</span></span></NuxtLink>
-      <NuxtLink to="/admin/catalog" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.catalog') }}</span></NuxtLink>
-      <NuxtLink :to="stats?.pending_orgs > 0 || !(stats?.pending_permits > 0) ? '/admin/orgs' : '/admin/orgs?status=pending_permits'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orgs') }} <span class="c-badge" data-testid="todo-pending_orgs">{{ $t('admin.index.todo.pending_orgs', { n: stats?.pending_orgs ?? '–' }) }}</span> <span class="c-badge" data-testid="todo-pending_permits">{{ $t('admin.index.todo.pending_permits', { n: stats?.pending_permits ?? '–' }) }}</span></span></NuxtLink>
-      <NuxtLink to="/admin/relief-events" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.events') }}</span></NuxtLink>
+      <NuxtLink v-if="canFinance" to="/admin/orders" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orders') }} <span class="c-badge" data-testid="todo-pending_orders">{{ $t('admin.index.todo.pending_orders', { n: stats?.pending_orders ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink v-if="canFinance" to="/admin/wallets" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.wallets') }}</span></NuxtLink>
+      <NuxtLink v-if="canFinance" to="/admin/cash-refunds" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.cashRefunds') }} <span class="c-badge" data-testid="todo-requested_refunds">{{ $t('admin.index.todo.requested_refunds', { n: stats?.requested_refunds ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink v-if="canFinance" to="/admin/wallet-debts" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.walletDebts') }} <span class="c-badge" data-testid="todo-open_debts">{{ $t('admin.index.todo.open_debts', { n: stats?.open_debts ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink v-if="canMod" to="/admin/catalog" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.catalog') }}</span></NuxtLink>
+      <NuxtLink v-if="canMod" :to="stats?.pending_orgs > 0 || !(stats?.pending_permits > 0) ? '/admin/orgs' : '/admin/orgs?status=pending_permits'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.orgs') }} <span class="c-badge" data-testid="todo-pending_orgs">{{ $t('admin.index.todo.pending_orgs', { n: stats?.pending_orgs ?? '–' }) }}</span> <span class="c-badge" data-testid="todo-pending_permits">{{ $t('admin.index.todo.pending_permits', { n: stats?.pending_permits ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink v-if="canMod" to="/admin/relief-events" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.events') }}</span></NuxtLink>
       <NuxtLink to="/admin/audit" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.audit') }}</span></NuxtLink>
-      <NuxtLink :to="stats?.disputed_topups > 0 ? '/admin/finance?tab=transactions&status=disputed' : '/admin/finance'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
-      <NuxtLink to="/admin/reports" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.reports') }} <span class="c-badge" data-testid="todo-open_reports">{{ $t('admin.index.todo.open_reports', { n: stats?.open_reports ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink v-if="canFinance" :to="stats?.disputed_topups > 0 ? '/admin/finance?tab=transactions&status=disputed' : '/admin/finance'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink v-if="canMod" to="/admin/reports" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.reports') }} <span class="c-badge" data-testid="todo-open_reports">{{ $t('admin.index.todo.open_reports', { n: stats?.open_reports ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/analytics" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.analytics') }}</span></NuxtLink>
     </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">
-      <button v-for="t in [['lists', $t('admin.index.tabs.lists')], ['users', $t('admin.index.tabs.users')], ['flags', $t('admin.index.tabs.flags')]]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>
+      <button v-for="t in [['lists', $t('admin.index.tabs.lists')], ['users', $t('admin.index.tabs.users')], ...(isAdmin ? [['flags', $t('admin.index.tabs.flags')]] : [])]" :key="t[0]" class="c-btn" :class="{ on: tab === t[0] }" @click="tab = t[0] as any">{{ t[1] }}</button>
     </nav>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
     <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
@@ -171,16 +175,16 @@ onMounted(loadStats)
       </div>
       <p v-if="uDone && !users.length" class="c-center c-mute">{{ $t('admin.index.users.empty') }}</p>
       <article v-for="u in users" :key="u.id" class="c-card c-mt12">
-        <strong>{{ u.display_name }}</strong> <span v-if="u.is_staff" class="c-badge">STAFF</span> <span v-if="u.blocked" class="c-badge hidden">{{ $t('admin.index.users.badgeBlocked') }}</span> <span v-if="u.deleted" class="c-badge">{{ $t('admin.index.deleted') }}</span>
+        <strong>{{ u.display_name }}</strong> <span v-for="x in (u.staff_roles || [])" :key="x" class="c-badge">{{ $t(`admin.index.roles.${x}`) }}</span> <span v-if="u.blocked" class="c-badge hidden">{{ $t('admin.index.users.badgeBlocked') }}</span> <span v-if="u.deleted" class="c-badge">{{ $t('admin.index.deleted') }}</span>
         <div class="c-mute">{{ shown[u.id] ? u.email : maskEmail(u.email || '') }} <button v-if="u.email" class="c-btn small" @click="shown[u.id] = !shown[u.id]">{{ shown[u.id] ? $t('admin.index.users.hideEmail') : $t('admin.index.users.show') }}</button></div>
         <div class="c-mute admin-id">{{ u.id }}<span v-if="u.handle">・@{{ u.handle }}</span></div>
         <div class="c-mute">{{ $t('admin.index.users.loginMethods') }}{{ u.identities.map((i: any) => PROVIDER[i.provider]).join($t('admin.index.users.sep')) || $t('admin.index.users.none') }}</div>
         <div class="c-row wrap c-mt c-mb" v-if="!u.deleted">
-          <button class="c-btn" :class="{ danger: !u.blocked }" @click="askUser(u, 'blocked', u.blocked ? $t('admin.index.users.unblock') : $t('admin.index.users.block'))">{{ u.blocked ? $t('admin.index.users.unblock') : $t('admin.index.users.block') }}</button>
-          <button class="c-btn" @click="askUser(u, 'staff', u.is_staff ? $t('admin.index.users.unsetStaff') : $t('admin.index.users.setStaff'))">{{ u.is_staff ? $t('admin.index.users.unsetStaff') : $t('admin.index.users.setStaff') }}</button>
-          <button v-for="i in u.identities.filter((i: any) => i.provider !== 'email')" :key="i.provider" class="c-btn" :disabled="u.identities.length <= 1" @click="askUser(u, 'unlink', $t('admin.index.users.unlink', { provider: PROVIDER[i.provider] }), i.provider)">{{ $t('admin.index.users.unlink', { provider: PROVIDER[i.provider] }) }}</button>
-          <button class="c-btn" :disabled="!u.email || u.blocked" @click="askUser(u, 'recovery', $t('admin.index.users.recovery'))">{{ $t('admin.index.users.recovery') }}</button>
-          <button v-if="u.mfa_enabled" class="c-btn" @click="askUser(u, 'mfa', $t('admin.index.users.resetMfa'))">{{ $t('admin.index.users.resetMfa') }}</button>
+          <button v-if="isAdmin || canMod" class="c-btn" :class="{ danger: !u.blocked }" @click="askUser(u, 'blocked', u.blocked ? $t('admin.index.users.unblock') : $t('admin.index.users.block'))">{{ u.blocked ? $t('admin.index.users.unblock') : $t('admin.index.users.block') }}</button>
+          <button v-if="isAdmin" class="c-btn" @click="askUser(u, 'staff', $t('admin.index.users.editRoles'))">{{ $t('admin.index.users.editRoles') }}</button>
+          <button v-for="i in (isAdmin ? u.identities : []).filter((i: any) => i.provider !== 'email')" :key="i.provider" class="c-btn" :disabled="u.identities.length <= 1" @click="askUser(u, 'unlink', $t('admin.index.users.unlink', { provider: PROVIDER[i.provider] }), i.provider)">{{ $t('admin.index.users.unlink', { provider: PROVIDER[i.provider] }) }}</button>
+          <button v-if="isAdmin" class="c-btn" :disabled="!u.email || u.blocked" @click="askUser(u, 'recovery', $t('admin.index.users.recovery'))">{{ $t('admin.index.users.recovery') }}</button>
+          <button v-if="isAdmin && u.mfa_enabled" class="c-btn" @click="askUser(u, 'mfa', $t('admin.index.users.resetMfa'))">{{ $t('admin.index.users.resetMfa') }}</button>
         </div>
         <p v-if="!u.email && !u.deleted" class="c-mute">{{ $t('admin.index.users.noEmail') }}</p>
         <div class="c-mute">{{ $t('admin.index.users.meta', { count: u.wishlist_count, date: new Date(u.created_at).toLocaleDateString(dl) }) }}</div>
@@ -188,7 +192,7 @@ onMounted(loadStats)
       <button v-if="uCursor" class="c-btn block" :disabled="uBusy" @click="searchUsers(true)">{{ $t('admin.index.users.loadMore') }}</button>
     </section>
 
-    <section v-if="tab === 'flags'" class="c-card">
+    <section v-if="isAdmin && tab === 'flags'" class="c-card">
       <label class="c-switch"><input type="checkbox" name="read_only" :checked="!!flags.read_only" :disabled="flags.read_only === null || flagBusy" @click.prevent="flagAsk = 'read_only'"><span>{{ $t('admin.index.flags.readOnly') }}<br><small class="c-mute">{{ $t('admin.index.flags.hint', { state: flagState('read_only') }) }}</small></span></label>
       <label class="c-switch"><input type="checkbox" name="staff_mfa_required" :checked="!!flags.staff_mfa_required" :disabled="flags.staff_mfa_required === null || flagBusy" @click.prevent="flagAsk = 'staff_mfa_required'"><span>{{ $t('admin.index.flags.mfa') }}<br><small class="c-mute">{{ $t('admin.index.flags.mfaHint', { state: flagState('staff_mfa_required') }) }}</small></span></label>
       <p class="c-mute">{{ $t('admin.index.flags.auditNote') }}</p>
@@ -198,6 +202,9 @@ onMounted(loadStats)
       <label v-if="mod && !mod.hidden" class="c-field"><span>{{ $t('admin.index.mod.reason') }}</span><input v-model="reason" maxlength="200"></label>
     </CreatorConfirm>
     <CreatorConfirm :open="!!userAct" :title="userAct?.title || ''" :text="$t('admin.index.userAct.text', { name: userAct?.user.display_name })" :ok="$t('admin.index.userAct.ok')" danger :busy="userBusy" :disabled="!userReason.trim()" :error="userErr" @close="!userBusy && (userAct = null)" @ok="doUser">
+      <fieldset v-if="userAct?.kind === 'staff'" class="c-field"><legend>{{ $t('admin.index.roles.label') }}</legend>
+        <label v-for="x in STAFF_ROLES" :key="x"><input v-model="userRoles" type="checkbox" :value="x" :disabled="userBusy"> {{ $t(`admin.index.roles.${x}`) }}</label>
+      </fieldset>
       <label class="c-field"><span>{{ $t('admin.index.userAct.reason') }}</span><input v-model="userReason" maxlength="200" :disabled="userBusy" required></label>
     </CreatorConfirm>
     <CreatorConfirm :open="!!flagAsk" :title="$t('admin.index.flags.confirmTitle')" :text="flagConfirm" :busy="flagBusy" danger @close="flagAsk = null" @ok="setFlag" />

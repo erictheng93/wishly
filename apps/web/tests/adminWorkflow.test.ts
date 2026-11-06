@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { hasStaffRole, STAFF_ROLES } from '../app/utils/staffRoles'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import Orgs from '../app/pages/admin/orgs.vue'
@@ -25,7 +26,7 @@ const stubs = {
 const settle = async () => { await flush(); await flush(); await nextTick() }
 function show(c: any) { const m = mount(c, {}, stubs, { fmtTime, fmtPts, ORDER_STATUS, orderActions, label: (m: any, k: string) => m[k] }); mounted.push(m); return m.el }
 beforeEach(() => {
-  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: null }), fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
+  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: ref({ staff_roles: ['admin'] }) }), hasStaffRole, STAFF_ROLES, fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
   route.query = { view: 'rows' } // 檢舉頁預設依對象；既有逐筆測試明指檢視
 })
 afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset(); replace.mockReset() })

@@ -187,7 +187,7 @@ th{background:var(--bg-alt);white-space:nowrap}
 <tr><td>採購單 purchase order</td><td>眾籌達標後建立，由營運人工代購並推進狀態</td></tr>
 <tr><td>完成度</td><td><code>sum(已捐助)/sum(需求) × 100</code> 四捨五入；眾籌品項「達標」才算 1/1</td></tr>
 <tr><td>驚喜模式</td><td>活動日之前建立者只看得到完成度，看不到誰送了什麼</td></tr>
-<tr><td>staff</td><td>營運人員；第一位須在資料庫設定 <code>is_staff = true</code></td></tr>
+<tr><td>staff</td><td>營運人員，角色 admin / finance / moderator / support 可多選（<code>staff_roles</code>）；第一位須在資料庫設定 <code>staff_roles = '{admin}'</code></td></tr>
 <tr><td>契約 / D 編號</td><td>程式註解中的「契約 4.1」「D48」指 <code>docs/04</code> 章節與 PRD 決策編號</td></tr>
 </table>
 
@@ -275,7 +275,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 <pre><code>cd apps/web &amp;&amp; npm install &amp;&amp; npm run dev     # http://localhost:3000</code></pre></li>
 <li><b>註冊一個帳號</b>：到 <code>/register</code>，驗證碼從 Mailpit（<code>http://localhost:8025</code>）取得。</li>
 <li><b>成為 staff（需要後台時）</b>
-<pre><code>docker compose exec db psql -U wishly -d wishly -c "UPDATE users SET is_staff = true WHERE email = 'you@example.com';"</code></pre></li>
+<pre><code>docker compose exec db psql -U wishly -d wishly -c "UPDATE users SET staff_roles = '{admin}' WHERE email = 'you@example.com';"</code></pre></li>
 </ol>
 <div class="box note"><b class="t">只想看訪客畫面？</b><code>node mocks/server.mjs</code> 在 <code>:8080</code> 啟動訪客端契約 mock（slug：<code>demo</code> / <code>closed</code> / <code>gone</code> / <code>boom</code> / <code>sseoff</code>），不需後端與資料庫。</div>
 
@@ -499,7 +499,7 @@ cargo run --manifest-path apps/api/Cargo.toml     # http://localhost:8080，啟�
 
 <h3>6.1 成為 staff 與兩步驟驗證</h3>
 <ul>
-<li><b>第一位 staff</b> 必須在資料庫設定：<code>UPDATE users SET is_staff = true WHERE email = '…';</code>。之後可在後台「使用者」分頁設為 / 取消 staff。</li>
+<li><b>第一位 staff</b> 必須在資料庫設定：<code>UPDATE users SET staff_roles = '{admin}' WHERE email = '…';</code>。之後由 admin 在後台「使用者」分頁勾選角色；只設 <code>is_staff = true</code> 會自動得到 admin（全部權限），加同事請勿用此寫法。</li>
 <li>最後一位有效 staff 不可被停權、降權，也不可自行刪帳號。</li>
 <li><b>啟用 TOTP</b>（<code>/admin/mfa</code>）：用驗證器 App（Google Authenticator、1Password 等）掃 QR code，輸入 6 位數碼完成啟用（RFC 6238：SHA-1、6 碼、30 秒）。啟用後每次登入後台都須先通過驗證；5 分鐘內最多嘗試 5 次。</li>
 <li>未啟用 TOTP 的 staff，後台首頁會顯示建議啟用的提示。</li>

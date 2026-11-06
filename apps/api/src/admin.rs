@@ -32,15 +32,37 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/analytics", get(analytics))
 }
 
+// 營運角色位元；DB 存 users.staff_roles text[]（0073），admin 涵蓋全部。
+pub const ANY: u8 = 0;
+pub const ADMIN: u8 = 1;
+pub const FINANCE: u8 = 2;
+pub const MODERATOR: u8 = 4;
+pub const SUPPORT: u8 = 8;
+pub const ROLES: [(&str, u8); 4] = [
+    ("admin", ADMIN),
+    ("finance", FINANCE),
+    ("moderator", MODERATOR),
+    ("support", SUPPORT),
+];
+
+pub fn role_mask(roles: &[String]) -> u8 {
+    ROLES
+        .iter()
+        .filter(|(n, _)| roles.iter().any(|r| r == n))
+        .fold(0, |m, (_, b)| m | b)
+}
+
 /// 已登入且 is_staff；已啟用 TOTP、或 system_flags.staff_mfa_required 開啟（#99，預設關）時，此 session 須在 12 小時內通過驗證。
 /// 否則 401 / 403 STAFF_ONLY / MFA_REQUIRED。驗證 12 小時後失效須重驗（session.rs）。
-pub struct Staff(pub Uuid);
+/// `R` 為所需角色位元（任一即可，admin 一律通過）；預設 ANY＝所有營運人員共用的唯讀查詢。不足回 403 STAFF_ROLE_REQUIRED。
+pub struct Staff<const R: u8 = ANY>(pub Uuid);
 
-impl FromRequestParts<AppState> for Staff {
+impl<const R: u8> FromRequestParts<AppState> for Staff<R> {
     type Rejection = AppError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
         let u = CurrentUser::from_request_parts(parts, st).await?;
         require_staff(&u)?;
+        require_role(&u, R)?;
         Ok(Staff(u.id))
     }
 }
@@ -53,6 +75,19 @@ pub fn require_staff(u: &CurrentUser) -> Result<(), AppError> {
         Err(AppError::problem(403, "MFA_REQUIRED", "請先完成兩步驟驗證"))
     } else {
         Ok(())
+    }
+}
+
+/// 呼叫前須已通過 `require_staff`；`need` 為 ANY 時不檢查。
+pub fn require_role(u: &CurrentUser, need: u8) -> Result<(), AppError> {
+    if need == ANY || u.staff_roles & (ADMIN | need) != 0 {
+        Ok(())
+    } else {
+        Err(AppError::problem(
+            403,
+            "STAFF_ROLE_REQUIRED",
+            "你的營運角色沒有此權限",
+        ))
     }
 }
 
@@ -219,7 +254,7 @@ async fn list_users(
     }
     let qid = qs.and_then(|s| s.parse::<Uuid>().ok());
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
-        "SELECT u.id, jsonb_build_object('id', u.id, 'display_name', u.display_name, 'handle', u.handle, 'email', u.email, 'is_staff', u.is_staff, 'mfa_enabled', u.totp_enabled_at IS NOT NULL,
+        "SELECT u.id, jsonb_build_object('id', u.id, 'display_name', u.display_name, 'handle', u.handle, 'email', u.email, 'is_staff', u.is_staff, 'staff_roles', u.staff_roles, 'mfa_enabled', u.totp_enabled_at IS NOT NULL,
            'blocked', u.blocked_at IS NOT NULL, 'blocked_at', u.blocked_at, 'deleted', u.deleted_at IS NOT NULL,
            'identities', (SELECT COALESCE(jsonb_agg(jsonb_build_object('provider', i.provider::text) ORDER BY i.provider::text), '[]') FROM auth_identities i WHERE i.user_id=u.id),
            'wishlist_count', (SELECT count(*) FROM wishlists w WHERE w.owner_id = u.id AND w.deleted_at IS NULL), 'created_at', u.created_at)
@@ -259,17 +294,19 @@ pub(crate) async fn lock_staff_changes(
         .await?;
     Ok(())
 }
-pub(crate) async fn protect_last_staff(
+/// 目標若是有效的 admin，且這次會失去 admin（降權 / 停權 / 刪帳），須另有一位有效 admin，否則 409 LAST_ADMIN。
+/// 呼叫前須已持有 lock_staff_changes 並鎖住目標列。
+pub(crate) async fn protect_last_admin(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     id: Uuid,
 ) -> Result<(), AppError> {
-    let another: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id<>$1 AND is_staff AND deleted_at IS NULL AND blocked_at IS NULL)")
+    let another: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id<>$1 AND 'admin' = ANY(staff_roles) AND deleted_at IS NULL AND blocked_at IS NULL)")
         .bind(id).fetch_one(&mut **tx).await?;
     if !another {
         return Err(AppError::problem(
             409,
-            "LAST_STAFF",
-            "不能移除最後一位有效 staff",
+            "LAST_ADMIN",
+            "不能移除最後一位有效 admin",
         ));
     }
     Ok(())
@@ -301,7 +338,7 @@ async fn revoke_sessions(
 /// 把最近 7 天寄送失敗（非地址錯誤）的通知重新排入佇列。
 async fn requeue_notifications(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<ADMIN>,
 ) -> Result<Json<Value>, AppError> {
     let mut tx = st.pool.begin().await?;
     let n = sqlx::query("UPDATE notifications SET status = 'pending', attempts = 0, scheduled_at = now()
@@ -320,12 +357,16 @@ async fn requeue_notifications(
     Ok(Json(json!({ "requeued": n })))
 }
 
+/// 停權：admin 或 moderator（停權營運人員只限 admin）；改營運角色（staff_roles，或舊的 is_staff）只限 admin。
 async fn update_user(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    u: CurrentUser,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
+    require_staff(&u)?;
+    require_role(&u, MODERATOR)?;
+    let sid = u.id;
     let reason = operation_reason(&b)?;
     for key in ["blocked", "is_staff"] {
         if b.get(key).is_some_and(|v| !v.is_boolean()) {
@@ -336,24 +377,62 @@ async fn update_user(
             ));
         }
     }
-    if b.get("blocked").is_none() && b.get("is_staff").is_none() {
+    let req_roles: Option<Vec<String>> = match b.get("staff_roles") {
+        None => None,
+        Some(v) => {
+            let arr = v
+                .as_array()
+                .ok_or_else(|| AppError::invalid("/staff_roles", "TYPE", "須為字串陣列"))?;
+            let mut out = vec![];
+            for r in arr {
+                let r = r
+                    .as_str()
+                    .filter(|r| ROLES.iter().any(|(n, _)| n == r))
+                    .ok_or_else(|| {
+                        AppError::invalid("/staff_roles", "INVALID", "未知的營運角色")
+                    })?;
+                if !out.iter().any(|x| x == r) {
+                    out.push(r.to_string());
+                }
+            }
+            out.sort();
+            Some(out)
+        }
+    };
+    let role_change = req_roles.is_some() || b.get("is_staff").is_some();
+    if b.get("blocked").is_none() && !role_change {
         return Err(AppError::invalid(
             "/",
             "REQUIRED",
             "須提供停權或 staff 設定",
         ));
     }
-    let mut tx = staff_transaction(&st.pool, sid).await?;
-    let (staff, blocked): (bool, bool) = sqlx::query_as("SELECT is_staff, blocked_at IS NOT NULL FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE")
-        .bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
-    let new_staff = b.get("is_staff").and_then(Value::as_bool).unwrap_or(staff);
-    let new_blocked = b.get("blocked").and_then(Value::as_bool).unwrap_or(blocked);
-    if staff && !blocked && (!new_staff || new_blocked) {
-        protect_last_staff(&mut tx, id).await?;
+    if role_change {
+        require_role(&u, ADMIN)?;
     }
-    let row: Value = sqlx::query_scalar("UPDATE users SET is_staff=$2, blocked_at=CASE WHEN $3 THEN COALESCE(blocked_at,now()) ELSE NULL END WHERE id=$1
-        RETURNING jsonb_build_object('id',id,'is_staff',is_staff,'blocked',blocked_at IS NOT NULL,'blocked_at',blocked_at)")
-        .bind(id).bind(new_staff).bind(new_blocked).fetch_one(&mut *tx).await?;
+    let mut tx = staff_transaction(&st.pool, sid).await?;
+    let (staff, blocked, roles): (bool, bool, Vec<String>) = sqlx::query_as("SELECT is_staff, blocked_at IS NOT NULL, staff_roles FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE")
+        .bind(id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    // 舊寫法 is_staff：true 保留既有角色、沒有就給最小的 support；false 清空
+    let new_roles = match (req_roles, b.get("is_staff").and_then(Value::as_bool)) {
+        (Some(r), _) => r,
+        (None, Some(true)) if roles.is_empty() => vec!["support".to_string()],
+        (None, Some(false)) => vec![],
+        _ => roles.clone(),
+    };
+    let new_staff = !new_roles.is_empty();
+    let new_blocked = b.get("blocked").and_then(Value::as_bool).unwrap_or(blocked);
+    if staff && new_blocked != blocked {
+        require_role(&u, ADMIN)?;
+    }
+    let was_admin = roles.iter().any(|r| r == "admin");
+    if was_admin && !blocked && (new_blocked || !new_roles.iter().any(|r| r == "admin")) {
+        protect_last_admin(&mut tx, id).await?;
+    }
+    // is_staff 由 trigger 依 staff_roles 推導（0073）
+    let row: Value = sqlx::query_scalar("UPDATE users SET staff_roles=$2, blocked_at=CASE WHEN $3 THEN COALESCE(blocked_at,now()) ELSE NULL END WHERE id=$1
+        RETURNING jsonb_build_object('id',id,'is_staff',is_staff,'staff_roles',staff_roles,'blocked',blocked_at IS NOT NULL,'blocked_at',blocked_at)")
+        .bind(id).bind(&new_roles).bind(new_blocked).fetch_one(&mut *tx).await?;
     if new_blocked || staff != new_staff {
         revoke_sessions(&mut tx, id).await?;
     }
@@ -384,7 +463,7 @@ async fn update_user(
         )
         .await?;
     }
-    audit(&mut *tx, sid, "user.update", "users", Some(id), json!({"reason":reason,"before":{"is_staff":staff,"blocked":blocked},"after":{"is_staff":new_staff,"blocked":new_blocked}})).await?;
+    audit(&mut *tx, sid, "user.update", "users", Some(id), json!({"reason":reason,"before":{"is_staff":staff,"staff_roles":roles,"blocked":blocked},"after":{"is_staff":new_staff,"staff_roles":new_roles,"blocked":new_blocked}})).await?;
     tx.commit().await?;
     if !purge.is_empty() {
         crate::cdn::purge_wishlists(purge.iter().map(|s| s.trim().to_string()).collect());
@@ -394,7 +473,7 @@ async fn update_user(
 
 async fn unlink_identity(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<ADMIN>,
     Path((id, provider)): Path<(Uuid, String)>,
     Json(b): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
@@ -425,7 +504,7 @@ async fn unlink_identity(
 /// 營運人員遺失驗證器時由另一位營運人員重設；撤銷其 session，下次登入重新設定。
 async fn reset_mfa(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<ADMIN>,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> Result<StatusCode, AppError> {
@@ -463,7 +542,7 @@ async fn reset_mfa(
 
 async fn recover_user(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<ADMIN>,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> Result<(axum::http::StatusCode, Json<Value>), AppError> {
@@ -559,7 +638,7 @@ async fn list_audit_logs(
     Ok(page(rows, lim))
 }
 
-async fn list_flags(State(st): State<AppState>, _s: Staff) -> Result<Json<Value>, AppError> {
+async fn list_flags(State(st): State<AppState>, _s: Staff<ADMIN>) -> Result<Json<Value>, AppError> {
     let rows: Vec<(String, Value, chrono::DateTime<chrono::Utc>)> =
         sqlx::query_as("SELECT key, value, updated_at FROM system_flags ORDER BY key")
             .fetch_all(&st.pool)
@@ -577,6 +656,7 @@ async fn set_flag(
     Json(b): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
     require_staff(&u)?;
+    require_role(&u, ADMIN)?;
     let sid = u.id;
     if key != "read_only" && key != "staff_mfa_required" {
         return Err(AppError::NotFound);

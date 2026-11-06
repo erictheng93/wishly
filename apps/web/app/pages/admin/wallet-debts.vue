@@ -2,7 +2,7 @@
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 拒付欠款：open → settled（已追回）| written_off（核銷）；note 必填，已結案不可再改
 import { DEBT_STATUSES, debtActions, debtPatch, listRows, type DebtTo } from '~/utils/walletOps'
-definePageMeta({ middleware: 'staff' })
+definePageMeta({ middleware: 'staff', staffRole: 'finance' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.walletDebts.title') })
 const { api } = useApi()

@@ -1,6 +1,6 @@
 //! 平台審核：組織、許可（含撤銷）。供 staff 使用，審核結果寄 `org.review` 通知給 owner。
 use crate::{
-    admin::{audit, limit, page, PageQ, Staff},
+    admin::{audit, limit, page, PageQ, Staff, MODERATOR},
     error::AppError,
     AppState,
 };
@@ -45,7 +45,7 @@ const FLAGGABLE: &[&str] = &[
 ];
 
 async fn list(
-    _: Staff,
+    _: Staff<MODERATOR>,
     State(st): State<AppState>,
     Query(q): Query<PageQ>,
 ) -> Result<Response, AppError> {
@@ -69,7 +69,7 @@ async fn list(
 }
 
 async fn detail(
-    _: Staff,
+    _: Staff<MODERATOR>,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
@@ -122,7 +122,7 @@ fn review_note(note: Option<&str>, required: bool) -> Result<Option<String>, App
 }
 
 async fn review(
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
     Json(mut b): Json<Review>,
@@ -262,7 +262,7 @@ struct Restore {
 /// 事件在撤銷時只清快取、未被改動，故無需還原。撤銷時關閉的檢舉維持已處置；review_note 清空（原撤銷理由留在稽核紀錄）。
 /// 據點只在組織已 verified、許可仍有效、事件仍可用時回到 active（SQL 先篩，trigger 不會中止交易）；其餘維持草稿並回報 skipped。
 async fn restore(
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
     Json(b): Json<Restore>,
@@ -350,7 +350,7 @@ async fn restore(
 }
 
 async fn review_permit(
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
     Json(mut b): Json<PermitReview>,
