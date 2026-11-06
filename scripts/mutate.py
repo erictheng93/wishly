@@ -108,6 +108,8 @@ CASES = {
     "activity-not-exists": (API + "session.rs", None, " OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)", "", "activity_days", "fresh_session_but_missing_today_row_reinserts"),
     "invite-list-allowed-on-conflict": (API + "friends.rs", "invite_accept", "VALUES ($1, $2) ON CONFLICT DO NOTHING", "VALUES ($1, $2)", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),
     "invite-list-selected-only": (API + "friends.rs", "invite_accept", 'if vis == "selected" {', "if false {", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),
+    "close-friends-owner-scope": (API + "access.rs", "check_wishlist", "c.owner_id = $1 AND", "c.owner_id = $1 OR", "close_friends", "selected_list_visible_to_close_only"),
+    "close-friends-unfriend-cleanup": (API + "friends.rs", "unfriend", "DELETE FROM close_friends WHERE (owner_id = $1 AND friend_id = $2) OR (owner_id = $2 AND friend_id = $1)", "DELETE FROM close_friends WHERE owner_id = $1 AND friend_id = $2 AND false", "close_friends", "unfriend_removes_close_both_ways"),
 }
 # Disable exactly one named constraint while retaining valid migration SQL.
 for name, migration, constraint, test in [
@@ -193,7 +195,9 @@ FAILURE_MARKERS.update({
     "push-endpoint-reassign": "push endpoint not reassigned to the new user",
     "activity-on-conflict": "ON CONFLICT DO NOTHING missing: last_seen_at not advanced",
     "invite-list-allowed-on-conflict": "repeat accept must stay idempotent",
-    "invite-list-selected-only": "accepter must be in allowed users",
+    "invite-list-selected-only": "accepter must be a close friend",
+    "close-friends-owner-scope": "selected list must only open for the owner's own close friends",
+    "close-friends-unfriend-cleanup": "unfriend must clear close_friends both ways",
     "activity-not-exists": "NOT EXISTS clause missing: today's row not re-inserted",
     "lot-debit-order": "扣點順序必須是 bonus",
     "lot-debit-allocations": "pledge 必須寫入 allocations",

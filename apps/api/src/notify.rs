@@ -716,7 +716,7 @@ async fn handle(
                 AND w.birthday_notify AND w.deleted_at IS NULL AND w.status = 'active' AND w.moderation_status = 'ok'
                 AND w.visibility::text <> 'private'
                 AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(r.id, o.id) AND f.user_b = GREATEST(r.id, o.id))
-                AND (w.visibility::text <> 'selected' OR EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = r.id))")
+                AND (w.visibility::text <> 'selected' OR EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = w.owner_id AND c.friend_id = r.id))")
             .bind(&payload).bind(uid).fetch_optional(pool).await?;
         let Some((owner_name, slug)) = row else {
             done!("cancelled", "birthday list no longer visible");

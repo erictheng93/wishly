@@ -880,24 +880,6 @@ async fn create_waits_on_event_lock_then_sees_hidden(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn site_has_no_allowed_users(pool: PgPool) {
-    let f = fx(&pool).await;
-    let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;
-    let url = format!("/wishlists/{}/allowed-users", id(&v));
-    let tk = ck(&f.coord.token);
-    assert_eq!(
-        call(&pool, "GET", &url, &tk, None).await.0,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
-    assert_eq!(
-        call(&pool, "PUT", &url, &tk, Some(json!({"user_ids": []})))
-            .await
-            .0,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
-}
-
-#[sqlx::test(migrations = "../../db/migrations")]
 async fn patching_site_address_updates_sealed_shipping_address(pool: PgPool) {
     let f = fx(&pool).await;
     let (_, v) = create_site(&pool, &f, &f.coord.token, body(&f)).await;

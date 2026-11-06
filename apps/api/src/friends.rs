@@ -387,9 +387,8 @@ async fn unfriend(
         .bind(y)
         .execute(&mut *tx)
         .await?;
-    // 雙方清單的指定名單中，彼此都要移除
-    sqlx::query("DELETE FROM wishlist_allowed_users a USING wishlists w
-                 WHERE a.wishlist_id = w.id AND ((w.owner_id = $1 AND a.user_id = $2) OR (w.owner_id = $2 AND a.user_id = $1))")
+    // 雙方的摯友名單中，彼此都要移除
+    sqlx::query("DELETE FROM close_friends WHERE (owner_id = $1 AND friend_id = $2) OR (owner_id = $2 AND friend_id = $1)")
         .bind(u.id).bind(other).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
@@ -510,10 +509,10 @@ async fn invite_accept(
     befriend(&mut tx, u.id, inviter).await?;
     let list = invite_list(&mut *tx, wid, inviter).await?;
     // 產品決定：接受 selected 清單的邀請即自動加入該清單名單
-    if let (Some(w), Some((_, _, vis))) = (wid, &list) {
+    if let (Some(_), Some((_, _, vis))) = (wid, &list) {
         if vis == "selected" {
-            sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
-                .bind(w).bind(u.id).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(inviter).bind(u.id).execute(&mut *tx).await?;
         }
     }
     let friend = friend_json(&mut tx, u.id, inviter).await?;
@@ -576,7 +575,7 @@ async fn feed(u: CurrentUser, State(st): State<AppState>) -> R<Json<Value>> {
          WHERE w.deleted_at IS NULL AND w.org_id IS NULL AND w.moderation_status = 'ok' AND w.status = 'active'
            AND (w.closes_at IS NULL OR w.closes_at > now())
            AND (w.visibility::text IN ('public', 'friends')
-                OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $1)))
+                OR (w.visibility::text = 'selected' AND EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = w.owner_id AND c.friend_id = $1)))
            AND s.n_new > 0
          ORDER BY s.at DESC LIMIT 30", claimed = crate::wishlists::CLAIMED_SQL, needed = crate::wishlists::NEEDED_SQL, open = crate::wishlists::OPEN_SQL)))
         .bind(u.id).fetch_all(&st.pool).await?;

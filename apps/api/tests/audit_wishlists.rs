@@ -151,7 +151,7 @@ async fn item_create_update_delete_reorder(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn address_and_allowed_users_are_not_leaked(pool: PgPool) {
+async fn address_and_close_friends_are_not_leaked(pool: PgPool) {
     let me = user(&pool, "甲").await;
     let f1 = user(&pool, "乙").await;
     let f2 = user(&pool, "丙").await;
@@ -165,24 +165,20 @@ async fn address_and_allowed_users_are_not_leaked(pool: PgPool) {
     let l = logs(&pool, "wishlist.shipping_address.update").await;
     assert_eq!(l, vec![json!({ "changed": true })]);
 
-    let put = |ids: Vec<Uuid>| json!({ "user_ids": ids });
-    let url = format!("/wishlists/{}/allowed-users", wl.id);
-    let (s, _, b) = call(
-        &pool,
-        "PUT",
-        &url,
-        &ck(&me.token),
-        Some(put(vec![f1.id, f2.id])),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "{b}");
-    call(&pool, "PUT", &url, &ck(&me.token), Some(put(vec![f2.id]))).await;
-    let l = logs(&pool, "wishlist.allowed_users.update").await;
+    for (m, f) in [("PUT", f1.id), ("PUT", f2.id), ("DELETE", f1.id)] {
+        let (s, _, b) = call(
+            &pool,
+            m,
+            &format!("/me/close-friends/{f}"),
+            &ck(&me.token),
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{b}");
+    }
     assert_eq!(
-        l,
-        vec![
-            json!({ "added": 2, "removed": 0 }),
-            json!({ "added": 0, "removed": 1 })
-        ]
+        logs(&pool, "close_friends.add").await,
+        vec![json!({}), json!({})]
     );
+    assert_eq!(logs(&pool, "close_friends.remove").await, vec![json!({})]);
 }

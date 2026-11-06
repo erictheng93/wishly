@@ -46,7 +46,7 @@ pub async fn birthday_tick_at(pool: &PgPool, today: NaiveDate) -> Result<u64, sq
                   WHERE r.id <> $1 AND r.deleted_at IS NULL AND r.blocked_at IS NULL
                     AND (COALESCE(r.notification_prefs->>'email_social', 'true') <> 'false' OR COALESCE(r.notification_prefs->>'inbox_social', 'true') <> 'false')
                     AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(r.id, $1) AND f.user_b = GREATEST(r.id, $1))
-                    AND ($4 <> 'selected' OR EXISTS (SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = $2 AND a.user_id = r.id))")
+                    AND ($4 <> 'selected' OR EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = $1 AND c.friend_id = r.id))")
                 .bind(owner).bind(wid).bind(&bday).bind(&vis)
                 .execute(&mut *tx).await?.rows_affected();
         }

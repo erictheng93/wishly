@@ -9,6 +9,7 @@ pub mod blocks;
 pub mod catalog;
 pub mod cdn;
 pub mod claims;
+pub mod close_friends;
 pub mod config;
 pub mod contributions;
 pub mod dashboard;
@@ -148,6 +149,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(topup::routes())
                 .merge(friends::routes())
                 .merge(blocks::routes())
+                .merge(close_friends::routes())
                 .merge(inspire::routes())
                 .merge(catalog::routes())
                 .merge(profiles::routes())

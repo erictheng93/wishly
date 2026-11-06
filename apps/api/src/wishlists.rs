@@ -29,10 +29,6 @@ pub fn routes() -> Router<AppState> {
             "/wishlists/{id}/shipping-address",
             get(address_get).put(address_put),
         )
-        .route(
-            "/wishlists/{id}/allowed-users",
-            get(allowed_get).put(allowed_put),
-        )
         .route("/wishlists/{id}/items", post(item_create))
         .route("/wishlists/{id}/items/reorder", post(item_reorder))
         .route("/items/{item_id}", patch(item_update).delete(item_delete))
@@ -2172,94 +2168,4 @@ async fn item_reorder(
     .await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-// ---------- 指定對象（visibility=selected 的名單，只能是擁有者的好友） ----------
-async fn allowed_list(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
-    let rows: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
-        "SELECT u.id, u.display_name, u.handle FROM wishlist_allowed_users a JOIN users u ON u.id = a.user_id
-         WHERE a.wishlist_id = $1 ORDER BY a.created_at, u.id").bind(id).fetch_all(pool).await?;
-    Ok(Json(
-        json!({ "users": rows.into_iter().map(|r| json!({ "id": r.0, "display_name": r.1, "handle": r.2 })).collect::<Vec<_>>() }),
-    ))
-}
-
-/// 據點恆為 public，沒有指定名單
-fn no_relief(w: &W) -> R<()> {
-    if w.ty == "relief" {
-        return Err(AppError::invalid(
-            "/type",
-            "NOT_APPLICABLE",
-            "救災據點沒有指定名單",
-        ));
-    }
-    Ok(())
-}
-
-async fn allowed_get(
-    u: CurrentUser,
-    State(st): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> R<Json<Value>> {
-    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
-    allowed_list(&st.pool, id).await
-}
-
-async fn allowed_put(
-    u: CurrentUser,
-    State(st): State<AppState>,
-    Path(id): Path<Uuid>,
-    Json(b): Json<Value>,
-) -> R<Json<Value>> {
-    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
-    let mut ids: Vec<Uuid> = obj(&b)?
-        .get("user_ids")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .ok_or_else(|| AppError::invalid("/user_ids", "TYPE", "user_ids 必須是 uuid 陣列"))?;
-    ids.sort();
-    ids.dedup();
-    if ids.len() > 200 {
-        return Err(AppError::invalid("/user_ids", "RANGE", "最多 200 位"));
-    }
-    let (a, b2): (Vec<Uuid>, Vec<Uuid>) = ids
-        .iter()
-        .map(|&f| if u.id < f { (u.id, f) } else { (f, u.id) })
-        .unzip();
-    let ok: i64 = sqlx::query_scalar("SELECT count(*) FROM friendships WHERE (user_a, user_b) IN (SELECT * FROM unnest($1::uuid[], $2::uuid[]))")
-        .bind(&a).bind(&b2).fetch_one(&st.pool).await?;
-    if ok != ids.len() as i64 {
-        return Err(AppError::problem(422, "NOT_FRIEND", "名單只能選擇你的好友"));
-    }
-    let mut tx = st.pool.begin().await?;
-    let old: Vec<Uuid> =
-        sqlx::query_scalar("SELECT user_id FROM wishlist_allowed_users WHERE wishlist_id = $1")
-            .bind(id)
-            .fetch_all(&mut *tx)
-            .await?;
-    sqlx::query("DELETE FROM wishlist_allowed_users WHERE wishlist_id = $1")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(
-        "INSERT INTO wishlist_allowed_users (wishlist_id, user_id) SELECT $1, unnest($2::uuid[])",
-    )
-    .bind(id)
-    .bind(&ids)
-    .execute(&mut *tx)
-    .await?;
-    let (added, removed) = (
-        ids.iter().filter(|x| !old.contains(x)).count(),
-        old.iter().filter(|x| !ids.contains(x)).count(),
-    );
-    crate::orgs::audit_user(
-        &mut *tx,
-        u.id,
-        "wishlist.allowed_users.update",
-        "wishlists",
-        Some(id),
-        json!({ "added": added, "removed": removed }),
-    )
-    .await?;
-    tx.commit().await?;
-    allowed_list(&st.pool, id).await
 }

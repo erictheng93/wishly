@@ -70,8 +70,8 @@ pub async fn check_wishlist(
         "friends" if are_friends(pool, w.owner_id, viewer.unwrap()).await? => Ok(()),
         "friends" => deny("FRIENDS_ONLY", "此清單僅限好友查看").await,
         "selected" => {
-            let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM wishlist_allowed_users WHERE wishlist_id = $1 AND user_id = $2)")
-                .bind(w.wishlist_id).bind(viewer.unwrap()).fetch_one(pool).await?;
+            let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = $1 AND c.friend_id = $2)")
+                .bind(w.owner_id).bind(viewer.unwrap()).fetch_one(pool).await?;
             if ok {
                 Ok(())
             } else {

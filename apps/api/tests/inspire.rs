@@ -48,7 +48,7 @@ async fn visibility_rules(pool: PgPool) {
     for v in ["public", "friends", "private"] {
         tagged(&pool, f.id, v, v).await;
     }
-    let sel = tagged(&pool, f.id, "selected", "selected").await;
+    tagged(&pool, f.id, "selected", "selected").await;
     tagged(&pool, x.id, "friends", "x-friends").await; // 非好友
     tagged(&pool, me.id, "public", "mine").await; // 自己的不列
                                                   // 同一商品但另一代號不應出現
@@ -62,8 +62,8 @@ async fn visibility_rules(pool: PgPool) {
         titles(&pool, "", &ck(&me.token)).await,
         ["friends", "public"]
     );
-    sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1,$2)")
-        .bind(sel)
+    sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1,$2)")
+        .bind(f.id)
         .bind(me.id)
         .execute(&pool)
         .await

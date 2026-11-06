@@ -61,9 +61,7 @@ async fn block(
         .execute(&mut *tx)
         .await?;
     sqlx::query(
-        "DELETE FROM wishlist_allowed_users a USING wishlists w
-          WHERE a.wishlist_id = w.id
-            AND ((w.owner_id = $1 AND a.user_id = $2) OR (w.owner_id = $2 AND a.user_id = $1))",
+        "DELETE FROM close_friends WHERE (owner_id = $1 AND friend_id = $2) OR (owner_id = $2 AND friend_id = $1)",
     )
     .bind(u.id)
     .bind(id)

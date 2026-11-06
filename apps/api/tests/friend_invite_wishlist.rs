@@ -161,7 +161,7 @@ async fn friends_list_invite_befriends_and_opens_list(pool: PgPool) {
         StatusCode::OK
     );
     // friends 清單不寫名單
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM wishlist_allowed_users")
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM close_friends")
         .fetch_one(&pool)
         .await
         .unwrap();
@@ -204,14 +204,14 @@ async fn selected_list_invite_adds_accepter_even_if_already_friends(pool: PgPool
         );
     }
     let n: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM wishlist_allowed_users WHERE wishlist_id = $1 AND user_id = $2",
+        "SELECT count(*) FROM close_friends WHERE owner_id = $1 AND friend_id = $2",
     )
-    .bind(l.id)
+    .bind(a.id)
     .bind(b.id)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(n, 1, "accepter must be in allowed users");
+    assert_eq!(n, 1, "accepter must be a close friend");
     assert_eq!(
         common::call(&pool, "GET", &uri, &common::ck(&b.token), None)
             .await

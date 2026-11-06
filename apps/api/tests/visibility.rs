@@ -1,4 +1,4 @@
-//! 清單可見性：4 種 visibility（public/friends/selected/private）× 擁有者/匿名/好友/非好友/名單；捐助門檻、快取標頭、allowed-users
+//! 清單可見性：4 種 visibility（public/friends/selected/private）× 擁有者/匿名/好友/非好友/名單；捐助門檻、快取標頭
 mod common;
 use axum::http::StatusCode;
 use serde_json::{json, Value};
@@ -38,15 +38,8 @@ async fn mk(pool: &PgPool, c: &Ctx, vis: &str) -> (Uuid, String, Uuid) {
         .await
         .unwrap();
     if vis == "selected" {
-        let (s, _, v) = call(
-            pool,
-            "PUT",
-            &format!("/wishlists/{id}/allowed-users"),
-            &ck(&c.owner.token),
-            Some(json!({ "user_ids": [c.allowed.id] })),
-        )
-        .await;
-        assert_eq!(s, StatusCode::OK, "{v}");
+        sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+            .bind(c.owner.id).bind(c.allowed.id).execute(pool).await.unwrap();
     }
     (id, w["slug"].as_str().unwrap().into(), it)
 }
@@ -279,71 +272,6 @@ async fn owner_visibility_rules(pool: PgPool) {
             .execute(&pool)
             .await
             .is_err()
-    );
-    assert_all_reconciled(&pool).await;
-}
-
-#[sqlx::test(migrations = "../../db/migrations")]
-async fn allowed_users_only_friends(pool: PgPool) {
-    let c = ctx(&pool).await;
-    let (id, _, _) = mk(&pool, &c, "selected").await;
-    let u = format!("/wishlists/{id}/allowed-users");
-    let (s, _, v) = call(
-        &pool,
-        "PUT",
-        &u,
-        &ck(&c.owner.token),
-        Some(json!({ "user_ids": [c.friend.id, c.stranger.id] })),
-    )
-    .await;
-    assert_eq!(
-        (s, v["code"].as_str()),
-        (StatusCode::UNPROCESSABLE_ENTITY, Some("NOT_FRIEND"))
-    );
-    // 失敗不改動既有名單
-    let (_, _, v) = call(&pool, "GET", &u, &ck(&c.owner.token), None).await;
-    assert_eq!(v["users"].as_array().unwrap().len(), 1);
-    let (s, _, v) = call(
-        &pool,
-        "PUT",
-        &u,
-        &ck(&c.owner.token),
-        Some(json!({ "user_ids": [c.friend.id, c.allowed.id, c.friend.id] })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(v["users"].as_array().unwrap().len(), 2);
-    assert_eq!(
-        call(
-            &pool,
-            "PUT",
-            &u,
-            &ck(&c.owner.token),
-            Some(json!({ "user_ids": [] }))
-        )
-        .await
-        .2["users"]
-            .as_array()
-            .unwrap()
-            .len(),
-        0
-    );
-    // 非擁有者 → 404
-    assert_eq!(
-        call(&pool, "GET", &u, &ck(&c.friend.token), None).await.0,
-        StatusCode::NOT_FOUND
-    );
-    assert_eq!(
-        call(
-            &pool,
-            "PUT",
-            &u,
-            &ck(&c.friend.token),
-            Some(json!({ "user_ids": [] }))
-        )
-        .await
-        .0,
-        StatusCode::NOT_FOUND
     );
     assert_all_reconciled(&pool).await;
 }
