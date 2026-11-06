@@ -37,11 +37,13 @@ async function linkOAuth(p: (typeof providers)[number]) {
     if (e.message !== 'cancelled') identityErr.value = linkError(e.message) || errMsg(e)
   } finally { identityBusy.value = false }
 }
+const ready = ref(false) // GET /me 回來並填好表單前不渲染，免得使用者先輸入的內容被覆寫
 onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
   ;[bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
   identityErr.value = linkError(String(route.query.error))
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
+  ready.value = true
   loadSessions()
   loadBlocks()
   loadActivity()
@@ -193,7 +195,7 @@ async function remove() {
   <main class="c-page x-set">
     <CreatorHeader :title="$t('settings.title')" back="/dashboard" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <template v-if="user">
+    <template v-if="user && ready">
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.profile') }}</h2>
         <p class="c-mute">{{ user.email || $t('settings.noEmail') }}</p>
