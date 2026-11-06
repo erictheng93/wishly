@@ -23,6 +23,8 @@ elif "/manifests/latest" in url:
     print("HTTP/2 200\r\ndocker-content-digest: " + os.environ["FAKE_DIGEST"] + "\r\n\r")
 elif url.endswith("/api/application.deploy"):
     sys.exit(int(os.environ.get("FAKE_DEPLOY_EXIT", "0")))
+elif "/api/deployment.all" in url:
+    print(os.environ.get("FAKE_DEPLOYMENTS", "[]"))
 '''
 
 
@@ -43,9 +45,10 @@ class AutodeployTests(unittest.TestCase):
         self.env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", CURL_LOG=str(self.log),
                         WISHLY_AUTODEPLOY_ENV=str(env_file), WISHLY_AUTODEPLOY_STATE=str(self.state))
 
-    def run_once(self, digest, deploy_exit=0):
+    def run_once(self, digest, deploy_exit=0, status=None):
         self.log.unlink(missing_ok=True)
-        env = dict(self.env, FAKE_DIGEST=digest, FAKE_DEPLOY_EXIT=str(deploy_exit))
+        deployments = [] if status is None else [{"title": f"autodeploy {digest}", "status": status, "createdAt": "2026-11-06T01:00:00Z"}]
+        env = dict(self.env, FAKE_DIGEST=digest, FAKE_DEPLOY_EXIT=str(deploy_exit), FAKE_DEPLOYMENTS=json.dumps(deployments))
         result = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
         return result, calls
@@ -73,7 +76,20 @@ class AutodeployTests(unittest.TestCase):
         self.assertIn("x-api-key: " + SECRETS["DOKPLOY_API_KEY"], deploy["stdin"])
         body = json.loads(deploy["argv"][deploy["argv"].index("-d") + 1])
         self.assertEqual(body["applicationId"], "app-123")
+        self.assertEqual(self.recorded(), "sha256:aaa")  # 只請求部署，尚未確認 done
+        self.assertTrue((self.state / "pending-digest").read_text().startswith("sha256:bbb "))
+
+        result, calls = self.run_once("sha256:bbb")  # Dokploy 尚無紀錄、pending 還新：等待
+        self.assertEqual(self.deploys(calls), [])
+        result, calls = self.run_once("sha256:bbb", status="running")
+        self.assertEqual(self.deploys(calls), [])
+        self.assertEqual(self.recorded(), "sha256:aaa")
+        result, calls = self.run_once("sha256:bbb", status="error")  # 失敗就重新觸發
+        self.assertEqual(len(self.deploys(calls)), 1)
+        result, calls = self.run_once("sha256:bbb", status="done")
+        self.assertEqual(self.deploys(calls), [])
         self.assertEqual(self.recorded(), "sha256:bbb")
+        self.assertFalse((self.state / "pending-digest").exists())
 
     def test_failed_deploy_is_retried_on_next_run(self):
         self.run_once("sha256:aaa")
@@ -81,10 +97,10 @@ class AutodeployTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(len(self.deploys(calls)), 1)
         self.assertEqual(self.recorded(), "sha256:aaa")
+        self.assertFalse((self.state / "pending-digest").exists())
         result, calls = self.run_once("sha256:bbb")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(self.deploys(calls)), 1)
-        self.assertEqual(self.recorded(), "sha256:bbb")
 
     def test_missing_digest_fails_without_touching_state(self):
         self.run_once("sha256:aaa")
