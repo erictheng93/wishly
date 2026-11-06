@@ -28,6 +28,7 @@ pub async fn event_summary_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
 }
 
 /// 有待辦才寄，給每位未封鎖的 staff；同一人 20 小時內已有 `staff.digest` 就略過。
+/// shortcut: 不依營運角色（0073）過濾，support 也會看到金流 / 審核件數；要分流時依 staff_roles 只帶各自負責的欄位。
 pub async fn staff_digest_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let r = sqlx::query(
         "WITH c AS (SELECT
