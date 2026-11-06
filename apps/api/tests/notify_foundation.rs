@@ -1180,3 +1180,70 @@ async fn every_item_edit_reaches_inbox_but_email_is_merged_and_rate_limited(pool
     let secs: f64 = sqlx::query_scalar("SELECT extract(epoch FROM scheduled_at - now())::float8 FROM notifications WHERE user_id=$1 AND status='pending'").bind(uid).fetch_one(&pool).await.unwrap();
     assert!((3590.0..=3601.0).contains(&secs), "{secs}");
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn bundling_skips_rows_leased_by_another_worker(pool: PgPool) {
+    init();
+    let owner = user(&pool, "o").await;
+    let u = user(&pool, "u").await;
+    let wl = wishlist(&pool, owner.id, ListOpts::default()).await;
+    let mut ids = vec![];
+    for t in ["甲", "乙", "丙"] {
+        let it = item(&pool, wl.id, t, 1).await;
+        ids.push(
+            push(
+                &pool,
+                u.id,
+                "claim.expired",
+                json!({"wishlist_id": wl.id, "item_id": it}),
+            )
+            .await,
+        );
+    }
+    // 丙被另一個 worker 領走（租約中，尚未到期）
+    sqlx::query("UPDATE notifications SET lease_id = gen_random_uuid(), lease_until = now() + interval '5 minutes', scheduled_at = now() + interval '5 minutes' WHERE id = $1")
+        .bind(ids[2]).execute(&pool).await.unwrap();
+    notify::tick_at(&pool, noon()).await.unwrap();
+    let foreign = row(&pool, ids[2]).await;
+    assert_eq!(foreign.0, "pending", "別人租約中的列不可被合併");
+    assert!(foreign.1.is_none());
+    // 本批的兩列照常合併成一封
+    let sent = [row(&pool, ids[0]).await, row(&pool, ids[1]).await];
+    assert_eq!(
+        sent.iter()
+            .filter(|r| r.0 == "sent" && r.1.as_deref().is_some_and(|e| e.starts_with("bundled:")))
+            .count(),
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cancelled_primary_requeues_bundled_members(pool: PgPool) {
+    init();
+    let u = user(&pool, "u").await;
+    // 主列的認領已不存在 -> cancelled；成員先前已被併入
+    let primary = push(
+        &pool,
+        u.id,
+        "claim.confirmation",
+        json!({"claim_id": Uuid::new_v4(), "more_items": ["乙"]}),
+    )
+    .await;
+    let member = push(
+        &pool,
+        u.id,
+        "claim.confirmation",
+        json!({"claim_id": Uuid::new_v4()}),
+    )
+    .await;
+    sqlx::query("UPDATE notifications SET status='sent', sent_at=now(), last_error='bundled:'||$2::text WHERE id=$1")
+        .bind(member).bind(primary).execute(&pool).await.unwrap();
+    notify::tick_at(&pool, noon()).await.unwrap();
+    assert_eq!(row(&pool, primary).await.0, "cancelled");
+    let m = row(&pool, member).await;
+    assert_eq!(
+        (m.0.as_str(), m.1),
+        ("pending", None),
+        "成員放回 pending 由各自重驗"
+    );
+}
