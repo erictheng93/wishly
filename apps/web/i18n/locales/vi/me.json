@@ -314,7 +314,8 @@
       "inDays": "Còn {n} ngày",
       "dateToday": "Hôm nay",
       "shareLinks": "Chia sẻ trang liên kết",
-      "seeWishes": "Xem danh sách ước của tôi"
+      "seeWishes": "Xem danh sách ước của tôi",
+      "age": "{n} tuổi"
     },
     "topup": {
       "title": "Nạp điểm",

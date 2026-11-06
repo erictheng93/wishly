@@ -314,7 +314,8 @@
       "inDays": "In {n} days",
       "dateToday": "Today",
       "shareLinks": "Share link page",
-      "seeWishes": "See my wishlists"
+      "seeWishes": "See my wishlists",
+      "age": "{n} years old"
     },
     "topup": {
       "title": "Top up",

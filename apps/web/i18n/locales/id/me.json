@@ -314,7 +314,8 @@
       "inDays": "{n} hari lagi",
       "dateToday": "Hari ini",
       "shareLinks": "Bagikan halaman tautan",
-      "seeWishes": "Lihat daftar harapan saya"
+      "seeWishes": "Lihat daftar harapan saya",
+      "age": "{n} tahun"
     },
     "topup": {
       "title": "Top up",

@@ -18,8 +18,7 @@ useSeoMeta({
   <main class="c-page">
     <section v-if="error || !u" class="c-gone"><p class="c-gone-t">{{ $t('me.profile.gone') }}</p></section>
     <template v-else>
-      <img v-if="u.cover_image_url" :src="u.cover_image_url" alt="" class="lk-cover">
-      <div v-else-if="u.cover_preset" class="lk-cover" :data-preset="u.cover_preset" />
+      <img v-if="u.cover_image_url || u.cover_preset" :src="u.cover_image_url || `/covers/${u.cover_preset}.svg`" alt="" class="lk-cover">
       <section class="lk-head">
         <div class="lk-av" aria-hidden="true"><img v-if="u.avatar_url" :src="u.avatar_url" alt="" class="lk-img"><template v-else>{{ (u.display_name || '?').slice(0, 1) }}</template></div>
         <h1 class="c-h2">{{ u.display_name }}</h1>

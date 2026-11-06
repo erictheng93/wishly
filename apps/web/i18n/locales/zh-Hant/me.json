@@ -314,7 +314,8 @@
       "inDays": "還有 {n} 天",
       "dateToday": "就是今天",
       "shareLinks": "分享連結頁",
-      "seeWishes": "看我的願望清單"
+      "seeWishes": "看我的願望清單",
+      "age": "{n} 歲"
     },
     "topup": {
       "title": "儲值",
