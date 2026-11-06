@@ -51,7 +51,7 @@ async function save() {
           </li>
         </ul>
         <div class="c-row">
-          <input v-model="draft[k]" maxlength="40" :placeholder="$t('settings.pc.gp.ph')" :aria-label="$t(k === 'gift_likes' ? 'settings.pc.gp.likes' : 'settings.pc.gp.dislikes')" @keydown.enter.prevent="add(k)">
+          <input v-model="draft[k]" maxlength="40" :placeholder="$t(k === 'gift_likes' ? 'settings.pc.gp.ph' : 'settings.pc.gp.phDislike')" :aria-label="$t(k === 'gift_likes' ? 'settings.pc.gp.likes' : 'settings.pc.gp.dislikes')" @keydown.enter.prevent="add(k)">
           <button type="button" class="c-btn" data-add :disabled="lists[k].length >= MAX || !draft[k].trim()" @click="add(k)">{{ $t('settings.pc.add') }}</button>
         </div>
         <small v-if="lists[k].length >= MAX" class="c-mute">{{ $t('settings.pc.gp.max') }}</small>

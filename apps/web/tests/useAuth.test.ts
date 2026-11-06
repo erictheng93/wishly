@@ -123,3 +123,16 @@ it('logout clears ws_hint', async () => {
   await auth.logout()
   expect(hint()).toBeNull()
 })
+
+it('fetchMeFresh skips a refetch right after a fetch but refreshes once stale', async () => {
+  vi.useFakeTimers()
+  api.mockResolvedValue({ id: 'u' })
+  const auth = useAuth()
+  await auth.fetchMe()
+  await auth.fetchMeFresh()
+  expect(api).toHaveBeenCalledTimes(1)
+  vi.advanceTimersByTime(6000)
+  await auth.fetchMeFresh()
+  expect(api).toHaveBeenCalledTimes(2)
+  vi.useRealTimers()
+})
