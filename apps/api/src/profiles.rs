@@ -151,9 +151,14 @@ async fn profile(
         );
     }
     // 居住地址：可見性與密文同一次查詢；解不開就省略該鍵
-    let home: Option<(String, Vec<u8>)> = sqlx::query_as(
+    // 匿名 / 非好友不可能看到（home_address_vis 無 public），省一次往返
+    let home: Option<(String, Vec<u8>)> = if matches!(rel, Rel::Anonymous | Rel::Other) {
+        None
+    } else {
+        sqlx::query_as(
         "SELECT u.home_address_vis::text, a.address_enc FROM users u JOIN user_addresses a ON a.user_id = u.id AND a.kind = 'home' WHERE u.id = $1")
-        .bind(uid).fetch_optional(&st.pool).await?;
+        .bind(uid).fetch_optional(&st.pool).await?
+    };
     if let Some((hv, enc)) = home.filter(|(hv, _)| can_see(hv, rel)) {
         match crate::sealed::open_str(&enc) {
             Some(a) => {
