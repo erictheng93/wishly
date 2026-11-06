@@ -55,11 +55,11 @@ print(max(d, key=lambda x: str(x.get("createdAt")))["status"] if d else "none")'
 echo "digest ${digest} 的部署狀態：${status}"
 case "$status" in
   done) echo "$digest" >"$STATE_DIR/deployed-digest"; rm -f "$STATE_DIR/pending-digest" ;;
-  error | cancelled) trigger ;;
-  none)
-    read -r p_digest p_at <"$STATE_DIR/pending-digest" 2>/dev/null || true
+  none | error | cancelled)
+    # 同一 digest 距上次觸發未滿 10 分鐘就等：尚未出現紀錄，或壞映像失敗時不要每分鐘重部署
+    { read -r p_digest p_at <"$STATE_DIR/pending-digest"; } 2>/dev/null || true
     if [ "${p_digest:-}" = "$digest" ] && [ $(($(date +%s) - ${p_at:-0})) -lt 600 ]; then
-      echo "已請求部署但 Dokploy 尚無紀錄，等待"
+      echo "距上次觸發未滿 10 分鐘，等待"
     else
       trigger
     fi ;;

@@ -84,7 +84,10 @@ class AutodeployTests(unittest.TestCase):
         result, calls = self.run_once("sha256:bbb", status="running")
         self.assertEqual(self.deploys(calls), [])
         self.assertEqual(self.recorded(), "sha256:aaa")
-        result, calls = self.run_once("sha256:bbb", status="error")  # 失敗就重新觸發
+        result, calls = self.run_once("sha256:bbb", status="error")  # 失敗但距上次觸發未滿 10 分鐘：等待
+        self.assertEqual(self.deploys(calls), [])
+        (self.state / "pending-digest").write_text("sha256:bbb 0\n")  # 模擬已過 10 分鐘
+        result, calls = self.run_once("sha256:bbb", status="error")
         self.assertEqual(len(self.deploys(calls)), 1)
         result, calls = self.run_once("sha256:bbb", status="done")
         self.assertEqual(self.deploys(calls), [])

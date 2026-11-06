@@ -12,7 +12,7 @@
 
 ## 1. 後端
 
-**自動部署（2026-11 起）**：合併到 main → CI 全綠 → `publish-image` 推 `:<sha>` 並移動 `:latest` → VPS 上的 `wishly-autodeploy.timer` 每分鐘查 GHCR，`latest` 的 digest 一變就呼叫本機 Dokploy `POST /api/application.deploy`，之後每分鐘查 `deployment.all`，該次部署狀態為 `done` 才記為已部署；`error` 會自動重觸發，請求後 10 分鐘 Dokploy 仍無紀錄也會重觸發。GitHub 不持有任何 VPS 或 Dokploy 憑證，Dokploy 也維持不對外。所以平常只需做下面的第 1、5、6 步確認；第 2–4 步是自動部署失效或暫停時的手動做法。
+**自動部署（2026-11 起）**：合併到 main → CI 全綠 → `publish-image` 推 `:<sha>` 並移動 `:latest` → VPS 上的 `wishly-autodeploy.timer` 每分鐘查 GHCR，`latest` 的 digest 一變就呼叫本機 Dokploy `POST /api/application.deploy`，之後每分鐘查 `deployment.all`，該次部署狀態為 `done` 才記為已部署；`error` 或請求後 Dokploy 一直沒有紀錄時，距上次觸發滿 10 分鐘才重觸發。GitHub 不持有任何 VPS 或 Dokploy 憑證，Dokploy 也維持不對外。所以平常只需做下面的第 1、5、6 步確認；第 2–4 步是自動部署失效或暫停時的手動做法。
 
 - **看紀錄**：`journalctl -u wishly-autodeploy -n 50`（每次部署印出新舊 digest）；`systemctl list-timers wishly-autodeploy.timer`。
 - **暫停**（例如資料庫維護）：`systemctl stop wishly-autodeploy.timer`；恢復：`systemctl start wishly-autodeploy.timer`（恢復後若 `latest` 已變會立即部署）。
