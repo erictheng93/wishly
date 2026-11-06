@@ -275,6 +275,7 @@
       "noLists": "You have no lists to add to yet",
       "create": "Create a list",
       "loadErr": "Could not load your lists. Please try again.",
+      "matched": "Matches: {tags}",
       "who": "Who wants this",
       "whoTitle": "Who wants this",
       "scope": {

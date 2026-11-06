@@ -491,6 +491,7 @@
       "spec": "規格",
       "note": "推薦說明",
       "price": "價格（NT$）",
+      "interests": "適合的興趣",
       "productUrl": "商品連結",
       "sort": "排序（小的在前）",
       "active": "上架中",

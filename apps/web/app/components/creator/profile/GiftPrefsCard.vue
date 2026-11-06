@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { INTEREST_GROUPS, MAX_INTERESTS } from '~/utils/interests'
+import { MAX_INTERESTS } from '~/utils/interests'
 // 送禮偏好（喜歡 / 不想收到）與興趣標籤，各自可設定誰看得到
 const MAX = 20
 const KEYS = ['gift_likes', 'gift_dislikes'] as const
@@ -21,11 +21,6 @@ function add(k: (typeof KEYS)[number]) {
 function move(k: (typeof KEYS)[number], i: number, d: number) {
   const l = lists[k], j = i + d
   if (j >= 0 && j < l.length) [l[i], l[j]] = [l[j]!, l[i]!]
-}
-function toggle(tag: string) {
-  const i = picked.value.indexOf(tag)
-  if (i >= 0) picked.value.splice(i, 1)
-  else if (picked.value.length < MAX_INTERESTS) picked.value.push(tag)
 }
 async function save() {
   if (busy.value) return
@@ -61,12 +56,7 @@ async function save() {
       </label>
       <fieldset class="c-field pf-set">
         <legend class="c-lbl">{{ $t('settings.pc.gp.interests') }} ({{ $t('settings.pc.gp.count', { n: picked.length, max: MAX_INTERESTS }) }})</legend>
-        <div v-for="g in INTEREST_GROUPS" :key="g.id" class="pf-group">
-          <p class="c-mute c-small">{{ $t(`interests.group.${g.id}`) }}</p>
-          <div class="c-row wrap">
-            <button v-for="tag in g.tags" :key="tag" type="button" class="c-btn small" :class="{ on: picked.includes(tag) }" :aria-pressed="picked.includes(tag)" data-chip :disabled="!picked.includes(tag) && picked.length >= MAX_INTERESTS" @click="toggle(tag)">{{ $t(`interests.tag.${tag}`) }}</button>
-          </div>
-        </div>
+        <InterestPicker v-model="picked" :max="MAX_INTERESTS" />
       </fieldset>
       <label class="c-field"><span>{{ $t('settings.pc.gp.interestsVis') }}</span>
         <select v-model="interestsVis"><option v-for="v in VIS" :key="v" :value="v">{{ $t(`settings.pc.vis.${v}`) }}</option></select>

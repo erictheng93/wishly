@@ -5,8 +5,9 @@ export const BUDGETS = ['lt1000', '1000-3000', 'gt3000'] as const
 export type CatalogFilter = { brand?: string; recipient?: string; occasion?: string; budget?: string }
 export type CatalogProduct = {
   ref: string; title: string; spec?: string | null; note?: string | null; price_amount: number | null
-  image_url?: string | null; product_url: string; recipients: string[]; occasions: string[]; brand: { slug: string; name: string } | null
+  image_url?: string | null; product_url: string; recipients: string[]; occasions: string[]; brand: { slug: string; name: string } | null; interests?: string[]
 }
+export type GiftPick = CatalogProduct & { matched: string[] }
 // 空值不帶；page 1 也省略（利於 CDN 快取命中）
 export function catalogQuery(f: CatalogFilter, page?: number | null) {
   const q: Record<string, string | number> = {}

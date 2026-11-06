@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import UiIcon from '../app/components/UiIcon.vue'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import GiftPrefsCard from '../app/components/creator/profile/GiftPrefsCard.vue'
+import InterestPicker from '../app/components/InterestPicker.vue'
 import DatesCard from '../app/components/creator/profile/DatesCard.vue'
 import { INTEREST_GROUPS, MAX_INTERESTS } from '../app/utils/interests'
 import { daysInMonth, formatBirthday, toBirthday } from '../app/utils/birthday'
@@ -26,7 +27,7 @@ beforeEach(() => {
 afterEach(() => { mounted?.unmount(); mounted = undefined; vi.unstubAllGlobals() })
 async function open(c: any, u: any = {}) {
   user.value = u
-  mounted = mount(c, {}, { UiIcon, CreatorConfirm })
+  mounted = mount(c, {}, { UiIcon, CreatorConfirm, InterestPicker })
   await flush()
   return mounted.el
 }
