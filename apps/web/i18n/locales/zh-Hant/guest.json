@@ -276,6 +276,10 @@
       "create": "建立清單",
       "loadErr": "清單載入失敗，請稍後再試",
       "matched": "符合：{tags}",
+      "forFriend": "幫哪位朋友挑？",
+      "forNone": "不指定",
+      "forFallback": "{name} 還沒有可參考的興趣，以下是一般推薦",
+      "matchedFor": "符合 {name} 的興趣：{tags}",
       "who": "誰想要這個",
       "whoTitle": "誰想要這個",
       "scope": {

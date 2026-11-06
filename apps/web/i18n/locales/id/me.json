@@ -309,6 +309,8 @@
       "secLikes": "Hadiah yang disukai",
       "secDislikes": "Tidak ingin menerima",
       "secInterests": "Minat",
+      "picksTitle": "Ide hadiah untuk {name}",
+      "picksFallback": "Mungkin {name} suka",
       "secDates": "Hari penting",
       "secAddress": "Alamat rumah",
       "inDays": "{n} hari lagi",

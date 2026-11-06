@@ -2,7 +2,7 @@
 import { fetchWishes, wishLeft, type WishScope } from '~/utils/inspireWishes'
 import type { CatalogProduct } from '~/utils/catalog'
 // 精選商品卡片格 + 「加到我的願望清單」「誰想要這個」兩個對話框；無購物車，只能加到自己的清單或看外部商品
-defineProps<{ products: CatalogProduct[]; matched?: Record<string, string[]> }>()
+defineProps<{ products: CatalogProduct[]; matched?: Record<string, string[]>; matchedName?: string }>()
 const { t } = useI18n()
 
 // 加到清單：僅 client 端（sheet 由點擊開啟）；未登入時 useApi 會 401 導去登入並帶回
@@ -64,7 +64,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
       <p v-if="p.brand" class="g-mute"><NuxtLink :to="localizedPath(`/brands/${p.brand.slug}`, $i18n.locale)">{{ p.brand.name }}</NuxtLink></p>
       <strong class="x-title">{{ p.title }}</strong>
       <p v-if="p.spec" class="g-mute">{{ p.spec }}</p>
-      <p v-if="matched?.[p.ref]?.length" class="x-match" data-matched>{{ $t('guest.inspire.matched', { tags: matched[p.ref]!.map(id => $t(`interests.tag.${id}`)).join(' / ') }) }}</p>
+      <p v-if="matched?.[p.ref]?.length" class="x-match" data-matched>{{ $t(matchedName ? 'guest.inspire.matchedFor' : 'guest.inspire.matched', { name: matchedName, tags: matched[p.ref]!.map(id => $t(`interests.tag.${id}`)).join(' / ') }) }}</p>
       <p v-if="p.price_amount != null" class="x-price">NT${{ p.price_amount.toLocaleString('en-US') }}</p>
       <p v-if="p.note" class="g-mute">{{ p.note }}</p>
       <div class="x-act">
