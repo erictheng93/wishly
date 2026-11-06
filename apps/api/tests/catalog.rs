@@ -376,3 +376,56 @@ async fn admin_product_lifecycle(pool: PgPool) {
     .unwrap();
     assert_eq!(n, 2);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn admin_sets_interests(pool: PgPool) {
+    let s = staff(&pool, "營運").await;
+    let h = ck(&s.token);
+    let (st, _, v) = call(
+        &pool,
+        "POST",
+        "/admin/catalog/products",
+        &h,
+        Some(json!({"ref":"i-1","title":"咖啡豆","price_amount":500,"product_url":"https://shop.test/c","interests":["coffee","tea"]})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{v}");
+    assert_eq!(v["product"]["interests"], json!(["coffee", "tea"]));
+    let id = v["product"]["id"].as_str().unwrap();
+    let (st, _, v) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/catalog/products/{id}"),
+        &h,
+        Some(json!({"interests":["travel"]})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["product"]["interests"], json!(["travel"]));
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn admin_rejects_unknown_interest(pool: PgPool) {
+    let s = staff(&pool, "營運").await;
+    let (st, _, v) = call(
+        &pool,
+        "POST",
+        "/admin/catalog/products",
+        &ck(&s.token),
+        Some(json!({"ref":"i-2","title":"x","price_amount":1,"product_url":"https://shop.test/x","interests":["nope"]})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["errors"][0]["pointer"], "/interests", "{v}");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn public_products_include_interests(pool: PgPool) {
+    product(&pool, "p1", None, 100, true).await;
+    sqlx::query("UPDATE catalog_products SET interests='{coffee}'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, _, v) = call(&pool, "GET", "/public/catalog/products", &[], None).await;
+    assert_eq!(v["products"][0]["interests"], json!(["coffee"]));
+}
