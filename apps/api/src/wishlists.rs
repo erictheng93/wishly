@@ -29,6 +29,10 @@ pub fn routes() -> Router<AppState> {
             "/wishlists/{id}/shipping-address",
             get(address_get).put(address_put),
         )
+        .route(
+            "/wishlists/{id}/shipping-address/from-default",
+            post(address_from_default),
+        )
         .route("/wishlists/{id}/items", post(item_create))
         .route("/wishlists/{id}/items/reorder", post(item_reorder))
         .route("/items/{item_id}", patch(item_update).delete(item_delete))
@@ -315,13 +319,18 @@ pub(crate) fn new_slug() -> String {
         .collect()
 }
 
-fn obj(v: &Value) -> R<&Map<String, Value>> {
+pub(crate) fn obj(v: &Value) -> R<&Map<String, Value>> {
     v.as_object()
         .ok_or_else(|| AppError::problem(400, "BAD_REQUEST", "請求內容必須是 JSON 物件"))
 }
 
 /// 讀取字串欄位：None=未帶；Some(None)=null/空字串；Some(Some)=值（trim 後，長度 min..=max 字元）
-fn text(m: &Map<String, Value>, k: &str, min: usize, max: usize) -> R<Option<Option<String>>> {
+pub(crate) fn text(
+    m: &Map<String, Value>,
+    k: &str,
+    min: usize,
+    max: usize,
+) -> R<Option<Option<String>>> {
     match m.get(k) {
         None => Ok(None),
         Some(Value::Null) => Ok(Some(None)),
@@ -1374,7 +1383,7 @@ fn mask_phone(s: &str) -> String {
         stars(n)
     }
 }
-fn mask_address(s: &str) -> String {
+pub(crate) fn mask_address(s: &str) -> String {
     let n = s.chars().count();
     format!(
         "{}***",
@@ -1383,7 +1392,7 @@ fn mask_address(s: &str) -> String {
             .collect::<String>()
     )
 }
-fn masked(name: &str, phone: &str, addr: &str) -> Value {
+pub(crate) fn masked(name: &str, phone: &str, addr: &str) -> Value {
     json!({ "has_shipping_address": true, "recipient_name": mask_name(name), "phone": mask_phone(phone), "address": mask_address(addr) })
 }
 
@@ -1393,8 +1402,12 @@ async fn address_get(
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
     load_owned(&st.pool, id, u.id).await?;
+    masked_address(&st.pool, id).await
+}
+
+async fn masked_address(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
     let row: Option<(Vec<u8>, Vec<u8>, Vec<u8>)> = sqlx::query_as("SELECT recipient_name_enc, phone_enc, address_enc FROM shipping_addresses WHERE wishlist_id = $1")
-        .bind(id).fetch_optional(&st.pool).await?;
+        .bind(id).fetch_optional(pool).await?;
     let Some((n, p, a)) = row else {
         return Ok(Json(json!({ "has_shipping_address": false })));
     };
@@ -1405,14 +1418,40 @@ async fn address_get(
     Ok(Json(masked(&open(&n)?, &open(&p)?, &open(&a)?)))
 }
 
-async fn address_put(
+/// 以帳號預設收件地址覆寫清單收件資訊：密文欄位直接在 SQL 內複製，不經明文
+async fn address_from_default(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(b): Json<Value>,
 ) -> R<Json<Value>> {
-    let m = obj(&b)?;
     let w = load_owned(&st.pool, id, u.id).await?;
+    check_address_target(&w)?;
+    let mut tx = st.pool.begin().await?;
+    let n = sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc)
+                         SELECT $1, recipient_name_enc, phone_enc, address_enc FROM user_addresses WHERE user_id = $2 AND kind = 'shipping'
+                         ON CONFLICT (wishlist_id) DO UPDATE SET recipient_name_enc = EXCLUDED.recipient_name_enc, phone_enc = EXCLUDED.phone_enc, address_enc = EXCLUDED.address_enc")
+        .bind(id).bind(u.id).execute(&mut *tx).await?.rows_affected();
+    if n == 0 {
+        return Err(AppError::problem(
+            409,
+            "NO_DEFAULT_ADDRESS",
+            "尚未設定預設收件地址",
+        ));
+    }
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "wishlist.shipping_address.update",
+        "wishlists",
+        Some(id),
+        json!({ "changed": true }),
+    )
+    .await?;
+    tx.commit().await?;
+    masked_address(&st.pool, id).await
+}
+
+fn check_address_target(w: &W) -> R<()> {
     if w.ty == "relief" {
         return Err(AppError::invalid(
             "/type",
@@ -1423,17 +1462,19 @@ async fn address_put(
     if matches!(w.status.as_str(), "closed" | "archived") {
         return Err(closed());
     }
-    let req = |k: &str, min, max| {
-        text(m, k, min, max)?
-            .flatten()
-            .ok_or_else(|| AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")))
-    };
-    let (name, phone, addr) = (
-        req("recipient_name", 1, 50)?,
-        req("phone", 6, 20)?,
-        req("address", 5, 200)?,
-    );
-    check_phone(&phone, "/phone")?;
+    Ok(())
+}
+
+async fn address_put(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Value>,
+) -> R<Json<Value>> {
+    let m = obj(&b)?;
+    let w = load_owned(&st.pool, id, u.id).await?;
+    check_address_target(&w)?;
+    let (name, phone, addr) = address_fields(m, true)?;
     let mut tx = st.pool.begin().await?;
     save_address(&mut *tx, id, &name, &phone, &addr).await?;
     // 收件資訊內容一律不進稽核
@@ -1448,6 +1489,25 @@ async fn address_put(
     .await?;
     tx.commit().await?;
     Ok(Json(masked(&name, &phone, &addr)))
+}
+
+/// 收件資訊欄位驗證（清單與帳號預設共用）；contact=false 時只要 address（居住地址）
+pub(crate) fn address_fields(m: &Map<String, Value>, contact: bool) -> R<(String, String, String)> {
+    let req = |k: &str, min, max| {
+        text(m, k, min, max)?
+            .flatten()
+            .ok_or_else(|| AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")))
+    };
+    let (name, phone) = if contact {
+        (req("recipient_name", 1, 50)?, req("phone", 6, 20)?)
+    } else {
+        Default::default()
+    };
+    let addr = req("address", 5, 200)?;
+    if contact {
+        check_phone(&phone, "/phone")?;
+    }
+    Ok((name, phone, addr))
 }
 
 /// 電話只允許數字、+、-、空白（address_put 與據點建立共用）

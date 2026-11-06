@@ -96,6 +96,7 @@
     "USER_NOT_FOUND": "Không tìm thấy người dùng này.",
     "SELF": "Bạn không thể làm điều này với chính mình.",
     "LIMIT": "Đã đạt giới hạn.",
+    "NO_DEFAULT_ADDRESS": "Chưa có địa chỉ nhận hàng mặc định. Hãy thêm trong cài đặt tài khoản trước.",
     "NOT_FRIEND": "Người này chưa phải là bạn bè của bạn.",
     "VALIDATION_FAILED": "Vui lòng kiểm tra thông tin đã nhập rồi thử lại.",
     "WALLET_CAP_EXCEEDED": "Lần nạp này sẽ vượt giới hạn số dư ví. Vui lòng giảm số tiền.",
