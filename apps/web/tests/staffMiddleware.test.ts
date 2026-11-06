@@ -1,3 +1,4 @@
+import { hasStaffRole } from '../app/utils/staffRoles'
 import { afterEach, beforeAll, expect, it, vi } from 'vitest'
 
 const fetchMe = vi.fn(), navigate = vi.fn((x: any) => ({ nav: x })), abort = vi.fn((e: any) => ({ abort: e }))
@@ -9,10 +10,11 @@ beforeAll(async () => {
   vi.stubGlobal('navigateTo', navigate)
   vi.stubGlobal('abortNavigation', abort)
   vi.stubGlobal('createError', (e: any) => e)
+  vi.stubGlobal('hasStaffRole', hasStaffRole)
   mw = (await import('../app/middleware/staff')).default as any
 })
 afterEach(() => vi.clearAllMocks())
-const to = { path: '/admin/analytics', fullPath: '/admin/analytics' }
+const to = { path: '/admin/analytics', fullPath: '/admin/analytics', meta: {} as any }
 
 it('non-staff arriving from login or register goes to dashboard instead of erroring', async () => {
   fetchMe.mockResolvedValue({ is_staff: false })
@@ -45,5 +47,15 @@ it('staff passes; unverified MFA, or not set up while enforcement is on, goes to
   expect(await mw(to, { path: '/login' })).toEqual(mfa)
   fetchMe.mockResolvedValue({ is_staff: true, mfa_enabled: true, mfa_verified: false })
   expect(await mw(to, { path: '/login' })).toEqual(mfa)
-  expect(await mw({ path: '/admin/mfa', fullPath: '/admin/mfa' }, { path: '/login' })).toBeUndefined()
+  expect(await mw({ path: '/admin/mfa', fullPath: '/admin/mfa', meta: {} }, { path: '/login' })).toBeUndefined()
+})
+
+it('page requiring a role redirects staff lacking it to /admin; admin passes', async () => {
+  const fin = { ...to, path: '/admin/finance', meta: { staffRole: 'finance' } }
+  fetchMe.mockResolvedValue({ is_staff: true, staff_roles: ['support'], mfa_enabled: true, mfa_verified: true })
+  await mw(fin, { path: '/admin' })
+  expect(navigate).toHaveBeenCalledWith('/admin', { replace: true })
+  navigate.mockClear()
+  fetchMe.mockResolvedValue({ is_staff: true, staff_roles: ['admin'], mfa_enabled: true, mfa_verified: true })
+  expect(await mw(fin, { path: '/admin' })).toBeUndefined()
 })

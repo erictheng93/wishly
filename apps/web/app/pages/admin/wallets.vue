@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
-definePageMeta({ middleware: 'staff' })
+definePageMeta({ middleware: 'staff', staffRole: 'finance' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.wallets.title') })
 const { api } = useApi()

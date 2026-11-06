@@ -658,6 +658,7 @@ struct UserJsonRow {
     email: Option<String>,
     avatar_key: Option<String>,
     is_staff: bool,
+    staff_roles: Vec<String>,
     notification_prefs: Value,
     handle: Option<String>,
     dcv: String,
@@ -685,7 +686,7 @@ struct UserJsonRow {
 /// GET /me 等共用的使用者 JSON。單一查詢（原本 5 次往返）：/me 是最常被呼叫的登入端點。
 pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError> {
     let r: UserJsonRow = sqlx::query_as(
-        "SELECT u.display_name, u.email, u.avatar_key, u.is_staff, u.notification_prefs, u.handle,
+        "SELECT u.display_name, u.email, u.avatar_key, u.is_staff, u.staff_roles, u.notification_prefs, u.handle,
                 u.default_claim_visibility::text AS dcv, u.bio, u.birthday, u.birthday_visibility::text AS bv, u.locale,
                 u.onboarding_done_at IS NOT NULL AS onboarding_done, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
                 EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'email' AND i.password_hash IS NOT NULL) AS has_password,
@@ -704,7 +705,7 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     .ok_or(AppError::Unauthorized)?;
     let avatar_url = crate::uploads::avatar_url(r.avatar_key.as_deref());
     Ok(
-        json!({ "id": id, "display_name": r.display_name, "email": r.email, "avatar_url": avatar_url, "is_staff": r.is_staff,
+        json!({ "id": id, "display_name": r.display_name, "email": r.email, "avatar_url": avatar_url, "is_staff": r.is_staff, "staff_roles": r.staff_roles,
                "notification_prefs": r.notification_prefs, "handle": r.handle, "default_claim_visibility": r.dcv, "bio": r.bio, "birthday": r.birthday, "birthday_visibility": r.bv, "locale": r.locale, "mfa_enabled": r.mfa_enabled, "has_password": r.has_password, "onboarding_done": r.onboarding_done, "identities": r.idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
                "orgs": r.orgs,
                "gift_likes": r.gift_likes, "gift_dislikes": r.gift_dislikes, "gift_prefs_vis": r.gift_prefs_vis,

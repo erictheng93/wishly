@@ -1,6 +1,7 @@
 {
   "admin": {
     "index": {
+      "roles": { "label": "Staff roles", "admin": "Admin", "finance": "Finance", "moderator": "Moderator", "support": "Support" },
       "title": "Operations console",
       "statsLabel": "Operations stats",
       "overview": "Overview",
@@ -76,8 +77,7 @@
         "sep": ", ",
         "unblock": "Unblock",
         "block": "Block",
-        "unsetStaff": "Remove staff",
-        "setStaff": "Make staff",
+        "editRoles": "Edit roles",
         "unlink": "Unlink {provider}",
         "recovery": "Send recovery email",
         "resetMfa": "Reset two-step verification",

@@ -2,7 +2,7 @@
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 金流後台：總覽＋分頁。分頁放網址 ?tab=，時間區間跨分頁共用。
 import { FINANCE_RANGES, FINANCE_TABS, type FinanceTab } from '~/utils/finance'
-definePageMeta({ middleware: 'staff' })
+definePageMeta({ middleware: 'staff', staffRole: 'finance' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.finance.title') })
 const route = useRoute(), router = useRouter()

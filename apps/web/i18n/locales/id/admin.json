@@ -1,6 +1,7 @@
 {
   "admin": {
     "index": {
+      "roles": { "label": "Peran staf", "admin": "Admin", "finance": "Keuangan", "moderator": "Moderator", "support": "Dukungan" },
       "title": "Panel admin operasional",
       "statsLabel": "Statistik operasional",
       "overview": "Ringkasan operasional",
@@ -76,8 +77,7 @@
         "sep": ", ",
         "unblock": "Cabut pembekuan",
         "block": "Bekukan",
-        "unsetStaff": "Cabut staff",
-        "setStaff": "Jadikan staff",
+        "editRoles": "Ubah peran",
         "unlink": "Putuskan tautan {provider}",
         "recovery": "Kirim email verifikasi pemulihan",
         "resetMfa": "Reset verifikasi dua langkah",

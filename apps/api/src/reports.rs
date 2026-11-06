@@ -1,6 +1,6 @@
 //! 檢舉（公開）+ staff 處理檢舉 / 下架與恢復清單（docs/04 4.11）。
 use crate::{
-    admin::{audit, page, Staff},
+    admin::{audit, page, Staff, MODERATOR},
     dashboard,
     error::AppError,
     ratelimit,
@@ -403,7 +403,7 @@ const FILTER_SQL: &str = "r.status = $1::report_status
 
 async fn list(
     State(st): State<AppState>,
-    _s: Staff,
+    _s: Staff<MODERATOR>,
     Query(q): Query<ReportQ>,
 ) -> Result<Response, AppError> {
     let (status, from, to) = parse_filters(&q)?;
@@ -427,7 +427,7 @@ async fn list(
 /// 依目標分組（件數多的在前），給 staff 排處理優先序。
 async fn targets(
     State(st): State<AppState>,
-    _s: Staff,
+    _s: Staff<MODERATOR>,
     Query(q): Query<ReportQ>,
 ) -> Result<Json<Value>, AppError> {
     let (status, from, to) = parse_filters(&q)?;
@@ -458,7 +458,7 @@ async fn targets(
 /// 使用者的處分紀錄：被檢舉次數（本人 + 其清單）與停權 / 解除停權。不含 IP / UA。
 async fn moderation_history(
     State(st): State<AppState>,
-    _s: Staff,
+    _s: Staff<MODERATOR>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
     let exists: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)")
@@ -502,7 +502,7 @@ struct Handle {
 
 async fn handle(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     Path(id): Path<Uuid>,
     Json(b): Json<Handle>,
 ) -> Result<Json<Value>, AppError> {
@@ -559,7 +559,7 @@ struct Moderate {
 
 async fn moderate(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     Path(id): Path<Uuid>,
     Json(b): Json<Moderate>,
 ) -> Result<Json<Value>, AppError> {

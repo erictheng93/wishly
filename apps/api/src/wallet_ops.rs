@@ -5,7 +5,7 @@
 //! 營運入口（D57）：`POST /admin/topups/{id}/dispute` 在單一交易內呼叫上述函式並寫 audit_logs；供應商 webhook 待取得官方爭議格式。
 //! 自動儲值只有設定 CRUD；觸發 job 與扣款需要金流授權，尚未實作。
 use crate::{
-    admin::{audit, limit, page, PageQ, Staff},
+    admin::{audit, limit, page, PageQ, Staff, FINANCE},
     error::AppError,
     idempotency, points,
     points::Tx,
@@ -178,7 +178,7 @@ async fn cash_refund_mine(
 /// GET /admin/cash-refunds?status=（requested | processing | completed | rejected）
 async fn cash_refund_list(
     State(st): State<AppState>,
-    Staff(_): Staff,
+    Staff(_): Staff<FINANCE>,
     Query(q): Query<PageQ>,
 ) -> R<Response> {
     if q.status
@@ -207,7 +207,7 @@ fn bad_transition() -> AppError {
 /// 依 lot_allocations 退回原批次）。先鎖錢包再改申請，狀態守衛在 UPDATE 的 WHERE，保證只退一次。
 async fn cash_refund_patch(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {
@@ -290,7 +290,7 @@ async fn cash_refund_patch(
 /// GET /admin/wallet-debts?status=（open | settled | written_off，預設 open）
 async fn debt_list(
     State(st): State<AppState>,
-    Staff(_): Staff,
+    Staff(_): Staff<FINANCE>,
     Query(q): Query<PageQ>,
 ) -> R<Response> {
     let status = q.status.clone().unwrap_or_else(|| "open".into());
@@ -310,7 +310,7 @@ async fn debt_list(
 /// PATCH /admin/wallet-debts/{id}：open → settled | written_off（note 必填）；已結案 → 409 INVALID_STATE_TRANSITION
 async fn debt_patch(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Path(id): Path<Uuid>,
     Json(b): Json<Value>,
 ) -> R<Json<Value>> {
@@ -528,7 +528,7 @@ struct TopupQ {
 /// q 不分大小寫比對姓名 / email / 商店交易序號 / 金流交易序號子字串（用 position 而非 LIKE，避免 % _ 被當萬用字元）；空白視為不篩選。
 async fn topup_list(
     State(st): State<AppState>,
-    Staff(_): Staff,
+    Staff(_): Staff<FINANCE>,
     Query(q): Query<TopupQ>,
 ) -> R<Response> {
     if q.method.as_deref().is_some_and(|m| {
@@ -582,7 +582,7 @@ async fn topup_list(
 /// won 對 paid 視為無動作（applied=false）：勝訴後狀態本來就是 paid。
 async fn topup_dispute(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<FINANCE>,
     Path(id): Path<Uuid>,
     headers: HeaderMap,
     body: Bytes,

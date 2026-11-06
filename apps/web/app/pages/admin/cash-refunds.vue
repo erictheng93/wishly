@@ -2,7 +2,7 @@
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 現金退款審核：requested → processing → completed；requested / processing → rejected（理由必填，點數退回原批次）
 import { CASH_REFUND_STATUSES, cashRefundActions, cashRefundPatch, listRows, type RefundTo } from '~/utils/walletOps'
-definePageMeta({ middleware: 'staff' })
+definePageMeta({ middleware: 'staff', staffRole: 'finance' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.cashRefunds.title') })
 const { api } = useApi()

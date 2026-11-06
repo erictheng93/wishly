@@ -1,7 +1,7 @@
 //! 災害事件：建立、查重、編輯、合併與下架（spec 2026-10-27-org-relief-registration-design）。
 //! 鎖序：relief_events（依 id 由小到大）→ wishlists。
 use crate::{
-    admin::{audit, Staff},
+    admin::{audit, Staff, MODERATOR},
     error::AppError,
     orgs::{audit_user, member_role, require_role},
     session::CurrentUser,
@@ -254,7 +254,7 @@ struct MergeBody {
 }
 
 async fn merge(
-    Staff(staff): Staff,
+    Staff(staff): Staff<MODERATOR>,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
     Json(b): Json<MergeBody>,
@@ -314,7 +314,7 @@ struct Moderate {
 }
 
 async fn moderate(
-    Staff(staff): Staff,
+    Staff(staff): Staff<MODERATOR>,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
     Json(b): Json<Moderate>,

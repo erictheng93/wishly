@@ -1,6 +1,7 @@
 {
   "admin": {
     "index": {
+      "roles": { "label": "營運角色", "admin": "管理員", "finance": "金流", "moderator": "內容審核", "support": "客服" },
       "title": "營運後台",
       "statsLabel": "營運統計",
       "overview": "營運概況",
@@ -76,8 +77,7 @@
         "sep": "、",
         "unblock": "解除停權",
         "block": "停權",
-        "unsetStaff": "取消 staff",
-        "setStaff": "設為 staff",
+        "editRoles": "編輯角色",
         "unlink": "解除 {provider} 綁定",
         "recovery": "寄送復原驗證信",
         "resetMfa": "重設兩步驟驗證",

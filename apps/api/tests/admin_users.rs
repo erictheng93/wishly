@@ -159,7 +159,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             )
             .await
             .2["code"],
-            "LAST_STAFF"
+            "LAST_ADMIN"
         );
     }
     let (id, token, _) = email_user(&pool, false, "user").await;
@@ -212,7 +212,7 @@ async fn last_staff_and_last_login_are_protected(pool: PgPool) {
             "PATCH",
             &format!("/admin/users/{id}"),
             &[("authorization", format!("Bearer {staff}"))],
-            Some(json!({"is_staff":true,"reason":"hire"}))
+            Some(json!({"staff_roles":["admin"],"reason":"hire"}))
         )
         .await
         .0,
@@ -413,7 +413,7 @@ async fn concurrent_staff_changes_keep_an_effective_staff(pool: PgPool) {
         )
         .await
         .2["code"],
-        "LAST_STAFF"
+        "LAST_ADMIN"
     );
     common::assert_all_reconciled(&pool).await;
 }
@@ -895,5 +895,126 @@ async fn blocked_owner_content_is_not_found_and_purged(pool: PgPool) {
     assert_eq!(
         call(&pool, "GET", "/users/blk_owner", &[], None).await.0,
         StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn staff_roles_gate_admin_endpoints(pool: PgPool) {
+    let admin = staff(&pool, "admin").await;
+    let fin = staff(&pool, "fin").await;
+    let target = user(&pool, "target").await;
+    let bearer = |t: &str| [("authorization", format!("Bearer {t}"))];
+    // admin 把 fin 改成只有 finance；未知角色 422
+    let path = format!("/admin/users/{}", fin.id);
+    let (st, _, body) = call(
+        &pool,
+        "PATCH",
+        &path,
+        &bearer(&admin.token),
+        Some(json!({"staff_roles":["finance","finance"],"reason":"r"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{body}");
+    assert_eq!(body["staff_roles"], json!(["finance"]));
+    assert_eq!(body["is_staff"], true);
+    let (st, _, _) = call(
+        &pool,
+        "PATCH",
+        &path,
+        &bearer(&admin.token),
+        Some(json!({"staff_roles":["root"],"reason":"r"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY);
+    // 改角色會撤 session？不會（is_staff 沒變），角色由快取失效即時生效
+    let (st, _, me) = call(&pool, "GET", "/me", &bearer(&fin.token), None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(me["staff_roles"], json!(["finance"]));
+    // finance：金流可用、審核 / 系統旗標 / 改角色 / 停權不可用、共用唯讀可用
+    for (m, p, ok) in [
+        ("GET", "/admin/finance/overview", true),
+        ("GET", "/admin/topups", true),
+        ("GET", "/admin/users", true),
+        ("GET", "/admin/reports", false),
+        ("GET", "/admin/orgs", false),
+        ("GET", "/admin/system-flags", false),
+    ] {
+        let (st, _, b) = call(&pool, m, p, &bearer(&fin.token), None).await;
+        if ok {
+            assert_eq!(st, StatusCode::OK, "{p}: {b}");
+        } else {
+            assert_eq!(st, StatusCode::FORBIDDEN, "{p}");
+            assert_eq!(b["code"], "STAFF_ROLE_REQUIRED", "{p}");
+        }
+    }
+    let tpath = format!("/admin/users/{}", target.id);
+    for body in [
+        json!({"blocked":true,"reason":"r"}),
+        json!({"staff_roles":["admin"],"reason":"r"}),
+    ] {
+        let (st, _, b) = call(&pool, "PATCH", &tpath, &bearer(&fin.token), Some(body)).await;
+        assert_eq!(
+            (st, b["code"].clone()),
+            (StatusCode::FORBIDDEN, json!("STAFF_ROLE_REQUIRED"))
+        );
+    }
+    // moderator 可停權一般使用者，但不能停權營運人員
+    let (st, _, _) = call(
+        &pool,
+        "PATCH",
+        &path,
+        &bearer(&admin.token),
+        Some(json!({"staff_roles":["moderator"],"reason":"r"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let (st, _, _) = call(
+        &pool,
+        "PATCH",
+        &tpath,
+        &bearer(&fin.token),
+        Some(json!({"blocked":true,"reason":"r"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let apath = format!("/admin/users/{}", admin.id);
+    let (st, _, b) = call(
+        &pool,
+        "PATCH",
+        &apath,
+        &bearer(&fin.token),
+        Some(json!({"blocked":true,"reason":"r"})),
+    )
+    .await;
+    assert_eq!(
+        (st, b["code"].clone()),
+        (StatusCode::FORBIDDEN, json!("STAFF_ROLE_REQUIRED"))
+    );
+    // 唯一 admin 不可拿掉自己的 admin
+    let (st, _, b) = call(
+        &pool,
+        "PATCH",
+        &apath,
+        &bearer(&admin.token),
+        Some(json!({"staff_roles":["finance"],"reason":"r"})),
+    )
+    .await;
+    assert_eq!(
+        (st, b["code"].clone()),
+        (StatusCode::CONFLICT, json!("LAST_ADMIN"))
+    );
+    // 舊寫法 is_staff=false 清空角色
+    let (st, _, b) = call(
+        &pool,
+        "PATCH",
+        &path,
+        &bearer(&admin.token),
+        Some(json!({"is_staff":false,"reason":"r"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(
+        (b["is_staff"].clone(), b["staff_roles"].clone()),
+        (json!(false), json!([]))
     );
 }

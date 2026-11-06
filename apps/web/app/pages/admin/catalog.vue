@@ -2,7 +2,7 @@
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 // 品牌館與精選商品後台：品牌 / 商品的列表與新增、編輯。slug / ref 建立後不可改；圖片經 CreatorImageUploader（purpose catalog）
 import { OCCASIONS, RECIPIENTS } from '~/utils/catalog'
-definePageMeta({ middleware: 'staff' })
+definePageMeta({ middleware: 'staff', staffRole: 'moderator' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.catalog.title') })
 const { api } = useApi()

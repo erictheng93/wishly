@@ -40,6 +40,8 @@ pub fn session_token(h: &axum::http::HeaderMap) -> Option<String> {
 pub struct CurrentUser {
     pub id: Uuid,
     pub is_staff: bool,
+    /// 營運角色位元（admin::ADMIN / FINANCE / MODERATOR / SUPPORT）
+    pub staff_roles: u8,
     pub session_id: Uuid,
     /// 此 session 已通過 TOTP（Staff 守衛用）
     pub mfa: bool,
@@ -53,6 +55,7 @@ pub struct CurrentUser {
 struct SessionRow {
     id: Uuid,
     is_staff: bool,
+    staff_roles: Vec<String>,
     blocked: bool,
     live: bool,
     session_id: Uuid,
@@ -74,7 +77,7 @@ impl FromRequestParts<AppState> for CurrentUser {
         }
         let gen = cache::generation();
         let row: Option<SessionRow> = sqlx::query_as(
-            "SELECT u.id, u.is_staff, u.blocked_at IS NOT NULL AS blocked, s.revoked_at IS NULL AS live, s.id AS session_id,
+            "SELECT u.id, u.is_staff, u.staff_roles, u.blocked_at IS NOT NULL AS blocked, s.revoked_at IS NULL AS live, s.id AS session_id,
                     s.mfa_at + interval '12 hours' AS mfa_until, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
                     u.is_staff AND COALESCE((SELECT value = 'true'::jsonb FROM system_flags WHERE key = 'staff_mfa_required'), false) AS mfa_required,
                     (s.last_seen_at < now() - interval '5 minutes' OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)) AS stale,
@@ -113,6 +116,7 @@ impl FromRequestParts<AppState> for CurrentUser {
                 let a = cache::Auth {
                     id: r.id,
                     is_staff: r.is_staff,
+                    staff_roles: crate::admin::role_mask(&r.staff_roles),
                     session_id: r.session_id,
                     mfa_until: r.mfa_until,
                     mfa_enabled: r.mfa_enabled,
@@ -186,6 +190,7 @@ mod cache {
     pub struct Auth {
         pub id: Uuid,
         pub is_staff: bool,
+        pub staff_roles: u8,
         pub session_id: Uuid,
         pub mfa_until: Option<DateTime<Utc>>,
         pub mfa_enabled: bool,
@@ -198,6 +203,7 @@ mod cache {
             CurrentUser {
                 id: self.id,
                 is_staff: self.is_staff,
+                staff_roles: self.staff_roles,
                 session_id: self.session_id,
                 mfa: self.mfa_until.is_some_and(|t| t > Utc::now()),
                 mfa_enabled: self.mfa_enabled,

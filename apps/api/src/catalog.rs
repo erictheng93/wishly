@@ -3,7 +3,7 @@
 //! brands 是展示用品牌，不是 docs/04 的 merchants；catalog_products 與 P2 同一張表（見 0028）。
 //! shortcut: 公開回應只 max-age=60 且不 purge CDN，改品牌 / 商品最多一分鐘後生效；要即時再接 cdn::purge。
 use crate::{
-    admin::{audit, Staff},
+    admin::{audit, Staff, MODERATOR},
     error::AppError,
     public::image_url,
     validate, AppState,
@@ -350,7 +350,7 @@ impl Brand {
     }
 }
 
-async fn admin_brands(State(st): State<AppState>, _s: Staff) -> R<Response> {
+async fn admin_brands(State(st): State<AppState>, _s: Staff<MODERATOR>) -> R<Response> {
     let rows: Vec<Brand> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {BCOLS} FROM brands ORDER BY sort_order, name, id"
     )))
@@ -373,7 +373,7 @@ fn no_store(v: Value, status: u16) -> Response {
 
 async fn create_brand(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     Json(v): Json<Value>,
 ) -> R<Response> {
     let m = body(v)?;
@@ -429,7 +429,7 @@ async fn create_brand(
 
 async fn patch_brand(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     Path(id): Path<Uuid>,
     Json(v): Json<Value>,
 ) -> R<Response> {
@@ -559,7 +559,7 @@ struct AdminProductQ {
 
 async fn admin_products(
     State(st): State<AppState>,
-    _s: Staff,
+    _s: Staff<MODERATOR>,
     Query(q): Query<AdminProductQ>,
 ) -> R<Response> {
     let page = q.page.unwrap_or(1).clamp(1, 1000);
@@ -582,7 +582,7 @@ async fn admin_products(
 
 async fn create_product(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     Json(v): Json<Value>,
 ) -> R<Response> {
     let m = body(v)?;
@@ -647,7 +647,7 @@ async fn create_product(
 
 async fn patch_product(
     State(st): State<AppState>,
-    Staff(sid): Staff,
+    Staff(sid): Staff<MODERATOR>,
     Path(id): Path<Uuid>,
     Json(v): Json<Value>,
 ) -> R<Response> {
