@@ -18,6 +18,10 @@ function add(k: (typeof KEYS)[number]) {
   if (!lists[k].includes(v)) lists[k].push(v)
   draft[k] = ''
 }
+function move(k: (typeof KEYS)[number], i: number, d: number) {
+  const l = lists[k], j = i + d
+  if (j >= 0 && j < l.length) [l[i], l[j]] = [l[j]!, l[i]!]
+}
 function toggle(tag: string) {
   const i = picked.value.indexOf(tag)
   if (i >= 0) picked.value.splice(i, 1)
@@ -41,6 +45,8 @@ async function save() {
         <ul class="identity-list">
           <li v-for="(x, i) in lists[k]" :key="x" class="c-row">
             <span class="c-grow">{{ x }}</span>
+            <button type="button" class="c-btn small" data-up :disabled="i === 0" :aria-label="$t('settings.pc.up')" @click="move(k, i, -1)"><UiIcon name="arrow-up" :size="16" /></button>
+            <button type="button" class="c-btn small" data-down :disabled="i === lists[k].length - 1" :aria-label="$t('settings.pc.down')" @click="move(k, i, 1)"><UiIcon name="arrow-down" :size="16" /></button>
             <button type="button" class="c-btn small danger" @click="lists[k].splice(i, 1)">{{ $t('settings.pc.remove') }}</button>
           </li>
         </ul>

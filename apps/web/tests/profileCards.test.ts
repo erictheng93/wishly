@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import UiIcon from '../app/components/UiIcon.vue'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import GiftPrefsCard from '../app/components/creator/profile/GiftPrefsCard.vue'
 import DatesCard from '../app/components/creator/profile/DatesCard.vue'
@@ -18,7 +19,7 @@ beforeEach(() => {
 afterEach(() => { mounted?.unmount(); mounted = undefined; vi.unstubAllGlobals() })
 async function open(c: any, u: any = {}) {
   user.value = u
-  mounted = mount(c)
+  mounted = mount(c, {}, { UiIcon })
   await flush()
   return mounted.el
 }
@@ -45,4 +46,16 @@ it('requires a year once a date stops recurring', async () => {
   expect(year.required).toBe(false)
   el.querySelector<HTMLInputElement>('[data-recurring]')!.click(); await nextTick()
   expect(year.required).toBe(true)
+})
+
+it('reorders gift entries with the down button and sends that order', async () => {
+  const el = await open(GiftPrefsCard)
+  const input = el.querySelector<HTMLInputElement>('fieldset input')!
+  for (const v of ['a', 'b']) {
+    input.value = v; input.dispatchEvent(new Event('input')); await nextTick()
+    el.querySelector<HTMLButtonElement>('[data-add]')!.click(); await nextTick()
+  }
+  el.querySelector<HTMLButtonElement>('[data-down]')!.click(); await nextTick()
+  el.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true })); await flush()
+  expect(api).toHaveBeenCalledWith('/me', expect.objectContaining({ method: 'PATCH', body: expect.objectContaining({ gift_likes: ['b', 'a'] }) }))
 })
