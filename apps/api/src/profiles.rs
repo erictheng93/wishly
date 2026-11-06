@@ -267,8 +267,9 @@ async fn profile(
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
     let links = crate::user_links::visible(&st.pool, uid).await?;
+    let dates = crate::user_dates::visible(&st.pool, uid, rel).await?;
     let mut user = json!({ "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday,
-                           "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()), "links": links });
+                           "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()), "links": links, "dates": dates });
     user.as_object_mut().expect("object").extend(extra);
     Ok(Json(json!({ "user": user,
                     "relation": relation, "request_id": request_id, "mutual": mutual,

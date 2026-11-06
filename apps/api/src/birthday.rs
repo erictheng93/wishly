@@ -13,7 +13,7 @@ pub async fn birthday_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
 }
 
 /// 生日所屬年份：今天起 `days` 天後的那一天所在年（跨年時為明年）
-fn year_of(today: NaiveDate, days: i64) -> i16 {
+pub(crate) fn year_of(today: NaiveDate, days: i64) -> i16 {
     (today + chrono::Duration::days(days)).year() as i16
 }
 
@@ -71,5 +71,6 @@ pub async fn birthday_tick_at(pool: &PgPool, today: NaiveDate) -> Result<u64, sq
             .bind(uid).bind(year_of(today, d)).bind(&bday)
             .execute(pool).await?.rows_affected();
     }
+    queued += crate::user_dates::date_tick_at(pool, today).await?;
     Ok(queued)
 }

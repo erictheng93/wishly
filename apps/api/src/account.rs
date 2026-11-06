@@ -169,7 +169,9 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     let now = chrono::Utc::now();
     let links: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('title', title, 'url', url, 'hidden', hidden) FROM user_links WHERE user_id = $1 ORDER BY position")
         .bind(u.id).fetch_all(&st.pool).await?;
-    let mut res = Json(json!({ "exported_at": now, "user": user, "links": links, "identities": identities, "wishlists": wishlists, "claims": claims,
+    let dates: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('title', title, 'month_day', month_day, 'year', year, 'recurring', recurring, 'visibility', visibility) FROM user_dates WHERE user_id = $1 ORDER BY month_day")
+        .bind(u.id).fetch_all(&st.pool).await?;
+    let mut res = Json(json!({ "exported_at": now, "user": user, "links": links, "dates": dates, "identities": identities, "wishlists": wishlists, "claims": claims,
         "wallet": wallet, "ledger": ledger, "contributions": contributions, "notifications": notifications })).into_response();
     let h = res.headers_mut();
     h.insert(
