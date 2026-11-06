@@ -343,7 +343,10 @@ pub fn category(kind: &str) -> Category {
         )
     {
         Category::Account
-    } else if matches!(head, "friend" | "birthday") || kind == "wishlist.supported" {
+    } else if matches!(head, "friend" | "birthday")
+        || kind == "profile.date_soon"
+        || kind == "wishlist.supported"
+    {
         Category::Social
     } else {
         Category::Gifts
@@ -376,7 +379,8 @@ pub fn email_tier(kind: &str) -> EmailTier {
         | "claim.cancelled_by_donor"
         | "topup.expired"
         | "wishlist.supported"
-        | "report.resolved" => EmailTier::InAppOnly,
+        | "report.resolved"
+        | "profile.date_soon" => EmailTier::InAppOnly,
         "claim.purchase_reminder"
         | "claim.list_closed"
         | "claim.cancelled_by_owner"
@@ -432,6 +436,7 @@ pub const KINDS: &[&str] = &[
     "birthday.friend",
     "birthday.nudge",
     "wishlist.supported",
+    "profile.date_soon",
     "topup.credited",
     "topup.expired",
     "cash_refund.updated",
@@ -478,6 +483,10 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
             None => "/friends".into(),
         },
         "birthday.nudge" => "/lists/new".into(),
+        "profile.date_soon" => match payload["handle"].as_str().or(payload["owner_id"].as_str()) {
+            Some(h) => format!("/u/{h}"),
+            None => "/friends".into(),
+        },
         "wishlist.supported" => match payload["wishlist_id"].as_str() {
             Some(w) => format!("/lists/{w}/edit"),
             None => "/dashboard".into(),
@@ -723,6 +732,24 @@ async fn handle(
         };
         payload["owner_name"] = owner_name.into();
         payload["slug"] = slug.into();
+    } else if kind == "profile.date_soon" {
+        // 寄前重驗：日子仍在、不是 private、收件人仍看得到（好友 / 摯友）且沒有封鎖
+        let row: Option<(String, Option<String>, String, String)> = sqlx::query_as(
+            "SELECT o.display_name, o.handle, d.title, d.month_day FROM user_dates d
+               JOIN users o ON o.id = d.user_id AND o.deleted_at IS NULL AND o.blocked_at IS NULL
+               JOIN users r ON r.id = $2 AND r.deleted_at IS NULL AND r.blocked_at IS NULL
+              WHERE d.id = ($1->>'date_id')::uuid AND d.user_id = ($1->>'owner_id')::uuid AND d.visibility <> 'private'
+                AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(r.id, o.id) AND f.user_b = GREATEST(r.id, o.id))
+                AND NOT EXISTS (SELECT 1 FROM user_blocks k WHERE (k.blocker_id = r.id AND k.blocked_id = o.id) OR (k.blocker_id = o.id AND k.blocked_id = r.id))
+                AND (d.visibility <> 'close' OR EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = o.id AND c.friend_id = r.id))")
+            .bind(&payload).bind(uid).fetch_optional(pool).await?;
+        let Some((owner_name, handle, title, md)) = row else {
+            done!("cancelled", "profile date no longer visible");
+        };
+        payload["owner_name"] = owner_name.into();
+        payload["handle"] = handle.into();
+        payload["title"] = title.into();
+        payload["month_day"] = md.into();
     } else if kind == "birthday.nudge" {
         let ok: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL AND u.birthday IS NOT NULL AND u.birthday_visibility::text <> 'private'
@@ -1754,6 +1781,20 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 ),
             )
         }
+        "profile.date_soon" => {
+            let who = payload["owner_name"].as_str().unwrap_or("");
+            let t = payload["title"].as_str().unwrap_or("");
+            let (m, d) = payload["month_day"].as_str().and_then(|b| b.split_once('-')).map(|(m, d)| (m.trim_start_matches('0'), d.trim_start_matches('0'))).unwrap_or(("", ""));
+            (
+                l.pick(format!("【Wishly】{who} 的「{t}」快到了"), format!("[Wishly] {who}'s \"{t}\" is coming up"), format!("[Wishly] Sắp đến \"{t}\" của {who}"), format!("[Wishly] \"{t}\" milik {who} sudah dekat")),
+                l.pick(
+                    format!("{who} 的「{t}」在 {m} 月 {d} 日，快到了！\n"),
+                    format!("{who}'s \"{t}\" is on {m}/{d} and it's coming up!\n"),
+                    format!("\"{t}\" của {who} vào ngày {d}/{m}, sắp đến rồi!\n"),
+                    format!("\"{t}\" milik {who} jatuh pada {d}/{m}, sebentar lagi!\n"),
+                ),
+            )
+        }
         "birthday.nudge" => (
             l.pick("【Wishly】你的生日快到了".into(), "[Wishly] Your birthday is coming up".into(), "[Wishly] Sắp đến sinh nhật của bạn".into(), "[Wishly] Ulang tahunmu sudah dekat".into()),
             l.pick(
@@ -1927,6 +1968,7 @@ mod tests {
             "birthday.friend",
             "birthday.nudge",
             "wishlist.supported",
+            "profile.date_soon",
         ] {
             assert_eq!(category(k), Social, "{k}");
         }

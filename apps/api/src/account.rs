@@ -176,7 +176,9 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     let o = |b: &[u8]| crate::sealed::open_str(b);
     let addresses: Vec<Value> = addr_rows.iter().map(|(k, n, p, a)| json!({ "kind": k,
         "recipient_name": n.as_deref().and_then(o), "phone": p.as_deref().and_then(o), "address": o(a) })).collect();
-    let mut res = Json(json!({ "exported_at": now, "user": user, "links": links, "addresses": addresses, "identities": identities, "wishlists": wishlists, "claims": claims,
+    let dates: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('title', title, 'month_day', month_day, 'year', year, 'recurring', recurring, 'visibility', visibility) FROM user_dates WHERE user_id = $1 ORDER BY month_day")
+        .bind(u.id).fetch_all(&st.pool).await?;
+    let mut res = Json(json!({ "exported_at": now, "user": user, "links": links, "addresses": addresses, "dates": dates, "identities": identities, "wishlists": wishlists, "claims": claims,
         "wallet": wallet, "ledger": ledger, "contributions": contributions, "notifications": notifications })).into_response();
     let h = res.headers_mut();
     h.insert(
@@ -309,6 +311,10 @@ async fn delete_me(
         .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM user_addresses WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM user_dates WHERE user_id = $1")
         .bind(id)
         .execute(&mut *tx)
         .await?;
