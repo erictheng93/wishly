@@ -69,5 +69,4 @@ async function save() {
 </template>
 <style scoped>
 .pf-set{border:0;padding:0;min-width:0}
-.pf-group{margin:0 0 10px}
 </style>

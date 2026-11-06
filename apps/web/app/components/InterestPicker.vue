@@ -11,7 +11,7 @@ function toggle(tag: string) {
 </script>
 <template>
   <div>
-    <div v-for="g in INTEREST_GROUPS" :key="g.id" class="pf-group">
+    <div v-for="g in INTEREST_GROUPS" :key="g.id" class="ip-group">
       <p class="c-mute c-small">{{ $t(`interests.group.${g.id}`) }}</p>
       <div class="c-row wrap">
         <button v-for="tag in g.tags" :key="tag" type="button" class="c-btn small" :class="{ on: modelValue.includes(tag) }" :aria-pressed="modelValue.includes(tag)" data-chip :disabled="!modelValue.includes(tag) && max != null && modelValue.length >= max" @click="toggle(tag)">{{ $t(`interests.tag.${tag}`) }}</button>
