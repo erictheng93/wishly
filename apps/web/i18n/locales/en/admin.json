@@ -491,6 +491,7 @@
       "spec": "Spec",
       "note": "Note",
       "price": "Price (NT$)",
+      "interests": "Fits interests",
       "productUrl": "Product link",
       "sort": "Sort order (lower first)",
       "active": "Active",

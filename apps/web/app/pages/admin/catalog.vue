@@ -34,7 +34,7 @@ function show(row: any | null) {
   editing.value = row; ferr.value = ''; imageKey.value = null
   Object.assign(f, tab.value === 'brands'
     ? { slug: '', name: '', description: '', website_url: '', active: true, sort_order: 0, ...row }
-    : { ref: '', brand_id: '', title: '', spec: '', note: '', price_amount: '', product_url: '', recipients: [], occasions: [], active: true, sort_order: 0, ...row, ...(row ? { brand_id: row.brand_id ?? '', recipients: [...row.recipients], occasions: [...row.occasions] } : {}) })
+    : { ref: '', brand_id: '', title: '', spec: '', note: '', price_amount: '', product_url: '', recipients: [], occasions: [], interests: [], active: true, sort_order: 0, ...row, ...(row ? { brand_id: row.brand_id ?? '', recipients: [...row.recipients], occasions: [...row.occasions], interests: [...(row.interests ?? [])] } : {}) })
   open.value = true
 }
 const blank = (v: any) => (v == null || String(v).trim() === '' ? null : String(v).trim())
@@ -46,7 +46,7 @@ function body() {
     if (imageKey.value) b.logo_key = imageKey.value
     return b
   }
-  const b: any = { ...base, brand_id: f.brand_id || null, title: f.title.trim(), spec: blank(f.spec), note: blank(f.note), product_url: f.product_url.trim(), recipients: f.recipients, occasions: f.occasions, price_amount: blank(f.price_amount) == null ? null : Number(f.price_amount) }
+  const b: any = { ...base, brand_id: f.brand_id || null, title: f.title.trim(), spec: blank(f.spec), note: blank(f.note), product_url: f.product_url.trim(), recipients: f.recipients, occasions: f.occasions, interests: f.interests, price_amount: blank(f.price_amount) == null ? null : Number(f.price_amount) }
   if (!editing.value) b.ref = f.ref.trim()
   if (imageKey.value) b.image_key = imageKey.value
   return b
@@ -131,6 +131,9 @@ const toggle = (list: string[], v: string) => { const i = list.indexOf(v); i < 0
           </fieldset>
           <fieldset class="c-field"><legend>{{ $t('guest.inspire.occasion') }}</legend>
             <label v-for="v in OCCASIONS" :key="v" class="c-row"><input type="checkbox" :checked="f.occasions.includes(v)" @change="toggle(f.occasions, v)">{{ $t(`guest.inspire.o.${v}`) }}</label>
+          </fieldset>
+          <fieldset class="c-field"><legend>{{ $t('admin.catalog.interests') }}</legend>
+            <InterestPicker v-model="f.interests" />
           </fieldset>
         </template>
         <label class="c-field"><span>{{ $t('admin.catalog.sort') }}</span><input v-model="f.sort_order" type="number" step="1" inputmode="numeric"></label>

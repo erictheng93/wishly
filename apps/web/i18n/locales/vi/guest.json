@@ -275,6 +275,7 @@
       "noLists": "Bạn chưa có danh sách nào để thêm",
       "create": "Tạo danh sách",
       "loadErr": "Không tải được danh sách. Vui lòng thử lại.",
+      "matched": "Phù hợp: {tags}",
       "who": "Ai muốn món này",
       "whoTitle": "Ai muốn món này",
       "scope": {

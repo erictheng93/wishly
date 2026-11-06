@@ -275,6 +275,7 @@
       "noLists": "Kamu belum punya wishlist untuk ditambahi",
       "create": "Buat wishlist",
       "loadErr": "Gagal memuat wishlist, coba lagi nanti",
+      "matched": "Cocok: {tags}",
       "who": "Siapa yang mau ini",
       "whoTitle": "Siapa yang mau ini",
       "scope": {

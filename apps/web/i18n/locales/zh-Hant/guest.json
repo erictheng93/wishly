@@ -275,6 +275,7 @@
       "noLists": "你還沒有可加入的清單",
       "create": "建立清單",
       "loadErr": "清單載入失敗，請稍後再試",
+      "matched": "符合：{tags}",
       "who": "誰想要這個",
       "whoTitle": "誰想要這個",
       "scope": {

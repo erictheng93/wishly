@@ -2,7 +2,7 @@
 import { fetchWishes, wishLeft, type WishScope } from '~/utils/inspireWishes'
 import type { CatalogProduct } from '~/utils/catalog'
 // 精選商品卡片格 + 「加到我的願望清單」「誰想要這個」兩個對話框；無購物車，只能加到自己的清單或看外部商品
-defineProps<{ products: CatalogProduct[] }>()
+defineProps<{ products: CatalogProduct[]; matched?: Record<string, string[]> }>()
 const { t } = useI18n()
 
 // 加到清單：僅 client 端（sheet 由點擊開啟）；未登入時 useApi 會 401 導去登入並帶回
@@ -64,6 +64,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
       <p v-if="p.brand" class="g-mute"><NuxtLink :to="localizedPath(`/brands/${p.brand.slug}`, $i18n.locale)">{{ p.brand.name }}</NuxtLink></p>
       <strong class="x-title">{{ p.title }}</strong>
       <p v-if="p.spec" class="g-mute">{{ p.spec }}</p>
+      <p v-if="matched?.[p.ref]?.length" class="x-match" data-matched>{{ $t('guest.inspire.matched', { tags: matched[p.ref]!.map(id => $t(`interests.tag.${id}`)).join(' / ') }) }}</p>
       <p v-if="p.price_amount != null" class="x-price">NT${{ p.price_amount.toLocaleString('en-US') }}</p>
       <p v-if="p.note" class="g-mute">{{ p.note }}</p>
       <div class="x-act">
@@ -130,6 +131,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
 .x-img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}
 .x-ph{display:flex;align-items:center;justify-content:center;background:var(--hatch),var(--bg-alt);color:var(--red-text);font-size:64px;font-weight:900;letter-spacing:-.04em}
 .x-title{display:block;font-size:20px;line-height:1.35;font-weight:800;overflow-wrap:anywhere;margin:4px 16px 0}
+.x-match{font:700 11px/1.4 var(--mono);letter-spacing:.08em;color:var(--mute);margin:8px 16px 0}
 .x-price{font:900 24px/1.2 var(--font);letter-spacing:-.02em;color:var(--fg);margin:8px 16px;font-variant-numeric:tabular-nums}
 .x-act{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto!important;padding:16px 0}
 .x-act>:first-child{grid-column:1/-1}

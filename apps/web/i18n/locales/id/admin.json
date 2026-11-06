@@ -491,6 +491,7 @@
       "spec": "Spesifikasi",
       "note": "Catatan rekomendasi",
       "price": "Harga (NT$)",
+      "interests": "Cocok untuk minat",
       "productUrl": "Tautan produk",
       "sort": "Urutan (angka kecil lebih dulu)",
       "active": "Sedang tayang",
