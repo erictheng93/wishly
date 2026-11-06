@@ -258,6 +258,51 @@ async fn limit_200(pool: PgPool) {
     assert_eq!(n_close(&pool).await, 200);
 }
 
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn concurrent_adds_respect_limit(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let (b, c) = (user(&pool, "B").await, user(&pool, "C").await);
+    befriend(&pool, a.id, b.id).await;
+    befriend(&pool, a.id, c.id).await;
+    sqlx::query("INSERT INTO users (display_name) SELECT 'x' || g FROM generate_series(1, 199) g")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO close_friends (owner_id, friend_id) SELECT $1, id FROM users WHERE display_name LIKE 'x%'")
+        .bind(a.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // 慢觸發器讓兩個不同好友的 INSERT 重疊；沒有 per-owner 鎖就都讀到 199 而寫成 201
+    sqlx::raw_sql(
+        "CREATE FUNCTION slow_cf() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN PERFORM pg_sleep(0.3); RETURN NEW; END $$;
+         CREATE TRIGGER slow_cf BEFORE INSERT ON close_friends FOR EACH ROW EXECUTE FUNCTION slow_cf()",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let app = common::test_app(&pool);
+    let put = |f: Uuid| {
+        let h = [ck(&a.token), idem(Uuid::new_v4())].concat();
+        let app = app.clone();
+        async move {
+            common::call_app(&app, "PUT", &format!("/me/close-friends/{f}"), &h, None)
+                .await
+                .0
+        }
+    };
+    let (r1, r2) = tokio::join!(put(b.id), put(c.id));
+    let mut got = [r1, r2];
+    got.sort();
+    assert_eq!(
+        got,
+        [StatusCode::NO_CONTENT, StatusCode::UNPROCESSABLE_ENTITY],
+        "concurrent adds exceeded the close-friends limit"
+    );
+    assert_eq!(n_close(&pool).await, 200);
+}
+
 async fn apply(pool: &PgPool, path: &std::path::Path) {
     sqlx::raw_sql(sqlx::AssertSqlSafe(std::fs::read_to_string(path).unwrap()))
         .execute(pool)
