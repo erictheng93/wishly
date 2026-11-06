@@ -24,10 +24,11 @@ const render = (compact: boolean) => {
 it('compact 保留符合興趣行與開啟動作，省略說明與按鈕', () => {
   const el = render(true)
   expect(el.querySelector('[data-matched]')).not.toBeNull()
-  expect(el.querySelector('.x-hit')).not.toBeNull()
+  expect(el.querySelectorAll('.x-act button').length).toBe(2)
+  expect(el.querySelector('.x-act a[href="https://x.test"][rel="noopener nofollow"]')).not.toBeNull()
+  expect(el.querySelector('.x-hit')).toBeNull()
   expect(el.textContent).not.toContain('店家備註')
   expect(el.textContent).not.toContain('350ml')
-  expect(el.querySelectorAll('.x-act, .x-act button').length).toBe(0)
 })
 it('非 compact 維持完整卡片', () => {
   const el = render(false)
