@@ -21,7 +21,6 @@ async function submit() {
     if (cover.value) Object.assign(body, { cover_image_key: cover.value, cover_preset: null })
     else Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
     const w = await api('/wishlists', { method: 'POST', body })
-    // 名單寫入失敗不擋導頁：清單已建立，編輯頁會顯示目前名單，可再調整
     await navigateTo(`/lists/${w.id}/edit`)
   } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
 }

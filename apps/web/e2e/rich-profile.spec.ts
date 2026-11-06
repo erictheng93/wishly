@@ -3,10 +3,10 @@ import { registerUser, loginBrowser } from './helpers'
 
 // 需要完整後端（Task 3–6）：連結頁匿名可見；偏好設為 friends 時，匿名看不到、好友看得到
 test('個人頁：連結頁匿名可見、偏好僅好友可見', async ({ page, browser }) => {
-  const a = await registerUser({ tag: 'rpa' }), b = await registerUser({ tag: 'rpb' })
+  const a = await registerUser({ tag: 'rpa' }), b = await registerUser({ tag: 'rpb' }), c = await registerUser({ tag: 'rpc' })
   const handle = `rp${Date.now().toString(36)}`.slice(0, 20)
   const ok = async (r: any) => { expect(r.ok(), await r.text()).toBeTruthy() }
-  await ok(await a.api.patch('me', { data: { handle, gift_likes: ['手沖咖啡豆'], gift_likes_vis: 'friends' } }))
+  await ok(await a.api.patch('me', { data: { handle, gift_likes: ['手沖咖啡豆'], gift_prefs_vis: 'friends' } }))
   await ok(await a.api.put('me/links', { data: { links: [{ title: '我的 IG', url: 'https://instagram.com/rp_test', hidden: false }] } }))
 
   await page.goto(`/l/${handle}`)
@@ -16,6 +16,14 @@ test('個人頁：連結頁匿名可見、偏好僅好友可見', async ({ page,
   await page.goto(`/u/${handle}`)
   await expect(page.getByRole('heading', { name: a.name })).toBeVisible()
   await expect(page.getByText('手沖咖啡豆')).toHaveCount(0)
+
+  // 已登入但非好友：同樣看不到
+  const ctx0 = await browser.newContext()
+  await loginBrowser(ctx0, c)
+  const p0 = await ctx0.newPage()
+  await p0.goto(`/u/${handle}`)
+  await expect(p0.getByRole('heading', { name: a.name })).toBeVisible()
+  await expect(p0.getByText('手沖咖啡豆')).toHaveCount(0)
 
   const inv = await (await a.api.post('friends/invites')).json()
   await ok(await b.api.post(`friends/invites/${inv.token}/accept`))

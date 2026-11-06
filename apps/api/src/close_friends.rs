@@ -33,7 +33,7 @@ pub async fn is_close(pool: &PgPool, owner: Uuid, viewer: Uuid) -> Result<bool, 
 async fn list(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, AppError> {
     let rows: Vec<(Uuid, String, Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT x.id, x.display_name, x.handle, x.avatar_key FROM close_friends c JOIN users x ON x.id = c.friend_id
-          WHERE c.owner_id = $1 AND x.deleted_at IS NULL ORDER BY c.created_at, x.id",
+          WHERE c.owner_id = $1 AND x.deleted_at IS NULL AND x.blocked_at IS NULL ORDER BY c.created_at, x.id",
     )
     .bind(u.id)
     .fetch_all(&st.pool)

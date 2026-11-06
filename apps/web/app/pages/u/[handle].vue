@@ -89,7 +89,7 @@ async function sendReport() {
       <section class="pf-hero">
         <div class="pf-av" aria-hidden="true"><img v-if="p.user.avatar_url" :src="p.user.avatar_url" alt="" class="pf-img"><template v-else>{{ (p.user.display_name || '?').slice(0, 1) }}</template></div>
         <h1 class="c-h2">{{ p.user.display_name }}</h1>
-        <p v-if="p.user.handle || p.user.birthday" class="c-mute pf-handle"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template><template v-if="p.user.age != null"> · {{ $t('me.profile.age', { n: p.user.age }) }}</template></p>
+        <p v-if="p.user.handle || p.user.birthday || p.user.age != null" class="c-mute pf-handle"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template><template v-if="p.user.age != null"><template v-if="p.user.handle || p.user.birthday"> · </template>{{ $t('me.profile.age', { n: p.user.age }) }}</template></p>
         <p v-if="p.user.dates?.length" class="c-mute pf-handle pf-date">{{ p.user.dates[0].title }} · {{ formatBirthday(p.user.dates[0].month_day) }} · {{ p.user.dates[0].days_until ? $t('me.profile.inDays', { n: p.user.dates[0].days_until }) : $t('me.profile.dateToday') }}</p>
         <p v-if="p.user.bio" class="pf-bio">{{ p.user.bio }}</p>
         <p v-if="p.mutual?.count" class="c-mute c-row wrap">
