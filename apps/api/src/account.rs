@@ -125,7 +125,9 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
             retry_after: Some(3600),
         });
     }
-    let user: Value = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'display_name', display_name, 'email', email, 'bio', bio, 'birthday', birthday, 'created_at', created_at) FROM users WHERE id = $1")
+    let user: Value = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'display_name', display_name, 'email', email, 'bio', bio, 'birthday', birthday, 'created_at', created_at,
+           'gift_likes', gift_likes, 'gift_dislikes', gift_dislikes, 'gift_prefs_vis', gift_prefs_vis, 'interests', interests, 'interests_vis', interests_vis,
+           'birth_year', birth_year, 'age_vis', age_vis, 'home_address_vis', home_address_vis, 'cover_preset', cover_preset, 'cover_image_key', cover_image_key) FROM users WHERE id = $1")
         .bind(u.id).fetch_one(&st.pool).await?;
     let identities: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('provider', provider::text) FROM auth_identities WHERE user_id = $1 ORDER BY created_at")
         .bind(u.id).fetch_all(&st.pool).await?;
@@ -367,7 +369,8 @@ async fn delete_me(
         "SELECT object_key FROM user_media WHERE user_id=$1
          UNION SELECT cover_image_key FROM wishlists WHERE owner_id=$1 AND org_id IS NULL AND cover_image_key IS NOT NULL
          UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id WHERE w.owner_id=$1 AND w.org_id IS NULL AND i.image_key IS NOT NULL
-         UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL")
+         UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL
+         UNION SELECT cover_image_key FROM users WHERE id=$1 AND cover_image_key IS NOT NULL")
         .bind(id).fetch_all(&mut *tx).await?;
     let media: Vec<String> = media
         .into_iter()
@@ -446,6 +449,7 @@ async fn delete_me(
         .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,
+                gift_likes = '{}', gift_dislikes = '{}', interests = '{}', birth_year = NULL, cover_preset = NULL, cover_image_key = NULL,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")
         .bind(id).fetch_one(&mut *tx).await?;
     crate::audit_ctx::insert(

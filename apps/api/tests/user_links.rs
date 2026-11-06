@@ -81,6 +81,13 @@ async fn public_links_hides_hidden(pool: PgPool) {
     assert_eq!(b["links"].as_array().unwrap().len(), 1);
     assert_eq!(b["links"][0]["title"], "show");
     assert_eq!(b["user"]["handle"], "alice");
+    assert!(b["user"]["cover_image_url"].is_null() && b["user"]["cover_preset"].is_null());
+    sqlx::query("UPDATE users SET cover_preset='gift' WHERE handle='alice'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, _, b) = call(&pool, "GET", "/public/links/alice", &[], None).await;
+    assert_eq!(b["user"]["cover_preset"], "gift");
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
