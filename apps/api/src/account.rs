@@ -165,7 +165,9 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     )
     .await?;
     let now = chrono::Utc::now();
-    let mut res = Json(json!({ "exported_at": now, "user": user, "identities": identities, "wishlists": wishlists, "claims": claims,
+    let links: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('title', title, 'url', url, 'hidden', hidden) FROM user_links WHERE user_id = $1 ORDER BY position")
+        .bind(u.id).fetch_all(&st.pool).await?;
+    let mut res = Json(json!({ "exported_at": now, "user": user, "links": links, "identities": identities, "wishlists": wishlists, "claims": claims,
         "wallet": wallet, "ledger": ledger, "contributions": contributions, "notifications": notifications })).into_response();
     let h = res.headers_mut();
     h.insert(
@@ -294,6 +296,10 @@ async fn delete_me(
         .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM push_subscriptions WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM user_links WHERE user_id = $1")
         .bind(id)
         .execute(&mut *tx)
         .await?;
