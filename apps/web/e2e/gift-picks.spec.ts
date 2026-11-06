@@ -21,6 +21,12 @@ test('興趣推薦：個人頁與情境頁', async ({ browser }) => {
   const inv = await (await a.api.post('friends/invites')).json()
   expect((await b.api.post(`friends/invites/${inv.token}/accept`)).ok()).toBeTruthy()
 
+  const anon = await browser.newContext()
+  const anonPage = await anon.newPage()
+  await anonPage.goto(`/u/${handle}`)
+  await expect(anonPage.getByRole('heading', { name: `適合送給 ${a.name} 的禮物` })).toBeVisible()
+  await anon.close()
+
   const ctx = await browser.newContext()
   await loginBrowser(ctx, b)
   const page = await ctx.newPage()

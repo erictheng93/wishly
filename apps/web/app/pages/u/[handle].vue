@@ -53,7 +53,7 @@ const picks = ref<{ basis: string; products: GiftPick[] } | null>(null)
 async function loadPicks() {
   picks.value = null
   if (!p.value || ['self', 'blocked'].includes(p.value.relation)) return
-  try { const r = await fetchGiftPicks(config.public.apiBase, p.value.user.id, { limit: 6 }); picks.value = r.products.length ? r : null } catch { picks.value = null }
+  try { const r = await fetchGiftPicks(config.public.apiBase, p.value.user.handle ?? p.value.user.id, { limit: 6 }); picks.value = r.products.length ? r : null } catch { picks.value = null }
 }
 onMounted(async () => {
   await fetchMe(); await load(); loadPicks()
