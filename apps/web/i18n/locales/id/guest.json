@@ -278,7 +278,7 @@
       "matched": "Cocok: {tags}",
       "forFriend": "Memilih untuk teman yang mana?",
       "forNone": "Tidak ditentukan",
-      "forFallback": "{name} belum punya minat untuk dijadikan acuan, ini rekomendasi umum",
+      "forFallback": "Belum ada produk yang cocok dengan minat {name} — ini rekomendasi umum.",
       "matchedFor": "Cocok dengan minat {name}: {tags}",
       "who": "Siapa yang mau ini",
       "whoTitle": "Siapa yang mau ini",

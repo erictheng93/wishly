@@ -28,7 +28,7 @@ const route = useRoute(), router = useRouter()
 const { user, fetchMe } = useAuth()
 const friends = ref<{ id: string; display_name: string }[]>([])
 const forId = ref(typeof route.query.for === 'string' ? route.query.for : '')
-const picks = ref<{ basis: string; products: GiftPick[] } | null>(null)
+const picks = ref<{ basis: string; products: GiftPick[]; excluded: string[] } | null>(null)
 const forName = computed(() => friends.value.find(f => f.id === forId.value)?.display_name ?? '')
 let pickSeq = 0
 const occasion = scene.occasion
@@ -45,7 +45,7 @@ onMounted(async () => {
   if (!friends.value.some(f => f.id === forId.value)) forId.value = ''
   loadPicks()
 })
-const shown = computed(() => picks.value?.basis === 'interests' ? mergePicks(picks.value.products, products.value) : products.value)
+const shown = computed(() => picks.value ? mergePicks(picks.value.basis === 'interests' ? picks.value.products : [], products.value, picks.value.excluded) : products.value)
 // 標題在冒號後讓斷行落在語意處（模板不用 v-html，拆字串後插 <wbr>）
 const headParts = computed(() => { const m = c.value.heading.match(/^(.*?[：:])(.+)$/); return m ? [m[1]!, m[2]!] : [c.value.heading] })
 const others = SCENES.filter(s => s.slug !== slug)

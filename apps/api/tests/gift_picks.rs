@@ -212,7 +212,10 @@ async fn blocked_cases(pool: PgPool) {
         .unwrap();
     let (s, b) = picks(&pool, Some(&v.token), "").await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(b, serde_json::json!({"basis":"fallback","products":[]}));
+    assert_eq!(
+        b,
+        serde_json::json!({"basis":"fallback","products":[],"excluded":[]})
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
@@ -232,4 +235,27 @@ async fn no_store_and_validation(pool: PgPool) {
         picks(&pool, None, "?limit=0").await.0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn excluded_lists_disliked_refs(pool: PgPool) {
+    let a = alice(&pool).await;
+    set(&pool, a.id, "interests='{coffee}', interests_vis='public', gift_dislikes='{香氛蠟燭}', gift_prefs_vis='public'").await;
+    prod(
+        &pool,
+        "t",
+        "手工香氛蠟燭",
+        &[],
+        &["friend"],
+        &["birthday"],
+        1,
+    )
+    .await;
+    prod(&pool, "x", "香氛蠟燭 其他場合", &[], &[], &["wedding"], 2).await;
+    prod(&pool, "ok", "咖啡杯", &[], &["friend"], &["birthday"], 3).await;
+    let (_, v) = picks(&pool, None, "?occasion=birthday").await;
+    assert_eq!(v["excluded"], serde_json::json!(["t"]));
+    set(&pool, a.id, "gift_prefs_vis='private'").await;
+    let (_, v) = picks(&pool, None, "?occasion=birthday").await;
+    assert_eq!(v["excluded"], serde_json::json!([]));
 }

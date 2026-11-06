@@ -146,7 +146,7 @@ async function sendReport() {
 
       <section v-if="picks" data-gift-picks>
         <h2 class="c-h2 pf-sec">{{ $t(picks.basis === 'interests' ? 'me.profile.picksTitle' : 'me.profile.picksFallback', { name: p.user.display_name }) }}</h2>
-        <GuestCatalogGrid :products="picks.products" :matched="picks.basis === 'interests' ? matchedMap(picks.products) : undefined" />
+        <GuestCatalogGrid compact :products="picks.products" :matched="picks.basis === 'interests' ? matchedMap(picks.products) : undefined" />
       </section>
 
       <section v-if="p.relation !== 'blocked'">
