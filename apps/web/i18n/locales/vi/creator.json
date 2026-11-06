@@ -102,7 +102,9 @@
       "saved": "Đã lưu",
       "saving": "Đang lưu…",
       "update": "Cập nhật thông tin nhận hàng",
-      "save": "Lưu thông tin nhận hàng"
+      "save": "Lưu thông tin nhận hàng",
+      "useDefault": "Dùng địa chỉ nhận hàng mặc định",
+      "useDefaultFailed": "Không thể dùng địa chỉ mặc định"
     },
     "status": {
       "draft": "Bản nháp",

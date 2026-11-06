@@ -102,7 +102,9 @@
       "saved": "Tersimpan",
       "saving": "Menyimpan…",
       "update": "Perbarui alamat pengiriman",
-      "save": "Simpan alamat pengiriman"
+      "save": "Simpan alamat pengiriman",
+      "useDefault": "Pakai alamat pengiriman default",
+      "useDefaultFailed": "Tidak dapat memakai alamat default"
     },
     "status": {
       "draft": "Draf",

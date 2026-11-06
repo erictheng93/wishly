@@ -28,8 +28,8 @@ useSeoMeta({
 })
 
 const copied = ref(false)
-async function share() {
-  const url = `${config.public.siteUrl}/u/${p.value.user.handle}`
+async function share(path = 'u') {
+  const url = `${config.public.siteUrl}/${path}/${p.value.user.handle}`
   try {
     if (navigator.share) await navigator.share({ title: p.value.user.display_name, url })
     else { await copyText(url); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
@@ -114,7 +114,8 @@ async function sendReport() {
         </template>
         <button v-else-if="p.relation === 'none'" class="c-btn primary" :disabled="busy" @click="add">{{ $t('me.profile.addFriend') }}</button>
         <NuxtLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="c-btn primary">{{ $t('me.profile.loginToAdd') }}</NuxtLink>
-        <button v-if="p.user.handle && p.relation !== 'blocked'" class="c-btn" @click="share">{{ $t('me.profile.share') }}</button>
+        <button v-if="p.user.handle && p.relation !== 'blocked'" class="c-btn" @click="share()">{{ $t('me.profile.share') }}</button>
+        <button v-if="p.user.handle && (p.relation === 'self' || p.user.links?.length)" class="c-btn" @click="share('l')">{{ $t('me.profile.shareLinks') }}</button>
         <span v-if="copied" class="c-mute" role="status">{{ $t('me.profile.copied') }}</span>
         </div>
         <div v-if="user && !['self', 'anonymous', 'blocked'].includes(p.relation)" class="c-row wrap">
@@ -129,6 +130,8 @@ async function sendReport() {
         <span class="pf-kick">{{ $t('me.profile.next') }} · {{ nextDays ? $t('me.profile.nextDays', { n: nextDays }) : $t('me.profile.nextToday') }}</span>
         <NuxtLink :to="`/s/${nextList.slug}`"><strong>{{ nextList.title }}</strong></NuxtLink>
       </section>
+
+      <CreatorProfileSections v-if="p.relation !== 'blocked'" :user="p.user" />
 
       <section v-if="p.relation !== 'blocked'">
         <h2 class="c-h2 pf-sec">{{ $t('me.profile.lists') }}</h2>

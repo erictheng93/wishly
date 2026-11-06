@@ -304,7 +304,17 @@
       "blockTitle": "Blokir {name}?",
       "blockText": "Mereka tidak akan lagi melihat profil dan daftar terbatas Anda; pertemanan dan permintaan akan dihapus. Anda dapat membuka blokir di Pengaturan.",
       "reportTitle": "Laporkan {name}",
-      "reportSent": "Laporan diterima. Kami akan segera menanganinya."
+      "reportSent": "Laporan diterima. Kami akan segera menanganinya.",
+      "secLinks": "Tautan",
+      "secLikes": "Hadiah yang disukai",
+      "secDislikes": "Tidak ingin menerima",
+      "secInterests": "Minat",
+      "secDates": "Hari penting",
+      "secAddress": "Alamat rumah",
+      "inDays": "{n} hari lagi",
+      "dateToday": "Hari ini",
+      "shareLinks": "Bagikan halaman tautan",
+      "seeWishes": "Lihat daftar harapan saya"
     },
     "topup": {
       "title": "Top up",
