@@ -7,6 +7,11 @@ it('mergePicks dedupes across pages', () => {
   const picks = [p('r2'), p('r5')].map(x => ({ ...x, matched: ['coffee'] }))
   expect(mergePicks(picks, ['r1', 'r2', 'r3', 'r5', 'r6'].map(p)).map(x => x.ref)).toEqual(['r2', 'r5', 'r1', 'r3', 'r6'])
 })
+it('mergePicks 拿掉 excluded，picks 仍在前', () => {
+  const picks = [{ ...p('r2'), matched: ['coffee'] }]
+  expect(mergePicks(picks, ['r1', 'r2', 'r3'].map(p), ['r1']).map(x => x.ref)).toEqual(['r2', 'r3'])
+  expect(mergePicks([], ['r1', 'r3'].map(p), ['r1']).map(x => x.ref)).toEqual(['r3'])
+})
 it('fetchGiftPicks 帶 occasion / limit 與憑證', async () => {
   const f = vi.fn().mockResolvedValue({ basis: 'interests', products: [] })
   vi.stubGlobal('$fetch', f)

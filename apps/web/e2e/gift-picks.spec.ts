@@ -16,7 +16,7 @@ test('興趣推薦：個人頁與情境頁', async ({ browser }) => {
   const a = await registerUser({ tag: 'gpa' }), b = await registerUser({ tag: 'gpb' })
   const handle = `gp${Date.now().toString(36)}`.slice(0, 20)
   const patch = async (data: object) => expect((await a.api.patch('me', { data })).ok()).toBeTruthy()
-  await patch({ handle, interests: ['coffee'], interests_vis: 'public' })
+  await patch({ handle, interests: ['coffee'], interests_vis: 'public', gift_dislikes: ['筆記本'], gift_prefs_vis: 'public' })
   const meA = await (await a.api.get('me')).json()
   const inv = await (await a.api.post('friends/invites')).json()
   expect((await b.api.post(`friends/invites/${inv.token}/accept`)).ok()).toBeTruthy()
@@ -39,7 +39,12 @@ test('興趣推薦：個人頁與情境頁', async ({ browser }) => {
   const first = page.locator('article.x-card').first()
   await expect(first.locator('[data-matched]')).toContainText(`符合 ${a.name} 的興趣：咖啡`)
 
+  await expect(page.locator('article.x-card').filter({ hasText: '筆記本與鋼筆禮盒' })).toHaveCount(0)
+
   await patch({ interests_vis: 'private' })
+  await page.goto(`/inspire/birthday?for=${meA.id}`)
+  await expect(page.getByRole('status').filter({ hasText: `沒有找到符合 ${a.name} 興趣的商品` })).toBeVisible()
+  await expect(page.locator('article.x-card').filter({ hasText: '筆記本與鋼筆禮盒' })).toHaveCount(0)
   await page.goto(`/u/${handle}`)
   await expect(page.locator('[data-gift-picks]').getByRole('heading', { name: `也許 ${a.name} 會喜歡` })).toBeVisible()
   await ctx.close()

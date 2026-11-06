@@ -2,7 +2,7 @@
 import { fetchWishes, wishLeft, type WishScope } from '~/utils/inspireWishes'
 import type { CatalogProduct } from '~/utils/catalog'
 // 精選商品卡片格 + 「加到我的願望清單」「誰想要這個」兩個對話框；無購物車，只能加到自己的清單或看外部商品
-defineProps<{ products: CatalogProduct[]; matched?: Record<string, string[]>; matchedName?: string }>()
+defineProps<{ products: CatalogProduct[]; matched?: Record<string, string[]>; matchedName?: string; compact?: boolean }>()
 const { t } = useI18n()
 
 // 加到清單：僅 client 端（sheet 由點擊開啟）；未登入時 useApi 會 401 導去登入並帶回
@@ -55,7 +55,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
 </script>
 
 <template>
-  <div class="g-grid x-grid">
+  <div class="g-grid x-grid" :class="{ 'x-compact': compact }">
     <article v-for="p in products" :key="p.ref" class="g-card x-card">
       <div class="x-cv">
         <img v-if="p.image_url" class="x-img" :src="p.image_url" alt="" loading="lazy">
@@ -63,10 +63,10 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
       </div>
       <p v-if="p.brand" class="g-mute"><NuxtLink :to="localizedPath(`/brands/${p.brand.slug}`, $i18n.locale)">{{ p.brand.name }}</NuxtLink></p>
       <strong class="x-title">{{ p.title }}</strong>
-      <p v-if="p.spec" class="g-mute">{{ p.spec }}</p>
+      <p v-if="p.spec && !compact" class="g-mute">{{ p.spec }}</p>
       <p v-if="matched?.[p.ref]?.length" class="x-match" data-matched>{{ $t(matchedName ? 'guest.inspire.matchedFor' : 'guest.inspire.matched', { name: matchedName, tags: matched[p.ref]!.map(id => $t(`interests.tag.${id}`)).join(' / ') }) }}</p>
       <p v-if="p.price_amount != null" class="x-price">NT${{ p.price_amount.toLocaleString('en-US') }}</p>
-      <p v-if="p.note" class="g-mute">{{ p.note }}</p>
+      <p v-if="p.note && !compact" class="g-mute">{{ p.note }}</p>
       <div class="x-act">
         <button class="g-btn block" @click="open(p)">{{ $t('guest.inspire.add') }}</button>
         <button class="g-btn ghost block" @click="openWho(p)">{{ $t('guest.inspire.who') }}</button>
@@ -144,4 +144,15 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
 .x-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:32px 24px}
 .x-grid>.x-card{margin:0}
 @media (hover:hover) and (pointer:fine){.x-card:hover{box-shadow:8px 8px 0 var(--bg-alt),8px 8px 0 1px var(--line);transform:translate(-3px,-3px);border-color:var(--ink-line)}}
+.x-compact{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:16px}
+.x-compact>.x-card{padding-bottom:0}
+.x-compact .x-act{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0 12px}
+.x-compact .x-act>:first-child{grid-column:auto}
+.x-compact .x-act .g-btn{width:auto;flex:1 1 auto;min-height:32px;padding:0 8px;font-size:12px}
+.x-compact .x-cv{margin-bottom:8px}
+.x-compact .x-img{aspect-ratio:auto;height:120px}
+.x-compact .x-ph{font-size:36px}
+.x-compact .x-title{font-size:15px;margin-top:2px}
+.x-compact .x-price{font-size:18px;margin:4px 16px 0}
+.x-compact .x-match{margin-top:4px}
 </style>

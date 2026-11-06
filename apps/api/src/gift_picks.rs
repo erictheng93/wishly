@@ -65,7 +65,9 @@ async fn gift_picks(
         return Err(AppError::NotFound);
     }
     if i_blocked {
-        return Ok(no_store(json!({ "basis": "fallback", "products": [] })));
+        return Ok(no_store(
+            json!({ "basis": "fallback", "products": [], "excluded": [] }),
+        ));
     }
     let ints = if can_see(&iv, rel) { ints } else { vec![] };
     // 去頭尾空白、小寫；長度（字元數）< 2 不比對，避免單字誤殺
@@ -98,13 +100,11 @@ async fn gift_picks(
     .fetch_all(&st.pool)
     .await?;
     // 排除不想收到（標題或品牌名）
-    let rows: Vec<PubRow> = rows
-        .into_iter()
-        .filter(|r| {
-            let text = format!("{}\n{}", r.1, r.12.as_deref().unwrap_or("")).to_lowercase();
-            !dis.iter().any(|d| text.contains(d.as_str()))
-        })
-        .collect();
+    let (rows, gone): (Vec<PubRow>, Vec<PubRow>) = rows.into_iter().partition(|r| {
+        let text = format!("{}\n{}", r.1, r.12.as_deref().unwrap_or("")).to_lowercase();
+        !dis.iter().any(|d| text.contains(d.as_str()))
+    });
+    let excluded: Vec<&str> = gone.iter().map(|r| r.0.as_str()).collect();
     let matched =
         |r: &PubRow| -> Vec<String> { ints.iter().filter(|i| r.10.contains(i)).cloned().collect() };
     let mut scored: Vec<(Vec<String>, PubRow)> = rows
@@ -140,5 +140,7 @@ async fn gift_picks(
             v
         })
         .collect();
-    Ok(no_store(json!({ "basis": basis, "products": products })))
+    Ok(no_store(
+        json!({ "basis": basis, "products": products, "excluded": excluded }),
+    ))
 }

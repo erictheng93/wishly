@@ -278,7 +278,7 @@
       "matched": "Phù hợp: {tags}",
       "forFriend": "Chọn quà cho bạn nào?",
       "forNone": "Không chỉ định",
-      "forFallback": "{name} chưa có sở thích để tham khảo, dưới đây là gợi ý chung",
+      "forFallback": "Chưa có sản phẩm nào hợp với sở thích của {name} — dưới đây là gợi ý chung.",
       "matchedFor": "Hợp sở thích của {name}: {tags}",
       "who": "Ai muốn món này",
       "whoTitle": "Ai muốn món này",
