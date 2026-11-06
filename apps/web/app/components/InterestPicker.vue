@@ -19,3 +19,6 @@ function toggle(tag: string) {
     </div>
   </div>
 </template>
+<style scoped>
+.ip-group{margin:0 0 10px}
+</style>
