@@ -126,15 +126,17 @@ async fn public(
     Path(handle): Path<String>,
 ) -> Result<Response, AppError> {
     // 不呼叫 access::viewer：回應會被 CDN 快取，只能含所有人都看得到的內容
-    // TODO(merge): users.cover_preset / cover_image_url 由 Task 3 加入後補進 user
-    let (uid, handle, name, bio, avatar_key): (
+    #[allow(clippy::type_complexity)]
+    let (uid, handle, name, bio, avatar_key, cover_preset, cover_key): (
         uuid::Uuid,
         String,
         String,
         Option<String>,
         Option<String>,
+        Option<String>,
+        Option<String>,
     ) = sqlx::query_as(
-        "SELECT id, handle, display_name, bio, avatar_key FROM users
+        "SELECT id, handle, display_name, bio, avatar_key, cover_preset, cover_image_key FROM users
           WHERE handle = lower($1) AND deleted_at IS NULL AND blocked_at IS NULL",
     )
     .bind(handle)
@@ -143,7 +145,9 @@ async fn public(
     .ok_or(AppError::NotFound)?;
     let links = visible(&st.pool, uid).await?;
     let body = json!({ "user": { "display_name": name, "handle": handle, "bio": bio,
-                                 "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()) },
+                                 "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()),
+                                 "cover_preset": cover_preset,
+                                 "cover_image_url": cover_key.as_deref().map(|k| crate::uploads::S3::get().public_url(k)) },
                        "links": links });
     Ok(([(header::CACHE_CONTROL, "public, s-maxage=60")], Json(body)).into_response())
 }

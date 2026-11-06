@@ -670,6 +670,16 @@ struct UserJsonRow {
     has_password: bool,
     idents: Vec<String>,
     orgs: Value,
+    gift_likes: Vec<String>,
+    gift_dislikes: Vec<String>,
+    gift_prefs_vis: String,
+    interests: Vec<String>,
+    interests_vis: String,
+    birth_year: Option<i16>,
+    age_vis: String,
+    home_address_vis: String,
+    cover_preset: Option<String>,
+    cover_image_key: Option<String>,
 }
 
 /// GET /me 等共用的使用者 JSON。單一查詢（原本 5 次往返）：/me 是最常被呼叫的登入端點。
@@ -683,7 +693,9 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
                 COALESCE((SELECT jsonb_agg(jsonb_build_object('id', o.id, 'name', o.display_name, 'role', m.role::text,
                                                               'verification_status', o.verification_status) ORDER BY o.created_at)
                             FROM org_members m JOIN organizations o ON o.id = m.org_id
-                           WHERE m.user_id = u.id AND m.disabled_at IS NULL), '[]'::jsonb) AS orgs
+                           WHERE m.user_id = u.id AND m.disabled_at IS NULL), '[]'::jsonb) AS orgs,
+                u.gift_likes, u.gift_dislikes, u.gift_prefs_vis::text, u.interests, u.interests_vis::text, u.birth_year,
+                u.age_vis::text, u.home_address_vis::text, u.cover_preset, u.cover_image_key
            FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL",
     )
     .bind(id)
@@ -694,7 +706,12 @@ pub(crate) async fn user_json(pool: &PgPool, id: Uuid) -> Result<Value, AppError
     Ok(
         json!({ "id": id, "display_name": r.display_name, "email": r.email, "avatar_url": avatar_url, "is_staff": r.is_staff,
                "notification_prefs": r.notification_prefs, "handle": r.handle, "default_claim_visibility": r.dcv, "bio": r.bio, "birthday": r.birthday, "birthday_visibility": r.bv, "locale": r.locale, "mfa_enabled": r.mfa_enabled, "has_password": r.has_password, "onboarding_done": r.onboarding_done, "identities": r.idents.iter().map(|p| json!({"provider": p})).collect::<Vec<_>>(),
-               "orgs": r.orgs }),
+               "orgs": r.orgs,
+               "gift_likes": r.gift_likes, "gift_dislikes": r.gift_dislikes, "gift_prefs_vis": r.gift_prefs_vis,
+               "interests": r.interests, "interests_vis": r.interests_vis, "birth_year": r.birth_year, "age_vis": r.age_vis,
+               "home_address_vis": r.home_address_vis, "cover_preset": r.cover_preset,
+               "cover_image_url": r.cover_image_key.as_deref().map(|k| crate::uploads::S3::get().public_url(k)),
+               "cover_image_key": r.cover_image_key }),
     )
 }
 
@@ -705,8 +722,10 @@ async fn me(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, A
     Ok(Json(v))
 }
 
-fn some_opt<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
-    Option::<String>::deserialize(d).map(Some)
+fn some_opt<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Option<Option<T>>, D::Error> {
+    Option::<T>::deserialize(d).map(Some)
 }
 
 #[derive(Deserialize)]
@@ -725,6 +744,49 @@ struct PatchMe {
     birthday_visibility: Option<String>,
     /// 介面語言（信件語言）：zh-TW / en / vi
     locale: Option<String>,
+    gift_likes: Option<Vec<String>>,
+    gift_dislikes: Option<Vec<String>>,
+    gift_prefs_vis: Option<String>,
+    interests: Option<Vec<String>>,
+    interests_vis: Option<String>,
+    #[serde(default, deserialize_with = "some_opt")]
+    birth_year: Option<Option<i32>>,
+    age_vis: Option<String>,
+    home_address_vis: Option<String>,
+    #[serde(default, deserialize_with = "some_opt")]
+    cover_preset: Option<Option<String>>,
+    #[serde(default, deserialize_with = "some_opt")]
+    cover_image_key: Option<Option<String>>,
+}
+
+fn vis_in(v: &str, ptr: &'static str, allowed: &[&str]) -> Result<(), AppError> {
+    if allowed.contains(&v) {
+        Ok(())
+    } else {
+        Err(AppError::invalid(ptr, "ENUM", "可見範圍不正確"))
+    }
+}
+
+/// 送禮偏好清單：每條 trim 後 1–40 字，去重保序，最多 20 條
+fn clean_gifts(v: &[String], ptr: &str) -> Result<Vec<String>, AppError> {
+    if v.len() > 20 {
+        return Err(AppError::invalid(ptr, "RANGE", "最多 20 條"));
+    }
+    let mut out: Vec<String> = Vec::new();
+    for (i, s) in v.iter().enumerate() {
+        let s = s.trim();
+        if !(1..=40).contains(&s.chars().count()) {
+            return Err(AppError::invalid(
+                &format!("{ptr}/{i}"),
+                "RANGE",
+                "每條須為 1–40 字",
+            ));
+        }
+        if !out.iter().any(|x| x == s) {
+            out.push(s.to_string());
+        }
+    }
+    Ok(out)
 }
 
 fn share_level(v: &str, ptr: &'static str) -> Result<(), AppError> {
@@ -737,6 +799,78 @@ fn share_level(v: &str, ptr: &'static str) -> Result<(), AppError> {
             "只能是 public / friends / private",
         ))
     }
+}
+
+/// 個人封面：preset 與自訂圖二選一，設定其一會清掉另一個；換掉舊圖在同交易排入退役
+async fn patch_cover(
+    st: &AppState,
+    uid: Uuid,
+    new_preset: &Option<Option<String>>,
+    new_key: &Option<Option<String>>,
+) -> Result<(), AppError> {
+    const PRESETS: [&str; 8] = [
+        "birthday",
+        "wedding",
+        "baby",
+        "housewarming",
+        "graduation",
+        "holiday",
+        "travel",
+        "gift",
+    ];
+    if let Some(Some(k)) = &new_key {
+        if !(crate::uploads::valid_key(k) && k.starts_with("covers/")) {
+            return Err(AppError::invalid(
+                "/cover_image_key",
+                "FORMAT",
+                "圖片 key 格式不正確",
+            ));
+        }
+    }
+    if new_preset
+        .as_ref()
+        .is_some_and(|v| v.as_deref().is_some_and(|v| !PRESETS.contains(&v)))
+    {
+        return Err(AppError::invalid("/cover_preset", "ENUM", "封面樣式不正確"));
+    }
+    if matches!((&new_preset, &new_key), (Some(Some(_)), Some(Some(_)))) {
+        return Err(AppError::invalid(
+            "/cover_preset",
+            "CONFLICT",
+            "封面樣式與自訂圖片只能擇一",
+        ));
+    }
+    let mut tx = crate::uploads::media_tx(&st.pool, uid).await?;
+    let (mut preset, mut key): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT cover_preset, cover_image_key FROM users WHERE id=$1")
+            .bind(uid)
+            .fetch_one(&mut *tx)
+            .await?;
+    let old = key.clone();
+    if let Some(v) = &new_key {
+        key = v.clone();
+        if key.is_some() {
+            preset = None;
+        }
+    }
+    if let Some(v) = &new_preset {
+        preset = v.clone();
+        if preset.is_some() {
+            key = None;
+        }
+    }
+    crate::uploads::remember_media(&mut tx, uid, key.as_deref()).await?;
+    sqlx::query("UPDATE users SET cover_preset=$2, cover_image_key=$3 WHERE id=$1")
+        .bind(uid)
+        .bind(&preset)
+        .bind(&key)
+        .execute(&mut *tx)
+        .await?;
+    if let Some(o) = old.filter(|o| Some(o) != key.as_ref()) {
+        crate::uploads::request_retire(&mut tx, &[o]).await?;
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 async fn patch_me(
@@ -884,6 +1018,93 @@ async fn patch_me(
                 .bind(u.id).execute(&mut *tx).await?;
         }
         tx.commit().await?;
+    }
+    if let Some(v) = &p.gift_likes {
+        let v = clean_gifts(v, "/gift_likes")?;
+        sqlx::query("UPDATE users SET gift_likes=$2 WHERE id=$1")
+            .bind(u.id)
+            .bind(v)
+            .execute(&st.pool)
+            .await?;
+    }
+    if let Some(v) = &p.gift_dislikes {
+        let v = clean_gifts(v, "/gift_dislikes")?;
+        sqlx::query("UPDATE users SET gift_dislikes=$2 WHERE id=$1")
+            .bind(u.id)
+            .bind(v)
+            .execute(&st.pool)
+            .await?;
+    }
+    if let Some(v) = &p.interests {
+        if v.len() > 10 || !crate::interests::valid(v) {
+            return Err(AppError::invalid(
+                "/interests",
+                "ENUM",
+                "興趣最多 10 個，且須在標籤庫內",
+            ));
+        }
+        let mut v = v.clone();
+        v.dedup();
+        sqlx::query("UPDATE users SET interests=$2 WHERE id=$1")
+            .bind(u.id)
+            .bind(v)
+            .execute(&st.pool)
+            .await?;
+    }
+    for (v, col, ptr, allowed) in [
+        (
+            &p.gift_prefs_vis,
+            "gift_prefs_vis",
+            "/gift_prefs_vis",
+            &["public", "friends", "close", "private"][..],
+        ),
+        (
+            &p.interests_vis,
+            "interests_vis",
+            "/interests_vis",
+            &["public", "friends", "close", "private"][..],
+        ),
+        (
+            &p.age_vis,
+            "age_vis",
+            "/age_vis",
+            &["friends", "close", "private"][..],
+        ),
+        (
+            &p.home_address_vis,
+            "home_address_vis",
+            "/home_address_vis",
+            &["friends", "close", "private"][..],
+        ),
+    ] {
+        if let Some(v) = v {
+            vis_in(v, ptr, allowed)?;
+            // col 來自上方常數，非使用者輸入
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE users SET {col}=$2::text::profile_vis WHERE id=$1"
+            )))
+            .bind(u.id)
+            .bind(v)
+            .execute(&st.pool)
+            .await?;
+        }
+    }
+    if let Some(y) = p.birth_year {
+        if y.is_some_and(|y| !(1900..=chrono::Datelike::year(&chrono::Utc::now())).contains(&y)) {
+            return Err(AppError::invalid(
+                "/birth_year",
+                "RANGE",
+                "出生年須介於 1900 與今年",
+            ));
+        }
+        sqlx::query("UPDATE users SET birth_year=$2 WHERE id=$1")
+            .bind(u.id)
+            .bind(y.map(|y| y as i16))
+            .execute(&st.pool)
+            .await?;
+    }
+    if p.cover_preset.is_some() || p.cover_image_key.is_some() {
+        patch_cover(&st, u.id, &p.cover_preset, &p.cover_image_key).await?;
     }
     if let Some(v) = &p.locale {
         if !["zh-TW", "en", "vi", "id"].contains(&v.as_str()) {

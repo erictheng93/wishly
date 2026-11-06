@@ -6,7 +6,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -34,6 +34,51 @@ type Donation = (
     Option<String>,
     String,
     String,
+    Option<String>,
+);
+
+/// 觀看者與個人頁主人的關係，供欄位可見性判斷（Task 4、5 共用）
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Rel {
+    Anonymous,
+    Other,
+    Friend,
+    Close,
+    SelfView,
+}
+
+/// vis：public / friends / close / private（profile_vis）
+pub(crate) fn can_see(vis: &str, rel: Rel) -> bool {
+    match vis {
+        "public" => true,
+        "friends" => matches!(rel, Rel::Friend | Rel::Close | Rel::SelfView),
+        "close" => matches!(rel, Rel::Close | Rel::SelfView),
+        _ => rel == Rel::SelfView,
+    }
+}
+
+/// 年齡：有生日 MM-DD 時，今天還沒到生日就少一歲
+fn age(today: NaiveDate, year: i16, mmdd: Option<&str>) -> i32 {
+    let mut a = today.year() - i32::from(year);
+    let passed = mmdd
+        .and_then(|s| NaiveDate::parse_from_str(&format!("2000-{s}"), "%Y-%m-%d").ok())
+        .is_none_or(|b| (today.month(), today.day()) >= (b.month(), b.day()));
+    if !passed {
+        a -= 1;
+    }
+    a
+}
+
+#[allow(clippy::type_complexity)]
+type RichRow = (
+    Vec<String>,
+    Vec<String>,
+    String,
+    Vec<String>,
+    String,
+    Option<i16>,
+    String,
+    Option<String>,
     Option<String>,
 );
 
@@ -92,6 +137,41 @@ async fn profile(
         Some(v) => access::are_friends(&st.pool, uid, v).await?,
         None => false,
     };
+    let rel = match viewer {
+        None => Rel::Anonymous,
+        Some(_) if is_self => Rel::SelfView,
+        Some(v) if friend && crate::close_friends::is_close(&st.pool, uid, v).await? => Rel::Close,
+        Some(_) if friend => Rel::Friend,
+        Some(_) => Rel::Other,
+    };
+    let (gl, gd, gv, ints, iv, by, av, cpreset, ckey): RichRow = sqlx::query_as(
+        "SELECT gift_likes, gift_dislikes, gift_prefs_vis::text, interests, interests_vis::text, birth_year, age_vis::text, cover_preset, cover_image_key
+           FROM users WHERE id = $1",
+    )
+    .bind(uid)
+    .fetch_one(&st.pool)
+    .await?;
+    let mut extra = serde_json::Map::new();
+    if can_see(&gv, rel) {
+        extra.insert("gift_likes".into(), json!(gl));
+        extra.insert("gift_dislikes".into(), json!(gd));
+    }
+    if can_see(&iv, rel) {
+        extra.insert("interests".into(), json!(ints));
+    }
+    if let (Some(y), true) = (by, can_see(&av, rel)) {
+        extra.insert(
+            "age".into(),
+            json!(age(Utc::now().date_naive(), y, birthday.as_deref())),
+        );
+    }
+    extra.insert("cover_preset".into(), json!(cpreset));
+    extra.insert(
+        "cover_image_url".into(),
+        json!(ckey
+            .as_deref()
+            .map(|k| crate::uploads::S3::get().public_url(k))),
+    );
     let mut request_id: Option<Uuid> = None;
     let relation = match viewer {
         None => "anonymous",
@@ -202,10 +282,33 @@ async fn profile(
         "wishlist": { "slug": slug, "title": wt, "owner": { "display_name": on, "handle": oh } } })).collect();
 
     let links = crate::user_links::visible(&st.pool, uid).await?;
-    Ok(Json(
-        json!({ "user": { "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday,
-                              "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()), "links": links },
+    let mut user = json!({ "id": uid, "handle": handle, "display_name": name, "bio": bio, "birthday": birthday,
+                           "avatar_url": crate::uploads::avatar_url(avatar_key.as_deref()), "links": links });
+    user.as_object_mut().expect("object").extend(extra);
+    Ok(Json(json!({ "user": user,
                     "relation": relation, "request_id": request_id, "mutual": mutual,
-                    "wishlists": wishlists, "donations": donations }),
-    ))
+                    "wishlists": wishlists, "donations": donations })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn age_respects_birthday() {
+        let d = |m, day| NaiveDate::from_ymd_opt(2026, m, day).unwrap();
+        assert_eq!(age(d(11, 6), 1996, Some("11-07")), 29);
+        assert_eq!(age(d(11, 6), 1996, Some("11-06")), 30);
+        assert_eq!(age(d(11, 6), 1996, None), 30);
+    }
+
+    #[test]
+    fn can_see_matrix() {
+        assert!(can_see("public", Rel::Anonymous));
+        assert!(!can_see("friends", Rel::Other));
+        assert!(can_see("friends", Rel::Close));
+        assert!(!can_see("close", Rel::Friend));
+        assert!(can_see("close", Rel::SelfView));
+        assert!(!can_see("private", Rel::Close));
+    }
 }
