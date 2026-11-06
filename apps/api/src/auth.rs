@@ -801,10 +801,86 @@ fn share_level(v: &str, ptr: &'static str) -> Result<(), AppError> {
     }
 }
 
+struct Rich {
+    any: bool,
+    likes: Option<Vec<String>>,
+    dislikes: Option<Vec<String>>,
+    interests: Option<Vec<String>>,
+}
+
+/// 驗證個人頁新欄位（不寫入）；回傳清理後的清單
+fn check_rich(p: &PatchMe) -> Result<Rich, AppError> {
+    const ALL: &[&str] = &["public", "friends", "close", "private"];
+    let likes = p
+        .gift_likes
+        .as_deref()
+        .map(|v| clean_gifts(v, "/gift_likes"))
+        .transpose()?;
+    let dislikes = p
+        .gift_dislikes
+        .as_deref()
+        .map(|v| clean_gifts(v, "/gift_dislikes"))
+        .transpose()?;
+    let interests = match &p.interests {
+        Some(v) => {
+            let mut u: Vec<String> = Vec::new();
+            for i in v {
+                if !u.contains(i) {
+                    u.push(i.clone());
+                }
+            }
+            if u.len() > 10 || !crate::interests::valid(&u) {
+                return Err(AppError::invalid(
+                    "/interests",
+                    "ENUM",
+                    "興趣最多 10 個，且須在標籤庫內",
+                ));
+            }
+            Some(u)
+        }
+        None => None,
+    };
+    for (v, ptr, allowed) in [
+        (&p.gift_prefs_vis, "/gift_prefs_vis", ALL),
+        (&p.interests_vis, "/interests_vis", ALL),
+        (&p.age_vis, "/age_vis", &ALL[1..]),
+        (&p.home_address_vis, "/home_address_vis", &ALL[1..]),
+    ] {
+        if let Some(v) = v {
+            vis_in(v, ptr, allowed)?;
+        }
+    }
+    if let Some(Some(y)) = p.birth_year {
+        if !(1900..=chrono::Datelike::year(&taipei_today())).contains(&y) {
+            return Err(AppError::invalid(
+                "/birth_year",
+                "RANGE",
+                "出生年須介於 1900 與今年",
+            ));
+        }
+    }
+    check_cover(&p.cover_preset, &p.cover_image_key)?;
+    Ok(Rich {
+        any: likes.is_some()
+            || dislikes.is_some()
+            || interests.is_some()
+            || p.gift_prefs_vis.is_some()
+            || p.interests_vis.is_some()
+            || p.age_vis.is_some()
+            || p.home_address_vis.is_some()
+            || p.birth_year.is_some(),
+        likes,
+        dislikes,
+        interests,
+    })
+}
+
+fn taipei_today() -> chrono::NaiveDate {
+    (chrono::Utc::now() + chrono::Duration::hours(8)).date_naive()
+}
+
 /// 個人封面：preset 與自訂圖二選一，設定其一會清掉另一個；換掉舊圖在同交易排入退役
-async fn patch_cover(
-    st: &AppState,
-    uid: Uuid,
+fn check_cover(
     new_preset: &Option<Option<String>>,
     new_key: &Option<Option<String>>,
 ) -> Result<(), AppError> {
@@ -840,6 +916,15 @@ async fn patch_cover(
             "封面樣式與自訂圖片只能擇一",
         ));
     }
+    Ok(())
+}
+
+async fn patch_cover(
+    st: &AppState,
+    uid: Uuid,
+    new_preset: &Option<Option<String>>,
+    new_key: &Option<Option<String>>,
+) -> Result<(), AppError> {
     let mut tx = crate::uploads::media_tx(&st.pool, uid).await?;
     let (mut preset, mut key): (Option<String>, Option<String>) =
         sqlx::query_as("SELECT cover_preset, cover_image_key FROM users WHERE id=$1")
@@ -878,6 +963,7 @@ async fn patch_me(
     State(st): State<AppState>,
     Json(p): Json<PatchMe>,
 ) -> Result<Json<Value>, AppError> {
+    let rich = check_rich(&p)?; // 新欄位全數驗證通過才開始寫入
     if let Some(n) = &p.display_name {
         if !(1..=50).contains(&n.trim().chars().count()) {
             return Err(AppError::invalid(
@@ -1019,89 +1105,27 @@ async fn patch_me(
         }
         tx.commit().await?;
     }
-    if let Some(v) = &p.gift_likes {
-        let v = clean_gifts(v, "/gift_likes")?;
-        sqlx::query("UPDATE users SET gift_likes=$2 WHERE id=$1")
-            .bind(u.id)
-            .bind(v)
-            .execute(&st.pool)
-            .await?;
-    }
-    if let Some(v) = &p.gift_dislikes {
-        let v = clean_gifts(v, "/gift_dislikes")?;
-        sqlx::query("UPDATE users SET gift_dislikes=$2 WHERE id=$1")
-            .bind(u.id)
-            .bind(v)
-            .execute(&st.pool)
-            .await?;
-    }
-    if let Some(v) = &p.interests {
-        if v.len() > 10 || !crate::interests::valid(v) {
-            return Err(AppError::invalid(
-                "/interests",
-                "ENUM",
-                "興趣最多 10 個，且須在標籤庫內",
-            ));
-        }
-        let mut v = v.clone();
-        v.dedup();
-        sqlx::query("UPDATE users SET interests=$2 WHERE id=$1")
-            .bind(u.id)
-            .bind(v)
-            .execute(&st.pool)
-            .await?;
-    }
-    for (v, col, ptr, allowed) in [
-        (
-            &p.gift_prefs_vis,
-            "gift_prefs_vis",
-            "/gift_prefs_vis",
-            &["public", "friends", "close", "private"][..],
-        ),
-        (
-            &p.interests_vis,
-            "interests_vis",
-            "/interests_vis",
-            &["public", "friends", "close", "private"][..],
-        ),
-        (
-            &p.age_vis,
-            "age_vis",
-            "/age_vis",
-            &["friends", "close", "private"][..],
-        ),
-        (
-            &p.home_address_vis,
-            "home_address_vis",
-            "/home_address_vis",
-            &["friends", "close", "private"][..],
-        ),
-    ] {
-        if let Some(v) = v {
-            vis_in(v, ptr, allowed)?;
-            // col 來自上方常數，非使用者輸入
-            sqlx::query(sqlx::AssertSqlSafe(format!(
-                "UPDATE users SET {col}=$2::text::profile_vis WHERE id=$1"
-            )))
-            .bind(u.id)
-            .bind(v)
-            .execute(&st.pool)
-            .await?;
-        }
-    }
-    if let Some(y) = p.birth_year {
-        if y.is_some_and(|y| !(1900..=chrono::Datelike::year(&chrono::Utc::now())).contains(&y)) {
-            return Err(AppError::invalid(
-                "/birth_year",
-                "RANGE",
-                "出生年須介於 1900 與今年",
-            ));
-        }
-        sqlx::query("UPDATE users SET birth_year=$2 WHERE id=$1")
-            .bind(u.id)
-            .bind(y.map(|y| y as i16))
-            .execute(&st.pool)
-            .await?;
+    if rich.any {
+        sqlx::query(
+            "UPDATE users SET gift_likes = COALESCE($2, gift_likes), gift_dislikes = COALESCE($3, gift_dislikes),
+                    interests = COALESCE($4, interests),
+                    gift_prefs_vis = COALESCE($5::text::profile_vis, gift_prefs_vis), interests_vis = COALESCE($6::text::profile_vis, interests_vis),
+                    age_vis = COALESCE($7::text::profile_vis, age_vis), home_address_vis = COALESCE($8::text::profile_vis, home_address_vis),
+                    birth_year = CASE WHEN $9 THEN $10 ELSE birth_year END
+              WHERE id = $1",
+        )
+        .bind(u.id)
+        .bind(&rich.likes)
+        .bind(&rich.dislikes)
+        .bind(&rich.interests)
+        .bind(&p.gift_prefs_vis)
+        .bind(&p.interests_vis)
+        .bind(&p.age_vis)
+        .bind(&p.home_address_vis)
+        .bind(p.birth_year.is_some())
+        .bind(p.birth_year.flatten().map(|y| y as i16))
+        .execute(&st.pool)
+        .await?;
     }
     if p.cover_preset.is_some() || p.cover_image_key.is_some() {
         patch_cover(&st, u.id, &p.cover_preset, &p.cover_image_key).await?;

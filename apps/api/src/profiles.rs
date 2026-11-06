@@ -69,19 +69,6 @@ fn age(today: NaiveDate, year: i16, mmdd: Option<&str>) -> i32 {
     a
 }
 
-#[allow(clippy::type_complexity)]
-type RichRow = (
-    Vec<String>,
-    Vec<String>,
-    String,
-    Vec<String>,
-    String,
-    Option<i16>,
-    String,
-    Option<String>,
-    Option<String>,
-);
-
 pub fn routes() -> Router<AppState> {
     Router::new().route("/users/{handle}", get(profile))
 }
@@ -99,8 +86,9 @@ async fn profile(
         return Err(AppError::NotFound);
     }
     #[allow(clippy::type_complexity)]
-    let (uid, handle, name, bio, birthday, bv, avatar_key): (Uuid, Option<String>, String, Option<String>, Option<String>, String, Option<String>) = sqlx::query_as(
-        "SELECT id, handle, display_name, bio, birthday, birthday_visibility::text, avatar_key FROM users
+    let (uid, handle, name, bio, birthday, bv, avatar_key, gl, gd, gv, ints, iv, by, av, cpreset, ckey): (Uuid, Option<String>, String, Option<String>, Option<String>, String, Option<String>, Vec<String>, Vec<String>, String, Vec<String>, String, Option<i16>, String, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT id, handle, display_name, bio, birthday, birthday_visibility::text, avatar_key,
+                gift_likes, gift_dislikes, gift_prefs_vis::text, interests, interests_vis::text, birth_year, age_vis::text, cover_preset, cover_image_key FROM users
           WHERE (id = $1 OR ($1 IS NULL AND handle = $2)) AND deleted_at IS NULL AND blocked_at IS NULL",
     )
     .bind(by_id)
@@ -144,13 +132,6 @@ async fn profile(
         Some(_) if friend => Rel::Friend,
         Some(_) => Rel::Other,
     };
-    let (gl, gd, gv, ints, iv, by, av, cpreset, ckey): RichRow = sqlx::query_as(
-        "SELECT gift_likes, gift_dislikes, gift_prefs_vis::text, interests, interests_vis::text, birth_year, age_vis::text, cover_preset, cover_image_key
-           FROM users WHERE id = $1",
-    )
-    .bind(uid)
-    .fetch_one(&st.pool)
-    .await?;
     let mut extra = serde_json::Map::new();
     if can_see(&gv, rel) {
         extra.insert("gift_likes".into(), json!(gl));
@@ -162,7 +143,11 @@ async fn profile(
     if let (Some(y), true) = (by, can_see(&av, rel)) {
         extra.insert(
             "age".into(),
-            json!(age(Utc::now().date_naive(), y, birthday.as_deref())),
+            json!(age(
+                (Utc::now() + chrono::Duration::hours(8)).date_naive(),
+                y,
+                birthday.as_deref()
+            )),
         );
     }
     extra.insert("cover_preset".into(), json!(cpreset));

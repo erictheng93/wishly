@@ -304,3 +304,28 @@ async fn export_includes_profile_fields(pool: PgPool) {
     assert_eq!(v["user"]["interests"], json!(["diy"]));
     assert_eq!(v["user"]["birth_year"], 1990);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patch_rejects_without_partial_write(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let (s, _) = patch(
+        &pool,
+        &a.token,
+        json!({"gift_likes": ["ok"], "interests": ["bad"]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = patch(
+        &pool,
+        &a.token,
+        json!({"gift_likes": ["ok"], "cover_preset": "nope"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let n: i32 = sqlx::query_scalar("SELECT cardinality(gift_likes) FROM users WHERE id=$1")
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
