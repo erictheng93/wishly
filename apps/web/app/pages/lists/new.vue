@@ -5,7 +5,6 @@ const { t } = useI18n()
 useHead({ title: () => t('lists.new.pageTitle') })
 const { api } = useApi()
 const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 as number | null, birthday_notify: false })
-const allowed = ref<string[]>([])
 const cover = ref<string | null>(null), coverPreset = ref<string | null>(DEFAULT_COVER)
 const upBusy = ref(false), busy = ref(false), err = ref(''), dateErr = ref('')
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)
@@ -23,7 +22,6 @@ async function submit() {
     else Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
     const w = await api('/wishlists', { method: 'POST', body })
     // 名單寫入失敗不擋導頁：清單已建立，編輯頁會顯示目前名單，可再調整
-    if (f.visibility === 'selected') await api(`/wishlists/${w.id}/allowed-users`, { method: 'PUT', body: { user_ids: allowed.value } }).catch(() => {})
     await navigateTo(`/lists/${w.id}/edit`)
   } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
 }
@@ -56,7 +54,7 @@ async function submit() {
       <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>{{ $t('lists.new.showNames') }}<br><small class="c-mute">{{ $t('lists.new.showNamesHint') }}</small></span></label>
       </div></section>
       <section class="ln-sec"><h2 class="ln-h">5　{{ $t('lists.new.sec.access') }}</h2><div class="ln-body">
-      <CreatorVisibilityPicker v-model:visibility="f.visibility" v-model:users="allowed" />
+      <CreatorVisibilityPicker v-model:visibility="f.visibility" />
       <CreatorBirthdayNotify v-model="f.birthday_notify" :visibility="f.visibility" />
       </div></section>
       <div class="ln-go">

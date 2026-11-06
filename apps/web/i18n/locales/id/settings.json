@@ -172,6 +172,12 @@
       "hint": "Orang yang diblokir tidak dapat melihat profil dan daftar terbatas Anda.",
       "empty": "Anda belum memblokir siapa pun.",
       "unblock": "Buka blokir"
+    },
+    "closeFriends": {
+      "title": "Teman dekat",
+      "hint": "Teman dekat bisa membuka daftar khusus teman dekat. {n} dipilih.",
+      "add": "Jadikan teman dekat",
+      "remove": "Hapus dari teman dekat"
     }
   }
 }

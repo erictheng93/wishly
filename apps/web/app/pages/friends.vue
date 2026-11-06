@@ -20,7 +20,9 @@ async function loadFeed() {
   feedErr.value = ''
   try { feed.value = await api('/friends/feed') } catch (e) { feedErr.value = msgOf(e) }
 }
-onMounted(() => { load(); loadFeed() })
+const cf = useCloseFriends()
+onMounted(() => { load(); loadFeed(); cf.load().catch(() => {}) })
+async function flipClose(id: string) { err.value = ''; try { await cf.toggle(id, !cf.ids.value.has(id)) } catch (e) { err.value = msgOf(e) } }
 // 動作後重新載入清單；失敗顯示錯誤
 async function act(f: () => Promise<any>) {
   err.value = msg.value = ''
@@ -254,6 +256,7 @@ const price = (n: number) => `NT$ ${n.toLocaleString('en-US')}`
               <NuxtLink :to="profilePath(f)"><strong>{{ f.display_name }}</strong></NuxtLink>
               <small v-if="f.handle" class="c-mute"> @{{ f.handle }}</small>
             </span>
+            <button class="c-btn" :aria-pressed="cf.ids.value.has(f.id)" @click="flipClose(f.id)">{{ cf.ids.value.has(f.id) ? $t('settings.closeFriends.remove') : $t('settings.closeFriends.add') }}</button>
             <button class="c-btn" @click="unfriend = f; ufErr = ''">{{ $t('me.friends.unfriend') }}</button>
           </div>
         </section>
