@@ -42,7 +42,7 @@ const PAGE: i64 = 24;
 /// 公開目錄最多翻到第幾頁（超過的頁碼會被夾回，所以最後一頁不給 next_page）
 const MAX_PAGE: i64 = 100;
 const RECIPIENTS: &[&str] = &["partner", "elder", "baby", "friend"];
-const OCCASIONS: &[&str] = &["birthday", "full_month", "housewarming", "holiday"];
+pub(crate) const OCCASIONS: &[&str] = &["birthday", "full_month", "housewarming", "holiday"];
 type R<T> = Result<T, AppError>;
 
 fn cached(body: Value) -> Response {
@@ -59,7 +59,7 @@ struct ProductQ {
     page: Option<i64>,
 }
 
-fn enum_opt<'a>(v: &'a Option<String>, ok: &[&str], ptr: &str) -> R<Option<&'a str>> {
+pub(crate) fn enum_opt<'a>(v: &'a Option<String>, ok: &[&str], ptr: &str) -> R<Option<&'a str>> {
     match v.as_deref() {
         None | Some("") => Ok(None),
         Some(s) if ok.contains(&s) => Ok(Some(s)),
@@ -71,7 +71,7 @@ fn enum_opt<'a>(v: &'a Option<String>, ok: &[&str], ptr: &str) -> R<Option<&'a s
     }
 }
 
-type PubRow = (
+pub(crate) type PubRow = (
     String,
     String,
     Option<String>,
@@ -86,6 +86,15 @@ type PubRow = (
     Option<String>,
     Option<String>,
 );
+
+/// 公開商品列 → JSON（public_products 與 gift_picks 共用）
+pub(crate) fn product_json(
+    (r, title, spec, note, price, ik, is, url, rc, oc, it, bs, bn): PubRow,
+) -> Value {
+    json!({ "ref": r, "title": title, "spec": spec, "note": note, "price_amount": price,
+        "image_url": image_url(ik.as_deref(), &is), "product_url": url, "recipients": rc, "occasions": oc, "interests": it,
+        "brand": bs.map(|s| json!({ "slug": s, "name": bn })) })
+}
 
 async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) -> R<Response> {
     let page = q.page.unwrap_or(1).clamp(1, MAX_PAGE);
@@ -125,11 +134,7 @@ async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) 
     let products: Vec<Value> = rows
         .into_iter()
         .take(PAGE as usize)
-        .map(|(r, title, spec, note, price, ik, is, url, rc, oc, it, bs, bn)| {
-            json!({ "ref": r, "title": title, "spec": spec, "note": note, "price_amount": price,
-                "image_url": image_url(ik.as_deref(), &is), "product_url": url, "recipients": rc, "occasions": oc, "interests": it,
-                "brand": bs.map(|s| json!({ "slug": s, "name": bn })) })
-        })
+        .map(product_json)
         .collect();
     Ok(cached(
         json!({ "products": products, "next_page": (more && page < MAX_PAGE).then_some(page + 1) }),
