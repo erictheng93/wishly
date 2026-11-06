@@ -98,20 +98,25 @@ async fn replace(
         clean.push((title, url.to_string(), l.hidden));
     }
     let mut tx = st.pool.begin().await?;
+    // 同一人的並行 PUT 依序執行，否則兩邊都看不到對方未提交的列而雙雙寫入（超過上限）
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('user_links:' || $1::text, 0))")
+        .bind(u.id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM user_links WHERE user_id = $1")
         .bind(u.id)
         .execute(&mut *tx)
         .await?;
-    for (i, (t, url, h)) in clean.iter().enumerate() {
-        sqlx::query("INSERT INTO user_links (user_id, title, url, position, hidden) VALUES ($1, $2, $3, $4, $5)")
-            .bind(u.id)
-            .bind(t)
-            .bind(url)
-            .bind(i as i16)
-            .bind(h)
-            .execute(&mut *tx)
-            .await?;
-    }
+    let titles: Vec<&str> = clean.iter().map(|c| c.0.as_str()).collect();
+    let urls: Vec<&str> = clean.iter().map(|c| c.1.as_str()).collect();
+    let hidden: Vec<bool> = clean.iter().map(|c| c.2).collect();
+    sqlx::query("INSERT INTO user_links (user_id, title, url, position, hidden) SELECT $1, t, u, (ord - 1)::smallint, h FROM unnest($2::text[], $3::text[], $4::bool[]) WITH ORDINALITY AS x(t, u, h, ord)")
+        .bind(u.id)
+        .bind(&titles)
+        .bind(&urls)
+        .bind(&hidden)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     list(u, State(st)).await
 }

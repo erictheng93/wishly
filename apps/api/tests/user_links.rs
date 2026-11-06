@@ -130,3 +130,25 @@ async fn profile_includes_links(pool: PgPool) {
         json!([{"title":"show","url":"https://a.com"}])
     );
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn concurrent_puts_keep_limit(pool: PgPool) {
+    let a = setup(&pool).await;
+    let links: Vec<Value> = (0..10)
+        .map(|i| json!({"title":"x","url":format!("https://a.com/{i}")}))
+        .collect();
+    let app = common::test_app(&pool);
+    let h = ck(&a.token);
+    let body = || Some(json!({ "links": links }));
+    let (r1, r2) = tokio::join!(
+        common::call_app(&app, "PUT", "/me/links", &h, body()),
+        common::call_app(&app, "PUT", "/me/links", &h, body())
+    );
+    assert_eq!((r1.0, r2.0), (StatusCode::OK, StatusCode::OK));
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM user_links WHERE user_id=$1")
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 10);
+}
