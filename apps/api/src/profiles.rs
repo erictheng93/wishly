@@ -150,6 +150,18 @@ async fn profile(
             )),
         );
     }
+    // 居住地址：可見性與密文同一次查詢；解不開就省略該鍵
+    let home: Option<(String, Vec<u8>)> = sqlx::query_as(
+        "SELECT u.home_address_vis::text, a.address_enc FROM users u JOIN user_addresses a ON a.user_id = u.id AND a.kind = 'home' WHERE u.id = $1")
+        .bind(uid).fetch_optional(&st.pool).await?;
+    if let Some((hv, enc)) = home.filter(|(hv, _)| can_see(hv, rel)) {
+        match crate::sealed::open_str(&enc) {
+            Some(a) => {
+                extra.insert("home_address".into(), json!(a));
+            }
+            None => tracing::warn!(user = %uid, vis = %hv, "home address undecryptable"),
+        }
+    }
     extra.insert("cover_preset".into(), json!(cpreset));
     extra.insert(
         "cover_image_url".into(),

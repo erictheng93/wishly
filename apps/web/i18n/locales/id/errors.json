@@ -96,6 +96,7 @@
     "USER_NOT_FOUND": "Pengguna itu tidak ditemukan.",
     "SELF": "Kamu tidak bisa melakukan ini pada dirimu sendiri.",
     "LIMIT": "Batas telah tercapai.",
+    "NO_DEFAULT_ADDRESS": "Belum ada alamat pengiriman default. Tambahkan dulu di pengaturan akun.",
     "NOT_FRIEND": "Orang itu belum menjadi temanmu.",
     "VALIDATION_FAILED": "Periksa isian lalu coba lagi",
     "WALLET_CAP_EXCEEDED": "Saldo setelah top up akan melebihi batas, kurangi jumlah",
