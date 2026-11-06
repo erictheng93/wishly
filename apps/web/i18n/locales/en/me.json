@@ -309,6 +309,8 @@
       "secLikes": "Gifts they like",
       "secDislikes": "Rather not receive",
       "secInterests": "Interests",
+      "picksTitle": "Gift ideas for {name}",
+      "picksFallback": "{name} might like",
       "secDates": "Important dates",
       "secAddress": "Home address",
       "inDays": "In {n} days",

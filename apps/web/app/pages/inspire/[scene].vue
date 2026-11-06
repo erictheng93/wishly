@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { GiftPick } from '~/utils/catalog'
 // 情境落地頁：接「生日禮物清單」這類搜尋（SSR）；文案在 i18n/locales/*/inspire.json，精選商品沿用商品目錄的場合篩選
 const slug = String(useRoute().params.scene)
 const scene = sceneBySlug(slug)
@@ -13,7 +14,7 @@ const c = computed(() => ({
   steps: pairs('steps', 't', 'd'), ideas: pairs('ideas', 't', 'd'), faq: pairs('faq', 'q', 'a') as { q: string, a: string }[],
 }))
 
-const { public: { siteUrl } } = useRuntimeConfig()
+const { public: { siteUrl, apiBase } } = useRuntimeConfig()
 // 行銷頁內容欄放寬到 1200（頁首跟著 --g-w 對齊）；head 標籤隨頁面卸載，不外洩到其他頁
 useSeoMeta({ title: () => t(`${k}.seoTitle`), description: () => c.value.seoDesc, ogTitle: () => c.value.heading, ogDescription: () => c.value.seoDesc, ogType: 'article' })
 useHead({
@@ -22,6 +23,29 @@ useHead({
 const { products } = scene.occasion
   ? await useCatalog(`scene-${slug}`, () => ({ recipient: '', occasion: scene.occasion!, budget: '' }))
   : { products: computed(() => []) }
+// 幫朋友挑：只在有 occasion 且已登入時出現；選擇存在 ?for=，全在 client 端（SSR 與 CDN 快取不變）
+const route = useRoute(), router = useRouter()
+const { user, fetchMe } = useAuth()
+const friends = ref<{ id: string; display_name: string }[]>([])
+const forId = ref(typeof route.query.for === 'string' ? route.query.for : '')
+const picks = ref<{ basis: string; products: GiftPick[] } | null>(null)
+const forName = computed(() => friends.value.find(f => f.id === forId.value)?.display_name ?? '')
+let pickSeq = 0
+const occasion = scene.occasion
+async function loadPicks() {
+  const n = ++pickSeq
+  picks.value = null
+  if (!forId.value || !occasion) return
+  try { const r = await fetchGiftPicks(apiBase, forId.value, { occasion, limit: 50 }); if (n === pickSeq) picks.value = r } catch { /* 失敗就當作沒有指定 */ }
+}
+function onFor() { router.replace({ query: { ...route.query, for: forId.value || undefined } }); loadPicks() }
+onMounted(async () => {
+  if (!occasion || !(await fetchMe())) return
+  try { friends.value = (await $fetch<any>(`${apiBase}/api/v1/friends`, { credentials: 'include', headers: nativeHeaders() })).friends } catch { return }
+  if (!friends.value.some(f => f.id === forId.value)) forId.value = ''
+  loadPicks()
+})
+const shown = computed(() => picks.value?.basis === 'interests' ? mergePicks(picks.value.products, products.value) : products.value)
 // 標題在冒號後讓斷行落在語意處（模板不用 v-html，拆字串後插 <wbr>）
 const headParts = computed(() => { const m = c.value.heading.match(/^(.*?[：:])(.+)$/); return m ? [m[1]!, m[2]!] : [c.value.heading] })
 const others = SCENES.filter(s => s.slug !== slug)
@@ -50,7 +74,13 @@ const others = SCENES.filter(s => s.slug !== slug)
 
     <section v-if="products.length">
       <h2>{{ $t('inspire.ui.products') }}</h2>
-      <GuestCatalogGrid :products="products" />
+      <template v-if="user && friends.length">
+        <label class="sc-for">{{ $t('guest.inspire.forFriend') }}
+          <select v-model="forId" @change="onFor"><option value="">{{ $t('guest.inspire.forNone') }}</option><option v-for="f in friends" :key="f.id" :value="f.id">{{ f.display_name }}</option></select>
+        </label>
+        <p v-if="picks?.basis === 'fallback'" class="g-mute" role="status">{{ $t('guest.inspire.forFallback', { name: forName }) }}</p>
+      </template>
+      <GuestCatalogGrid :products="shown" :matched="picks?.basis === 'interests' ? matchedMap(picks.products) : undefined" :matched-name="forName" />
     </section>
 
     <section>
@@ -73,6 +103,8 @@ const others = SCENES.filter(s => s.slug !== slug)
 .x-h1{margin:16px 0 40px;font-size:clamp(38px,6vw,88px);font-weight:900;letter-spacing:-.03em;line-height:1.1;word-break:keep-all}
 html:lang(vi) .x-h1{line-height:1.2}
 .sc-lead{max-width:38em;font-size:18px;line-height:1.9}
+.sc-for{display:flex;align-items:center;gap:12px;margin:0 0 16px;font-weight:700}
+.sc-for select{min-height:44px;padding:0 12px;font:inherit;border:1px solid var(--ink-line);background:var(--bg);color:var(--fg)}
 .sc-cta{display:flex;flex-wrap:wrap;gap:8px;margin:32px 0 0}
 .sc-cta .g-btn{min-height:56px;font-size:16px;padding:0 32px}
 section{margin-top:72px;padding-top:32px;border-top:1px solid var(--ink-line)}
