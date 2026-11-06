@@ -172,6 +172,69 @@
       "hint": "Blocked people can't see your profile or restricted lists.",
       "empty": "You haven't blocked anyone.",
       "unblock": "Unblock"
+    },
+    "pc": {
+      "vis": {
+        "public": "Public",
+        "friends": "Friends",
+        "close": "Close friends",
+        "private": "Not shown (only me)"
+      },
+      "showOn": "Show on profile",
+      "up": "Move up",
+      "down": "Move down",
+      "remove": "Remove",
+      "add": "Add",
+      "ap": {
+        "title": "Profile appearance",
+        "bio": "Bio (shown on your profile, optional)",
+        "links": "Links",
+        "linkTitle": "Link title",
+        "linkUrl": "https:// URL",
+        "linkHidden": "Hide on profile",
+        "copyPage": "Copy links page URL",
+        "copied": "Copied",
+        "needHandle": "Set a handle above first to get a links page URL",
+        "linksMax": "Up to 10 links",
+        "pageUrl": "Links page: "
+      },
+      "gp": {
+        "title": "Gift preferences and interests",
+        "likes": "Things I like",
+        "dislikes": "Things I would rather not get",
+        "ph": "e.g. dark chocolate",
+        "max": "Up to 20 entries",
+        "interests": "Interest tags",
+        "count": "{n} / {max} selected",
+        "interestsVis": "Show interests to"
+      },
+      "dt": {
+        "title": "Important dates",
+        "hint": "Add anniversaries and holidays. Friends get an in-app reminder 7 days before.",
+        "name": "Name (e.g. wedding anniversary)",
+        "month": "Month",
+        "day": "Day",
+        "recurring": "Repeats every year",
+        "year": "Year",
+        "yearHint": "A one-off date needs a year",
+        "empty": "No important dates yet",
+        "max": "Up to 20 dates",
+        "past": "Past"
+      },
+      "pv": {
+        "title": "Private details",
+        "hint": "Addresses and age are never public; you choose who can see them on your profile.",
+        "age": "Age",
+        "birthYear": "Birth year (only your age is shown, never the year)",
+        "shipTitle": "Default shipping address",
+        "recipient": "Recipient",
+        "phone": "Phone",
+        "address": "Address",
+        "keepHint": "Saved. To change it, enter the full details again; the plain text never stays on screen.",
+        "homeTitle": "Home address",
+        "noneSaved": "Not set",
+        "clear": "Clear"
+      }
     }
   }
 }
