@@ -214,7 +214,7 @@ dialog.c-sheet:focus-visible{outline:0}
   .c-rail a.router-link-active{color:var(--fg);font-weight:800}
   .c-rail a.router-link-active::before{width:14px;margin-right:0}
   /* 頁首內容與側欄同一條左邊界：品牌字標對齊選單文字 */
-  .c-page:has(.c-rail)>.c-head{margin-left:calc(-212px - 20px);padding-left:34px}
+  .c-page:has(.c-rail)>.c-head{margin-left:calc(-1 * min(232px, 50vw - var(--c-w) / 2));padding-left:calc(max(16px, 50vw - var(--c-w) / 2 - 212px) + 14px - max(0px, 50vw - var(--c-w) / 2 - 232px))} /* 頁首不超出視窗左緣，品牌字仍對齊側欄文字（側欄 left＝max(16px,…)＋14px）；寬螢幕等同 -232／34 */
   .c-btn.c-nav-dup,a.c-btn.c-nav-dup{display:none} /* 需高於 a.c-btn 的 display */
   .c-fab{right:calc(50% - var(--c-w) / 2 - 28px);translate:100% 0} /* 浮動鈕移到內容欄右側留白，不蓋住卡片 */
 }

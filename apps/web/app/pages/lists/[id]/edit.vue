@@ -306,7 +306,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 .ed-n{position:absolute;top:14px;right:16px;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute)}
 .ed-item .c-thumb{width:72px;height:72px}
 .ed-item .c-grow strong{font-size:17px;line-height:1.3;display:block;padding-right:36px}
-.ed-act{flex-wrap:nowrap;gap:8px;padding-top:12px;border-top:1px dashed var(--line);margin-top:14px}
+.ed-act{flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px dashed var(--line);margin-top:14px}
 /* ↑ ↓ 併成一組方塊靠左；編輯／刪除靠右、不撐滿；刪除無框紅字 */
 .ed-act>.c-btn:nth-child(-n+2){flex:none;width:44px;padding:0}
 .ed-act>.c-btn:nth-child(2){margin-left:-9px}

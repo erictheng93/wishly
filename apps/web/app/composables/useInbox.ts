@@ -7,14 +7,17 @@ export function useInbox() {
   const version = useState<number>('inbox-version', () => 0)
   const toast = useState<any>('inbox-toast', () => null)
   const seen = useState<{ top: string | null, unread: number } | null>('inbox-seen', () => null)
+  const gen = useState<number>('inbox-gen', () => 0) // reset() 遞增；refresh 進行中遇到 reset 就丟棄回應
   const { api } = useApi()
   let busy = false, again = false
   // 同時間只抓一次，期間又有訊號就結束後再抓一次：一連串訊號不會變成一連串請求，回應也不會亂序
   async function refresh() {
     if (busy) { again = true; return }
     busy = true
+    const g = gen.value
     try {
       const r = await api('/me/notifications', { query: { limit: 5 }, noRedirect: true })
+      if (g !== gen.value) { busy = false; again = false; return }
       toast.value = pickToast(seen.value, r.items, r.unread) ?? toast.value
       seen.value = { top: r.items[0]?.id ?? null, unread: r.unread }
       latest.value = r.items; unread.value = r.unread; version.value++
@@ -29,6 +32,6 @@ export function useInbox() {
   async function readAll() {
     try { await api('/me/notifications/read-all', { method: 'POST' }); const now = new Date().toISOString(); latest.value.forEach(n => { n.read_at ||= now }); unread.value = 0 } catch {}
   }
-  const reset = () => { unread.value = 0; latest.value = []; toast.value = null; seen.value = null }
+  const reset = () => { gen.value++; unread.value = 0; latest.value = []; toast.value = null; seen.value = null }
   return { unread, latest, version, toast, refresh, readOne, readAll, reset }
 }
