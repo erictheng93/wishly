@@ -7,7 +7,7 @@ export function useAuth() {
   const loaded = useState<boolean>('auth-loaded', () => false)
   const lastFetch = useState<number>('auth-fetched-at', () => 0)
   const { api, base } = useApi()
-  const { locale } = useI18n()
+  const { locale } = useNuxtApp().$i18n
   async function fetchMe(force = false) {
     if (loaded.value && !force) return user.value
     const hint = useAuthHint()
