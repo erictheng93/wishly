@@ -137,6 +137,15 @@ async fn concurrent_puts_keep_limit(pool: PgPool) {
     let links: Vec<Value> = (0..10)
         .map(|i| json!({"title":"x","url":format!("https://a.com/{i}")}))
         .collect();
+    // 慢觸發器讓兩個交易的 INSERT 必然重疊；沒有 advisory lock 就會各寫一組（20 列）
+    sqlx::raw_sql(
+        "CREATE FUNCTION slow_links() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN PERFORM pg_sleep(0.3); RETURN NULL; END $$;
+         CREATE TRIGGER slow_links BEFORE INSERT ON user_links FOR EACH STATEMENT EXECUTE FUNCTION slow_links()",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     let app = common::test_app(&pool);
     let h = ck(&a.token);
     let body = || Some(json!({ "links": links }));
@@ -150,5 +159,5 @@ async fn concurrent_puts_keep_limit(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(n, 10);
+    assert_eq!(n, 10, "concurrent PUTs exceeded the link limit");
 }
