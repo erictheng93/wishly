@@ -37,11 +37,13 @@ async function linkOAuth(p: (typeof providers)[number]) {
     if (e.message !== 'cancelled') identityErr.value = linkError(e.message) || errMsg(e)
   } finally { identityBusy.value = false }
 }
-onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
+const ready = ref(false) // GET /me 回來並填好表單前不渲染，免得使用者先輸入的內容被覆寫
+onMounted(async () => { try { await fetchMe(true) } catch { /* 保留舊的 user */ } name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
   ;[bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
   identityErr.value = linkError(String(route.query.error))
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
+  ready.value = true
   loadSessions()
   loadBlocks()
   loadActivity()
@@ -193,7 +195,7 @@ async function remove() {
   <main class="c-page x-set">
     <CreatorHeader :title="$t('settings.title')" back="/dashboard" />
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <template v-if="user">
+    <template v-if="user && ready">
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.profile') }}</h2>
         <p class="c-mute">{{ user.email || $t('settings.noEmail') }}</p>
@@ -345,6 +347,7 @@ async function remove() {
       </section>
       <p class="c-mute"><NuxtLink to="/terms">{{ $t('settings.terms') }}</NuxtLink>・<NuxtLink to="/privacy">{{ $t('settings.privacy') }}</NuxtLink></p>
     </template>
+    <p v-else-if="!ready" class="c-mute" role="status">{{ $t('me.loading') }}</p>
     <CreatorConfirm :open="!!removingProvider" :title="$t('settings.login.unlinkTitle', { label: removingLabel })" :text="$t('settings.login.unlinkText')" :ok="$t('settings.login.unlinkOk')" danger :busy="identityBusy" :error="identityErr" @close="!identityBusy && (removingProvider = '')" @ok="unlinkIdentity" />
     <CreatorConfirm :open="showDel" :title="$t('settings.del.confirmTitle')" :text="$t('settings.del.confirmText')" :ok="$t('settings.del.ok')" danger :busy="delBusy" :disabled="word !== $t('settings.del.word') || (user?.has_password && !delPw)" :error="delErr" @close="showDel = false" @ok="remove">
       <label class="c-field"><span>{{ $t('settings.del.prompt', { word: $t('settings.del.word') }) }}</span><input v-model="word" autocomplete="off"></label>

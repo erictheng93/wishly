@@ -17,8 +17,7 @@ test('設定帳號代號：已被使用時顯示說明，換一個即可儲存�
   const me = await registerUser({ tag: 'me' })
   await loginBrowser(page.context(), me)
 
-  const meLoaded = page.waitForResponse(r => r.url().endsWith('/api/v1/me') && r.request().method() === 'GET') // onMounted 的 fetchMe 會覆寫表單，等它跑完
-  await page.goto('/settings'); await hydrated(page); await meLoaded; await page.waitForTimeout(300)
+  await page.goto('/settings'); await hydrated(page)
   const input = page.getByLabel('帳號代號（個人頁網址，可留空）')
   const form = page.locator('form', { has: input })
   await input.fill(taken)

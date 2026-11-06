@@ -71,7 +71,12 @@ async fn add(
             "摯友只能從你的好友中選擇",
         ));
     }
-    // 已在名單內的重複 PUT 不受上限影響（冪等）；shortcut: 上限檢查未跨 pair 鎖，併發最多略超 200
+    // 上限要跨 pair 序列化：同一 owner 併發加不同好友時，各 pair 鎖互不擋
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('close_friends:' || $1::text, 0))")
+        .bind(u.id)
+        .execute(&mut *tx)
+        .await?;
+    // 已在名單內的重複 PUT 不受上限影響（冪等）
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM close_friends WHERE owner_id = $1")
         .bind(u.id)
         .fetch_one(&mut *tx)

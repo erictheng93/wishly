@@ -35,8 +35,7 @@ test('沒填生日：開關停用，顯示原因與「前往設定」連結', as
 
 test('設定頁填生日後，新增清單勾選 → 建立成功 → 編輯頁顯示已開啟', async ({ page }) => {
   await member(page)
-  const meLoaded = page.waitForResponse(r => r.url().endsWith('/api/v1/me') && r.request().method() === 'GET') // onMounted 的 fetchMe 會覆寫表單，等它跑完
-  await page.goto('/settings'); await hydrated(page); await meLoaded; await page.waitForTimeout(300)
+  await page.goto('/settings'); await hydrated(page)
   const bd = page.getByRole('group', { name: '生日（可留空，只記月日）' })
   await bd.getByLabel('月', { exact: true }).selectOption('06')
   await bd.getByLabel('日', { exact: true }).selectOption('15')

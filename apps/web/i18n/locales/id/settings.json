@@ -187,6 +187,9 @@
         "private": "Tidak ditampilkan (hanya saya)"
       },
       "showOn": "Tampilkan di profil",
+      "edit": "Ubah",
+      "save": "Simpan",
+      "cancel": "Batal",
       "up": "Naik",
       "down": "Turun",
       "remove": "Hapus",

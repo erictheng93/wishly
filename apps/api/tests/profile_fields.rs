@@ -26,6 +26,28 @@ async fn view(pool: &PgPool, tok: Option<&str>) -> (StatusCode, Value) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
+async fn legacy_patch_rolls_back_on_later_error(pool: PgPool) {
+    let (a, b) = (user(&pool, "A").await, user(&pool, "B").await);
+    handle(&pool, b.id, "taken_one").await;
+    let (s, v) = patch(
+        &pool,
+        &a.token,
+        json!({"display_name": "新名字", "handle": "taken_one"}),
+    )
+    .await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("HANDLE_TAKEN"))
+    );
+    let name: String = sqlx::query_scalar("SELECT display_name FROM users WHERE id=$1")
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(name, "A");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
 async fn patch_validates_gift_lists(pool: PgPool) {
     let a = user(&pool, "A").await;
     let many: Vec<String> = (0..21).map(|i| format!("x{i}")).collect();

@@ -48,6 +48,19 @@ it('requires a year once a date stops recurring', async () => {
   expect(year.required).toBe(true)
 })
 
+it('edits an existing date through PATCH instead of adding a new one', async () => {
+  const row = { id: 'd1', title: '生日', month_day: '05-01', year: null, recurring: true, visibility: 'friends' }
+  api.mockImplementation(async (path: string) => (path === '/me/dates' ? { dates: [row] } : {}))
+  const el = await open(DatesCard)
+  el.querySelector<HTMLButtonElement>('[data-edit]')!.click(); await nextTick()
+  const title = el.querySelector<HTMLInputElement>('form input')!
+  expect(title.value).toBe('生日')
+  title.value = '新生日'; title.dispatchEvent(new Event('input')); await nextTick()
+  el.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true })); await flush()
+  expect(api).toHaveBeenCalledWith('/me/dates/d1', expect.objectContaining({ method: 'PATCH', body: expect.objectContaining({ title: '新生日', month_day: '05-01' }) }))
+  api.mockImplementation(async (path: string) => (path === '/me/dates' ? { dates: [] } : {}))
+})
+
 it('reorders gift entries with the down button and sends that order', async () => {
   const el = await open(GiftPrefsCard)
   const input = el.querySelector<HTMLInputElement>('fieldset input')!

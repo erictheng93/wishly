@@ -187,6 +187,9 @@
         "private": "Không hiển thị (chỉ mình tôi)"
       },
       "showOn": "Hiển thị trên trang cá nhân",
+      "edit": "Sửa",
+      "save": "Lưu",
+      "cancel": "Hủy",
       "up": "Lên",
       "down": "Xuống",
       "remove": "Xóa",

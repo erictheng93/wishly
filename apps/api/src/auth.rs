@@ -964,6 +964,7 @@ async fn patch_me(
     Json(p): Json<PatchMe>,
 ) -> Result<Json<Value>, AppError> {
     let rich = check_rich(&p)?; // 新欄位全數驗證通過才開始寫入
+    let mut tx = st.pool.begin().await?; // 除封面外同一交易：任一欄位失敗整批 rollback
     if let Some(n) = &p.display_name {
         if !(1..=50).contains(&n.trim().chars().count()) {
             return Err(AppError::invalid(
@@ -975,7 +976,7 @@ async fn patch_me(
         sqlx::query("UPDATE users SET display_name=$2 WHERE id=$1")
             .bind(u.id)
             .bind(n.trim())
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
     }
     if let Some(prefs) = p.notification_prefs {
@@ -998,7 +999,7 @@ async fn patch_me(
         sqlx::query("UPDATE users SET notification_prefs = notification_prefs || $2 WHERE id=$1")
             .bind(u.id)
             .bind(prefs)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
     }
     if let Some(h) = p.handle {
@@ -1018,7 +1019,7 @@ async fn patch_me(
         match sqlx::query("UPDATE users SET handle=$2 WHERE id=$1")
             .bind(u.id)
             .bind(h)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await
         {
             Err(sqlx::Error::Database(e)) if e.constraint() == Some("users_handle_key") => {
@@ -1034,7 +1035,7 @@ async fn patch_me(
         sqlx::query("UPDATE users SET default_claim_visibility=$2::text::share_level WHERE id=$1")
             .bind(u.id)
             .bind(v)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
     }
     if let Some(b) = p.bio {
@@ -1046,7 +1047,7 @@ async fn patch_me(
         sqlx::query("UPDATE users SET bio=$2 WHERE id=$1")
             .bind(u.id)
             .bind(b)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
     }
     if let Some(b) = p.birthday.clone() {
@@ -1064,7 +1065,7 @@ async fn patch_me(
         sqlx::query("UPDATE users SET birthday=$2 WHERE id=$1")
             .bind(u.id)
             .bind(&b)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
         // 改日期：排隊中的朋友通知帶舊日期，取消並清掉該清單的已寄記錄，新日期進窗口時才排得回來（清空走下方）
         if b.is_some() {
@@ -1076,7 +1077,7 @@ async fn patch_me(
             )
             .bind(u.id)
             .bind(&b)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
         }
     }
@@ -1085,12 +1086,11 @@ async fn patch_me(
         sqlx::query("UPDATE users SET birthday_visibility=$2::text::share_level WHERE id=$1")
             .bind(u.id)
             .bind(v)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
     }
     // 生日清空或設為私人：關掉所有清單的生日通知，並取消尚未寄出的朋友通知（D65）
     if matches!(p.birthday, Some(None)) || p.birthday_visibility.as_deref() == Some("private") {
-        let mut tx = st.pool.begin().await?;
         let gone: bool = sqlx::query_scalar("SELECT birthday IS NULL OR birthday_visibility::text = 'private' FROM users WHERE id=$1")
             .bind(u.id).fetch_one(&mut *tx).await?;
         if gone {
@@ -1103,7 +1103,6 @@ async fn patch_me(
             sqlx::query("UPDATE notifications SET status='cancelled' WHERE status='pending' AND kind='birthday.friend' AND payload->>'owner_id' = $1::text")
                 .bind(u.id).execute(&mut *tx).await?;
         }
-        tx.commit().await?;
     }
     if rich.any {
         sqlx::query(
@@ -1124,11 +1123,8 @@ async fn patch_me(
         .bind(&p.home_address_vis)
         .bind(p.birth_year.is_some())
         .bind(p.birth_year.flatten().map(|y| y as i16))
-        .execute(&st.pool)
+        .execute(&mut *tx)
         .await?;
-    }
-    if p.cover_preset.is_some() || p.cover_image_key.is_some() {
-        patch_cover(&st, u.id, &p.cover_preset, &p.cover_image_key).await?;
     }
     if let Some(v) = &p.locale {
         if !["zh-TW", "en", "vi", "id"].contains(&v.as_str()) {
@@ -1141,8 +1137,12 @@ async fn patch_me(
         sqlx::query("UPDATE users SET locale=$2 WHERE id=$1")
             .bind(u.id)
             .bind(v)
-            .execute(&st.pool)
+            .execute(&mut *tx)
             .await?;
+    }
+    tx.commit().await?;
+    if p.cover_preset.is_some() || p.cover_image_key.is_some() {
+        patch_cover(&st, u.id, &p.cover_preset, &p.cover_image_key).await?;
     }
     Ok(Json(user_json(&st.pool, u.id).await?))
 }
