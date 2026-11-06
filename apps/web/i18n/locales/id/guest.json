@@ -275,6 +275,11 @@
       "noLists": "Kamu belum punya wishlist untuk ditambahi",
       "create": "Buat wishlist",
       "loadErr": "Gagal memuat wishlist, coba lagi nanti",
+      "matched": "Cocok: {tags}",
+      "forFriend": "Memilih untuk teman yang mana?",
+      "forNone": "Tidak ditentukan",
+      "forFallback": "{name} belum punya minat untuk dijadikan acuan, ini rekomendasi umum",
+      "matchedFor": "Cocok dengan minat {name}: {tags}",
       "who": "Siapa yang mau ini",
       "whoTitle": "Siapa yang mau ini",
       "scope": {

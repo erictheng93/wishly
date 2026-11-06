@@ -16,6 +16,7 @@ pub mod dashboard;
 pub mod error;
 pub mod finance;
 pub mod friends;
+pub mod gift_picks;
 pub mod guest;
 pub mod health;
 pub mod idempotency;
@@ -160,6 +161,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(inspire::routes())
                 .merge(catalog::routes())
                 .merge(profiles::routes())
+                .merge(gift_picks::routes())
                 .merge(inbox::routes())
                 .merge(onboarding::routes())
                 .merge(pwa_events::routes())

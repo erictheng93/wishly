@@ -309,6 +309,8 @@
       "secLikes": "喜歡的禮物",
       "secDislikes": "不想收到的",
       "secInterests": "興趣",
+      "picksTitle": "適合送給 {name} 的禮物",
+      "picksFallback": "也許 {name} 會喜歡",
       "secDates": "重要日子",
       "secAddress": "家裡地址",
       "inDays": "還有 {n} 天",

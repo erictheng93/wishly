@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import '~/assets/guest.css' // 推薦區塊用 CatalogGrid（g- 樣式）
+import type { GiftPick } from '~/utils/catalog'
 const route = useRoute()
 const handle = String(route.params.handle)
 const { api, base } = useApi()
@@ -46,8 +48,15 @@ async function load() {
     state.value = missing ? 'gone' : 'error'
   }
 }
+// 送禮推薦：本人、封鎖、API 失敗或沒有商品都整區不顯示
+const picks = ref<{ basis: string; products: GiftPick[] } | null>(null)
+async function loadPicks() {
+  picks.value = null
+  if (!p.value || ['self', 'blocked'].includes(p.value.relation)) return
+  try { const r = await fetchGiftPicks(config.public.apiBase, p.value.user.handle ?? p.value.user.id, { limit: 6 }); picks.value = r.products.length ? r : null } catch { picks.value = null }
+}
 onMounted(async () => {
-  await fetchMe(); await load()
+  await fetchMe(); await load(); loadPicks()
   // 用 id 進來但對方已設 handle：換成好分享的網址
   if (p.value?.user.handle && p.value.user.handle !== handle.toLowerCase()) useRouter().replace(`/u/${p.value.user.handle}`)
 })
@@ -134,6 +143,11 @@ async function sendReport() {
       </section>
 
       <CreatorProfileSections v-if="p.relation !== 'blocked'" :user="p.user" />
+
+      <section v-if="picks" data-gift-picks>
+        <h2 class="c-h2 pf-sec">{{ $t(picks.basis === 'interests' ? 'me.profile.picksTitle' : 'me.profile.picksFallback', { name: p.user.display_name }) }}</h2>
+        <GuestCatalogGrid :products="picks.products" :matched="picks.basis === 'interests' ? matchedMap(picks.products) : undefined" />
+      </section>
 
       <section v-if="p.relation !== 'blocked'">
         <h2 class="c-h2 pf-sec">{{ $t('me.profile.lists') }}</h2>

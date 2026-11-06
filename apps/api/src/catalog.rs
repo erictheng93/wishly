@@ -42,7 +42,7 @@ const PAGE: i64 = 24;
 /// 公開目錄最多翻到第幾頁（超過的頁碼會被夾回，所以最後一頁不給 next_page）
 const MAX_PAGE: i64 = 100;
 const RECIPIENTS: &[&str] = &["partner", "elder", "baby", "friend"];
-const OCCASIONS: &[&str] = &["birthday", "full_month", "housewarming", "holiday"];
+pub(crate) const OCCASIONS: &[&str] = &["birthday", "full_month", "housewarming", "holiday"];
 type R<T> = Result<T, AppError>;
 
 fn cached(body: Value) -> Response {
@@ -59,7 +59,7 @@ struct ProductQ {
     page: Option<i64>,
 }
 
-fn enum_opt<'a>(v: &'a Option<String>, ok: &[&str], ptr: &str) -> R<Option<&'a str>> {
+pub(crate) fn enum_opt<'a>(v: &'a Option<String>, ok: &[&str], ptr: &str) -> R<Option<&'a str>> {
     match v.as_deref() {
         None | Some("") => Ok(None),
         Some(s) if ok.contains(&s) => Ok(Some(s)),
@@ -71,7 +71,7 @@ fn enum_opt<'a>(v: &'a Option<String>, ok: &[&str], ptr: &str) -> R<Option<&'a s
     }
 }
 
-type PubRow = (
+pub(crate) type PubRow = (
     String,
     String,
     Option<String>,
@@ -82,9 +82,19 @@ type PubRow = (
     String,
     Vec<String>,
     Vec<String>,
+    Vec<String>,
     Option<String>,
     Option<String>,
 );
+
+/// 公開商品列 → JSON（public_products 與 gift_picks 共用）
+pub(crate) fn product_json(
+    (r, title, spec, note, price, ik, is, url, rc, oc, it, bs, bn): PubRow,
+) -> Value {
+    json!({ "ref": r, "title": title, "spec": spec, "note": note, "price_amount": price,
+        "image_url": image_url(ik.as_deref(), &is), "product_url": url, "recipients": rc, "occasions": oc, "interests": it,
+        "brand": bs.map(|s| json!({ "slug": s, "name": bn })) })
+}
 
 async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) -> R<Response> {
     let page = q.page.unwrap_or(1).clamp(1, MAX_PAGE);
@@ -101,7 +111,7 @@ async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) 
     let brand = q.brand.as_deref().filter(|s| !s.is_empty());
     let rows: Vec<PubRow> = sqlx::query_as(
         "SELECT p.ref, p.title, p.spec, p.note, p.price_amount, p.image_key, p.image_status::text, p.product_url,
-                p.recipients, p.occasions, b.slug, b.name
+                p.recipients, p.occasions, p.interests, b.slug, b.name
          FROM catalog_products p LEFT JOIN brands b ON b.id = p.brand_id
          WHERE p.active AND (b.id IS NULL OR b.active)
            AND ($1::text IS NULL OR b.slug = $1)
@@ -124,11 +134,7 @@ async fn public_products(State(st): State<AppState>, Query(q): Query<ProductQ>) 
     let products: Vec<Value> = rows
         .into_iter()
         .take(PAGE as usize)
-        .map(|(r, title, spec, note, price, ik, is, url, rc, oc, bs, bn)| {
-            json!({ "ref": r, "title": title, "spec": spec, "note": note, "price_amount": price,
-                "image_url": image_url(ik.as_deref(), &is), "product_url": url, "recipients": rc, "occasions": oc,
-                "brand": bs.map(|s| json!({ "slug": s, "name": bn })) })
-        })
+        .map(product_json)
         .collect();
     Ok(cached(
         json!({ "products": products, "next_page": (more && page < MAX_PAGE).then_some(page + 1) }),
@@ -472,19 +478,20 @@ struct Prod {
     product_url: String,
     recipients: Vec<String>,
     occasions: Vec<String>,
+    interests: Vec<String>,
     active: bool,
     sort_order: i32,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
-const PCOLS: &str = "id, ref, brand_id, title, spec, note, price_amount, image_key, image_status::text AS image_status, product_url, recipients, occasions, active, sort_order, created_at, updated_at";
+const PCOLS: &str = "id, ref, brand_id, title, spec, note, price_amount, image_key, image_status::text AS image_status, product_url, recipients, occasions, interests, active, sort_order, created_at, updated_at";
 
 impl Prod {
     fn admin(&self) -> Value {
         json!({ "id": self.id, "ref": self.ref_, "brand_id": self.brand_id, "title": self.title, "spec": self.spec, "note": self.note,
             "price_amount": self.price_amount, "image_url": image_url(self.image_key.as_deref(), &self.image_status),
             "image_key": self.image_key, "image_status": self.image_status, "product_url": self.product_url,
-            "recipients": self.recipients, "occasions": self.occasions, "active": self.active, "sort_order": self.sort_order,
+            "recipients": self.recipients, "occasions": self.occasions, "interests": self.interests, "active": self.active, "sort_order": self.sort_order,
             "created_at": self.created_at, "updated_at": self.updated_at })
     }
     async fn merge(&mut self, m: &Map<String, Value>, pool: &PgPool) -> R<()> {
@@ -511,6 +518,9 @@ impl Prod {
         }
         if let Some(o) = vocab(m, "occasions", OCCASIONS)? {
             self.occasions = o;
+        }
+        if let Some(i) = vocab(m, "interests", crate::interests::INTERESTS)? {
+            self.interests = i;
         }
         if let Some(a) = flag(m, "active")? {
             self.active = a;
@@ -599,6 +609,7 @@ async fn create_product(
         product_url: String::new(),
         recipients: vec![],
         occasions: vec![],
+        interests: vec![],
         active: false,
         sort_order: 0,
         created_at: Utc::now(),
@@ -616,10 +627,10 @@ async fn create_product(
     }
     let mut tx = st.pool.begin().await?;
     let row: Prod = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "INSERT INTO catalog_products (ref, brand_id, title, spec, note, price_amount, image_key, image_status, product_url, recipients, occasions, active, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12) RETURNING {PCOLS}")))
+        "INSERT INTO catalog_products (ref, brand_id, title, spec, note, price_amount, image_key, image_status, product_url, recipients, occasions, interests, active, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,$8,$9,$10,$11,$12,$13) RETURNING {PCOLS}")))
         .bind(&p.ref_).bind(p.brand_id).bind(&p.title).bind(&p.spec).bind(&p.note).bind(p.price_amount).bind(&p.image_key)
-        .bind(&p.product_url).bind(&p.recipients).bind(&p.occasions).bind(p.active).bind(p.sort_order)
+        .bind(&p.product_url).bind(&p.recipients).bind(&p.occasions).bind(&p.interests).bind(p.active).bind(p.sort_order)
         .fetch_one(&mut *tx).await.map_err(|e| conflict(e, "REF_TAKEN", "ref"))?;
     audit(
         &mut *tx,
@@ -654,9 +665,9 @@ async fn patch_product(
     let row: Prod = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "UPDATE catalog_products SET brand_id=$2, title=$3, spec=$4, note=$5, price_amount=$6, image_key=$7,
                 image_status=CASE WHEN $7::text IS NULL THEN 'none' ELSE 'ready' END::image_status,
-                product_url=$8, recipients=$9, occasions=$10, active=$11, sort_order=$12 WHERE id=$1 RETURNING {PCOLS}")))
+                product_url=$8, recipients=$9, occasions=$10, interests=$11, active=$12, sort_order=$13 WHERE id=$1 RETURNING {PCOLS}")))
         .bind(id).bind(p.brand_id).bind(&p.title).bind(&p.spec).bind(&p.note).bind(p.price_amount).bind(&p.image_key)
-        .bind(&p.product_url).bind(&p.recipients).bind(&p.occasions).bind(p.active).bind(p.sort_order)
+        .bind(&p.product_url).bind(&p.recipients).bind(&p.occasions).bind(&p.interests).bind(p.active).bind(p.sort_order)
         .fetch_one(&mut *tx).await?;
     audit(
         &mut *tx,

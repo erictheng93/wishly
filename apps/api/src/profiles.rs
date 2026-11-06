@@ -57,6 +57,56 @@ pub(crate) fn can_see(vis: &str, rel: Rel) -> bool {
     }
 }
 
+/// 觀看者對個人頁主人的關係（封鎖旗標 + 好友），個人頁與 gift-picks 共用
+pub(crate) struct Relation {
+    pub rel: Rel,
+    pub blocked_by_owner: bool,
+    pub i_blocked: bool,
+    pub friend: bool,
+}
+
+pub(crate) async fn relation_of(
+    pool: &sqlx::PgPool,
+    owner: Uuid,
+    viewer: Option<Uuid>,
+) -> Result<Relation, AppError> {
+    let is_self = viewer == Some(owner);
+    let (mut blocked_by_owner, mut i_blocked) = (false, false);
+    if let (Some(v), false) = (viewer, is_self) {
+        (blocked_by_owner, i_blocked) = sqlx::query_as(
+            "SELECT EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2),
+                    EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1)",
+        )
+        .bind(owner)
+        .bind(v)
+        .fetch_one(pool)
+        .await?;
+    }
+    // 任一方向封鎖就不必再算好友 / 親密（呼叫端只會 404 或回精簡內容）
+    let friend = match viewer {
+        Some(v) if !blocked_by_owner && !i_blocked => access::are_friends(pool, owner, v).await?,
+        _ => false,
+    };
+    let rel = match viewer {
+        None => Rel::Anonymous,
+        Some(_) if is_self => Rel::SelfView,
+        Some(v) if friend && crate::close_friends::is_close(pool, owner, v).await? => Rel::Close,
+        Some(_) if friend => Rel::Friend,
+        Some(_) => Rel::Other,
+    };
+    Ok(Relation {
+        rel,
+        blocked_by_owner,
+        i_blocked,
+        friend,
+    })
+}
+
+/// 生日可見性（share_level：public / friends / private）
+pub(crate) fn birthday_visible(bv: &str, is_self: bool, friend: bool) -> bool {
+    bv == "public" || is_self || (bv == "friends" && friend)
+}
+
 /// 年齡：有生日 MM-DD 時，今天還沒到生日就少一歲
 fn age(today: NaiveDate, year: i16, mmdd: Option<&str>) -> i32 {
     let mut a = today.year() - i32::from(year);
@@ -98,20 +148,14 @@ async fn profile(
     .ok_or(AppError::NotFound)?;
     let is_self = viewer == Some(uid);
     // 封鎖：對方封鎖了我 → 404（不洩漏）；我封鎖對方 → 只回基本資料，relation = "blocked"
-    let mut i_blocked = false;
-    if let (Some(v), false) = (viewer, is_self) {
-        let (they, me): (bool, bool) = sqlx::query_as(
-            "SELECT EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2),
-                    EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1)",
-        )
-        .bind(uid)
-        .bind(v)
-        .fetch_one(&st.pool)
-        .await?;
-        if they {
-            return Err(AppError::NotFound);
-        }
-        i_blocked = me;
+    let Relation {
+        rel,
+        blocked_by_owner,
+        i_blocked,
+        friend,
+    } = relation_of(&st.pool, uid, viewer).await?;
+    if blocked_by_owner {
+        return Err(AppError::NotFound);
     }
     if i_blocked {
         return Ok(Json(
@@ -121,17 +165,6 @@ async fn profile(
                     "wishlists": [], "donations": [] }),
         ));
     }
-    let friend = match viewer {
-        Some(v) => access::are_friends(&st.pool, uid, v).await?,
-        None => false,
-    };
-    let rel = match viewer {
-        None => Rel::Anonymous,
-        Some(_) if is_self => Rel::SelfView,
-        Some(v) if friend && crate::close_friends::is_close(&st.pool, uid, v).await? => Rel::Close,
-        Some(_) if friend => Rel::Friend,
-        Some(_) => Rel::Other,
-    };
     let mut extra = serde_json::Map::new();
     if can_see(&gv, rel) {
         extra.insert("gift_likes".into(), json!(gl));
@@ -223,7 +256,7 @@ async fn profile(
         _ => Value::Null,
     };
 
-    let birthday = birthday.filter(|_| bv == "public" || is_self || (bv == "friends" && friend));
+    let birthday = birthday.filter(|_| birthday_visible(&bv, is_self, friend));
 
     // 清單：public 一律；friends 需好友；selected 需在名單；本人另看 friends/selected（private 不列）
     // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）

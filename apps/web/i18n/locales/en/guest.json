@@ -275,6 +275,11 @@
       "noLists": "You have no lists to add to yet",
       "create": "Create a list",
       "loadErr": "Could not load your lists. Please try again.",
+      "matched": "Matches: {tags}",
+      "forFriend": "Picking for which friend?",
+      "forNone": "Anyone",
+      "forFallback": "{name} has no interests to go on yet, so these are general picks",
+      "matchedFor": "Matches {name}'s interests: {tags}",
       "who": "Who wants this",
       "whoTitle": "Who wants this",
       "scope": {

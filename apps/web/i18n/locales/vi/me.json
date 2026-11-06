@@ -309,6 +309,8 @@
       "secLikes": "Quà họ thích",
       "secDislikes": "Không muốn nhận",
       "secInterests": "Sở thích",
+      "picksTitle": "Quà tặng hợp với {name}",
+      "picksFallback": "{name} có thể sẽ thích",
       "secDates": "Ngày quan trọng",
       "secAddress": "Địa chỉ nhà",
       "inDays": "Còn {n} ngày",
