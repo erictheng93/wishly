@@ -153,7 +153,7 @@ test('指定好友清單：被指定的好友可開，其他好友被擋', async
   await befriend(owner, allowed); await befriend(owner, other)
   const list = await listWith(owner, 'selected')
   const me = await (await ok(await allowed.api.get('me'), 'me')).json()
-  await ok(await owner.api.put(`wishlists/${list.id}/allowed-users`, { data: { user_ids: [me.id] } }), '指定名單')
+  await ok(await owner.api.put(`me/close-friends/${me.id}`), '加入摯友')
 
   const pa = await pageFor(browser, allowed), po = await pageFor(browser, other)
   await pa.goto(`/s/${list.slug}`)

@@ -6,7 +6,7 @@ test('個人頁：連結頁匿名可見、偏好僅好友可見', async ({ page,
   const a = await registerUser({ tag: 'rpa' }), b = await registerUser({ tag: 'rpb' })
   const handle = `rp${Date.now().toString(36)}`.slice(0, 20)
   const ok = async (r: any) => { expect(r.ok(), await r.text()).toBeTruthy() }
-  await ok(await a.api.patch('me', { data: { handle, gift_likes: '手沖咖啡豆', gift_likes_vis: 'friends' } }))
+  await ok(await a.api.patch('me', { data: { handle, gift_likes: ['手沖咖啡豆'], gift_likes_vis: 'friends' } }))
   await ok(await a.api.put('me/links', { data: { links: [{ title: '我的 IG', url: 'https://instagram.com/rp_test', hidden: false }] } }))
 
   await page.goto(`/l/${handle}`)
