@@ -305,6 +305,7 @@ async function remove() {
           <button class="c-btn" :disabled="hBad">{{ $t('settings.save') }}</button>
         </form>
       </section>
+      <CreatorProfileCloseFriendsCard />
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.notify.title') }}</h2>
         <!-- 每類一列、站內與 Email 兩個開關；帳務類兩個都鎖定開啟 -->

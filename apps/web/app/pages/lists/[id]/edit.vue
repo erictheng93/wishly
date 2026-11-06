@@ -17,7 +17,6 @@ const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
 function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
 const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168, birthday_notify: false })
-const allowed = ref<string[]>([])
 const rcptKey = ref('')
 const relief = computed(() => w.value?.type === 'relief')
 // 實收登記：每筆品項一張 sheet；明細來自 GET /orgs/{org}/sites/{id}/receipts
@@ -46,9 +45,9 @@ async function loadPermits() {
 const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null), coverBusy = ref(false)
 // 未儲存偵測：與最後一次載入 / 儲存的設定比對（封面另外即時儲存，不算在內）
 const snap = ref('')
-const snapNow = () => JSON.stringify([meta, allowed.value])
+const snapNow = () => JSON.stringify(meta)
 const dirty = computed(() => !!snap.value && snapNow() !== snap.value)
-function revert() { const [m, a] = JSON.parse(snap.value); Object.assign(meta, m); allowed.value = a }
+function revert() { Object.assign(meta, JSON.parse(snap.value)) }
 let poll: any
 
 async function load(quiet = false) {
@@ -59,7 +58,6 @@ async function load(quiet = false) {
     if (!quiet || !dirty.value) { // 背景重載（圖片輪詢、品項儲存後）不蓋掉還沒存的設定
       Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours, birthday_notify: !!r.wishlist.birthday_notify })
       coverPreset.value = r.wishlist.cover_preset ?? null; coverKey.value = null
-      if (r.wishlist.visibility === 'selected') allowed.value = (await api(`/wishlists/${id}/allowed-users`).catch(() => ({ users: [] }))).users.map((u: any) => u.id)
       snap.value = snapNow()
     }
     err.value = ''; stale.value = false
@@ -110,10 +108,6 @@ async function saveMeta() {
   else if (coverPreset.value !== (w.value?.cover_preset ?? null)) Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
   if (!await patchList(body)) return
   coverKey.value = null
-  if (!relief.value && meta.visibility === 'selected') {
-    try { await api(`/wishlists/${id}/allowed-users`, { method: 'PUT', body: { user_ids: allowed.value } }) }
-    catch (e) { msg.value = ''; err.value = errMsg(e); return }
-  }
   snap.value = snapNow()
 }
 // 封面上傳完成或點選預設圖就直接儲存；失敗時留著，按「儲存設定」會再送一次
@@ -247,7 +241,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="coverKey" :current-url="w.cover_image_url" @busy="coverBusy = $event" />
           <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
           <label v-if="!relief" class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
-          <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" v-model:users="allowed" />
+          <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" />
           <CreatorBirthdayNotify v-if="!relief && !w.org_id" v-model="meta.birthday_notify" :visibility="meta.visibility" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>

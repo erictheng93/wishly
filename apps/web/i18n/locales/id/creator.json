@@ -133,17 +133,18 @@
       },
       "selected": {
         "label": "Teman dekat",
-        "desc": "Hanya teman dekat yang kamu pilih dari daftar teman yang bisa membuka, mereka perlu masuk."
+        "desc": "Hanya daftar teman dekat Anda yang bisa membukanya; mereka perlu masuk."
       },
       "private": {
         "label": "Pribadi",
         "desc": "Hanya kamu yang bisa melihat, jika teman membukanya akan tampil tidak ditemukan."
       },
       "who": "Siapa yang boleh melihat wishlist ini",
-      "pickTitle": "Pilih teman dekat ({n} dipilih)",
       "loading": "Memuat teman…",
       "noFriendsPre": "Belum ada teman. Buka ",
-      "noFriendsPost": " untuk mengundang teman, lalu kembali dan pilih."
+      "noFriendsPost": " untuk mengundang teman, lalu kembali dan pilih.",
+      "closeCount": "{n} teman dekat",
+      "manage": "Kelola teman dekat"
     },
     "analytics": {
       "funnel": {

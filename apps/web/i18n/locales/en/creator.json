@@ -133,17 +133,18 @@
       },
       "selected": {
         "label": "Close friends",
-        "desc": "Only the close friends you pick from your friends can open it, and they need to sign in."
+        "desc": "Only people on your close-friends list can open it; they need to sign in."
       },
       "private": {
         "label": "Private",
         "desc": "Only you can see it. Friends who open it will see \"not found\"."
       },
       "who": "Who can see this list",
-      "pickTitle": "Choose close friends ({n} selected)",
       "loading": "Loading friends…",
       "noFriendsPre": "No friends yet. Go to ",
-      "noFriendsPost": " to invite friends, then come back to pick."
+      "noFriendsPost": " to invite friends, then come back to pick.",
+      "closeCount": "{n} close friends",
+      "manage": "Manage close friends"
     },
     "analytics": {
       "funnel": {

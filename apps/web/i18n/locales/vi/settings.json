@@ -172,6 +172,12 @@
       "hint": "Người bị chặn không thấy trang cá nhân và danh sách giới hạn của bạn.",
       "empty": "Bạn chưa chặn ai.",
       "unblock": "Bỏ chặn"
+    },
+    "closeFriends": {
+      "title": "Bạn thân",
+      "hint": "Bạn thân mở được các danh sách chỉ dành cho bạn thân. Đã chọn {n}.",
+      "add": "Thêm vào bạn thân",
+      "remove": "Bỏ khỏi bạn thân"
     }
   }
 }
