@@ -418,6 +418,15 @@ async fn relief_immutable_and_patchable_fields(pool: PgPool) {
         ),
         "{e}"
     );
+    // 地址變更要留稽核（只記 changed，不記地址）；沒改地址不重複寫
+    let rows: Vec<Value> = sqlx::query_scalar("SELECT diff FROM audit_logs WHERE action='wishlist.shipping_address.update' AND entity_id=$1")
+        .bind(id(&v)).fetch_all(&pool).await.unwrap();
+    assert_eq!(rows, vec![json!({"changed": true})]);
+    let (s, _, _) = patch(json!({"site_address":"花蓮縣鳳林鎮中正路二號"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE action='wishlist.shipping_address.update' AND entity_id=$1")
+        .bind(id(&v)).fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 1);
     let other = permit(
         &pool,
         org(&pool, f.coord.id, "verified").await,

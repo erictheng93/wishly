@@ -7,6 +7,7 @@ export function useAuth() {
   const loaded = useState<boolean>('auth-loaded', () => false)
   const lastFetch = useState<number>('auth-fetched-at', () => 0)
   const { api, base } = useApi()
+  const { locale } = useI18n()
   async function fetchMe(force = false) {
     if (loaded.value && !force) return user.value
     const hint = useAuthHint()
@@ -57,7 +58,7 @@ export function useAuth() {
     // 原生殼：系統瀏覽器完成後以 deep link 回 App。登入憑 verifier 兌換權杖；
     // 綁定因瀏覽器沒有 session，先以 Bearer 換一張綁 app_challenge 的一次性 ticket
     if (isNative()) {
-      const start = `${base}/auth/oauth/${provider}/start?native=true`
+      const start = `${base}/auth/oauth/${provider}/start?native=true&locale=${locale.value}`
       const r = await nativeOAuth(async (c) => {
         if (!link) return `${start}&app_challenge=${c}`
         const { ticket } = await api(`/auth/oauth/${provider}/link-ticket`, { method: 'POST', body: { app_challenge: c }, noRedirect: true })
@@ -71,7 +72,7 @@ export function useAuth() {
     }
     // 回來時可能直接落在分享頁（不經 fetchMe），先樂觀設登入線索，分享頁才會查 /me；沒登入成功的話下一次 fetchMe 的 401 會清掉
     useAuthHint().value = true
-    window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
+    window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}&locale=${locale.value}${link ? '&link=true' : ''}`
   }
   return { oauth, user, loaded, fetchMe, fetchMeFresh, logout, logoutFailed, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }
 }

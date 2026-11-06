@@ -174,6 +174,15 @@ async fn friends_list_invite_befriends_and_opens_list(pool: PgPool) {
         .unwrap();
     assert!(preview(&pool, &t).await.1["wishlist"].is_null());
     assert!(accept(&pool, &b.token, &t).await.1["wishlist"].is_null());
+    // 同一張邀請重送不再通知邀請人
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM notifications WHERE user_id = $1 AND kind = 'friend.accepted'",
+    )
+    .bind(a.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

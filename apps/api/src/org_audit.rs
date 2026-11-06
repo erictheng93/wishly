@@ -33,7 +33,7 @@ async fn list(
     Path(org): Path<Uuid>,
     Query(q): Query<Q>,
 ) -> Result<Response, AppError> {
-    require_role(&st.pool, org, u.id, "coordinator").await?;
+    let role = require_role(&st.pool, org, u.id, "coordinator").await?;
     if q.from.zip(q.to).is_some_and(|(from, to)| from > to) {
         return Err(AppError::invalid(
             "/to",
@@ -45,7 +45,7 @@ async fn list(
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT a.id, jsonb_build_object('id',a.id,'action',a.action,'entity',a.entity,'entity_id',a.entity_id,
-            'diff',a.diff,'created_at',a.created_at,
+            'diff',CASE WHEN a.action LIKE 'org.invite.%' AND $8::text <> 'owner' THEN a.diff - 'email' ELSE a.diff END,'created_at',a.created_at,
             'actor', CASE a.actor_type::text
               WHEN 'user' THEN jsonb_build_object('type','user','name',u.display_name)
               WHEN 'staff' THEN jsonb_build_object('type','staff','name',NULL)
@@ -67,7 +67,7 @@ async fn list(
            AND ($6::date IS NULL OR a.created_at < (($6::date+1)::timestamp AT TIME ZONE 'Asia/Taipei'))
          ORDER BY a.id DESC LIMIT $7",
     )
-    .bind(org).bind(q.cursor).bind(&q.action).bind(&q.entity).bind(q.from).bind(q.to).bind(lim + 1)
+    .bind(org).bind(q.cursor).bind(&q.action).bind(&q.entity).bind(q.from).bind(q.to).bind(lim + 1).bind(&role)
     .fetch_all(&st.pool)
     .await?;
     Ok(page(rows, lim))

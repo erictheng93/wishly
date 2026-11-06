@@ -78,16 +78,20 @@ pub(crate) async fn blocked_between<'e, E: sqlx::PgExecutor<'e>>(
         .await
 }
 
-/// 成為好友（冪等）；同時清掉雙方之間的待處理申請
-async fn befriend(ex: &mut sqlx::PgConnection, a: Uuid, b: Uuid) -> R<()> {
+/// 成為好友（冪等）；同時清掉雙方之間的待處理申請。回傳是否為新建立的好友關係
+async fn befriend(ex: &mut sqlx::PgConnection, a: Uuid, b: Uuid) -> R<bool> {
     let (x, y) = pair(a, b);
-    sqlx::query("INSERT INTO friendships (user_a, user_b) VALUES ($1, $2) ON CONFLICT DO NOTHING")
-        .bind(x)
-        .bind(y)
-        .execute(&mut *ex)
-        .await?;
+    let created = sqlx::query(
+        "INSERT INTO friendships (user_a, user_b) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    )
+    .bind(x)
+    .bind(y)
+    .execute(&mut *ex)
+    .await?
+    .rows_affected()
+        == 1;
     sqlx::query("DELETE FROM friend_requests WHERE (from_user = $1 AND to_user = $2) OR (from_user = $2 AND to_user = $1)").bind(a).bind(b).execute(&mut *ex).await?;
-    Ok(())
+    Ok(created)
 }
 
 async fn friend_json(ex: &mut sqlx::PgConnection, me: Uuid, other: Uuid) -> R<Value> {
@@ -506,7 +510,7 @@ async fn invite_accept(
     if blocked_between(&mut *tx, u.id, inviter).await? {
         return Err(AppError::NotFound); // 與無效邀請同一個回應
     }
-    befriend(&mut tx, u.id, inviter).await?;
+    let created = befriend(&mut tx, u.id, inviter).await?;
     let list = invite_list(&mut *tx, wid, inviter).await?;
     // 產品決定：接受 selected 清單的邀請即自動加入該清單名單
     if let (Some(_), Some((_, _, vis))) = (wid, &list) {
@@ -516,13 +520,16 @@ async fn invite_accept(
         }
     }
     let friend = friend_json(&mut tx, u.id, inviter).await?;
-    crate::notify::enqueue(
-        &mut *tx,
-        inviter,
-        "friend.accepted",
-        json!({"from_user": u.id}),
-    )
-    .await?;
+    // 重複送出同一張邀請不再通知邀請人
+    if created {
+        crate::notify::enqueue(
+            &mut *tx,
+            inviter,
+            "friend.accepted",
+            json!({"from_user": u.id}),
+        )
+        .await?;
+    }
     tx.commit().await?;
     Ok(Json(
         json!({ "friend": friend, "wishlist": list.map(|(slug, ..)| json!({ "slug": slug })) }),
