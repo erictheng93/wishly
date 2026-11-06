@@ -965,13 +965,13 @@ if (want('G')) {
     note('只對已驗證 Email 寄信；無 Email（LINE／Google 帳號）則按鈕 disabled，畫面提示「須另行核驗身分」，後台沒有核驗流程或換綁功能。')
   }, { page: cp })
 
-  await run.step('P-68', '設為 staff／取消 staff（原因必填，撤銷對方現有登入）', async ({ note }) => {
+  await run.step('P-68', '編輯營運角色：授予／移除客服（原因必填，撤銷對方現有登入）', async ({ note }) => {
     const row = cp.getByRole('article').filter({ hasText: S.victim.name })
-    await row.getByRole('button', { name: '設為 staff' }).click(); await dlg(cp).getByLabel('操作原因').fill('新進客服，授權後台'); await dlg(cp).getByRole('button', { name: '確認執行' }).click()
-    await expect(row.getByText('STAFF', { exact: true })).toBeVisible()
-    ok(sql(`SELECT is_staff FROM users WHERE id='${S.victim.id}'`) === 't', 'DB 未設 staff')
-    await row.getByRole('button', { name: '取消 staff' }).click(); await dlg(cp).getByLabel('操作原因').fill('測試完畢，取消授權'); await dlg(cp).getByRole('button', { name: '確認執行' }).click()
-    await expect(row.getByText('STAFF', { exact: true })).toHaveCount(0)
+    await row.getByRole('button', { name: '編輯角色' }).click(); await dlg(cp).getByLabel('客服').click(); await dlg(cp).getByLabel('操作原因').fill('新進客服，授權後台'); await dlg(cp).getByRole('button', { name: '確認執行' }).click()
+    await expect(row.getByText('客服', { exact: true })).toBeVisible()
+    ok(sql(`SELECT staff_roles::text FROM users WHERE id='${S.victim.id}'`) === '{support}', 'DB 未設 support')
+    await row.getByRole('button', { name: '編輯角色' }).click(); await dlg(cp).getByLabel('客服').click(); await dlg(cp).getByLabel('操作原因').fill('測試完畢，取消授權'); await dlg(cp).getByRole('button', { name: '確認執行' }).click()
+    await expect(row.getByText('客服', { exact: true })).toHaveCount(0)
     note('授權與取消皆成功；stats 上的「使用者」計入 staff。「最後一位 staff 保護」未在共用環境驗證（有其他 agent 的 staff，不會觸發）。')
   }, { page: cp })
 
