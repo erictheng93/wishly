@@ -304,7 +304,18 @@
       "blockTitle": "Chặn {name}?",
       "blockText": "Họ sẽ không còn thấy trang cá nhân và danh sách giới hạn của bạn; quan hệ bạn bè và lời mời sẽ bị xóa. Bạn có thể bỏ chặn trong Cài đặt.",
       "reportTitle": "Báo cáo {name}",
-      "reportSent": "Đã nhận báo cáo. Chúng tôi sẽ xử lý sớm."
+      "reportSent": "Đã nhận báo cáo. Chúng tôi sẽ xử lý sớm.",
+      "secLinks": "Liên kết",
+      "secLikes": "Quà họ thích",
+      "secDislikes": "Không muốn nhận",
+      "secInterests": "Sở thích",
+      "secDates": "Ngày quan trọng",
+      "secAddress": "Địa chỉ nhà",
+      "inDays": "Còn {n} ngày",
+      "dateToday": "Hôm nay",
+      "shareLinks": "Chia sẻ trang liên kết",
+      "seeWishes": "Xem danh sách ước của tôi",
+      "age": "{n} tuổi"
     },
     "topup": {
       "title": "Nạp điểm",

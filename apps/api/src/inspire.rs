@@ -77,7 +77,7 @@ async fn wishes(
                 OR (w.visibility::text = 'friends' AND EXISTS (
                       SELECT 1 FROM friendships f WHERE f.user_a = least($2, w.owner_id) AND f.user_b = greatest($2, w.owner_id)))
                 OR (w.visibility::text = 'selected' AND EXISTS (
-                      SELECT 1 FROM wishlist_allowed_users a WHERE a.wishlist_id = w.id AND a.user_id = $2)))
+                      SELECT 1 FROM close_friends c WHERE c.owner_id = w.owner_id AND c.friend_id = $2)))
          ORDER BY open DESC, i.created_at DESC LIMIT 50",
         claimed = crate::wishlists::CLAIMED_SQL,
         open = crate::wishlists::OPEN_SQL

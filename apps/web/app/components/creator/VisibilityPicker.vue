@@ -1,14 +1,8 @@
 <script setup lang="ts">
-// 可見性選擇 + 摯友勾選（new / edit 共用）
+// 可見性選擇；摯友名單在設定頁管理（new / edit 共用）
 const visibility = defineModel<string>('visibility', { required: true })
-const users = defineModel<string[]>('users', { default: () => [] })
-const { api } = useApi()
-const friends = ref<any[] | null>(null), fErr = ref('')
-watch(visibility, async v => {
-  if (v !== 'selected' || friends.value) return
-  try { friends.value = (await api('/friends')).friends ?? [] } catch (e) { fErr.value = errMsg(e) }
-}, { immediate: true })
-function toggle(id: string, on: boolean) { users.value = on ? [...users.value, id] : users.value.filter(x => x !== id) }
+const { ids, load } = useCloseFriends()
+watch(visibility, v => { if (v === 'selected') load().catch(() => {}) }, { immediate: true })
 </script>
 <template>
   <fieldset class="c-field c-vis">
@@ -18,16 +12,7 @@ function toggle(id: string, on: boolean) { users.value = on ? [...users.value, i
       <span>{{ o.label }}<br><small class="c-mute">{{ o.desc }}</small></span>
     </label>
   </fieldset>
-  <div v-if="visibility === 'selected'" class="c-field">
-    <span>{{ $t('creator.vis.pickTitle', { n: users.length }) }}</span>
-    <p v-if="fErr" class="c-err" role="alert">{{ fErr }}</p>
-    <p v-else-if="!friends" class="c-mute" role="status">{{ $t('creator.vis.loading') }}</p>
-    <p v-else-if="!friends.length" class="c-mute">{{ $t('creator.vis.noFriendsPre') }}<NuxtLink to="/friends">{{ $t('common.friends') }}</NuxtLink>{{ $t('creator.vis.noFriendsPost') }}</p>
-    <label v-for="f in friends" :key="f.id" class="c-switch">
-      <input type="checkbox" :checked="users.includes(f.id)" @change="toggle(f.id, ($event.target as HTMLInputElement).checked)">
-      <span>{{ f.display_name }}<small v-if="f.handle" class="c-mute">　@{{ f.handle }}</small></span>
-    </label>
-  </div>
+  <p v-if="visibility === 'selected'" class="c-mute">{{ $t('creator.vis.closeCount', { n: ids.size }) }} <NuxtLink to="/settings#close-friends">{{ $t('creator.vis.manage') }}</NuxtLink></p>
 </template>
 <style scoped>
 .c-vis{border:0;padding:0;margin:0 0 16px;min-width:0}

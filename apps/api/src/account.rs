@@ -125,7 +125,9 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
             retry_after: Some(3600),
         });
     }
-    let user: Value = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'display_name', display_name, 'email', email, 'bio', bio, 'birthday', birthday, 'created_at', created_at) FROM users WHERE id = $1")
+    let user: Value = sqlx::query_scalar("SELECT jsonb_build_object('id', id, 'display_name', display_name, 'email', email, 'bio', bio, 'birthday', birthday, 'created_at', created_at,
+           'gift_likes', gift_likes, 'gift_dislikes', gift_dislikes, 'gift_prefs_vis', gift_prefs_vis, 'interests', interests, 'interests_vis', interests_vis,
+           'birth_year', birth_year, 'age_vis', age_vis, 'home_address_vis', home_address_vis, 'cover_preset', cover_preset, 'cover_image_key', cover_image_key) FROM users WHERE id = $1")
         .bind(u.id).fetch_one(&st.pool).await?;
     let identities: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('provider', provider::text) FROM auth_identities WHERE user_id = $1 ORDER BY created_at")
         .bind(u.id).fetch_all(&st.pool).await?;
@@ -165,7 +167,18 @@ async fn export(State(st): State<AppState>, u: CurrentUser) -> Result<Response, 
     )
     .await?;
     let now = chrono::Utc::now();
-    let mut res = Json(json!({ "exported_at": now, "user": user, "identities": identities, "wishlists": wishlists, "claims": claims,
+    let links: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('title', title, 'url', url, 'hidden', hidden) FROM user_links WHERE user_id = $1 ORDER BY position")
+        .bind(u.id).fetch_all(&st.pool).await?;
+    // 匯出給本人：地址解密為明文
+    #[allow(clippy::type_complexity)]
+    let addr_rows: Vec<(String, Option<Vec<u8>>, Option<Vec<u8>>, Vec<u8>)> = sqlx::query_as("SELECT kind, recipient_name_enc, phone_enc, address_enc FROM user_addresses WHERE user_id = $1")
+        .bind(u.id).fetch_all(&st.pool).await?;
+    let o = |b: &[u8]| crate::sealed::open_str(b);
+    let addresses: Vec<Value> = addr_rows.iter().map(|(k, n, p, a)| json!({ "kind": k,
+        "recipient_name": n.as_deref().and_then(o), "phone": p.as_deref().and_then(o), "address": o(a) })).collect();
+    let dates: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('title', title, 'month_day', month_day, 'year', year, 'recurring', recurring, 'visibility', visibility) FROM user_dates WHERE user_id = $1 ORDER BY month_day")
+        .bind(u.id).fetch_all(&st.pool).await?;
+    let mut res = Json(json!({ "exported_at": now, "user": user, "links": links, "addresses": addresses, "dates": dates, "identities": identities, "wishlists": wishlists, "claims": claims,
         "wallet": wallet, "ledger": ledger, "contributions": contributions, "notifications": notifications })).into_response();
     let h = res.headers_mut();
     h.insert(
@@ -297,6 +310,18 @@ async fn delete_me(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    sqlx::query("DELETE FROM user_addresses WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM user_dates WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM user_links WHERE user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM user_activity_days WHERE user_id = $1")
         .bind(id)
         .execute(&mut *tx)
@@ -361,7 +386,8 @@ async fn delete_me(
         "SELECT object_key FROM user_media WHERE user_id=$1
          UNION SELECT cover_image_key FROM wishlists WHERE owner_id=$1 AND org_id IS NULL AND cover_image_key IS NOT NULL
          UNION SELECT i.image_key FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id WHERE w.owner_id=$1 AND w.org_id IS NULL AND i.image_key IS NOT NULL
-         UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL")
+         UNION SELECT avatar_key FROM users WHERE id=$1 AND avatar_key IS NOT NULL
+         UNION SELECT cover_image_key FROM users WHERE id=$1 AND cover_image_key IS NOT NULL")
         .bind(id).fetch_all(&mut *tx).await?;
     let media: Vec<String> = media
         .into_iter()
@@ -440,6 +466,7 @@ async fn delete_me(
         .bind(id).execute(&mut *tx).await?;
     let (at,): (chrono::DateTime<chrono::Utc>,) = sqlx::query_as(
         "UPDATE users SET display_name = '已刪除的使用者', email = NULL, avatar_key = NULL, bio = NULL, birthday = NULL, notification_prefs = '{}'::jsonb,
+                gift_likes = '{}', gift_dislikes = '{}', interests = '{}', birth_year = NULL, cover_preset = NULL, cover_image_key = NULL,
                 deleted_at = now(), anonymized_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING anonymized_at")
         .bind(id).fetch_one(&mut *tx).await?;
     crate::audit_ctx::insert(

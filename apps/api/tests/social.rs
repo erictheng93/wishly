@@ -562,16 +562,14 @@ async fn invite_links(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn unfriend_clears_allowed_users(pool: PgPool) {
+async fn unfriend_clears_close_friends(pool: PgPool) {
     let (a, ta, _) = handle_user(&pool, "A", Some("alice")).await;
     let (b, _, _) = handle_user(&pool, "B", Some("bobby")).await;
     let (c, _, _) = handle_user(&pool, "C", Some("carol")).await;
     befriend(&pool, a, b).await;
     befriend(&pool, a, c).await;
-    let (wa, _) = list(&pool, a, "selected", false).await;
-    let (wb, _) = list(&pool, b, "selected", false).await;
-    for (w, u) in [(wa, b), (wa, c), (wb, a)] {
-        sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1, $2)")
+    for (w, u) in [(a, b), (a, c), (b, a)] {
+        sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1, $2)")
             .bind(w)
             .bind(u)
             .execute(&pool)
@@ -591,12 +589,11 @@ async fn unfriend_clears_allowed_users(pool: PgPool) {
         StatusCode::NO_CONTENT
     );
     assert!(!crate_are_friends(&pool, a, b).await && crate_are_friends(&pool, a, c).await);
-    let left: Vec<(Uuid, Uuid)> =
-        sqlx::query_as("SELECT wishlist_id, user_id FROM wishlist_allowed_users")
-            .fetch_all(&pool)
-            .await
-            .unwrap();
-    assert_eq!(left, vec![(wa, c)]);
+    let left: Vec<(Uuid, Uuid)> = sqlx::query_as("SELECT owner_id, friend_id FROM close_friends")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(left, vec![(a, c)]);
     common::assert_all_reconciled(&pool).await;
 }
 
@@ -612,8 +609,8 @@ async fn profile_lists_visibility(pool: PgPool) {
         list(&pool, o, v, false).await;
     }
     let (w_sel, _) = list(&pool, o, "selected", false).await;
-    sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1, $2)")
-        .bind(w_sel)
+    sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1, $2)")
+        .bind(o)
         .bind(sel)
         .execute(&pool)
         .await
@@ -624,13 +621,7 @@ async fn profile_lists_visibility(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    let (w_sel2, _) = list(&pool, o, "selected", false).await;
-    sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1, $2)")
-        .bind(w_sel2)
-        .bind(sel)
-        .execute(&pool)
-        .await
-        .unwrap();
+    list(&pool, o, "selected", false).await;
     let vis = |v: &Value| -> Vec<String> {
         let mut x: Vec<String> = v["wishlists"]
             .as_array()
@@ -694,7 +685,8 @@ async fn profile_lists_visibility(pool: PgPool) {
         None,
     )
     .await;
-    assert_eq!(vis(&v), vec!["friends", "public", "selected"]);
+    // 摯友看得到擁有者所有（非草稿）selected 清單
+    assert_eq!(vis(&v), vec!["friends", "public", "selected", "selected"]);
     let (_, _, v) = common::call(
         &pool,
         "GET",
@@ -1517,8 +1509,12 @@ async fn friend_feed_respects_visibility_and_birthdays(pool: PgPool) {
     let (_, allowed_item) = list(&pool, f, "selected", false).await;
     sqlx::query("UPDATE wishlists SET title='清單-選中' WHERE id = (SELECT wishlist_id FROM wishlist_items WHERE id=$1)")
         .bind(allowed_item).execute(&pool).await.unwrap();
-    sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) SELECT wishlist_id, $2 FROM wishlist_items WHERE id=$1")
-        .bind(allowed_item).bind(me).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1, $2)")
+        .bind(f)
+        .bind(me)
+        .execute(&pool)
+        .await
+        .unwrap();
     // 我送的禮物已送達
     let delivered = user_claim(&pool, allowed_item, me, "friends").await;
     sqlx::query("UPDATE claims SET status='delivered', delivered_at=now() WHERE id=$1")
@@ -1540,7 +1536,8 @@ async fn friend_feed_respects_visibility_and_birthdays(pool: PgPool) {
         .map(|e| e["wishlist"]["title"].as_str().unwrap())
         .collect();
     titles.sort();
-    assert_eq!(titles, ["清單-friends", "清單-選中"]);
+    // 摯友名單是帳號層級：我是 f 的摯友，f 的兩份 selected 清單都看得到
+    assert_eq!(titles, ["清單-friends", "清單-selected", "清單-選中"]);
     let gift = body["events"]
         .as_array()
         .unwrap()

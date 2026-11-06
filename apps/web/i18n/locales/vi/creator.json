@@ -102,7 +102,9 @@
       "saved": "Đã lưu",
       "saving": "Đang lưu…",
       "update": "Cập nhật thông tin nhận hàng",
-      "save": "Lưu thông tin nhận hàng"
+      "save": "Lưu thông tin nhận hàng",
+      "useDefault": "Dùng địa chỉ nhận hàng mặc định",
+      "useDefaultFailed": "Không thể dùng địa chỉ mặc định"
     },
     "status": {
       "draft": "Bản nháp",
@@ -133,17 +135,18 @@
       },
       "selected": {
         "label": "Bạn thân",
-        "desc": "Chỉ những bạn thân bạn chọn từ danh sách bạn bè mới mở được và họ cần đăng nhập."
+        "desc": "Chỉ danh sách bạn thân của bạn mới mở được, cần đăng nhập."
       },
       "private": {
         "label": "Riêng tư",
         "desc": "Chỉ mình bạn xem được. Bạn bè mở ra sẽ thấy \"không tìm thấy\"."
       },
       "who": "Ai có thể xem danh sách này",
-      "pickTitle": "Chọn bạn thân (đã chọn {n})",
       "loading": "Đang tải danh sách bạn bè…",
       "noFriendsPre": "Chưa có bạn bè. Hãy vào ",
-      "noFriendsPost": " để mời bạn bè, rồi quay lại chọn."
+      "noFriendsPost": " để mời bạn bè, rồi quay lại chọn.",
+      "closeCount": "{n} bạn thân",
+      "manage": "Quản lý bạn thân"
     },
     "analytics": {
       "funnel": {

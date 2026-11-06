@@ -65,6 +65,7 @@ CASES = {
     "cash-refund-reject-once": (API + "wallet_ops.rs", "cash_refund_patch", "ELSE status IN ('requested', 'processing') END", "ELSE true END", "wallet_ops", "concurrent_rejections_restore_points_once"),
     "wallet-debt-state-guard": (API + "wallet_ops.rs", "debt_patch", "WHERE id = $1 AND status = 'open'", "WHERE id = $1", "wallet_ops", "charge_back_recovers_remaining_lot_records_debt_and_is_idempotent"),
     "debt-offset-settled-guard": (API + "points.rs", "offset_charged_back", "d.status IN ('open', 'written_off')", "true", "wallet_ops", "settled_debt_lets_returned_points_credit_normally"),
+    "user-date-sent-on-conflict": (API + "user_dates.rs", "date_tick_at", "ON CONFLICT DO NOTHING RETURNING date_id", "RETURNING date_id", "user_dates", "idempotent_same_year"),
     "birthday-friend-once": (API + "birthday.rs", "birthday_tick_at", "VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING wishlist_id", "VALUES ($1, $2) ON CONFLICT (wishlist_id, year) DO UPDATE SET year = EXCLUDED.year RETURNING wishlist_id", "birthday_notify", "tick_recipients_and_idempotency"),
     "birthday-nudge-once": (API + "birthday.rs", "birthday_tick_at", "WHERE id = $1 AND birthday_nudged_year IS DISTINCT FROM $2 RETURNING id", "WHERE id = $1 RETURNING id", "birthday_notify", "nudge_rules"),
     "debt-offset-return-path": (API + "points.rs", "return_to_allocations", "running = offset_charged_back(tx, wallet_id, lot, take, running).await?;", "let _ = offset_charged_back;", "wallet_ops", "withdrawn_pledge_after_charge_back_offsets_debt_instead_of_reviving_points"),
@@ -94,6 +95,7 @@ CASES = {
     "login-reserve-commits-before-argon": (API + "auth_ext.rs", "login", "        tx.commit().await?;\n        fid\n", "        std::mem::forget(tx);\n        fid\n", "lib", "auth_ext::argon_tests::login_holds_no_db_connection_while_waiting_for_argon"),
     "media-key-lock": (API + "uploads.rs", "lock_key", "SELECT pg_advisory_xact_lock($1, hashtext($2))", "SELECT $1::int, hashtext($2)", "lib", "uploads::tests::retire_waits_for_in_flight_attachment"),
     "media-user-lock": (API + "uploads.rs", "lock_user", "SELECT pg_advisory_xact_lock($1, hashtext($2))", "SELECT $1::int, hashtext($2)", "account_media_cleanup", "delete_me_removes_unshared_media_only"),
+    "user-links-advisory-lock": (API + "user_links.rs", "replace", "SELECT pg_advisory_xact_lock(hashtextextended('user_links:' || $1::text, 0))", "SELECT hashtextextended('user_links:' || $1::text, 0)", "user_links", "concurrent_puts_keep_limit"),
     "media-remember-on-conflict": (API + "uploads.rs", None, "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING", "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2)", "lib", "uploads::tests::remember_media_is_idempotent"),
     "media-retire-request-lock": (API + "uploads.rs", "request_retire", "        lock_key(tx, key).await?;\n", "        let _ = key;\n", "lib", "uploads::tests::retire_request_survives_concurrent_drain"),
     "media-purge-rotation": (API + "uploads.rs", "drain_media", "ORDER BY max(purge_tried_at) NULLS FIRST, object_key", "ORDER BY object_key", "media_purge_rotation", "failing_keys_do_not_starve_the_purge_queue"),
@@ -108,6 +110,8 @@ CASES = {
     "activity-not-exists": (API + "session.rs", None, " OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)", "", "activity_days", "fresh_session_but_missing_today_row_reinserts"),
     "invite-list-allowed-on-conflict": (API + "friends.rs", "invite_accept", "VALUES ($1, $2) ON CONFLICT DO NOTHING", "VALUES ($1, $2)", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),
     "invite-list-selected-only": (API + "friends.rs", "invite_accept", 'if vis == "selected" {', "if false {", "friend_invite_wishlist", "selected_list_invite_adds_accepter_even_if_already_friends"),
+    "close-friends-owner-scope": (API + "access.rs", "check_wishlist", "c.owner_id = $1 AND", "c.owner_id = $1 OR", "close_friends", "selected_list_visible_to_close_only"),
+    "close-friends-unfriend-cleanup": (API + "friends.rs", "unfriend", "DELETE FROM close_friends WHERE (owner_id = $1 AND friend_id = $2) OR (owner_id = $2 AND friend_id = $1)", "DELETE FROM close_friends WHERE owner_id = $1 AND friend_id = $2 AND false", "close_friends", "unfriend_removes_close_both_ways"),
 }
 # Disable exactly one named constraint while retaining valid migration SQL.
 for name, migration, constraint, test in [
@@ -136,6 +140,7 @@ FAILURE_MARKERS = {name: "CDN purge missing for wishlist" for name in CASES if n
 FAILURE_MARKERS.update({
     "user-suspend-reports-open-only": "已駁回的檢舉不可被停權覆寫",
     "org-reject-reports-open-only": "已駁回的檢舉不可被撤銷組織覆寫",
+    "user-date-sent-on-conflict": "同年重跑不可重複排入",
     "absorb-skip-locked": "不可等待對方的列鎖",
     "absorb-wallet-lock": "入帳進行中不可併入",
     "grant-recheck-after-wallet-lock": "已刪帳號不可被入點",
@@ -159,6 +164,7 @@ FAILURE_MARKERS.update({
     "topup-dispute-row-lock": "charge_back applied twice",
     "topup-dispute-state-guard": "pending 不可",
     "account-delete-topup-lock": "FROM topups t JOIN point_wallets",
+    "user-links-advisory-lock": "concurrent PUTs exceeded the link limit",
     "block-request-pair-lock": "timed out waiting for DB operations blocked by fixture transaction",
     "block-accept-pair-lock": "timed out waiting for DB operations blocked by fixture transaction",
     "block-invite-pair-lock": "timed out waiting for DB operations blocked by fixture transaction",
@@ -193,7 +199,9 @@ FAILURE_MARKERS.update({
     "push-endpoint-reassign": "push endpoint not reassigned to the new user",
     "activity-on-conflict": "ON CONFLICT DO NOTHING missing: last_seen_at not advanced",
     "invite-list-allowed-on-conflict": "repeat accept must stay idempotent",
-    "invite-list-selected-only": "accepter must be in allowed users",
+    "invite-list-selected-only": "accepter must be a close friend",
+    "close-friends-owner-scope": "selected list must only open for the owner's own close friends",
+    "close-friends-unfriend-cleanup": "unfriend must clear close_friends both ways",
     "activity-not-exists": "NOT EXISTS clause missing: today's row not re-inserted",
     "lot-debit-order": "扣點順序必須是 bonus",
     "lot-debit-allocations": "pledge 必須寫入 allocations",

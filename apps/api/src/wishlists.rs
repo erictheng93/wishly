@@ -30,8 +30,8 @@ pub fn routes() -> Router<AppState> {
             get(address_get).put(address_put),
         )
         .route(
-            "/wishlists/{id}/allowed-users",
-            get(allowed_get).put(allowed_put),
+            "/wishlists/{id}/shipping-address/from-default",
+            post(address_from_default),
         )
         .route("/wishlists/{id}/items", post(item_create))
         .route("/wishlists/{id}/items/reorder", post(item_reorder))
@@ -319,13 +319,18 @@ pub(crate) fn new_slug() -> String {
         .collect()
 }
 
-fn obj(v: &Value) -> R<&Map<String, Value>> {
+pub(crate) fn obj(v: &Value) -> R<&Map<String, Value>> {
     v.as_object()
         .ok_or_else(|| AppError::problem(400, "BAD_REQUEST", "請求內容必須是 JSON 物件"))
 }
 
 /// 讀取字串欄位：None=未帶；Some(None)=null/空字串；Some(Some)=值（trim 後，長度 min..=max 字元）
-fn text(m: &Map<String, Value>, k: &str, min: usize, max: usize) -> R<Option<Option<String>>> {
+pub(crate) fn text(
+    m: &Map<String, Value>,
+    k: &str,
+    min: usize,
+    max: usize,
+) -> R<Option<Option<String>>> {
     match m.get(k) {
         None => Ok(None),
         Some(Value::Null) => Ok(Some(None)),
@@ -1378,7 +1383,7 @@ fn mask_phone(s: &str) -> String {
         stars(n)
     }
 }
-fn mask_address(s: &str) -> String {
+pub(crate) fn mask_address(s: &str) -> String {
     let n = s.chars().count();
     format!(
         "{}***",
@@ -1387,7 +1392,7 @@ fn mask_address(s: &str) -> String {
             .collect::<String>()
     )
 }
-fn masked(name: &str, phone: &str, addr: &str) -> Value {
+pub(crate) fn masked(name: &str, phone: &str, addr: &str) -> Value {
     json!({ "has_shipping_address": true, "recipient_name": mask_name(name), "phone": mask_phone(phone), "address": mask_address(addr) })
 }
 
@@ -1397,8 +1402,12 @@ async fn address_get(
     Path(id): Path<Uuid>,
 ) -> R<Json<Value>> {
     load_owned(&st.pool, id, u.id).await?;
+    masked_address(&st.pool, id).await
+}
+
+async fn masked_address(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
     let row: Option<(Vec<u8>, Vec<u8>, Vec<u8>)> = sqlx::query_as("SELECT recipient_name_enc, phone_enc, address_enc FROM shipping_addresses WHERE wishlist_id = $1")
-        .bind(id).fetch_optional(&st.pool).await?;
+        .bind(id).fetch_optional(pool).await?;
     let Some((n, p, a)) = row else {
         return Ok(Json(json!({ "has_shipping_address": false })));
     };
@@ -1409,14 +1418,40 @@ async fn address_get(
     Ok(Json(masked(&open(&n)?, &open(&p)?, &open(&a)?)))
 }
 
-async fn address_put(
+/// 以帳號預設收件地址覆寫清單收件資訊：密文欄位直接在 SQL 內複製，不經明文
+async fn address_from_default(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(b): Json<Value>,
 ) -> R<Json<Value>> {
-    let m = obj(&b)?;
     let w = load_owned(&st.pool, id, u.id).await?;
+    check_address_target(&w)?;
+    let mut tx = st.pool.begin().await?;
+    let n = sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc)
+                         SELECT $1, recipient_name_enc, phone_enc, address_enc FROM user_addresses WHERE user_id = $2 AND kind = 'shipping'
+                         ON CONFLICT (wishlist_id) DO UPDATE SET recipient_name_enc = EXCLUDED.recipient_name_enc, phone_enc = EXCLUDED.phone_enc, address_enc = EXCLUDED.address_enc")
+        .bind(id).bind(u.id).execute(&mut *tx).await?.rows_affected();
+    if n == 0 {
+        return Err(AppError::problem(
+            409,
+            "NO_DEFAULT_ADDRESS",
+            "尚未設定預設收件地址",
+        ));
+    }
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "wishlist.shipping_address.update",
+        "wishlists",
+        Some(id),
+        json!({ "changed": true }),
+    )
+    .await?;
+    tx.commit().await?;
+    masked_address(&st.pool, id).await
+}
+
+fn check_address_target(w: &W) -> R<()> {
     if w.ty == "relief" {
         return Err(AppError::invalid(
             "/type",
@@ -1427,17 +1462,19 @@ async fn address_put(
     if matches!(w.status.as_str(), "closed" | "archived") {
         return Err(closed());
     }
-    let req = |k: &str, min, max| {
-        text(m, k, min, max)?
-            .flatten()
-            .ok_or_else(|| AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")))
-    };
-    let (name, phone, addr) = (
-        req("recipient_name", 1, 50)?,
-        req("phone", 6, 20)?,
-        req("address", 5, 200)?,
-    );
-    check_phone(&phone, "/phone")?;
+    Ok(())
+}
+
+async fn address_put(
+    u: CurrentUser,
+    State(st): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(b): Json<Value>,
+) -> R<Json<Value>> {
+    let m = obj(&b)?;
+    let w = load_owned(&st.pool, id, u.id).await?;
+    check_address_target(&w)?;
+    let (name, phone, addr) = address_fields(m, true)?;
     let mut tx = st.pool.begin().await?;
     save_address(&mut *tx, id, &name, &phone, &addr).await?;
     // 收件資訊內容一律不進稽核
@@ -1452,6 +1489,25 @@ async fn address_put(
     .await?;
     tx.commit().await?;
     Ok(Json(masked(&name, &phone, &addr)))
+}
+
+/// 收件資訊欄位驗證（清單與帳號預設共用）；contact=false 時只要 address（居住地址）
+pub(crate) fn address_fields(m: &Map<String, Value>, contact: bool) -> R<(String, String, String)> {
+    let req = |k: &str, min, max| {
+        text(m, k, min, max)?
+            .flatten()
+            .ok_or_else(|| AppError::invalid(&format!("/{k}"), "REQUIRED", &format!("{k} 必填")))
+    };
+    let (name, phone) = if contact {
+        (req("recipient_name", 1, 50)?, req("phone", 6, 20)?)
+    } else {
+        Default::default()
+    };
+    let addr = req("address", 5, 200)?;
+    if contact {
+        check_phone(&phone, "/phone")?;
+    }
+    Ok((name, phone, addr))
 }
 
 /// 電話只允許數字、+、-、空白（address_put 與據點建立共用）
@@ -2172,94 +2228,4 @@ async fn item_reorder(
     .await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-// ---------- 指定對象（visibility=selected 的名單，只能是擁有者的好友） ----------
-async fn allowed_list(pool: &PgPool, id: Uuid) -> R<Json<Value>> {
-    let rows: Vec<(Uuid, String, Option<String>)> = sqlx::query_as(
-        "SELECT u.id, u.display_name, u.handle FROM wishlist_allowed_users a JOIN users u ON u.id = a.user_id
-         WHERE a.wishlist_id = $1 ORDER BY a.created_at, u.id").bind(id).fetch_all(pool).await?;
-    Ok(Json(
-        json!({ "users": rows.into_iter().map(|r| json!({ "id": r.0, "display_name": r.1, "handle": r.2 })).collect::<Vec<_>>() }),
-    ))
-}
-
-/// 據點恆為 public，沒有指定名單
-fn no_relief(w: &W) -> R<()> {
-    if w.ty == "relief" {
-        return Err(AppError::invalid(
-            "/type",
-            "NOT_APPLICABLE",
-            "救災據點沒有指定名單",
-        ));
-    }
-    Ok(())
-}
-
-async fn allowed_get(
-    u: CurrentUser,
-    State(st): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> R<Json<Value>> {
-    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
-    allowed_list(&st.pool, id).await
-}
-
-async fn allowed_put(
-    u: CurrentUser,
-    State(st): State<AppState>,
-    Path(id): Path<Uuid>,
-    Json(b): Json<Value>,
-) -> R<Json<Value>> {
-    no_relief(&load_owned(&st.pool, id, u.id).await?)?;
-    let mut ids: Vec<Uuid> = obj(&b)?
-        .get("user_ids")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .ok_or_else(|| AppError::invalid("/user_ids", "TYPE", "user_ids 必須是 uuid 陣列"))?;
-    ids.sort();
-    ids.dedup();
-    if ids.len() > 200 {
-        return Err(AppError::invalid("/user_ids", "RANGE", "最多 200 位"));
-    }
-    let (a, b2): (Vec<Uuid>, Vec<Uuid>) = ids
-        .iter()
-        .map(|&f| if u.id < f { (u.id, f) } else { (f, u.id) })
-        .unzip();
-    let ok: i64 = sqlx::query_scalar("SELECT count(*) FROM friendships WHERE (user_a, user_b) IN (SELECT * FROM unnest($1::uuid[], $2::uuid[]))")
-        .bind(&a).bind(&b2).fetch_one(&st.pool).await?;
-    if ok != ids.len() as i64 {
-        return Err(AppError::problem(422, "NOT_FRIEND", "名單只能選擇你的好友"));
-    }
-    let mut tx = st.pool.begin().await?;
-    let old: Vec<Uuid> =
-        sqlx::query_scalar("SELECT user_id FROM wishlist_allowed_users WHERE wishlist_id = $1")
-            .bind(id)
-            .fetch_all(&mut *tx)
-            .await?;
-    sqlx::query("DELETE FROM wishlist_allowed_users WHERE wishlist_id = $1")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(
-        "INSERT INTO wishlist_allowed_users (wishlist_id, user_id) SELECT $1, unnest($2::uuid[])",
-    )
-    .bind(id)
-    .bind(&ids)
-    .execute(&mut *tx)
-    .await?;
-    let (added, removed) = (
-        ids.iter().filter(|x| !old.contains(x)).count(),
-        old.iter().filter(|x| !ids.contains(x)).count(),
-    );
-    crate::orgs::audit_user(
-        &mut *tx,
-        u.id,
-        "wishlist.allowed_users.update",
-        "wishlists",
-        Some(id),
-        json!({ "added": added, "removed": removed }),
-    )
-    .await?;
-    tx.commit().await?;
-    allowed_list(&st.pool, id).await
 }

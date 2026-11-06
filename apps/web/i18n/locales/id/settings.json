@@ -172,6 +172,75 @@
       "hint": "Orang yang diblokir tidak dapat melihat profil dan daftar terbatas Anda.",
       "empty": "Anda belum memblokir siapa pun.",
       "unblock": "Buka blokir"
+    },
+    "closeFriends": {
+      "title": "Teman dekat",
+      "hint": "Teman dekat bisa membuka daftar khusus teman dekat. {n} dipilih.",
+      "add": "Jadikan teman dekat",
+      "remove": "Hapus dari teman dekat"
+    },
+    "pc": {
+      "vis": {
+        "public": "Publik",
+        "friends": "Teman",
+        "close": "Teman dekat",
+        "private": "Tidak ditampilkan (hanya saya)"
+      },
+      "showOn": "Tampilkan di profil",
+      "up": "Naik",
+      "down": "Turun",
+      "remove": "Hapus",
+      "add": "Tambah",
+      "ap": {
+        "title": "Tampilan profil",
+        "bio": "Bio (tampil di profil, opsional)",
+        "links": "Tautan",
+        "linkTitle": "Judul tautan",
+        "linkUrl": "URL https://",
+        "linkHidden": "Sembunyikan di profil",
+        "copyPage": "Salin URL halaman tautan",
+        "copied": "Tersalin",
+        "needHandle": "Atur handle di atas dulu untuk mendapat URL halaman tautan",
+        "linksMax": "Maksimal 10 tautan",
+        "pageUrl": "Halaman tautan: "
+      },
+      "gp": {
+        "title": "Preferensi hadiah dan minat",
+        "likes": "Yang saya suka",
+        "dislikes": "Yang tidak ingin saya terima",
+        "ph": "mis. cokelat hitam",
+        "max": "Maksimal 20 entri",
+        "interests": "Tag minat",
+        "count": "{n} / {max} dipilih",
+        "interestsVis": "Tampilkan minat kepada"
+      },
+      "dt": {
+        "title": "Tanggal penting",
+        "hint": "Tambahkan hari jadi dan hari raya. Teman mendapat pengingat di aplikasi 7 hari sebelumnya.",
+        "name": "Nama (mis. hari jadi pernikahan)",
+        "month": "Bulan",
+        "day": "Tanggal",
+        "recurring": "Berulang setiap tahun",
+        "year": "Tahun",
+        "yearHint": "Tanggal sekali saja harus memakai tahun",
+        "empty": "Belum ada tanggal penting",
+        "max": "Maksimal 20 tanggal",
+        "past": "Lewat"
+      },
+      "pv": {
+        "title": "Data pribadi",
+        "hint": "Alamat dan usia tidak pernah publik; Anda memilih siapa yang bisa melihatnya di profil.",
+        "age": "Usia",
+        "birthYear": "Tahun lahir (hanya usia yang tampil, bukan tahunnya)",
+        "shipTitle": "Alamat pengiriman default",
+        "recipient": "Penerima",
+        "phone": "Telepon",
+        "address": "Alamat",
+        "keepHint": "Tersimpan. Untuk mengubah, masukkan ulang data lengkap; teks asli tidak tersisa di layar.",
+        "homeTitle": "Alamat rumah",
+        "noneSaved": "Belum diatur",
+        "clear": "Hapus"
+      }
     }
   }
 }

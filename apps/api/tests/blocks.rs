@@ -64,8 +64,8 @@ async fn block_clears_relations_and_hides_both_ways(pool: PgPool) {
         },
     )
     .await;
-    sqlx::query("INSERT INTO wishlist_allowed_users (wishlist_id, user_id) VALUES ($1,$2)")
-        .bind(la.id)
+    sqlx::query("INSERT INTO close_friends (owner_id, friend_id) VALUES ($1,$2)")
+        .bind(a)
         .bind(b)
         .execute(&pool)
         .await
@@ -97,10 +97,7 @@ async fn block_clears_relations_and_hides_both_ways(pool: PgPool) {
         count(&pool, "SELECT count(*) FROM friend_requests").await,
         0
     );
-    assert_eq!(
-        count(&pool, "SELECT count(*) FROM wishlist_allowed_users").await,
-        0
-    );
+    assert_eq!(count(&pool, "SELECT count(*) FROM close_friends").await, 0);
 
     // 雙向都不能送申請，且回應與找不到人相同
     for (tok, to) in [(&ta, "bobby"), (&tb, "alice")] {

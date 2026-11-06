@@ -102,7 +102,9 @@
       "saved": "已儲存",
       "saving": "儲存中…",
       "update": "更新收件資訊",
-      "save": "儲存收件資訊"
+      "save": "儲存收件資訊",
+      "useDefault": "使用預設收件地址",
+      "useDefaultFailed": "無法帶入預設收件地址"
     },
     "status": {
       "draft": "草稿",
@@ -133,17 +135,18 @@
       },
       "selected": {
         "label": "摯友",
-        "desc": "只有你從好友中勾選的摯友能開，對方需要登入。"
+        "desc": "只有你的摯友名單能開，對方需要登入。"
       },
       "private": {
         "label": "私人",
         "desc": "只有你自己看得到，朋友打開會顯示找不到。"
       },
       "who": "誰可以看這份清單",
-      "pickTitle": "選擇摯友（已選 {n} 位）",
       "loading": "載入好友中…",
       "noFriendsPre": "還沒有好友。先到 ",
-      "noFriendsPost": " 邀請朋友，再回來勾選。"
+      "noFriendsPost": " 邀請朋友，再回來勾選。",
+      "closeCount": "已設 {n} 位摯友",
+      "manage": "管理摯友名單"
     },
     "analytics": {
       "funnel": {

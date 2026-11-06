@@ -9,6 +9,7 @@ pub mod blocks;
 pub mod catalog;
 pub mod cdn;
 pub mod claims;
+pub mod close_friends;
 pub mod config;
 pub mod contributions;
 pub mod dashboard;
@@ -21,6 +22,7 @@ pub mod idempotency;
 pub mod identities;
 pub mod inbox;
 pub mod inspire;
+pub mod interests;
 pub mod notify;
 pub mod notify_jobs;
 pub mod onboarding;
@@ -47,6 +49,9 @@ pub mod share_views;
 pub mod support;
 pub mod topup;
 pub mod uploads;
+pub mod user_addresses;
+pub mod user_dates;
+pub mod user_links;
 pub mod validate;
 pub mod wallet;
 pub mod wallet_ops;
@@ -122,6 +127,9 @@ pub fn app(state: AppState) -> Router {
             Router::new()
                 .merge(public::routes())
                 .merge(share_views::routes())
+                .merge(user_links::routes())
+                .merge(user_addresses::routes())
+                .merge(user_dates::routes())
                 .merge(guest::routes())
                 .merge(claims::routes())
                 .merge(contributions::routes())
@@ -148,6 +156,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(topup::routes())
                 .merge(friends::routes())
                 .merge(blocks::routes())
+                .merge(close_friends::routes())
                 .merge(inspire::routes())
                 .merge(catalog::routes())
                 .merge(profiles::routes())

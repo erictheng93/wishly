@@ -19,7 +19,7 @@ const name = ref(''), msg = ref(''), err = ref('')
 const handle = ref(''), dcv = ref('friends'), hMsg = ref(''), hErr = ref(''), copied = ref(false), idCopied = ref(false)
 const profileUrl = computed(() => user.value?.handle ? `${siteOrigin()}/u/${user.value.handle}` : '')
 const hBad = computed(() => !!handle.value && !isValidHandle(handle.value))
-const bio = ref(''), bMonth = ref(''), bDay = ref(''), bVis = ref('friends')
+const bMonth = ref(''), bDay = ref(''), bVis = ref('friends')
 const bDays = computed(() => daysInMonth(bMonth.value))
 const pad = (n: number) => String(n).padStart(2, '0')
 const exporting = ref(false), exportErr = ref('')
@@ -38,7 +38,7 @@ async function linkOAuth(p: (typeof providers)[number]) {
   } finally { identityBusy.value = false }
 }
 onMounted(async () => { await fetchMe(true); name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
-  bio.value = user.value?.bio ?? ''; [bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
+  ;[bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
   identityErr.value = linkError(String(route.query.error))
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
@@ -155,7 +155,7 @@ async function saveSocial() {
   try {
     user.value = await api('/me', { method: 'PATCH', body: {
       handle: handle.value || null, default_claim_visibility: dcv.value,
-      bio: bio.value.trim() || null, birthday, birthday_visibility: bVis.value } })
+      birthday, birthday_visibility: bVis.value } })
     ;[bMonth.value = '', bDay.value = ''] = user.value.birthday?.split('-') ?? [] // 日被夾到月底時同步顯示
     hMsg.value = t('settings.saved')
   } catch (e: any) { hErr.value = apiErrMsg(e) }
@@ -287,7 +287,6 @@ async function remove() {
           <label class="c-field"><span>{{ $t('settings.social.handle') }}</span><input v-model="handle" maxlength="30" autocapitalize="none" autocomplete="off" :placeholder="$t('settings.social.handlePh')"></label>
           <p v-if="hBad" class="c-err" role="alert">{{ $t('settings.social.handleBadHint') }}</p>
           <p v-if="profileUrl" class="c-mute st-kv"><span>{{ $t('settings.social.yourPage') }}</span><NuxtLink :to="`/u/${user.handle}`">{{ profileUrl }}</NuxtLink> <button type="button" class="c-btn" @click="copyUrl">{{ copied ? $t('settings.social.copied') : $t('settings.social.copy') }}</button></p>
-          <label class="c-field"><span>{{ $t('settings.social.bio') }}</span><textarea v-model="bio" maxlength="160" rows="3" /></label>
           <div class="c-field" role="group" aria-labelledby="bday-label"><span id="bday-label">{{ $t('settings.social.birthday') }}</span>
             <div class="c-row">
               <select v-model="bMonth" :aria-label="$t('settings.social.monthAria')"><option value="">{{ $t('settings.social.monthOpt') }}</option><option v-for="m in 12" :key="m" :value="pad(m)">{{ $t('settings.social.monthN', { n: m }) }}</option></select>
@@ -305,6 +304,11 @@ async function remove() {
           <button class="c-btn" :disabled="hBad">{{ $t('settings.save') }}</button>
         </form>
       </section>
+      <CreatorProfileAppearanceCard />
+      <CreatorProfileGiftPrefsCard />
+      <CreatorProfileDatesCard />
+      <CreatorProfilePrivateInfoCard />
+      <CreatorProfileCloseFriendsCard />
       <section class="c-card">
         <h2 class="c-h2">{{ $t('settings.notify.title') }}</h2>
         <!-- 每類一列、站內與 Email 兩個開關；帳務類兩個都鎖定開啟 -->

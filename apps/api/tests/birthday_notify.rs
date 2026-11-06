@@ -170,8 +170,8 @@ async fn tick_recipients_and_idempotency(pool: PgPool) {
         befriend(&pool, o.id, f.id).await;
     }
     for f in [&f_in, &f_off, &stranger] {
-        sqlx::query("INSERT INTO wishlist_allowed_users(wishlist_id,user_id) VALUES($1,$2)")
-            .bind(w.id)
+        sqlx::query("INSERT INTO close_friends(owner_id,friend_id) VALUES($1,$2)")
+            .bind(o.id)
             .bind(f.id)
             .execute(&pool)
             .await
@@ -229,9 +229,9 @@ async fn tick_recipients_and_idempotency(pool: PgPool) {
     assert_eq!(queued(&pool, "birthday.friend").await, want);
 }
 
-/// 不同摯友看不同生日清單：各通知各的對象，晚開的清單也會寄，同清單不重寄。
+/// selected 清單的對象是帳號摯友名單：晚開的清單也會寄給同一批人，同清單不重寄。
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn tick_each_list_notifies_its_own_audience(pool: PgPool) {
+async fn tick_selected_lists_notify_close_friends(pool: PgPool) {
     let o = user(&pool, "壽星").await;
     set_birthday(&pool, o.id, "10-05", "friends").await;
     let opts = || ListOpts {
@@ -250,14 +250,10 @@ async fn tick_each_list_notifies_its_own_audience(pool: PgPool) {
     for f in [&only_a, &only_b, &both] {
         befriend(&pool, o.id, f.id).await;
     }
-    for (w, f) in [
-        (a.id, only_a.id),
-        (a.id, both.id),
-        (b.id, only_b.id),
-        (b.id, both.id),
-    ] {
-        sqlx::query("INSERT INTO wishlist_allowed_users(wishlist_id,user_id) VALUES($1,$2)")
-            .bind(w)
+    // only_b 是好友但不在摯友名單
+    for f in [only_a.id, both.id] {
+        sqlx::query("INSERT INTO close_friends(owner_id,friend_id) VALUES($1,$2)")
+            .bind(o.id)
             .bind(f)
             .execute(&pool)
             .await
@@ -286,12 +282,12 @@ async fn tick_each_list_notifies_its_own_audience(pool: PgPool) {
     assert_eq!(sent(a.id).await, sorted(vec![only_a.id, both.id]));
     assert!(sent(b.id).await.is_empty());
 
-    // 第二份在窗口內才開：寄給它自己的對象，第一份不重寄
+    // 第二份在窗口內才開：對象同為擁有者的摯友，第一份不重寄
     enable(&pool, b.id).await;
     wishly_api::birthday::birthday_tick_at(&pool, day(9, 29))
         .await
         .unwrap();
-    assert_eq!(sent(b.id).await, sorted(vec![only_b.id, both.id]));
+    assert_eq!(sent(b.id).await, sorted(vec![only_a.id, both.id]));
     assert_eq!(sent(a.id).await.len(), 2);
 }
 

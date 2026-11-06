@@ -4,7 +4,7 @@ const native = !!process.env.NUXT_NATIVE
 import { isLocalizable, PREFIX_LOCALES } from './app/utils/localized'
 
 // 語系檔依功能區拆開（i18n/locales/<語系>/<區>.json，檔內最外層 key 即區名），各區獨立維護
-const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire']
+const AREAS = ['common', 'errors', 'guest', 'creator', 'auth', 'lists', 'me', 'admin', 'settings', 'legal', 'org', 'onboarding', 'inspire', 'interests']
 const loc = (code: string, language: string, name: string) => ({ code, language, name, files: AREAS.map(a => `${code}/${a}.json`) })
 
 export default defineNuxtConfig({
@@ -49,6 +49,8 @@ export default defineNuxtConfig({
     ...Object.fromEntries(['/dashboard/**', '/lists/**', '/me/wallet', '/me/topup', '/me/refund', '/me/claims', '/me/notifications', '/settings', '/welcome', '/friends', '/invite/**', '/admin/**', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite/**', '/orgs/**'].map(r => [r, { ssr: false }])),
     // 個人頁一律 noindex（F22）；SSR 只為連結預覽（OG）；互動內容在 ClientOnly，另加回應標頭
     '/u/**': { headers: { 'X-Robots-Tag': 'noindex' } },
+    // 連結頁：SSR（OG 預覽），不收錄、不在 LOCALIZABLE／sitemap
+    '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
     // 測試用：NUXT_API_PROXY=<後端網址> 時，同網域的 /api/v1/** 代理到該後端（只有 npm run deploy:preview 會設）。
     // 為什麼：Pages 與臨時通道是不同網站，cookie 會被當第三方擋掉；同源代理後 cookie 是第一方。
     ...(process.env.NUXT_API_PROXY ? { '/api/v1/**': { proxy: `${process.env.NUXT_API_PROXY.replace(/\/$/, '')}/api/v1/**` } } : {}),
