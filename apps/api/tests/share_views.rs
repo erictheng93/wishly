@@ -140,6 +140,15 @@ async fn malformed_fields_become_null(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn rate_limited_still_204_without_row(pool: PgPool) {
     let w = list(&pool).await;
+    // 限流是對齊時鐘的 60 秒固定視窗：跨過整分鐘計數會歸零，接近邊界就先等到下一分鐘再發
+    let into_minute = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        % 60;
+    if into_minute >= 40 {
+        tokio::time::sleep(std::time::Duration::from_secs(60 - into_minute)).await;
+    }
     for _ in 0..62 {
         assert_eq!(
             view(&pool, &w.slug, "5.5.5.5", Some(UA), &[], json!({})).await,
