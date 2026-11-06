@@ -28,8 +28,8 @@ useSeoMeta({
 })
 
 const copied = ref(false)
-async function share() {
-  const url = `${config.public.siteUrl}/u/${p.value.user.handle}`
+async function share(path = 'u') {
+  const url = `${config.public.siteUrl}/${path}/${p.value.user.handle}`
   try {
     if (navigator.share) await navigator.share({ title: p.value.user.display_name, url })
     else { await copyText(url); copied.value = true; setTimeout(() => (copied.value = false), 2000) }
@@ -85,10 +85,12 @@ async function sendReport() {
     <section v-else-if="state === 'gone'" class="c-gone"><p class="c-gone-t">{{ $t('me.profile.gone') }}</p></section>
     <section v-else-if="state === 'error'" class="c-gone err"><p class="c-err c-gone-t" role="alert">{{ $t('me.profile.loadFailed') }}</p><button class="c-btn" @click="load">{{ $t('me.retry') }}</button></section>
     <template v-else>
+      <img v-if="p.user.cover_image_url || p.user.cover_preset" :src="p.user.cover_image_url || `/covers/${p.user.cover_preset}.svg`" alt="" class="pf-cover">
       <section class="pf-hero">
         <div class="pf-av" aria-hidden="true"><img v-if="p.user.avatar_url" :src="p.user.avatar_url" alt="" class="pf-img"><template v-else>{{ (p.user.display_name || '?').slice(0, 1) }}</template></div>
         <h1 class="c-h2">{{ p.user.display_name }}</h1>
-        <p v-if="p.user.handle || p.user.birthday" class="c-mute pf-handle"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template></p>
+        <p v-if="p.user.handle || p.user.birthday" class="c-mute pf-handle"><template v-if="p.user.handle">@{{ p.user.handle }}</template><template v-if="p.user.birthday">{{ $t('me.profile.birthday', { date: formatBirthday(p.user.birthday) }) }}</template><template v-if="p.user.age != null"> · {{ $t('me.profile.age', { n: p.user.age }) }}</template></p>
+        <p v-if="p.user.dates?.length" class="c-mute pf-handle pf-date">{{ p.user.dates[0].title }} · {{ formatBirthday(p.user.dates[0].month_day) }} · {{ p.user.dates[0].days_until ? $t('me.profile.inDays', { n: p.user.dates[0].days_until }) : $t('me.profile.dateToday') }}</p>
         <p v-if="p.user.bio" class="pf-bio">{{ p.user.bio }}</p>
         <p v-if="p.mutual?.count" class="c-mute c-row wrap">
           <NuxtLink v-for="m in p.mutual.users" :key="m.id" :to="profilePath(m)" class="c-row"><span class="pf-av pf-av-s" aria-hidden="true"><img v-if="m.avatar_url" :src="m.avatar_url" alt="" class="pf-img"><template v-else>{{ (m.display_name || '?').slice(0, 1) }}</template></span>{{ m.display_name }}</NuxtLink>
@@ -114,7 +116,8 @@ async function sendReport() {
         </template>
         <button v-else-if="p.relation === 'none'" class="c-btn primary" :disabled="busy" @click="add">{{ $t('me.profile.addFriend') }}</button>
         <NuxtLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="c-btn primary">{{ $t('me.profile.loginToAdd') }}</NuxtLink>
-        <button v-if="p.user.handle && p.relation !== 'blocked'" class="c-btn" @click="share">{{ $t('me.profile.share') }}</button>
+        <button v-if="p.user.handle && p.relation !== 'blocked'" class="c-btn" @click="share()">{{ $t('me.profile.share') }}</button>
+        <button v-if="p.user.handle && (p.relation === 'self' || p.user.links?.length)" class="c-btn" @click="share('l')">{{ $t('me.profile.shareLinks') }}</button>
         <span v-if="copied" class="c-mute" role="status">{{ $t('me.profile.copied') }}</span>
         </div>
         <div v-if="user && !['self', 'anonymous', 'blocked'].includes(p.relation)" class="c-row wrap">
@@ -129,6 +132,8 @@ async function sendReport() {
         <span class="pf-kick">{{ $t('me.profile.next') }} · {{ nextDays ? $t('me.profile.nextDays', { n: nextDays }) : $t('me.profile.nextToday') }}</span>
         <NuxtLink :to="`/s/${nextList.slug}`"><strong>{{ nextList.title }}</strong></NuxtLink>
       </section>
+
+      <CreatorProfileSections v-if="p.relation !== 'blocked'" :user="p.user" />
 
       <section v-if="p.relation !== 'blocked'">
         <h2 class="c-h2 pf-sec">{{ $t('me.profile.lists') }}</h2>
@@ -187,6 +192,7 @@ async function sendReport() {
 </template>
 
 <style scoped>
+.pf-cover{display:block;width:100%;height:140px;object-fit:cover;background:var(--bg-alt)}
 .pf-kick{display:block;margin:0 0 8px;font:700 12px var(--mono);letter-spacing:.04em;color:var(--mute)}
 .pf-hero{border-bottom:1px solid var(--ink-line);padding:32px 0 24px;margin:0;display:grid;grid-template-columns:72px minmax(0,1fr);gap:2px 16px;align-items:center}
 .pf-hero>*{grid-column:1/-1}
@@ -196,6 +202,7 @@ html:lang(vi) .pf-hero>.c-h2{line-height:1.2}
 .pf-hero>.c-h2::before{display:none}
 .pf-hero>p{margin:0}
 .pf-hero>.pf-handle{grid-row:2;grid-column:2;align-self:start;font:500 13px var(--mono);letter-spacing:.04em}
+.pf-hero>.pf-date{grid-row:auto;grid-column:1/-1;margin-top:8px}
 .pf-bio{white-space:pre-line;margin-top:12px!important}
 .pf-hero>.c-row{margin-top:14px}
 .pf-hero>.pf-act{margin-top:18px}

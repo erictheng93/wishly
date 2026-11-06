@@ -304,7 +304,18 @@
       "blockTitle": "封鎖 {name}？",
       "blockText": "封鎖後對方將看不到你的個人頁與限定清單，你們的好友關係與申請會一併移除。之後可在設定中解除封鎖。",
       "reportTitle": "檢舉 {name}",
-      "reportSent": "已收到檢舉，我們會盡快處理"
+      "reportSent": "已收到檢舉，我們會盡快處理",
+      "secLinks": "連結",
+      "secLikes": "喜歡的禮物",
+      "secDislikes": "不想收到的",
+      "secInterests": "興趣",
+      "secDates": "重要日子",
+      "secAddress": "家裡地址",
+      "inDays": "還有 {n} 天",
+      "dateToday": "就是今天",
+      "shareLinks": "分享連結頁",
+      "seeWishes": "看我的願望清單",
+      "age": "{n} 歲"
     },
     "topup": {
       "title": "儲值",

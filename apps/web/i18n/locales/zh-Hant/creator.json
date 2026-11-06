@@ -102,7 +102,9 @@
       "saved": "已儲存",
       "saving": "儲存中…",
       "update": "更新收件資訊",
-      "save": "儲存收件資訊"
+      "save": "儲存收件資訊",
+      "useDefault": "使用預設收件地址",
+      "useDefaultFailed": "無法帶入預設收件地址"
     },
     "status": {
       "draft": "草稿",

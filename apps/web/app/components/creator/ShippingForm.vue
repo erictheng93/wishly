@@ -7,10 +7,18 @@ const { t } = useI18n()
 const cur = ref<any>(null)
 const f = reactive({ recipient_name: '', phone: '', address: '' })
 const busy = ref(false), err = ref(''), msg = ref('')
+const hasDefault = ref(false)
 const errs = ref<Record<string, string>>({})
 onMounted(async () => {
   try { cur.value = await api(`/wishlists/${props.wishlistId}/shipping-address`); emit('saved', cur.value) } catch (e) { err.value = errMsg(e) }
+  // 帳號有預設收件地址才顯示帶入按鈕；查不到就當沒有
+  try { hasDefault.value = !!(await api<any>('/me/addresses')).shipping } catch { /* 沒有就不顯示 */ }
 })
+async function useDefault() {
+  err.value = msg.value = ''; busy.value = true
+  try { cur.value = await api(`/wishlists/${props.wishlistId}/shipping-address/from-default`, { method: 'POST' }); msg.value = t('creator.shipping.saved'); emit('saved', cur.value) }
+  catch (e) { err.value = errMsg(e) } finally { busy.value = false }
+}
 async function save() {
   err.value = msg.value = ''; errs.value = {}
   busy.value = true
@@ -29,6 +37,7 @@ async function save() {
     <p class="c-mute">{{ $t('creator.shipping.intro') }}</p>
     <dl v-if="cur?.has_shipping_address" class="c-dl"><dt>{{ $t('creator.shipping.recipient') }}</dt><dd>{{ cur.recipient_name }}</dd><dt>{{ $t('creator.shipping.phone') }}</dt><dd>{{ cur.phone }}</dd><dt>{{ $t('creator.shipping.address') }}</dt><dd>{{ cur.address }}</dd></dl>
     <p v-else-if="cur" class="c-err">{{ $t('creator.shipping.empty') }}</p>
+    <button v-if="hasDefault && !cur?.has_shipping_address" type="button" class="c-btn block" :disabled="busy" @click="useDefault">{{ $t('creator.shipping.useDefault') }}</button>
     <form @submit.prevent="save">
       <label class="c-field"><span>{{ $t('creator.shipping.recipientLabel') }}</span><input v-model="f.recipient_name" maxlength="50" required autocomplete="name"><small v-if="errs.recipient_name" class="c-err">{{ errs.recipient_name }}</small></label>
       <label class="c-field"><span>{{ $t('creator.shipping.phoneLabel') }}</span><input v-model="f.phone" type="tel" maxlength="20" minlength="6" required autocomplete="tel"><small v-if="errs.phone" class="c-err">{{ errs.phone }}</small></label>

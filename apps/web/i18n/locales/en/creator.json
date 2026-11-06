@@ -102,7 +102,9 @@
       "saved": "Saved",
       "saving": "Saving…",
       "update": "Update shipping info",
-      "save": "Save shipping info"
+      "save": "Save shipping info",
+      "useDefault": "Use my default shipping address",
+      "useDefaultFailed": "Could not apply the default address"
     },
     "status": {
       "draft": "Draft",
