@@ -263,3 +263,68 @@ async fn staff_digest_only_with_work_and_once_per_20h(pool: PgPool) {
             .unwrap();
     assert_eq!(p["reports"], 1);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn staff_digest_routes_counts_by_role(pool: PgPool) {
+    init();
+    let admin = staff(&pool, "admin").await;
+    let mut ids = vec![];
+    for role in ["moderator", "finance", "support"] {
+        let s = staff(&pool, role).await;
+        sqlx::query("UPDATE users SET staff_roles=ARRAY[$2] WHERE id=$1")
+            .bind(s.id)
+            .bind(role)
+            .execute(&pool)
+            .await
+            .unwrap();
+        ids.push(s.id);
+    }
+    let (m, f, sup) = (ids[0], ids[1], ids[2]);
+    let o = user(&pool, "o").await;
+    let wl = wishlist(&pool, o.id, ListOpts::default()).await;
+    sqlx::query("INSERT INTO content_reports(wishlist_id,reason) VALUES($1,'scam')")
+        .bind(wl.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        notify_jobs::staff_digest_tick(&pool).await.unwrap(),
+        2,
+        "只有檢舉：admin 與 moderator 收到"
+    );
+    let payload = |id: Uuid| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, serde_json::Value>(
+                "SELECT payload FROM notifications WHERE user_id=$1 AND kind='staff.digest'",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let pm = payload(m).await;
+    assert_eq!(pm, json!({"reports":1,"orgs":0,"permits":0}));
+    let pa = payload(admin.id).await;
+    assert_eq!(pa["refunds"], 0);
+    assert_eq!(pa["failed"], 0);
+    assert_eq!(count(&pool, f, "staff.digest").await, 0);
+    assert_eq!(count(&pool, sup, "staff.digest").await, 0);
+    let (_, body) = notify::render_lang(
+        notify::Lang::En,
+        "staff.digest",
+        "",
+        &json!({"refunds":2,"orders":1}),
+    );
+    assert!(
+        body.starts_with("Cash refunds 2, orders to handle 1."),
+        "{body}"
+    );
+    let (_, body) = notify::render_lang(notify::Lang::Zh, "staff.digest", "", &pm);
+    assert!(
+        body.starts_with("待處理檢舉 1、待審組織 0、待審許可 0。"),
+        "{body}"
+    );
+    assert!(!body.contains("退款"), "{body}");
+}

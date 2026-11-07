@@ -28,7 +28,8 @@ pub async fn event_summary_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
 }
 
 /// 有待辦才寄，給每位未封鎖的 staff；同一人 20 小時內已有 `staff.digest` 就略過。
-/// shortcut: 不依營運角色（0073）過濾，support 也會看到金流 / 審核件數；要分流時依 staff_roles 只帶各自負責的欄位。
+/// 依營運角色（0073）只帶各自負責的件數（admin 全部）：moderator＝檢舉 / 組織 / 許可，finance＝現金退款 / 訂單，
+/// 寄送失敗通知只給 admin（重排僅 admin 可用）；support 沒有負責項目，不寄。payload 缺鍵＝不負責。
 pub async fn staff_digest_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let r = sqlx::query(
         "WITH c AS (SELECT
@@ -40,11 +41,18 @@ pub async fn staff_digest_tick(pool: &PgPool) -> Result<u64, sqlx::Error> {
             (SELECT count(*) FROM notifications WHERE status = 'failed' AND scheduled_at > now() - interval '7 days') AS failed)
          INSERT INTO notifications (user_id, channel, kind, payload)
          SELECT u.id, 'email'::notification_channel, 'staff.digest',
-                jsonb_build_object('reports', c.reports, 'refunds', c.refunds, 'orgs', c.orgs,
-                                   'permits', c.permits, 'orders', c.orders, 'failed', c.failed)
-           FROM users u, c
+                jsonb_strip_nulls(jsonb_build_object(
+                  'reports', CASE WHEN r.m THEN c.reports END, 'orgs', CASE WHEN r.m THEN c.orgs END,
+                  'permits', CASE WHEN r.m THEN c.permits END, 'refunds', CASE WHEN r.f THEN c.refunds END,
+                  'orders', CASE WHEN r.f THEN c.orders END, 'failed', CASE WHEN r.a THEN c.failed END))
+           FROM users u CROSS JOIN c
+           CROSS JOIN LATERAL (SELECT 'admin' = ANY(u.staff_roles) AS a,
+                                      u.staff_roles && '{admin,moderator}'::text[] AS m,
+                                      u.staff_roles && '{admin,finance}'::text[] AS f) r
           WHERE u.is_staff AND u.blocked_at IS NULL AND u.deleted_at IS NULL
-            AND c.reports + c.refunds + c.orgs + c.permits + c.orders + c.failed > 0
+            AND CASE WHEN r.m THEN c.reports + c.orgs + c.permits ELSE 0 END
+              + CASE WHEN r.f THEN c.refunds + c.orders ELSE 0 END
+              + CASE WHEN r.a THEN c.failed ELSE 0 END > 0
             AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = u.id AND n.kind = 'staff.digest'
                              AND n.created_at > now() - interval '20 hours')")
         .execute(pool).await?;

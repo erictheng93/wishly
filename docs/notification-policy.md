@@ -30,7 +30,7 @@
 | 金流 | `topup.credited`、`cash_refund.updated`、`wallet.frozen`、`wallet.unfrozen`、`wallet.chargeback`、`order.failed`、`order.partial_refund`、`funding.expired`、`funding.released`、`item.removed` |
 | 組織與治理 | `org.invite`、`org.review`、`org.permit_reviewed`、`org.permit_rejected`、`org.permit_revoked`、`org.permit_expiring`、`org.permit_expired`、`org.event_hidden`、`wishlist.moderated` |
 | 緊急期限 | `site.paused`、`wishlist.closing` |
-| 營運 | `staff.digest` |
+| 營運 | `staff.digest`（依營運角色只列負責件數：moderator 檢舉 / 組織 / 許可、finance 現金退款 / 訂單、寄送失敗只給 admin，admin 全部；support 不寄） |
 
 ### 第二級：不可關閉，09:00 才寄（`Daytime`）
 
