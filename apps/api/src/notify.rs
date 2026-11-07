@@ -1642,15 +1642,31 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
             ),
         ),
         "staff.digest" => {
-            let g = |k: &str| payload[k].as_i64().unwrap_or(0);
-            let (r, f, o, p, d, x) = (g("reports"), g("refunds"), g("orgs"), g("permits"), g("orders"), g("failed"));
+            // 只列 payload 有的鍵（依角色分流，見 notify_jobs::staff_digest_tick）
+            const ITEMS: [(&str, [&str; 4]); 6] = [
+                ("reports", ["待處理檢舉", "Open reports", "Báo cáo chờ xử lý", "Laporan menunggu"]),
+                ("refunds", ["現金退款", "cash refunds", "hoàn tiền mặt", "pengembalian dana tunai"]),
+                ("orgs", ["待審組織", "organizations to review", "tổ chức chờ duyệt", "organisasi perlu ditinjau"]),
+                ("permits", ["待審許可", "permits to review", "giấy phép chờ duyệt", "izin perlu ditinjau"]),
+                ("orders", ["待處理訂單", "orders to handle", "đơn cần xử lý", "pesanan perlu diurus"]),
+                ("failed", ["寄送失敗通知", "failed notifications", "thông báo gửi lỗi", "notifikasi gagal terkirim"]),
+            ];
+            let list = |i: usize, sep: &str| -> String {
+                let s = ITEMS
+                    .iter()
+                    .filter_map(|(k, n)| payload[*k].as_i64().map(|v| format!("{} {v}", n[i])))
+                    .collect::<Vec<_>>()
+                    .join(sep);
+                let mut c = s.chars();
+                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+            };
             (
                 l.pick("【Wishly】今日營運待辦".into(), "[Wishly] Today's operations to-do".into(), "[Wishly] Việc vận hành cần xử lý hôm nay".into(), "[Wishly] Tugas operasional hari ini".into()),
                 l.pick(
-                    format!("待處理檢舉 {r}、現金退款 {f}、待審組織 {o}、待審許可 {p}、待處理訂單 {d}、寄送失敗通知 {x}。\n後台：{base}/admin\n"),
-                    format!("Open reports {r}, cash refunds {f}, organizations to review {o}, permits to review {p}, orders to handle {d}, failed notifications {x}.\nConsole: {base}/admin\n"),
-                    format!("Báo cáo chờ xử lý {r}, hoàn tiền mặt {f}, tổ chức chờ duyệt {o}, giấy phép chờ duyệt {p}, đơn cần xử lý {d}, thông báo gửi lỗi {x}.\nTrang quản trị: {base}/admin\n"),
-                    format!("Laporan menunggu {r}, pengembalian dana tunai {f}, organisasi perlu ditinjau {o}, izin perlu ditinjau {p}, pesanan perlu diurus {d}, notifikasi gagal terkirim {x}.\nKonsol: {base}/admin\n"),
+                    format!("{}。\n後台：{base}/admin\n", list(0, "、")),
+                    format!("{}.\nConsole: {base}/admin\n", list(1, ", ")),
+                    format!("{}.\nTrang quản trị: {base}/admin\n", list(2, ", ")),
+                    format!("{}.\nKonsol: {base}/admin\n", list(3, ", ")),
                 ),
             )
         }
