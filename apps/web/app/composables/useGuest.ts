@@ -11,13 +11,18 @@ let mem: string | null = null
 
 const safe = <T>(f: () => T): T | null => { try { return f() } catch { return null } }
 const readCookie = () => safe(() => document.cookie.split('; ').find(c => c.startsWith('ws_guest_js='))?.split('=')[1] ?? null)
+// 管理權杖：https 下加 Secure，避免未升級的 http 請求帶出（本機 http 開發不加，否則寫不進去）
+const writeCookie = (t: string) => safe(() => { document.cookie = `ws_guest_js=${t}; Path=/; Max-Age=31536000; SameSite=Lax${globalThis.location?.protocol === 'https:' ? '; Secure' : ''}` })
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, public detail: string, public data: any = {}) { super(detail) }
 }
 
+let upgraded = false
 export function getGuestToken(): string | null {
   if (!import.meta.client) return null
+  // 舊版寫入的 ws_guest_js 沒有 Secure：讀到時以同名同路徑覆寫一次補上
+  if (!upgraded) { upgraded = true; const c = readCookie(); if (c) writeCookie(c) }
   return safe(() => localStorage.getItem(KEY)) || readCookie() || safe(() => sessionStorage.getItem(KEY)) || mem
 }
 
@@ -27,7 +32,7 @@ export function setGuestToken(t: string | null): boolean {
   let persisted = false
   if (t) {
     persisted = safe(() => { localStorage.setItem(KEY, t); return localStorage.getItem(KEY) === t }) === true
-    safe(() => { document.cookie = `ws_guest_js=${t}; Path=/; Max-Age=31536000; SameSite=Lax`; persisted ||= readCookie() === t })
+    writeCookie(t); persisted ||= readCookie() === t
     safe(() => sessionStorage.setItem(KEY, t))
   } else {
     safe(() => localStorage.removeItem(KEY)); safe(() => sessionStorage.removeItem(KEY))
