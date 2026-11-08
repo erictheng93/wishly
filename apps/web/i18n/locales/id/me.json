@@ -403,7 +403,7 @@
       "invoiceMember": "Faktur elektronik akan diterbitkan ke penyimpanan anggota.",
       "cardRetry": "Untuk mencoba lagi, batalkan pesanan ini lalu buat pesanan baru.",
       "cancel": "Batalkan pesanan",
-      "cancelText": "Batalkan top-up yang menunggu pembayaran ini? Jika Anda sudah membayar, dana tetap akan dikreditkan."
+      "cancelText": "Batalkan top-up yang menunggu pembayaran ini? Jika Anda sudah membayar, dana tetap akan dikreditkan. Hingga batas waktu pembayaran semula, jumlah ini tetap dihitung dalam batas top-up Anda."
     },
     "frozenBanner": "Dompet dibekukan: sementara tidak bisa ikut patungan atau mengajukan pengembalian dana tunai. Hubungi layanan pelanggan.",
     "refund": {

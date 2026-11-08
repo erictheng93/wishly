@@ -1453,14 +1453,14 @@ async fn create_rejects_frozen_wallet(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn cancel_pending_topup_frees_cap_and_late_payment_still_credits(pool: PgPool) {
+async fn cancel_keeps_cap_until_expiry_and_late_payment_still_credits(pool: PgPool) {
     let a = aged_user(&pool, "甲").await;
     let b = aged_user(&pool, "乙").await;
     let (_, _, v) = order(&pool, &a.token, 50_000, "atm").await;
     let id = v["topup"]["id"].as_str().unwrap().to_string();
     let no = trade_no(&pool, &id).await;
     let path = format!("/wallet/topups/{id}/cancel");
-    // 他人 404、本人成功並釋放上限
+    // 他人 404、本人成功；額度保留到 expires_at（取消後仍可能付款）
     assert_eq!(
         call(&pool, "POST", &path, &ck(&b.token), None).await.0,
         StatusCode::NOT_FOUND
@@ -1478,16 +1478,46 @@ async fn cancel_pending_topup_frees_cap_and_late_payment_still_credits(pool: PgP
         (s, v["code"].as_str()),
         (StatusCode::CONFLICT, Some("INVALID_STATE_TRANSITION"))
     );
+    let (s, _, v) = order(&pool, &a.token, 50_000, "atm").await;
     assert_eq!(
-        order(&pool, &a.token, 50_000, "atm").await.0,
-        StatusCode::CREATED
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("WALLET_CAP_EXCEEDED")),
+        "{v}"
     );
-    // 取消後才收到的成功付款通知仍入帳
+    // 取消後才收到的成功付款通知仍入帳，且不會超過上限
     mock().arm(&no, paid(50_000));
     assert_eq!(notify(&pool, &no, 50_000).await.2, "1|OK");
     assert_eq!(status_of(&pool, &no).await, "paid");
     assert_eq!(balance(&pool, a.id).await, 50_000);
     assert_points_reconciled(&pool).await;
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cancelled_topup_holds_new_account_daily_until_expiry(pool: PgPool) {
+    let n = user(&pool, "新帳號").await;
+    let (_, _, v) = order(&pool, &n.token, 3000, "atm").await;
+    let id = v["topup"]["id"].as_str().unwrap().to_string();
+    let path = format!("/wallet/topups/{id}/cancel");
+    assert_eq!(
+        call(&pool, "POST", &path, &ck(&n.token), None).await.0,
+        StatusCode::OK
+    );
+    let (s, _, v) = order(&pool, &n.token, 1000, "card").await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("TOPUP_LIMIT_EXCEEDED")),
+        "{v}"
+    );
+    // 繳費期限過了才釋放
+    sqlx::query("UPDATE topups SET expires_at = now() - interval '1 second' WHERE id = $1::uuid")
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        order(&pool, &n.token, 1000, "card").await.0,
+        StatusCode::CREATED
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

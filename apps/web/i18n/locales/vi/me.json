@@ -403,7 +403,7 @@
       "invoiceMember": "Hóa đơn điện tử sẽ được xuất vào kho lưu trữ hóa đơn của thành viên.",
       "cardRetry": "Để thử lại, hãy hủy đơn này và tạo đơn mới.",
       "cancel": "Hủy đơn",
-      "cancelText": "Hủy lệnh nạp tiền đang chờ thanh toán này? Nếu bạn đã thanh toán, khoản tiền vẫn sẽ được ghi nhận."
+      "cancelText": "Hủy lệnh nạp tiền đang chờ thanh toán này? Nếu bạn đã thanh toán, khoản tiền vẫn sẽ được ghi nhận. Cho đến hạn thanh toán ban đầu, số tiền này vẫn được tính vào hạn mức nạp tiền."
     },
     "frozenBanner": "Ví của bạn đã bị đóng băng: tạm thời không thể tài trợ hoặc yêu cầu hoàn tiền mặt. Vui lòng liên hệ hỗ trợ.",
     "refund": {
