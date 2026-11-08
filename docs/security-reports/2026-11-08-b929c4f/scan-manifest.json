@@ -1,0 +1,57 @@
+{
+  "documentType": "codex-security.scan-manifest",
+  "scan": {
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "62780d7804f3be429ba08c78fc381dde0849f65f7a1b6c3ab678cedc34071ee9"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "1ee5bc154f0efb97bb63afb238410d093da33bb55fa33f0c5dc57df06fb67ad1"
+      }
+    ],
+    "completedAt": "2026-11-08T03:43:42.703336Z",
+    "coverageRef": "coverage.json",
+    "findingsRef": "findings.json",
+    "id": "2419f271-872c-46fa-83fa-be73822e1949",
+    "preservedSources": {
+      "checkpoint-heads/5dfb2183582e1d8ff856c3d8120156dae3fd5c2d59b73ebdd1599612646dd320.json": "5dfb2183582e1d8ff856c3d8120156dae3fd5c2d59b73ebdd1599612646dd320",
+      "checkpoints/1e6db78df9d48164c0d83864785ed5459309fb6a475fac77b567f6caf4bb86de.json": "0a425bd77718088f2ea9bc05286026d6d8a5094aa24b5c27a2ac4ba83e9044c4",
+      "checkpoints/254379299b8ea2af027bb472dacbc208a600f6603fb8f521362b536d00c89cc0.json": "254379299b8ea2af027bb472dacbc208a600f6603fb8f521362b536d00c89cc0",
+      "checkpoints/3069f371f11bbf28eac8722c505c6720ee784348c28554b4ed6337e2a4b63b7a.json": "3069f371f11bbf28eac8722c505c6720ee784348c28554b4ed6337e2a4b63b7a",
+      "checkpoints/a6bb59c07757f9405ff5821cb49876e107a4ac82179ed03343a5e10581251448.json": "3c5daa799b77165d1e5ad18ea51bbe77319cb74a7dc46469a36e5efde0bc7e04",
+      "source-order/1979e76beffc068a86c795936fcfde2e498d547e697e5d9ce5b66cf970fbf4d9.json": "1979e76beffc068a86c795936fcfde2e498d547e697e5d9ce5b66cf970fbf4d9"
+    },
+    "producer": {
+      "name": "codex-security-plugin",
+      "version": "0.1.32"
+    },
+    "scope": {
+      "excludePaths": [],
+      "includePaths": [
+        "."
+      ],
+      "limitations": [
+        "No runtime testing, provider verification or exhaustive per-file review."
+      ],
+      "summary": "Repository-wide target with focused static coverage of identity, wallet, public sharing and client credentials."
+    },
+    "sealedAt": "2026-11-08T03:43:42.703336Z",
+    "startedAt": "2026-11-08T03:40:16.985540Z",
+    "status": "completed",
+    "target": {
+      "displayName": "Wishlist",
+      "kind": "git_revision",
+      "revision": "b929c4fa2fe4ca6cffafc79e47865bfb19c80d84",
+      "targetId": "target_sha256_5375d5a314f98844adebec22a0e7a333d3902ec6371b97e5e86220e134cd3e34"
+    },
+    "threatModel": {
+      "content": "Wishly accepts browser traffic through Nuxt and axum. Public wishlist readers, guests, authenticated members, organization operators and staff have different access to identity, fulfillment records and wallet balances. PostgreSQL persists authorization and ledger state. Media storage and outbound notifications cross service boundaries. Staff session MFA, object-level authorization, visibility filters, and transaction integrity protect these assets. Production configuration and external service permissions are unverified.\n\nRepository: Wishlist\nVersion: b929c4fa2fe4ca6cffafc79e47865bfb19c80d84",
+      "format": "markdown"
+    }
+  },
+  "schemaVersion": "1.0"
+}
