@@ -489,6 +489,40 @@ async fn recovery_codes_unlock_once_and_reset_clears_them(pool: PgPool) {
     assert_eq!(r.0, 200, "{:?}", r.2);
     let codes: Vec<String> = serde_json::from_value(r.2["recovery_codes"].clone()).unwrap();
     assert_eq!(codes.len(), 10);
+    // 每組至少 128 bits：28 個 base32 字元（140 bits）
+    assert!(
+        codes.iter().all(|c| c.replace('-', "").len() == 28),
+        "{codes:?}"
+    );
+    // 舊版 8 字元（40 bits）的碼即使雜湊仍在表內也不接受
+    let legacy = "abcd-efgh";
+    sqlx::query("INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES ($1, $2)")
+        .bind(s.id)
+        .bind(wishly_api::session::hash_token("abcdefgh"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let t0 = common::session(&pool, s.id).await;
+    let r = call(
+        &pool,
+        "POST",
+        "/auth/mfa/verify",
+        &ck(&t0),
+        Some(json!({"code": legacy})),
+    )
+    .await;
+    assert_eq!(
+        (r.0.as_u16(), r.2["code"].as_str()),
+        (400, Some("MFA_CODE_INVALID")),
+        "{:?}",
+        r.2
+    );
+    sqlx::query("DELETE FROM totp_recovery_codes WHERE user_id=$1 AND code_hash=$2")
+        .bind(s.id)
+        .bind(wishly_api::session::hash_token("abcdefgh"))
+        .execute(&pool)
+        .await
+        .unwrap();
     // 新 session 用備用碼解鎖（大小寫、連字號不拘）；同一碼不能再用
     let t2 = common::session(&pool, s.id).await;
     let typed = codes[0].replace('-', "").to_uppercase();
@@ -527,8 +561,8 @@ async fn recovery_codes_unlock_once_and_reset_clears_them(pool: PgPool) {
     assert_eq!(r.2["code"], "MFA_CODE_INVALID");
     assert_eq!(
         audit_count(&pool, s.id, "auth.mfa_failed").await,
-        2,
-        "用過的與亂打的備用碼各記一筆"
+        3,
+        "舊格式、用過的與亂打的備用碼各記一筆"
     );
     // 另一位營運人員重設後，舊備用碼全部失效
     let s2 = common::staff(&pool, "ops2").await;

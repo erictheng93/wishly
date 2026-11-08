@@ -234,14 +234,21 @@ struct CodeReq {
     code: String,
 }
 
-/// 備用碼張數；格式 xxxx-xxxx（base32 小寫，40 bits）
+/// 備用碼張數；格式 xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx（base32 小寫，140 bits）。
+/// 雜湊是無鹽 SHA-256，資料庫外洩時強度只靠亂數長度，所以至少 128 bits
 const RECOVERY_CODES: usize = 10;
+/// 備用碼去掉連字號後的長度；舊版 8 字元（40 bits）的碼因此一律失效，營運人員需重新產生
+const RECOVERY_LEN: usize = 28;
 
 fn recovery_code() -> String {
-    let mut b = [0u8; 5];
+    let mut b = [0u8; 20];
     rand::thread_rng().fill_bytes(&mut b);
-    let s = base32(&b).to_lowercase();
-    format!("{}-{}", &s[..4], &s[4..8])
+    let s = base32(&b).to_lowercase(); // 32 字元，取 28（140 bits）
+    s.as_bytes()[..RECOVERY_LEN]
+        .chunks(4)
+        .map(|c| std::str::from_utf8(c).unwrap())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// 輸入的備用碼正規化後雜湊：忽略大小寫、空白與連字號
@@ -350,7 +357,11 @@ async fn mfa_verify(
         return Ok(StatusCode::NO_CONTENT);
     }
     crate::ratelimit::check(&st.pool, &format!("mfa:{}", u.id), 5, 300).await?;
-    let n = sqlx::query(
+    let fresh_format = code.chars().filter(|c| c.is_ascii_alphanumeric()).count() == RECOVERY_LEN;
+    let n = if !fresh_format {
+        0
+    } else {
+        sqlx::query(
         "UPDATE totp_recovery_codes c SET used_at=now() FROM users u
           WHERE c.user_id=$1 AND c.code_hash=$2 AND c.used_at IS NULL AND u.id=c.user_id AND u.totp_enabled_at IS NOT NULL",
     )
@@ -358,7 +369,8 @@ async fn mfa_verify(
     .bind(recovery_hash(code))
     .execute(&st.pool)
     .await?
-    .rows_affected();
+    .rows_affected()
+    };
     if n != 1 {
         mfa_failed(&st, &u, &ip).await?;
         return Err(code_invalid());
