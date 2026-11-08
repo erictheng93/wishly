@@ -4,7 +4,7 @@ definePageMeta({ middleware: 'auth' })
 const { t, locale, locales } = useI18n()
 useHead({ title: () => t('settings.title') })
 const { api } = useApi()
-const { user, fetchMeFresh, logout, oauth } = useAuth()
+const { user, fetchMeFresh, logout, logoutFailed, oauth } = useAuth()
 const route = useRoute()
 const providers = [{ provider: 'email', label: 'Email' }, { provider: 'google', label: 'Google' }, { provider: 'line', label: 'LINE' }] as const
 const linked = computed(() => new Set<string>((user.value?.identities ?? []).map((i: any) => i.provider)))
@@ -338,6 +338,7 @@ async function remove() {
         <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? $t('settings.export.busy') : $t('settings.export.btn') }}</button>
       </section>
       <section class="c-card">
+        <p v-if="logoutFailed" class="c-err" role="alert">{{ $t('settings.logoutFailed') }}</p>
         <button class="c-btn block" @click="logout()">{{ $t('settings.logout') }}</button>
       </section>
       <section class="c-card bad">

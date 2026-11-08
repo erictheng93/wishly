@@ -96,6 +96,7 @@
       "busy": "Mengekspor…"
     },
     "logout": "Keluar",
+    "logoutFailed": "Proses keluar belum selesai (masalah jaringan atau server), perangkat ini masih masuk. Silakan ketuk Keluar lagi.",
     "del": {
       "title": "Hapus akun",
       "text": "Kami akan menghapus Email dan namamu, wishlist-mu diarsipkan dan dicabut dari publik. Tindakan ini tidak bisa dibatalkan.",

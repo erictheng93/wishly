@@ -96,6 +96,7 @@
       "busy": "Đang xuất…"
     },
     "logout": "Đăng xuất",
+    "logoutFailed": "Đăng xuất chưa hoàn tất (lỗi mạng hoặc máy chủ), thiết bị này vẫn đang đăng nhập. Vui lòng nhấn Đăng xuất lần nữa.",
     "del": {
       "title": "Xóa tài khoản",
       "text": "Chúng tôi sẽ xóa Email và tên của bạn, các danh sách sẽ được lưu trữ và gỡ khỏi chế độ công khai. Hành động này không thể hoàn tác.",

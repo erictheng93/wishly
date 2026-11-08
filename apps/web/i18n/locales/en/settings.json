@@ -96,6 +96,7 @@
       "busy": "Exporting…"
     },
     "logout": "Sign out",
+    "logoutFailed": "Sign-out didn't finish (network or server problem), so this device is still signed in. Please tap Sign out again.",
     "del": {
       "title": "Delete account",
       "text": "We will remove your email and name, and your lists will be archived and taken off public view. This can't be undone.",
