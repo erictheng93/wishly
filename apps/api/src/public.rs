@@ -365,8 +365,9 @@ async fn render(
     // 與 claimers 同一道閘：show_claimer_names 且未驚喜鎖定才輸出。
     let mut contributors: HashMap<Uuid, Vec<Value>> = HashMap::new();
     if visible {
+        // 逐筆套可見度後才合併：非 public（friends / private）一律視同匿名，不併入具名總額（此回應可被共用快取）
         let rows: Vec<(Uuid, Uuid, bool, String, i64)> = sqlx::query_as(
-            "SELECT c.item_id, c.user_id, c.is_anonymous, c.donor_name, c.points FROM contributions c JOIN wishlist_items i ON i.id = c.item_id
+            "SELECT c.item_id, c.user_id, (c.is_anonymous OR c.visibility <> 'public'), c.donor_name, c.points FROM contributions c JOIN wishlist_items i ON i.id = c.item_id
              WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('pledged', 'captured') ORDER BY c.created_at, c.id")
             .bind(w.id).fetch_all(&st.pool).await?;
         let mut merged: HashMap<(Uuid, Uuid), usize> = HashMap::new(); // (item, user) -> 該品項 contributors 的索引（僅非匿名）
