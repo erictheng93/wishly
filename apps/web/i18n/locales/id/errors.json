@@ -20,7 +20,7 @@
     "generic": "Terjadi kesalahan, coba lagi nanti",
     "ACCOUNT_BLOCKED": "Akun diblokir, hubungi layanan pelanggan",
     "ACCOUNT_HAS_POINTS": "Akun masih punya poin atau patungan yang sedang berjalan, selesaikan dulu di dompet dan hubungi layanan pelanggan",
-    "REAUTH_REQUIRED": "Demi keamanan, masuk ulang sebelum menghapus akun",
+    "REAUTH_REQUIRED": "Demi keamanan, konfirmasi identitas terlebih dahulu.",
     "ACCOUNT_HAS_BALANCE": "Akun masih punya saldo atau transaksi yang sedang berjalan, selesaikan dulu sebelum menghapus",
     "AMOUNT_MISMATCH": "Jumlah pembayaran tidak sesuai dengan pesanan",
     "AUTO_TOPUP_LIMIT_REACHED": "Jumlah top up sekali tidak boleh melebihi batas bulanan",
@@ -165,6 +165,7 @@
       "birthday_notify_NOT_PERSONAL": "Daftar organisasi dan titik bantuan tidak dapat mengirim notifikasi ulang tahun."
     },
     "ADDRESS_UNAVAILABLE": "Informasi penerima sementara tidak tersedia. Coba lagi nanti.",
-    "RESTORE_NOT_ALLOWED": "Organisasi ini tidak dapat dipulihkan (tidak dicabut, atau sudah lewat 7 hari)"
+    "RESTORE_NOT_ALLOWED": "Organisasi ini tidak dapat dipulihkan (tidak dicabut, atau sudah lewat 7 hari)",
+    "NO_EMAIL_IDENTITY": "Akun ini belum menautkan email."
   }
 }

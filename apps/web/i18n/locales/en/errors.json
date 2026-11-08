@@ -20,7 +20,7 @@
     "generic": "Something went wrong. Please try again later.",
     "ACCOUNT_BLOCKED": "Your account is suspended. Please contact support.",
     "ACCOUNT_HAS_POINTS": "Your account still has points or active contributions. Open your wallet and contact support before deleting it.",
-    "REAUTH_REQUIRED": "For your security, please sign in again before deleting your account.",
+    "REAUTH_REQUIRED": "For your security, please confirm your identity first.",
     "ACCOUNT_HAS_BALANCE": "Your account still has a balance or active transactions. Resolve them before deleting it.",
     "AMOUNT_MISMATCH": "The payment amount does not match the order.",
     "AUTO_TOPUP_LIMIT_REACHED": "The top-up amount cannot exceed the monthly limit.",
@@ -165,6 +165,7 @@
       "birthday_notify_NOT_PERSONAL": "Organization and relief-site lists can't send birthday notifications."
     },
     "ADDRESS_UNAVAILABLE": "Shipping details are temporarily unavailable. Please try again later.",
-    "RESTORE_NOT_ALLOWED": "This organization can't be restored (it wasn't revoked, or the 7-day window has passed)"
+    "RESTORE_NOT_ALLOWED": "This organization can't be restored (it wasn't revoked, or the 7-day window has passed)",
+    "NO_EMAIL_IDENTITY": "This account has no linked email."
   }
 }

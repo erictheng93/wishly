@@ -20,7 +20,7 @@
     "generic": "Đã xảy ra lỗi, vui lòng thử lại sau.",
     "ACCOUNT_BLOCKED": "Tài khoản đã bị đình chỉ. Vui lòng liên hệ hỗ trợ.",
     "ACCOUNT_HAS_POINTS": "Tài khoản vẫn còn điểm hoặc khoản tài trợ đang hoạt động. Hãy vào ví và liên hệ hỗ trợ trước khi xóa.",
-    "REAUTH_REQUIRED": "Để bảo mật, vui lòng đăng nhập lại trước khi xóa tài khoản.",
+    "REAUTH_REQUIRED": "Để bảo mật, vui lòng xác nhận danh tính trước.",
     "ACCOUNT_HAS_BALANCE": "Tài khoản vẫn còn số dư hoặc giao dịch đang hoạt động. Vui lòng xử lý trước khi xóa.",
     "AMOUNT_MISMATCH": "Số tiền thanh toán không khớp với đơn hàng.",
     "AUTO_TOPUP_LIMIT_REACHED": "Số tiền nạp mỗi lần không được vượt quá giới hạn hàng tháng.",
@@ -165,6 +165,7 @@
       "birthday_notify_NOT_PERSONAL": "Danh sách của tổ chức và điểm cứu trợ không thể gửi thông báo sinh nhật."
     },
     "ADDRESS_UNAVAILABLE": "Tạm thời không thể đọc thông tin nhận hàng. Vui lòng thử lại sau.",
-    "RESTORE_NOT_ALLOWED": "Không thể khôi phục xác minh cho tổ chức này (không bị thu hồi hoặc đã quá 7 ngày)"
+    "RESTORE_NOT_ALLOWED": "Không thể khôi phục xác minh cho tổ chức này (không bị thu hồi hoặc đã quá 7 ngày)",
+    "NO_EMAIL_IDENTITY": "Tài khoản này chưa liên kết Email."
   }
 }

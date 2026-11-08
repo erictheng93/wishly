@@ -32,14 +32,25 @@
         "oauth_failed": "Linking failed. Please try again and check which account you are signing in with.",
         "oauth_unavailable": "This sign-in method is not available yet.",
         "identity_in_use": "This sign-in method or email belongs to another account that has data, so it can't be merged automatically. Sign in with that account or contact support with both account IDs.",
-        "provider_already_linked": "This sign-in method is already linked. Unlink it first to change it."
+        "provider_already_linked": "This sign-in method is already linked. Unlink it first to change it.",
+        "reauth_required": "For your security, please confirm your identity before changing sign-in methods."
       },
       "linkedMsg": "{label} linked",
       "emailLinkedMsg": "Email linked. You can now receive notifications and set a password.",
       "unlinkedMsg": "{label} unlinked",
       "unlinkTitle": "Unlink {label}?",
       "unlinkText": "Unlinking signs out your other devices; this device stays signed in. You will need another linked method to sign in. Without an email you can't receive notifications or reset your password. Signing in again by verifying the same email may link it back to this account automatically.",
-      "unlinkOk": "Unlink"
+      "unlinkOk": "Unlink",
+      "reauth": {
+        "title": "Confirm it's you",
+        "text": "For your security, confirm your identity before changing sign-in methods.",
+        "password": "Current password",
+        "sendCode": "Email me a code",
+        "code": "Email code",
+        "confirm": "Confirm",
+        "relogin": "Sign in again instead",
+        "cancel": "Cancel"
+      }
     },
     "pw": {
       "title": "Change password",

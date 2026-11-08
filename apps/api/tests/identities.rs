@@ -1117,3 +1117,199 @@ async fn absorb_retires_unused_uploads(pool: PgPool) {
     .unwrap();
     assert_eq!(pending, 0, "封面 / 品項圖也要隨帳號退役");
 }
+
+async fn password_identity(pool: &PgPool, id: Uuid, pw: &str) {
+    use argon2::{
+        password_hash::{rand_core::OsRng, SaltString},
+        Argon2, PasswordHasher,
+    };
+    let h = Argon2::default()
+        .hash_password(pw.as_bytes(), &SaltString::generate(&mut OsRng))
+        .unwrap()
+        .to_string();
+    sqlx::query("INSERT INTO auth_identities (user_id, provider, provider_uid, password_hash) SELECT id, 'email', email, $2 FROM users WHERE id=$1")
+        .bind(id).bind(h).execute(pool).await.unwrap();
+}
+
+async fn age_session(pool: &PgPool, token: &str, created: &str, reauth: Option<&str>) {
+    sqlx::query("UPDATE sessions SET created_at = now() - $2::interval, reauth_at = now() - $3::interval WHERE token_hash=$1")
+        .bind(hash_token(token)).bind(created).bind(reauth).execute(pool).await.unwrap();
+}
+
+/// 舊 session 輸入密碼 / 驗證碼後才能綁定；錯誤不開窗口；窗口 10 分鐘後失效；驗證碼只對發碼的 session 有效。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reauth_by_password_or_code_unlocks_linking(pool: PgPool) {
+    let u = common::user(&pool, "重新驗證").await;
+    password_identity(&pool, u.id, "correct-horse-battery").await;
+    let probe = || async {
+        common::call(
+            &pool,
+            "POST",
+            "/me/identities/email/request",
+            &common::ck(&u.token),
+            Some(json!({"email":"x@example.com"})),
+        )
+        .await
+    };
+    age_session(&pool, &u.token, "11 minutes", None).await;
+    assert_eq!(probe().await.0, 403);
+    let bad = common::call(
+        &pool,
+        "POST",
+        "/me/reauth",
+        &common::ck(&u.token),
+        Some(json!({"password":"wrong"})),
+    )
+    .await;
+    assert_eq!(bad.0, 401);
+    let set: bool =
+        sqlx::query_scalar("SELECT reauth_at IS NOT NULL FROM sessions WHERE token_hash=$1")
+            .bind(hash_token(&u.token))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(!set);
+    assert_eq!(
+        common::call(
+            &pool,
+            "POST",
+            "/me/reauth",
+            &common::ck(&u.token),
+            Some(json!({"password":"correct-horse-battery"}))
+        )
+        .await
+        .0,
+        204
+    );
+    assert_eq!(probe().await.0, 202);
+    age_session(&pool, &u.token, "11 minutes", Some("11 minutes")).await;
+    assert_eq!(probe().await.0, 403);
+    // 驗證碼：只對發碼的 session 有效
+    let other = common::session(&pool, u.id).await;
+    age_session(&pool, &other, "11 minutes", None).await;
+    assert_eq!(
+        common::call(
+            &pool,
+            "POST",
+            "/me/reauth/code",
+            &common::ck(&u.token),
+            None
+        )
+        .await
+        .0,
+        202
+    );
+    sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE purpose='reauth'")
+        .bind(code_hash("123456", "dev-pepper"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let body = json!({"code":"123456"});
+    assert_eq!(
+        common::call(
+            &pool,
+            "POST",
+            "/me/reauth",
+            &common::ck(&other),
+            Some(body.clone())
+        )
+        .await
+        .0,
+        400
+    );
+    assert_eq!(
+        common::call(
+            &pool,
+            "POST",
+            "/me/reauth",
+            &common::ck(&u.token),
+            Some(body)
+        )
+        .await
+        .0,
+        204
+    );
+    assert_eq!(probe().await.0, 202);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reauth_code_needs_a_bound_email(pool: PgPool) {
+    let u = provider_user(&pool, "line").await;
+    let (s, _, b) = common::call(
+        &pool,
+        "POST",
+        "/me/reauth/code",
+        &common::ck(&u.token),
+        None,
+    )
+    .await;
+    assert_eq!(
+        (s.as_u16(), b["code"].as_str()),
+        (409, Some("NO_EMAIL_IDENTITY"))
+    );
+}
+
+/// 被盜 session 不能綁定 / 解除登入方式：session 需在 10 分鐘內建立或重新驗證。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn stale_session_cannot_verify_or_unlink(pool: PgPool) {
+    let u = provider_user(&pool, "line").await;
+    let req = json!({"email":"fresh@example.com"});
+    let ck = common::ck(&u.token);
+    assert_eq!(
+        common::call(
+            &pool,
+            "POST",
+            "/me/identities/email/request",
+            &ck,
+            Some(req)
+        )
+        .await
+        .0,
+        202
+    );
+    sqlx::query("UPDATE otp_challenges SET code_hash=$1 WHERE email='fresh@example.com'")
+        .bind(code_hash("123456", "dev-pepper"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let verify = json!({"email":"fresh@example.com","code":"123456"});
+    age_session(&pool, &u.token, "11 minutes", None).await;
+    let (s, _, b) = common::call(
+        &pool,
+        "POST",
+        "/me/identities/email/verify",
+        &ck,
+        Some(verify.clone()),
+    )
+    .await;
+    assert_eq!(
+        (s.as_u16(), b["code"].as_str()),
+        (403, Some("REAUTH_REQUIRED"))
+    );
+    age_session(&pool, &u.token, "1 minute", None).await;
+    assert_eq!(
+        common::call(
+            &pool,
+            "POST",
+            "/me/identities/email/verify",
+            &ck,
+            Some(verify)
+        )
+        .await
+        .0,
+        200
+    );
+    age_session(&pool, &u.token, "11 minutes", None).await;
+    let (s, _, b) = common::call(&pool, "DELETE", "/me/identities/email", &ck, None).await;
+    assert_eq!(
+        (s.as_u16(), b["code"].as_str()),
+        (403, Some("REAUTH_REQUIRED"))
+    );
+    age_session(&pool, &u.token, "1 minute", None).await;
+    assert_eq!(
+        common::call(&pool, "DELETE", "/me/identities/email", &ck, None)
+            .await
+            .0,
+        200
+    );
+}

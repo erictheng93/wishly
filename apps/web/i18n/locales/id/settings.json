@@ -32,14 +32,25 @@
         "oauth_failed": "Gagal menautkan, ulangi dan pastikan akun yang dipakai untuk masuk",
         "oauth_unavailable": "Cara masuk ini belum dibuka",
         "identity_in_use": "Cara masuk atau Email ini milik akun lain yang sudah berisi data sehingga tidak bisa digabung otomatis. Masuk dengan akun itu atau hubungi layanan pelanggan dengan kedua ID akun.",
-        "provider_already_linked": "Cara masuk ini sudah tertaut, putuskan dulu sebelum menggantinya"
+        "provider_already_linked": "Cara masuk ini sudah tertaut, putuskan dulu sebelum menggantinya",
+        "reauth_required": "Demi keamanan, konfirmasi identitas sebelum mengubah cara masuk."
       },
       "linkedMsg": "{label} tertaut",
       "emailLinkedMsg": "Email tertaut, kamu bisa menerima pemberitahuan dan mengatur kata sandi",
       "unlinkedMsg": "Tautan {label} diputuskan",
       "unlinkTitle": "Putuskan tautan {label}?",
       "unlinkText": "Setelah diputus, perangkat lain akan keluar sedangkan perangkat ini tetap masuk. Selanjutnya kamu harus masuk dengan cara lain yang tertaut. Tanpa Email yang tersisa, kamu tidak bisa menerima pemberitahuan atau mengatur ulang kata sandi; jika nanti masuk lagi dengan Email yang sama, akun ini mungkin otomatis tertaut kembali.",
-      "unlinkOk": "Putuskan tautan"
+      "unlinkOk": "Putuskan tautan",
+      "reauth": {
+        "title": "Konfirmasi identitas",
+        "text": "Demi keamanan, konfirmasi identitas sebelum mengubah cara masuk.",
+        "password": "Kata sandi saat ini",
+        "sendCode": "Kirim kode ke email saya",
+        "code": "Kode email",
+        "confirm": "Konfirmasi",
+        "relogin": "Masuk ulang saja",
+        "cancel": "Batal"
+      }
     },
     "pw": {
       "title": "Ubah kata sandi",
