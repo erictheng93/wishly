@@ -38,6 +38,8 @@ pub const WALLET_CAP: i64 = 50_000;
 const HOURLY_LIMIT: i64 = 10;
 /// 新帳號（註冊 30 天內）每日（Asia/Taipei）儲值上限（4.14 / D47-2）。
 const NEW_ACCOUNT_DAILY: i64 = 3000;
+/// 使用者取消的單：綠界繳費代碼 / 付款頁在 expires_at 前仍可能付款並入帳，額度要保留到期限
+const HELD_SQL: &str = "(status = 'pending' OR (status = 'failed' AND failure_reason = '使用者取消')) AND expires_at > now()";
 /// 信用卡付款頁有效分鐘；超商 / ATM 繳費期限天數。
 const CARD_TTL_MIN: i64 = 30;
 const OFFLINE_TTL_DAYS: i64 = 3;
@@ -365,11 +367,11 @@ async fn create(
             retry_after: Some(wait as u64),
         });
     }
-    // 錢包上限：餘額 + 未過期待付款 + 本次
-    let held: i64 = sqlx::query_scalar(
+    // 錢包上限：餘額 + 未過期待付款（含已取消但仍可能付款）+ 本次
+    let held: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT (SELECT balance FROM point_wallets WHERE id = $1)
-              + COALESCE((SELECT sum(amount) FROM topups WHERE wallet_id = $1 AND status = 'pending' AND expires_at > now()), 0)::bigint",
-    )
+              + COALESCE((SELECT sum(amount) FROM topups WHERE wallet_id = $1 AND {HELD_SQL}), 0)::bigint"
+    )))
     .bind(wallet)
     .fetch_one(&mut *tx)
     .await?;
@@ -382,12 +384,12 @@ async fn create(
         });
     }
     // 4.14 新帳號每日上限（gift_card_orders 尚未存在，僅計儲值單）；0 rows = 非新帳號
-    let remaining: Option<i64> = sqlx::query_scalar(
+    let remaining: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT ($2 - COALESCE((SELECT sum(t.amount) FROM topups t
-                                 WHERE t.wallet_id = $3 AND t.status IN ('pending', 'paid')
+                                 WHERE t.wallet_id = $3 AND (t.status = 'paid' OR {HELD_SQL})
                                    AND t.created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei'), 0))::bigint
-           FROM users u WHERE u.id = $1 AND u.created_at > now() - interval '30 days'",
-    )
+           FROM users u WHERE u.id = $1 AND u.created_at > now() - interval '30 days'"
+    )))
     .bind(user.id)
     .bind(NEW_ACCOUNT_DAILY)
     .bind(wallet)

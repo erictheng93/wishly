@@ -903,9 +903,21 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
     let done = cf_item(&pool, &t, wid, 100).await;
+    // 預設可見度是 private；阿明、路人C 設為公開才會具名
+    sqlx::query("UPDATE users SET default_claim_visibility = 'public' WHERE id = ANY($1)")
+        .bind(vec![a, c])
+        .execute(&pool)
+        .await
+        .unwrap();
     pledge(&pool, item, a, 100, false).await;
     pledge(&pool, item, a, 200, false).await; // 同一位非匿名 → 合併
-    pledge(&pool, item, b_, 50, true).await;
+    let hidden = pledge(&pool, item, a, 40, false).await;
+    sqlx::query("UPDATE contributions SET visibility = 'friends' WHERE id = $1")
+        .bind(hidden)
+        .execute(&pool)
+        .await
+        .unwrap(); // 同一人混合可見度：非 public 那筆不可併入具名總額
+    pledge(&pool, item, b_, 50, false).await; // 非匿名但可見度 private（預設）→ 匿名
     pledge(&pool, item, b_, 70, true).await; // 匿名各自一筆
     let gone = pledge(&pool, item, c, 30, false).await;
     let mut tx = pool.begin().await.unwrap();
@@ -947,7 +959,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
             i["remaining_points"].as_i64(),
             i["progress_percent"].as_i64()
         ),
-        (Some(1000), Some(420), Some(580), Some(42)),
+        (Some(1000), Some(460), Some(540), Some(46)),
         "{i}"
     );
     assert_eq!(
@@ -960,7 +972,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     );
     assert!(i["funding_deadline"].is_string());
     let cs = i["contributors"].as_array().unwrap();
-    assert_eq!(cs.len(), 3, "{cs:?}"); // 阿明(合併) + 匿名 x2；撤回的不列
+    assert_eq!(cs.len(), 4, "{cs:?}"); // 阿明(公開合併) + 匿名 x3；撤回的不列
     assert_eq!(
         cs[0],
         json!({ "display_name": "阿明", "points": 300, "anonymous": false })
@@ -970,7 +982,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
             .filter(|c| c["display_name"] == "匿名朋友")
             .map(|c| c["points"].as_i64().unwrap())
             .collect::<Vec<_>>(),
-        vec![50, 70]
+        vec![40, 50, 70]
     );
     assert!(!p.to_string().contains("小華") && !p.to_string().contains("example.com"));
     let d = find(done);
@@ -1014,7 +1026,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     )
     .await;
     assert!(p["items"][0].get("contributors").is_none(), "{p}");
-    assert_eq!(p["items"][0]["pledged_points"], 420);
+    assert_eq!(p["items"][0]["pledged_points"], 460);
     common::assert_all_reconciled(&pool).await;
 }
 

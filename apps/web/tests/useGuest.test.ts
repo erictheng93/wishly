@@ -49,3 +49,11 @@ it('turns disconnected transport into a typed NETWORK error', async () => {
   expect(sys.value?.kind).toBe('busy') // happy-dom 的 navigator.onLine 為 true：連不到 = 伺服器端問題
   await expect(useGuest().api('/me/claims')).rejects.toMatchObject({ status: 0, code: 'NETWORK' })
 })
+
+it('guest cookie copy is written with Secure on https', () => {
+  const set = vi.spyOn(document, 'cookie', 'set')
+  vi.stubGlobal('location', { protocol: 'https:' })
+  setGuestToken('tok')
+  expect(set.mock.calls.some(([v]) => v.startsWith('ws_guest_js=tok;') && v.endsWith('; Secure'))).toBe(true)
+  set.mockRestore()
+})

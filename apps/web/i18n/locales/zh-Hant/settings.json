@@ -32,14 +32,25 @@
         "oauth_failed": "綁定失敗，請重新操作並確認登入帳號",
         "oauth_unavailable": "此登入方式尚未開放",
         "identity_in_use": "此登入方式或 Email 已屬於另一個有資料的帳號，無法自動合併。請使用原帳號登入，或聯絡客服並提供兩邊的帳號 ID",
-        "provider_already_linked": "已綁定此登入方式，請先解除後再更換"
+        "provider_already_linked": "已綁定此登入方式，請先解除後再更換",
+        "reauth_required": "為了安全，請重新確認身分後再變更登入方式"
       },
       "linkedMsg": "已綁定 {label}",
       "emailLinkedMsg": "已綁定 Email，可收取通知並設定密碼",
       "unlinkedMsg": "已解除 {label} 綁定",
       "unlinkTitle": "解除 {label} 綁定？",
       "unlinkText": "解除後會登出其他裝置，目前裝置保持登入。之後須使用其他已綁定的方式登入。沒有剩餘 Email 時無法收通知或重設密碼；日後重新驗證相同 Email 登入，仍可能自動連結回此帳號。",
-      "unlinkOk": "解除綁定"
+      "unlinkOk": "解除綁定",
+      "reauth": {
+        "title": "確認身分",
+        "text": "為了安全，變更登入方式前請先確認身分。",
+        "password": "目前密碼",
+        "sendCode": "寄驗證碼到我的 Email",
+        "code": "Email 驗證碼",
+        "confirm": "確認",
+        "relogin": "改為重新登入",
+        "cancel": "取消"
+      }
     },
     "pw": {
       "title": "變更密碼",
@@ -96,6 +107,7 @@
       "busy": "匯出中…"
     },
     "logout": "登出",
+    "logoutFailed": "登出沒有完成（網路或伺服器問題），這個裝置仍是登入狀態。請再按一次登出。",
     "del": {
       "title": "刪除帳號",
       "text": "我們會移除你的 Email 與名稱，你的清單會封存並從公開移除。此動作無法復原。",

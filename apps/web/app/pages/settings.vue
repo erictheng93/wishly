@@ -4,7 +4,7 @@ definePageMeta({ middleware: 'auth' })
 const { t, locale, locales } = useI18n()
 useHead({ title: () => t('settings.title') })
 const { api } = useApi()
-const { user, fetchMeFresh, logout, oauth } = useAuth()
+const { user, fetchMeFresh, logout, logoutFailed, oauth } = useAuth()
 const route = useRoute()
 const providers = [{ provider: 'email', label: 'Email' }, { provider: 'google', label: 'Google' }, { provider: 'line', label: 'LINE' }] as const
 const linked = computed(() => new Set<string>((user.value?.identities ?? []).map((i: any) => i.provider)))
@@ -24,23 +24,46 @@ const bDays = computed(() => daysInMonth(bMonth.value))
 const pad = (n: number) => String(n).padStart(2, '0')
 const exporting = ref(false), exportErr = ref('')
 const showDel = ref(false), word = ref(''), delPw = ref(''), delBusy = ref(false), delErr = ref(''), delReauth = ref(false)
-const LINK_ERROR_KEYS = ['oauth_failed', 'oauth_unavailable', 'identity_in_use', 'provider_already_linked']
+const LINK_ERROR_KEYS = ['oauth_failed', 'oauth_unavailable', 'identity_in_use', 'provider_already_linked', 'reauth_required']
+// 綁定 / 解除登入方式須近期驗證：被擋時開確認區塊（密碼或 Email 驗證碼），成功後重試剛才的動作
+const reauthOpen = ref(false), reauthPw = ref(''), reauthCode = ref(''), reauthSent = ref(false), reauthBusy = ref(false), reauthErr = ref('')
+let reauthRetry: (() => unknown) | undefined
+function askReauth(retry?: () => unknown) {
+  reauthRetry = retry; reauthOpen.value = true; reauthErr.value = ''; reauthPw.value = reauthCode.value = ''; reauthSent.value = false
+}
+async function sendReauthCode() {
+  reauthBusy.value = true; reauthErr.value = ''
+  try { await api('/me/reauth/code', { method: 'POST' }); reauthSent.value = true } catch (e) { reauthErr.value = errMsg(e) } finally { reauthBusy.value = false }
+}
+async function submitReauth() {
+  reauthBusy.value = true; reauthErr.value = ''
+  try {
+    await api('/me/reauth', { method: 'POST', body: reauthPw.value ? { password: reauthPw.value } : { code: reauthCode.value } })
+    reauthOpen.value = false
+    const retry = reauthRetry; reauthRetry = undefined
+    reauthBusy.value = false
+    await retry?.()
+  } catch (e) { reauthErr.value = errMsg(e) } finally { reauthBusy.value = false }
+}
 const linkError = (code: string) => (LINK_ERROR_KEYS.includes(code) ? t(`settings.login.err.${code}`) : '')
 // 網頁版整頁導向供應商再回來；原生殼等 deep link 回來後就地更新
 async function linkOAuth(p: (typeof providers)[number]) {
   if (identityBusy.value || p.provider === 'email') return
   identityBusy.value = true; identityErr.value = identityMsg.value = ''
   try {
+    if (!(await api('/me/reauth')).fresh) { askReauth(() => linkOAuth(p)); return }
     await oauth(p.provider, '/settings', true)
     if (isNative()) identityMsg.value = t('settings.login.linkedMsg', { label: p.label })
   } catch (e: any) {
-    if (e.message !== 'cancelled') identityErr.value = linkError(e.message) || errMsg(e)
+    if (e.code === 'REAUTH_REQUIRED') askReauth(() => linkOAuth(p))
+    else if (e.message !== 'cancelled') identityErr.value = linkError(e.message) || errMsg(e)
   } finally { identityBusy.value = false }
 }
 const ready = ref(false) // GET /me 回來並填好表單前不渲染，免得使用者先輸入的內容被覆寫
 onMounted(async () => { try { await fetchMeFresh() } catch { /* 保留舊的 user */ } name.value = user.value?.display_name ?? ''; handle.value = user.value?.handle ?? ''; dcv.value = user.value?.default_claim_visibility ?? 'friends'
   ;[bMonth.value = '', bDay.value = ''] = user.value?.birthday?.split('-') ?? []; bVis.value = user.value?.birthday_visibility ?? 'friends'; linkEmail.value = user.value?.email ?? ''
   identityErr.value = linkError(String(route.query.error))
+  if (route.query.error === 'reauth_required') { identityErr.value = ''; askReauth() }
   const label = providers.find(p => p.provider === route.query.linked)?.label
   if (label) identityMsg.value = t('settings.login.linkedMsg', { label })
   ready.value = true
@@ -59,7 +82,7 @@ async function sendLinkEmail() {
     clearInterval(linkTimer)
     linkTimer = setInterval(() => { if (--cooldown.value <= 0) clearInterval(linkTimer) }, 1000)
     nextTick(() => linkOtp.value?.focus())
-  } catch (e) { identityErr.value = errMsg(e) } finally { identityBusy.value = false }
+  } catch (e: any) { if (e.code === 'REAUTH_REQUIRED') askReauth(sendLinkEmail); else identityErr.value = errMsg(e) } finally { identityBusy.value = false }
 }
 function changeLinkEmail() { sentEmail.value = ''; linkCode.value = ''; cooldown.value = 0; clearInterval(linkTimer) }
 async function verifyLinkEmail() {
@@ -69,7 +92,10 @@ async function verifyLinkEmail() {
     user.value = await api('/me/identities/email/verify', { method: 'POST', body: { email: sentEmail.value, code: linkCode.value } })
     sentEmail.value = ''; linkCode.value = ''; cooldown.value = 0; clearInterval(linkTimer)
     identityMsg.value = t('settings.login.emailLinkedMsg')
-  } catch (e) { identityErr.value = errMsg(e); linkCode.value = ''; linkOtp.value?.focus() } finally { identityBusy.value = false }
+  } catch (e: any) {
+    if (e.code === 'REAUTH_REQUIRED') askReauth(verifyLinkEmail)
+    else { identityErr.value = errMsg(e); linkCode.value = ''; linkOtp.value?.focus() }
+  } finally { identityBusy.value = false }
 }
 function closeUnlink() { if (!identityBusy.value) removingProvider.value = '' }
 async function unlinkIdentity() {
@@ -79,7 +105,10 @@ async function unlinkIdentity() {
     user.value = await api(`/me/identities/${removingProvider.value}`, { method: 'DELETE' })
     identityMsg.value = t('settings.login.unlinkedMsg', { label: removingLabel.value })
     removingProvider.value = ''; linkEmail.value = user.value.email ?? ''
-  } catch (e) { identityErr.value = errMsg(e) } finally { identityBusy.value = false }
+  } catch (e: any) {
+    if (e.code === 'REAUTH_REQUIRED') { const p = removingProvider.value; removingProvider.value = ''; askReauth(() => { removingProvider.value = p; return unlinkIdentity() }) }
+    else identityErr.value = errMsg(e)
+  } finally { identityBusy.value = false }
 }
 
 // 登入裝置
@@ -231,6 +260,23 @@ async function remove() {
         </form>
         <p v-if="user.email && !user.has_password" class="c-mute"><NuxtLink to="/forgot-password">{{ $t('settings.login.setPw') }}</NuxtLink>{{ $t('settings.login.setPwNote') }}</p>
         <p v-else-if="!user.email" class="c-mute">{{ $t('settings.login.noEmailWarn') }}</p>
+        <div v-if="reauthOpen" class="c-card" role="group" :aria-label="$t('settings.login.reauth.title')">
+          <p class="c-mute">{{ $t('settings.login.reauth.text') }}</p>
+          <form v-if="user.has_password" @submit.prevent="submitReauth">
+            <CreatorPasswordField v-model="reauthPw" :label="$t('settings.login.reauth.password')" autocomplete="current-password" />
+            <button class="c-btn primary block c-mb" :disabled="reauthBusy || !reauthPw">{{ $t('settings.login.reauth.confirm') }}</button>
+          </form>
+          <form v-if="linked.has('email')" @submit.prevent="submitReauth">
+            <button v-if="!reauthSent" type="button" class="c-btn c-mb" :disabled="reauthBusy" @click="sendReauthCode">{{ $t('settings.login.reauth.sendCode') }}</button>
+            <template v-else>
+              <label class="c-field"><span>{{ $t('settings.login.reauth.code') }}</span><input v-model="reauthCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
+              <button class="c-btn primary block c-mb" :disabled="reauthBusy || reauthCode.length !== 6">{{ $t('settings.login.reauth.confirm') }}</button>
+            </template>
+          </form>
+          <p v-if="reauthErr" class="c-err" role="alert">{{ reauthErr }}</p>
+          <button type="button" class="c-btn" @click="logout('/settings')">{{ $t('settings.login.reauth.relogin') }}</button>
+          <button type="button" class="c-btn" @click="reauthOpen = false">{{ $t('settings.login.reauth.cancel') }}</button>
+        </div>
         <p v-if="identityErr && !removingProvider" class="c-err" role="alert">{{ identityErr }}</p>
         <p v-if="identityMsg" class="c-ok" role="status">{{ identityMsg }}</p>
       </section>
@@ -338,6 +384,7 @@ async function remove() {
         <button class="c-btn" :disabled="exporting" @click="exportData">{{ exporting ? $t('settings.export.busy') : $t('settings.export.btn') }}</button>
       </section>
       <section class="c-card">
+        <p v-if="logoutFailed" class="c-err" role="alert">{{ $t('settings.logoutFailed') }}</p>
         <button class="c-btn block" @click="logout()">{{ $t('settings.logout') }}</button>
       </section>
       <section class="c-card bad">

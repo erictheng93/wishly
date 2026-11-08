@@ -8,7 +8,7 @@ use crate::{
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
-    routing::{delete, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Deserialize;
@@ -21,6 +21,8 @@ pub fn routes() -> Router<AppState> {
         .route("/me/identities/email/request", post(request_email))
         .route("/me/identities/email/verify", post(verify_email))
         .route("/me/identities/{provider}", delete(unlink))
+        .route("/me/reauth", get(reauth_status).post(reauth))
+        .route("/me/reauth/code", post(reauth_code))
 }
 
 pub(crate) fn in_use() -> AppError {
@@ -60,6 +62,30 @@ pub(crate) async fn lock_identity(
     Ok(())
 }
 
+/// 綁定 / 解除登入方式須由 10 分鐘內建立或重新驗證（密碼 / Email 碼）過的 session 操作，防被盜 session 植入自己的登入方式後長期持有帳號。
+fn reauth_required() -> AppError {
+    AppError::problem(
+        403,
+        "REAUTH_REQUIRED",
+        "為了安全，請重新登入後再變更登入方式",
+    )
+}
+
+/// 提早檢查（不鎖列），免得白跑一趟供應商或寄一封信；權威檢查在 `lock_user`。
+pub(crate) async fn require_fresh_session(pool: &PgPool, session_id: Uuid) -> Result<(), AppError> {
+    let fresh: bool = sqlx::query_scalar(
+        "SELECT (created_at > now() - interval '10 minutes' OR coalesce(reauth_at > now() - interval '10 minutes', false)) FROM sessions WHERE id=$1",
+    )
+    .bind(session_id)
+    .fetch_one(pool)
+    .await?;
+    if fresh {
+        Ok(())
+    } else {
+        Err(reauth_required())
+    }
+}
+
 async fn lock_user(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
@@ -74,12 +100,13 @@ async fn lock_user(
             "帳號已停權，請聯絡客服",
         ));
     }
-    let live: Option<Uuid> = sqlx::query_scalar("SELECT id FROM sessions WHERE user_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at > now() FOR SHARE")
+    let live: Option<bool> = sqlx::query_scalar("SELECT (created_at > now() - interval '10 minutes' OR coalesce(reauth_at > now() - interval '10 minutes', false)) FROM sessions WHERE user_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at > now() FOR SHARE")
         .bind(id).bind(session_hash).fetch_optional(&mut **tx).await?;
-    if live.is_none() {
-        return Err(AppError::Unauthorized);
+    match live {
+        None => Err(AppError::Unauthorized),
+        Some(false) => Err(reauth_required()),
+        Some(true) => Ok(email),
     }
-    Ok(email)
 }
 
 /// 保留寄送當下的收件人，即使之後解除 email 也能收到安全信；不受通知偏好影響（Account 類）。
@@ -338,6 +365,7 @@ async fn request_email(
     Json(b): Json<Email>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     let email = auth::norm_email(&b.email)?;
+    require_fresh_session(&st.pool, u.session_id).await?;
     crate::ratelimit::check(&st.pool, &format!("identity-email:{}", u.id), 5, 3600).await?;
     auth::issue_otp_scoped(
         &st.pool,
@@ -363,6 +391,8 @@ async fn verify_email(
     Json(b): Json<auth::VerifyReq>,
 ) -> Result<Json<Value>, AppError> {
     let email = auth::norm_email(&b.email)?;
+    // 先驗新鮮度，免得驗證碼被消耗後才被擋
+    require_fresh_session(&st.pool, u.session_id).await?;
     let hash = session_hash(&headers)?;
     auth::consume_otp_scoped(
         &st.pool,
@@ -444,4 +474,115 @@ pub(crate) async fn unlink_locked(
         .execute(&mut **tx)
         .await?;
     Ok(())
+}
+
+async fn reauth_status(
+    State(st): State<AppState>,
+    u: CurrentUser,
+) -> Result<Json<Value>, AppError> {
+    let fresh = require_fresh_session(&st.pool, u.session_id).await.is_ok();
+    Ok(Json(json!({ "fresh": fresh })))
+}
+
+/// 使用者已綁定的 Email（reauth 驗證碼只寄到這裡）。
+async fn bound_email(pool: &PgPool, id: Uuid) -> Result<String, AppError> {
+    sqlx::query_scalar(
+        "SELECT provider_uid FROM auth_identities WHERE user_id=$1 AND provider='email'",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::problem(409, "NO_EMAIL_IDENTITY", "此帳號沒有已綁定的 Email"))
+}
+
+async fn reauth_code(
+    State(st): State<AppState>,
+    u: CurrentUser,
+    headers: HeaderMap,
+) -> Result<(StatusCode, Json<Value>), AppError> {
+    let email = bound_email(&st.pool, u.id).await?;
+    crate::ratelimit::check(&st.pool, &format!("reauth-code:{}", u.id), 5, 3600).await?;
+    auth::issue_otp_scoped(
+        &st.pool,
+        &email,
+        "reauth",
+        None,
+        None,
+        Some(u.id),
+        Some(&session_hash(&headers)?),
+        false,
+    )
+    .await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({"expires_in":600,"resend_after":60})),
+    ))
+}
+
+#[derive(Deserialize)]
+struct ReauthReq {
+    password: Option<String>,
+    code: Option<String>,
+}
+
+/// 輸入密碼或 Email 驗證碼後，只對目前這個 session 開 10 分鐘的敏感操作窗口。
+async fn reauth(
+    State(st): State<AppState>,
+    u: CurrentUser,
+    headers: HeaderMap,
+    Json(b): Json<ReauthReq>,
+) -> Result<StatusCode, AppError> {
+    let hash = session_hash(&headers)?;
+    if let Some(pw) = b.password.filter(|p| !p.is_empty()) {
+        let stored: Option<String> = sqlx::query_scalar("SELECT password_hash FROM auth_identities WHERE user_id=$1 AND provider='email' AND password_hash IS NOT NULL")
+            .bind(u.id).fetch_optional(&st.pool).await?;
+        let stored =
+            stored.ok_or_else(|| AppError::invalid("/password", "INVALID", "此帳號未設定密碼"))?;
+        // 驗證前就計數；argon2 不在交易內執行
+        crate::ratelimit::check(&st.pool, &format!("reauth-pw:{}", u.id), 5, 900).await?;
+        let ok = crate::auth_ext::argon_run(move || {
+            pw.chars().count() <= 128 && crate::auth_ext::verify_pw(&pw, &stored)
+        })
+        .await?;
+        if !ok {
+            return Err(AppError::problem(401, "INVALID_CREDENTIALS", "密碼不正確"));
+        }
+    } else if let Some(code) = b.code {
+        let email = bound_email(&st.pool, u.id).await?;
+        auth::consume_otp_scoped(
+            &st.pool,
+            &email,
+            &code,
+            "reauth",
+            Some(u.id),
+            Some(&hash),
+            None,
+        )
+        .await?;
+    } else {
+        return Err(AppError::invalid(
+            "/password",
+            "REQUIRED",
+            "請輸入密碼或驗證碼",
+        ));
+    }
+    let n = sqlx::query("UPDATE sessions SET reauth_at=now() WHERE id=$1 AND revoked_at IS NULL")
+        .bind(u.session_id)
+        .execute(&st.pool)
+        .await?
+        .rows_affected();
+    if n == 0 {
+        return Err(AppError::Unauthorized);
+    }
+    crate::security::audit(
+        &st.pool,
+        u.id,
+        "auth.reauth",
+        "users",
+        u.id,
+        None,
+        json!({}),
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }

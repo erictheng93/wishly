@@ -403,7 +403,7 @@
       "invoiceMember": "The e-invoice will be issued to your member carrier.",
       "cardRetry": "To retry, cancel this order and create a new one.",
       "cancel": "Cancel order",
-      "cancelText": "Cancel this pending top-up? If you have already paid, the payment will still be credited."
+      "cancelText": "Cancel this pending top-up? If you have already paid, the payment will still be credited. Until the original payment deadline, this amount still counts toward your top-up limits."
     },
     "frozenBanner": "Your wallet is frozen: you can't contribute or request a cash refund for now. Please contact support.",
     "refund": {

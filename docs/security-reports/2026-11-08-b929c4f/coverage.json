@@ -1,0 +1,58 @@
+{
+  "completeness": "partial",
+  "deferred": [
+    {
+      "id": "deferred-933c5650684dab2d",
+      "reason": "Files outside the focused source reviews have not received an individual security audit."
+    }
+  ],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [],
+  "explicitExclusions": [],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "repository",
+  "mode": "repository",
+  "openQuestions": [],
+  "scanId": "2419f271-872c-46fa-83fa-be73822e1949",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "reported",
+      "id": "surface-6dedb52b78e5ba6e",
+      "label": "Sharing a wishlist reveals restricted donors\u2019 names and points",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-95b57d89a3460e69",
+      "label": "Late top-up settlement can exceed spending controls",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-3505d9b84a3fd178",
+      "label": "Browser reports logout success after revocation fails",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-3e53c896ac984eb6",
+      "label": "Legacy guest recovery cookie lacks Secure",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-3700e0a135e936d6",
+      "label": "Staff recovery hashes provide limited offline guessing resistance",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-dd03b3e16783bdd1",
+      "label": "A stolen session can persist account access through identity linking",
+      "receiptRefs": []
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { user, logout } = useAuth()
+const { user, logout, logoutFailed } = useAuth()
 const myPage = computed(() => user.value ? profilePath(user.value) : '/settings')
 const { count } = useFriendRequests()
 const { current, orgs, switchTo } = useOrgMode()
@@ -39,6 +39,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
       <NuxtLink to="/me/wallet">{{ $t('common.points') }}</NuxtLink>
       <NuxtLink to="/settings">{{ $t('common.settings') }}</NuxtLink>
       <NuxtLink v-if="user.is_staff" to="/admin">{{ $t('common.admin') }}</NuxtLink>
+      <p v-if="logoutFailed" class="um-err" role="alert">{{ $t('settings.logoutFailed') }}</p>
       <button type="button" @click="logout()">{{ $t('settings.logout') }}</button>
     </nav>
   </div>
@@ -57,6 +58,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
 .um-pop{position:absolute;right:0;top:calc(100% + 8px);min-width:224px;z-index:30;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--ink-line);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line);animation:rise .22s var(--ease)}
 .um-pop>a,.um-pop>button,.um-who{display:flex;flex-direction:column;justify-content:center;min-height:44px;padding:0 16px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-size:14px;font-weight:700;text-align:left;cursor:pointer;transition:background var(--t) var(--ease),padding var(--t) var(--ease)}
 .um-pop>a>span{display:inline-flex;align-items:center}
+.um-err{margin:0;padding:10px 16px;border-top:1px solid var(--line);color:var(--red);font-size:13px;max-width:260px}
 .um-who{padding:10px 16px;border-top:0;border-bottom:1px solid var(--ink-line);background:var(--bg-alt)}
 .um-who b{font-size:15px}
 .um-pop>button[aria-pressed=true]{flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;font-weight:800}

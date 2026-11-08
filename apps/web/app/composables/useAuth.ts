@@ -23,14 +23,21 @@ export function useAuth() {
   }
   // 剛抓過（如 auth middleware）就不再重抓；供頁面進入時避免連續兩次 GET /me
   const fetchMeFresh = (maxAgeMs = 5000) => fetchMe(Date.now() - lastFetch.value > maxAgeMs)
+  const logoutFailed = useState<boolean>('auth-logout-failed', () => false)
+  /** 網頁的 ws_session 是 HttpOnly、前端清不掉：伺服器沒確認撤銷（401 = 本來就失效）就不可假裝已登出。回傳是否完成 */
   async function logout(redirect?: string) {
     const hint = useAuthHint() // await 之前取：useCookie 需要 Nuxt context
+    logoutFailed.value = false
     await dropPush(api) // 共用裝置：先退訂，下一位使用者才不會收到前一位的通知（需趁 session 還在）
-    try { await api('/auth/logout', { method: 'POST', noRedirect: true }) } catch {}
+    try { await api('/auth/logout', { method: 'POST', noRedirect: true }) } catch (e: any) {
+      // 原生殼清掉 keychain 權杖後本機就沒有憑證，照常登出
+      if (e?.status !== 401 && !isNative()) { logoutFailed.value = true; return false }
+    }
     user.value = null
     hint.value = null
     setNativeToken(null)
     await navigateTo(redirect ? { path: '/login', query: { redirect } } : '/login')
+    return true
   }
   const post = (path: string, body: any) => api(path, { method: 'POST', body, noRedirect: true, credentials: 'include' })
   // 成功回 session cookie；重抓 /me 讓全域 user 就緒
@@ -64,5 +71,5 @@ export function useAuth() {
     }
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
-  return { oauth, user, loaded, fetchMe, fetchMeFresh, logout, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }
+  return { oauth, user, loaded, fetchMe, fetchMeFresh, logout, logoutFailed, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }
 }

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useAuth } from '../app/composables/useAuth'
 
 const states = new Map<string, ReturnType<typeof ref>>()
-const api = vi.fn(), token = vi.fn(), navigate = vi.fn(), dropPush = vi.fn()
+const api = vi.fn(), token = vi.fn(), navigate = vi.fn(), dropPush = vi.fn(), native = vi.fn(() => false)
 beforeEach(() => {
   states.clear()
   vi.stubGlobal('useState', (key: string, init: () => any) => {
@@ -14,6 +14,7 @@ beforeEach(() => {
   vi.stubGlobal('setNativeToken', token)
   vi.stubGlobal('navigateTo', navigate)
   vi.stubGlobal('dropPush', dropPush)
+  vi.stubGlobal('isNative', native)
   vi.stubGlobal('useCookie', (key: string) => {
     if (!states.has(`cookie:${key}`)) states.set(`cookie:${key}`, ref(null))
     return states.get(`cookie:${key}`)
@@ -74,7 +75,32 @@ it('verifyLoginCode saves native session before fetching fresh identity', async 
   expect(api.mock.calls[1]).toEqual(['/me', { noRedirect: true }])
 })
 
-it('logout clears identity and native token even if server logout fails', async () => {
+it('web logout keeps the signed-in state and reports failure when revocation is not confirmed', async () => {
+  const auth = useAuth()
+  auth.user.value = { id: 'old' }
+  api.mockRejectedValue(new Error('offline'))
+  expect(await auth.logout()).toBe(false)
+  expect(auth.user.value).toEqual({ id: 'old' })
+  expect(auth.logoutFailed.value).toBe(true)
+  expect(navigate).not.toHaveBeenCalled()
+  // 重試成功即清除錯誤並登出
+  api.mockResolvedValue(undefined)
+  expect(await auth.logout()).toBe(true)
+  expect(auth.logoutFailed.value).toBe(false)
+  expect(auth.user.value).toBeNull()
+  expect(navigate).toHaveBeenCalledWith('/login')
+})
+
+it('logout completes when the session is already invalid (401)', async () => {
+  const auth = useAuth()
+  auth.user.value = { id: 'old' }
+  api.mockRejectedValue({ status: 401, code: 'UNAUTHORIZED' })
+  expect(await auth.logout()).toBe(true)
+  expect(auth.user.value).toBeNull()
+})
+
+it('native logout clears identity and token even if server logout fails', async () => {
+  native.mockReturnValue(true)
   const auth = useAuth()
   auth.user.value = { id: 'old' }
   api.mockRejectedValue(new Error('offline'))
@@ -119,7 +145,7 @@ it('logout clears ws_hint', async () => {
   const auth = useAuth()
   api.mockResolvedValueOnce({ id: 'me' })
   await auth.fetchMe(true)
-  api.mockRejectedValue(new Error('offline'))
+  api.mockResolvedValue(undefined)
   await auth.logout()
   expect(hint()).toBeNull()
 })

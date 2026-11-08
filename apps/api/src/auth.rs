@@ -404,18 +404,22 @@ pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
         ("register", Zh) => "Wishly 註冊驗證碼",
         ("reset", Zh) => "Wishly 重設密碼驗證碼",
         ("link", Zh) => "Wishly 綁定 Email 驗證碼",
+        ("reauth", Zh) => "Wishly 身分確認驗證碼",
         (_, Zh) => "Wishly 登入驗證碼",
         ("register", En) => "Wishly sign-up verification code",
         ("reset", En) => "Wishly password reset verification code",
         ("link", En) => "Wishly email linking verification code",
+        ("reauth", En) => "Wishly identity confirmation code",
         (_, En) => "Wishly sign-in verification code",
         ("register", Vi) => "Mã xác minh đăng ký Wishly",
         ("reset", Vi) => "Mã xác minh đặt lại mật khẩu Wishly",
         ("link", Vi) => "Mã xác minh liên kết Email Wishly",
+        ("reauth", Vi) => "Mã xác nhận danh tính Wishly",
         (_, Vi) => "Mã xác minh đăng nhập Wishly",
         ("register", Id) => "Kode verifikasi pendaftaran Wishly",
         ("reset", Id) => "Kode verifikasi atur ulang kata sandi Wishly",
         ("link", Id) => "Kode verifikasi penautan email Wishly",
+        ("reauth", Id) => "Kode konfirmasi identitas Wishly",
         (_, Id) => "Kode verifikasi masuk Wishly",
     };
     tokio::spawn(send_mail(
@@ -1338,6 +1342,20 @@ async fn oauth_start(
         (Some(uid), sh.map(hex::encode))
     } else if q.link {
         let u = CurrentUser::from_request_parts(&mut parts, &st).await?;
+        // 整頁導覽進來，回前端設定頁顯示提示，而不是一頁 JSON
+        if crate::identities::require_fresh_session(&st.pool, u.session_id)
+            .await
+            .is_err()
+        {
+            return Ok((
+                StatusCode::FOUND,
+                [(
+                    header::LOCATION,
+                    format!("{}/settings?error=reauth_required", app_url()),
+                )],
+            )
+                .into_response());
+        }
         crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
         (
             Some(u.id),
@@ -1475,6 +1493,10 @@ fn oauth_error(error: AppError) -> &'static str {
             code: "PROVIDER_ALREADY_LINKED",
             ..
         } => "provider_already_linked",
+        AppError::Problem {
+            code: "REAUTH_REQUIRED",
+            ..
+        } => "reauth_required",
         error => {
             tracing::warn!(?error, "oauth callback failed");
             "oauth_failed"
@@ -1709,6 +1731,7 @@ async fn link_ticket(
             "需要 43 字元的 app_challenge",
         ));
     }
+    crate::identities::require_fresh_session(&st.pool, u.session_id).await?;
     crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
     let session_hash = crate::session::session_token(&headers).map(|t| hash_token(&t));
     let ticket = rand_b64(32);
