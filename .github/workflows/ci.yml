@@ -56,7 +56,7 @@ jobs:
         with: { components: "rustfmt, clippy" }
       - run: cargo fmt --manifest-path apps/api/Cargo.toml --check
       - run: python3 scripts/test_coverage.py && python3 scripts/test_mutate.py && python3 scripts/test_autodeploy.py
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with: { tool: "cargo-audit@0.22.2" }
       - run: sh scripts/audit-api.sh
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -99,7 +99,7 @@ jobs:
         with: { components: llvm-tools-preview }
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with: { workspaces: apps/api, save-if: "${{ github.ref == 'refs/heads/main' }}" }
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with: { tool: "cargo-llvm-cov@0.9.1,cargo-nextest@0.9.149" }
       - run: sh scripts/coverage-api.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -280,7 +280,7 @@ jobs:
             echo EOF; } >> "$GITHUB_OUTPUT"
           [ -z "$newer" ] || printf '::notice::main 已有較新的 API 變更，不移動 latest：\n%s\n' "$newer"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
       # image job 已在同一 commit 寫入映像層快取，這裡應全數命中，只做推送。
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
