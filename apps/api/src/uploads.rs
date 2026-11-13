@@ -783,7 +783,8 @@ pub fn strip_metadata(data: &[u8]) -> Result<(Vec<u8>, &'static str), String> {
     let mut lim = image::Limits::default();
     lim.max_image_width = Some(8192);
     lim.max_image_height = Some(8192);
-    lim.max_alloc = Some(256 << 20);
+    // 8192² × 4 = 256 MiB，故 128 MiB 才是實際上限（約 5800² RGBA）；尺寸限制保留作為早期拒絕
+    lim.max_alloc = Some(128 << 20);
     rd.limits(lim);
     let mut dec = rd.into_decoder().map_err(|e| e.to_string())?;
     let orient = dec.orientation().map_err(|e| e.to_string())?;
@@ -820,8 +821,8 @@ fn ext_of(ct: &str) -> Option<&'static str> {
 
 /// confirm 每使用者每小時上限（大於 presign 的 60，容許重試）
 const CONFIRM_LIMIT: i32 = 120;
-/// 同時進行的圖片解碼數
-static DECODE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+/// 同時進行的圖片解碼數（1 GB 主機：2 × 128 MiB 上限）
+static DECODE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 
 async fn presign(
     State(st): State<AppState>,
@@ -947,13 +948,14 @@ async fn confirm(
         .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
     let want_ext = r.object_key.rsplit('.').next().unwrap_or("");
     // 解碼是 CPU 密集：丟 blocking 池並以全域信號量限制同時解碼數，避免耗盡 worker / 記憶體
-    let _permit = DECODE_SLOTS
+    let permit = DECODE_SLOTS
         .acquire()
         .await
         .map_err(|_| AppError::problem(503, "BUSY", "圖片處理忙碌中，請稍後再試"))?;
     let stripped = tokio::task::spawn_blocking(move || strip_metadata(&bytes))
         .await
         .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"))?;
+    drop(permit); // 解碼完即放行，不佔著跑 S3 與 DB
     match stripped {
         Ok((clean, ct)) if ext_of(ct) == Some(want_ext) => {
             // 先記下擁有權（含舊版 presign 的 key），再在交易外發佈
