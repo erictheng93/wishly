@@ -366,7 +366,7 @@ async fn request_email(
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     let email = auth::norm_email(&b.email)?;
     require_fresh_session(&st.pool, u.session_id).await?;
-    crate::ratelimit::check(&st.pool, &format!("identity-email:{}", u.id), 5, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("identity-email:{}", u.id), 5, 3600).await?;
     auth::issue_otp_scoped(
         &st.pool,
         &email,
@@ -501,7 +501,7 @@ async fn reauth_code(
     headers: HeaderMap,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
     let email = bound_email(&st.pool, u.id).await?;
-    crate::ratelimit::check(&st.pool, &format!("reauth-code:{}", u.id), 5, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("reauth-code:{}", u.id), 5, 3600).await?;
     auth::issue_otp_scoped(
         &st.pool,
         &email,
@@ -539,7 +539,7 @@ async fn reauth(
         let stored =
             stored.ok_or_else(|| AppError::invalid("/password", "INVALID", "此帳號未設定密碼"))?;
         // 驗證前就計數；argon2 不在交易內執行
-        crate::ratelimit::check(&st.pool, &format!("reauth-pw:{}", u.id), 5, 900).await?;
+        crate::ratelimit::check_pool(&st.pool, &format!("reauth-pw:{}", u.id), 5, 900).await?;
         let ok = crate::auth_ext::argon_run(move || {
             pw.chars().count() <= 128 && crate::auth_ext::verify_pw(&pw, &stored)
         })

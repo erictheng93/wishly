@@ -175,10 +175,10 @@ async fn create_org(
         }
     }
     let ip = crate::config::client_ip(&parts, crate::config::get());
-    ratelimit::check(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
     verify_turnstile(crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
     if user.is_none() && guest.is_none() {
-        ratelimit::check(&st.pool, &format!("report_org:{oid}:{ip}"), 1, 86400).await?;
+        ratelimit::check_pool(&st.pool, &format!("report_org:{oid}:{ip}"), 1, 86400).await?;
     }
     // 快照只存 logo key（輸出才換 URL）；不含聯絡 email / 電話
     let id: Uuid = sqlx::query_scalar(
@@ -242,11 +242,11 @@ async fn create(
         }
     }
     let ip = crate::config::client_ip(&parts, crate::config::get());
-    ratelimit::check(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
     verify_turnstile(crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
     if user.is_none() && guest.is_none() {
         // 匿名檢舉者以 IP 近似「同一檢舉者」：同清單 24 小時 1 筆
-        ratelimit::check(&st.pool, &format!("report_wl:{wid}:{ip}"), 1, 86400).await?;
+        ratelimit::check_pool(&st.pool, &format!("report_wl:{wid}:{ip}"), 1, 86400).await?;
     }
     // 快照與 INSERT 同一句（單次往返）；只存圖片 key，輸出時才換 URL（見 snapshot_urls）。items 最多 50 筆。
     const ITEM_SNAP: &str = "jsonb_build_object('id', i.id, 'title', i.title, 'description', i.description, 'product_url', i.product_url,

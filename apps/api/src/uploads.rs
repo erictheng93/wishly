@@ -870,7 +870,7 @@ async fn presign(
             "圖片大小須介於 1 byte 與 5 MB",
         ));
     }
-    crate::ratelimit::check(&st.pool, &format!("presign:{}", user.id), 60, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("presign:{}", user.id), 60, 3600).await?;
     ensure_bucket().await;
     let s3 = S3::get();
     let object_key = format!("{dir}/{}.{ext}", Uuid::new_v4());
@@ -927,7 +927,7 @@ async fn confirm(
     if r.object_key.starts_with("catalog/") {
         crate::admin::require_staff(&user)?;
     }
-    crate::ratelimit::check(
+    crate::ratelimit::check_pool(
         &st.pool,
         &format!("confirm:{}", user.id),
         CONFIRM_LIMIT,

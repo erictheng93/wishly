@@ -198,7 +198,7 @@ async fn register(
     crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<RegisterReq>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
-    crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
     check_pw(&r.password)?;
     let name = r.display_name.trim();
@@ -236,7 +236,7 @@ async fn register_verify(
     headers: HeaderMap,
     Json(r): Json<CodeReq>,
 ) -> Result<Response, AppError> {
-    crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     let (pw, name) = consume_otp(&st.pool, &email, &r.code, "register", r.challenge_id).await?;
     let (Some(pw), Some(name)) = (pw, name) else {
@@ -309,7 +309,7 @@ async fn login(
     if login_locked(counts) {
         return Err(crate::auth::rate_limited(300));
     }
-    let busy_site = !crate::ratelimit::allow(&st.pool, "login_global", 300, 900).await?;
+    let busy_site = !crate::ratelimit::allow_pool(&st.pool, "login_global", 300, 900).await?;
     let captcha = login_needs_captcha(counts) || busy_site;
     if captcha {
         crate::auth::require_captcha(r.turnstile_token.as_deref(), &ip).await?;
@@ -400,7 +400,7 @@ async fn reset_request(
     crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<ResetReq>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
-    crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
     crate::auth::otp_gate(&st.pool, "reset", &email, &ip, r.turnstile_token.as_deref()).await?;
     let exists: bool = sqlx::query_scalar(
@@ -434,7 +434,7 @@ async fn reset_confirm(
     crate::ratelimit::Peer(ip): crate::ratelimit::Peer,
     Json(r): Json<ResetConfirm>,
 ) -> Result<StatusCode, AppError> {
-    crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     check_pw(&r.new_password)?;
     consume_otp(&st.pool, &email, &r.code, "reset", r.challenge_id).await?;

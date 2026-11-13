@@ -161,7 +161,7 @@ async fn invite_create(
     }
     let handle = clean_handle(&b.handle)?;
     // 會寄信到任意信箱，且邀請人可自訂組織名稱，限流防止被當垃圾信管道；tx 外計數，429 不被 rollback
-    crate::ratelimit::check(&st.pool, &format!("org-invite:{}", u.id), 30, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("org-invite:{}", u.id), 30, 3600).await?;
     let (token, h) = new_token();
     let url = format!("{}/org/invite/{token}", crate::auth::app_url());
     let mut tx = st.pool.begin().await?;

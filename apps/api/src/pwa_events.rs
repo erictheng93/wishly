@@ -30,7 +30,7 @@ async fn record(
     if !["claim", "fund", "appinstalled", "first_run"].contains(&b.context.as_str()) {
         return Err(bad("/context"));
     }
-    crate::ratelimit::check(&st.pool, &format!("pwa_event:{ip}"), 30, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("pwa_event:{ip}"), 30, 3600).await?;
     sqlx::query("INSERT INTO pwa_events (event, platform, context) VALUES ($1, $2, $3)")
         .bind(&b.event)
         .bind(&b.platform)
