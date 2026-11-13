@@ -69,6 +69,8 @@ export function useAuth() {
       }
       return session('/auth/native/exchange', { code: r.code, verifier: r.verifier })
     }
+    // 回來時可能直接落在分享頁（不經 fetchMe），先樂觀設登入線索，分享頁才會查 /me；沒登入成功的話下一次 fetchMe 的 401 會清掉
+    useAuthHint().value = true
     window.location.href = `${base}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(redirect)}${link ? '&link=true' : ''}`
   }
   return { oauth, user, loaded, fetchMe, fetchMeFresh, logout, logoutFailed, login, register, verifyRegister, requestLoginCode, verifyLoginCode, requestReset, confirmReset }

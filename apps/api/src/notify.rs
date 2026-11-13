@@ -241,11 +241,18 @@ pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Res
 
 pub fn spawn_worker(pool: PgPool) {
     tokio::spawn(async move {
+        let mut idle = 1; // 秒
         loop {
-            if let Err(e) = tick(&pool).await {
-                tracing::warn!(error = %e, "notify worker");
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await; // pending 掃描走 notifications_due_idx
+            // 沒東西可寄就逐步放慢到 5 秒一次（閒置時每秒一次輪詢占了背景往返的九成）；一有工作立刻回到每秒
+            idle = match tick(&pool).await {
+                Ok(0) => (idle + 1).min(5),
+                Ok(_) => 1,
+                Err(e) => {
+                    tracing::warn!(error = %e, "notify worker");
+                    idle
+                }
+            };
+            tokio::time::sleep(Duration::from_secs(idle)).await; // pending 掃描走 notifications_due_idx
         }
     });
 }

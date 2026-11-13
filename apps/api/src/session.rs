@@ -150,7 +150,7 @@ pub fn spawn_cache_listener(pool: sqlx::PgPool) {
             if pool.is_closed() {
                 return;
             }
-            if let Ok(mut l) = sqlx::postgres::PgListener::connect_with(&pool).await {
+            if let Ok(mut l) = crate::dashboard::pg_listener(&pool).await {
                 if l.listen(cache::CHANNEL).await.is_ok() {
                     cache::set_active(true);
                     // try_recv：斷線時回 Ok(None) 而不是悄悄重連（重連期間的通知會遺失），我們必須知道並停用快取
