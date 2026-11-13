@@ -8,7 +8,8 @@ use std::net::SocketAddr;
 
 const UA: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148";
 
-async fn view(
+/// 只排進佇列、不 flush
+async fn view_q(
     pool: &PgPool,
     slug: &str,
     ip: &str,
@@ -30,6 +31,20 @@ async fn view(
         format!("{ip}:1234").parse::<SocketAddr>().unwrap(),
     ));
     call_request(&test_app(pool), req).await.0.as_u16()
+}
+
+/// 排進佇列後立即 flush，讓後續查表是確定的
+async fn view(
+    pool: &PgPool,
+    slug: &str,
+    ip: &str,
+    ua: Option<&str>,
+    extra: &[(&str, String)],
+    body: Value,
+) -> u16 {
+    let st = view_q(pool, slug, ip, ua, extra, body).await;
+    wishly_api::share_views::flush(pool).await;
+    st
 }
 
 async fn rows(pool: &PgPool) -> i64 {
@@ -299,4 +314,60 @@ async fn cleanup_keeps_share_views_forever(pool: PgPool) {
         .unwrap();
     wishly_api::ratelimit::cleanup(&pool).await.unwrap();
     assert_eq!(rows(&pool).await, 1);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn batch_flush_writes_matching_rows(pool: PgPool) {
+    let a = list(&pool).await;
+    let o2 = user(&pool, "B").await;
+    let b = wishlist(&pool, o2.id, ListOpts::default()).await;
+    let vid = uuid::Uuid::new_v4();
+    // 不存在的清單：進佇列但 JOIN 不到，不會寫入
+    assert_eq!(
+        view_q(&pool, "zzzzzzzzzz", "1.1.1.1", Some(UA), &[], json!({})).await,
+        204
+    );
+    // 全部欄位皆有值
+    view_q(
+        &pool,
+        &a.slug,
+        "1.1.1.2",
+        Some(UA),
+        &[],
+        json!({"visitor_id": vid, "referrer_host": "x.example.com"}),
+    )
+    .await;
+    // 選填欄位全為 NULL
+    view_q(
+        &pool,
+        &b.slug,
+        "[2001:db8::1]",
+        Some("Mozilla/5.0 (Windows NT 10.0)"),
+        &[],
+        json!({}),
+    )
+    .await;
+    assert_eq!(rows(&pool).await, 0); // 尚未 flush
+    wishly_api::share_views::flush(&pool).await;
+    assert_eq!(rows(&pool).await, 2);
+    let r: (Option<uuid::Uuid>, Option<String>, String) = sqlx::query_as(
+        "SELECT visitor_id, referrer_host, device FROM share_views WHERE wishlist_id = $1",
+    )
+    .bind(a.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (r.0, r.1.as_deref(), r.2.as_str()),
+        (Some(vid), Some("x.example.com"), "mobile")
+    );
+    let r: (Option<uuid::Uuid>, Option<String>, Option<String>, String, String) = sqlx::query_as(
+        "SELECT visitor_id, referrer_host, country, host(ip), device FROM share_views WHERE wishlist_id = $1",
+    )
+    .bind(b.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((r.0, r.1, r.2), (None, None, None));
+    assert_eq!((r.3.as_str(), r.4.as_str()), ("2001:db8::1", "desktop"));
 }
