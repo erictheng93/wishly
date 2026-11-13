@@ -102,6 +102,19 @@ type InboxRow = (
     Option<chrono::DateTime<chrono::Utc>>,
 );
 
+/// 同 InboxRow，但整列可為 NULL（空頁時只剩未讀數），末欄為未讀數
+type PageRow = (
+    Option<Uuid>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<chrono::DateTime<chrono::Utc>>,
+    Option<chrono::DateTime<chrono::Utc>>,
+    i64,
+);
+
 #[derive(Deserialize)]
 struct ListQ {
     before: Option<Uuid>,
@@ -134,13 +147,23 @@ async fn list(
         ));
     }
     // 多取一筆判斷有沒有下一頁；游標是上一頁最後一筆的 id（依 inbox_at DESC, id DESC）
-    let rows: Vec<InboxRow> = sqlx::query_as(
-        "SELECT n.id, n.kind, n.inbox_title, n.inbox_link, n.inbox_body, n.inbox_category, n.inbox_at, n.read_at FROM notifications n
-          WHERE n.user_id = $1 AND n.inbox_at IS NOT NULL
-            AND ($4::text IS NULL OR n.inbox_category = $4)
-            AND ($2::uuid IS NULL OR (n.inbox_at, n.id) < (SELECT b.inbox_at, b.id FROM notifications b WHERE b.id = $2 AND b.user_id = $1))
-          ORDER BY n.inbox_at DESC, n.id DESC LIMIT $3")
+    // 未讀數與列表同一個往返：外層以 LEFT JOIN 讓空頁也帶出 unread（該列 id 為 NULL）
+    let all: Vec<PageRow> = sqlx::query_as(
+        "WITH page AS (
+            SELECT n.id, n.kind, n.inbox_title, n.inbox_link, n.inbox_body, n.inbox_category, n.inbox_at, n.read_at FROM notifications n
+             WHERE n.user_id = $1 AND n.inbox_at IS NOT NULL
+               AND ($4::text IS NULL OR n.inbox_category = $4)
+               AND ($2::uuid IS NULL OR (n.inbox_at, n.id) < (SELECT b.inbox_at, b.id FROM notifications b WHERE b.id = $2 AND b.user_id = $1))
+             ORDER BY n.inbox_at DESC, n.id DESC LIMIT $3),
+         u AS (SELECT count(*) AS c FROM notifications WHERE user_id = $1 AND inbox_at IS NOT NULL AND read_at IS NULL)
+         SELECT p.id, p.kind, p.inbox_title, p.inbox_link, p.inbox_body, p.inbox_category, p.inbox_at, p.read_at, u.c
+           FROM u LEFT JOIN page p ON true ORDER BY p.inbox_at DESC, p.id DESC")
         .bind(u.id).bind(q.before).bind(limit + 1).bind(&q.category).fetch_all(&st.pool).await?;
+    let unread = all.first().map_or(0, |r| r.8);
+    let rows: Vec<InboxRow> = all
+        .into_iter()
+        .filter_map(|r| Some((r.0?, r.1?, r.2, r.3, r.4, r.5, r.6?, r.7)))
+        .collect();
     let more = rows.len() as i64 > limit;
     let items: Vec<Value> = rows.iter().take(limit as usize)
         .map(|(id, kind, title, link, body, category, at, read)| json!({ "id": id, "kind": kind, "title": title, "link": link, "body": body, "category": category, "created_at": at, "read_at": read }))
@@ -151,7 +174,7 @@ async fn list(
         None
     };
     Ok(Json(
-        json!({ "items": items, "next_cursor": next_cursor, "unread": unread(&st.pool, u.id).await? }),
+        json!({ "items": items, "next_cursor": next_cursor, "unread": unread }),
     ))
 }
 

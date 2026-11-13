@@ -1,5 +1,5 @@
 //! 清單與捐助的可見性判斷（0004_social）。所有對外讀取/捐助/SSE/檢舉都經 `check_wishlist`。
-use crate::{error::AppError, session::hash_token, AppState};
+use crate::{error::AppError, AppState};
 use axum::http::request::Parts;
 use serde_json::json;
 use sqlx::PgExecutor;
@@ -29,13 +29,7 @@ pub async fn viewer(parts: &Parts, st: &AppState) -> Result<Option<Uuid>, AppErr
     let Some(tok) = crate::session::session_token(&parts.headers) else {
         return Ok(None);
     };
-    if let Some(id) = crate::session::cached_user(&tok) {
-        return Ok(Some(id));
-    }
-    Ok(sqlx::query_scalar(
-        "SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
-         WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.deleted_at IS NULL AND u.blocked_at IS NULL")
-        .bind(hash_token(&tok)).fetch_optional(&st.pool).await?)
+    Ok(crate::session::viewer_user(&st.pool, &tok).await?)
 }
 
 /// 已在外層排除 draft/archived/刪除/下架；這裡只看 visibility。

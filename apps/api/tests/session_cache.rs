@@ -158,4 +158,27 @@ async fn session_cache_hits_and_is_invalidated_by_triggers(pool: PgPool) {
             .is_ok(),
         "撤銷應發通知"
     );
+
+    // 7) viewer 路徑（/users/{id} 匿名 404、登入 200）未命中時也要寫回快取：關 trigger 後撤銷，第二次仍放行
+    let g = user(&pool, "g").await;
+    let prof = |t: String| {
+        let pool = pool.clone();
+        let uri = format!("/users/{}", g.id);
+        async move { call(&pool, "GET", &uri, &ck(&t), None).await.0 }
+    };
+    assert_eq!(prof(g.token.clone()).await, StatusCode::OK);
+    sqlx::query("ALTER TABLE sessions DISABLE TRIGGER sessions_cache_inval_upd")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE sessions SET revoked_at = now() - interval '1 second' WHERE user_id = $1")
+        .bind(g.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        prof(g.token.clone()).await,
+        StatusCode::OK,
+        "viewer 應命中快取"
+    );
 }

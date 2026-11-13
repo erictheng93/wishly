@@ -67,6 +67,34 @@ struct SessionRow {
     expires_at: DateTime<Utc>,
 }
 
+/// CurrentUser 與 `access::viewer` 共用的 session 查詢（單一 SQL，避免兩邊分歧）
+async fn fetch_row(pool: &sqlx::PgPool, hash: &[u8]) -> Result<Option<SessionRow>, sqlx::Error> {
+    sqlx::query_as(
+            "SELECT u.id, u.is_staff, u.staff_roles, u.blocked_at IS NOT NULL AS blocked, s.revoked_at IS NULL AS live, s.id AS session_id,
+                    s.mfa_at + interval '12 hours' AS mfa_until, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
+                    u.is_staff AND COALESCE((SELECT value = 'true'::jsonb FROM system_flags WHERE key = 'staff_mfa_required'), false) AS mfa_required,
+                    (s.last_seen_at < now() - interval '5 minutes' OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)) AS stale,
+                    s.expires_at
+             FROM sessions s JOIN users u ON u.id = s.user_id
+             WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL")
+        .bind(hash).fetch_optional(pool).await
+}
+
+impl SessionRow {
+    fn auth(&self) -> cache::Auth {
+        cache::Auth {
+            id: self.id,
+            is_staff: self.is_staff,
+            staff_roles: crate::admin::role_mask(&self.staff_roles),
+            session_id: self.session_id,
+            mfa_until: self.mfa_until,
+            mfa_enabled: self.mfa_enabled,
+            mfa_required: self.mfa_required,
+            expires_at: self.expires_at,
+        }
+    }
+}
+
 impl FromRequestParts<AppState> for CurrentUser {
     type Rejection = AppError;
     async fn from_request_parts(parts: &mut Parts, st: &AppState) -> Result<Self, AppError> {
@@ -76,15 +104,7 @@ impl FromRequestParts<AppState> for CurrentUser {
             return Ok(a.current());
         }
         let gen = cache::generation();
-        let row: Option<SessionRow> = sqlx::query_as(
-            "SELECT u.id, u.is_staff, u.staff_roles, u.blocked_at IS NOT NULL AS blocked, s.revoked_at IS NULL AS live, s.id AS session_id,
-                    s.mfa_at + interval '12 hours' AS mfa_until, u.totp_enabled_at IS NOT NULL AS mfa_enabled,
-                    u.is_staff AND COALESCE((SELECT value = 'true'::jsonb FROM system_flags WHERE key = 'staff_mfa_required'), false) AS mfa_required,
-                    (s.last_seen_at < now() - interval '5 minutes' OR NOT EXISTS (SELECT 1 FROM user_activity_days a WHERE a.user_id = u.id AND a.day = (now() AT TIME ZONE 'Asia/Taipei')::date)) AS stale,
-                    s.expires_at
-             FROM sessions s JOIN users u ON u.id = s.user_id
-             WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL")
-            .bind(&hash).fetch_optional(&st.pool).await?;
+        let row = fetch_row(&st.pool, &hash).await?;
         match row {
             Some(r) if r.blocked => Err(AppError::problem(
                 403,
@@ -113,16 +133,7 @@ impl FromRequestParts<AppState> for CurrentUser {
                                 .await;
                     }
                 }
-                let a = cache::Auth {
-                    id: r.id,
-                    is_staff: r.is_staff,
-                    staff_roles: crate::admin::role_mask(&r.staff_roles),
-                    session_id: r.session_id,
-                    mfa_until: r.mfa_until,
-                    mfa_enabled: r.mfa_enabled,
-                    mfa_required: r.mfa_required,
-                    expires_at: r.expires_at,
-                };
+                let a = r.auth();
                 let cu = a.current();
                 if let Some(g) = gen {
                     cache::put(hash, a, g);
@@ -134,9 +145,26 @@ impl FromRequestParts<AppState> for CurrentUser {
     }
 }
 
-/// 有效登入的 user id（給 `access::viewer` 用）：只查快取，未命中回 None 由呼叫端自己查 DB。
-pub(crate) fn cached_user(token: &str) -> Option<Uuid> {
-    cache::get(&hash_token(token)).map(|a| a.id)
+/// 有效登入的 user id（給 `access::viewer` 用）：先查快取，未命中查 DB 並與 CurrentUser 一樣寫回（含世代檢查）；
+/// 無效或停權一律視為匿名（None），且不快取。
+pub(crate) async fn viewer_user(
+    pool: &sqlx::PgPool,
+    token: &str,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let hash = hash_token(token);
+    if let Some(a) = cache::get(&hash) {
+        return Ok(Some(a.id));
+    }
+    let gen = cache::generation();
+    Ok(match fetch_row(pool, &hash).await? {
+        Some(r) if r.live && !r.blocked => {
+            if let Some(g) = gen {
+                cache::put(hash, r.auth(), g);
+            }
+            Some(r.id)
+        }
+        _ => None,
+    })
 }
 
 /// 開啟 session 快取：連上 LISTEN session_inval 後才生效；斷線期間快取停用並清空，重連後重新啟用。
