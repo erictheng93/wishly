@@ -60,6 +60,7 @@ async fn gift_picks(
         blocked_by_owner,
         i_blocked,
         friend,
+        ..
     } = relation_of(&st.pool, uid, viewer).await?;
     if blocked_by_owner {
         return Err(AppError::NotFound);

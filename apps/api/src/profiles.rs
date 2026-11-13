@@ -63,42 +63,63 @@ pub(crate) struct Relation {
     pub blocked_by_owner: bool,
     pub i_blocked: bool,
     pub friend: bool,
+    /// 好友申請：對方寄給我 / 我寄給對方（僅登入的非本人觀看者查詢）
+    pub incoming: Option<Uuid>,
+    pub outgoing: Option<Uuid>,
 }
 
+/// 單一查詢取齊封鎖、好友、摯友與好友申請；匿名與本人不查
 pub(crate) async fn relation_of(
     pool: &sqlx::PgPool,
     owner: Uuid,
     viewer: Option<Uuid>,
 ) -> Result<Relation, AppError> {
-    let is_self = viewer == Some(owner);
-    let (mut blocked_by_owner, mut i_blocked) = (false, false);
-    if let (Some(v), false) = (viewer, is_self) {
-        (blocked_by_owner, i_blocked) = sqlx::query_as(
-            "SELECT EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2),
-                    EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1)",
-        )
-        .bind(owner)
-        .bind(v)
-        .fetch_one(pool)
-        .await?;
-    }
-    // 任一方向封鎖就不必再算好友 / 親密（呼叫端只會 404 或回精簡內容）
-    let friend = match viewer {
-        Some(v) if !blocked_by_owner && !i_blocked => access::are_friends(pool, owner, v).await?,
-        _ => false,
+    let mut r = Relation {
+        rel: Rel::Anonymous,
+        blocked_by_owner: false,
+        i_blocked: false,
+        friend: false,
+        incoming: None,
+        outgoing: None,
     };
-    let rel = match viewer {
-        None => Rel::Anonymous,
-        Some(_) if is_self => Rel::SelfView,
-        Some(v) if friend && crate::close_friends::is_close(pool, owner, v).await? => Rel::Close,
-        Some(_) if friend => Rel::Friend,
-        Some(_) => Rel::Other,
+    let Some(v) = viewer else { return Ok(r) };
+    if v == owner {
+        r.rel = Rel::SelfView;
+        return Ok(r);
+    }
+    let (blocked_by_owner, i_blocked, friend, close, incoming, outgoing): (
+        bool,
+        bool,
+        bool,
+        bool,
+        Option<Uuid>,
+        Option<Uuid>,
+    ) = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2),
+                EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1),
+                EXISTS (SELECT 1 FROM friendships WHERE user_a = LEAST($1, $2) AND user_b = GREATEST($1, $2)),
+                EXISTS (SELECT 1 FROM close_friends WHERE owner_id = $1 AND friend_id = $2),
+                (SELECT id FROM friend_requests WHERE from_user = $1 AND to_user = $2),
+                (SELECT id FROM friend_requests WHERE from_user = $2 AND to_user = $1)",
+    )
+    .bind(owner)
+    .bind(v)
+    .fetch_one(pool)
+    .await?;
+    // 任一方向封鎖就不算好友 / 親密（呼叫端只會 404 或回精簡內容）
+    let friend = friend && !blocked_by_owner && !i_blocked;
+    r.rel = match (friend, close) {
+        (true, true) => Rel::Close,
+        (true, false) => Rel::Friend,
+        _ => Rel::Other,
     };
     Ok(Relation {
-        rel,
+        rel: r.rel,
         blocked_by_owner,
         i_blocked,
         friend,
+        incoming,
+        outgoing,
     })
 }
 
@@ -153,6 +174,8 @@ async fn profile(
         blocked_by_owner,
         i_blocked,
         friend,
+        incoming,
+        outgoing,
     } = relation_of(&st.pool, uid, viewer).await?;
     if blocked_by_owner {
         return Err(AppError::NotFound);
@@ -212,20 +235,12 @@ async fn profile(
         None => "anonymous",
         Some(_) if is_self => "self",
         Some(_) if friend => "friend",
-        Some(v) => {
+        Some(_) => {
             // 兩個方向各自唯一；incoming（對方寄給我）優先
-            let (inc, out): (Option<Uuid>, Option<Uuid>) = sqlx::query_as(
-                "SELECT (SELECT id FROM friend_requests WHERE from_user = $1 AND to_user = $2),
-                        (SELECT id FROM friend_requests WHERE from_user = $2 AND to_user = $1)",
-            )
-            .bind(uid)
-            .bind(v)
-            .fetch_one(&st.pool)
-            .await?;
-            request_id = inc.or(out);
-            if inc.is_some() {
+            request_id = incoming.or(outgoing);
+            if incoming.is_some() {
                 "incoming"
-            } else if out.is_some() {
+            } else if outgoing.is_some() {
                 "outgoing"
             } else {
                 "none"
@@ -262,10 +277,10 @@ async fn profile(
     // 完成度與分享頁同規則（眾籌品項達標算 1/1，見 wishlists::units / CLAIMED_SQL）
     let lists: Vec<ProfileWishlist> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT w.slug::text, w.title, w.type::text, w.status::text, w.visibility::text, w.cover_image_key, w.cover_image_status::text, w.cover_preset, w.event_date,
-                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum({claimed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL),
-                (SELECT COALESCE(sum({needed}), 0) FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL)
+                s.n, s.got, s.need
          FROM wishlists w
+         CROSS JOIN LATERAL (SELECT count(*) AS n, COALESCE(sum({claimed}), 0) AS got, COALESCE(sum({needed}), 0) AS need
+                               FROM wishlist_items i WHERE i.wishlist_id = w.id AND i.deleted_at IS NULL) s
          WHERE w.owner_id = $1 AND w.org_id IS NULL AND w.deleted_at IS NULL AND w.moderation_status = 'ok' AND w.status IN ('active', 'closed')
            AND (w.visibility::text = 'public'
                 OR (w.visibility::text IN ('friends', 'selected') AND $3)
