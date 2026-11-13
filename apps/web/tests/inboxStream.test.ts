@@ -80,6 +80,12 @@ describe('startInboxStream', () => {
     await tick(600); expect(fetchImpl).toHaveBeenCalledTimes(2)
     s.stop(); vi.restoreAllMocks()
   })
+  it('預設為全幅抖動：random=0 時延遲為 0.5 倍', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const c = conn(), c2 = conn(); const { s, fetchImpl } = setup([c, c2], { jitter: undefined })
+    await tick(); c.end(); await tick(1100); expect(fetchImpl).toHaveBeenCalledTimes(2)
+    s.stop(); vi.restoreAllMocks()
+  })
   it('stop() 中止連線且不再重連', async () => {
     const c = conn(); const { s, fetchImpl } = setup([c])
     await tick(); s.stop(); await tick(60000); expect(fetchImpl).toHaveBeenCalledTimes(1)

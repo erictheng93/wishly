@@ -189,6 +189,7 @@ async function saveSocial() {
       birthday, birthday_visibility: bVis.value } })
     ;[bMonth.value = '', bDay.value = ''] = user.value.birthday?.split('-') ?? [] // 日被夾到月底時同步顯示
     hMsg.value = t('settings.saved')
+    useOnboarding().refresh() // 新手導覽：個人資料步驟可能因此完成
   } catch (e: any) { hErr.value = apiErrMsg(e) }
 }
 async function copyId() { try { await copyText(user.value!.id); idCopied.value = true } catch { msg.value = t('settings.social.copyFail') } }

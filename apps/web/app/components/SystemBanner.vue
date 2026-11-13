@@ -4,7 +4,7 @@ const s = useSysStatus()
 const { public: { apiBase } } = useRuntimeConfig()
 async function check() {
   try {
-    const r = await $fetch<{ read_only: boolean }>(`${apiBase}/api/v1/public/status`)
+    const r = await fetchPublicStatus(apiBase)
     s.value = r.read_only ? { kind: 'readOnly', until: Date.now() + 60_000 } : null
   } catch (e: any) {
     const before = s.value

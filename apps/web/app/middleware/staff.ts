@@ -1,6 +1,6 @@
 export default defineNuxtRouteMiddleware(async (to, from) => {
   if (import.meta.server) return
-  const u = await useAuth().fetchMe(true) // 要拿到目前 session 的 mfa_verified
+  const u = await useAuth().fetchMeFresh(30_000) // 30 秒內抓過就沿用；MFA 驗證後 mfa.vue 會強制重抓
   if (!u) return navigateTo({ path: '/login', query: { redirect: to.fullPath, ...(useState<string>('auth-error', () => '').value === 'account_blocked' ? { error: 'account_blocked' } : {}) } })
   if (!u.is_staff) {
     // 剛從登入 / 註冊被帶回 /admin（redirect 參數）的一般使用者：改去 dashboard，不讓登入流程報錯；直接打網址則照舊 403（錯誤頁呈現為找不到頁面）

@@ -67,8 +67,8 @@ async function run(f: () => Promise<any>) {
 }
 const add = () => run(() => api('/friends/requests', { method: 'POST', body: { to: handle } }))
 const { refresh: refreshReqCount } = useFriendRequests()
-const accept = () => run(async () => { await api(`/friends/requests/${p.value.request_id}/accept`, { method: 'POST' }); refreshReqCount() })
-const dropRequest = () => run(async () => { await api(`/friends/requests/${p.value.request_id}`, { method: 'DELETE' }); refreshReqCount() })
+const accept = () => run(async () => { await api(`/friends/requests/${p.value.request_id}/accept`, { method: 'POST' }); refreshReqCount(true) })
+const dropRequest = () => run(async () => { await api(`/friends/requests/${p.value.request_id}`, { method: 'DELETE' }); refreshReqCount(true) })
 const unfriending = ref(false)
 const unfriend = () => run(async () => { await api(`/friends/${p.value.user.id}`, { method: 'DELETE' }); unfriending.value = false })
 const blocking = ref(false)
