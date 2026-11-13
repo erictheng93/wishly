@@ -25,6 +25,7 @@ export function onTourPage(step: TourStep | null, path: string, wishlistId?: str
   return path === tourTarget(step, wishlistId)
 }
 
+let inflight: Promise<TourState | null> | null = null
 export function useOnboarding() {
   const state = useState<TourState | null>('onboarding', () => null)
   const { user } = useAuth()
@@ -32,16 +33,19 @@ export function useOnboarding() {
   // 只有後端明確回 false 才算進行中：舊版 API 沒有這個欄位時不打擾
   const pending = computed(() => user.value?.onboarding_done === false)
   const active = computed(() => pending.value && !!state.value && !state.value.done)
-  async function refresh() {
-    if (!pending.value) { state.value = null; return null }
-    try { state.value = await api('/me/onboarding', { noRedirect: true }) } catch {} // 失敗保留前值，導覽不擋主要功能
-    return state.value
+  // 同時進行中的請求共用（導覽條與儀表板同頁掛載時只打一次）
+  function refresh(): Promise<TourState | null> {
+    if (!pending.value) { state.value = null; return Promise.resolve(null) }
+    return inflight ??= api('/me/onboarding', { noRedirect: true }).then((r: TourState) => { state.value = r }, () => {}) // 失敗保留前值，導覽不擋主要功能
+      .then(() => state.value).finally(() => { inflight = null })
   }
+  /** 已載入就沿用（換頁不重抓）；步驟推進靠各動作之後的 refresh() */
+  const ensure = () => state.value ? Promise.resolve(state.value) : refresh()
   /** done=true：完成或跳過；false：重新開始（設定頁） */
   async function finish(done = true) {
     state.value = await api('/me/onboarding', { method: 'PATCH', body: { done }, noRedirect: true })
     if (user.value) user.value = { ...user.value, onboarding_done: done }
     return state.value
   }
-  return { state, active, pending, refresh, finish }
+  return { state, active, pending, refresh, ensure, finish }
 }

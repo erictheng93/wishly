@@ -2,6 +2,6 @@
 export async function useOrgsEnabled() {
   const { public: { apiBase } } = useRuntimeConfig()
   const { data } = await useAsyncData('pub-status', () =>
-    $fetch<{ orgs_enabled?: boolean }>(`${apiBase}/api/v1/public/status`).catch(() => null))
+    fetchPublicStatus(apiBase).catch(() => null))
   return computed(() => data.value?.orgs_enabled === true)
 }

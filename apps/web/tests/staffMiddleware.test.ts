@@ -5,7 +5,7 @@ const fetchMe = vi.fn(), navigate = vi.fn((x: any) => ({ nav: x })), abort = vi.
 let mw: (to: any, from: any) => Promise<any>
 beforeAll(async () => {
   vi.stubGlobal('defineNuxtRouteMiddleware', (f: any) => f)
-  vi.stubGlobal('useAuth', () => ({ fetchMe }))
+  vi.stubGlobal('useAuth', () => ({ fetchMeFresh: fetchMe }))
   vi.stubGlobal('useState', () => ({ value: '' }))
   vi.stubGlobal('navigateTo', navigate)
   vi.stubGlobal('abortNavigation', abort)

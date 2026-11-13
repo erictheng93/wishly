@@ -23,7 +23,7 @@ async function loadMine() {
 watch(() => user.value?.id, (id, old) => {
   if (!id || old) mine.value = null // 登出或換帳號：不留前一位的清單
   if (!id) return
-  refreshRequests()
+  refreshRequests(true) // 登入或換帳號：不沿用前一位的新鮮度
   if (!mine.value && !mineBusy) loadMine()
 }, { immediate: true })
 const plus = computed(() => mine.value?.more ? '+' : '')

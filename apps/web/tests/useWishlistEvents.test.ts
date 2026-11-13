@@ -72,6 +72,26 @@ it('polls without EventSource and cleans up the timer', () => {
   expect(events).toEqual(['poll'])
 })
 
+it('non-CLOSED error closes the stream and reopens it itself after a jittered backoff (1s-3s for the first failure)', () => {
+  setup()
+  const first = FakeES.all[0]!
+  first.onerror()
+  expect(first.closed).toBe(true)
+  vi.advanceTimersByTime(999); expect(FakeES.all).toHaveLength(1)
+  vi.advanceTimersByTime(2001); expect(FakeES.all).toHaveLength(2)
+})
+
+it('skips polling while hidden and polls once when the tab becomes visible', () => {
+  const { events } = setup(), es = FakeES.all[0]!
+  es.readyState = 2; es.onerror() // 進入輪詢
+  let hidden = true
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') })
+  vi.advanceTimersByTime(5000); expect(events).toEqual([])
+  hidden = false; document.dispatchEvent(new Event('visibilitychange'))
+  expect(events).toEqual(['poll'])
+  vi.advanceTimersByTime(1000); expect(events).toEqual(['poll', 'poll'])
+})
+
 it('changing slug closes previous stream and opens the new URL', async () => {
   const { slug } = setup(), first = FakeES.all[0]!
   slug.value = 'next'; await nextTick()

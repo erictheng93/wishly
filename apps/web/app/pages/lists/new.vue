@@ -21,6 +21,7 @@ async function submit() {
     if (cover.value) Object.assign(body, { cover_image_key: cover.value, cover_preset: null })
     else Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
     const w = await api('/wishlists', { method: 'POST', body })
+    useOnboarding().refresh() // 新手導覽：建立清單完成
     await navigateTo(`/lists/${w.id}/edit`)
   } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
 }
