@@ -46,6 +46,7 @@ async fn main() {
     wishly_api::relief_events::spawn_permit_expiry(pool.clone());
     wishly_api::uploads::spawn_media_worker(pool.clone());
     wishly_api::topup::spawn_expire(pool.clone());
+    wishly_api::share_views::spawn_flusher(pool.clone());
     axum::serve(
         listener,
         app(AppState { pool }).into_make_service_with_connect_info::<std::net::SocketAddr>(),

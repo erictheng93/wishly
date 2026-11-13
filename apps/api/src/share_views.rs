@@ -81,6 +81,88 @@ fn ip_key(ip: std::net::IpAddr) -> String {
     }
 }
 
+struct Row {
+    slug: String,
+    visitor_id: Option<uuid::Uuid>,
+    ip: String,
+    country: Option<String>,
+    city: Option<String>,
+    device: &'static str,
+    user_agent: String,
+    referrer_host: Option<String>,
+}
+
+const BATCH_MAX: usize = 200;
+const QUEUE_MAX: usize = 10_000;
+static QUEUE: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, Vec<Row>>>> =
+    std::sync::LazyLock::new(Default::default);
+static WAKE: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+fn db_key(pool: &sqlx::PgPool) -> String {
+    pool.connect_options()
+        .get_database()
+        .unwrap_or("")
+        .to_string()
+}
+
+/// 把該資料庫佇列中的紀錄以單一敘述寫入。失敗只記 warn（不含 IP / UA）並丟棄該批。
+/// 單一敘述的隱含交易以 set_config(..., true) 非同步 commit：不等 WAL fsync（低規主機磁碟 fsync 是寫入瓶頸），
+/// 代價是主機當機時最近約 0.6 秒的紀錄可能遺失，資料一致性不受影響。業務寫入不可比照。
+pub async fn flush(pool: &sqlx::PgPool) {
+    let key = db_key(pool);
+    loop {
+        let batch: Vec<Row> = {
+            let mut q = QUEUE.lock().unwrap();
+            let Some(v) = q.get_mut(&key) else { return };
+            let n = v.len().min(BATCH_MAX);
+            if n == 0 {
+                return;
+            }
+            v.drain(..n).collect()
+        };
+        let n = batch.len();
+        let col = |f: fn(&Row) -> Option<String>| batch.iter().map(f).collect::<Vec<_>>();
+        let r = sqlx::query(
+            "INSERT INTO share_views (wishlist_id, visitor_id, ip, country, city, device, user_agent, referrer_host)
+             SELECT w.id, v.vid, v.ip::inet, v.country, v.city, v.device, v.ua, v.ref
+               FROM UNNEST($1::text[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[])
+                    AS v(slug, vid, ip, country, city, device, ua, ref)
+               JOIN wishlists w ON w.slug = v.slug::bpchar AND w.deleted_at IS NULL,
+                    (SELECT set_config('synchronous_commit', 'off', true)) lazy",
+        )
+        .bind(col(|r| Some(r.slug.clone())))
+        .bind(batch.iter().map(|r| r.visitor_id).collect::<Vec<_>>())
+        .bind(col(|r| Some(r.ip.clone())))
+        .bind(col(|r| r.country.clone()))
+        .bind(col(|r| r.city.clone()))
+        .bind(col(|r| Some(r.device.to_string())))
+        .bind(col(|r| Some(r.user_agent.clone())))
+        .bind(col(|r| r.referrer_host.clone()))
+        .execute(pool)
+        .await;
+        if let Err(e) = r {
+            let code = e
+                .as_database_error()
+                .and_then(|d| d.code().map(|c| c.to_string()));
+            tracing::warn!(rows = n, ?code, "share_views 批次寫入失敗，已丟棄");
+        }
+    }
+}
+
+/// 背景批次寫入：佇列達 BATCH_MAX 或每 500ms 寫一次。
+/// main.rs 沒有優雅關閉流程，所以不另做關閉時 flush：定期寫入已把遺失上限壓在約 0.5 秒。
+pub fn spawn_flusher(pool: sqlx::PgPool) {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = WAKE.notified() => {}
+                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
+            }
+            flush(&pool).await;
+        }
+    });
+}
+
 async fn record(
     State(st): State<AppState>,
     Path(slug): Path<String>,
@@ -128,24 +210,30 @@ async fn record(
         crate::config::get().trusted_proxy_cloudflare,
     );
     let ua: String = ua.chars().take(512).collect();
-    // 效能（分享頁每次瀏覽都打）：寫入只有單一敘述，並以 set_config(..., true) 讓這個隱含交易非同步 commit：不等 WAL fsync（低規主機磁碟 fsync 是寫入瓶頸），
-    // 代價是主機當機（非程式崩潰）時最近約 0.6 秒的瀏覽紀錄可能遺失，資料一致性不受影響。業務寫入不可比照。
-    sqlx::query(
-        "INSERT INTO share_views (wishlist_id, visitor_id, ip, country, city, device, user_agent, referrer_host)
-         SELECT w.id, $2, $3::inet, $4, $5, $6, $7, $8
-           FROM wishlists w, (SELECT set_config('synchronous_commit', 'off', true)) lazy
-          WHERE w.slug = $1::bpchar AND w.deleted_at IS NULL",
-    )
-    .bind(&slug)
-    .bind(visitor_id)
-    .bind(&ip)
-    .bind(country)
-    .bind(city)
-    .bind(device(&ua))
-    .bind(&ua)
-    .bind(referrer)
-    .execute(&st.pool)
-    .await?;
+    // 不碰 DB：進佇列後立即回 204，由 spawn_flusher 批次寫入（見 flush）。佇列滿就丟棄：這類紀錄允許遺失。
+    let row = Row {
+        slug,
+        visitor_id,
+        ip,
+        country,
+        city,
+        device: device(&ua),
+        user_agent: ua,
+        referrer_host: referrer,
+    };
+    // 佇列以資料庫名為鍵：正式程序只有一個；sqlx::test 每個測試各有資料庫與 runtime，不會互相寫錯庫
+    let key = db_key(&st.pool);
+    let full = {
+        let mut q = QUEUE.lock().unwrap();
+        let v = q.entry(key).or_default();
+        if v.len() < QUEUE_MAX {
+            v.push(row);
+        }
+        v.len() >= BATCH_MAX
+    };
+    if full {
+        WAKE.notify_one();
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
