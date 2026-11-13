@@ -190,6 +190,7 @@ async fn list_wishlists(
         )
         .await?;
     }
+    let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT w.id, jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title, 'status', w.status::text, 'type', w.type::text,
            'owner', jsonb_build_object('id', u.id, 'display_name', u.display_name, 'email', u.email),
@@ -204,7 +205,7 @@ async fn list_wishlists(
            AND ($3::uuid IS NULL OR w.id > $3)
            AND ($5::text IS NULL OR w.status::text=$5)
          ORDER BY w.id LIMIT $4")
-        .bind(qs).bind(&q.moderation_status).bind(q.cursor).bind(limit(&q) + 1).bind(&q.status).fetch_all(&st.pool).await?;
+        .bind(qs).bind(&q.moderation_status).bind(q.cursor).bind(limit(&q) + 1).bind(&q.status).fetch_all(&mut *tx).await?;
     Ok(page(rows, limit(&q)))
 }
 
@@ -253,6 +254,7 @@ async fn list_users(
         .await?;
     }
     let qid = qs.and_then(|s| s.parse::<Uuid>().ok());
+    let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT u.id, jsonb_build_object('id', u.id, 'display_name', u.display_name, 'handle', u.handle, 'email', u.email, 'is_staff', u.is_staff, 'staff_roles', u.staff_roles, 'mfa_enabled', u.totp_enabled_at IS NOT NULL,
            'blocked', u.blocked_at IS NOT NULL, 'blocked_at', u.blocked_at, 'deleted', u.deleted_at IS NOT NULL,
@@ -267,7 +269,7 @@ async fn list_users(
                 OR ($6='deleted' AND u.deleted_at IS NOT NULL)
                 OR ($6='staff' AND u.is_staff AND u.deleted_at IS NULL AND u.blocked_at IS NULL))
          ORDER BY u.id LIMIT $4")
-        .bind(qs).bind(qid).bind(q.cursor).bind(lim+1).bind(&q.provider).bind(&q.status).fetch_all(&st.pool).await?;
+        .bind(qs).bind(qid).bind(q.cursor).bind(lim+1).bind(&q.provider).bind(&q.status).fetch_all(&mut *tx).await?;
     Ok(page(rows, lim))
 }
 
@@ -625,6 +627,7 @@ async fn list_audit_logs(
         ));
     }
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
+    let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let rows: Vec<(Uuid,Value)> = sqlx::query_as("SELECT a.id,jsonb_build_object('id',a.id,'actor_type',a.actor_type::text,'actor_id',a.actor_id,
         'actor_name',u.display_name,'action',a.action,'entity',a.entity,'entity_id',a.entity_id,'diff',a.diff,'ip',host(a.ip),'request_id',a.request_id,'user_agent',a.user_agent,'created_at',a.created_at)
         FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id AND a.actor_type::text IN ('staff','user')
@@ -634,7 +637,7 @@ async fn list_audit_logs(
           AND ($7::date IS NULL OR a.created_at < (($7::date+1)::timestamp AT TIME ZONE 'Asia/Taipei'))
           AND ($9::uuid IS NULL OR a.request_id=$9)
         ORDER BY a.id DESC LIMIT $8")
-        .bind(q.cursor).bind(q.actor_id).bind(&q.action).bind(&q.entity).bind(q.entity_id).bind(q.from).bind(q.to).bind(lim+1).bind(q.request_id).fetch_all(&st.pool).await?;
+        .bind(q.cursor).bind(q.actor_id).bind(&q.action).bind(&q.entity).bind(q.entity_id).bind(q.from).bind(q.to).bind(lim+1).bind(q.request_id).fetch_all(&mut *tx).await?;
     Ok(page(rows, lim))
 }
 
@@ -703,7 +706,7 @@ async fn set_flag(
 }
 
 /// 最簡統計：直接聚合現有表，不引入第三方。
-pub async fn stats_json(pool: &PgPool) -> Result<Value, sqlx::Error> {
+pub async fn stats_json(pool: &mut sqlx::PgConnection) -> Result<Value, sqlx::Error> {
     let (v,): (Value,) = sqlx::query_as(
         "SELECT jsonb_build_object(
            'users', (SELECT count(*) FROM users WHERE deleted_at IS NULL),
@@ -727,7 +730,13 @@ pub async fn stats_json(pool: &PgPool) -> Result<Value, sqlx::Error> {
 }
 
 async fn stats(State(st): State<AppState>, _s: Staff) -> Result<Json<Value>, AppError> {
-    Ok(Json(stats_json(&st.pool).await?))
+    let pool = &st.pool;
+    let v = crate::staff_db::cached("stats".into(), || async move {
+        let mut tx = crate::staff_db::begin_read(pool).await?;
+        Ok::<_, AppError>(stats_json(&mut tx).await?)
+    })
+    .await?;
+    Ok(Json(v))
 }
 
 #[derive(Deserialize)]
@@ -749,7 +758,10 @@ async fn analytics(
             "days 須介於 7 到 365",
         ));
     }
-    let (v,): (Value,) = sqlx::query_as(
+    let pool = &st.pool;
+    let v = crate::staff_db::cached(format!("analytics:{days}"), || async move {
+    let mut tx = crate::staff_db::begin_read(pool).await?;
+    let (mut v,): (Value,) = sqlx::query_as(
         "WITH b AS (SELECT (now() AT TIME ZONE 'Asia/Taipei')::date AS today),
          r AS (SELECT today - ($1 - 1) AS d0, today FROM b),
          -- 區間起點（含）的 timestamptz
@@ -839,9 +851,8 @@ async fn analytics(
                SELECT kind, jsonb_object_agg(k, CASE WHEN n < 5 THEN NULL ELSE to_jsonb(n) END) o FROM dist GROUP BY kind) t))",
     )
     .bind(days)
-    .fetch_one(&st.pool)
+    .fetch_one(&mut *tx)
     .await?;
-    let mut v = v;
     // 空桶整組省略後，前端仍需要這些鍵
     for k in [
         "provider",
@@ -857,6 +868,9 @@ async fn analytics(
             v["distribution"][k] = json!({});
         }
     }
+    Ok::<_, AppError>(v)
+    })
+    .await?;
     let mut res = Json(v).into_response();
     res.headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

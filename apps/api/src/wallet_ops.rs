@@ -560,6 +560,7 @@ async fn topup_list(
         return Err(AppError::invalid("/status", "ENUM", "status 不正確"));
     }
     let lim = q.limit.unwrap_or(50).clamp(1, 100);
+    let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT t.id, jsonb_build_object('id', t.id, 'amount', t.amount, 'method', t.method, 'status', t.status,
                 'provider', t.provider, 'provider_txn_id', t.provider_txn_id, 'merchant_trade_no', t.merchant_trade_no, 'created_at', t.created_at, 'paid_at', t.paid_at,
@@ -573,7 +574,7 @@ async fn topup_list(
                  OR COALESCE(position(lower($6) IN lower(t.merchant_trade_no)) > 0, false)
                  OR COALESCE(position(lower($6) IN lower(t.provider_txn_id)) > 0, false))
           ORDER BY t.id DESC LIMIT $3")
-        .bind(&q.status).bind(q.cursor).bind(lim + 1).bind(&q.method).bind(q.user_id).bind(kw).fetch_all(&st.pool).await?;
+        .bind(&q.status).bind(q.cursor).bind(lim + 1).bind(&q.method).bind(q.user_id).bind(kw).fetch_all(&mut *tx).await?;
     Ok(page(rows, lim))
 }
 

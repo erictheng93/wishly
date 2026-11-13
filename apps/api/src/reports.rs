@@ -175,10 +175,10 @@ async fn create_org(
         }
     }
     let ip = crate::config::client_ip(&parts, crate::config::get());
-    ratelimit::check(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
     verify_turnstile(crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
     if user.is_none() && guest.is_none() {
-        ratelimit::check(&st.pool, &format!("report_org:{oid}:{ip}"), 1, 86400).await?;
+        ratelimit::check_pool(&st.pool, &format!("report_org:{oid}:{ip}"), 1, 86400).await?;
     }
     // 快照只存 logo key（輸出才換 URL）；不含聯絡 email / 電話
     let id: Uuid = sqlx::query_scalar(
@@ -242,11 +242,11 @@ async fn create(
         }
     }
     let ip = crate::config::client_ip(&parts, crate::config::get());
-    ratelimit::check(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("report_ip:{ip}"), 10, 3600).await?;
     verify_turnstile(crate::config::get(), b.turnstile_token.as_deref(), &ip).await?;
     if user.is_none() && guest.is_none() {
         // 匿名檢舉者以 IP 近似「同一檢舉者」：同清單 24 小時 1 筆
-        ratelimit::check(&st.pool, &format!("report_wl:{wid}:{ip}"), 1, 86400).await?;
+        ratelimit::check_pool(&st.pool, &format!("report_wl:{wid}:{ip}"), 1, 86400).await?;
     }
     // 快照與 INSERT 同一句（單次往返）；只存圖片 key，輸出時才換 URL（見 snapshot_urls）。items 最多 50 筆。
     const ITEM_SNAP: &str = "jsonb_build_object('id', i.id, 'title', i.title, 'description', i.description, 'product_url', i.product_url,
@@ -408,12 +408,13 @@ async fn list(
 ) -> Result<Response, AppError> {
     let (status, from, to) = parse_filters(&q)?;
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
+    let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "{REPORT_SQL} WHERE {FILTER_SQL} AND ($2::uuid IS NULL OR r.id > $2)
            AND ($8::uuid IS NULL OR r.wishlist_id = $8) AND ($9::uuid IS NULL OR r.reported_user_id = $9) AND ($10::uuid IS NULL OR r.reported_org_id = $10)
          ORDER BY r.id LIMIT $3")))
         .bind(status).bind(q.cursor).bind(lim + 1).bind(q.kind.as_deref()).bind(q.reason.as_deref())
-        .bind(from).bind(to).bind(q.wishlist_id).bind(q.user_id).bind(q.org_id).fetch_all(&st.pool).await?;
+        .bind(from).bind(to).bind(q.wishlist_id).bind(q.user_id).bind(q.org_id).fetch_all(&mut *tx).await?;
     let rows = rows
         .into_iter()
         .map(|(id, mut v)| {
@@ -433,6 +434,7 @@ async fn targets(
     let (status, from, to) = parse_filters(&q)?;
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
     let offset = q.offset.unwrap_or(0).max(0);
+    let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let mut rows: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT jsonb_build_object(
            'kind', CASE WHEN g.wishlist_id IS NOT NULL THEN 'wishlist' WHEN g.reported_user_id IS NOT NULL THEN 'user' ELSE 'org' END,
@@ -449,7 +451,7 @@ async fn targets(
          LIMIT $3 OFFSET $2",
         wl = wl_obj!(), us = user_obj!(), og = org_obj!())))
         .bind(status).bind(offset).bind(lim + 1).bind(q.kind.as_deref()).bind(q.reason.as_deref())
-        .bind(from).bind(to).fetch_all(&st.pool).await?;
+        .bind(from).bind(to).fetch_all(&mut *tx).await?;
     let next = (rows.len() as i64 > lim).then(|| offset + lim);
     rows.truncate(lim as usize);
     Ok(Json(json!({ "data": rows, "next_offset": next })))

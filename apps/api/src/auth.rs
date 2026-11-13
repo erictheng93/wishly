@@ -439,10 +439,10 @@ pub(crate) async fn otp_gate(
     ip: &str,
     turnstile_token: Option<&str>,
 ) -> Result<(), AppError> {
-    if !crate::ratelimit::allow(pool, &format!("otp_soft:{purpose}:{email}"), 3, 3600).await? {
+    if !crate::ratelimit::allow_pool(pool, &format!("otp_soft:{purpose}:{email}"), 3, 3600).await? {
         require_captcha(turnstile_token, ip).await?;
     }
-    crate::ratelimit::check(pool, &format!("otp_gap:{purpose}:{ip}:{email}"), 1, 60).await
+    crate::ratelimit::check_pool(pool, &format!("otp_gap:{purpose}:{ip}:{email}"), 1, 60).await
 }
 
 /// Turnstile 驗證；缺 / 錯 token 回 403 CAPTCHA_REQUIRED（前端據此顯示人機驗證）。
@@ -475,7 +475,7 @@ async fn otp_request(
     Peer(ip): Peer,
     Json(r): Json<EmailReq>,
 ) -> Result<(StatusCode, Json<Value>), AppError> {
-    crate::ratelimit::check(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("otp_req:{ip}"), 20, 3600).await?;
     let email = norm_email(&r.email)?;
     otp_gate(&st.pool, "login", &email, &ip, r.turnstile_token.as_deref()).await?;
     let id = issue_otp(&st.pool, &email, "login", None, None).await?;
@@ -612,7 +612,7 @@ async fn otp_verify(
     headers: HeaderMap,
     Json(r): Json<VerifyReq>,
 ) -> Result<Response, AppError> {
-    crate::ratelimit::check(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("otp_ver:{ip}"), 30, 3600).await?;
     let email = norm_email(&r.email)?;
     consume_otp(&st.pool, &email, &r.code, "login", r.challenge_id).await?;
     let name = email.split('@').next().unwrap_or("user");
@@ -1356,7 +1356,8 @@ async fn oauth_start(
             )
                 .into_response());
         }
-        crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
+        crate::ratelimit::check_pool(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600)
+            .await?;
         (
             Some(u.id),
             crate::session::session_token(&parts.headers).map(|t| hex::encode(hash_token(&t))),
@@ -1732,7 +1733,7 @@ async fn link_ticket(
         ));
     }
     crate::identities::require_fresh_session(&st.pool, u.session_id).await?;
-    crate::ratelimit::check(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("identity-oauth:{}", u.id), 20, 3600).await?;
     let session_hash = crate::session::session_token(&headers).map(|t| hash_token(&t));
     let ticket = rand_b64(32);
     sqlx::query("INSERT INTO native_auth_codes (code_hash, user_id, challenge, expires_at, purpose, session_hash) VALUES ($1,$2,$3, now() + interval '60 seconds','link',$4)")

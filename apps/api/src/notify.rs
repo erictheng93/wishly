@@ -198,6 +198,14 @@ pub async fn enqueue_purchase_reminders<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
+static CF_MAIL_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
+        .build()
+        .expect("cloudflare mail http client")
+});
+
 /// 唯一寄信點。設了 CF_ACCOUNT_ID + CF_EMAIL_API_TOKEN 就走 Cloudflare Email Service REST API
 /// （production 啟動時強制要求）；否則 dev 走 SMTP → Mailpit。錯誤字串不含 token。
 pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Result<(), String> {
@@ -206,7 +214,7 @@ pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Res
             "{}/accounts/{acct}/email/sending/send",
             cfg.cf_api_base.trim_end_matches('/')
         );
-        let r = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().map_err(|e| e.without_url().to_string())?
+        let r = CF_MAIL_CLIENT
             .post(url).bearer_auth(tok)
             .json(&serde_json::json!({ "from": cfg.mail_from, "to": to, "subject": subject, "text": body }))
             .send().await.map_err(|e| e.without_url().to_string())?;

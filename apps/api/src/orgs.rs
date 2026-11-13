@@ -531,7 +531,7 @@ async fn upload(
             .fetch_one(&st.pool)
             .await?;
     only_for(&early, permit)?; // 省一次無謂的 S3 寫入；權威判斷在下方鎖內
-    crate::ratelimit::check(&st.pool, &format!("org-doc:{}", u.id), 30, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("org-doc:{}", u.id), 30, 3600).await?;
     let key = format!("org-docs/{id}/{}", Uuid::new_v4());
     crate::uploads::put_object(&key, crate::sealed::seal(&body), "application/octet-stream")
         .await?;
@@ -715,7 +715,7 @@ async fn add_permit(
             "截止日不可早於起始日",
         ));
     }
-    crate::ratelimit::check(&st.pool, &format!("org-permit:{}", u.id), 20, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("org-permit:{}", u.id), 20, 3600).await?;
     let mut tx = crate::begin_contended(&st.pool).await?;
     let (status, _, _) = lock(&mut tx, id).await?; // 與刪文件互斥
     require_role(&mut *tx, id, u.id, "owner").await?;
