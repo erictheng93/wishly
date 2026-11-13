@@ -229,6 +229,16 @@ async fn unsubscribe(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// 安全設定（SSRF）：不跟隨重導向、5 秒逾時；端點白名單在 `send_one` 之前驗證。
+static PUSH_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(5))
+        .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
+        .build()
+        .expect("push http client")
+});
+
 /// notify worker 在寄送階段呼叫。任何失敗只 warn：不 panic、不影響通知狀態、不重試。
 pub async fn deliver(pool: &PgPool, uid: Uuid, title: &str, path: &str) {
     let cfg = config::get();
@@ -256,16 +266,10 @@ pub async fn deliver(pool: &PgPool, uid: Uuid, title: &str, path: &str) {
         }
         title.pop();
     };
-    let Ok(client) = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(5))
-        .build()
-    else {
-        return;
-    };
+    let client = &*PUSH_CLIENT;
     // 並行送出：通知 worker 是循序的，最久只被單次逾時（5 秒）卡住，不隨裝置數累加
     futures_util::future::join_all(subs.iter().map(|(id, endpoint, p256dh, auth)| {
-        let (client, plain) = (&client, plain.as_bytes());
+        let (client, plain) = (client, plain.as_bytes());
         async move {
             match send_one(client, vapid, endpoint, p256dh, auth, plain).await {
                 Ok(s) if s == StatusCode::NOT_FOUND || s == StatusCode::GONE => {

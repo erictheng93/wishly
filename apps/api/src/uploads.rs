@@ -80,8 +80,7 @@ pub(crate) async fn import_avatar(
             let Some(old) = current else { return Ok::<(), String>(()); };
             if old.as_deref().is_some_and(|k| k.starts_with("avatars/")) { return Ok(()); }
             let Some(url) = picture.as_deref().or(old.as_deref()).and_then(|p| avatar_source(&provider, p)) else { return Ok(()); };
-            let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).redirect(reqwest::redirect::Policy::none()).build().map_err(|e| e.to_string())?;
-            let bytes = avatar_bytes(&client, url).await?;
+            let bytes = avatar_bytes(&AVATAR_CLIENT, url).await?;
             let (clean, ct) = tokio::task::spawn_blocking(move || strip_metadata(&bytes)).await.map_err(|e| e.to_string())??;
             let key = format!("avatars/{}.{}", Uuid::new_v4(), ext_of(ct).unwrap());
             let mut tx = media_tx(&pool, id).await.map_err(|e| format!("{e:?}"))?;
@@ -279,6 +278,23 @@ async fn s3_req(
     s3_req_headers(method, key, body, &[]).await
 }
 
+/// 模組級共用 client（避免每次呼叫重做 TLS 設定）；設定與原本逐次建立的完全相同。
+static AVATAR_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none())
+        .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
+        .build()
+        .expect("avatar http client")
+});
+static S3_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
+        .build()
+        .expect("s3 http client")
+});
+
 async fn s3_req_headers(
     method: &str,
     key: &str,
@@ -287,11 +303,7 @@ async fn s3_req_headers(
 ) -> Result<reqwest::Response, AppError> {
     let s3 = S3::get();
     let url = s3.presign(method, key, 300, headers, Utc::now());
-    let c = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
-    let mut rb = c.request(method.parse().unwrap(), url);
+    let mut rb = S3_CLIENT.request(method.parse().unwrap(), url);
     for (name, value) in headers {
         rb = rb.header(*name, *value);
     }
