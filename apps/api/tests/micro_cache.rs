@@ -43,6 +43,18 @@ async fn micro_cache_bounds_staleness_and_admin_flag_is_immediate(pool: PgPool) 
     let (_, _, v) = call(&pool, "GET", "/public/wishlists?type=registry", &[], None).await;
     assert_eq!(titles(v), vec!["改名後".to_string()]);
 
+    // 營運統計：守衛每次都先跑（非營運 403），通過後 60 秒內回快取
+    let adm = staff(&pool, "營運統計").await;
+    let (s, _, _) = call(&pool, "GET", "/admin/stats", &ck(&donor.token), None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _, v1) = call(&pool, "GET", "/admin/stats", &ck(&adm.token), None).await;
+    assert_eq!(s, StatusCode::OK);
+    user(&pool, "新使用者").await;
+    let (_, _, v2) = call(&pool, "GET", "/admin/stats", &ck(&adm.token), None).await;
+    assert_eq!(v2, v1, "60 秒內應回快取");
+    let (s, _, _) = call(&pool, "GET", "/admin/stats", &ck(&donor.token), None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "快取不可繞過守衛");
+
     // read_only：直接改 DB 最多晚 1 秒生效
     assert_eq!(
         call(&pool, "GET", "/public/status", &[], None).await.2["read_only"],

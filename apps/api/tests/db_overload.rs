@@ -58,6 +58,27 @@ async fn lock_timeout_maps_to_503(pool: PgPool) {
     assert_eq!(other.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn staff_read_statement_timeout_maps_to_503(pool: PgPool) {
+    // 以 50ms 取代 8 秒；timeout 只作用於該交易，歸還後連線不受影響
+    let mut tx = wishly_api::staff_db::begin_read_with(&pool, "50ms")
+        .await
+        .unwrap();
+    let e = sqlx::query("SELECT pg_sleep(2)")
+        .execute(&mut *tx)
+        .await
+        .unwrap_err();
+    let res = wishly_api::error::AppError::Db(e).into_response();
+    assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(res.headers().get("retry-after").unwrap(), "2");
+    drop(tx);
+    let st: String = sqlx::query_scalar("SHOW statement_timeout")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(st, "0");
+}
+
 /// 占住品項列鎖，回傳持鎖交易（drop 即釋放）
 async fn hold_item(pool: &PgPool, item: uuid::Uuid) -> sqlx::Transaction<'static, sqlx::Postgres> {
     let mut tx = pool.begin().await.unwrap();

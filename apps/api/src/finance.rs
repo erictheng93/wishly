@@ -65,6 +65,20 @@ pub fn json_resp(body: &Value) -> Response {
         .unwrap()
 }
 
+/// 執行聚合 SQL（`$1` = days）：8 秒 statement_timeout + 60 秒快取；角色守衛與 days 驗證已在呼叫前完成。
+async fn respond(pool: &sqlx::PgPool, name: &str, days: i32, sql: String) -> R<Response> {
+    let v = crate::staff_db::cached(format!("finance:{name}:{days}"), || async move {
+        let mut tx = crate::staff_db::begin_read(pool).await?;
+        let (v,): (Value,) = sqlx::query_as(sqlx::AssertSqlSafe(sql))
+            .bind(days)
+            .fetch_one(&mut *tx)
+            .await?;
+        Ok::<_, AppError>(v)
+    })
+    .await?;
+    Ok(json_resp(&v))
+}
+
 async fn overview(
     State(st): State<AppState>,
     _s: Staff<FINANCE>,
@@ -99,11 +113,7 @@ async fn overview(
                'first_time', (SELECT count(*) FROM fp, rg WHERE fp.first_paid >= rg.prev_start AND fp.first_paid < rg.prev_end))),
            'daily', (SELECT jsonb_agg(jsonb_build_object('date', d, 'gross', gross) ORDER BY d) FROM daily))"
     );
-    let (v,): (Value,) = sqlx::query_as(sqlx::AssertSqlSafe(sql))
-        .bind(days)
-        .fetch_one(&st.pool)
-        .await?;
-    Ok(json_resp(&v))
+    respond(&st.pool, "overview", days, sql).await
 }
 
 /// 付費用戶：以錢包為單位，金額與筆數只算區間內。
@@ -144,11 +154,7 @@ async fn payers(
                 FROM (SELECT * FROM pw ORDER BY amount DESC, wallet_id LIMIT 20) x
                 JOIN point_wallets w ON w.id = x.wallet_id JOIN users u ON u.id = w.user_id), '[]'::jsonb))"
     );
-    let (v,): (Value,) = sqlx::query_as(sqlx::AssertSqlSafe(sql))
-        .bind(days)
-        .fetch_one(&st.pool)
-        .await?;
-    Ok(json_resp(&v))
+    respond(&st.pool, "payers", days, sql).await
 }
 
 /// 渠道比較：固定四種渠道必出現，line_pay / apple_pay 有資料才出現。
@@ -176,11 +182,7 @@ async fn channels(
                           'success_rate', CASE WHEN COALESCE(done, 0) = 0 THEN NULL ELSE ok::float8 / done END,
                           'payers', payers) ORDER BY gross DESC, m) FROM ch))"
     );
-    let (v,): (Value,) = sqlx::query_as(sqlx::AssertSqlSafe(sql))
-        .bind(days)
-        .fetch_one(&st.pool)
-        .await?;
-    Ok(json_resp(&v))
+    respond(&st.pool, "channels", days, sql).await
 }
 
 /// 風險與負債：負債 = 未使用點數（餘額，依批次拆分）+ 認捐中（已自餘額扣除，不重複）。
@@ -221,9 +223,5 @@ async fn risk(
                 FROM invoices i JOIN topups t ON t.id = i.source_id
                 WHERE i.source_type = 'topup' AND i.status = 'pending' AND t.paid_at IS NOT NULL))"
     );
-    let (v,): (Value,) = sqlx::query_as(sqlx::AssertSqlSafe(sql))
-        .bind(days)
-        .fetch_one(&st.pool)
-        .await?;
-    Ok(json_resp(&v))
+    respond(&st.pool, "risk", days, sql).await
 }
