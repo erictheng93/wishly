@@ -38,9 +38,8 @@ export const options = {
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
 }
 
-// 預設只有 2xx / 3xx 算成功；預期的業務回應只在個別請求放寬（訪客 /me 的 401、捐助撞到品項已滿的 409），
+// 預設只有 2xx / 3xx 算成功；預期的業務回應只在個別請求放寬（捐助撞到品項已滿的 409），
 // 會員請求若因 session 失效等原因回 401 仍算錯誤，不會被當成「正常」而掩蓋。
-const OK_ANON_401 = http.expectedStatuses({ min: 200, max: 399 }, 401)
 const OK_CLAIM_409 = http.expectedStatuses({ min: 200, max: 399 }, 409)
 
 const t0 = Date.now()
@@ -84,7 +83,7 @@ function visitor() {
     if (et) etags[s] = et
     get(`/public/wishlists/${s}`, 'GET /public/wishlists/:slug (etag)', et ? { 'If-None-Match': et } : {})
     get('/public/status', 'GET /public/status')
-    get('/me', 'GET /me (anon)', null, OK_ANON_401)
+    // 匿名訪客沒有登入線索，前端不再打 /me（原本每次吃一個 401）
     send('POST', `/public/wishlists/${s}/views`, {}, 'POST /views')
   })
   think()

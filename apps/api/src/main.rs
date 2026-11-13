@@ -28,6 +28,10 @@ async fn main() {
     let pool = PgPoolOptions::new()
         .max_connections(max_conns)
         .acquire_timeout(std::time::Duration::from_secs(3)) // 6.4：取不到連線 3 秒即回 503，不讓請求堆積
+        // 預設每次取連線先 ping 一次＝每個查詢多一次往返；DB 同機，死連線改由查詢失敗 + 定期汰換處理
+        .test_before_acquire(false)
+        .max_lifetime(std::time::Duration::from_secs(1800))
+        .idle_timeout(std::time::Duration::from_secs(300))
         .connect_with(opts)
         .await
         .expect("db");

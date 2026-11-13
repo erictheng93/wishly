@@ -152,12 +152,30 @@ pub(crate) async fn subscribe(
     Ok(bus(pool).await?.subscribe())
 }
 
+/// LISTEN 專用連線：自己開一個只有 1 條連線的池，不長期佔用請求用的連線池（池只有 5 條時佔 1 條就少 20%）。
+/// 主池關閉時連帶關閉，listener 的 recv 才會照原本的方式結束。
+pub(crate) async fn pg_listener(pool: &PgPool) -> Result<sqlx::postgres::PgListener, sqlx::Error> {
+    let own = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(1)
+        .idle_timeout(Duration::from_secs(5)) // 斷線重連後舊池的連線自行回收
+        .connect_with((*pool.connect_options()).clone())
+        .await?;
+    let l = sqlx::postgres::PgListener::connect_with(&own).await?;
+    let main = pool.clone();
+    // shortcut: 每次重連留下一個等待主池關閉的小任務，重連頻繁到有感時改成共用一個
+    tokio::spawn(async move {
+        main.close_event().await;
+        own.close().await;
+    });
+    Ok(l)
+}
+
 static BUS: OnceCell<broadcast::Sender<(Uuid, u64)>> = OnceCell::const_new();
 
 async fn bus(pool: &PgPool) -> Result<&'static broadcast::Sender<(Uuid, u64)>, sqlx::Error> {
     BUS.get_or_try_init(|| async {
         // 回應 SSE 之前完成 LISTEN，避免首個捐助通知在 listener 啟動前遺失。
-        let mut listener = sqlx::postgres::PgListener::connect_with(pool).await?;
+        let mut listener = pg_listener(pool).await?;
         listener.listen(CHANNEL).await?;
         let (tx, _) = broadcast::channel(256);
         let (pool, t) = (pool.clone(), tx.clone());
@@ -177,7 +195,7 @@ async fn bus(pool: &PgPool) -> Result<&'static broadcast::Sender<(Uuid, u64)>, s
                     if pool.is_closed() {
                         return;
                     }
-                    if let Ok(mut next) = sqlx::postgres::PgListener::connect_with(&pool).await {
+                    if let Ok(mut next) = pg_listener(&pool).await {
                         if next.listen(CHANNEL).await.is_ok() {
                             listener = next;
                             break;
@@ -313,6 +331,7 @@ async fn events(
         .unwrap_or_default();
     let (tx, out) = mpsc::channel::<Result<Event, Infallible>>(16);
     let pool = st.pool.clone();
+    let mut public = vis == "public";
     tokio::spawn(async move {
         let _slot = slot; // 連線結束才歸還名額
         let deadline = tokio::time::sleep(Duration::from_secs(30 * 60)); // 每條連線最長 30 分鐘
@@ -327,7 +346,8 @@ async fn events(
             tokio::select! {
                 _ = &mut deadline => break,
                 // 定期重驗沿用最新共用快照：清單欄位變更都會 notify，好友/指定名單由 check_wishlist 即時查
-                _ = recheck.tick() => { periodic = true; nseq = NOTIFY_SEQ.load(Ordering::Relaxed); }
+                // 公開清單不需要：可見度、下架、刪除都會 notify；否則每條連線每分鐘白查 2 次 DB
+                _ = recheck.tick(), if !public => { periodic = true; nseq = NOTIFY_SEQ.load(Ordering::Relaxed); }
                 _ = tx.closed() => break,
                 r = rx.recv() => match r {
                     Ok((id, _)) if id != wid => continue, // 含站內通知的 user_id 訊號
@@ -343,6 +363,7 @@ async fn events(
             let Some(s) = snap.filter(|s| matches!(s.status.as_str(), "active" | "closed")) else {
                 break;
             };
+            public = s.visibility == "public"; // 改成非公開後恢復定期重驗
             if s.visibility != "public"
                 && crate::access::check_wishlist(
                     &pool,

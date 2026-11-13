@@ -81,7 +81,11 @@ const closed = computed(() => data.value?.status === 'closed')
 const online = ref(true), mode = ref<LiveMode>('connecting'), lineHint = ref(false)
 // --- 我的捐助（有 token 時 GET /guest/me）---
 const myClaims = ref<Record<string, any>>({})
+// 登入線索：ws_hint cookie（fetchMe 成功才設）或原生殼的 Bearer 權杖；都沒有且沒有舊訪客 token = 匿名，/me、/guest/me 必為 401，省掉
+const hint = useAuthHint()
+const hinted = () => !!hint.value || !!nativeHeaders().Authorization
 async function loadMine() {
+  if (!getGuestToken() && !hinted()) return
   try { // 不先檢查 token：登入使用者靠 session cookie 捐助，沒有 guest token
     const r = await api('/guest/me?limit=100')
     myClaims.value = Object.fromEntries(r.claims.filter((c: any) => c.wishlist.slug === slug && ['reserved', 'purchased', 'delivered'].includes(c.claim.status)).map((c: any) => [c.claim.item_id, { ...c.claim, item_changed_at: c.item_changed_at }]))
@@ -114,7 +118,8 @@ onMounted(async () => {
   addEventListener('online', () => { online.value = true; reload() }); addEventListener('offline', () => (online.value = false))
   lineHint.value = isLineBrowser() && !getPref('ws_hint_dismissed')
   loadMine()
-  meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include', headers: nativeHeaders() }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(e => trackIfAnonymous(e, apiBase, slug))
+  if (hinted()) meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include', headers: nativeHeaders() }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(e => trackIfAnonymous(e, apiBase, slug))
+  else trackShareView(apiBase, slug)
   if (hold(st.value) || st.value === 404) await loadClient()
   startLive()
   nextTick(focusItem)

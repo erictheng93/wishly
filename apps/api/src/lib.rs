@@ -274,6 +274,8 @@ fn cors() -> tower_http::cors::CorsLayer {
             HeaderName::from_static("x-guest-token"),
             HeaderName::from_static("idempotency-key"),
         ])
+        // 預檢結果讓瀏覽器快取 2 小時（Chrome 上限），否則帶自訂標頭 / JSON 的請求每次多一個 OPTIONS
+        .max_age(std::time::Duration::from_secs(7200))
         // 跨網域前端要讀得到：重放標記與 429 / 503 的等待秒數
         .expose_headers([
             HeaderName::from_static("idempotency-replayed"),

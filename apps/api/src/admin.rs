@@ -199,7 +199,7 @@ async fn list_wishlists(
            'created_at', w.created_at)
          FROM wishlists w JOIN users u ON u.id = w.owner_id
          WHERE w.deleted_at IS NULL
-           AND ($1::text IS NULL OR w.slug::text = $1 OR left(u.email, length($1)) = lower($1))
+           AND ($1::text IS NULL OR w.slug = $1::bpchar OR left(u.email, length($1)) = lower($1))
            AND ($2::text IS NULL OR w.moderation_status::text = $2)
            AND ($3::uuid IS NULL OR w.id > $3)
            AND ($5::text IS NULL OR w.status::text=$5)
