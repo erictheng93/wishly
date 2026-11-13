@@ -2,20 +2,53 @@
 use crate::error::AppError;
 use sqlx::PgPool;
 
+/// 同一份 upsert；`$from` 為 `FROM w` 或附帶 `set_config` 的版本。ON CONFLICT 以後的文字兩者完全相同。
+macro_rules! hit_sql {
+    ($from:literal) => {
+        concat!(
+            "WITH w AS (SELECT to_timestamp(floor(extract(epoch FROM now()) / $2) * $2) AS s)
+         INSERT INTO rate_limits (key, window_start, count) SELECT $1, w.s, 1 ",
+            $from,
+            "
+         ON CONFLICT (key, window_start) DO UPDATE SET count = rate_limits.count + 1
+         RETURNING count, GREATEST(1, ceil(extract(epoch FROM window_start + make_interval(secs => $2) - now()))::bigint)"
+        )
+    };
+}
+const HIT_SQL: &str = hit_sql!("FROM w");
+/// 單一敘述的隱含交易以 set_config(..., true) 非同步 commit（同 share_views.rs）：不等 WAL fsync，
+/// 主機當機時最近約 0.6 秒的計數可能遺失（無害）。只給 autocommit 路徑用；業務交易內的限流（claims / contributions
+/// / 現金退款 / 支持品項）一律走 `check`，維持與業務寫入同步 commit。
+const HIT_SQL_ASYNC: &str =
+    hit_sql!("FROM w, (SELECT set_config('synchronous_commit', 'off', true)) lazy");
+
 /// 計數 +1；回 Ok(true)=未超限，Ok(false)=超限（Err(secs) 以 allow_retry 取得）
 async fn hit<'e>(
     pool: impl sqlx::PgExecutor<'e>,
+    sql: &'static str,
     key: &str,
     limit: i32,
     window_secs: i64,
 ) -> Result<(bool, i64), AppError> {
-    let (count, retry): (i32, i64) = sqlx::query_as(
-        "WITH w AS (SELECT to_timestamp(floor(extract(epoch FROM now()) / $2) * $2) AS s)
-         INSERT INTO rate_limits (key, window_start, count) SELECT $1, w.s, 1 FROM w
-         ON CONFLICT (key, window_start) DO UPDATE SET count = rate_limits.count + 1
-         RETURNING count, GREATEST(1, ceil(extract(epoch FROM window_start + make_interval(secs => $2) - now()))::bigint)")
-        .bind(key).bind(window_secs as f64).fetch_one(pool).await?;
+    let (count, retry): (i32, i64) = sqlx::query_as(sql)
+        .bind(key)
+        .bind(window_secs as f64)
+        .fetch_one(pool)
+        .await?;
     Ok((count <= limit, retry))
+}
+
+fn verdict((ok, retry): (bool, i64)) -> Result<(), AppError> {
+    if ok {
+        return Ok(());
+    }
+    Err(AppError::Problem {
+        status: 429,
+        code: "RATE_LIMITED",
+        detail: "請求過於頻繁，請稍後再試".into(),
+        errors: None,
+        retry_after: Some(retry as u64),
+    })
 }
 
 /// 超限 → 429 RATE_LIMITED + Retry-After
@@ -25,16 +58,17 @@ pub async fn check<'e>(
     limit: i32,
     window_secs: i64,
 ) -> Result<(), AppError> {
-    match hit(pool, key, limit, window_secs).await? {
-        (true, _) => Ok(()),
-        (false, r) => Err(AppError::Problem {
-            status: 429,
-            code: "RATE_LIMITED",
-            detail: "請求過於頻繁，請稍後再試".into(),
-            errors: None,
-            retry_after: Some(r as u64),
-        }),
-    }
+    verdict(hit(pool, HIT_SQL, key, limit, window_secs).await?)
+}
+
+/// `check` 的連線池（autocommit）版本，非同步 commit；交易內請用 `check`。
+pub async fn check_pool(
+    pool: &sqlx::PgPool,
+    key: &str,
+    limit: i32,
+    window_secs: i64,
+) -> Result<(), AppError> {
+    verdict(hit(pool, HIT_SQL_ASYNC, key, limit, window_secs).await?)
 }
 
 /// 不報錯版本：超限回 false（用於「超限就略過副作用」，如不寄信）
@@ -44,7 +78,17 @@ pub async fn allow<'e>(
     limit: i32,
     window_secs: i64,
 ) -> Result<bool, AppError> {
-    Ok(hit(pool, key, limit, window_secs).await?.0)
+    Ok(hit(pool, HIT_SQL, key, limit, window_secs).await?.0)
+}
+
+/// `allow` 的連線池（autocommit）版本，非同步 commit。
+pub async fn allow_pool(
+    pool: &sqlx::PgPool,
+    key: &str,
+    limit: i32,
+    window_secs: i64,
+) -> Result<bool, AppError> {
+    Ok(hit(pool, HIT_SQL_ASYNC, key, limit, window_secs).await?.0)
 }
 
 /// 程序內固定視窗限流（不寫 DB）：只用於「超限就略過副作用」的高頻、低風險場景（分享頁瀏覽紀錄）。

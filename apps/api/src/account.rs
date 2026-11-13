@@ -227,7 +227,7 @@ async fn reauth(pool: &sqlx::PgPool, u: &CurrentUser, pw: Option<&str>) -> Resul
         .ok_or_else(|| AppError::invalid("/password", "REQUIRED", "請輸入密碼"))?
         .to_owned();
     // 驗證前就計數：超限時連正確密碼也不驗，暴力猜測拿不到判定
-    crate::ratelimit::check(pool, &format!("delete-me-pw:{}", u.id), 5, 900).await?;
+    crate::ratelimit::check_pool(pool, &format!("delete-me-pw:{}", u.id), 5, 900).await?;
     let ok = crate::auth_ext::argon_run(move || {
         pw.chars().count() <= 128 && crate::auth_ext::verify_pw(&pw, &hash)
     })

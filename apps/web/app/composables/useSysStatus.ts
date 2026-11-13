@@ -10,3 +10,16 @@ export function noteUnavailable(status: number, code?: string, retryAfter?: numb
   if (!DOWN.has(status) && !(status === 0 && globalThis.navigator?.onLine !== false)) return
   useSysStatus().value = { kind: code === 'READ_ONLY_MODE' ? 'readOnly' : 'busy', until: Date.now() + (retryAfter || 30) * 1000 }
 }
+
+// GET /public/status 共用一個 promise（橫幅、useOrgsEnabled、useTopupMethods 同頁各抓一次太浪費）；3 秒內重複呼叫共用，之後重抓（橫幅的唯讀複查要拿新值）
+type PubStatus = { read_only: boolean, orgs_enabled?: boolean, topup_methods?: string[] }
+let statusP: Promise<PubStatus> | null = null
+export function fetchPublicStatus(apiBase: string) {
+  if (!statusP) {
+    const p = $fetch<PubStatus>(`${apiBase}/api/v1/public/status`)
+    statusP = p
+    const clear = () => setTimeout(() => { if (statusP === p) statusP = null }, 3000)
+    p.then(clear, clear)
+  }
+  return statusP
+}

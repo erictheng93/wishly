@@ -80,8 +80,7 @@ pub(crate) async fn import_avatar(
             let Some(old) = current else { return Ok::<(), String>(()); };
             if old.as_deref().is_some_and(|k| k.starts_with("avatars/")) { return Ok(()); }
             let Some(url) = picture.as_deref().or(old.as_deref()).and_then(|p| avatar_source(&provider, p)) else { return Ok(()); };
-            let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).redirect(reqwest::redirect::Policy::none()).build().map_err(|e| e.to_string())?;
-            let bytes = avatar_bytes(&client, url).await?;
+            let bytes = avatar_bytes(&AVATAR_CLIENT, url).await?;
             let (clean, ct) = tokio::task::spawn_blocking(move || strip_metadata(&bytes)).await.map_err(|e| e.to_string())??;
             let key = format!("avatars/{}.{}", Uuid::new_v4(), ext_of(ct).unwrap());
             let mut tx = media_tx(&pool, id).await.map_err(|e| format!("{e:?}"))?;
@@ -279,6 +278,23 @@ async fn s3_req(
     s3_req_headers(method, key, body, &[]).await
 }
 
+/// 模組級共用 client（避免每次呼叫重做 TLS 設定）；設定與原本逐次建立的完全相同。
+static AVATAR_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none())
+        .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
+        .build()
+        .expect("avatar http client")
+});
+static S3_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
+        .build()
+        .expect("s3 http client")
+});
+
 async fn s3_req_headers(
     method: &str,
     key: &str,
@@ -287,11 +303,7 @@ async fn s3_req_headers(
 ) -> Result<reqwest::Response, AppError> {
     let s3 = S3::get();
     let url = s3.presign(method, key, 300, headers, Utc::now());
-    let c = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
-    let mut rb = c.request(method.parse().unwrap(), url);
+    let mut rb = S3_CLIENT.request(method.parse().unwrap(), url);
     for (name, value) in headers {
         rb = rb.header(*name, *value);
     }
@@ -783,7 +795,8 @@ pub fn strip_metadata(data: &[u8]) -> Result<(Vec<u8>, &'static str), String> {
     let mut lim = image::Limits::default();
     lim.max_image_width = Some(8192);
     lim.max_image_height = Some(8192);
-    lim.max_alloc = Some(256 << 20);
+    // 8192² × 4 = 256 MiB，故 128 MiB 才是實際上限（約 5800² RGBA）；尺寸限制保留作為早期拒絕
+    lim.max_alloc = Some(128 << 20);
     rd.limits(lim);
     let mut dec = rd.into_decoder().map_err(|e| e.to_string())?;
     let orient = dec.orientation().map_err(|e| e.to_string())?;
@@ -820,8 +833,8 @@ fn ext_of(ct: &str) -> Option<&'static str> {
 
 /// confirm 每使用者每小時上限（大於 presign 的 60，容許重試）
 const CONFIRM_LIMIT: i32 = 120;
-/// 同時進行的圖片解碼數
-static DECODE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+/// 同時進行的圖片解碼數（1 GB 主機：2 × 128 MiB 上限）
+static DECODE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 
 async fn presign(
     State(st): State<AppState>,
@@ -857,7 +870,7 @@ async fn presign(
             "圖片大小須介於 1 byte 與 5 MB",
         ));
     }
-    crate::ratelimit::check(&st.pool, &format!("presign:{}", user.id), 60, 3600).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("presign:{}", user.id), 60, 3600).await?;
     ensure_bucket().await;
     let s3 = S3::get();
     let object_key = format!("{dir}/{}.{ext}", Uuid::new_v4());
@@ -914,7 +927,7 @@ async fn confirm(
     if r.object_key.starts_with("catalog/") {
         crate::admin::require_staff(&user)?;
     }
-    crate::ratelimit::check(
+    crate::ratelimit::check_pool(
         &st.pool,
         &format!("confirm:{}", user.id),
         CONFIRM_LIMIT,
@@ -947,13 +960,14 @@ async fn confirm(
         .map_err(|_| AppError::problem(502, "UPSTREAM_ERROR", "儲存服務暫時無法使用"))?;
     let want_ext = r.object_key.rsplit('.').next().unwrap_or("");
     // 解碼是 CPU 密集：丟 blocking 池並以全域信號量限制同時解碼數，避免耗盡 worker / 記憶體
-    let _permit = DECODE_SLOTS
+    let permit = DECODE_SLOTS
         .acquire()
         .await
         .map_err(|_| AppError::problem(503, "BUSY", "圖片處理忙碌中，請稍後再試"))?;
     let stripped = tokio::task::spawn_blocking(move || strip_metadata(&bytes))
         .await
         .map_err(|_| AppError::problem(500, "INTERNAL_ERROR", "圖片處理失敗"))?;
+    drop(permit); // 解碼完即放行，不佔著跑 S3 與 DB
     match stripped {
         Ok((clean, ct)) if ext_of(ct) == Some(want_ext) => {
             // 先記下擁有權（含舊版 presign 的 key），再在交易外發佈

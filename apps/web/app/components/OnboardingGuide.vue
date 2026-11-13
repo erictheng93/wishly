@@ -2,7 +2,7 @@
 // 新手導覽條：放在創建者頁標題下、訪客頁頁首下。導覽進行中才出現；在該步驟的頁面說明「怎麼做」，其他頁給「前往」
 const route = useRoute()
 const { user, fetchMe } = useAuth()
-const { state, active, refresh, finish } = useOnboarding()
+const { state, active, refresh, ensure, finish } = useOnboarding()
 const busy = ref(false)
 const hidden = computed(() => route.path === '/welcome' || route.path.startsWith('/admin'))
 const cur = computed(() => state.value?.current ?? null)
@@ -15,8 +15,8 @@ async function close() {
   try { await finish(true) } catch {} finally { busy.value = false }
 }
 // 訪客頁（SSR）不一定抓過 /me：有「可能已登入」旗標才抓，免得每位訪客都打一次 API
-onMounted(async () => { if (!user.value && useAuthHint().value) await fetchMe(); refresh() })
-watch(() => route.fullPath, () => refresh())
+onMounted(async () => { if (!user.value && useAuthHint().value) await fetchMe(); ensure() })
+watch(() => user.value?.id, () => refresh()) // 換帳號才重抓；換頁不抓
 </script>
 <template>
   <aside v-if="active && !hidden && state" class="tour" :aria-label="$t('onboarding.guide.aria')">

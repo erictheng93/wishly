@@ -39,7 +39,7 @@ async fn block(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     not_self(u.id, id)?;
-    ratelimit::check(&st.pool, &format!("user_block:{}", u.id), 60, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("user_block:{}", u.id), 60, 3600).await?;
     live_user(&st, id).await?;
     let mut tx = st.pool.begin().await?;
     lock_pair(&mut tx, u.id, id).await?; // 鎖序：pair lock 一律最先
@@ -156,7 +156,7 @@ async fn report(
             Json(json!({ "id": id, "status": "open" })),
         ));
     }
-    ratelimit::check(&st.pool, &format!("user_report:{}", u.id), 10, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("user_report:{}", u.id), 10, 3600).await?;
     let rid: Uuid = sqlx::query_scalar(
         "INSERT INTO content_reports (reported_user_id, reason, detail, reporter_user_id, snapshot)
          SELECT $1, $2::report_reason, $3, $4,

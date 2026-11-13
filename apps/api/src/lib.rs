@@ -47,6 +47,7 @@ pub mod security;
 pub mod security_activity;
 pub mod session;
 pub mod share_views;
+pub mod staff_db;
 pub mod support;
 pub mod topup;
 pub mod uploads;

@@ -2,6 +2,6 @@
 export function useTopupMethods() {
   const { public: { apiBase } } = useRuntimeConfig()
   const { data, status } = useAsyncData('pub-status', () =>
-    $fetch<{ orgs_enabled?: boolean, topup_methods?: string[] }>(`${apiBase}/api/v1/public/status`).catch(() => null))
+    fetchPublicStatus(apiBase).catch(() => null))
   return { methods: computed(() => data.value?.topup_methods ?? []), ready: computed(() => status.value === 'success' || status.value === 'error') }
 }

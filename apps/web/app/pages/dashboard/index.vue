@@ -33,7 +33,7 @@ const pctOf = (w: any) => Math.max(0, Math.min(100, Number(w.completion?.complet
 const tour = useOnboarding()
 onMounted(async () => {
   load()
-  const s = await tour.refresh()
+  const s = await tour.ensure()
   let welcomed = false
   try { welcomed = !!sessionStorage.getItem('ws_tour_welcomed') } catch {}
   if (tour.active.value && s && s.steps.every(x => !x.done) && !welcomed) navigateTo('/welcome')

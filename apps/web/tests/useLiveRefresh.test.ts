@@ -67,6 +67,15 @@ describe('createLiveRefresh', () => {
     expect(modes).toEqual(['polling'])
     l.stop(); vi.advanceTimersByTime(60000); expect(refresh).not.toHaveBeenCalled()
   })
+  it('non-CLOSED error: closes and reopens itself after a jittered backoff; stop() cancels the retry', () => {
+    const { l } = setup(), first = FakeES.last
+    first.onerror()
+    expect(first.closed).toBe(true)
+    vi.advanceTimersByTime(999); expect(FakeES.last).toBe(first)
+    vi.advanceTimersByTime(2001); expect(FakeES.last).not.toBe(first)
+    const second = FakeES.last
+    second.onerror(); l.stop(); vi.advanceTimersByTime(60000); expect(FakeES.last).toBe(second)
+  })
   it('labels', () => {
     expect([liveLabel('live'), liveLabel('polling'), liveLabel('connecting')]).toEqual(['即時更新中', '定時更新', '連線中…'])
   })

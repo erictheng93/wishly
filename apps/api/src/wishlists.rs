@@ -1186,6 +1186,24 @@ fn orders_summary(statuses: impl Iterator<Item = Option<String>>) -> Value {
     json!({ "funded_count": f, "ordered_count": o, "shipped_count": s, "delivered_count": d })
 }
 
+#[cfg(test)]
+mod taipei_tests {
+    #[test]
+    fn taipei_midnight_is_previous_day_1600_utc() {
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 3, 1).unwrap();
+        assert_eq!(
+            super::taipei_midnight(d).unwrap().to_rfc3339(),
+            "2026-02-28T16:00:00+00:00"
+        );
+    }
+}
+
+/// 台北（固定 UTC+8、無日光節約）當日 00:00 對應的 UTC 時刻；省去一次 SQL 往返
+fn taipei_midnight(d: NaiveDate) -> Option<DateTime<Utc>> {
+    d.and_hms_opt(0, 0, 0)
+        .map(|t| DateTime::from_naive_utc_and_offset(t, Utc) - chrono::Duration::hours(8))
+}
+
 async fn dashboard(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -1216,12 +1234,7 @@ async fn dashboard(
     let qty_items = || items.iter().filter(|i| i.funding_mode == "quantity");
     let cf_items = || items.iter().filter(|i| i.funding_mode == "crowdfund");
     let unlock: Option<DateTime<Utc>> = match w.event_date {
-        Some(d) if w.surprise_mode => {
-            sqlx::query_scalar("SELECT ($1::date)::timestamp AT TIME ZONE 'Asia/Taipei'")
-                .bind(d)
-                .fetch_one(&st.pool)
-                .await?
-        }
+        Some(d) if w.surprise_mode => taipei_midnight(d),
         _ => None,
     };
     // 每品項幾人認領（有效 claims 筆數 / pledged+captured contributions 的不同捐贈者）：鎖定期間也輸出，只有人數、沒有身分

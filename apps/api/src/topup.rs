@@ -577,7 +577,7 @@ async fn query_trade(cfg: &Ecpay, trade_no: &str) -> Result<Vec<(String, String)
     ];
     let mac = check_mac(&f, cfg);
     f.push(("CheckMacValue".into(), mac));
-    let res = reqwest::Client::new()
+    let res = QUERY_CLIENT
         .post(&cfg.query_url)
         .form(&f)
         .timeout(std::time::Duration::from_secs(cfg.query_timeout_secs))
@@ -590,6 +590,14 @@ async fn query_trade(cfg: &Ecpay, trade_no: &str) -> Result<Vec<(String, String)
     let text = res.text().await.map_err(|e| unavailable(&e.to_string()))?;
     serde_urlencoded::from_str(&text).map_err(|e| unavailable(&e.to_string()))
 }
+
+static QUERY_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    // 逾時由每次請求依設定帶入；不留閒置連線（同原本每次新建 client 的行為，測試跨 runtime 才不會踩到失效連線）
+    reqwest::Client::builder()
+        .pool_max_idle_per_host(0)
+        .build()
+        .expect("ecpay http client")
+});
 
 /// 入帳前二次確認：回應簽章正確，且 TradeStatus=1（已付款）、金額、MerchantTradeNo、TradeNo 皆與訂單一致。
 /// 任一不符 → 不入帳、寫 audit_logs（topup.query_mismatch）並告警，回 422 讓綠界重送。

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SystemBanner from '../app/components/SystemBanner.vue'
-import { noteUnavailable, useSysStatus } from '../app/composables/useSysStatus'
+import { fetchPublicStatus, noteUnavailable, useSysStatus } from '../app/composables/useSysStatus'
 import { flush, mount } from './vueHarness'
 
 const state = ref<any>(null)
@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   state.value = { kind: 'readOnly', until: Date.now() + 60_000 } // 已在維護中，掛載時不先查
   for (const [name, value] of Object.entries({
-    onBeforeUnmount, onMounted, watch, noteUnavailable, useSysStatus,
+    onBeforeUnmount, onMounted, watch, noteUnavailable, useSysStatus, fetchPublicStatus,
     useState: () => state,
     useRuntimeConfig: () => ({ public: { apiBase: 'http://api' } }),
     $fetch: fetch,

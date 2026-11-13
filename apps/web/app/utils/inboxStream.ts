@@ -9,7 +9,7 @@ export interface InboxStreamOpts {
   failLimit?: number // 連續失敗幾次後改輪詢
   pollMs?: number
   idleMs?: number // 超過這麼久沒收到任何位元組（伺服器每 15 秒有心跳）就視為斷線
-  jitter?: number // 重連延遲隨機放大的比例，避免部署重啟後所有客戶端同時湧入
+  jitter?: number // 重連延遲隨機抖動的幅度（±比例，0.5 = 0.5x～1.5x），避免部署重啟後所有客戶端同時湧入
 }
 
 export function startInboxStream(o: InboxStreamOpts) {
@@ -47,7 +47,7 @@ export function startInboxStream(o: InboxStreamOpts) {
       } catch { /* 斷線或被 stop 中止，走下面的重連 */ }
       if (stopped) return
       if (!ok && ++fails >= failLimit) poll ??= setInterval(o.onEvent, pollMs) // 連不上時用輪詢兜底
-      await sleep(delays[Math.min(ok ? 0 : fails - 1, delays.length - 1)]! * (1 + Math.random() * jitter))
+      await sleep(delays[Math.min(ok ? 0 : fails - 1, delays.length - 1)]! * (1 - jitter + Math.random() * 2 * jitter)) // 全幅抖動：平均不變、分散更寬
     }
   }
   function stop() { stopped = true; ctrl?.abort(); stopPoll(); clearTimeout(timer); wake?.() }

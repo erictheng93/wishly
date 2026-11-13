@@ -140,7 +140,7 @@ async fn request(
     State(st): State<AppState>,
     Json(b): Json<ReqBody>,
 ) -> R<(StatusCode, Json<Value>)> {
-    ratelimit::check(&st.pool, &format!("friend_req:{}", u.id), 30, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("friend_req:{}", u.id), 30, 3600).await?;
     let to = b.to.trim().to_lowercase();
     if to.is_empty() || to.chars().count() > 200 {
         return Err(AppError::invalid(
@@ -218,7 +218,7 @@ async fn search(
     State(st): State<AppState>,
     Query(p): Query<SearchQuery>,
 ) -> R<Json<Value>> {
-    ratelimit::check(&st.pool, &format!("user_search:{}", u.id), 600, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("user_search:{}", u.id), 600, 3600).await?;
     let q =
         p.q.split_whitespace()
             .collect::<Vec<_>>()

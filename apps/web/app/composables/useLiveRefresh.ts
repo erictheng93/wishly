@@ -13,9 +13,12 @@ export interface LiveOpts {
   pollMs?: number, failLimit?: number, connectTimeoutMs?: number
 }
 
+/** 自行重連的退避：2s 起指數成長、上限 30s，再乘 0.5～1.5 抖動（原生 EventSource 固定約 3 秒重連，API 重啟後全體同時湧入） */
+export const sseBackoff = (fails: number) => Math.min(30000, 2000 * 2 ** Math.max(0, fails - 1)) * (0.5 + Math.random())
+
 export function createLiveRefresh(o: LiveOpts) {
   const { pollMs = 15000, failLimit = 3, connectTimeoutMs = 30000, eventTypes = ['item.updated', 'wishlist.updated'] } = o
-  let es: EventSource | undefined, poll: ReturnType<typeof setInterval> | undefined, connectTimer: ReturnType<typeof setTimeout> | undefined
+  let es: EventSource | undefined, poll: ReturnType<typeof setInterval> | undefined, connectTimer: ReturnType<typeof setTimeout> | undefined, retry: ReturnType<typeof setTimeout> | undefined
   let fails = 0, mode: LiveMode = 'connecting'
   const set = (m: LiveMode) => { if (m !== mode) { mode = m; o.onMode(m) } }
   const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden'
@@ -31,19 +34,23 @@ export function createLiveRefresh(o: LiveOpts) {
   function start() {
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible)
     if (typeof EventSource === 'undefined') return startPoll()
-    es = new EventSource(o.url, { withCredentials: o.withCredentials })
     connectTimer = setTimeout(() => { if (mode !== 'live') startPoll() }, connectTimeoutMs)
-    es.onopen = () => { fails = 0; clearTimeout(connectTimer); stopPoll(); set('live') }
-    es.onerror = () => {
+    connect()
+  }
+  function connect() {
+    const cur = es = new EventSource(o.url, { withCredentials: o.withCredentials })
+    cur.onopen = () => { fails = 0; clearTimeout(connectTimer); stopPoll(); set('live') }
+    cur.onerror = () => {
       fails++
-      const closed = es?.readyState === 2 // 被伺服器拒絕（404/410）：瀏覽器不再重連，重抓一次讓頁面顯示下架 / 找不到
+      const closed = cur.readyState === 2 // 被伺服器拒絕（404/410）：瀏覽器不再重連，重抓一次讓頁面顯示下架 / 找不到
       if (mode === 'live') set('connecting')
       if (closed || fails >= failLimit) { startPoll(); if (closed) o.refresh() }
+      if (!closed) { cur.close(); clearTimeout(retry); retry = setTimeout(connect, sseBackoff(fails)) } // 自己重連（抖動退避）
     }
-    for (const t of eventTypes) es.addEventListener(t, (ev: any) => { try { o.onEvent(t, JSON.parse(ev.data)) } catch { o.onEvent(t, null) } })
+    for (const t of eventTypes) cur.addEventListener(t, (ev: any) => { try { o.onEvent(t, JSON.parse(ev.data)) } catch { o.onEvent(t, null) } })
   }
   function stop() {
-    es?.close(); es = undefined; stopPoll(); clearTimeout(connectTimer)
+    es?.close(); es = undefined; stopPoll(); clearTimeout(connectTimer); clearTimeout(retry)
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
   }
   return { start, stop }

@@ -100,7 +100,7 @@ fn code_invalid() -> AppError {
 
 /// 驗證碼正確且時間步比上次新才通過；`pending` = 設定中（尚未啟用）。通過即啟用。
 async fn accept_code(st: &AppState, uid: Uuid, code: &str, pending: bool) -> Result<(), AppError> {
-    crate::ratelimit::check(&st.pool, &format!("mfa:{uid}"), 5, 300).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("mfa:{uid}"), 5, 300).await?;
     let sealed: Option<Vec<u8>> = sqlx::query_scalar(
         "SELECT totp_secret FROM users WHERE id=$1 AND totp_secret IS NOT NULL AND (totp_enabled_at IS NULL) = $2",
     )
@@ -356,7 +356,7 @@ async fn mfa_verify(
         mark_session(&st, &u, &ip, "auth.mfa_verified").await?;
         return Ok(StatusCode::NO_CONTENT);
     }
-    crate::ratelimit::check(&st.pool, &format!("mfa:{}", u.id), 5, 300).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("mfa:{}", u.id), 5, 300).await?;
     let fresh_format = code.chars().filter(|c| c.is_ascii_alphanumeric()).count() == RECOVERY_LEN;
     let n = if !fresh_format {
         0
@@ -476,7 +476,7 @@ async fn change_password(
 ) -> Result<StatusCode, AppError> {
     crate::auth_ext::check_pw(&r.new_password)
         .map_err(|_| AppError::invalid("/new_password", "RANGE", "密碼長度須為 8–128 字元"))?;
-    crate::ratelimit::check(&st.pool, &format!("pw-change:{}", u.id), 5, 900).await?;
+    crate::ratelimit::check_pool(&st.pool, &format!("pw-change:{}", u.id), 5, 900).await?;
     let row: Option<(String, Option<String>)> = sqlx::query_as(
         "SELECT provider_uid, password_hash FROM auth_identities WHERE user_id=$1 AND provider='email'",
     )
