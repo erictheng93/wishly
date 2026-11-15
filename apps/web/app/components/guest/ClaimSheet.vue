@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import '~/assets/guest.css'
 // 捐助 / 修改捐助 bottom sheet（docs 03 §5.7）。Idempotency-Key 於開啟時產生，重試沿用。
-const props = defineProps<{ item: any, mine: any | null, online: boolean, loggedInName?: string, via?: string }>()
+const props = defineProps<{ item: any, mine: any | null, online: boolean, loggedInName?: string, via?: string, claimersVisible?: boolean, surpriseLocked?: boolean }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [remaining: number], switchEdit: [], login: [] }>()
 const { api, newKey } = useGuest()
 const { t } = useI18n()
@@ -22,6 +22,7 @@ const msg = ref('')
 const errs = ref<Record<string, string>>({})
 const note0 = note.value
 const dirty = computed(() => note.value !== note0 || anon.value)
+const visNote = computed(() => claimVisNote({ anon: anon.value, surpriseLocked: props.surpriseLocked, claimersVisible: props.claimersVisible, vis: vis.value }))
 
 async function submit() {
   errs.value = {}; msg.value = ''
@@ -84,6 +85,7 @@ async function submit() {
       <div v-if="errs.note" class="g-field-err">{{ errs.note }}</div>
       <!-- 放在留言欄之後：GuestDialog 會把初始焦點給第一個 input -->
       <label v-if="!editing" class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.claim.anon') }}</label>
+      <p v-if="!editing && visNote" class="g-mute">{{ $t(visNote) }}</p>
       <p class="g-mute">{{ $t('guest.claim.notice') }}<NuxtLink :to="localizedPath('/privacy', $i18n.locale) + '#collect'" target="_blank">{{ $t('guest.claim.privacyLink') }}</NuxtLink><span class="g-nowrap">{{ $t('guest.claim.noCheck') }}</span></p>
       <button class="g-btn" :disabled="busy || !online">{{ !online ? $t('guest.claim.offline') : busy ? $t('guest.sending') : editing ? $t('guest.claim.save') : $t('guest.claim.confirm') }}</button>
       <button type="button" class="g-link" @click="emit('close')">{{ $t('guest.cancel') }}</button>

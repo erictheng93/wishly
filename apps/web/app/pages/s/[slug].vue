@@ -41,7 +41,17 @@ async function loadClient() {
   } finally { checking.value = false }
 }
 // 受限清單用帶憑證的 $fetch 更新；公開清單維持 useFetch refresh（ETag）
-const reload = () => restricted.value ? loadClient() : refresh()
+// viaCreds：公開清單但已登入且有匿名項目 → 改走帶憑證路徑（好友才看得到 friends 級名字），之後 reload / 即時更新都維持這條路
+const viaCreds = ref(false)
+async function reload() {
+  if (restricted.value || viaCreds.value) return loadClient()
+  await refresh()
+  return switchToCreds()
+}
+async function switchToCreds() {
+  if (viaCreds.value || !needsCredsFetch({ loggedIn: !!me.value, visibility: data.value?.visibility, claimersVisible: data.value?.claimers_visible, items: data.value?.items })) return
+  viaCreds.value = true; await loadClient()
+}
 const gone = computed(() => st.value === 410)
 const notFound = computed(() => st.value === 404)
 const forbidden = computed(() => st.value === 403 && !!gate.value)
@@ -121,6 +131,7 @@ onMounted(async () => {
   if (hinted()) meReady = $fetch<any>(`${apiBase}/api/v1/me`, { credentials: 'include', headers: nativeHeaders() }).then(m => { me.value = m; isOwner.value = m?.id === data.value?.owner?.id }).catch(e => trackIfAnonymous(e, apiBase, slug))
   else trackShareView(apiBase, slug)
   if (hold(st.value) || st.value === 404) await loadClient()
+  else { await meReady; await switchToCreds() }
   startLive()
   nextTick(focusItem)
 })
@@ -146,7 +157,7 @@ function startLive() {
       if (d.deleted) items.value = items.value.filter(i => i.id !== d.item_id)
       else {
         items.value = items.value.map(i => i.id === d.item_id ? mergeItemEvent(i, d) : i)
-        if (items.value.some(i => i.id === d.item_id && i.funding_mode === 'crowdfund')) refresh() // contributors 不在事件裡，補抓一次
+        if (items.value.some(i => i.id === d.item_id && i.funding_mode === 'crowdfund')) reload() // contributors 不在事件裡，補抓一次
       }
     },
   })
@@ -176,7 +187,7 @@ async function onFund(it: any) {
 function onFunded(r: any) {
   items.value = items.value.map(i => i.id === r.item.id ? { ...i, ...r.item } : i)
   funded.value = { ...r, title: fundItem.value?.title }
-  fundId.value = null; refresh()
+  fundId.value = null; reload()
   useOnboarding().refresh() // 點數認捐也算完成「捐助」
 }
 async function onSwitchEdit() { await loadMine(); const it = sheetItem.value; sheetItem.value = null; await nextTick(); sheetItem.value = it }
@@ -271,10 +282,10 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
       </div>
     </template>
 
-    <GuestClaimSheet v-if="sheetItem" :key="sheetItem.id + (sheetMine?.id ?? '')" :item="sheetItem" :mine="sheetMine" :via="viaId" :online="online" :logged-in-name="me?.display_name"
+    <GuestClaimSheet v-if="sheetItem" :key="sheetItem.id + (sheetMine?.id ?? '')" :item="sheetItem" :mine="sheetMine" :via="viaId" :online="online" :logged-in-name="me?.display_name" :claimers-visible="data?.claimers_visible" :surprise-locked="data?.surprise_locked"
       @close="sheetItem = null" @done="onDone" @stale="onStale" @switch-edit="onSwitchEdit" @login="onLoginExpired" />
-    <GuestFundSheet v-if="fundItem" :key="fundItem.id" :item="fundItem" :slug="slug" :via="viaId" :online="online" :logged-in-name="me?.display_name"
-      @close="fundId = null" @done="onFunded" @stale="refresh()" />
+    <GuestFundSheet v-if="fundItem" :key="fundItem.id" :item="fundItem" :slug="slug" :via="viaId" :online="online" :logged-in-name="me?.display_name" :claimers-visible="data?.claimers_visible" :surprise-locked="data?.surprise_locked"
+      @close="fundId = null" @done="onFunded" @stale="reload()" />
     <GuestDialog v-if="funded" labelledby="funded-title" @close="funded = null"><div class="g-sheet center">
       <h1 id="funded-title" class="ok">{{ $t('guest.slug.fundedTitle') }}</h1>
       <p>{{ $t('guest.slug.fundedLine', { title: funded.title, pts: fmtPts(funded.contribution.points) }) }}</p>

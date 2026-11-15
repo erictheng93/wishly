@@ -2,7 +2,7 @@
 import '~/assets/guest.css'
 // 「心願眾籌」bottom sheet（契約 POST /items/{id}/contributions）。需要登入；Idempotency-Key 於開啟時產生，
 // 確定性失敗後換新 key（body 可能已改），網路失敗才沿用同一把重試。
-const props = defineProps<{ item: any, online: boolean, slug: string, loggedInName?: string, via?: string }>()
+const props = defineProps<{ item: any, online: boolean, slug: string, loggedInName?: string, via?: string, claimersVisible?: boolean, surpriseLocked?: boolean }>()
 const emit = defineEmits<{ close: [], done: [r: any], stale: [] }>()
 const { api } = useApi()
 const { t } = useI18n()
@@ -17,6 +17,7 @@ const message = ref(''), anon = ref(false)
 const balance = ref<number | null>(null)
 const busy = ref(false), msg = ref(''), needWallet = ref(false), needLogin = ref(false)
 const dirty = computed(() => !!message.value || anon.value)
+const visNote = computed(() => claimVisNote({ anon: anon.value, surpriseLocked: props.surpriseLocked, claimersVisible: props.claimersVisible, vis: vis.value }))
 const chips = computed(() => quickAmounts(remaining.value))
 
 onMounted(async () => { try { balance.value = (await api('/wallet', { noRedirect: true })).wallet.balance } catch { /* 餘額只是提示 */ } })
@@ -70,6 +71,7 @@ async function submit() {
         <label for="fv">{{ $t('guest.fund.visLabel') }}</label>
         <select id="fv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option></select>
       </template>
+      <p v-if="visNote" class="g-mute">{{ $t(visNote) }}</p>
       <p class="g-mute">{{ $t('guest.fund.notice') }}</p>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}
         <NuxtLink v-if="needWallet" to="/me/wallet">{{ $t('guest.fund.viewWallet') }}</NuxtLink>

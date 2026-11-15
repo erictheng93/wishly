@@ -163,8 +163,10 @@ async fn visibility_matrix(pool: PgPool) {
 async fn age_computed_from_birthday(pool: PgPool) {
     let a = user(&pool, "A").await;
     handle(&pool, a.id, "alice").await;
-    let t = Utc::now().date_naive() + Duration::days(1);
-    patch(&pool, &a.token, json!({"birth_year": Utc::now().year() - 30, "birthday": t.format("%m-%d").to_string(), "age_vis": "friends"})).await;
+    // 伺服器以台北日期（UTC+8）算年齡；用 UTC 日期在 UTC 16–24 時會差一天
+    let today = (Utc::now() + Duration::hours(8)).date_naive();
+    let t = today + Duration::days(1);
+    patch(&pool, &a.token, json!({"birth_year": today.year() - 30, "birthday": t.format("%m-%d").to_string(), "age_vis": "friends"})).await;
     let (_, v) = view(&pool, Some(&a.token)).await;
     // 明天是 1/1 時 birthday 落在隔年，仍是「今天未到生日」
     assert_eq!(v["user"]["age"], 29);

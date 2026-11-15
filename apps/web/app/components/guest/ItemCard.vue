@@ -3,6 +3,8 @@ import '~/assets/guest.css'
 const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean, loginTo?: any, siteOff?: boolean }>() // loginTo 有值 = 未登入，認捐鈕改為前往登入
 defineEmits<{ claim: [], fund: [], ack: [] }>()
 const crowd = computed(() => props.item.funding_mode === 'crowdfund')
+const namesShown = computed(() => !props.masked && !!(crowd.value ? props.item.contributors?.length : props.item.claimers?.length))
+const supporters = computed(() => !namesShown.value && props.item.supporter_count >= 2 ? props.item.supporter_count : 0)
 const ds = computed(() => deriveDisplayStatus(props.item) ?? '')
 const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fully_claimed)
 // image_status 非 ready 時 API 不給 image_url，顯示灰色佔位
@@ -26,6 +28,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
         <div class="g-mute">{{ $t('guest.card.claimed') }} <b class="g-num">{{ item.qty_claimed }} / {{ item.qty_needed }}</b><template v-if="mine">{{ $t('guest.card.mineQty', { n: mine.qty }) }}</template></div>
         <div v-if="!masked && item.claimers?.length" class="g-mute">{{ $t('guest.card.claimedBy', { names: item.claimers.map((c: any) => c.anonymous ? $t('guest.anon') : c.display_name).join($t('guest.listSep')) }) }}</div>
       </template>
+      <div v-if="supporters" class="g-mute">{{ $t(crowd ? 'guest.card.supportersFund' : 'guest.card.supportersClaim', { n: supporters }) }}</div>
       <div v-if="mine?.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(mine.item_changed_at) }) }}<button class="g-link" @click="$emit('ack')">{{ $t('me.claims.ackItemChange') }}</button></div>
       <div class="g-actions">
         <span v-if="masked" class="g-mute">{{ $t('guest.card.ownerBlocked') }}</span>
