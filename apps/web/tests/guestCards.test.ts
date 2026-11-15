@@ -161,3 +161,12 @@ it('ended support card has no link', () => {
 it('closed list support card has no link', () => {
   expect(supportCard(support(), true).querySelector('a')).toBeNull()
 })
+
+it('shows the supporter count only when names are hidden and count >= 2', () => {
+  expect(card({ ...quantity, claimers: [], supporter_count: 3 }).textContent).toContain('3 位朋友一起認捐')
+  expect(card({ ...quantity, supporter_count: 3 }, { masked: true }).textContent).toContain('3 位朋友一起認捐')
+  expect(card({ ...quantity, supporter_count: 3 }).textContent).not.toContain('位朋友一起')
+  expect(card({ ...quantity, claimers: [], supporter_count: 1 }).textContent).not.toContain('位朋友一起')
+  expect(card({ ...quantity, claimers: [], supporter_count: null }).textContent).not.toContain('位朋友一起')
+  expect(card({ ...crowdfunding, contributors: [], supporter_count: 2 }).textContent).toContain('2 位朋友一起贊助')
+})

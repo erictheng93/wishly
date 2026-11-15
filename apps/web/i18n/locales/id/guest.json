@@ -88,7 +88,9 @@
       "fullClaimed": "Sudah habis diklaim",
       "loginClaim": "Masuk untuk kasih",
       "claimBtn": "Aku yang kasih",
-      "productLink": "Tautan produk"
+      "productLink": "Tautan produk",
+      "supportersClaim": "{n} teman mengklaim bersama",
+      "supportersFund": "{n} teman berpatungan bersama"
     },
     "report": {
       "title": "Laporkan wishlist ini",
@@ -359,6 +361,14 @@
       "qty": "Barang yang diambil lewat sini",
       "go": "Pergi mendukung",
       "ended": "Selesai"
+    },
+    "visWho": {
+      "anon": "Pemilik daftar dan semua orang lain hanya melihat \"Anonim\".",
+      "surprise": "Mode kejutan: sebelum hari acara pemilik daftar tidak bisa melihat siapa yang memberi; orang lain hanya melihat \"Sudah ada yang klaim\".",
+      "hidden": "Pemilik daftar bisa melihat namamu; orang lain hanya melihat \"Sudah ada yang klaim\".",
+      "public": "Pemilik daftar dan semua orang yang melihat daftar ini bisa melihat namamu.",
+      "friends": "Pemilik daftar dan teman-temanmu bisa melihat namamu; orang lain melihat \"Anonim\".",
+      "private": "Hanya pemilik daftar yang bisa melihat namamu; orang lain melihat \"Anonim\"."
     }
   }
 }

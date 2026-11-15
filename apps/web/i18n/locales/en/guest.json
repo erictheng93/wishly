@@ -88,7 +88,9 @@
       "fullClaimed": "Fully claimed",
       "loginClaim": "Sign in to give",
       "claimBtn": "I'll give this",
-      "productLink": "Product link"
+      "productLink": "Product link",
+      "supportersClaim": "{n} friends claimed this together",
+      "supportersFund": "{n} friends contributed together"
     },
     "report": {
       "title": "Report this list",
@@ -359,6 +361,14 @@
       "qty": "Items claimed through here",
       "go": "Go support",
       "ended": "Ended"
+    },
+    "visWho": {
+      "anon": "The list owner and everyone else will only see \"Anonymous\".",
+      "surprise": "Surprise mode: until the event date the list owner can't see who gave this; others only see \"Someone has claimed this\".",
+      "hidden": "The list owner can see your name; others only see \"Someone has claimed this\".",
+      "public": "The list owner and everyone viewing this list can see your name.",
+      "friends": "The list owner and your friends can see your name; others see \"Anonymous\".",
+      "private": "Only the list owner can see your name; others see \"Anonymous\"."
     }
   }
 }
