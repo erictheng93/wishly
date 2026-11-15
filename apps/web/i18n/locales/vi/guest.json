@@ -88,7 +88,9 @@
       "fullClaimed": "Đã có người nhận tặng hết",
       "loginClaim": "Đăng nhập để tặng",
       "claimBtn": "Tôi sẽ tặng",
-      "productLink": "Liên kết sản phẩm"
+      "productLink": "Liên kết sản phẩm",
+      "supportersClaim": "{n} người bạn cùng nhận tặng",
+      "supportersFund": "{n} người bạn cùng tài trợ"
     },
     "report": {
       "title": "Báo cáo danh sách này",
@@ -359,6 +361,14 @@
       "qty": "Vật phẩm nhận tặng qua đây",
       "go": "Đến ủng hộ",
       "ended": "Đã kết thúc"
+    },
+    "visWho": {
+      "anon": "Chủ danh sách và mọi người khác chỉ thấy \"Ẩn danh\".",
+      "surprise": "Chế độ bất ngờ: trước ngày sự kiện chủ danh sách không thấy ai tặng; người khác chỉ thấy \"Đã có người nhận tặng\".",
+      "hidden": "Chủ danh sách thấy tên bạn; người khác chỉ thấy \"Đã có người nhận tặng\".",
+      "public": "Chủ danh sách và mọi người xem danh sách này đều thấy tên bạn.",
+      "friends": "Chủ danh sách và bạn bè của bạn thấy tên bạn; người khác thấy \"Ẩn danh\".",
+      "private": "Chỉ chủ danh sách thấy tên bạn; người khác thấy \"Ẩn danh\"."
     }
   }
 }

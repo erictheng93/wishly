@@ -2870,7 +2870,7 @@ Content-Type: application/json</code></pre><pre><code>{
   <li>items[] 只有 qty_claimed / qty_needed / qty_remaining 等彙總，沒有 claims，沒有 claimers 欄位；claimers_visible=false。</li>
   <li>show_claimer_names=true <em>且</em> 非驚喜鎖定期間，每個 item 才多出 <code>"claimers": [{ "display_name": "小明", "qty": 3 }]</code>，claimers_visible=true。驚喜鎖定期間無論 show_claimer_names 為何一律不輸出（伺服器端強制）。</li>
   <li>眾籌（P2）：公開 target_points / pledged_points / remaining_points / funding_status / <code>display_status</code> / funding_deadline。<code>display_status</code>（D22-6）是由 funding_status 與採購單狀態推導的衍生欄位，前端徽章直接使用：<code>open</code>（募集中）、<code>funded</code>（已達標，排隊下單）、<code>ordered</code>（已下單）、<code>shipped</code>（運送中）、<code>delivered</code>（已送達；fulfilled 亦對應此值）、<code>expired</code>（已截止未達標）；quantity 品項為 null；<code>is_anonymous=true</code> 的捐贈者永遠顯示為「匿名朋友」，非匿名者只在 show_claimer_names=true 且非驚喜鎖定期間才以 <code>contributors: [{ "display_name": "小明", "points": 3000 }]</code> 出現。P0/P1 的品項一律為 quantity，眾籌欄位皆為 null。</li>
-  <li><strong>v0.5 捐助者名稱：</strong>登入者的捐助若 <code>visibility</code> 不是 public，<code>claimers[].display_name</code> 一律顯示「匿名」（同一品項同名合併計數）；訪客捐助（visibility=NULL）與 public 的登入者捐助顯示 <code>claimer_name</code>。分享頁<strong>不做逐觀看者的好友判斷</strong>（friends 層級的捐助在此也顯示「匿名」；好友才看得到的資訊走 <code>GET /users/{handle}</code>）。<code>contributors</code>（眾籌）目前<strong>不受</strong> <code>default_claim_visibility</code> 影響，仍依 is_anonymous 與 show_claimer_names。</li>
+  <li><strong>v0.5 捐助者名稱：</strong>登入者的捐助若 <code>visibility</code> 不是 public，<code>claimers[].display_name</code> 一律顯示「匿名」（同一品項同名合併計數）；訪客捐助（visibility=NULL）與 public 的登入者捐助顯示 <code>claimer_name</code>。<code>/public/wishlists/{slug}</code>（可快取）<strong>不做逐觀看者判斷</strong>，friends 層級的捐助顯示「匿名」；<code>/restricted/wishlists/{slug}</code>（no-store）依觀看者：非 is_anonymous 且（public、本人、或 friends 級且觀看者為捐助者好友）才顯示真名。<code>contributors</code>（眾籌）同規則，只有顯示真名者依 (item, user) 合併。每個非 support 品項另有 <code>supporter_count</code>（quantity = 有效認捐的不重複人數；crowdfund = 不重複贊助者數；驚喜鎖定期間為 null，與 show_claimer_names 無關）。</li>
   <li>回應含 <code>surprise_mode</code> 與 <code>owner.id</code>，前端比對 GET /me 的 id，若為建立者本人且 surprise_mode=true 則顯示「驚喜模式中」遮罩（軟性遮蔽，見 D4）。</li>
   <li><strong>moderation_status=hidden（被檢舉下架）→ 410 <code>WISHLIST_REMOVED</code></strong>（前端顯示「此清單已被下架」，body 不含下架原因）。</li>
   <li>status=draft / archived、已刪除 → 404；visibility=private → 404（v0.6：此路徑對擁有者本人也是 404，擁有者改走 restricted 路徑）。<strong>其他受限可見性（friends / selected）在此路徑一律回 403（不含清單內容）</strong>，body 見 <a href="#vis-matrix">可見性矩陣</a>（<code>visibility</code> 與 <code>owner</code> 供前端顯示門檻頁）。檢查順序：存在 / draft / archived → 可見性 → hidden（所以無權者對已下架的受限清單先拿到 403，而非 410）。回應新增頂層 <code>visibility</code>。status=closed → 200（前端顯示已結束，捐助 API 回 WISHLIST_CLOSED）。</li>
@@ -3959,6 +3959,8 @@ export interface PublicItem {
   display_status: DisplayStatus | null   // crowdfund 才有；前端徽章用
   funding_deadline: ISODateTime | null
   progress_percent: number
+  /** 不重複支持人數；support 品項無此欄，驚喜鎖定中為 null */
+  supporter_count?: number | null
   /** 僅 claimers_visible=true 時出現（quantity） */
   claimers?: { display_name: string; qty: number }[]
   /** 僅 claimers_visible=true 時出現（crowdfund）；is_anonymous 的捐贈者顯示為「匿名朋友」 */

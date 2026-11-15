@@ -228,6 +228,7 @@ struct It {
     funding_deadline: Option<DateTime<Utc>>,
     category: Option<String>,
     urgency: Option<String>,
+    supporter_count: Option<i64>,
 }
 
 /// 可被 CDN 快取的路徑：**不讀 cookie**，只會回 public 清單內容；
@@ -325,10 +326,13 @@ async fn render(
     let items: Vec<It> = sqlx::query_as(
         sqlx::AssertSqlSafe(format!("SELECT i.id, i.title, i.brand, i.spec, i.image_key, i.image_status::text AS image_status, i.product_url, i.unit_price_amount,
                 i.priority::text AS priority, i.funding_mode::text AS funding_mode, i.qty_needed, i.qty_claimed,
-                i.target_points, i.pledged_points, i.funding_status::text AS funding_status, ({}) AS display_status, i.funding_deadline, i.category, i.urgency
+                i.target_points, i.pledged_points, i.funding_status::text AS funding_status, ({}) AS display_status, i.funding_deadline, i.category, i.urgency,
+                CASE WHEN $2 OR i.funding_mode = 'support' THEN NULL
+                     WHEN i.funding_mode = 'crowdfund' THEN (SELECT count(DISTINCT c.user_id) FROM contributions c WHERE c.item_id = i.id AND c.status IN ('pledged', 'captured'))
+                     ELSE (SELECT count(DISTINCT COALESCE(c.user_id, c.id)) FROM claims c WHERE c.item_id = i.id AND c.status IN ('reserved', 'purchased', 'delivered')) END AS supporter_count
          FROM wishlist_items i LEFT JOIN purchase_orders po ON po.item_id = i.id
          WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL ORDER BY i.sort_order, i.id", crate::points::DISPLAY_STATUS_SQL)))
-        .bind(w.id).fetch_all(&st.pool).await?;
+        .bind(w.id).bind(w.locked).fetch_all(&st.pool).await?;
 
     let support_ids: Vec<Uuid> = items
         .iter()
@@ -346,13 +350,16 @@ async fn render(
     let mut claimers: HashMap<Uuid, Vec<Value>> = HashMap::new();
     if visible {
         let rows: Vec<(Uuid, String, bool, i64)> = sqlx::query_as(
-            // 匿名或登入者的捐助非 public → 對外顯示「匿名」（此回應可被共用快取，不做逐觀看者的好友判斷）
-            "SELECT c.item_id, CASE WHEN NOT c.is_anonymous AND (c.visibility IS NULL OR c.visibility = 'public') THEN c.claimer_name ELSE '匿名' END AS n,
-                    (c.is_anonymous OR NOT (c.visibility IS NULL OR c.visibility = 'public')) AS anon, sum(c.qty)::bigint
-             FROM claims c JOIN wishlist_items i ON i.id = c.item_id
-             WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('reserved','purchased','delivered')
-             GROUP BY c.item_id, n, anon ORDER BY min(c.created_at)")
-            .bind(w.id).fetch_all(&st.pool).await?;
+            // 顯示真名：非匿名，且 public / 舊訪客認捐（visibility NULL）/ 本人 / friends 級且觀看者是好友。
+            // 公開路徑 $2 = NULL → 只剩 public，回應可被共用快取。
+            "SELECT item_id, CASE WHEN s THEN claimer_name ELSE '匿名' END AS n, NOT s AS anon, sum(qty)::bigint
+             FROM (SELECT c.item_id, c.claimer_name, c.qty, c.created_at,
+                          (NOT c.is_anonymous AND (c.visibility IS NULL OR c.visibility = 'public' OR ($2::uuid IS NOT NULL AND (c.user_id = $2
+                            OR (c.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(c.user_id, $2) AND f.user_b = GREATEST(c.user_id, $2))))))) AS s
+                   FROM claims c JOIN wishlist_items i ON i.id = c.item_id
+                   WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('reserved','purchased','delivered')) t
+             GROUP BY item_id, n, anon ORDER BY min(created_at)")
+            .bind(w.id).bind(who.flatten()).fetch_all(&st.pool).await?;
         for (item, name, anon, qty) in rows {
             claimers
                 .entry(item)
@@ -365,11 +372,14 @@ async fn render(
     // 與 claimers 同一道閘：show_claimer_names 且未驚喜鎖定才輸出。
     let mut contributors: HashMap<Uuid, Vec<Value>> = HashMap::new();
     if visible {
-        // 逐筆套可見度後才合併：非 public（friends / private）一律視同匿名，不併入具名總額（此回應可被共用快取）
+        // 逐筆套可見度後才合併：看不到真名的（規則同上）視同匿名，不併入具名總額
         let rows: Vec<(Uuid, Uuid, bool, String, i64)> = sqlx::query_as(
-            "SELECT c.item_id, c.user_id, (c.is_anonymous OR c.visibility <> 'public'), c.donor_name, c.points FROM contributions c JOIN wishlist_items i ON i.id = c.item_id
+            "SELECT c.item_id, c.user_id,
+                    NOT (NOT c.is_anonymous AND (c.visibility = 'public' OR ($2::uuid IS NOT NULL AND (c.user_id = $2
+                      OR (c.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships f WHERE f.user_a = LEAST(c.user_id, $2) AND f.user_b = GREATEST(c.user_id, $2))))))),
+                    c.donor_name, c.points FROM contributions c JOIN wishlist_items i ON i.id = c.item_id
              WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND c.status IN ('pledged', 'captured') ORDER BY c.created_at, c.id")
-            .bind(w.id).fetch_all(&st.pool).await?;
+            .bind(w.id).bind(who.flatten()).fetch_all(&st.pool).await?;
         let mut merged: HashMap<(Uuid, Uuid), usize> = HashMap::new(); // (item, user) -> 該品項 contributors 的索引（僅非匿名）
         for (item, user, anon, name, points) in rows {
             let list = contributors.entry(item).or_default();
@@ -430,9 +440,12 @@ async fn render(
         });
         if let Some(sp) = support.remove(&i.id) {
             v["support"] = sp;
-        } else if visible {
-            v["claimers"] = json!(claimers.remove(&i.id).unwrap_or_default());
-            if cf { v["contributors"] = json!(contributors.remove(&i.id).unwrap_or_default()); }
+        } else {
+            v["supporter_count"] = json!(i.supporter_count);
+            if visible {
+                v["claimers"] = json!(claimers.remove(&i.id).unwrap_or_default());
+                if cf { v["contributors"] = json!(contributors.remove(&i.id).unwrap_or_default()); }
+            }
         }
         v
     }).collect();

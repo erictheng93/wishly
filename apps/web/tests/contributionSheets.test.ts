@@ -5,6 +5,7 @@ import ClaimSheet from '../app/components/guest/ClaimSheet.vue'
 import FundSheet from '../app/components/guest/FundSheet.vue'
 import GuestDialog from '../app/components/guest/Dialog.vue'
 import { contributionErr, fmtPts, fmtTime, quickAmounts } from '../app/utils/crowdfund'
+import { claimVisNote } from '../app/utils/claimerVis'
 import { mount, input, submit, flush } from './vueHarness'
 
 const api = vi.fn(), setToken = vi.fn(), done = vi.fn(), stale = vi.fn()
@@ -17,7 +18,7 @@ beforeEach(() => {
     useAuth: () => ({ fetchMe: async () => ({ default_claim_visibility: 'private' }) }),
     getPref: () => null, setPref: vi.fn(), getGuestToken: () => currentToken,
     setGuestToken: (token: string) => { currentToken = token; setToken(token); return true },
-    fmtPts, fmtTime, contributionErr, quickAmounts,
+    fmtPts, fmtTime, contributionErr, quickAmounts, claimVisNote,
     errMsg: (error: any) => error.detail,
   })) vi.stubGlobal(name, value)
 })
@@ -201,4 +202,15 @@ it('fund POST carries via_item_id from the via prop', async () => {
   el.querySelector<HTMLButtonElement>('button.g-btn:not(.ghost)')!.click(); await flush()
   const post = api.mock.calls.find(c => c[0] === '/items/item/contributions')!
   expect(post[1].body.via_item_id).toBe(VIA)
+})
+
+it('claim sheet explains who can see the name, live with the anonymous checkbox, and not when editing', async () => {
+  const el = claim(null, true, '我', { claimersVisible: true })
+  await flush()
+  expect(el.textContent).toContain('只有清單主人看得到你的名字') // 預設可見度 private
+  const box = el.querySelector<HTMLInputElement>('input[type=checkbox]')!
+  box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); await flush()
+  expect(el.textContent).toContain('都只會看到「匿名朋友」')
+  mounted?.unmount()
+  expect(claim({ id: 'c', qty: 1 }, true, '我', { claimersVisible: true }).textContent).not.toContain('看得到你的名字')
 })
