@@ -183,7 +183,7 @@ jobs:
           name: web-coverage
           path: apps/web/coverage/
   web-audit:
-    # 每週排程也會跑：沒有 push 時仍能發現新公告（含 overrides 換成 fork 的 braces／node-forge，npm audit 以名稱＋版本比對）
+    # 每週排程也會跑：沒有 push 時仍能發現新公告
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest

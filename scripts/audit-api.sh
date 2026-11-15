@@ -8,5 +8,9 @@ ignores=""
 if ! printf '%s\n' "$deps" | grep -q '^rsa v'; then
     ignores="--ignore RUSTSEC-2023-0071"
 fi
+# 同理：未啟用的 SQLite driver 讓鎖檔含 libsqlite3-sys（RUSTSEC-2026-0459，需 >=0.39，sqlx 0.9 尚不允許）。
+if ! printf '%s\n' "$deps" | grep -q '^libsqlite3-sys v'; then
+    ignores="$ignores --ignore RUSTSEC-2026-0459"
+fi
 # shellcheck disable=SC2086
 cargo audit $ignores

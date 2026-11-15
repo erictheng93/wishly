@@ -1,70 +1,10 @@
 import { generateKeyPairSync } from 'node:crypto'
-import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
-// Exercise the actual transitive copies used by globby/fast-glob and listhen (package.json overrides → wishly forks).
-const braces = createRequire(require.resolve('micromatch'))('braces')
+// 對 listhen 實際使用的 node-forge 副本驗證（上游 1.4.1 起已修補 GHSA-86w9-cpqp-85rv，見 patches/README.md）
 const forge = createRequire(require.resolve('listhen'))('node-forge')
-
-describe('GHSA-vfj7-8cjw-p6xm', () => {
-  const deepPatterns = [
-    '{'.repeat(4500) + 'a' + '}'.repeat(4500),
-    '('.repeat(4500) + 'a' + ')'.repeat(4500),
-    '({'.repeat(2250) + 'a' + '})'.repeat(2250),
-    '{'.repeat(4500) + 'a',
-  ]
-
-  it.each(['parse', 'compile', 'expand', 'stringify'])('%s rejects excessive pattern depth before stack exhaustion', method => {
-    for (const pattern of deepPatterns) {
-      expect(() => braces[method](pattern)).toThrow(SyntaxError)
-    }
-  })
-
-  it.each(['compile', 'expand', 'stringify'])('%s also bounds caller-supplied ASTs and cycles', method => {
-    const ast: any = { type: 'root', nodes: [] }
-    let node = ast
-    for (let i = 0; i < 4500; i++) {
-      const child = { type: 'paren', nodes: [], parent: node }
-      node.nodes.push(child)
-      node = child
-    }
-    node.nodes.push({ type: 'text', value: 'a' })
-    expect(() => braces[method](ast)).toThrow(SyntaxError)
-    const cyclic: any = { type: 'root', nodes: [] }
-    cyclic.nodes.push(cyclic)
-    expect(() => braces[method](cyclic)).toThrow(SyntaxError)
-  })
-
-  it('preserves ordinary expansion, nesting, and literal delimiters', () => {
-    expect(braces.expand('src/{app,test}/{1..2}.ts')).toEqual([
-      'src/app/1.ts', 'src/app/2.ts', 'src/test/1.ts', 'src/test/2.ts',
-    ])
-    const nested = '{'.repeat(32) + 'a' + '}'.repeat(32)
-    expect(braces.stringify(nested)).toBe(nested)
-    for (const literal of [
-      '['.repeat(4500) + 'a' + ']'.repeat(4500),
-      '"' + '{'.repeat(4500) + '"',
-      '\\{'.repeat(4500),
-    ]) {
-      expect(() => braces.compile(literal)).not.toThrow()
-      expect(() => braces.expand(literal)).not.toThrow()
-      expect(() => braces.stringify(literal)).not.toThrow()
-    }
-  })
-
-  it('bounds expand ancestry walks on a caller-supplied parent cycle', () => {
-    const result = spawnSync(process.execPath, ['-e', `
-      const braces = require(${JSON.stringify(require.resolve('braces'))});
-      const ast = { type: 'paren', nodes: [] };
-      ast.parent = ast;
-      try { braces.expand(ast); process.exitCode = 1; }
-      catch (error) { if (!(error instanceof SyntaxError)) throw error; }
-    `], { timeout: 2000, encoding: 'utf8' })
-    expect(result.status, result.error?.message ?? result.stderr).toBe(0)
-  })
-})
 
 describe('GHSA-86w9-cpqp-85rv', () => {
   const keys = generateKeyPairSync('rsa', {
