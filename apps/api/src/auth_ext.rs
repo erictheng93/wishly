@@ -124,12 +124,21 @@ mod argon_tests {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
         assert!(reserved, "登入應先提交預約再等待 Argon2");
-        let open_tx: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND xact_start IS NOT NULL",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        // commit 後資料列已可見，但後端要送出 ReadyForQuery 才清 xact_start，短暫輪詢避開這個空檔；
+        // 真的在等 Argon2 時持有交易會一直是 1（名額仍被 held 佔住）。
+        let mut open_tx = -1i64;
+        for _ in 0..50 {
+            open_tx = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND xact_start IS NOT NULL",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            if open_tx == 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
         assert_eq!(open_tx, 0, "等 Argon2 期間不得開著交易");
         drop(held);
         let res = login.await.unwrap().unwrap();
