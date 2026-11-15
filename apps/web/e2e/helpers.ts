@@ -1,6 +1,6 @@
 import { expect, request as pwRequest, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test'
 import { randomBytes } from 'node:crypto'
-import { API, E2E_DB, MAILPIT } from './support/env'
+import { API, E2E_DB, MAILPIT, WEB } from './support/env'
 // @ts-expect-error 純 JS 模組（也給 reset-db.mjs 用）
 import { psql } from './support/psql.mjs'
 
@@ -92,7 +92,8 @@ export async function createList(user: User, o: ListOpts = {}): Promise<List> {
 
 /** 把 API context 的 session cookie 帶進瀏覽器 context（跳過 UI 登入） */
 export async function loginBrowser(ctx: BrowserContext, user: User) {
-  await ctx.addCookies((await user.api.storageState()).cookies)
+  // ws_hint：真實瀏覽器登入後由 fetchMe 設在網頁網域；分享頁沒有它就當匿名、不打 /me
+  await ctx.addCookies([...(await user.api.storageState()).cookies, { name: 'ws_hint', value: 'true', url: WEB }])
 }
 
 /** 用 UI 登入（密碼） */

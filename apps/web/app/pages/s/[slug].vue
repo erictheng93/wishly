@@ -93,7 +93,9 @@ const online = ref(true), mode = ref<LiveMode>('connecting'), lineHint = ref(fal
 const myClaims = ref<Record<string, any>>({})
 // 登入線索：ws_hint cookie（fetchMe 成功才設）或原生殼的 Bearer 權杖；都沒有且沒有舊訪客 token = 匿名，/me、/guest/me 必為 401，省掉
 const hint = useAuthHint()
-const hinted = () => !!hint.value || !!nativeHeaders().Authorization
+// JS 讀寫不到 cookie（部分 LINE 內建瀏覽器）時 ws_hint 永遠寫不進去，退回一律打 /me，否則已登入會員會被當成匿名
+const cookieBlind = () => { try { document.cookie = 'ws_ck=1; path=/; max-age=5; samesite=lax'; return !document.cookie.includes('ws_ck=1') } catch { return true } }
+const hinted = () => !!hint.value || !!nativeHeaders().Authorization || cookieBlind()
 async function loadMine() {
   if (!getGuestToken() && !hinted()) return
   try { // 不先檢查 token：登入使用者靠 session cookie 捐助，沒有 guest token
