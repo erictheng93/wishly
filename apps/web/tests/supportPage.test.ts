@@ -9,6 +9,7 @@ const api = vi.fn()
 const fetchMe = vi.fn()
 const user = ref<any>(null)
 const hint = ref<any>(null)
+const runtime = { public: { turnstileSiteKey: '' } }
 const route = { query: {} as Record<string, any> }
 const mounted: ReturnType<typeof mount>[] = []
 const stubs = {
@@ -25,9 +26,9 @@ const settle = async () => { await flush(); await flush(); await nextTick() }
 function show(c: any) { const m = mount(c, {}, stubs, { fmtTime: (v: any) => v }); mounted.push(m); return m.el }
 class ApiErr extends Error { constructor(public code: string, msg: string) { super(msg) } }
 beforeEach(() => {
-  user.value = null; hint.value = null; route.query = {}
+  user.value = null; hint.value = null; route.query = {}; runtime.public.turnstileSiteKey = ''
   fetchMe.mockImplementation(async () => user.value)
-  for (const [k, v] of Object.entries({ computed, nextTick, onMounted, ref, watch, definePageMeta: () => {}, useHead: () => {}, useSeoMeta: () => {}, useApi: () => ({ api }), useAuth: () => ({ user, fetchMe }), useAuthHint: () => hint, useRoute: () => route, errMsg: (e: any) => e.message, fmtTime: (v: any) => v, hasStaffRole: (u: any, r: string) => !!u?.staff_roles?.some((x: string) => x === r || x === 'admin') })) vi.stubGlobal(k, v)
+  for (const [k, v] of Object.entries({ computed, nextTick, onMounted, ref, watch, definePageMeta: () => {}, useHead: () => {}, useSeoMeta: () => {}, useApi: () => ({ api }), useAuth: () => ({ user, fetchMe }), useAuthHint: () => hint, useRoute: () => route, useRuntimeConfig: () => runtime, errMsg: (e: any) => e.message, fmtTime: (v: any) => v, hasStaffRole: (u: any, r: string) => !!u?.staff_roles?.some((x: string) => x === r || x === 'admin') })) vi.stubGlobal(k, v)
 })
 afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset(); fetchMe.mockReset() })
 
@@ -47,6 +48,25 @@ it('未登入：不抓 /me、顯示 Email 與 Turnstile，送到公開端點且�
   await submit(el); await settle()
   expect(api).toHaveBeenCalledWith('/public/support-requests', { method: 'POST', noRedirect: true, body: { email: 'a@example.com', category: 'other', body: '我被停權了', turnstile_token: 'tok' } })
   expect(el.querySelector('[data-testid="sent"]')?.textContent).toContain('以 Email 回覆')
+})
+
+it('未登入有 site key 但尚無 Turnstile token：不呼叫 api、顯示請先驗證', async () => {
+  runtime.public.turnstileSiteKey = 'site-key'
+  const el = show(Support); await settle()
+  await input(el, '[data-testid="email"]', 'a@example.com')
+  await input(el, '[data-testid="body"]', '求助')
+  await submit(el); await settle()
+  expect(api).not.toHaveBeenCalled()
+  expect(el.querySelector('[data-testid="err"]')?.textContent).toBe('請先完成人機驗證後再試')
+})
+
+it('未登入沒有 site key（本機）：無 token 仍會送出', async () => {
+  api.mockResolvedValue({ id: 'x', status: 'open' })
+  const el = show(Support); await settle()
+  await input(el, '[data-testid="email"]', 'a@example.com')
+  await input(el, '[data-testid="body"]', '求助')
+  await submit(el); await settle()
+  expect(api).toHaveBeenCalledTimes(1)
 })
 
 it('未登入送出失敗顯示錯誤（含上限）', async () => {

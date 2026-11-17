@@ -16,6 +16,7 @@ const rows = ref<any[]>([])
 const category = ref<string>((CATEGORIES as readonly string[]).includes(q('category')) ? q('category') : 'other')
 const wishlistId = ref(/^[0-9a-f-]{36}$/i.test(q('wishlist')) ? q('wishlist') : '')
 const body = ref(''), email = ref(''), tsToken = ref(''), capKey = ref(0)
+const siteKey = useRuntimeConfig().public.turnstileSiteKey as string
 const busy = ref(false), err = ref(''), sent = ref('')
 
 async function load() {
@@ -33,6 +34,8 @@ async function submit() {
   err.value = ''; sent.value = ''
   if (!body.value.trim()) { err.value = t('me.support.bodyRequired'); return }
   if (!user.value && !email.value.trim()) { err.value = t('me.support.emailRequired'); return }
+  // 沒 token 必定被後端拒絕，卻會先扣每 IP 每小時 5 次的限流；本機未設 site key 時不要求
+  if (!user.value && siteKey && !tsToken.value) { err.value = t('errors.CAPTCHA_REQUIRED'); return }
   busy.value = true
   try {
     if (user.value) {
