@@ -27,7 +27,8 @@
       "readOnly": "Maintenance in progress. You can browse, but changes are paused for now.",
       "busyTitle": "We're a bit busy",
       "busyDesc": "Lots of people are here right now. Please wait a few seconds and reload.",
-      "reload": "Reload"
+      "reload": "Reload",
+      "dismiss": "Dismiss notice"
     },
     "support": "Contact support: ",
     "supportSubject": "Wishly support",

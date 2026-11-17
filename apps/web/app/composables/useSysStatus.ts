@@ -12,7 +12,7 @@ export function noteUnavailable(status: number, code?: string, retryAfter?: numb
 }
 
 // GET /public/status 共用一個 promise（橫幅、useOrgsEnabled、useTopupMethods 同頁各抓一次太浪費）；3 秒內重複呼叫共用，之後重抓（橫幅的唯讀複查要拿新值）
-type PubStatus = { read_only: boolean, orgs_enabled?: boolean, topup_methods?: string[] }
+type PubStatus = { read_only: boolean, orgs_enabled?: boolean, topup_methods?: string[], notices?: SysNotice[] }
 let statusP: Promise<PubStatus> | null = null
 export function fetchPublicStatus(apiBase: string) {
   if (!statusP) {

@@ -128,6 +128,31 @@
         "disputed_topups": "Sengketa {n}",
         "open_debts": "Utang terbuka {n}",
         "open_reports": "{n} menunggu"
+      },
+      "notices": {
+        "title": "Pengumuman sistem",
+        "empty": "Belum ada pengumuman",
+        "allLocales": "Semua bahasa",
+        "disable": "Nonaktifkan",
+        "confirmDisable": "Nonaktifkan pengumuman \"{title}\"? Tidak dapat dibatalkan.",
+        "fTitle": "Judul (maks. 80 karakter)",
+        "fBody": "Isi (maks. 500 karakter, teks biasa)",
+        "fLevel": "Tingkat",
+        "fLocale": "Bahasa",
+        "fStarts": "Mulai (kosong = sekarang)",
+        "fEnds": "Berakhir (kosong = tanpa batas)",
+        "create": "Terbitkan pengumuman",
+        "levels": {
+          "info": "Info",
+          "warning": "Peringatan",
+          "critical": "Darurat (tidak dapat ditutup)"
+        },
+        "states": {
+          "scheduled": "Terjadwal",
+          "active": "Aktif",
+          "ended": "Berakhir",
+          "disabled": "Dinonaktifkan"
+        }
       }
     },
     "audit": {

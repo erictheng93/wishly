@@ -97,12 +97,8 @@ async fn replace(
         }
         clean.push((title, url.to_string(), l.hidden));
     }
+    // media_tx 取每人的 advisory lock：同一人的並行 PUT 依序執行，否則兩邊都看不到對方未提交的列而雙雙寫入（超過上限）
     let mut tx = crate::uploads::media_tx(&st.pool, u.id).await?;
-    // 同一人的並行 PUT 依序執行，否則兩邊都看不到對方未提交的列而雙雙寫入（超過上限）
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('user_links:' || $1::text, 0))")
-        .bind(u.id)
-        .execute(&mut *tx)
-        .await?;
     sqlx::query("DELETE FROM user_links WHERE user_id = $1")
         .bind(u.id)
         .execute(&mut *tx)

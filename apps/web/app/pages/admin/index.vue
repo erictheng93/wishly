@@ -101,7 +101,35 @@ async function loadFlags() {
     for (const k of ['read_only', 'staff_mfa_required'] as FlagKey[]) flags[k] = !!data.find((f: any) => f.key === k)?.value
   } catch (e) { flags.read_only = flags.staff_mfa_required = null; err.value = errMsg(e) }
 }
-watch(tab, t => { if (t === 'flags') loadFlags() })
+// 系統公告（#96）：與旗標同分頁，僅 admin
+type AdminNotice = { id: string, title: string, level: string, locale: string | null, starts_at: string, ends_at: string | null, disabled_at: string | null }
+const notices = ref<AdminNotice[]>([])
+const nf = reactive({ title: '', body: '', level: 'info', locale: '', starts: '', ends: '' })
+const noticeAsk = ref<AdminNotice | null>(null), noticeBusy = ref(false)
+const noticeState = (n: AdminNotice) => {
+  const now = Date.now()
+  return n.disabled_at ? 'disabled' : new Date(n.starts_at).getTime() > now ? 'scheduled' : n.ends_at && new Date(n.ends_at).getTime() <= now ? 'ended' : 'active'
+}
+const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleString(dl.value, { dateStyle: 'short', timeStyle: 'short' }) : '∞'
+async function loadNotices() {
+  try { notices.value = (await api('/admin/notices')).data } catch (e) { err.value = errMsg(e) }
+}
+async function createNotice() {
+  noticeBusy.value = true; err.value = ''
+  try {
+    await api('/admin/notices', { method: 'POST', body: { title: nf.title, body: nf.body || undefined, level: nf.level, locale: nf.locale || null, starts_at: fromLocalInput(nf.starts) || undefined, ends_at: fromLocalInput(nf.ends) } })
+    Object.assign(nf, { title: '', body: '', level: 'info', locale: '', starts: '', ends: '' })
+    await loadNotices()
+  } catch (e) { err.value = errMsg(e) } finally { noticeBusy.value = false }
+}
+async function disableNotice() {
+  const n = noticeAsk.value
+  if (!n) return
+  noticeBusy.value = true; err.value = ''
+  try { await api(`/admin/notices/${n.id}/disable`, { method: 'POST' }); noticeAsk.value = null; await loadNotices() }
+  catch (e) { err.value = errMsg(e); noticeAsk.value = null } finally { noticeBusy.value = false }
+}
+watch(tab, t => { if (t === 'flags') { loadFlags(); loadNotices() } })
 const rqBusy = ref(false), rqMsg = ref('')
 async function requeue() {
   rqBusy.value = true; rqMsg.value = statsErr.value = ''
@@ -198,6 +226,31 @@ onMounted(loadStats)
       <p class="c-mute">{{ $t('admin.index.flags.auditNote') }}</p>
     </section>
 
+    <section v-if="isAdmin && tab === 'flags'" class="c-card">
+      <h2>{{ $t('admin.index.notices.title') }}</h2>
+      <p v-if="!notices.length" class="c-mute">{{ $t('admin.index.notices.empty') }}</p>
+      <ul v-else class="c-list">
+        <li v-for="n in notices" :key="n.id">
+          <strong>{{ n.title }}</strong>
+          <small class="c-mute"> {{ $t(`admin.index.notices.levels.${n.level}`) }}・{{ n.locale ?? $t('admin.index.notices.allLocales') }}・{{ fmtTime(n.starts_at) }} – {{ fmtTime(n.ends_at) }}・{{ $t(`admin.index.notices.states.${noticeState(n)}`) }}</small>
+          <button v-if="noticeState(n) !== 'disabled'" class="c-btn" :disabled="noticeBusy" @click="noticeAsk = n">{{ $t('admin.index.notices.disable') }}</button>
+        </li>
+      </ul>
+      <form @submit.prevent="createNotice">
+        <label class="c-field"><span>{{ $t('admin.index.notices.fTitle') }}</span><input v-model="nf.title" maxlength="80" required :disabled="noticeBusy"></label>
+        <label class="c-field"><span>{{ $t('admin.index.notices.fBody') }}</span><textarea v-model="nf.body" maxlength="500" rows="3" :disabled="noticeBusy" /></label>
+        <label class="c-field"><span>{{ $t('admin.index.notices.fLevel') }}</span>
+          <select v-model="nf.level" :disabled="noticeBusy"><option v-for="l in ['info', 'warning', 'critical']" :key="l" :value="l">{{ $t(`admin.index.notices.levels.${l}`) }}</option></select>
+        </label>
+        <label class="c-field"><span>{{ $t('admin.index.notices.fLocale') }}</span>
+          <select v-model="nf.locale" :disabled="noticeBusy"><option value="">{{ $t('admin.index.notices.allLocales') }}</option><option v-for="l in ['zh-Hant', 'en', 'vi', 'id']" :key="l" :value="l">{{ l }}</option></select>
+        </label>
+        <label class="c-field"><span>{{ $t('admin.index.notices.fStarts') }}</span><input v-model="nf.starts" type="datetime-local" :disabled="noticeBusy"></label>
+        <label class="c-field"><span>{{ $t('admin.index.notices.fEnds') }}</span><input v-model="nf.ends" type="datetime-local" :disabled="noticeBusy"></label>
+        <button class="c-btn on" :disabled="noticeBusy || !nf.title.trim()">{{ $t('admin.index.notices.create') }}</button>
+      </form>
+    </section>
+
     <CreatorConfirm :open="!!mod" :title="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideTitle')" :text="$t('admin.index.mod.text', { title: mod?.title })" :ok="mod?.hidden ? $t('admin.index.restore') : $t('admin.index.mod.hideOk')" :danger="!mod?.hidden" :busy="modBusy" :disabled="!mod?.hidden && !reason.trim()" :error="modErr" @close="mod = null" @ok="doMod">
       <label v-if="mod && !mod.hidden" class="c-field"><span>{{ $t('admin.index.mod.reason') }}</span><input v-model="reason" maxlength="200"></label>
     </CreatorConfirm>
@@ -207,6 +260,7 @@ onMounted(loadStats)
       </fieldset>
       <label class="c-field"><span>{{ $t('admin.index.userAct.reason') }}</span><input v-model="userReason" maxlength="200" :disabled="userBusy" required></label>
     </CreatorConfirm>
+    <CreatorConfirm :open="!!noticeAsk" :title="$t('admin.index.notices.disable')" :text="$t('admin.index.notices.confirmDisable', { title: noticeAsk?.title })" :busy="noticeBusy" danger @close="noticeAsk = null" @ok="disableNotice" />
     <CreatorConfirm :open="!!flagAsk" :title="$t('admin.index.flags.confirmTitle')" :text="flagConfirm" :busy="flagBusy" danger @close="flagAsk = null" @ok="setFlag" />
   </main>
 </template>

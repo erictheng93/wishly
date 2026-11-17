@@ -27,7 +27,8 @@
       "readOnly": "Sistem sedang dalam pemeliharaan. Saat ini kamu hanya bisa melihat, belum bisa menambah atau mengubah.",
       "busyTitle": "Sistem sibuk",
       "busyDesc": "Sedang banyak pengguna. Tunggu beberapa detik lalu muat ulang.",
-      "reload": "Muat ulang"
+      "reload": "Muat ulang",
+      "dismiss": "Tutup pengumuman"
     },
     "support": "Hubungi dukungan: ",
     "supportSubject": "Dukungan Wishly",

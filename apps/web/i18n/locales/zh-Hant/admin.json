@@ -128,6 +128,31 @@
         "disputed_topups": "爭議 {n}",
         "open_debts": "欠款 {n}",
         "open_reports": "待處理 {n}"
+      },
+      "notices": {
+        "title": "系統公告",
+        "empty": "目前沒有公告",
+        "allLocales": "全部語系",
+        "disable": "停用",
+        "confirmDisable": "停用公告「{title}」？停用後無法恢復。",
+        "fTitle": "標題（80 字內）",
+        "fBody": "內容（500 字內，純文字）",
+        "fLevel": "等級",
+        "fLocale": "語系",
+        "fStarts": "開始時間（空白＝立即）",
+        "fEnds": "結束時間（空白＝不結束）",
+        "create": "發佈公告",
+        "levels": {
+          "info": "一般",
+          "warning": "警告",
+          "critical": "緊急（不可關閉）"
+        },
+        "states": {
+          "scheduled": "排程中",
+          "active": "顯示中",
+          "ended": "已結束",
+          "disabled": "已停用"
+        }
       }
     },
     "audit": {
