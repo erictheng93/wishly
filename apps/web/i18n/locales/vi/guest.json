@@ -16,7 +16,8 @@
       "public": "Mọi người",
       "friends": "Bạn bè của tôi (người khác thấy Ẩn danh)",
       "private": "Chỉ chủ danh sách",
-      "anonymous": "Ẩn danh (chủ danh sách cũng không thấy)"
+      "anonymous": "Ẩn danh (chủ danh sách cũng không thấy)",
+      "default": "Theo mặc định tài khoản"
     },
     "reasonRequired": "Vui lòng nhập lý do",
     "turnstile": {

@@ -180,13 +180,26 @@ it('fund visibility defaults to the account setting and the user can change it b
   expect(api.mock.calls[0][1].body).toMatchObject({ points: 100, visibility: 'public' })
 })
 
-it('fund without a loaded account default hides the picker and lets the server apply the default', async () => {
+it('fund without a loaded account default still shows the picker: default option lets the server decide, anonymous is selectable', async () => {
   vi.stubGlobal('useAuth', () => ({ fetchMe: () => Promise.reject(new Error('offline')) }))
   const el = await fund()
-  expect(el.querySelector('#fv')).toBeNull()
+  expect(el.querySelector('#fv')).not.toBeNull()
   api.mockClear(); api.mockResolvedValue({ id: 'funded' })
   await input(el, '#fp', '100'); await submit(el); await flush()
-  expect(api.mock.calls[0][1].body.visibility).toBeUndefined()
+  expect(api.mock.calls[0][1].body).toMatchObject({ visibility: undefined, is_anonymous: false })
+  api.mockClear()
+  await pick(el, '#fv', 'anonymous'); await submit(el); await flush()
+  expect(api.mock.calls[0][1].body).toMatchObject({ visibility: 'private', is_anonymous: true })
+})
+
+it('claim picker is usable before /me resolves: anonymous chosen early is kept when the account default arrives', async () => {
+  const me = deferred()
+  vi.stubGlobal('useAuth', () => ({ fetchMe: () => me.promise }))
+  const el = claim(null, true, '小明')
+  await flush()
+  await pick(el, '#cv', 'anonymous')
+  me.resolve({ default_claim_visibility: 'friends' }); await flush()
+  expect(el.querySelector<HTMLSelectElement>('#cv')!.value).toBe('anonymous')
 })
 
 const VIA = '11111111-1111-4111-8111-111111111111'

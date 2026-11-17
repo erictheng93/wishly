@@ -9,7 +9,7 @@ const { t } = useI18n()
 // 登入者：預設帶帳號的 default_claim_visibility（分享頁不會預先載入 /me，這裡自己抓）；載入前不送，由伺服器套預設
 const { fetchMe } = useAuth()
 const vis = ref<string | undefined>()
-if (props.loggedInName) fetchMe().then(u => { vis.value ??= u?.default_claim_visibility })
+if (props.loggedInName) fetchMe().then(u => { vis.value ??= u?.default_claim_visibility }).catch(() => { /* 取不到就讓伺服器套預設 */ })
 const key = newKey()
 const editing = !!props.mine
 // 舊訪客捐助只能減少或取消，不能加量（後端同樣擋）；登入會員可調到剩餘上限
@@ -75,10 +75,8 @@ async function submit() {
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
       <template v-if="!editing">
         <p class="g-mute">{{ $t('guest.claim.asUser', { name: loggedInName }) }}</p>
-        <template v-if="vis">
-          <label for="cv">{{ $t('guest.claim.visLabel') }}</label>
-          <select id="cv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option><option value="anonymous">{{ $t('guest.visibility.anonymous') }}</option></select>
-        </template>
+        <label for="cv">{{ $t('guest.claim.visLabel') }}</label>
+        <select id="cv" v-model="vis" :disabled="busy"><option v-if="vis === undefined" :value="undefined">{{ $t('guest.visibility.default') }}</option><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option><option value="anonymous">{{ $t('guest.visibility.anonymous') }}</option></select>
       </template>
       <label for="cm">{{ $t('guest.noteLabel') }}</label>
       <input id="cm" v-model="note" maxlength="200" :readonly="busy">
