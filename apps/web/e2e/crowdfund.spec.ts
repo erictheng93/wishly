@@ -206,11 +206,11 @@ test('截止未達標：捐贈者在 7 天選擇期內轉投到同清單其他�
   await expect(c).toContainText('已截止')
   await expect(c).toContainText('逾期會自動退回')
   const visibility = c.getByLabel('誰看得到')
-  await expect(visibility).toHaveValue('private')
-  await visibility.selectOption('friends')
+  await expect(visibility).toHaveValue('friends')
+  await visibility.selectOption('private')
   await expect(ap.getByRole('status')).toContainText('可見度已更新')
   await ap.reload()
-  await expect(visibility).toHaveValue('friends')
+  await expect(visibility).toHaveValue('private')
   // 儲存失敗時還原，不讓畫面誤報已成功公開；5xx 不顯示後端 detail（#29）。
   await ap.route('**/api/v1/contributions/*', async route => {
     if (route.request().method() === 'PATCH') await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'INTERNAL_ERROR', detail: '儲存失敗' }) })
@@ -218,7 +218,7 @@ test('截止未達標：捐贈者在 7 天選擇期內轉投到同清單其他�
   })
   await visibility.selectOption('public')
   await expect(ap.getByRole('alert')).toContainText('系統暫時發生問題')
-  await expect(visibility).toHaveValue('friends')
+  await expect(visibility).toHaveValue('private')
   await ap.unroute('**/api/v1/contributions/*')
   await ap.screenshot({ path: 'test-results/contribution-visibility-desktop.png', fullPage: true })
   await ap.setViewportSize({ width: 390, height: 844 })
@@ -229,7 +229,7 @@ test('截止未達標：捐贈者在 7 天選擇期內轉投到同清單其他�
   await ap.getByRole('button', { name: '確認轉投' }).click()
   await expect(ap.locator('article', { hasText: '嬰兒床' })).toContainText('已贊助')
   await expect(ap.locator('article', { hasText: '汽車座椅' })).toContainText('已轉投')
-  await expect(ap.locator('article', { hasText: '嬰兒床' }).getByLabel('誰看得到')).toHaveValue('friends')
-  await expect(c.getByLabel('誰看得到')).toHaveValue('friends')
+  await expect(ap.locator('article', { hasText: '嬰兒床' }).getByLabel('誰看得到')).toHaveValue('private')
+  await expect(c.getByLabel('誰看得到')).toHaveValue('private')
   await expect(balanceOf(ap)).toHaveText('300') // 轉投不動錢包
 })
