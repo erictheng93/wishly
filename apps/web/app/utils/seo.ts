@@ -46,7 +46,7 @@ export function orgLd(siteUrl: string, slug: string, org: any) {
   return {
     '@context': 'https://schema.org', '@type': 'NGO', name: org.display_name, url: `${siteUrl}/o/${slug}`,
     ...(org.intro ? { description: org.intro } : {}),
-    ...(org.logo ? { logo: org.logo } : {}),
+    ...(org.logo_url ? { logo: org.logo_url } : {}),
   }
 }
 

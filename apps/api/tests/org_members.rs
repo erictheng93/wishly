@@ -384,3 +384,118 @@ async fn invite_inbox_link_opens_the_invite(pool: PgPool) {
     .unwrap();
     assert_eq!(link, format!("/org/invite/{}", token_of(&v)));
 }
+
+/// 離開組織：有效成員可停用自己（不需 owner）；不可藉此改角色 / handle 或動別人。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn member_can_leave_org(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let c = user(&pool, "C").await;
+    let v = user(&pool, "V").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    member(&pool, o, c.id, "coordinator").await;
+    member(&pool, o, v.id, "volunteer").await;
+    let (ev, _) = event(&pool, o).await;
+    let p = permit(&pool, o, "approved", 30).await;
+    let w = site(&pool, o, c.id, ev, p, "active").await.id;
+    let can = |uid: Uuid| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, bool>(
+                "SELECT can_manage_wishlist(owner_id, org_id, $2) FROM wishlists WHERE id=$1",
+            )
+            .bind(w)
+            .bind(uid)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    assert!(can(c.id).await);
+    let uri = |id: Uuid| format!("/orgs/{o}/members/{id}");
+    // 非 owner：改自己的角色 / handle、離開時順便改角色、重新啟用，都不行
+    for b in [
+        json!({"role":"owner"}),
+        json!({"handle":"x"}),
+        json!({"disabled":true,"role":"owner"}),
+        json!({"disabled":false}),
+    ] {
+        let (s, _, e) = call(&pool, "PATCH", &uri(c.id), &ck(&c.token), Some(b)).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
+    }
+    // 也不能停用別人
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &uri(v.id),
+        &ck(&c.token),
+        Some(json!({"disabled":true})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    for (tok, id) in [(&c.token, c.id), (&v.token, v.id)] {
+        let (s, _, m) = call(
+            &pool,
+            "PATCH",
+            &uri(id),
+            &ck(tok),
+            Some(json!({"disabled":true})),
+        )
+        .await;
+        assert_eq!(
+            (s, m["disabled_at"].is_null()),
+            (StatusCode::OK, false),
+            "{m}"
+        );
+        // 離開後已非成員：不能重新啟用自己
+        let (s, _, _) = call(
+            &pool,
+            "PATCH",
+            &uri(id),
+            &ck(tok),
+            Some(json!({"disabled":false})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
+    }
+    assert!(!can(c.id).await);
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM audit_logs WHERE action='org.member.leave' AND diff->>'org_id'=$1::text",
+    )
+    .bind(o)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 2);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn one_of_two_owners_can_leave(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let b = user(&pool, "B").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    member(&pool, o, b.id, "owner").await;
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}/members/{}", b.id),
+        &ck(&b.token),
+        Some(json!({"disabled":true})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // 剩下的 A 是最後一位 owner：離開被擋，需先轉讓
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}/members/{}", a.id),
+        &ck(&a.token),
+        Some(json!({"disabled":true})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("LAST_OWNER"))
+    );
+}

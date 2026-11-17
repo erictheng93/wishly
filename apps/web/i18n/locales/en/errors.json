@@ -113,7 +113,7 @@
     "ALREADY_VOIDED": "This receipt has already been voided.",
     "INVALID_STATE": "This action is not allowed in the current state. Refresh and try again.",
     "PERMIT_REQUIRED": "At least one approved fundraising permit is required.",
-    "LAST_OWNER": "The organization needs at least one active owner.",
+    "LAST_OWNER": "The organization needs at least one active owner. To leave or step down, first make another member an owner.",
     "ORG_ROLE_REQUIRED": "Your organization role does not allow this. Contact an owner.",
     "INVITE_EXPIRED": "This invitation has expired or was cancelled. Ask for a new one.",
     "ALREADY_MEMBER": "You are already a member of this organization.",

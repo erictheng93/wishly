@@ -14,7 +14,7 @@ useSeoMeta({
   description: () => org.value?.intro || t('guest.relief.seoDesc'),
   ogTitle: () => org.value?.display_name ?? t('guest.relief.heading'),
   ogDescription: () => org.value?.intro || t('guest.relief.seoDesc'),
-  ogImage: () => org.value?.logo ?? `${origin}/og-default.png`, ogType: 'website', ogUrl: `${origin}/o/${slug}`, twitterCard: 'summary',
+  ogImage: () => org.value?.logo_url ?? `${origin}/og-default.png`, ogType: 'website', ogUrl: `${origin}/o/${slug}`, twitterCard: 'summary',
 })
 </script>
 
@@ -25,7 +25,7 @@ useSeoMeta({
     <div v-else-if="error" class="c-nf err"><h1>{{ $t('guest.loadFailed') }}</h1><button class="g-btn" @click="refresh()">{{ $t('guest.reload') }}</button></div>
     <template v-else-if="org">
       <header class="x-head">
-        <img v-if="org.logo" class="x-logo" :src="org.logo" alt="" loading="lazy">
+        <img v-if="org.logo_url" class="x-logo" :src="org.logo_url" alt="" loading="lazy">
         <div>
           <h1>{{ org.display_name }}<span class="g-badge">{{ $t('guest.relief.verified') }}</span></h1>
           <p v-if="org.intro" class="x-intro">{{ org.intro }}</p>

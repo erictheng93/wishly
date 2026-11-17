@@ -552,7 +552,8 @@ async fn retire_media(pool: &sqlx::PgPool, key: &str) -> Result<bool, AppError> 
     let referenced: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM wishlists w JOIN users u ON u.id=w.owner_id WHERE w.cover_image_key=$1 AND (u.deleted_at IS NULL OR w.org_id IS NOT NULL) AND w.deleted_at IS NULL)
          OR EXISTS (SELECT 1 FROM wishlist_items i JOIN wishlists w ON w.id=i.wishlist_id JOIN users u ON u.id=w.owner_id WHERE i.image_key=$1 AND (u.deleted_at IS NULL OR w.org_id IS NOT NULL) AND w.deleted_at IS NULL AND i.deleted_at IS NULL)
-         OR EXISTS (SELECT 1 FROM users WHERE (avatar_key=$1 OR cover_image_key=$1) AND deleted_at IS NULL)")
+         OR EXISTS (SELECT 1 FROM users WHERE (avatar_key=$1 OR cover_image_key=$1) AND deleted_at IS NULL)
+         OR EXISTS (SELECT 1 FROM organizations WHERE logo_key=$1)")
         .bind(key).fetch_one(&mut *tx).await?;
     if referenced {
         // 仍被引用：在物件鎖內撤銷要求。request_retire 也持同一把鎖，不會在檢查後、撤銷前插入新要求而被抹掉
@@ -671,7 +672,7 @@ pub async fn drain_media(pool: &sqlx::PgPool) -> bool {
     };
     for key in pending {
         let result = async {
-            // 仍被其他清單 / 品項 / 頭像引用：retire_media 保留圖片並撤銷要求
+            // 仍被其他清單 / 品項 / 頭像 / 組織 Logo 引用：retire_media 保留圖片並撤銷要求
             retire_media(pool, &key).await?;
             Ok::<(), AppError>(())
         }

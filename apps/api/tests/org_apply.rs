@@ -211,6 +211,200 @@ async fn needs_changes_only_flagged_fields_editable(pool: PgPool) {
     );
 }
 
+/// 組織 Logo：沿用 `/uploads/presign`（purpose=cover）→ confirm 取得 key，再以 PATCH 掛上；可編輯規則同其他欄位。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn logo_follows_patch_rules(pool: PgPool) {
+    let u = user(&pool, "A").await;
+    let c = user(&pool, "C").await;
+    let key = || json!({ "logo_key": format!("covers/{}.png", Uuid::new_v4()) });
+    let patch = |o: Uuid, tok: String, b: Value| {
+        let pool = pool.clone();
+        async move {
+            let (s, _, v) = call(&pool, "PATCH", &format!("/orgs/{o}"), &ck(&tok), Some(b)).await;
+            (s, v)
+        }
+    };
+    // 上傳管線的型別 / 大小檢查
+    for b in [
+        json!({"purpose":"cover","content_type":"image/gif","content_length":10}),
+        json!({"purpose":"cover","content_type":"image/png","content_length":6 * 1024 * 1024}),
+    ] {
+        let (s, _, e) = call(&pool, "POST", "/uploads/presign", &ck(&u.token), Some(b)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{e}");
+    }
+    // 建立時不收 Logo；草稿可掛上，key 須為圖片管線的 covers/ key
+    let (s, _) = create(
+        &pool,
+        &u.token,
+        json!({"legal_name":"甲","display_name":"甲","logo_key":"covers/x.png"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (_, d) = create(
+        &pool,
+        &u.token,
+        json!({"legal_name":"甲","display_name":"甲"}),
+    )
+    .await;
+    let draft = oid(&d);
+    member(&pool, draft, c.id, "coordinator").await;
+    let (s, v) = patch(draft, u.token.clone(), key()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["logo_url"].is_string());
+    let (s, e) = patch(draft, u.token.clone(), json!({"logo_key":"items/x.png"})).await;
+    assert_eq!(
+        (s, ptr(&e)),
+        (StatusCode::UNPROCESSABLE_ENTITY, "/logo_key")
+    );
+    assert_eq!(
+        patch(draft, c.token.clone(), key()).await.0,
+        StatusCode::FORBIDDEN
+    );
+    // needs_changes：未標記 → FIELD_LOCKED；標記 logo_key → 可改
+    let nc = org(&pool, u.id, "needs_changes").await;
+    member(&pool, nc, u.id, "owner").await;
+    let (s, e) = patch(nc, u.token.clone(), key()).await;
+    assert_eq!(
+        (s, e["errors"][0]["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("FIELD_LOCKED"))
+    );
+    sqlx::query("UPDATE organizations SET flagged_fields='{logo_key}' WHERE id=$1")
+        .bind(nc)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(patch(nc, u.token.clone(), key()).await.0, StatusCode::OK);
+    // pending 不可改；verified 可改、不重審、可移除
+    let p = org(&pool, u.id, "pending").await;
+    member(&pool, p, u.id, "owner").await;
+    assert_eq!(
+        patch(p, u.token.clone(), key()).await.0,
+        StatusCode::CONFLICT
+    );
+    let ok = org(&pool, u.id, "verified").await;
+    member(&pool, ok, u.id, "owner").await;
+    let (s, v) = patch(ok, u.token.clone(), key()).await;
+    assert_eq!(
+        (s, v["verification_status"].as_str()),
+        (StatusCode::OK, Some("verified"))
+    );
+    let (s, v) = patch(ok, u.token.clone(), json!({"logo_key":null})).await;
+    assert_eq!((s, v["logo_url"].is_null()), (StatusCode::OK, true));
+}
+
+/// 上傳者刪帳號時，仍被組織引用的 Logo 不可被退役。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn org_logo_survives_uploader_media_retire(pool: PgPool) {
+    let u = user(&pool, "A").await;
+    let o = org(&pool, u.id, "verified").await;
+    member(&pool, o, u.id, "owner").await;
+    let key = format!("covers/{}.png", Uuid::new_v4());
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}"),
+        &ck(&u.token),
+        Some(json!({ "logo_key": key })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    sqlx::query("UPDATE user_media SET retire_requested_at=now() WHERE object_key=$1")
+        .bind(&key)
+        .execute(&pool)
+        .await
+        .unwrap();
+    wishly_api::uploads::drain_media(&pool).await;
+    let deleted: bool =
+        sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM user_media WHERE object_key=$1")
+            .bind(&key)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(!deleted, "org logo was retired while still referenced");
+}
+
+/// 已通過的組織：owner 可維護簡介與聯絡方式，不重審；身分欄位仍鎖；非 owner 被拒；pending 不可改。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn verified_org_edits_profile_only(pool: PgPool) {
+    let u = user(&pool, "A").await;
+    let c = user(&pool, "C").await;
+    let o = org(&pool, u.id, "verified").await;
+    member(&pool, o, u.id, "owner").await;
+    member(&pool, o, c.id, "coordinator").await;
+    let uri = format!("/orgs/{o}");
+    let (s, _, v) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&u.token),
+        Some(json!({"intro":"新簡介","website":"https://example.org","contact_name":"新聯絡人",
+            "contact_title":"幹事","contact_phone":"0911222333","public_email":"new@example.org","public_phone":"02-1234"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        (
+            v["verification_status"].as_str(),
+            v["intro"].as_str(),
+            v["contact_phone"].as_str()
+        ),
+        (Some("verified"), Some("新簡介"), Some("0911222333"))
+    );
+    // 稽核只記欄位名，不含電話 / Email 內容
+    let diff: Value = sqlx::query_scalar(
+        "SELECT diff FROM audit_logs WHERE action='org.update' AND entity_id=$1",
+    )
+    .bind(o)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        !diff.to_string().contains("0911222333") && !diff.to_string().contains("new@example.org")
+    );
+    for b in [
+        json!({"legal_name":"改"}),
+        json!({"tax_id":"04595257"}),
+        json!({"intro":"x","display_name":"改"}),
+    ] {
+        let (s, _, e) = call(&pool, "PATCH", &uri, &ck(&u.token), Some(b)).await;
+        assert_eq!(
+            (s, e["errors"][0]["code"].as_str()),
+            (StatusCode::UNPROCESSABLE_ENTITY, Some("FIELD_LOCKED")),
+            "{e}"
+        );
+    }
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        &uri,
+        &ck(&c.token),
+        Some(json!({"intro":"x"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (status, intro): (String, String) =
+        sqlx::query_as("SELECT verification_status, intro FROM organizations WHERE id=$1")
+            .bind(o)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((status.as_str(), intro.as_str()), ("verified", "新簡介"));
+    let p = org(&pool, u.id, "pending").await;
+    member(&pool, p, u.id, "owner").await;
+    let (s, _, e) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{p}"),
+        &ck(&u.token),
+        Some(json!({"intro":"x"})),
+    )
+    .await;
+    assert_eq!(
+        (s, e["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ORG_NOT_EDITABLE"))
+    );
+}
+
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn resubmit_blocked_until_resubmit_after(pool: PgPool) {
     let u = user(&pool, "A").await;

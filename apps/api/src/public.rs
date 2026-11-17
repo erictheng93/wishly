@@ -296,7 +296,8 @@ async fn render(
                 w.cover_image_status::text AS cover_image_status, w.cover_preset, w.event_date, w.closes_at, w.show_claimer_names, w.surprise_mode,
                 w.owner_id, u.display_name AS owner_name,
                 surprise_locked(w.surprise_mode, w.event_date) AS locked,
-                GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at)) AS updated_at,
+                GREATEST(w.updated_at, COALESCE((SELECT max(updated_at) FROM wishlist_items WHERE wishlist_id = w.id), w.updated_at),
+                         COALESCE((SELECT updated_at FROM organizations WHERE id = w.org_id), w.updated_at)) AS updated_at,
                 EXISTS (SELECT 1 FROM wishlist_items WHERE wishlist_id = w.id AND deleted_at IS NULL AND funding_mode = 'support') AS has_support
          FROM wishlists w JOIN users u ON u.id = w.owner_id
          WHERE w.slug = $1::bpchar AND w.deleted_at IS NULL AND u.blocked_at IS NULL")
@@ -530,9 +531,9 @@ mod relief {
         body: &mut Value,
     ) -> Result<(), AppError> {
         let v: Value = sqlx::query_scalar(
-            // 聯絡方式與許可公開給捐助者（資訊透明）；verified 組織的 public_* 只在補正時可改，permit 換掉會動 updated_at
+            // 聯絡方式與許可公開給捐助者（資訊透明）；組織資料變動會動 organizations.updated_at（併入 ETag），permit 換掉會動清單 updated_at
             "SELECT jsonb_build_object('org', jsonb_build_object('slug', o.slug, 'display_name', o.display_name, 'verified', o.verification_status = 'verified',
-                           'public_email', o.public_email, 'public_phone', o.public_phone),
+                           'public_email', o.public_email, 'public_phone', o.public_phone, 'logo_key', o.logo_key),
                     'permit', CASE WHEN p.id IS NULL THEN NULL ELSE jsonb_build_object('permit_no', p.permit_no, 'valid_from', p.valid_from, 'valid_to', p.valid_to) END,
                     'site_address', w.site_address, 'site_status', w.site_status)
                FROM wishlists w JOIN organizations o ON o.id = w.org_id
@@ -550,6 +551,9 @@ mod relief {
              SELECT jsonb_build_object('slug', slug, 'name', name) FROM c WHERE merged_into IS NULL AND m = 'ok'")
             .bind(id).fetch_optional(pool).await?;
         let mut v = v;
+        let key = v["org"]["logo_key"].take();
+        v["org"]["logo_url"] = crate::orgs::logo_url(key.as_str());
+        v["org"].as_object_mut().map(|o| o.remove("logo_key"));
         v["event"] = event.unwrap_or(Value::Null);
         if let (Some(b), Some(x)) = (body.as_object_mut(), v.as_object()) {
             b.extend(x.clone());
@@ -654,9 +658,7 @@ mod relief {
                FROM organizations WHERE slug = $1::bpchar AND verification_status = 'verified'")
             .bind(&slug).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
         let key = v["logo_key"].take();
-        v["logo"] = json!(key
-            .as_str()
-            .map(|k| crate::uploads::S3::get().public_url(k)));
+        v["logo_url"] = crate::orgs::logo_url(key.as_str());
         v.as_object_mut().map(|o| o.remove("logo_key"));
         let sites: Vec<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "SELECT jsonb_build_object('slug', w.slug, 'title', w.title, 'site_address', w.site_address, 'site_status', w.site_status,

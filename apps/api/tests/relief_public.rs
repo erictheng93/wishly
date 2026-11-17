@@ -46,7 +46,7 @@ async fn public_site_includes_org_and_event(pool: PgPool) {
     assert_eq!(
         v["org"],
         json!({"slug": os, "display_name": "測試協會", "verified": true,
-               "public_email": "org@example.com", "public_phone": null})
+               "public_email": "org@example.com", "public_phone": null, "logo_url": null})
     );
     assert_eq!(v["permit"]["permit_no"], "P-1", "{v}");
     assert!(v["permit"]["valid_to"].is_string(), "{v}");
@@ -480,4 +480,58 @@ async fn public_endpoints_ignore_cookie(pool: PgPool) {
             "{path}"
         );
     }
+}
+
+/// 組織 Logo：沿用圖片管線的 key，PATCH /orgs/{id} 掛上 / 移除；公開組織頁與據點頁回 logo_url；
+/// verified 改 Logo 不重審，且據點頁 ETag 跟著組織更新而變（避免 304 卡住舊聯絡方式 / Logo）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn org_logo_on_public_pages(pool: PgPool) {
+    let (u, o, _, _, s) = setup(&pool).await;
+    let os: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1")
+        .bind(o)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let site_path = format!("/public/wishlists/{}", s.slug);
+    let (_, h0, _) = call(&pool, "GET", &site_path, &[], None).await;
+    let key = format!("covers/{}.webp", Uuid::new_v4());
+    let (st, _, v) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}"),
+        &ck(&u.token),
+        Some(json!({ "logo_key": key })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["verification_status"], "verified");
+    assert!(v["logo_url"].as_str().unwrap().ends_with(&key), "{v}");
+    let (_, v) = get(&pool, &format!("/public/orgs/{os}")).await;
+    assert!(v["logo_url"].as_str().unwrap().ends_with(&key), "{v}");
+    let (_, h1, v) = call(&pool, "GET", &site_path, &[], None).await;
+    assert!(
+        v["org"]["logo_url"].as_str().unwrap().ends_with(&key),
+        "{v}"
+    );
+    assert_ne!(h0.get("etag"), h1.get("etag"));
+    // 移除：公開頁回 null，舊圖排入退役
+    let (st, _, _) = call(
+        &pool,
+        "PATCH",
+        &format!("/orgs/{o}"),
+        &ck(&u.token),
+        Some(json!({ "logo_key": null })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let (_, v) = get(&pool, &format!("/public/orgs/{os}")).await;
+    assert!(v["logo_url"].is_null(), "{v}");
+    let retire: bool = sqlx::query_scalar(
+        "SELECT retire_requested_at IS NOT NULL FROM user_media WHERE object_key=$1",
+    )
+    .bind(&key)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(retire);
 }

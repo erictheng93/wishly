@@ -113,7 +113,7 @@
     "ALREADY_VOIDED": "Bản ghi nhận này đã bị hủy.",
     "INVALID_STATE": "Hành động này không được phép ở trạng thái hiện tại. Hãy tải lại rồi thử lại.",
     "PERMIT_REQUIRED": "Cần ít nhất một giấy phép gây quỹ đã được duyệt.",
-    "LAST_OWNER": "Tổ chức cần có ít nhất một chủ sở hữu đang hoạt động.",
+    "LAST_OWNER": "Tổ chức cần có ít nhất một chủ sở hữu đang hoạt động. Để rời hoặc hạ vai trò, trước tiên hãy chuyển quyền chủ sở hữu cho thành viên khác.",
     "ORG_ROLE_REQUIRED": "Vai trò của bạn trong tổ chức không đủ quyền. Hãy liên hệ chủ sở hữu.",
     "INVITE_EXPIRED": "Lời mời đã hết hạn hoặc bị hủy. Hãy xin lời mời mới.",
     "ALREADY_MEMBER": "Bạn đã là thành viên của tổ chức này.",

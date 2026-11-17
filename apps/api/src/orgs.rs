@@ -126,6 +126,14 @@ struct Fields {
     contact_phone: Option<String>,
     public_email: Option<String>,
     public_phone: Option<String>,
+    /// 走既有圖片管線（`/uploads/presign` purpose=cover → confirm）取得的 key；null 移除。只在 PATCH 接受
+    #[serde(default, deserialize_with = "crate::auth::some_opt")]
+    logo_key: Option<Option<String>>,
+}
+
+/// 組織 Logo 的公開網址（無則 null）
+pub(crate) fn logo_url(key: Option<&str>) -> Value {
+    json!(key.map(|k| crate::uploads::S3::get().public_url(k)))
 }
 
 /// 驗證並正規化；回傳有帶的欄位名（供 needs_changes 鎖欄位用）。給了就不可為空（本版不支援清空欄位）。
@@ -153,6 +161,18 @@ fn clean(mut f: Fields) -> R<(Fields, Vec<&'static str>)> {
             return Err(AppError::invalid("/org_type", "ENUM", "組織類型不正確"));
         }
     }
+    if let Some(k) = &f.logo_key {
+        if k.as_deref()
+            .is_some_and(|k| !(crate::uploads::valid_key(k) && k.starts_with("covers/")))
+        {
+            return Err(AppError::invalid(
+                "/logo_key",
+                "FORMAT",
+                "圖片 key 格式不正確",
+            ));
+        }
+        names.push("logo_key");
+    }
     if let Some(t) = &f.tax_id {
         if !validate::tax_id_ok(t) {
             return Err(AppError::invalid(
@@ -179,6 +199,7 @@ async fn org_json<'e>(ex: impl PgExecutor<'e>, id: Uuid, role: &str) -> R<Value>
              FROM org_documents d WHERE d.org_id = o.id)), contact_phone_enc FROM organizations o WHERE id=$1")
             .bind(id).fetch_one(ex).await?;
     v["role"] = json!(role);
+    v["logo_url"] = logo_url(v["logo_key"].as_str());
     if role == "owner" {
         v["contact_phone"] = json!(enc.as_deref().and_then(crate::sealed::open_str));
     }
@@ -218,6 +239,13 @@ async fn create(
         if v.is_none() {
             return Err(AppError::invalid(&format!("/{n}"), "REQUIRED", "必填"));
         }
+    }
+    if b.logo_key.is_some() {
+        return Err(AppError::invalid(
+            "/logo_key",
+            "INVALID",
+            "建立草稿後再上傳 Logo",
+        ));
     }
     let (f, _) = clean(b)?;
     check_tax_id(&st.pool, f.tax_id.as_deref(), None).await?;
@@ -276,13 +304,31 @@ async fn lock(tx: &mut crate::points::Tx<'_>, id: Uuid) -> R<(String, Vec<String
         .bind(id).fetch_optional(&mut **tx).await?.ok_or(AppError::NotFound)
 }
 
+/// verified 組織仍可修改的欄位（不涉身分）。
+const PROFILE_FIELDS: &[&str] = &[
+    "website",
+    "intro",
+    "contact_name",
+    "contact_title",
+    "contact_phone",
+    "public_email",
+    "public_phone",
+    "logo_key",
+];
+
 async fn patch(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
     Json(b): Json<Fields>,
 ) -> R<Json<Value>> {
-    let mut tx = crate::begin_contended(&st.pool).await?;
+    // 換 Logo 時比照使用者封面：先取使用者圖片鎖（media_tx），再鎖組織列；鎖序 圖片使用者鎖 → organizations → 物件鎖
+    let logo = b.logo_key.is_some();
+    let mut tx = if logo {
+        crate::uploads::media_tx(&st.pool, u.id).await?
+    } else {
+        crate::begin_contended(&st.pool).await?
+    };
     let (status, flagged, too_early) = lock(&mut tx, id).await?;
     require_role(&mut *tx, id, u.id, "owner").await?;
     let (f, names) = clean(b)?;
@@ -308,6 +354,17 @@ async fn patch(
             }
             true
         }
+        // 已通過：只可維護公開簡介與聯絡方式，身分欄位要改須另行處理，不重審
+        "verified" => {
+            if let Some(n) = names.iter().find(|n| !PROFILE_FIELDS.contains(n)) {
+                return Err(AppError::invalid(
+                    &format!("/{n}"),
+                    "FIELD_LOCKED",
+                    "已通過的組織不可修改此欄位",
+                ));
+            }
+            false
+        }
         _ => {
             return Err(AppError::problem(
                 409,
@@ -317,6 +374,19 @@ async fn patch(
         }
     };
     check_tax_id(&mut *tx, f.tax_id.as_deref(), Some(id)).await?;
+    let new_logo = f.logo_key.clone().flatten();
+    if logo {
+        let old: Option<String> =
+            sqlx::query_scalar("SELECT logo_key FROM organizations WHERE id=$1")
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
+        crate::uploads::remember_media(&mut tx, u.id, new_logo.as_deref()).await?;
+        // 舊圖退役由 media worker 在交易外刪除（仍被引用就保留）
+        if let Some(o) = old.filter(|o| Some(o) != new_logo.as_ref()) {
+            crate::uploads::request_retire(&mut tx, &[o]).await?;
+        }
+    }
     sqlx::query(
         "UPDATE organizations SET legal_name=COALESCE($2,legal_name), display_name=COALESCE($3,display_name), org_type=COALESCE($4,org_type),
            tax_id=COALESCE($5,tax_id), registration_no=COALESCE($6,registration_no), authority=COALESCE($7,authority),
@@ -324,11 +394,12 @@ async fn patch(
            contact_title=COALESCE($12,contact_title), contact_phone_enc=COALESCE($13,contact_phone_enc),
            public_email=COALESCE($14,public_email), public_phone=COALESCE($15,public_phone),
            verification_status=CASE WHEN $16 THEN 'draft' ELSE verification_status END,
-           flagged_fields=CASE WHEN $16 THEN '{}' ELSE flagged_fields END
+           flagged_fields=CASE WHEN $16 THEN '{}' ELSE flagged_fields END,
+           logo_key=CASE WHEN $17 THEN $18 ELSE logo_key END
          WHERE id=$1")
         .bind(id).bind(&f.legal_name).bind(&f.display_name).bind(&f.org_type).bind(&f.tax_id).bind(&f.registration_no)
         .bind(&f.authority).bind(&f.website).bind(&f.intro).bind(&f.rep_name).bind(&f.contact_name).bind(&f.contact_title)
-        .bind(seal_phone(&f)).bind(&f.public_email).bind(&f.public_phone).bind(reopen)
+        .bind(seal_phone(&f)).bind(&f.public_email).bind(&f.public_phone).bind(reopen).bind(logo).bind(&new_logo)
         .execute(&mut *tx).await.map_err(map_unique)?;
     audit_user(
         &mut *tx,
@@ -341,6 +412,18 @@ async fn patch(
     .await?;
     let v = org_json(&mut *tx, id, "owner").await?;
     tx.commit().await?;
+    if status == "verified" {
+        // 組織頁與據點頁（帶組織聯絡方式與 Logo）都有 CDN 快取
+        crate::cdn::purge_org(v["slug"].as_str().unwrap_or_default().to_owned());
+        let sites: Vec<String> = sqlx::query_scalar(
+            "SELECT slug::text FROM wishlists WHERE org_id=$1 AND deleted_at IS NULL",
+        )
+        .bind(id)
+        .fetch_all(&st.pool)
+        .await
+        .unwrap_or_default(); // 已提交，purge 只是盡力而為（據點頁 s-maxage=10 會自然過期）
+        crate::cdn::purge_wishlists(sites);
+    }
     Ok(Json(v))
 }
 

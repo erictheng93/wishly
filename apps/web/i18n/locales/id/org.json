@@ -72,7 +72,9 @@
         "religious": "Lembaga keagamaan",
         "other": "Lembaga terdaftar lainnya"
       },
-      "reapply": "Ajukan ulang"
+      "reapply": "Ajukan ulang",
+      "logo": "Logo organisasi (opsional)",
+      "logoRemove": "Hapus logo"
     },
     "console": {
       "title": "Konsol organisasi",
@@ -107,7 +109,11 @@
         "revoked": "Verifikasi organisasi dicabut",
         "event_hidden": "Peristiwa diturunkan",
         "permit": "Izin belum disetujui atau sudah kedaluwarsa"
-      }
+      },
+      "profile": "Profil organisasi",
+      "profileHint": "Organisasi terverifikasi dapat memperbarui logo, profil singkat, dan kontak kapan saja tanpa peninjauan ulang. Data identitas seperti nama dan NPWP tidak dapat diubah di sini.",
+      "profileSave": "Simpan profil",
+      "profileSaved": "Tersimpan"
     },
     "members": {
       "title": "Anggota & undangan",
@@ -132,7 +138,9 @@
         "owner": "Pemilik",
         "coordinator": "Koordinator",
         "volunteer": "Relawan"
-      }
+      },
+      "leave": "Keluar dari organisasi",
+      "leaveText": "Yakin ingin keluar dari organisasi ini? Setelah keluar, Anda tidak dapat lagi mengelola posko atau melihat data organisasi, dan perlu diundang ulang untuk bergabung."
     },
     "invite": {
       "title": "Gabung organisasi",
@@ -273,7 +281,8 @@
         "item_create": "Menambahkan barang",
         "item_update": "Memperbarui barang",
         "item_delete": "Menghapus barang",
-        "item_reorder": "Mengurutkan ulang barang"
+        "item_reorder": "Mengurutkan ulang barang",
+        "org_member_leave": "Keluar dari organisasi"
       }
     }
   }

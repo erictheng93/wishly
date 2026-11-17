@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 選圖 -> 檢查型別/大小 -> 最長邊 1280 壓縮 -> presign -> PUT。modelValue = object_key
-const props = defineProps<{ purpose: 'cover' | 'item' | 'catalog'; modelValue?: string | null; currentUrl?: string | null }>()
+const props = defineProps<{ purpose: 'cover' | 'item' | 'catalog'; modelValue?: string | null; currentUrl?: string | null; label?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string | null]; busy: [boolean] }>()
 const { api } = useApi()
 const { t } = useI18n()
@@ -51,7 +51,7 @@ function pick(ev: Event) {
 </script>
 <template>
   <div class="c-field">
-    <span>{{ purpose === 'cover' ? $t('creator.image.cover') : $t('creator.image.item') }}</span>
+    <span>{{ label ?? (purpose === 'cover' ? $t('creator.image.cover') : $t('creator.image.item')) }}</span>
     <div class="c-row">
       <img v-if="preview || currentUrl" class="c-thumb" :src="preview || currentUrl!" alt="">
       <div v-else class="c-thumb is-empty" aria-hidden="true" />

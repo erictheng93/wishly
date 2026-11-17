@@ -727,7 +727,7 @@ async fn me(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, A
     Ok(Json(v))
 }
 
-fn some_opt<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+pub(crate) fn some_opt<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     d: D,
 ) -> Result<Option<Option<T>>, D::Error> {
     Option::<T>::deserialize(d).map(Some)

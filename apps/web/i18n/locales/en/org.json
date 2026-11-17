@@ -72,7 +72,9 @@
         "religious": "Religious body",
         "other": "Other registered body"
       },
-      "reapply": "Reapply"
+      "reapply": "Reapply",
+      "logo": "Organization logo (optional)",
+      "logoRemove": "Remove logo"
     },
     "console": {
       "title": "Org console",
@@ -107,7 +109,11 @@
         "revoked": "Organization verification revoked",
         "event_hidden": "Event taken down",
         "permit": "Permit not approved or expired"
-      }
+      },
+      "profile": "Organization profile",
+      "profileHint": "Verified organizations can update their logo, intro and contact details at any time without another review. Identity details such as name and tax ID cannot be changed here.",
+      "profileSave": "Save profile",
+      "profileSaved": "Saved"
     },
     "members": {
       "title": "Members & invites",
@@ -132,7 +138,9 @@
         "owner": "Owner",
         "coordinator": "Coordinator",
         "volunteer": "Volunteer"
-      }
+      },
+      "leave": "Leave organization",
+      "leaveText": "Leave this organization? You will no longer be able to manage its sites or view its details, and will need a new invite to rejoin."
     },
     "invite": {
       "title": "Join organization",
@@ -273,7 +281,8 @@
         "wishlist_archive": "Archived list",
         "wishlist_shipping_address_update": "Updated shipping info",
         "wishlist_allowed_users_update": "Updated allowed viewers",
-        "item_reorder": "Reordered items"
+        "item_reorder": "Reordered items",
+        "org_member_leave": "Left organization"
       }
     }
   }
