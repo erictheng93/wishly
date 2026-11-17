@@ -26,8 +26,14 @@ async function loadReceipts() {
   try { receipts.value = Object.fromEntries((await api(`/orgs/${w.value.org_id}/sites/${id}/receipts`)).items.map((r: any) => [r.item_id, r])) } catch { /* 明細失敗不擋編輯 */ }
 }
 function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
+const overAsk = ref(false)
+// 超收只提示：累計 + 本次 > 需求時先確認，後端不擋（眾籌品項沒有數量需求，不確認）
+function submitReceipt() {
+  if (rcpt.value.funding_mode === 'quantity' && (receipts.value[rcpt.value.id]?.total ?? 0) + Number(rcptF.qty) > rcpt.value.qty_needed) overAsk.value = true
+  else saveReceipt()
+}
 async function saveReceipt() {
-  rcptBusy.value = true; rcptErr.value = ''
+  overAsk.value = false; rcptBusy.value = true; rcptErr.value = ''
   try {
     await api(`/orgs/${w.value.org_id}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': rcptKey.value }, noRedirect: true, body: { item_id: rcpt.value.id, qty: Number(rcptF.qty), note: rcptF.note || undefined } })
     rcpt.value = null; await load(true)
@@ -266,15 +272,16 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 
     <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" :relief="relief" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
     <CreatorSheet :open="!!rcpt" :title="$t('org.relief.receiptTitle')" @close="rcpt = null">
-      <form v-if="rcpt" @submit.prevent="saveReceipt">
+      <form v-if="rcpt" @submit.prevent="submitReceipt">
         <p class="rc-head"><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
-        <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k" :style="e.voided_at ? 'text-decoration:line-through' : ''">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
+        <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k"><span :style="e.voided_at ? 'text-decoration:line-through' : ''">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</span><span v-if="e.voided_at">　{{ $t('org.relief.receiptVoided', { reason: e.void_reason }) }}</span></li></ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
         <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>
         <button class="c-btn primary block" :disabled="rcptBusy">{{ $t('org.relief.receiptSave') }}</button>
       </form>
     </CreatorSheet>
+    <CreatorConfirm :open="overAsk" :title="$t('org.relief.receiptOverTitle')" :text="$t('org.relief.receiptOverText', { n: rcpt?.qty_needed })" :ok="$t('org.relief.receiptSave')" @close="overAsk = false" @ok="saveReceipt" />
     <CreatorConfirm :open="!!del" :title="$t('lists.edit.delTitle')" :text="$t('lists.edit.delText', { title: del?.title })" :ok="del?.force ? $t('lists.edit.delForce') : $t('lists.edit.delOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
     <CreatorSheet :open="showShare" :title="$t('lists.edit.shareTitle')" @close="showShare = false">
       <p v-if="w?.status === 'draft'" class="c-err">{{ $t('lists.edit.draftWarn') }}</p>
