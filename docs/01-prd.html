@@ -107,7 +107,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tbody>
 <tr><td>一、生日（<code>personal</code>）</td><td>朋友不知道送什麼，怕與別人重複。</td><td>本人列清單，朋友開連結參考並捐助；他人只看到「已捐助」。</td></tr>
 <tr><td>二、孕婦（<code>registry</code>）</td><td>大家都送奶瓶，沒人送奶粉、紙尿褲、嬰兒車。</td><td>列出品項與數量（奶瓶 10、XX 品牌奶粉 2 罐、紙尿褲 5 包、嬰兒車 1），親友自行捐助；嬰兒車等高價品，MVP 先以數量 1 捐助，Phase 2 起可由多位親友以心願眾籌，達標後平台自動購買並寄給孕婦；孕婦可看完成度與誰捐助了什麼（驚喜模式除外）。</td></tr>
-<tr><td>三、天災（<code>relief</code>，P2）</td><td>志工與救災隊不知道災民缺什麼（藥品、清水、食物），無法統計與協調。</td><td>組織建立據點，志工統計需求並分配；捐贈者看地圖與緊急度認捐，志工登記實收。</td></tr>
+<tr><td>三、天災（<code>relief</code>，P2）</td><td>志工與救災隊不知道災民缺什麼（藥品、清水、食物），無法統計與協調。</td><td>組織建立據點，志工統計需求並分配；捐贈者看據點列表與緊急度認捐（地圖延後，D64），志工登記實收。</td></tr>
 </tbody></table>
 <h3>2.2 產品願景</h3>
 <p>讓「想要的人」與「想送的人」同步。連結貼進 LINE 群組，對方點開就能捐助，不必安裝、不必註冊。</p>
@@ -148,7 +148,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <li><b>LINE 優先</b>：LINE Login、LINE 內建瀏覽器相容（cookie 不穩時，會員改以 Bearer / 重新登入處理；舊訪客認捐仍可憑 <code>X-Guest-Token</code> 管理）、LINE Messaging API 通知。</li>
 <li><b>繁中在地化</b>：台灣用語、信用卡 / LINE Pay / Apple Pay 等在地付款方式、台灣個資法與電子支付法規意識。</li>
 <li><b>驚喜模式</b>：活動日前建立者看不到誰捐助了什麼，只看完成度。</li>
-<li><b>同一資料模型延伸到救災</b>：relief 據點 = 帶座標的 wishlist，不需另起一套系統。</li>
+<li><b>同一資料模型延伸到救災</b>：relief 據點 = 帶地址的 wishlist（座標延後，D64），不需另起一套系統。</li>
 </ol>
 <h3>3.2.1 效仿星巴克：儲值錢包、禮物卡、星禮程、企業採購</h3>
 <p>星巴克台灣的隨行卡（儲值卡）、電子禮物卡、星禮程（回饋星星）與企業採購，構成「預收現金 + 高留存 + 社交送禮」的飛輪。對應到 Wishly：</p>
@@ -233,7 +233,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>企業福委會窗口 <span class="badge p2">P2</span></td><td>公司 HR / 福委會</td><td>為員工的生日、生育發放禮券並核銷</td><td>發放與對帳繁瑣、需要統編發票</td><td>批次採購、匯款、三聯式發票、兌換連結 CSV、未兌換整批退款（依合約）</td></tr>
 <tr><td>救災組織協調員 <span class="badge p2">P2</span></td><td>NGO 物資組長</td><td>掌握各據點缺口並調度</td><td>資料散落在群組與表單</td><td>據點彙總、緊急度、角色權限、稽核紀錄</td></tr>
 <tr><td>志工 <span class="badge p2">P2</span></td><td>據點現場志工</td><td>快速登記需求與實收</td><td>現場網路不穩、沒時間操作</td><td>離線佇列、簡單表單、登記實收</td></tr>
-<tr><td>救災捐贈者 <span class="badge p2">P2</span></td><td>企業 CSR 或熱心個人</td><td>捐出對方真正需要的物資</td><td>不知道缺什麼、怕堆積無用物資</td><td>地圖看據點與緊急度、認捐、追蹤送達</td></tr>
+<tr><td>救災捐贈者 <span class="badge p2">P2</span></td><td>企業 CSR 或熱心個人</td><td>捐出對方真正需要的物資</td><td>不知道缺什麼、怕堆積無用物資</td><td>據點列表看緊急度（地圖延後，D64）、認捐、追蹤送達</td></tr>
 <tr><td>營運代購人員 <span class="badge p2">P2</span></td><td>平台營運（is_staff）</td><td>在時限內買到非目錄商品並更新出貨狀態</td><td>訂單散落、漲價缺貨、需留存憑證</td><td>後台訂單佇列、填商家訂單編號與物流單號、失敗處理（觸發退點）、稽核紀錄</td></tr>
 </tbody></table>
 
@@ -374,12 +374,12 @@ header.top,main{padding-left:16px;padding-right:16px}
 <ul>
 <li><b>Given</b> 我是 <code>owner</code>，<b>When</b> 我邀請成員為 <code>coordinator</code> 或 <code>volunteer</code>，<b>Then</b> 成員取得對應權限。</li>
 <li><b>Given</b> 我是 <code>volunteer</code>，<b>When</b> 嘗試改成員角色，<b>Then</b> 回 <code>FORBIDDEN</code>。</li>
-<li><b>Given</b> 我建立據點含座標與地址，<b>When</b> 狀態為 <code>active</code>，<b>Then</b> 出現在 <code>/relief</code> 地圖。</li>
+<li><b>Given</b> 我建立據點含縣市與地址，<b>When</b> 狀態為 <code>active</code>，<b>Then</b> 出現在事件頁的據點列表（座標與 <code>/relief</code> 地圖延後，D64）。</li>
 </ul></div>
 <div class="story"><span class="id">US-14 需求登記與彙總</span>　身為志工，我想登記品項類別與緊急度，協調員可看彙總。
 <ul>
-<li><b>Given</b> 我在據點新增「飲用水，category=water，urgency=critical」，<b>When</b> 儲存，<b>Then</b> 在 <code>GET /public/relief/needs/summary</code> 彙總出現。</li>
-<li><b>Given</b> 我在地圖拖動，<b>When</b> 送出 bbox，<b>Then</b> 回傳範圍內據點。</li>
+<li><b>Given</b> 我在據點新增「飲用水，category=water，urgency=critical」，<b>When</b> 儲存，<b>Then</b> 在事件頁據點的需求列表出現（<code>GET /public/relief/needs/summary</code> 彙總端點延後，D64）。</li>
+<li>[延後，D64] <b>Given</b> 我在地圖拖動，<b>When</b> 送出 bbox，<b>Then</b> 回傳範圍內據點。</li>
 </ul></div>
 <div class="story"><span class="id">US-15 認捐、運送、實收</span>　身為捐贈者與志工，我想追蹤物資從認捐到實收。
 <ul>
@@ -511,7 +511,7 @@ header.top,main{padding-left:16px;padding-right:16px}
 </ul></div>
 <div class="story"><span class="id">US-44 救災組織驗證（P2-D）</span>　身為救災組織，我想取得已驗證徽章。
 <ul>
-<li><b>Given</b> 我的組織 <code>verification_status=pending</code>，<b>When</b> 我嘗試建立 <code>public</code> 據點，<b>Then</b> 回 403 <code>ORG_NOT_VERIFIED</code>；據點只能維持 draft（D52：link 已廢止，未驗證組織的據點維持 draft，驗證通過後才能發布），不上地圖、不出現在 <code>GET /public/relief/sites</code>。</li>
+<li><b>Given</b> 我的組織 <code>verification_status=pending</code>，<b>When</b> 我嘗試建立事件或據點，<b>Then</b> 建事件回 403 <code>ORG_NOT_VERIFIED</code>、建據點因許可未核准回 409 <code>PERMIT_INVALID</code>；審核期間不能預先建立草稿據點，通過認證且許可核准後才能建立（2026-11 依實作同步，#91；D52 的「未驗證據點維持 draft」只適用於驗證被撤銷而降級的既有據點），不出現在公開據點列表。</li>
 <li><b>Given</b> 我上傳立案證書或政府單位證明（R2 私有 bucket），<b>When</b> staff 於 <code>PATCH /admin/orgs/{id}/verification</code> 核准，<b>Then</b> 狀態為 <code>verified</code>，公開頁顯示「已驗證組織」徽章。</li>
 </ul></div>
 
@@ -543,8 +543,8 @@ header.top,main{padding-left:16px;padding-right:16px}
 <tr><td>FR-22</td><td>範本清單</td><td>新生兒、婚禮、喬遷預設品項</td><td><span class="badge p1">P1</span></td><td>1.5</td></tr>
 <tr><td>FR-30</td><td>換裝置找回訪客捐助（完整版）</td><td>MVP 最小版為捐助確認信的「管理我的捐助」連結（FR-56）；P1 完整版：自助寄送管理連結、多筆捐助合併</td><td><span class="badge p1">P1</span></td><td>1.5</td></tr>
 <tr><td>FR-23</td><td>組織與成員</td><td>organizations、org_members；owner / coordinator / volunteer</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
-<tr><td>FR-24</td><td>救災據點</td><td>relief 型 wishlist + PostGIS 座標、site_status</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
-<tr><td>FR-25</td><td>據點地圖與查詢</td><td><code>/relief</code>；bbox / near 查詢</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
+<tr><td>FR-24</td><td>救災據點</td><td>relief 型 wishlist + 文字地址、site_status（PostGIS 座標延後，D64）</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
+<tr><td>FR-25</td><td>據點地圖與查詢</td><td><code>/relief</code>；bbox / near 查詢（延後，D64）</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-26</td><td>需求彙總</td><td>依 relief_category、relief_urgency 彙總</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-27</td><td>認捐 → 運送 → 實收</td><td>claim_status 流轉（reserved 已認捐、purchased 運送中、delivered 已實收）；receipts 記錄實收；捐助逾期預設 48 小時（<code>claim_ttl_hours</code>），背景 job 轉 expired 並回補數量</td><td><span class="badge p2">P2</span></td><td>2</td></tr>
 <tr><td>FR-28</td><td>離線佇列</td><td>Background Sync 搭配 Idempotency-Key</td><td><span class="badge p2">P2</span></td><td>2</td></tr>

@@ -210,7 +210,7 @@ flowchart LR
 <tr><td>建立 org、邀請 / 變更成員角色</td><td class="c">—</td><td class="c">○</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>任何登入者可建立 org 並成為 org owner；成員管理僅 org owner</td></tr>
 <tr><td>建立 / 編輯據點 site</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td>P2</td></tr>
 <tr><td>登記實收 receipts</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td>P2；需 Idempotency-Key</td></tr>
-<tr><td>地圖 / 需求彙總查詢</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td>P2；公開</td></tr>
+<tr><td>地圖 / 需求彙總查詢（延後，D64）</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td>P2；公開</td></tr>
 <tr><td>claim 逾期轉 expired、對帳、清理、通知寄送</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td>audit_logs 的 actor_type = system</td></tr>
 <tr><td>讀取 audit_logs</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">●</td><td>v1 無對外 API，僅內部查詢</td></tr>
 <tr><td>瀏覽 friends / selected 清單 <span class="badge p0">P0</span></td><td class="c">—</td><td class="c">●</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">○</td><td class="c">—</td><td>F21；需登入且為好友 / 在名單內；owner 本人免檢查；org 角色欄僅表示「已登入」，不因 org 身分放行</td></tr>
@@ -1138,7 +1138,7 @@ sequenceDiagram
 <h4>F10-0 組織驗證（D43，第一段實作版）</h4>
 <table class="meta"><tbody>
 <tr><td>規則</td><td><code>organizations.verification_status</code> ∈ draft | pending | needs_changes | verified | rejected。送審須有立案文件（<code>org_documents</code>，上傳至私有儲存，不經 CDN，成員與 staff 以受控端點下載）與至少一張勸募許可（<code>org_permits</code>，各自 pending / approved / rejected，有效期間）。通過審核需至少一張已核准的許可（<code>PERMIT_REQUIRED</code>）。</td></tr>
-<tr><td>未驗證限制</td><td>未驗證組織不能建立災害事件（<code>ORG_NOT_VERIFIED</code> 403），據點不能上線。公開 API 一律檢查組織仍為 verified。驗證被撤銷（verified → rejected）時，同交易把該組織上線據點降回草稿並 purge 事件頁與組織頁快取。撤銷單一已核准許可只暫停使用該許可的據點，不改組織狀態。許可到期（台北日期）由背景工作每小時暫停據點並通知 owner。</td></tr>
+<tr><td>未驗證限制</td><td>未驗證組織不能建立災害事件（<code>ORG_NOT_VERIFIED</code> 403），也不能建立據點（需已核准許可，否則 409 <code>PERMIT_INVALID</code>）；審核期間無法預先建立草稿據點（#91）。公開 API 一律檢查組織仍為 verified。驗證被撤銷（verified → rejected）時，同交易把該組織上線據點降回草稿並 purge 事件頁與組織頁快取。撤銷單一已核准許可只暫停使用該許可的據點，不改組織狀態。許可到期（台北日期）由背景工作每小時暫停據點並通知 owner。</td></tr>
 <tr><td>API</td><td>staff：<code>GET /admin/orgs?status=</code>、<code>GET /admin/orgs/{id}</code>、<code>POST /admin/orgs/{id}/review</code>、<code>POST /admin/permits/{id}/review</code>（寫 audit_logs）。</td></tr>
 <tr><td>錯誤碼</td><td><code>ORG_NOT_VERIFIED</code> 403；<code>ORG_ROLE_REQUIRED</code> 403；<code>STAFF_ONLY</code> 403；其餘見契約 04 的救災組織錯誤碼。</td></tr>
 </tbody></table>

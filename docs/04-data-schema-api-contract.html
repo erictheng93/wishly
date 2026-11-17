@@ -713,7 +713,7 @@ CREATE TABLE organizations (
   authority           text,
   website             text,
   intro               text        CHECK (char_length(intro) &lt;= 2000),
-  logo_key            text,
+  logo_key            text,                -- 保留未使用：本階段不做 Logo 上傳與顯示（#91）
   rep_name            text,
   contact_name        text,
   contact_title       text,
@@ -2383,7 +2383,7 @@ VALUES ('staff', $4, 'wallet_debt.resolve', 'wallet_debts', $1, jsonb_build_obje
 COMMIT;
 
 -- ================================================================
--- 4.4 PostGIS 據點查詢（僅公開、進行中的據點）
+-- 4.4 [延後，D64；第一段未實作] PostGIS 據點查詢（僅公開、進行中的據點）
 -- ================================================================
 -- bbox：&amp;&amp; 走 GiST 索引（geography 的 &amp;&amp; 比較 2D 邊界框）；ST_MakeEnvelope 參數順序 (minLng, minLat, maxLng, maxLat)
 SELECT w.id, w.slug, w.title, w.address, w.site_status,
@@ -2405,7 +2405,7 @@ SELECT w.id, w.slug, w.title,
  LIMIT $4;
 
 -- ================================================================
--- 4.5 需求彙總（GET /public/relief/needs/summary?bbox=...）
+-- 4.5 [延後，D64；第一段未實作] 需求彙總（GET /public/relief/needs/summary?bbox=...）
 -- ================================================================
 SELECT i.category, i.urgency,
        count(DISTINCT w.id)                              AS site_count,
