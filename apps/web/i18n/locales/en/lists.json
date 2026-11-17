@@ -31,7 +31,7 @@
       "surprise": "Surprise mode",
       "surpriseHint": "Until the event date, you only see the progress, not who gave what. Requires an event date.",
       "showNames": "Show giver nicknames to other visitors",
-      "showNamesHint": "Off by default",
+      "showNamesHint": "Givers choose for themselves: by default only the giver's friends see the name and others see \"Anonymous\"; givers can also pick public or anonymous.",
       "creating": "Creating…",
       "submit": "Create and add items",
       "sec": {
@@ -89,6 +89,7 @@
       "event": "Event date",
       "closes": "Auto-end time (optional, leave empty for no deadline)",
       "showNames": "Show giver nicknames to other visitors",
+      "showNamesHint": "Givers choose for themselves: by default only the giver's friends see the name and others see \"Anonymous\"; givers can also pick public or anonymous.",
       "surprise": "Surprise mode: {state}",
       "surpriseLocked": "On (locked until the event date, cannot be turned off)",
       "surpriseUnlocked": "On (unlocked)",

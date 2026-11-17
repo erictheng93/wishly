@@ -126,7 +126,7 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
   const bf = bp.getByRole('dialog')
   await expect(bf).toBeVisible()
   await bf.getByLabel('贊助點數').fill('400')
-  await bf.getByLabel('匿名贊助（頁面上顯示為「匿名朋友」）').check()
+  await bf.getByLabel('我的名字顯示給').selectOption('anonymous')
   await bf.getByRole('button', { name: /確認贊助/ }).click()
   await expect(bp.getByRole('heading', { name: '✓ 感謝你的贊助！' })).toBeVisible()
   await expect(bp.getByText('剛好達標了！')).toBeVisible()

@@ -240,7 +240,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <label class="c-field"><span>{{ $t('lists.edit.closes') }}</span><input v-model="meta.closes_at" type="datetime-local"></label>
           <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="coverKey" :current-url="w.cover_image_url" @busy="coverBusy = $event" />
           <CreatorTtlPicker v-model="meta.claim_ttl_hours" />
-          <label v-if="!relief" class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}</span></label>
+          <label v-if="!relief" class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}<br><small class="c-mute">{{ $t('lists.edit.showNamesHint') }}</small></span></label>
           <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" />
           <CreatorBirthdayNotify v-if="!relief && !w.org_id" v-model="meta.birthday_notify" :visibility="meta.visibility" />
           <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>

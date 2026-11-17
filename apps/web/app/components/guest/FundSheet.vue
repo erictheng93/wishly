@@ -13,7 +13,8 @@ useAuth().fetchMe().then(u => { vis.value ??= u?.default_claim_visibility }).cat
 const key = ref(crypto.randomUUID())
 const remaining = computed(() => props.item.remaining_points ?? 0)
 const points = ref<number | ''>(Math.min(remaining.value, 500) || remaining.value || '')
-const message = ref(''), anon = ref(false)
+const message = ref('')
+const anon = computed(() => vis.value === 'anonymous') // 單一選單：「匿名」送 is_anonymous + private
 const balance = ref<number | null>(null)
 const busy = ref(false), msg = ref(''), needWallet = ref(false), needLogin = ref(false)
 const dirty = computed(() => !!message.value || anon.value)
@@ -32,7 +33,7 @@ async function submit() {
   try {
     const r = await api(`/items/${props.item.id}/contributions`, {
       method: 'POST', headers: { 'Idempotency-Key': key.value }, noRedirect: true,
-      body: { points: points.value, message: message.value.trim() || undefined, is_anonymous: anon.value, visibility: vis.value, via_item_id: props.via },
+      body: { points: points.value, message: message.value.trim() || undefined, is_anonymous: anon.value, visibility: anon.value ? 'private' : vis.value, via_item_id: props.via },
     })
     emit('done', r)
   } catch (e: any) {
@@ -66,10 +67,9 @@ async function submit() {
       <p v-if="after != null && after < 0" class="g-field-err">{{ $t('guest.fund.insufficient', { n: fmtPts(-after) }) }}</p>
       <label for="fm">{{ $t('guest.noteLabel') }}</label>
       <input id="fm" v-model="message" maxlength="200" :readonly="busy">
-      <label class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.fund.anon') }}</label>
       <template v-if="vis">
         <label for="fv">{{ $t('guest.fund.visLabel') }}</label>
-        <select id="fv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option></select>
+        <select id="fv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option><option value="anonymous">{{ $t('guest.visibility.anonymous') }}</option></select>
       </template>
       <p v-if="visNote" class="g-mute">{{ $t(visNote) }}</p>
       <p class="g-mute">{{ $t('guest.fund.notice') }}</p>

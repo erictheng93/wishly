@@ -31,7 +31,7 @@
       "surprise": "驚喜模式",
       "surpriseHint": "活動日前，你只看得到完成度，看不到誰送了什麼。需設定活動日。",
       "showNames": "顯示送禮者暱稱給其他訪客",
-      "showNamesHint": "預設關閉",
+      "showNamesHint": "送禮者可自己決定：預設只有其好友看得到名字，其他人看到「匿名」，也可選擇公開或匿名。",
       "creating": "建立中…",
       "submit": "建立並新增品項",
       "sec": {
@@ -89,6 +89,7 @@
       "event": "活動日",
       "closes": "自動結束時間（選填，留空＝不設期限）",
       "showNames": "顯示送禮者暱稱給其他訪客",
+      "showNamesHint": "送禮者可自己決定：預設只有其好友看得到名字，其他人看到「匿名」，也可選擇公開或匿名。",
       "surprise": "驚喜模式：{state}",
       "surpriseLocked": "開啟中（鎖定至活動日，無法關閉）",
       "surpriseUnlocked": "開啟中（已解鎖）",

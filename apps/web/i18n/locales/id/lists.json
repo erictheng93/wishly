@@ -31,7 +31,7 @@
       "surprise": "Mode kejutan",
       "surpriseHint": "Sebelum tanggal acara, kamu hanya melihat progres, tidak melihat siapa memberi apa. Perlu mengatur tanggal acara.",
       "showNames": "Tampilkan nama panggilan pemberi hadiah ke pengunjung lain",
-      "showNamesHint": "Nonaktif secara default",
+      "showNamesHint": "Pemberi memilih sendiri: secara default hanya teman pemberi yang melihat nama, yang lain melihat \"Anonim\"; pemberi juga bisa memilih publik atau anonim.",
       "creating": "Membuat…",
       "submit": "Buat dan tambah barang",
       "sec": {
@@ -89,6 +89,7 @@
       "event": "Tanggal acara",
       "closes": "Waktu penutupan otomatis (opsional, kosongkan = tanpa batas)",
       "showNames": "Tampilkan nama panggilan pemberi hadiah ke pengunjung lain",
+      "showNamesHint": "Pemberi memilih sendiri: secara default hanya teman pemberi yang melihat nama, yang lain melihat \"Anonim\"; pemberi juga bisa memilih publik atau anonim.",
       "surprise": "Mode kejutan: {state}",
       "surpriseLocked": "Aktif (terkunci sampai tanggal acara, tidak bisa dimatikan)",
       "surpriseUnlocked": "Aktif (sudah terbuka)",

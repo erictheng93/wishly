@@ -891,7 +891,7 @@ async fn me_handle_and_default_visibility(pool: PgPool) {
     )
     .await;
     assert!(v["handle"].is_null());
-    assert_eq!(v["default_claim_visibility"], "private");
+    assert_eq!(v["default_claim_visibility"], "friends");
     let (s, _, v) = common::call(
         &pool,
         "PATCH",
@@ -1142,8 +1142,8 @@ async fn pledge_row(pool: &PgPool, wl: Uuid, user: Uuid, points: i64, anon: bool
          VALUES ($1, '推車', 1, 'crowdfund', 10000, CASE WHEN $2 IN ('pledged','captured') THEN $3::bigint ELSE 0 END, 'open', now() + interval '7 days', 'concierge') RETURNING id").bind(wl).bind(status).bind(points).fetch_one(pool).await.unwrap();
     let wallet: Uuid = sqlx::query_scalar("INSERT INTO point_wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id RETURNING id")
         .bind(user).fetch_one(pool).await.unwrap();
-    sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, is_anonymous, status, released_at, captured_at)
-                 VALUES ($1, $2, $3, $4, 'x', $5, $6, $7::text::contribution_status, CASE WHEN $7 = 'released' THEN now() END, CASE WHEN $7 = 'captured' THEN now() END)")
+    sqlx::query("INSERT INTO contributions (item_id, wishlist_id, user_id, wallet_id, donor_name, points, is_anonymous, visibility, status, released_at, captured_at)
+                 VALUES ($1, $2, $3, $4, 'x', $5, $6, 'private', $7::text::contribution_status, CASE WHEN $7 = 'released' THEN now() END, CASE WHEN $7 = 'captured' THEN now() END)")
         .bind(item).bind(wl).bind(user).bind(wallet).bind(points).bind(anon).bind(status).execute(pool).await.unwrap();
 }
 

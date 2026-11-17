@@ -16,7 +16,7 @@ const editing = !!props.mine
 const max = ref(props.loggedInName ? props.item.qty_remaining + (props.mine?.qty ?? 0) : (props.mine?.qty ?? 0))
 const qty = ref(Math.min(props.mine?.qty ?? 1, max.value))
 const note = ref(props.mine?.note ?? '')
-const anon = ref(false)
+const anon = computed(() => vis.value === 'anonymous') // 單一選單：「匿名」送 is_anonymous + private
 const busy = ref(false)
 const msg = ref('')
 const errs = ref<Record<string, string>>({})
@@ -34,7 +34,7 @@ async function submit() {
     } else {
       r = await api(`/items/${props.item.id}/claims`, {
         method: 'POST', headers: { 'Idempotency-Key': key }, keepToken: true,
-        body: { qty: qty.value, note: note.value || undefined, visibility: vis.value, is_anonymous: anon.value, via_item_id: props.via },
+        body: { qty: qty.value, note: note.value || undefined, visibility: anon.value ? 'private' : vis.value, is_anonymous: anon.value, via_item_id: props.via },
       })
     }
     emit('done', r)
@@ -77,14 +77,12 @@ async function submit() {
         <p class="g-mute">{{ $t('guest.claim.asUser', { name: loggedInName }) }}</p>
         <template v-if="vis">
           <label for="cv">{{ $t('guest.claim.visLabel') }}</label>
-          <select id="cv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option></select>
+          <select id="cv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option><option value="anonymous">{{ $t('guest.visibility.anonymous') }}</option></select>
         </template>
       </template>
       <label for="cm">{{ $t('guest.noteLabel') }}</label>
       <input id="cm" v-model="note" maxlength="200" :readonly="busy">
       <div v-if="errs.note" class="g-field-err">{{ errs.note }}</div>
-      <!-- 放在留言欄之後：GuestDialog 會把初始焦點給第一個 input -->
-      <label v-if="!editing" class="g-radio"><input v-model="anon" type="checkbox" :disabled="busy">{{ $t('guest.claim.anon') }}</label>
       <p v-if="!editing && visNote" class="g-mute">{{ $t(visNote) }}</p>
       <p class="g-mute">{{ $t('guest.claim.notice') }}<NuxtLink :to="localizedPath('/privacy', $i18n.locale) + '#collect'" target="_blank">{{ $t('guest.claim.privacyLink') }}</NuxtLink><span class="g-nowrap">{{ $t('guest.claim.noCheck') }}</span></p>
       <button class="g-btn" :disabled="busy || !online">{{ !online ? $t('guest.claim.offline') : busy ? $t('guest.sending') : editing ? $t('guest.claim.save') : $t('guest.claim.confirm') }}</button>

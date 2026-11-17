@@ -35,6 +35,10 @@ async function fund(online = true) {
   await flush()
   return mounted.el
 }
+async function pick(el: HTMLElement, sel: string, v: string) {
+  const s = el.querySelector<HTMLSelectElement>(sel)!
+  s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); await nextTick()
+}
 function deferred() {
   let resolve!: (value: any) => void
   let reject!: (error: any) => void
@@ -50,7 +54,7 @@ it('signed-in claim has no nickname/contact/email fields and sends only qty, not
   const plus = el.querySelector<HTMLButtonElement>('button[aria-label="增加"]')!
   plus.click(); await nextTick(); plus.click(); await nextTick()
   expect(plus.disabled).toBe(true)
-  el.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); await nextTick()
+  await pick(el, '#cv', 'anonymous')
   await submit(el)
   expect(el.querySelector<HTMLButtonElement>('button.g-btn')!.disabled).toBe(true)
   expect(el.textContent).toContain('送出中')
@@ -118,7 +122,7 @@ it('fund submits trimmed message and list access; busy state prevents another cl
   const el = await fund(), request = deferred()
   api.mockClear(); api.mockReturnValue(request.promise)
   await input(el, '#fp', '300'); await input(el, '#fm', '  生日快樂  ')
-  el.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); await nextTick()
+  await pick(el, '#fv', 'anonymous')
   await submit(el)
   const button = el.querySelector<HTMLButtonElement>('button.g-btn:not(.ghost)')!
   expect(button.disabled).toBe(true)
@@ -204,13 +208,20 @@ it('fund POST carries via_item_id from the via prop', async () => {
   expect(post[1].body.via_item_id).toBe(VIA)
 })
 
-it('claim sheet explains who can see the name, live with the anonymous checkbox, and not when editing', async () => {
+it('claim sheet explains who can see the name, live with the anonymous option, and not when editing', async () => {
   const el = claim(null, true, '我', { claimersVisible: true })
   await flush()
   expect(el.textContent).toContain('只有清單主人看得到你的名字') // 預設可見度 private
-  const box = el.querySelector<HTMLInputElement>('input[type=checkbox]')!
-  box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); await flush()
+  await pick(el, '#cv', 'anonymous')
   expect(el.textContent).toContain('都只會看到「匿名朋友」')
   mounted?.unmount()
   expect(claim({ id: 'c', qty: 1 }, true, '我', { claimersVisible: true }).textContent).not.toContain('看得到你的名字')
+})
+
+it('claim select: a non-anonymous option sends is_anonymous false with that visibility', async () => {
+  api.mockResolvedValue({ id: 'claim' })
+  const el = claim(null, true, '阿明'); await flush()
+  expect(el.querySelector('input[type="checkbox"]')).toBeNull()
+  await pick(el, '#cv', 'friends'); await submit(el); await flush()
+  expect(api.mock.calls[0]![1].body).toMatchObject({ visibility: 'friends', is_anonymous: false })
 })
