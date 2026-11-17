@@ -100,7 +100,14 @@
       },
       "permitNote": "Catatan peninjauan: {note}",
       "permitApply": "Gunakan untuk {n} lokasi dengan izin tidak berlaku",
-      "permitApplied": "{n} lokasi dialihkan ke izin ini. Lanjutkan lokasi yang dijeda dari halaman edit."
+      "permitApplied": "{n} lokasi dialihkan ke izin ini. Lanjutkan lokasi yang dijeda dari halaman edit.",
+      "eventHidden": "Diturunkan",
+      "eventHiddenReason": "Alasan penurunan: {reason}",
+      "pausedReason": {
+        "revoked": "Verifikasi organisasi dicabut",
+        "event_hidden": "Peristiwa diturunkan",
+        "permit": "Izin belum disetujui atau sudah kedaluwarsa"
+      }
     },
     "members": {
       "title": "Anggota & undangan",
@@ -219,7 +226,10 @@
       "stNoPermitLink": "Ke izin penggalangan",
       "permitLabel": "Izin penggalangan",
       "permitExpiredOpt": "kedaluwarsa",
-      "permitResumeHint": "Ganti ke izin yang berlaku agar lokasi yang dijeda bisa dilanjutkan"
+      "permitResumeHint": "Ganti ke izin yang berlaku agar lokasi yang dijeda bisa dilanjutkan",
+      "evEditTitle": "Edit peristiwa bantuan",
+      "evSave": "Simpan",
+      "evSaving": "Menyimpan…"
     },
     "audit": {
       "link": "Log audit",

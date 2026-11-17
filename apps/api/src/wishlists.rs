@@ -901,6 +901,7 @@ async fn update(
                  closes_reminded_at = CASE WHEN closes_at IS DISTINCT FROM $13 THEN NULL ELSE closes_reminded_at END, cover_preset=$15,
                  closed_at = CASE WHEN $11 IN ('closed','archived') THEN coalesce(closed_at, now()) ELSE NULL END,
                  site_status=$16, site_address=$17, event_id=$18, permit_id=$19,
+                 event_paused_at = CASE WHEN site_status IS DISTINCT FROM $16 OR event_id IS DISTINCT FROM $18 OR status IS DISTINCT FROM $11::wishlist_status THEN NULL ELSE event_paused_at END,
                  owner_id = CASE WHEN $20::bool AND EXISTS (SELECT 1 FROM users o WHERE o.id = wishlists.owner_id AND (o.deleted_at IS NOT NULL OR o.blocked_at IS NOT NULL))
                                  THEN $21 ELSE owner_id END
                  WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status

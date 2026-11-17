@@ -96,7 +96,7 @@ pub async fn enqueue_owner<'e, E: sqlx::PgExecutor<'e>>(
     Ok(())
 }
 
-/// 通知組織的 owner（未停用、帳號未刪除）。
+/// 通知組織的管理者：owner 與 coordinator（未停用、帳號未刪除；volunteer 不收）。
 pub async fn enqueue_org_owners<'e, E: sqlx::PgExecutor<'e>>(
     ex: E,
     org_id: Uuid,
@@ -107,7 +107,7 @@ pub async fn enqueue_org_owners<'e, E: sqlx::PgExecutor<'e>>(
         "INSERT INTO notifications (user_id, channel, kind, payload)
          SELECT m.user_id, 'email'::notification_channel, $2, $3
            FROM org_members m JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL
-          WHERE m.org_id = $1 AND m.disabled_at IS NULL AND m.role = 'owner'",
+          WHERE m.org_id = $1 AND m.disabled_at IS NULL AND m.role IN ('owner', 'coordinator')",
     )
     .bind(org_id)
     .bind(kind)
@@ -469,6 +469,7 @@ pub const KINDS: &[&str] = &[
     "org.permit_rejected",
     "org.permit_reviewed",
     "org.event_hidden",
+    "org.event_restored",
     "crowdfund.funded",
     "order.shipped",
     "order.delivered",
@@ -570,7 +571,7 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
         | "org.permit_reviewed" => {
             format!("/orgs/{org}#permits")
         }
-        "org.event_hidden" => format!("/orgs/{org}"),
+        "org.event_hidden" | "org.event_restored" => format!("/orgs/{org}"),
         // 邀請頁要帶權杖；payload.url 是完整網址，站內信只放相對路徑
         "org.invite" => payload["url"]
             .as_str()
@@ -1712,6 +1713,21 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 ),
             )
         }
+        "org.event_restored" => {
+            let name = payload["display_name"].as_str().unwrap_or("");
+            let ev = payload["event_title"].as_str().unwrap_or("");
+            let n = payload["restored"].as_i64().unwrap_or(0);
+            let url = format!("{base}/orgs/{}", payload["org_id"].as_str().unwrap_or(""));
+            (
+                l.pick(format!("【Wishly】事件「{ev}」已恢復上架"), format!("[Wishly] Event \"{ev}\" is back up"), format!("[Wishly] Sự kiện \"{ev}\" đã được khôi phục"), format!("[Wishly] Acara \"{ev}\" ditayangkan kembali")),
+                l.pick(
+                    format!("組織「{name}」的事件「{ev}」已恢復上架，{n} 個因下架而暫停的救災據點已恢復營運。\n組織後台：{url}\n"),
+                    format!("The event \"{ev}\" of \"{name}\" is back up, and {n} relief site(s) paused by the takedown have resumed.\nOrganization dashboard: {url}\n"),
+                    format!("Sự kiện \"{ev}\" của \"{name}\" đã được khôi phục, {n} điểm cứu trợ bị tạm dừng do gỡ sự kiện đã hoạt động lại.\nTrang quản trị tổ chức: {url}\n"),
+                    format!("Acara \"{ev}\" milik \"{name}\" ditayangkan kembali, dan {n} lokasi bantuan yang dijeda karena penurunan sudah beroperasi lagi.\nDasbor organisasi: {url}\n"),
+                ),
+            )
+        }
         "auth.mfa_enabled" => (
             l.pick("【Wishly】兩步驟驗證已啟用".into(), "[Wishly] Two-step verification enabled".into(), "[Wishly] Đã bật xác minh hai bước".into(), "[Wishly] Verifikasi dua langkah diaktifkan".into()),
             l.pick(
@@ -2103,6 +2119,7 @@ mod tests {
             "wishlist.closing",
             "funding.released",
             "org.invite",
+            "org.event_restored",
             "staff.digest",
         ] {
             assert_eq!(email_tier(k), Immediate, "{k}");

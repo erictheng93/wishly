@@ -320,3 +320,233 @@ async fn merge_into_hidden_422_and_merged_event_not_editable(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
 }
+
+async fn set_mod(pool: &PgPool, tok: &str, e: Uuid, status: &str) {
+    let (s, _, v) = call(
+        pool,
+        "PATCH",
+        &format!("/admin/relief-events/{e}"),
+        &ck(tok),
+        Some(json!({"moderation_status": status, "moderation_reason": "不實"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+async fn site_status(pool: &PgPool, w: Uuid) -> (String, String, bool) {
+    sqlx::query_as(
+        "SELECT status::text, site_status, event_paused_at IS NOT NULL FROM wishlists WHERE id=$1",
+    )
+    .bind(w)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+async fn kind_count(pool: &PgPool, u: Uuid, kind: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM notifications WHERE user_id=$1 AND kind=$2")
+        .bind(u)
+        .bind(kind)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+/// GET /orgs/{id}/sites 的 paused_reason，依據點 id 取
+async fn reasons(pool: &PgPool, tok: &str, o: Uuid) -> std::collections::HashMap<String, Value> {
+    let (s, _, v) = call(pool, "GET", &format!("/orgs/{o}/sites"), &ck(tok), None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|r| {
+            (
+                r["id"].as_str().unwrap().to_string(),
+                r["paused_reason"].clone(),
+            )
+        })
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn unhide_restores_only_sites_paused_by_takedown(pool: PgPool) {
+    let cdn = common::cdn::init();
+    let st = staff(&pool, "S").await;
+    let (owner, coord, vol) = (
+        user(&pool, "O").await,
+        user(&pool, "C").await,
+        user(&pool, "V").await,
+    );
+    let o = org(&pool, owner.id, "verified").await;
+    member(&pool, o, owner.id, "owner").await;
+    member(&pool, o, coord.id, "coordinator").await;
+    member(&pool, o, vol.id, "volunteer").await;
+    let p = permit(&pool, o, "approved", 30).await;
+    let p_exp = permit(&pool, o, "approved", 30).await;
+    let (e, _) = event(&pool, o).await;
+    let live = site(&pool, o, owner.id, e, p, "active").await;
+    let manual = site(&pool, o, owner.id, e, p, "active").await;
+    let expiring = site(&pool, o, owner.id, e, p_exp, "active").await;
+    sqlx::query("UPDATE wishlists SET site_status='paused' WHERE id=$1")
+        .bind(manual.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // 另一個組織的據點：下架後組織被撤銷 → 取消下架不恢復，等恢復認證時才一併恢復營運
+    let o2_owner = user(&pool, "O2").await;
+    let o2 = org(&pool, o2_owner.id, "verified").await;
+    member(&pool, o2, o2_owner.id, "owner").await;
+    let p2 = permit(&pool, o2, "approved", 30).await;
+    let revoked = site(&pool, o2, o2_owner.id, e, p2, "active").await;
+
+    set_mod(&pool, &st.token, e, "hidden").await;
+    assert_eq!(
+        site_status(&pool, live.id).await,
+        ("active".into(), "paused".into(), true)
+    );
+    assert_eq!(
+        site_status(&pool, manual.id).await,
+        ("active".into(), "paused".into(), false)
+    );
+    for u in [owner.id, coord.id] {
+        assert_eq!(kind_count(&pool, u, "org.event_hidden").await, 1);
+    }
+    assert_eq!(kind_count(&pool, vol.id, "org.event_hidden").await, 0);
+    let r = reasons(&pool, &vol.token, o).await;
+    assert_eq!(r[&live.id.to_string()], json!("event_hidden"));
+    // 組織成員看得到下架狀態與原因
+    let (_, _, evs) = call(
+        &pool,
+        "GET",
+        &format!("/orgs/{o}/events"),
+        &ck(&vol.token),
+        None,
+    )
+    .await;
+    assert_eq!(
+        (
+            evs[0]["moderation_status"].clone(),
+            evs[0]["moderation_reason"].clone()
+        ),
+        (json!("hidden"), json!("不實"))
+    );
+
+    sqlx::query(
+        "UPDATE org_permits SET valid_to=(now() AT TIME ZONE 'Asia/Taipei')::date-1 WHERE id=$1",
+    )
+    .bind(p_exp)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        &format!("/admin/orgs/{o2}/review"),
+        &ck(&st.token),
+        Some(json!({"decision":"reject","note":"撤銷"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(
+        reasons(&pool, &o2_owner.token, o2).await[&revoked.id.to_string()],
+        json!("revoked")
+    );
+
+    let o_slug: String = sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id=$1")
+        .bind(o)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let org_purges = || cdn.requests_for_url(&common::cdn::org_url(&o_slug)).len();
+    cdn.wait_for_url(&common::cdn::org_url(&o_slug)).await; // 下架那次
+    let before = org_purges();
+    set_mod(&pool, &st.token, e, "ok").await;
+    assert_eq!(
+        site_status(&pool, live.id).await,
+        ("active".into(), "active".into(), false)
+    );
+    assert_eq!(
+        site_status(&pool, manual.id).await,
+        ("active".into(), "paused".into(), false),
+        "下架前已手動暫停的據點不恢復"
+    );
+    assert_eq!(
+        site_status(&pool, expiring.id).await,
+        ("active".into(), "paused".into(), false),
+        "許可過期不恢復、標記清除"
+    );
+    assert_eq!(
+        site_status(&pool, revoked.id).await,
+        ("draft".into(), "paused".into(), true),
+        "撤銷中的據點不恢復、標記留給恢復認證"
+    );
+    wait_until("org page purge after unhide", || async {
+        org_purges() > before
+    })
+    .await;
+    for u in [owner.id, coord.id] {
+        assert_eq!(kind_count(&pool, u, "org.event_restored").await, 1);
+    }
+    assert_eq!(kind_count(&pool, vol.id, "org.event_restored").await, 0);
+    assert_eq!(
+        kind_count(&pool, o2_owner.id, "org.event_restored").await,
+        0
+    );
+    let n: i64 = sqlx::query_scalar("SELECT (payload->>'restored')::int8 FROM notifications WHERE user_id=$1 AND kind='org.event_restored'")
+        .bind(owner.id).fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 1);
+    let r = reasons(&pool, &owner.token, o).await;
+    assert_eq!(r[&live.id.to_string()], Value::Null);
+    assert_eq!(r[&manual.id.to_string()], Value::Null, "手動暫停");
+    assert_eq!(r[&expiring.id.to_string()], json!("permit"));
+
+    // 恢復認證：事件已取消下架，撤銷前因下架暫停的據點一併恢復營運
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        &format!("/admin/orgs/{o2}/restore"),
+        &ck(&st.token),
+        Some(json!({"reason":"誤判"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(
+        site_status(&pool, revoked.id).await,
+        ("active".into(), "active".into(), false)
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn unhide_waits_on_org_lock_then_sees_revocation(pool: PgPool) {
+    let st = staff(&pool, "S").await;
+    let u = user(&pool, "A").await;
+    let o = org(&pool, u.id, "verified").await;
+    let p = permit(&pool, o, "approved", 30).await;
+    let (e, _) = event(&pool, o).await;
+    let w = site(&pool, o, u.id, e, p, "active").await;
+    set_mod(&pool, &st.token, e, "hidden").await;
+    let mut tx = pool.begin().await.unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE")
+        .bind(o)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    let (p2, tok) = (pool.clone(), st.token.clone());
+    let h = tokio::spawn(async move { set_mod(&p2, &tok, e, "ok").await });
+    wait_for_blocked(&pool, pid, 1).await;
+    sqlx::query(
+        "UPDATE organizations SET verification_status='rejected', verified_at=NULL WHERE id=$1",
+    )
+    .bind(o)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    h.await.unwrap();
+    assert_eq!(
+        site_status(&pool, w.id).await.1,
+        "paused",
+        "restored a site of a concurrently revoked org"
+    );
+}

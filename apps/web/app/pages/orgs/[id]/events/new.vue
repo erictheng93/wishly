@@ -1,12 +1,26 @@
 <script setup lang="ts">
-// 建立救災事件：先依縣市＋日期查重，使用者確認都不是才顯示建立表單
-definePageMeta({ middleware: 'auth' })
+// 建立救災事件：先依縣市＋日期查重，使用者確認都不是才顯示建立表單。
+// 同一張表單也用於編輯（/orgs/:id/events/:eid/edit）：只能改名稱、地區說明、事件說明（PATCH /relief-events/{id}）
+definePageMeta({ middleware: 'auth', alias: '/orgs/:id/events/:eid/edit' })
 const { t } = useI18n()
-useHead({ title: () => t('org.relief.evNewTitle') })
+const route = useRoute()
+const id = route.params.id as string
+const eid = route.params.eid as string | undefined
+useHead({ title: () => t(eid ? 'org.relief.evEditTitle' : 'org.relief.evNewTitle') })
 const { api } = useApi()
-const id = useRoute().params.id as string
 const f = reactive({ name: '', hazard_type: 'earthquake', county: '', counties: [] as string[], occurred_on: '', area_note: '', description: '' })
 const similar = ref<any[]>([]), dismissed = ref(false), checked = ref(false), busy = ref(false), err = ref('')
+const loaded = ref(!eid)
+if (eid) {
+  onMounted(async () => {
+    try {
+      const e = (await api<any[]>(`/orgs/${id}/events`)).find(x => x.id === eid)
+      if (!e) throw new Error(t('errors.fields.NOT_FOUND'))
+      Object.assign(f, { name: e.name, area_note: e.area_note ?? '', description: e.description ?? '' })
+      loaded.value = true
+    } catch (e) { err.value = errMsg(e) }
+  })
+}
 // 查重看主要縣市＋日期（選了會自動勾進受災縣市）；回應過期（使用者又改了條件）就丟棄
 let seq = 0
 watch(() => [f.county, f.occurred_on], async ([county, date]) => {
@@ -19,13 +33,14 @@ watch(() => [f.county, f.occurred_on], async ([county, date]) => {
     if (n === seq) { similar.value = r; checked.value = true }
   } catch { if (n === seq) checked.value = true /* 查重失敗不擋建立 */ }
 })
-const showForm = computed(() => (checked.value && !similar.value.length) || dismissed.value)
+const showForm = computed(() => eid ? loaded.value : ((checked.value && !similar.value.length) || dismissed.value) && f.county && f.occurred_on)
 async function submit() {
   err.value = ''
-  if (!f.counties.length) { err.value = t('org.relief.evCounties'); return }
+  if (!eid && !f.counties.length) { err.value = t('org.relief.evCounties'); return }
   busy.value = true
   try {
-    await api(`/orgs/${id}/events`, { method: 'POST', body: { name: f.name.trim(), hazard_type: f.hazard_type, counties: f.counties, occurred_on: f.occurred_on, area_note: f.area_note || undefined, description: f.description || undefined } })
+    if (eid) await api(`/relief-events/${eid}`, { method: 'PATCH', body: { name: f.name.trim(), area_note: f.area_note, description: f.description } })
+    else await api(`/orgs/${id}/events`, { method: 'POST', body: { name: f.name.trim(), hazard_type: f.hazard_type, counties: f.counties, occurred_on: f.occurred_on, area_note: f.area_note || undefined, description: f.description || undefined } })
     await navigateTo(`/orgs/${id}`)
   } catch (e: any) {
     err.value = e.code === 'ORG_NOT_VERIFIED' ? t('org.relief.notVerified') : errMsg(e)
@@ -35,8 +50,9 @@ async function submit() {
 
 <template>
   <main class="c-page">
-    <CreatorHeader :title="$t('org.relief.evNewTitle')" :back="`/orgs/${id}`" />
-    <div class="c-card fm">
+    <CreatorHeader :title="$t(eid ? 'org.relief.evEditTitle' : 'org.relief.evNewTitle')" :back="`/orgs/${id}`" />
+    <p v-if="eid && !loaded && err" class="c-err c-errbox" role="alert">{{ err }}</p>
+    <div v-if="!eid" class="c-card fm">
       <div class="fm-grid">
         <label class="c-field"><span>{{ $t('org.relief.evCounties') }}</span>
           <select v-model="f.county" name="county"><option value="" disabled>{{ $t('org.relief.pick') }}</option><option v-for="c in COUNTIES" :key="c" :value="c">{{ c }}</option></select>
@@ -45,7 +61,7 @@ async function submit() {
       </div>
     </div>
 
-    <section v-if="similar.length && !dismissed" class="c-card fm-sim">
+    <section v-if="!eid && similar.length && !dismissed" class="c-card fm-sim">
       <h2 class="c-h2">{{ $t('org.relief.similarTitle') }}</h2>
       <p class="c-mute">{{ $t('org.relief.similarHint') }}</p>
       <article v-for="e in similar" :key="e.id" class="c-card">
@@ -56,18 +72,20 @@ async function submit() {
       <button type="button" class="c-btn block" @click="dismissed = true">{{ $t('org.relief.noneOfThese') }}</button>
     </section>
 
-    <form v-if="showForm && f.county && f.occurred_on" class="c-card fm" @submit.prevent="submit">
-      <label class="c-field"><span>{{ $t('org.relief.evName') }}</span><input v-model="f.name" name="name" maxlength="100" required></label>
-      <label class="c-field"><span>{{ $t('org.relief.evHazard') }}</span>
-        <select v-model="f.hazard_type" name="hazard_type"><option v-for="h in HAZARDS" :key="h" :value="h">{{ $t(`org.relief.hazard.${h}`) }}</option></select>
-      </label>
-      <fieldset class="c-field"><legend>{{ $t('org.relief.evCounties') }}</legend>
-        <label v-for="c in COUNTIES" :key="c" class="c-switch"><input v-model="f.counties" type="checkbox" :value="c"><span>{{ c }}</span></label>
-      </fieldset>
+    <form v-if="showForm" class="c-card fm" @submit.prevent="submit">
+      <label class="c-field"><span>{{ $t('org.relief.evName') }}</span><input v-model="f.name" name="name" maxlength="80" required></label>
+      <template v-if="!eid">
+        <label class="c-field"><span>{{ $t('org.relief.evHazard') }}</span>
+          <select v-model="f.hazard_type" name="hazard_type"><option v-for="h in HAZARDS" :key="h" :value="h">{{ $t(`org.relief.hazard.${h}`) }}</option></select>
+        </label>
+        <fieldset class="c-field"><legend>{{ $t('org.relief.evCounties') }}</legend>
+          <label v-for="c in COUNTIES" :key="c" class="c-switch"><input v-model="f.counties" type="checkbox" :value="c"><span>{{ c }}</span></label>
+        </fieldset>
+      </template>
       <label class="c-field"><span>{{ $t('org.relief.evArea') }}</span><input v-model="f.area_note" maxlength="200"></label>
-      <label class="c-field"><span>{{ $t('org.relief.evDesc') }}</span><textarea v-model="f.description" rows="3" /></label>
+      <label class="c-field"><span>{{ $t('org.relief.evDesc') }}</span><textarea v-model="f.description" rows="3" maxlength="2000" /></label>
       <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
-      <button class="c-btn primary block" :disabled="busy">{{ busy ? $t('org.relief.evSubmitting') : $t('org.relief.evSubmit') }}</button>
+      <button class="c-btn primary block" :disabled="busy">{{ eid ? (busy ? $t('org.relief.evSaving') : $t('org.relief.evSave')) : (busy ? $t('org.relief.evSubmitting') : $t('org.relief.evSubmit')) }}</button>
     </form>
   </main>
 </template>

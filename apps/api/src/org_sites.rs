@@ -180,13 +180,37 @@ async fn create(
     ))
 }
 
+#[derive(sqlx::FromRow)]
+struct SiteRow {
+    #[sqlx(flatten)]
+    w: W,
+    paused_reason: Option<String>,
+}
+
+/// 每列多一個 paused_reason（讀取時推導，不存欄位）：停止服務（撤銷降為草稿或 site_status=paused）時依序為
+/// revoked（組織被撤銷）、event_hidden（事件下架中）、permit（許可未核准或已過期），其餘為 null（手動暫停）
 async fn list(u: CurrentUser, State(st): State<AppState>, Path(org): Path<Uuid>) -> R<Json<Value>> {
     require_role(&st.pool, org, u.id, "volunteer").await?;
-    let rows: Vec<W> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {WCOLS} FROM wishlists WHERE org_id = $1 AND deleted_at IS NULL ORDER BY id DESC"
+    let rows: Vec<SiteRow> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {WCOLS},
+                CASE WHEN revoke_paused_at IS NOT NULL THEN 'revoked'
+                     WHEN site_status <> 'paused' THEN NULL
+                     WHEN EXISTS (SELECT 1 FROM relief_events e WHERE e.id = wishlists.event_id AND e.moderation_status = 'hidden') THEN 'event_hidden'
+                     WHEN NOT EXISTS (SELECT 1 FROM org_permits p WHERE p.id = wishlists.permit_id AND p.status = 'approved'
+                                      AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN p.valid_from AND p.valid_to) THEN 'permit'
+                END AS paused_reason
+           FROM wishlists WHERE org_id = $1 AND deleted_at IS NULL ORDER BY id DESC"
     )))
     .bind(org)
     .fetch_all(&st.pool)
     .await?;
-    Ok(Json(Value::Array(rows.iter().map(W::json).collect())))
+    Ok(Json(Value::Array(
+        rows.iter()
+            .map(|r| {
+                let mut v = r.w.json();
+                v["paused_reason"] = json!(r.paused_reason);
+                v
+            })
+            .collect(),
+    )))
 }
