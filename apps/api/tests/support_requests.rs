@@ -322,7 +322,7 @@ async fn public_create_rules(pool: PgPool) {
     );
 
     // 每 IP 限流
-    for i in 0..5 {
+    for i in 0..30 {
         let (st, _, _) = create_public(&pool, "10.4.0.1", ok(&format!("ip{i}@example.com"))).await;
         assert_eq!(st, StatusCode::CREATED);
     }

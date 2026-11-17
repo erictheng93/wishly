@@ -34,7 +34,7 @@ async function submit() {
   err.value = ''; sent.value = ''
   if (!body.value.trim()) { err.value = t('me.support.bodyRequired'); return }
   if (!user.value && !email.value.trim()) { err.value = t('me.support.emailRequired'); return }
-  // 沒 token 必定被後端拒絕，卻會先扣每 IP 每小時 5 次的限流；本機未設 site key 時不要求
+  // 沒 token 必定被後端拒絕，卻會先扣每 IP 每小時 30 次的限流；本機未設 site key 時不要求
   if (!user.value && siteKey && !tsToken.value) { err.value = t('errors.CAPTCHA_REQUIRED'); return }
   busy.value = true
   try {
