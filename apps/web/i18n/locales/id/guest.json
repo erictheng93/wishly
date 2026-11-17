@@ -16,7 +16,8 @@
       "public": "Semua orang",
       "friends": "Teman saya (yang lain melihat Anonim)",
       "private": "Hanya pemilik daftar",
-      "anonymous": "Anonim (pemilik daftar pun tidak melihat)"
+      "anonymous": "Anonim (pemilik daftar pun tidak melihat)",
+      "default": "Sesuai default akun"
     },
     "reasonRequired": "Isi alasannya",
     "turnstile": {

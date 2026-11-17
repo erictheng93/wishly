@@ -16,7 +16,8 @@
       "public": "Everyone",
       "friends": "My friends (others see Anonymous)",
       "private": "Only the list owner",
-      "anonymous": "Anonymous (even the list owner can't see)"
+      "anonymous": "Anonymous (even the list owner can't see)",
+      "default": "Account default"
     },
     "reasonRequired": "Please enter a reason",
     "turnstile": {

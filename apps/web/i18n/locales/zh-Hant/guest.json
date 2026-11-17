@@ -16,7 +16,8 @@
       "public": "所有人",
       "friends": "我的好友（其他人看到匿名）",
       "private": "只有清單主人",
-      "anonymous": "匿名（連清單主人都看不到）"
+      "anonymous": "匿名（連清單主人都看不到）",
+      "default": "依帳號預設"
     },
     "reasonRequired": "請填原因",
     "turnstile": {

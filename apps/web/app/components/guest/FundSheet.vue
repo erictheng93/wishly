@@ -67,10 +67,8 @@ async function submit() {
       <p v-if="after != null && after < 0" class="g-field-err">{{ $t('guest.fund.insufficient', { n: fmtPts(-after) }) }}</p>
       <label for="fm">{{ $t('guest.noteLabel') }}</label>
       <input id="fm" v-model="message" maxlength="200" :readonly="busy">
-      <template v-if="vis">
-        <label for="fv">{{ $t('guest.fund.visLabel') }}</label>
-        <select id="fv" v-model="vis" :disabled="busy"><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option><option value="anonymous">{{ $t('guest.visibility.anonymous') }}</option></select>
-      </template>
+      <label for="fv">{{ $t('guest.fund.visLabel') }}</label>
+      <select id="fv" v-model="vis" :disabled="busy"><option v-if="vis === undefined" :value="undefined">{{ $t('guest.visibility.default') }}</option><option value="public">{{ $t('guest.visibility.public') }}</option><option value="friends">{{ $t('guest.visibility.friends') }}</option><option value="private">{{ $t('guest.visibility.private') }}</option><option value="anonymous">{{ $t('guest.visibility.anonymous') }}</option></select>
       <p v-if="visNote" class="g-mute">{{ $t(visNote) }}</p>
       <p class="g-mute">{{ $t('guest.fund.notice') }}</p>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}
