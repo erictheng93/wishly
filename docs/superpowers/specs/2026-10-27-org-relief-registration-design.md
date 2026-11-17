@@ -27,7 +27,7 @@ PRD／流程／契約裡**早已規劃 P2-D relief**，但**完全沒有實作**
 | 最後一位 owner | 不可降級或移除（`FOR UPDATE` 檢查） |
 | 驗證狀態 | `verification_status`：`pending` / `verified` / `rejected`；驗證文件上傳到 R2 私有路徑，只給該 org 成員和 staff 用短效簽名網址讀 |
 | 未驗證不得公開 | trigger `wishlists_check_org_verified` → 403 `ORG_NOT_VERIFIED`。撤銷驗證時，同一交易把 public 據點降為 draft，並 `cdn::purge_wishlists` |
-| 清單＝據點 | relief 清單就是 `type=relief` 的 wishlist，帶地址（文字）、`site_status`（PostGIS 座標延後，D64，見 PRD）（active / paused / closed），強制 public、不顯示捐助者名稱、不能開驚喜模式，認捐預設 48 小時逾期 |
+| 清單＝據點 | relief 清單就是 `type=relief` 的 wishlist，帶文字地址（PostGIS 座標延後，D64）、`site_status`（active / paused / closed），強制 public、不顯示捐助者名稱、不能開驚喜模式，認捐預設 48 小時逾期 |
 | 物資認捐 | 沿用 `claims.rs`（要登入、需 `Idempotency-Key`、防超賣鎖序不變） |
 | 實收 | `receipts` 表 = 志工登記「實際收到幾件」 |
 | 不收災民個資 | 只記錄據點層級的需求 |
