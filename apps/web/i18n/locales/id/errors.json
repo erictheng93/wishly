@@ -110,6 +110,7 @@
     "REF_TAKEN": "Nomor ini sudah dipakai, coba yang lain",
     "SITE_PAUSED": "Lokasi ini dijeda dan sedang tidak menerima donasi.",
     "SITE_CLOSED": "Lokasi ini sudah berakhir.",
+    "ALREADY_VOIDED": "Catatan penerimaan ini sudah dibatalkan.",
     "INVALID_STATE": "Tindakan ini tidak diizinkan pada status saat ini. Muat ulang lalu coba lagi.",
     "PERMIT_REQUIRED": "Minimal satu izin penggalangan dana yang disetujui diperlukan.",
     "LAST_OWNER": "Organisasi membutuhkan minimal satu pemilik aktif.",

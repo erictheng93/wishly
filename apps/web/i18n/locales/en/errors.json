@@ -110,6 +110,7 @@
     "REF_TAKEN": "This reference is already in use. Try another one.",
     "SITE_PAUSED": "This site is paused and not accepting pledges right now.",
     "SITE_CLOSED": "This site has ended.",
+    "ALREADY_VOIDED": "This receipt has already been voided.",
     "INVALID_STATE": "This action is not allowed in the current state. Refresh and try again.",
     "PERMIT_REQUIRED": "At least one approved fundraising permit is required.",
     "LAST_OWNER": "The organization needs at least one active owner.",

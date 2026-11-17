@@ -110,6 +110,7 @@
     "REF_TAKEN": "這個編號已被使用，換一個試試",
     "SITE_PAUSED": "此據點已暫停，暫不接受認領",
     "SITE_CLOSED": "此據點已結束，無法再操作",
+    "ALREADY_VOIDED": "此實收紀錄已作廢",
     "INVALID_STATE": "目前狀態不允許這個操作，請重新整理後再試",
     "PERMIT_REQUIRED": "需至少一張已核准的勸募許可才能通過審核",
     "LAST_OWNER": "組織至少需要一位有效的擁有者",

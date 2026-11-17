@@ -110,6 +110,7 @@
     "REF_TAKEN": "Mã tham chiếu này đã được sử dụng. Hãy thử mã khác.",
     "SITE_PAUSED": "Điểm này đang tạm dừng và không nhận cam kết lúc này.",
     "SITE_CLOSED": "Điểm này đã kết thúc.",
+    "ALREADY_VOIDED": "Bản ghi nhận này đã bị hủy.",
     "INVALID_STATE": "Hành động này không được phép ở trạng thái hiện tại. Hãy tải lại rồi thử lại.",
     "PERMIT_REQUIRED": "Cần ít nhất một giấy phép gây quỹ đã được duyệt.",
     "LAST_OWNER": "Tổ chức cần có ít nhất một chủ sở hữu đang hoạt động.",
