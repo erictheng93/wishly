@@ -63,7 +63,7 @@ async fn upsert(
     addr: &str,
 ) -> R<()> {
     let seal = |s: &str| crate::sealed::seal(s.as_bytes());
-    let mut tx = pool.begin().await?;
+    let mut tx = crate::uploads::media_tx(pool, uid).await?;
     sqlx::query("INSERT INTO user_addresses (user_id, kind, recipient_name_enc, phone_enc, address_enc) VALUES ($1, $2, $3, $4, $5)
                  ON CONFLICT (user_id, kind) DO UPDATE SET recipient_name_enc = EXCLUDED.recipient_name_enc, phone_enc = EXCLUDED.phone_enc,
                    address_enc = EXCLUDED.address_enc, updated_at = now()")

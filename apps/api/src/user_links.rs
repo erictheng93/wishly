@@ -97,7 +97,7 @@ async fn replace(
         }
         clean.push((title, url.to_string(), l.hidden));
     }
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::uploads::media_tx(&st.pool, u.id).await?;
     // 同一人的並行 PUT 依序執行，否則兩邊都看不到對方未提交的列而雙雙寫入（超過上限）
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('user_links:' || $1::text, 0))")
         .bind(u.id)

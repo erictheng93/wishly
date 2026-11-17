@@ -33,3 +33,15 @@ it('load fills list and ids', async () => {
   await c.load()
   expect([...c.ids.value]).toEqual(['a', 'b'])
 })
+
+it('failure only reverts its own id, keeping other toggles', async () => {
+  const c = useCloseFriends()
+  c.ids.value = new Set()
+  let fail!: (e: Error) => void
+  api.mockImplementationOnce(() => new Promise((_, rej) => { fail = rej }))
+  api.mockResolvedValueOnce(undefined)
+  const p1 = c.toggle('a', true).catch(() => {})
+  await c.toggle('b', true)
+  fail(new Error('x')); await p1
+  expect([...c.ids.value]).toEqual(['b'])
+})

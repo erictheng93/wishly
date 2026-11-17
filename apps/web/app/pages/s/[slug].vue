@@ -159,7 +159,7 @@ function startLive() {
       if (d.deleted) items.value = items.value.filter(i => i.id !== d.item_id)
       else {
         items.value = items.value.map(i => i.id === d.item_id ? mergeItemEvent(i, d) : i)
-        if (items.value.some(i => i.id === d.item_id && i.funding_mode === 'crowdfund')) reload() // contributors 不在事件裡，補抓一次
+        if (items.value.some(i => i.id === d.item_id)) reload() // contributors / supporter_count 不在事件裡，補抓一次
       }
     },
   })
