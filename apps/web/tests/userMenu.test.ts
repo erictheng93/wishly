@@ -41,7 +41,8 @@ it('exposes ordinary links and a logout button in an expanded account disclosure
   expect(trigger.hasAttribute('aria-haspopup')).toBe(false)
   const panel = document.getElementById(trigger.getAttribute('aria-controls')!)!
   expect(panel).not.toBeNull()
-  expect(panel.querySelectorAll('a[href]')).toHaveLength(5)
+  expect(panel.querySelectorAll('a[href]')).toHaveLength(6)
+  expect(panel.querySelector('a[href="/support"]')).not.toBeNull()
   expect(panel.querySelector('button')?.textContent).toBe('登出')
   expect(mounted!.el.querySelector('[role="menu"], [role="menuitem"]')).toBeNull()
   expect(document.activeElement).toBe(trigger)
