@@ -39,6 +39,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
       <NuxtLink to="/me/wallet">{{ $t('common.points') }}</NuxtLink>
       <NuxtLink to="/settings">{{ $t('common.settings') }}</NuxtLink>
       <NuxtLink v-if="user.is_staff" to="/admin">{{ $t('common.admin') }}</NuxtLink>
+      <NuxtLink to="/support">{{ $t('me.support.title') }}</NuxtLink>
       <p v-if="logoutFailed" class="um-err" role="alert">{{ $t('settings.logoutFailed') }}</p>
       <button type="button" @click="logout()">{{ $t('settings.logout') }}</button>
     </nav>
