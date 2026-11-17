@@ -62,7 +62,7 @@ const wipe = () => {
   <GuestTop />
   <main class="g-wrap">
     <div class="cl-head"><h1>{{ $t('me.claims.title') }}</h1></div>
-    <div v-if="recoverFailed" class="g-banner err" role="alert">{{ $t('me.claims.recoverFailed') }}</div>
+    <div v-if="recoverFailed" class="g-banner err" role="alert">{{ $t('me.claims.recoverFailed') }} <SupportLink /></div>
     <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
     <p v-if="state === 'loading'" class="g-mute cl-loading" role="status">{{ $t('me.loading') }}</p>
     <div v-else-if="state === 'error'" class="g-center cl-state bad"><p>{{ $t('me.claims.loadFailed') }}</p><button class="g-btn" @click="load">{{ $t('me.retry') }}</button></div>

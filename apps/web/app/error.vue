@@ -28,6 +28,7 @@ useSeoMeta({ title: () => missing.value ? t('auth.error.notFoundTitle') : busy.v
     <template v-else>
       <h1>{{ $t('auth.error.serverTitle') }}</h1>
       <p class="g-mute">{{ $t('auth.error.serverDesc') }}</p>
+      <p class="g-mute">{{ $t('common.support') }}<SupportLink /></p>
     </template>
     <button class="g-btn" @click="clearError({ redirect: '/' })">{{ $t('auth.error.home') }}</button>
     </div>
