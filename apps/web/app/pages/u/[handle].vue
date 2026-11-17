@@ -50,10 +50,12 @@ async function load() {
 }
 // 送禮推薦：本人、封鎖、API 失敗或沒有商品都整區不顯示
 const picks = ref<{ basis: string; products: GiftPick[] } | null>(null)
+let picksSeq = 0
 async function loadPicks() {
+  const seq = ++picksSeq
   picks.value = null
   if (!p.value || ['self', 'blocked'].includes(p.value.relation)) return
-  try { const r = await fetchGiftPicks(config.public.apiBase, p.value.user.handle ?? p.value.user.id, { limit: 6 }); picks.value = r.products.length ? r : null } catch { picks.value = null }
+  try { const r = await fetchGiftPicks(config.public.apiBase, p.value.user.handle ?? p.value.user.id, { limit: 6 }); if (seq === picksSeq) picks.value = r.products.length ? r : null } catch { if (seq === picksSeq) picks.value = null }
 }
 onMounted(async () => {
   await fetchMe(); await load(); loadPicks()
@@ -63,7 +65,7 @@ onMounted(async () => {
 
 async function run(f: () => Promise<any>) {
   busy.value = true; err.value = ''
-  try { await f(); await load() } catch (e) { err.value = apiErrMsg(e as any) } finally { busy.value = false }
+  try { await f(); await load(); loadPicks() } catch (e) { err.value = apiErrMsg(e as any) } finally { busy.value = false }
 }
 const add = () => run(() => api('/friends/requests', { method: 'POST', body: { to: handle } }))
 const { refresh: refreshReqCount } = useFriendRequests()

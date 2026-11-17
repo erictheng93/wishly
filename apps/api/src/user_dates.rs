@@ -32,15 +32,57 @@ fn valid_mmdd(b: &str) -> bool {
     b.len() == 5 && NaiveDate::parse_from_str(&format!("2000-{b}"), "%Y-%m-%d").is_ok()
 }
 
-/// 距離下次發生的天數；一次性日子須是今天以後（年份對得上）才算。非閏年的 02-29 以 02-28 計。
+/// 距離發生的天數；每年重複取下次發生，一次性以指定年份計、須是今天以後。非閏年的 02-29 以 02-28 計。
 pub(crate) fn upcoming(
     today: NaiveDate,
     md: &str,
     year: Option<i16>,
     recurring: bool,
 ) -> Option<i64> {
-    let d = crate::friends::days_until(today, md)?;
-    (recurring || year == Some(crate::birthday::year_of(today, d))).then_some(d)
+    if recurring {
+        return crate::friends::days_until(today, md);
+    }
+    let (m, d) = md.split_once('-')?;
+    let (m, d): (u32, u32) = (m.parse().ok()?, d.parse().ok()?);
+    let y = year? as i32;
+    let on = NaiveDate::from_ymd_opt(y, m, d).or_else(|| {
+        (m == 2 && d == 29)
+            .then(|| NaiveDate::from_ymd_opt(y, 2, 28))
+            .flatten()
+    })?;
+    let n = (on - today).num_days();
+    (n >= 0).then_some(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn d(s: &str) -> NaiveDate {
+        s.parse().unwrap()
+    }
+
+    #[test]
+    fn one_time_far_future_is_kept() {
+        assert_eq!(
+            upcoming(d("2026-11-06"), "12-01", Some(2027), false),
+            Some(390)
+        );
+    }
+
+    #[test]
+    fn one_time_today_and_past() {
+        assert_eq!(
+            upcoming(d("2026-11-06"), "11-06", Some(2026), false),
+            Some(0)
+        );
+        assert_eq!(upcoming(d("2026-11-06"), "11-05", Some(2026), false), None);
+    }
+
+    #[test]
+    fn recurring_rolls_over() {
+        assert_eq!(upcoming(d("2026-11-06"), "01-01", None, true), Some(56));
+    }
 }
 
 fn check(
@@ -140,7 +182,7 @@ async fn create(
 ) -> Result<Json<Value>, AppError> {
     let title = b.title.trim().to_string();
     check(&title, &b.month_day, b.year, b.recurring, &b.visibility)?;
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::uploads::media_tx(&st.pool, u.id).await?;
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('user_dates:' || $1::text, 0))")
         .bind(u.id)
         .execute(&mut *tx)

@@ -1,3 +1,5 @@
+// 每個 id 最新一次切換的序號，過期的失敗不可還原較新的狀態
+const seqs = new Map<string, number>()
 // 摯友名單（帳號層級）；friends.vue 與設定頁卡片共用同一份狀態
 export function useCloseFriends() {
   const { api } = useApi()
@@ -9,11 +11,17 @@ export function useCloseFriends() {
   }
   // 樂觀更新，失敗還原並把錯誤丟給呼叫端
   async function toggle(id: string, on: boolean) {
-    const prev = ids.value, next = new Set(prev)
+    const seq = (seqs.get(id) ?? 0) + 1
+    seqs.set(id, seq)
+    const next = new Set(ids.value)
     on ? next.add(id) : next.delete(id)
     ids.value = next
     try { await api(`/me/close-friends/${id}`, { method: on ? 'PUT' : 'DELETE' }) }
-    catch (e) { ids.value = prev; throw e }
+    catch (e) {
+      // 只還原這個 id，不動其他並行切換的結果
+      if (seqs.get(id) === seq) { const r = new Set(ids.value); on ? r.delete(id) : r.add(id); ids.value = r }
+      throw e
+    }
   }
   return { ids, list, load, toggle }
 }

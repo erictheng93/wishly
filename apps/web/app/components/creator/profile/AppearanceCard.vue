@@ -8,11 +8,13 @@ const bio = ref(user.value?.bio ?? '')
 const preset = ref<string | null>(user.value?.cover_preset ?? null)
 const imageKey = ref<string | null>(user.value?.cover_image_key ?? null)
 const links = ref<{ title: string, url: string, hidden: boolean }[]>([])
+// 連結載入成功前不可存：否則空清單會讓後端清掉所有已存連結
+const linksLoaded = ref(false)
 const linkErrs = ref<Record<number, string>>({})
 const uploading = ref(false), busy = ref(false), err = ref(''), msg = ref(''), copied = ref(false)
 const pageUrl = computed(() => user.value?.handle ? `${siteOrigin()}/l/${user.value.handle}` : '')
 onMounted(async () => {
-  try { links.value = (await api('/me/links')).links } catch (e: any) { err.value = apiErrMsg(e) }
+  try { links.value = (await api('/me/links')).links; linksLoaded.value = true } catch (e: any) { err.value = apiErrMsg(e) }
 })
 function move(i: number, d: number) {
   const j = i + d
@@ -24,7 +26,7 @@ async function save() {
   busy.value = true; err.value = msg.value = ''; linkErrs.value = {}
   try {
     user.value = await api('/me', { method: 'PATCH', body: { bio: bio.value.trim() || null, cover_preset: preset.value, cover_image_key: imageKey.value } })
-    await api('/me/links', { method: 'PUT', body: { links: links.value.map(l => ({ title: l.title.trim(), url: l.url.trim(), hidden: l.hidden })) } })
+    if (linksLoaded.value) await api('/me/links', { method: 'PUT', body: { links: links.value.map(l => ({ title: l.title.trim(), url: l.url.trim(), hidden: l.hidden })) } })
     msg.value = t('settings.saved')
   } catch (e: any) {
     for (const x of e.errors ?? []) { const m = /^\/links\/(\d+)\//.exec(x.pointer ?? ''); if (m) linkErrs.value[+m[1]!] = x.detail }
@@ -56,7 +58,7 @@ async function copy() { try { await copyText(pageUrl.value); copied.value = true
             <button type="button" class="c-btn small danger" @click="links.splice(i, 1)">{{ $t('settings.pc.remove') }}</button>
           </div>
         </div>
-        <button type="button" class="c-btn small" :disabled="links.length >= MAX_LINKS" @click="links.push({ title: '', url: 'https://', hidden: false })"><UiIcon name="plus" :size="16" />{{ $t('settings.pc.add') }}</button>
+        <button type="button" class="c-btn small" :disabled="!linksLoaded || links.length >= MAX_LINKS" @click="links.push({ title: '', url: 'https://', hidden: false })"><UiIcon name="plus" :size="16" />{{ $t('settings.pc.add') }}</button>
         <small v-if="links.length >= MAX_LINKS" class="c-mute"> {{ $t('settings.pc.ap.linksMax') }}</small>
       </fieldset>
       <p class="c-mute st-kv">
