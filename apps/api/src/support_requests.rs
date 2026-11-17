@@ -135,7 +135,7 @@ async fn create_public(
     let email = crate::auth::norm_email(&b.email)?;
     let body = validate(&b.category, &b.body)?;
     let ip = crate::config::client_ip(&parts, crate::config::get());
-    ratelimit::check_pool(&st.pool, &format!("support_ip:{ip}"), 5, 3600).await?;
+    ratelimit::check_pool(&st.pool, &format!("support_ip:{ip}"), 30, 3600).await?;
     crate::auth::require_captcha(b.turnstile_token.as_deref(), &ip).await?;
     // shortcut: 同上，併發可能略超過上限，由每 IP 限流兜底
     let id: Option<Uuid> = sqlx::query_scalar(
