@@ -13,9 +13,10 @@
     "listSep": ", ",
     "pts": "{n} poin",
     "visibility": {
-      "public": "Publik",
-      "friends": "Hanya teman",
-      "private": "Pribadi"
+      "public": "Semua orang",
+      "friends": "Teman saya (yang lain melihat Anonim)",
+      "private": "Hanya pemilik daftar",
+      "anonymous": "Anonim (pemilik daftar pun tidak melihat)"
     },
     "reasonRequired": "Isi alasannya",
     "turnstile": {
@@ -27,7 +28,6 @@
       "required": "Selesaikan verifikasi dulu"
     },
     "claim": {
-      "anon": "Klaim anonim (penerima dan halaman berbagi hanya melihat \"anonim\")",
       "soldOutN": "Maaf, tinggal {n} lagi.",
       "soldOut": "Baru saja habis diklaim orang lain.",
       "exists": "Kamu sudah mengklaim barang ini, sudah dialihkan ke mode ubah",
@@ -37,7 +37,7 @@
       "dec": "Kurangi",
       "inc": "Tambah",
       "asUser": "Kasih hadiah sebagai {name}",
-      "visLabel": "Siapa yang bisa melihat bahwa ini darimu",
+      "visLabel": "Tampilkan namaku kepada",
       "notice": "Kasih hadiah perlu masuk sebagai anggota. Setelah mengklaim, kamu bisa mengubah atau membatalkannya kapan saja. Cara kami memakai datamu: ",
       "privacyLink": "Pemberitahuan pengumpulan data pribadi",
       "noCheck": " (tidak perlu dicentang)",
@@ -59,8 +59,7 @@
       "pointsLabel": "Poin patungan",
       "fullRemaining": "Seluruh sisa {n}",
       "insufficient": "Saldo tidak cukup, kurang {n} poin",
-      "anon": "Patungan anonim (tampil sebagai \"Teman anonim\" di halaman)",
-      "visLabel": "Siapa yang bisa melihat patungan ini",
+      "visLabel": "Tampilkan namaku kepada",
       "notice": "Poin dipakai untuk pembelian oleh platform; setelah target tercapai, platform memesan dan mengirimkannya ke yang berulang tahun, dan tidak diubah menjadi uang tunai untuk pemilik.",
       "viewWallet": "Lihat poin saya",
       "relogin": "Masuk ulang",

@@ -81,7 +81,7 @@ test('好友：邀請連結 + QR → 未登入開連結帶 redirect → 登入�
 test('僅好友清單：匿名請先登入、非好友被擋並可前往個人頁、好友可看並捐助（可見度預設帶帳號設定）', async ({ browser }) => {
   const owner = await withHandle('fo'), friend = await registerUser({ tag: 'ff' }), stranger = await registerUser({ tag: 'fs' })
   await befriend(owner, friend)
-  await ok(await friend.api.patch('me', { data: { default_claim_visibility: 'friends' } }), '帳號預設可見度')
+  await ok(await friend.api.patch('me', { data: { default_claim_visibility: 'public' } }), '帳號預設可見度')
   const list = await listWith(owner, 'friends')
 
   const anon = await pageFor(browser)
@@ -100,7 +100,7 @@ test('僅好友清單：匿名請先登入、非好友被擋並可前往個人�
   await expect(pf.getByRole('heading', { level: 1, name: list.title })).toBeVisible()
   await pf.locator('li.g-card', { hasText: '奶瓶' }).getByRole('button', { name: '我來送' }).click()
   const sheet = pf.getByRole('dialog')
-  await expect(sheet.getByLabel('誰看得到是你送的')).toHaveValue('friends') // 帳號預設
+  await expect(sheet.getByLabel('我的名字顯示給')).toHaveValue('public') // 帳號預設
   await sheet.getByRole('button', { name: '確定要送' }).click()
   await expect(pf.getByRole('heading', { name: '✓ 這份交給你了！' })).toBeVisible()
   await closeAll([owner, friend, stranger])

@@ -13,9 +13,10 @@
     "listSep": "、",
     "pts": "{n} 點",
     "visibility": {
-      "public": "公開",
-      "friends": "僅好友",
-      "private": "私人"
+      "public": "所有人",
+      "friends": "我的好友（其他人看到匿名）",
+      "private": "只有清單主人",
+      "anonymous": "匿名（連清單主人都看不到）"
     },
     "reasonRequired": "請填原因",
     "turnstile": {
@@ -27,7 +28,6 @@
       "required": "請先完成驗證"
     },
     "claim": {
-      "anon": "匿名認領（收禮者與分享頁只會看到「匿名」）",
       "soldOutN": "抱歉，只剩 {n} 個了。",
       "soldOut": "剛剛被別人認領完了。",
       "exists": "你已經要送這個品項了，已幫你切換到修改",
@@ -37,7 +37,7 @@
       "dec": "減少",
       "inc": "增加",
       "asUser": "以 {name} 的身分送禮",
-      "visLabel": "誰看得到是你送的",
+      "visLabel": "我的名字顯示給",
       "notice": "送禮需登入會員，送出後可隨時修改或取消。我們如何使用你的資料：",
       "privacyLink": "個資蒐集告知",
       "noCheck": "（不需勾選）",
@@ -59,8 +59,7 @@
       "pointsLabel": "贊助點數",
       "fullRemaining": "剩餘全額 {n}",
       "insufficient": "餘額不足，還缺 {n} 點",
-      "anon": "匿名贊助（頁面上顯示為「匿名朋友」）",
-      "visLabel": "這筆贊助誰看得到",
+      "visLabel": "我的名字顯示給",
       "notice": "點數用於平台代購，達標後由平台下單寄給壽星，不會轉成現金給建立者。",
       "viewWallet": "查看我的點數",
       "relogin": "重新登入",

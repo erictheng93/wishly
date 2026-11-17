@@ -13,9 +13,10 @@
     "listSep": ", ",
     "pts": "{n} điểm",
     "visibility": {
-      "public": "Công khai",
-      "friends": "Chỉ bạn bè",
-      "private": "Riêng tư"
+      "public": "Mọi người",
+      "friends": "Bạn bè của tôi (người khác thấy Ẩn danh)",
+      "private": "Chỉ chủ danh sách",
+      "anonymous": "Ẩn danh (chủ danh sách cũng không thấy)"
     },
     "reasonRequired": "Vui lòng nhập lý do",
     "turnstile": {
@@ -27,7 +28,6 @@
       "required": "Vui lòng hoàn tất xác minh trước"
     },
     "claim": {
-      "anon": "Nhận tặng ẩn danh (người nhận và trang chia sẻ chỉ thấy \"Ẩn danh\")",
       "soldOutN": "Rất tiếc, chỉ còn {n} món.",
       "soldOut": "Vừa có người khác nhận tặng hết rồi.",
       "exists": "Bạn đã nhận tặng món này rồi, đã chuyển sang chỉnh sửa",
@@ -37,7 +37,7 @@
       "dec": "Giảm",
       "inc": "Tăng",
       "asUser": "Tặng với tư cách {name}",
-      "visLabel": "Ai có thể thấy bạn tặng món này",
+      "visLabel": "Hiện tên tôi cho",
       "notice": "Cần đăng nhập để tặng. Bạn có thể sửa hoặc hủy bất cứ lúc nào. Cách chúng tôi dùng dữ liệu của bạn: ",
       "privacyLink": "Thông báo thu thập dữ liệu cá nhân",
       "noCheck": " (không cần tích chọn)",
@@ -59,8 +59,7 @@
       "pointsLabel": "Số điểm tài trợ",
       "fullRemaining": "Toàn bộ phần còn lại {n}",
       "insufficient": "Số dư không đủ, còn thiếu {n} điểm",
-      "anon": "Tài trợ ẩn danh (hiển thị là \"Bạn ẩn danh\")",
-      "visLabel": "Ai có thể thấy khoản tài trợ này",
+      "visLabel": "Hiện tên tôi cho",
       "notice": "Điểm được dùng để nền tảng mua hộ. Khi đạt mục tiêu, nền tảng sẽ đặt hàng và gửi cho người nhận, không quy đổi thành tiền mặt cho người tạo.",
       "viewWallet": "Xem điểm của tôi",
       "relogin": "Đăng nhập lại",

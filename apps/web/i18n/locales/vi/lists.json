@@ -31,7 +31,7 @@
       "surprise": "Chế độ bất ngờ",
       "surpriseHint": "Trước ngày sự kiện, bạn chỉ thấy tiến độ, không thấy ai tặng gì. Cần đặt ngày sự kiện.",
       "showNames": "Hiện biệt danh người tặng cho khách khác",
-      "showNamesHint": "Mặc định tắt",
+      "showNamesHint": "Người tặng tự quyết định: mặc định chỉ bạn bè của họ thấy tên, người khác thấy \"Ẩn danh\"; họ cũng có thể chọn công khai hoặc ẩn danh.",
       "creating": "Đang tạo…",
       "submit": "Tạo và thêm món quà",
       "sec": {
@@ -89,6 +89,7 @@
       "event": "Ngày sự kiện",
       "closes": "Thời gian tự động kết thúc (tùy chọn, để trống nếu không giới hạn)",
       "showNames": "Hiện biệt danh người tặng cho khách khác",
+      "showNamesHint": "Người tặng tự quyết định: mặc định chỉ bạn bè của họ thấy tên, người khác thấy \"Ẩn danh\"; họ cũng có thể chọn công khai hoặc ẩn danh.",
       "surprise": "Chế độ bất ngờ: {state}",
       "surpriseLocked": "Đang bật (khóa đến ngày sự kiện, không thể tắt)",
       "surpriseUnlocked": "Đang bật (đã mở khóa)",

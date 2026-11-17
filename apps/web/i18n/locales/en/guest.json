@@ -13,9 +13,10 @@
     "listSep": ", ",
     "pts": "{n} pts",
     "visibility": {
-      "public": "Public",
-      "friends": "Friends only",
-      "private": "Private"
+      "public": "Everyone",
+      "friends": "My friends (others see Anonymous)",
+      "private": "Only the list owner",
+      "anonymous": "Anonymous (even the list owner can't see)"
     },
     "reasonRequired": "Please enter a reason",
     "turnstile": {
@@ -27,7 +28,6 @@
       "required": "Please complete the verification first"
     },
     "claim": {
-      "anon": "Claim anonymously (the recipient and share page only see \"Anonymous\")",
       "soldOutN": "Sorry, only {n} left.",
       "soldOut": "Someone else just claimed the rest.",
       "exists": "You have already claimed this item. Switched to edit.",
@@ -37,7 +37,7 @@
       "dec": "Decrease",
       "inc": "Increase",
       "asUser": "Giving as {name}",
-      "visLabel": "Who can see you're giving this",
+      "visLabel": "Show my name to",
       "notice": "Giving a gift requires a signed-in account. You can edit or cancel anytime. How we use your data: ",
       "privacyLink": "Privacy notice",
       "noCheck": " (no checkbox needed)",
@@ -59,8 +59,7 @@
       "pointsLabel": "Points to contribute",
       "fullRemaining": "Full remaining {n}",
       "insufficient": "Insufficient balance, {n} pts short",
-      "anon": "Contribute anonymously (shown as \"Anonymous friend\")",
-      "visLabel": "Who can see this contribution",
+      "visLabel": "Show my name to",
       "notice": "Points are used for platform-purchased gifts. Once the goal is reached, the platform orders and ships the item to the recipient. Points are never paid out as cash to the creator.",
       "viewWallet": "View my points",
       "relogin": "Sign in again",
