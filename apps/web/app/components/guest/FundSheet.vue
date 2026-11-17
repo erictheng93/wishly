@@ -16,7 +16,7 @@ const points = ref<number | ''>(Math.min(remaining.value, 500) || remaining.valu
 const message = ref('')
 const anon = computed(() => vis.value === 'anonymous') // 單一選單：「匿名」送 is_anonymous + private
 const balance = ref<number | null>(null)
-const busy = ref(false), msg = ref(''), needWallet = ref(false), needLogin = ref(false)
+const busy = ref(false), msg = ref(''), needWallet = ref(false), needLogin = ref(false), frozen = ref(false)
 const dirty = computed(() => !!message.value || anon.value)
 const visNote = computed(() => claimVisNote({ anon: anon.value, surpriseLocked: props.surpriseLocked, claimersVisible: props.claimersVisible, vis: vis.value }))
 const chips = computed(() => quickAmounts(remaining.value))
@@ -27,7 +27,7 @@ const valid = computed(() => Number.isInteger(points.value) && (points.value as 
 const after = computed(() => balance.value != null && typeof points.value === 'number' ? balance.value - points.value : null)
 
 async function submit() {
-  msg.value = ''; needWallet.value = needLogin.value = false
+  msg.value = ''; needWallet.value = needLogin.value = frozen.value = false
   if (!valid.value) { msg.value = t('guest.fund.rangeErr', { max: fmtPts(remaining.value) }); return }
   busy.value = true
   try {
@@ -39,7 +39,7 @@ async function submit() {
   } catch (e: any) {
     if (e.code === 'UNAUTHORIZED') { needLogin.value = true; msg.value = t('guest.fund.loginExpired') } else {
       const c = contributionErr(e.code, e.body, errMsg(e))
-      msg.value = c.msg; needWallet.value = !!c.wallet
+      msg.value = c.msg; needWallet.value = !!c.wallet; frozen.value = e.code === 'WALLET_FROZEN'
       if (c.points) points.value = c.points
       if (e.body?.balance != null) balance.value = e.body.balance
       if (['ITEM_FUNDED', 'FUNDING_EXPIRED', 'CROWDFUND_TARGET_EXCEEDED'].includes(e.code)) emit('stale')
@@ -74,6 +74,7 @@ async function submit() {
       <p v-if="visNote" class="g-mute">{{ $t(visNote) }}</p>
       <p class="g-mute">{{ $t('guest.fund.notice') }}</p>
       <div v-if="msg" class="g-banner err" role="alert">{{ msg }}
+        <SupportLink v-if="frozen" />
         <NuxtLink v-if="needWallet" to="/me/wallet">{{ $t('guest.fund.viewWallet') }}</NuxtLink>
         <NuxtLink v-if="needLogin" :to="{ path: '/login', query: { redirect: localizedPath(`/s/${slug}`, $i18n.locale) } }">{{ $t('guest.fund.relogin') }}</NuxtLink>
       </div>

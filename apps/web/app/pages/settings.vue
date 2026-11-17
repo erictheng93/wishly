@@ -278,7 +278,7 @@ async function remove() {
           <button type="button" class="c-btn" @click="logout('/settings')">{{ $t('settings.login.reauth.relogin') }}</button>
           <button type="button" class="c-btn" @click="reauthOpen = false">{{ $t('settings.login.reauth.cancel') }}</button>
         </div>
-        <p v-if="identityErr && !removingProvider" class="c-err" role="alert">{{ identityErr }}</p>
+        <p v-if="identityErr && !removingProvider" class="c-err" role="alert">{{ identityErr }} <SupportLink /></p>
         <p v-if="identityMsg" class="c-ok" role="status">{{ identityMsg }}</p>
       </section>
       <section v-if="user.has_password" class="c-card">
@@ -398,6 +398,7 @@ async function remove() {
     <p v-else-if="!ready" class="c-mute" role="status">{{ $t('me.loading') }}</p>
     <CreatorConfirm :open="!!removingProvider" :title="$t('settings.login.unlinkTitle', { label: removingLabel })" :text="$t('settings.login.unlinkText')" :ok="$t('settings.login.unlinkOk')" danger :busy="identityBusy" :error="identityErr" @close="!identityBusy && (removingProvider = '')" @ok="unlinkIdentity" />
     <CreatorConfirm :open="showDel" :title="$t('settings.del.confirmTitle')" :text="$t('settings.del.confirmText')" :ok="$t('settings.del.ok')" danger :busy="delBusy" :disabled="word !== $t('settings.del.word') || (user?.has_password && !delPw)" :error="delErr" @close="showDel = false" @ok="remove">
+      <p v-if="delErr" class="c-mute">{{ $t('common.support') }}<SupportLink /></p>
       <label class="c-field"><span>{{ $t('settings.del.prompt', { word: $t('settings.del.word') }) }}</span><input v-model="word" autocomplete="off"></label>
       <CreatorPasswordField v-if="user?.has_password" v-model="delPw" :label="$t('settings.del.password')" autocomplete="current-password" />
       <button v-if="delReauth" type="button" class="c-btn primary block c-mb" @click="logout('/settings')">{{ $t('settings.del.relogin') }}</button>
