@@ -94,7 +94,16 @@ async fn update_member(
         }
     }
     let handle = clean_handle(&b.handle)?;
-    require_role(&st.pool, id, u.id, "owner").await?;
+    // 離開組織：任何有效成員可停用自己；不可順便改角色 / handle
+    let leave =
+        target == u.id && b.disabled == Some(true) && b.role.is_none() && b.handle.is_none();
+    require_role(
+        &st.pool,
+        id,
+        u.id,
+        if leave { "volunteer" } else { "owner" },
+    )
+    .await?;
     let mut tx = crate::begin_contended(&st.pool).await?;
     lock_org(&mut tx, id).await?;
     let owners: Vec<Uuid> = sqlx::query_scalar(
@@ -114,11 +123,15 @@ async fn update_member(
         return Err(AppError::problem(
             409,
             "LAST_OWNER",
-            "組織至少需要一位有效的擁有者",
+            "組織至少需要一位有效的擁有者；若要離開或降級，請先把擁有者角色轉給其他成員",
         ));
     }
-    // 等鎖期間操作者可能已被降級 / 停用
-    if !owners.contains(&u.id) {
+    // 等鎖期間操作者可能已被降級 / 停用（離開時則是本人已被停用）
+    if if leave {
+        disabled
+    } else {
+        !owners.contains(&u.id)
+    } {
         return Err(AppError::problem(
             403,
             "ORG_ROLE_REQUIRED",
@@ -129,7 +142,7 @@ async fn update_member(
                    disabled_at=CASE WHEN $6 THEN COALESCE(disabled_at, now()) ELSE NULL END WHERE org_id=$1 AND user_id=$2")
         .bind(id).bind(target).bind(&new_role).bind(b.handle.is_some()).bind(&handle).bind(new_disabled)
         .execute(&mut *tx).await?;
-    audit_user(&mut *tx, u.id, "org.member.update", "org_member", Some(target),
+    audit_user(&mut *tx, u.id, if leave { "org.member.leave" } else { "org.member.update" }, "org_member", Some(target),
         json!({"org_id": id, "role": [role, new_role], "disabled": [disabled, new_disabled], "handle": b.handle})).await?;
     let v: Value = sqlx::query_scalar(member_sql!("WHERE m.org_id=$1 AND m.user_id=$2"))
         .bind(id)

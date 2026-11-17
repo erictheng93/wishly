@@ -140,6 +140,7 @@ async function submitRestore() {
             <template v-for="f in FLAGS.filter(f => f !== 'documents' && f !== 'permits' && f !== 'logo_key')" :key="f">
               <dt>{{ flagLabel(f) }}</dt><dd>{{ show(f, detail.org[f]) }}</dd>
             </template>
+            <dt>{{ flagLabel('logo_key') }}</dt><dd><img v-if="detail.org.logo_url" class="ao-logo" :src="detail.org.logo_url" alt=""><template v-else>—</template></dd>
             <template v-if="detail.org.review_note"><dt>{{ $t('admin.orgs.reviewNote') }}</dt><dd>{{ detail.org.review_note }}</dd></template>
           </dl>
 
@@ -200,6 +201,7 @@ async function submitRestore() {
 </template>
 <style scoped>
 .ao-note{white-space:pre-wrap;overflow-wrap:anywhere}
+.ao-logo{width:72px;height:72px;object-fit:contain;border:1px solid var(--line);background:var(--card)}
 /* 補件欄位：桌面兩欄 */
 @media (min-width:768px){.ao-flags{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}.ao-flags>legend{grid-column:1/-1}}
 /* 手機：詳情標籤在上、值在下，網址與長名稱不被窄欄斷成一字一行 */

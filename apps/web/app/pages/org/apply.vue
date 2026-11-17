@@ -63,11 +63,19 @@ async function save(f: string) {
   if (!org.value || !can(f)) return
   await run(async () => { await api(`/orgs/${org.value.id}`, { method: 'PATCH', body: { [f]: form[f] } }) })
 }
+// Logo（選填）：沿用圖片上傳元件取得 key 後 PATCH；尚無草稿時先暫存，建立草稿後再掛上
+const logoKey = ref<string | null>(null), logoReset = ref(0)
+async function setLogo(k: string | null) {
+  if (!k) logoReset.value++
+  if (!org.value) { logoKey.value = k; return }
+  await run(async () => { await api(`/orgs/${org.value.id}`, { method: 'PATCH', body: { logo_key: k } }); await reload() })
+}
 async function next() {
   await run(async () => {
     if (!org.value) {
       const body = Object.fromEntries(FIELDS.filter(f => form[f]).map(f => [f, form[f]]))
       org.value = await api('/orgs', { method: 'POST', body })
+      if (logoKey.value) await api(`/orgs/${org.value.id}`, { method: 'PATCH', body: { logo_key: logoKey.value } })
       await reload()
     }
     step.value++
@@ -128,6 +136,11 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
           <small v-if="f === 'tax_id' && taxBad" class="c-err">{{ $t('org.apply.taxBad') }}</small>
           <small v-else-if="f === 'tax_id' && taxErr" class="c-err">{{ taxErr }}</small>
         </label>
+        <template v-if="i === 0">
+          <CreatorImageUploader v-if="can('logo_key')" :key="logoReset" :model-value="logoKey" purpose="cover" :label="$t('org.apply.logo')" :current-url="org?.logo_url" @update:model-value="setLogo" />
+          <div v-else-if="org?.logo_url" class="c-field"><span>{{ $t('org.apply.logo') }}</span><img class="ap-logo" :src="org.logo_url" alt=""></div>
+          <button v-if="can('logo_key') && (org?.logo_url || logoKey)" type="button" class="c-btn" :disabled="busy" @click="setLogo(null)">{{ $t('org.apply.logoRemove') }}</button>
+        </template>
       </section>
 
       <section v-show="step === 3" class="c-card ap-s3">
@@ -203,6 +216,8 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 .ap-stepof span{white-space:nowrap}
 .ap-stepof span:not(:last-child)::after{content:"/" / "";margin:0 8px;color:var(--line)}
 .ap-of{flex:0 0 100%;font-style:normal}
+.ap-logo{width:72px;height:72px;object-fit:contain;border:1px solid var(--line)}
+.ap-sec>.c-btn{justify-self:start;margin-bottom:18px}
 .ap-note{padding:16px 18px;border:1px solid var(--line);line-height:1.65}
 .ap-note br{display:none}
 .ap-note strong{display:block;margin-bottom:4px;font-size:14px}

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 成員與邀請（owner 管理；其他角色只能看成員）
+// 成員與邀請（owner 管理；其他角色只能看成員，任何成員都可自行離開）
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('org.members.title') })
 const { api } = useApi()
-const { user } = useAuth()
+const { user, fetchMe } = useAuth()
 const id = useRoute().params.id as string
 const { orgs, current, adopt } = useOrgMode()
 const isOwner = computed(() => orgs.value.find(o => o.id === id)?.role === 'owner')
@@ -13,7 +13,7 @@ const members = ref<any[]>([]), invites = ref<any[]>([])
 const err = ref(''), busy = ref(false), copied = ref(false)
 const form = reactive({ email: '', role: 'volunteer', handle: '' })
 const link = ref('')
-const off = ref<any>(null)
+const off = ref<any>(null), leaving = ref(false)
 if (current.value !== id) adopt(id)
 
 async function load() {
@@ -33,6 +33,11 @@ const invite = () => run(async () => {
 const cancel = (i: any) => run(async () => { await api(`/orgs/${id}/invites/${i.id}`, { method: 'DELETE' }); await load() })
 const patch = (m: any, body: any) => run(async () => { await api(`/orgs/${id}/members/${m.user_id}`, { method: 'PATCH', body }); await load() })
 const disable = () => run(async () => { await patch(off.value, { disabled: true }); off.value = null })
+// 離開組織：停用自己；最後一位 owner 會被 LAST_OWNER 擋下（錯誤訊息提示先轉讓）
+const leave = () => { leaving.value = false; run(async () => {
+  await api(`/orgs/${id}/members/${user.value!.id}`, { method: 'PATCH', body: { disabled: true } })
+  adopt(null); await fetchMe(true); await navigateTo('/dashboard')
+}) }
 async function copy() { try { await navigator.clipboard.writeText(link.value); copied.value = true } catch {} }
 </script>
 
@@ -52,6 +57,7 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
           </select>
           <span v-else>{{ $t(`org.members.r.${m.role}`) }}</span>
           <button v-if="isOwner && !m.disabled_at && m.user_id !== user?.id" type="button" class="c-btn danger" @click="off = m">{{ $t('org.members.disable') }}</button>
+          <button v-if="!m.disabled_at && m.user_id === user?.id" type="button" class="c-btn danger" :disabled="busy" @click="leaving = true">{{ $t('org.members.leave') }}</button>
           <button v-if="isOwner && m.disabled_at" type="button" class="c-btn" :disabled="busy" @click="patch(m, { disabled: false })">{{ $t('org.members.enable') }}</button>
         </li>
       </ul>
@@ -89,6 +95,7 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
     </template>
 
     <CreatorConfirm :open="!!off" :title="$t('org.members.disableTitle')" :text="$t('org.members.disableText', { name: off?.display_name })" danger :busy="busy" @close="off = null" @ok="disable" />
+    <CreatorConfirm :open="leaving" :title="$t('org.members.leave')" :text="$t('org.members.leaveText')" danger :busy="busy" @close="leaving = false" @ok="leave" />
   </main>
 </template>
 

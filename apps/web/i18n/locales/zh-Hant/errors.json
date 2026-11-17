@@ -114,7 +114,7 @@
     "ALREADY_VOIDED": "此實收紀錄已作廢",
     "INVALID_STATE": "目前狀態不允許這個操作，請重新整理後再試",
     "PERMIT_REQUIRED": "需至少一張已核准的勸募許可才能通過審核",
-    "LAST_OWNER": "組織至少需要一位有效的擁有者",
+    "LAST_OWNER": "組織至少需要一位有效的擁有者；若要離開或降級，請先把擁有者角色轉給其他成員",
     "ORG_ROLE_REQUIRED": "你的組織角色權限不足，請聯絡擁有者",
     "INVITE_EXPIRED": "邀請已過期或已被取消，請向對方索取新的邀請",
     "ALREADY_MEMBER": "你已經是此組織的成員",

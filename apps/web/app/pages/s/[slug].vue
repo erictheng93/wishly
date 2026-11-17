@@ -247,6 +247,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
             <template v-if="data.event_date">{{ $t('guest.slug.date', { date: data.event_date }) }}</template><template v-if="data.closes_at && data.status === 'active'">{{ $t('guest.slug.endsAt', { time: new Date(data.closes_at).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Taipei' }) }) }}</template><template v-if="data.owner">{{ $t('guest.slug.createdBy', { name: data.owner.display_name }) }}</template>
           </p>
           <p v-if="data.org" class="g-mute">
+            <img v-if="data.org.logo_url" class="sx-org-logo" :src="data.org.logo_url" alt="" loading="lazy">
             <NuxtLink :to="localizedPath(`/o/${data.org.slug}`, $i18n.locale)">{{ data.org.display_name }}</NuxtLink><span v-if="data.org.verified" class="g-badge">{{ $t('guest.relief.verified') }}</span>
             <template v-if="data.event">・{{ $t('guest.relief.event') }}：<NuxtLink :to="localizedPath(`/e/${data.event.slug}`, $i18n.locale)">{{ data.event.name }}</NuxtLink></template>
           </p>
@@ -331,6 +332,7 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
 html:lang(en) .sx-main h1,html:lang(id) .sx-main h1{line-height:1.12}
 html:lang(vi) .sx-main h1{line-height:1.2}
 .sx-meta{margin:0;font-size:12px;font-family:var(--mono);letter-spacing:.06em}
+.sx-org-logo{width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:8px;border:1px solid var(--line);background:var(--card)}
 .sx-desc{margin:14px 0 0;line-height:1.75;max-width:38em;white-space:pre-line;overflow-wrap:anywhere}
 /* 完成度：數字與 % 同基線；紅色只留給進度條；右側只有「還可以送」一格 */
 .sx-gauge{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"big stats" "bar bar" "cap cap";column-gap:24px;align-items:end;align-self:start;border-top:1px solid var(--ink-line);padding:18px 0 0}

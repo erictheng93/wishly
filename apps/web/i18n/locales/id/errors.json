@@ -114,7 +114,7 @@
     "ALREADY_VOIDED": "Catatan penerimaan ini sudah dibatalkan.",
     "INVALID_STATE": "Tindakan ini tidak diizinkan pada status saat ini. Muat ulang lalu coba lagi.",
     "PERMIT_REQUIRED": "Minimal satu izin penggalangan dana yang disetujui diperlukan.",
-    "LAST_OWNER": "Organisasi membutuhkan minimal satu pemilik aktif.",
+    "LAST_OWNER": "Organisasi membutuhkan minimal satu pemilik aktif. Untuk keluar atau turun peran, jadikan anggota lain sebagai pemilik terlebih dahulu.",
     "ORG_ROLE_REQUIRED": "Peran organisasi Anda tidak cukup untuk tindakan ini. Hubungi pemilik.",
     "INVITE_EXPIRED": "Undangan sudah kedaluwarsa atau dibatalkan. Minta undangan baru.",
     "ALREADY_MEMBER": "Anda sudah menjadi anggota organisasi ini.",

@@ -85,7 +85,7 @@ PRD／流程／契約裡**早已規劃 P2-D relief**，但**完全沒有實作**
 
 - `/org` 是訪客可看的 SSR 頁，說明服務、申請前要準備的文件，CTA 是「申請成為公益組織」。登入頁也加一行連結。
 - **申請表**
-  1. **基本資料**：組織全名（與立案證書一致）、對外顯示名稱、組織類型（社團法人／財團法人／宗教團體／其他立案團體）、統一編號（8 碼，即時檢查格式和檢查碼）、立案字號與主管機關、官網或粉專（選填）、簡介。（Logo 上傳與顯示本階段不做，`organizations.logo_key` 欄位保留未使用。）
+  1. **基本資料**：組織全名（與立案證書一致）、對外顯示名稱、組織類型（社團法人／財團法人／宗教團體／其他立案團體）、統一編號（8 碼，即時檢查格式和檢查碼）、立案字號與主管機關、官網或粉專（選填）、簡介。Logo（選填，JPEG / PNG / WebP、≤5 MB，沿用清單封面的圖片上傳管線並去除 EXIF；草稿建立後即可上傳，補件時須被標記「組織標誌」才能更換）。Logo 顯示於組織公開頁 `/o/{slug}` 與據點頁的組織列，staff 審核頁可檢視；已通過的組織可在組織後台「組織資料」隨時更換或移除，不需重審（#91）。
   2. **負責人與聯絡**：負責人姓名；聯絡窗口姓名、職稱、手機（只給審核用，不公開）；對外公開的 email 和電話。
   3. **證明文件**（PDF / JPG / PNG，每個檔案 ≤10MB，私有儲存）：立案證書（必填）；勸募許可函，含字號和有效期間（必填）；可開立抵稅收據的資格證明（選填，沒有的話該 org 不提供「需要收據」選項）。
   4. **確認送出**：預覽資料，勾選「資料真實、同意組織條款」。
@@ -127,7 +127,7 @@ PRD／流程／契約裡**早已規劃 P2-D relief**，但**完全沒有實作**
 ## 6. 資料與 API 變更（相對既有契約）
 
 **Migration（新檔，依序累加）**：落實既有契約裡的 `organizations` / `org_members` / `wishlists` relief 欄位 / `receipts` / trigger，另外加上：
-- `organizations`：申請欄位（統編、立案字號、主管機關、類型、負責人、聯絡窗口、公開聯絡方式；`logo_key` 保留未使用）；`verification_status` 加 `draft`、`needs_changes`；審核意見、被點名欄位（`jsonb`）、`resubmit_after`；`can_issue_tax_receipt`。
+- `organizations`：申請欄位（統編、立案字號、主管機關、類型、負責人、聯絡窗口、公開聯絡方式、Logo（`logo_key`，存圖片管線的 key，公開回 `logo_url`））；`verification_status` 加 `draft`、`needs_changes`；審核意見、被點名欄位（`jsonb`）、`resubmit_after`；`can_issue_tax_receipt`。
 - `org_documents`：org_id、kind（`registration` / `permit` / `tax_receipt_eligibility`）、檔案 key、上傳者。
 - `org_permits`：org_id、字號、有效起訖、審核狀態。
 - `org_members`：加 `handle`（組織內顯示代號）、`disabled_at`。

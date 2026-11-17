@@ -21,12 +21,30 @@ const usable = (p: any) => p.status === 'approved' && p.valid_from <= today && !
 const hasValid = computed(() => permits.value.some(usable))
 // 未關閉、但綁著失效許可的據點：可一鍵換成有效許可
 const stale = computed(() => sites.value.filter(s => s.status !== 'closed' && !usable(permits.value.find(p => p.id === s.permit_id) ?? {})))
+// 已通過組織的 owner 可維護公開簡介與聯絡方式（不重審）；後端不支援清空欄位，只送有改且非空白的
+const PROFILE = ['website', 'intro', 'contact_name', 'contact_title', 'contact_phone', 'public_email', 'public_phone']
+const profile = reactive<Record<string, string>>({}), profileMsg = ref('')
+const fillProfile = () => PROFILE.forEach((f) => { profile[f] = org.value?.[f] ?? '' })
+async function saveProfile() {
+  err.value = profileMsg.value = ''; busy.value = true
+  try {
+    const body = Object.fromEntries(PROFILE.map(f => [f, profile[f]?.trim() ?? '']).filter(([f, v]) => v && v !== (org.value[f!] ?? '')))
+    if (Object.keys(body).length) { org.value = await api(`/orgs/${id}`, { method: 'PATCH', body }); fillProfile() }
+    profileMsg.value = t('org.console.profileSaved')
+  } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
+}
+// Logo：上傳元件取得 key 後立即掛上（null＝移除）；verified 改 Logo 不重審
+const logoReset = ref(0)
+async function setLogo(k: string | null) {
+  err.value = profileMsg.value = ''; busy.value = true
+  try { org.value = await api(`/orgs/${id}`, { method: 'PATCH', body: { logo_key: k } }); if (!k) logoReset.value++ } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
+}
 const loadPermits = async () => { permits.value = await api(`/orgs/${id}/permits`) }
 if (current.value !== id) adopt(id)
 onMounted(async () => {
   try {
     ;[org.value, sites.value, events.value] = await Promise.all([api(`/orgs/${id}`), api(`/orgs/${id}/sites`), api(`/orgs/${id}/events`)])
-    await loadPermits()
+    fillProfile(); await loadPermits()
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
   if (location.hash === '#permits') nextTick(() => document.getElementById('permits')?.scrollIntoView()) // 區塊載入後才渲染，瀏覽器原生錨點跳不到
 })
@@ -69,7 +87,7 @@ async function applyPermit(pid: string) {
         <NuxtLink to="/org/apply">{{ $t('org.console.toApply') }}</NuxtLink>
       </div>
       <nav class="c-row oh-nav">
-        <NuxtLink v-if="role === 'owner'" :to="`/orgs/${id}/members`" class="c-btn">{{ $t('org.console.members') }}</NuxtLink>
+        <NuxtLink :to="`/orgs/${id}/members`" class="c-btn">{{ $t('org.console.members') }}</NuxtLink>
         <NuxtLink v-if="canEdit" :to="`/orgs/${id}/audit`" class="c-btn">{{ $t('org.audit.link') }}</NuxtLink>
       </nav>
 
@@ -130,6 +148,22 @@ async function applyPermit(pid: string) {
           <button class="c-btn primary" :disabled="busy || !permit.permit_no || !permit.valid_from || !permit.valid_to || !permitFile">{{ $t('org.apply.addPermit') }}</button>
         </form>
       </section>
+
+      <section v-if="role === 'owner' && verified" class="c-card oh-sec">
+        <h2 class="c-h2">{{ $t('org.console.profile') }}</h2>
+        <p class="c-mute">{{ $t('org.console.profileHint') }}</p>
+        <CreatorImageUploader :key="logoReset" purpose="cover" :label="$t('org.apply.logo')" :current-url="org.logo_url" @update:model-value="setLogo" />
+        <button v-if="org.logo_url" type="button" class="c-btn" :disabled="busy" @click="setLogo(null)">{{ $t('org.apply.logoRemove') }}</button>
+        <form class="oh-prof" @submit.prevent="saveProfile">
+          <label v-for="f in PROFILE" :key="f" class="c-field" :class="{ 'oh-wide': f === 'intro' }">
+            <span>{{ $t(`org.apply.f.${f}`) }}</span>
+            <textarea v-if="f === 'intro'" v-model="profile[f]" :name="f" rows="4" maxlength="2000" />
+            <input v-else v-model="profile[f]" :name="f" :type="f === 'public_email' ? 'email' : f.endsWith('phone') ? 'tel' : 'text'" autocomplete="off">
+          </label>
+          <p v-if="profileMsg" class="c-ok oh-wide" role="status">{{ profileMsg }}</p>
+          <button class="c-btn primary" :disabled="busy">{{ $t('org.console.profileSave') }}</button>
+        </form>
+      </section>
     </template>
   </main>
 </template>
@@ -149,6 +183,9 @@ async function applyPermit(pid: string) {
 .oh-file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .oh-file-name.on{color:var(--fg)}
 .oh-form>.c-btn{min-height:48px}
+.oh-prof{display:grid;gap:0 20px;margin-top:16px}
+.oh-prof>.c-btn{justify-self:start;min-height:48px}
+@media (min-width:900px){.oh-prof{grid-template-columns:repeat(2,minmax(0,1fr))}.oh-prof>.oh-wide,.oh-prof>.c-btn{grid-column:1/-1}}
 .oh-list .c-badge.approved{color:var(--ok);border-color:currentColor}
 .oh-list .c-badge.pending{color:var(--red-text);border-color:currentColor}
 .oe-load{padding:28px 0;font:600 12px var(--mono);letter-spacing:.14em}

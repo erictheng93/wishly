@@ -72,7 +72,9 @@
         "religious": "Tổ chức tôn giáo",
         "other": "Tổ chức đã đăng ký khác"
       },
-      "reapply": "Đăng ký lại"
+      "reapply": "Đăng ký lại",
+      "logo": "Logo tổ chức (không bắt buộc)",
+      "logoRemove": "Xóa logo"
     },
     "console": {
       "title": "Bảng điều khiển tổ chức",
@@ -107,7 +109,11 @@
         "revoked": "Xác minh tổ chức đã bị thu hồi",
         "event_hidden": "Sự kiện đã bị gỡ",
         "permit": "Giấy phép chưa được duyệt hoặc đã hết hạn"
-      }
+      },
+      "profile": "Thông tin tổ chức",
+      "profileHint": "Tổ chức đã xác minh có thể cập nhật logo, giới thiệu và thông tin liên hệ bất cứ lúc nào mà không cần xét duyệt lại. Không thể sửa thông tin định danh như tên và mã số thuế tại đây.",
+      "profileSave": "Lưu thông tin",
+      "profileSaved": "Đã lưu"
     },
     "members": {
       "title": "Thành viên & lời mời",
@@ -132,7 +138,9 @@
         "owner": "Chủ sở hữu",
         "coordinator": "Điều phối viên",
         "volunteer": "Tình nguyện viên"
-      }
+      },
+      "leave": "Rời tổ chức",
+      "leaveText": "Bạn có chắc muốn rời tổ chức này? Sau khi rời, bạn sẽ không thể quản lý điểm tiếp nhận hay xem thông tin tổ chức và cần được mời lại để tham gia."
     },
     "invite": {
       "title": "Tham gia tổ chức",
@@ -273,7 +281,8 @@
         "item_create": "Thêm món",
         "item_update": "Cập nhật món",
         "item_delete": "Xóa món",
-        "item_reorder": "Sắp xếp lại món"
+        "item_reorder": "Sắp xếp lại món",
+        "org_member_leave": "Rời tổ chức"
       }
     }
   }

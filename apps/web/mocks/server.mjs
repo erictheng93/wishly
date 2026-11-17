@@ -105,7 +105,7 @@ http.createServer(async (req, res) => {
   }
   if ((m = p.match(/^\/public\/orgs\/([^/]+)$/))) {
     if (m[1] !== reliefOrg.slug) return err(res, 404, 'NOT_FOUND', '找不到')
-    return send(res, 200, { ...reliefOrg, intro: '長期投入災後物資援助。', website: 'https://example.com', public_email: 'hi@example.com', public_phone: null, logo: null, sites: reliefSites.map(({ needs, org, ...x }) => ({ ...x, event: { slug: quake.slug, name: quake.name } })) })
+    return send(res, 200, { ...reliefOrg, intro: '長期投入災後物資援助。', website: 'https://example.com', public_email: 'hi@example.com', public_phone: null, logo_url: null, sites: reliefSites.map(({ needs, org, ...x }) => ({ ...x, event: { slug: quake.slug, name: quake.name } })) })
   }
   if (p === '/public/wishlists') {
     const page = +(u.searchParams.get('page') ?? 1), ty = u.searchParams.get('type')

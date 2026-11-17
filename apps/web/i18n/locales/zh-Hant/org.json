@@ -72,7 +72,9 @@
         "religious": "宗教團體",
         "other": "其他立案團體"
       },
-      "reapply": "重新申請"
+      "reapply": "重新申請",
+      "logo": "組織 Logo（選填）",
+      "logoRemove": "移除 Logo"
     },
     "console": {
       "title": "組織後台",
@@ -107,7 +109,11 @@
         "revoked": "組織認證已撤銷",
         "event_hidden": "所屬事件已下架",
         "permit": "勸募許可未核准或已到期"
-      }
+      },
+      "profile": "組織資料",
+      "profileHint": "已通過認證的組織可隨時更新 Logo、簡介與聯絡方式，不需重新審核；名稱、統編等身分資料不可在此修改。",
+      "profileSave": "儲存組織資料",
+      "profileSaved": "已儲存"
     },
     "members": {
       "title": "成員與邀請",
@@ -132,7 +138,9 @@
         "owner": "擁有者",
         "coordinator": "協調員",
         "volunteer": "志工"
-      }
+      },
+      "leave": "離開組織",
+      "leaveText": "確定要離開此組織？離開後將無法再管理據點與查看組織資料，需重新受邀才能加入。"
     },
     "invite": {
       "title": "加入組織",
@@ -273,7 +281,8 @@
         "wishlist_archive": "封存清單",
         "wishlist_shipping_address_update": "更新收件資訊",
         "wishlist_allowed_users_update": "更新可見名單",
-        "item_reorder": "調整品項順序"
+        "item_reorder": "調整品項順序",
+        "org_member_leave": "離開組織"
       }
     }
   }
