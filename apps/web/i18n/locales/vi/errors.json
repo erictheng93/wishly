@@ -28,6 +28,7 @@
     "BUSY": "Hệ thống đang bận. Vui lòng thử lại sau.",
     "IMAGE_REMOVED": "Ảnh này đã bị xóa. Vui lòng tải lên lại.",
     "CAPTCHA_REQUIRED": "Vui lòng hoàn tất xác minh không phải robot rồi thử lại.",
+    "SUPPORT_OPEN_LIMIT": "Bạn có quá nhiều yêu cầu hỗ trợ chưa được trả lời. Vui lòng chờ phản hồi trước khi gửi thêm.",
     "CAPTCHA_UNAVAILABLE": "Dịch vụ xác minh người dùng tạm thời không khả dụng. Vui lòng thử lại sau.",
     "CLAIM_ALREADY_EXISTS": "Bạn đã nhận tặng món này. Hãy chỉnh sửa số lượng hiện có.",
     "CONTRIBUTION_LOCKED": "Khoản tài trợ này đã bị khóa và không thể rút lại.",

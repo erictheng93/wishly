@@ -1,5 +1,35 @@
 {
   "admin": {
+    "support": {
+      "title": "客服工單",
+      "statusLabel": "狀態",
+      "status": {
+        "open": "待回覆",
+        "closed": "已結案"
+      },
+      "kind": {
+        "member": "會員",
+        "guest": "未登入"
+      },
+      "userId": "帳號 ID",
+      "wishlist": "相關清單",
+      "topup": "相關儲值",
+      "createdAt": "送出時間",
+      "handledAt": "結案時間",
+      "handledBy": "處理人",
+      "reply": "回覆 / 處理紀錄",
+      "mailto": "用 Email 回覆",
+      "action": "回覆並結案",
+      "confirmMember": "回覆後工單即結案，會員會在站內收到通知。",
+      "confirmGuest": "未登入工單系統不會寄信。請先用客服信箱回信給 {email}，再在這裡記下處理內容並結案。",
+      "replyLabel": "回覆內容",
+      "done": "已結案",
+      "stale": "這筆工單已被其他人處理，列表已更新。",
+      "empty": "沒有工單",
+      "loading": "載入中…",
+      "loadMore": "載入更多",
+      "retry": "重試"
+    },
     "index": {
       "roles": { "label": "營運角色", "admin": "管理員", "finance": "金流", "moderator": "內容審核", "support": "客服" },
       "title": "營運後台",
@@ -31,7 +61,8 @@
         "orgs": "組織與許可審核",
         "events": "救災事件管理",
         "finance": "金流後台",
-        "reports": "檢舉處理"
+        "reports": "檢舉處理",
+        "support": "客服工單"
       },
       "tabsLabel": "後台功能",
       "tabs": {
@@ -127,7 +158,8 @@
         "requested_refunds": "待審退款 {n}",
         "disputed_topups": "爭議 {n}",
         "open_debts": "欠款 {n}",
-        "open_reports": "待處理 {n}"
+        "open_reports": "待處理 {n}",
+        "open_support_requests": "待回覆 {n}"
       },
       "notices": {
         "title": "系統公告",

@@ -49,9 +49,11 @@
 
 ### 第四級：會員不寄，只留站內（`InAppOnly`）
 
-`claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`、`wishlist.supported`、`report.resolved`、`profile.date_soon`。
+`claim.confirmation`、`friend.accepted`、`item.reopened`、`claim.cancelled_by_donor`、`topup.expired`、`wishlist.supported`、`report.resolved`、`support.replied`、`profile.date_soon`。
 
 `report.resolved`（檢舉結案回饋）只發給登入的檢舉者，訪客與匿名檢舉者不通知；歸類為帳號類（不可關閉站內）、只留站內。payload 只有 `outcome`（`actioned` / `dismissed`），不含被檢舉對象、被檢舉者身分或 staff 備註；同一次批次結案（下架清單、停權使用者、撤銷組織）每位檢舉者只收一則。
+
+`support.replied`（客服工單已回覆並結案，#92）只發給會員工單的提出者；歸類為帳號類（不可關閉站內）、只留站內，連到 `/support`。payload 為空，不含回覆內文與營運身分（站內信只提示到客服頁查看）。未登入者送出的工單（`contact_email` 未經驗證）系統一律不寄信、不發通知，由營運以客服信箱自行回信；營運端也沒有「有新工單」的通知。
 
 `profile.date_soon`（好友的重要日子 7 天內到來，每個日子每年一次）屬社交類、只留站內；對象為作者的好友（可見性 close 時僅摯友），排除任一方向封鎖與已關閉站內社交通知者，private 不通知；寄前重驗可見性，改期 / 改對象會重新評估。
 

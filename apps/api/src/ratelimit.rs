@@ -155,6 +155,10 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
     sqlx::query(REPORT_RETENTION_SQL).execute(pool).await?;
+    // 客服工單（含未登入者的 Email）結案一年後刪除；open 不清
+    sqlx::query("DELETE FROM support_requests WHERE status = 'closed' AND handled_at < now() - interval '365 days'")
+        .execute(pool)
+        .await?;
     // 稽核保留政策：只有「內容編輯」類一年後清除；金流、安全、刪除、封存、地址異動、營運操作永久保留。
     // audit_logs 有只增不改的 trigger，須在同一交易內以 wishly.audit_purge 開啟 DELETE 例外。
     let mut tx = pool.begin().await?;

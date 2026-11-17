@@ -49,6 +49,7 @@ pub mod session;
 pub mod share_views;
 pub mod staff_db;
 pub mod support;
+pub mod support_requests;
 pub mod topup;
 pub mod uploads;
 pub mod user_addresses;
@@ -140,6 +141,7 @@ pub fn app(state: AppState) -> Router {
                 .merge(finance::routes())
                 .merge(dashboard::routes())
                 .merge(reports::routes())
+                .merge(support_requests::routes())
                 .merge(admin::routes())
                 .merge(orders::routes())
                 .merge(orgs::routes())

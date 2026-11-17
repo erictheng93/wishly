@@ -33,6 +33,7 @@
     "support": "聯絡客服：",
     "supportSubject": "Wishly 客服",
     "supportBody": "帳號 ID：{id}\n\n問題描述：\n",
+    "supportForm": "或填寫客服表單",
     "notifications": "通知",
     "unreadCount": "{n} 則未讀",
     "close": "關閉"

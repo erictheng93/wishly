@@ -1,5 +1,37 @@
 {
   "me": {
+    "support": {
+      "title": "Dukungan",
+      "intro": "Ada masalah atau ingin mengajukan banding? Isi formulir di bawah dan kami akan membalas secepatnya.",
+      "email": "Email kontak",
+      "emailHint": "Kami akan membalas ke alamat ini.",
+      "emailRequired": "Isi email kontak",
+      "category": "Topik",
+      "categories": {
+        "account": "Akun dan masuk",
+        "wishlist": "Wishlist",
+        "payment": "Pembayaran dan isi ulang",
+        "wallet": "Dompet poin",
+        "other": "Lainnya"
+      },
+      "wishlistRef": "Wishlist terkait sudah dilampirkan.",
+      "body": "Jelaskan masalahnya",
+      "placeholder": "Ceritakan apa yang terjadi dan bantuan apa yang kamu perlukan",
+      "bodyRequired": "Jelaskan masalahnya",
+      "submit": "Kirim",
+      "submitting": "Mengirim…",
+      "sent": "Permintaanmu sudah kami terima. Kami akan memberi tahu saat sudah dibalas.",
+      "sentGuest": "Permintaanmu sudah kami terima dan akan kami balas lewat email.",
+      "emailAlt": "Kamu juga bisa langsung mengirim email ke tim dukungan: ",
+      "mine": "Permintaan dukunganku",
+      "empty": "Belum ada permintaan dukungan.",
+      "status": {
+        "open": "Diproses",
+        "closed": "Sudah dibalas"
+      },
+      "createdAt": "Dikirim {time}",
+      "reply": "Balasan tim dukungan"
+    },
     "home": {
       "seoTitle": "Wishly – Wishlist dan berbagi keinginan",
       "seoDesc": "Buat wishlist dan bagikan lewat satu tautan. Untuk hadiah, ulang tahun, atau pernikahan: teman cukup buka tautannya untuk melihat, lalu masuk untuk mengklaim hadiah yang mau mereka kasih, tanpa dobel dan tanpa kelebihan klaim.",

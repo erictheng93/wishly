@@ -28,6 +28,7 @@
     "BUSY": "Sistem sedang sibuk, coba lagi nanti",
     "IMAGE_REMOVED": "Gambar sudah dihapus, unggah ulang",
     "CAPTCHA_REQUIRED": "Selesaikan verifikasi manusia dulu lalu coba lagi",
+    "SUPPORT_OPEN_LIMIT": "Terlalu banyak permintaan dukungan yang belum dibalas. Tunggu balasan sebelum mengirim lagi.",
     "CAPTCHA_UNAVAILABLE": "Layanan verifikasi manusia sedang tidak tersedia, coba lagi nanti",
     "CLAIM_ALREADY_EXISTS": "Kamu sudah mengklaim barang ini, ubah jumlah yang sudah ada",
     "CONTRIBUTION_LOCKED": "Patungan ini sudah dikunci dan tidak bisa ditarik",

@@ -28,6 +28,7 @@
     "BUSY": "系統忙碌，請稍後再試",
     "IMAGE_REMOVED": "圖片已移除，請重新上傳",
     "CAPTCHA_REQUIRED": "請先完成人機驗證後再試",
+    "SUPPORT_OPEN_LIMIT": "尚未回覆的客服請求太多，請等候回覆後再送出",
     "CAPTCHA_UNAVAILABLE": "人機驗證服務暫時無法使用，請稍後再試",
     "CLAIM_ALREADY_EXISTS": "你已經要送這個品項，請修改原本的數量",
     "CONTRIBUTION_LOCKED": "此筆贊助已鎖定，無法撤回",

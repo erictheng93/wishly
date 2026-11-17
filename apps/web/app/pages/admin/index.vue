@@ -169,6 +169,7 @@ onMounted(loadStats)
       <NuxtLink to="/admin/audit" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.audit') }}</span></NuxtLink>
       <NuxtLink v-if="canFinance" :to="stats?.disputed_topups > 0 ? '/admin/finance?tab=transactions&status=disputed' : '/admin/finance'" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.finance') }} <span class="c-badge" data-testid="todo-disputed_topups">{{ $t('admin.index.todo.disputed_topups', { n: stats?.disputed_topups ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink v-if="canMod" to="/admin/reports" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.reports') }} <span class="c-badge" data-testid="todo-open_reports">{{ $t('admin.index.todo.open_reports', { n: stats?.open_reports ?? '–' }) }}</span></span></NuxtLink>
+      <NuxtLink to="/admin/support" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.support') }} <span class="c-badge" data-testid="todo-open_support_requests">{{ $t('admin.index.todo.open_support_requests', { n: stats?.open_support_requests ?? '–' }) }}</span></span></NuxtLink>
       <NuxtLink to="/admin/analytics" class="c-btn c-grow"><span class="k-nav-content">{{ $t('admin.index.nav.analytics') }}</span></NuxtLink>
     </nav>
     <nav class="c-tabs" :aria-label="$t('admin.index.tabsLabel')">

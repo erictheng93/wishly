@@ -391,6 +391,7 @@ pub fn category(kind: &str) -> Category {
                 | "cash_refund.updated"
                 | "wishlist.moderated"
                 | "report.resolved"
+                | "support.replied"
                 | "order.failed"
                 | "order.partial_refund"
                 | "funding.expired"
@@ -442,6 +443,7 @@ pub fn email_tier(kind: &str) -> EmailTier {
         | "topup.expired"
         | "wishlist.supported"
         | "report.resolved"
+        | "support.replied"
         | "profile.date_soon" => EmailTier::InAppOnly,
         "claim.purchase_reminder"
         | "claim.list_closed"
@@ -508,6 +510,7 @@ pub const KINDS: &[&str] = &[
     "wallet.chargeback",
     "wishlist.moderated",
     "report.resolved",
+    "support.replied",
     "account.suspended",
     "account.restored",
     "staff.digest",
@@ -563,6 +566,7 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
         | "account.suspended"
         | "account.restored" => "/settings".into(),
         "report.resolved" => "/me/notifications".into(),
+        "support.replied" => "/support".into(),
         "auth.mfa_reset" | "staff.digest" => "/admin".into(),
         "org.permit_revoked"
         | "org.permit_rejected"
@@ -1936,6 +1940,16 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 },
             )
         }
+        // payload 刻意不放回覆內文（站內信標題 / 內文凍結在通知列），請使用者到 /support 看
+        "support.replied" => (
+            l.pick("【Wishly】客服已回覆你的請求".into(), "[Wishly] Support replied to your request".into(), "[Wishly] Bộ phận hỗ trợ đã trả lời yêu cầu của bạn".into(), "[Wishly] Tim dukungan sudah membalas permintaanmu".into()),
+            l.pick(
+                format!("客服已回覆你的客服請求，請到客服頁查看。\n{base}/support\n"),
+                format!("Our support team has replied to your request. See the reply on the support page.\n{base}/support\n"),
+                format!("Bộ phận hỗ trợ đã trả lời yêu cầu của bạn. Xem câu trả lời tại trang hỗ trợ.\n{base}/support\n"),
+                format!("Tim dukungan sudah membalas permintaanmu. Lihat balasannya di halaman dukungan.\n{base}/support\n"),
+            ),
+        ),
         "wishlist.supported" => {
             let who = payload["supporter_name"].as_str().unwrap_or_default();
             (
@@ -2069,6 +2083,7 @@ mod tests {
             "cash_refund.updated",
             "wishlist.moderated",
             "report.resolved",
+            "support.replied",
             "order.failed",
             "order.partial_refund",
             "funding.expired",
@@ -2153,6 +2168,7 @@ mod tests {
             "topup.expired",
             "wishlist.supported",
             "report.resolved",
+            "support.replied",
         ] {
             assert_eq!(email_tier(k), InAppOnly, "{k}");
         }
