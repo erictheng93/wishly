@@ -128,6 +128,31 @@
         "disputed_topups": "Disputes {n}",
         "open_debts": "Open debts {n}",
         "open_reports": "{n} open"
+      },
+      "notices": {
+        "title": "System notices",
+        "empty": "No notices yet",
+        "allLocales": "All locales",
+        "disable": "Disable",
+        "confirmDisable": "Disable notice \"{title}\"? This cannot be undone.",
+        "fTitle": "Title (max 80 chars)",
+        "fBody": "Body (max 500 chars, plain text)",
+        "fLevel": "Level",
+        "fLocale": "Locale",
+        "fStarts": "Starts at (blank = now)",
+        "fEnds": "Ends at (blank = never)",
+        "create": "Publish notice",
+        "levels": {
+          "info": "Info",
+          "warning": "Warning",
+          "critical": "Critical (cannot be dismissed)"
+        },
+        "states": {
+          "scheduled": "Scheduled",
+          "active": "Active",
+          "ended": "Ended",
+          "disabled": "Disabled"
+        }
       }
     },
     "audit": {

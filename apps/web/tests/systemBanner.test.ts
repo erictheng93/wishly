@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { readDismissed, visibleNotices, writeDismissed } from '../app/utils/notices'
 import SystemBanner from '../app/components/SystemBanner.vue'
 import { fetchPublicStatus, noteUnavailable, useSysStatus } from '../app/composables/useSysStatus'
 import { flush, mount } from './vueHarness'
@@ -13,12 +14,14 @@ beforeEach(() => {
   vi.useFakeTimers()
   state.value = { kind: 'readOnly', until: Date.now() + 60_000 } // 已在維護中，掛載時不先查
   for (const [name, value] of Object.entries({
-    onBeforeUnmount, onMounted, watch, noteUnavailable, useSysStatus, fetchPublicStatus,
+    onBeforeUnmount, onMounted, watch, ref, computed, visibleNotices, readDismissed, writeDismissed, useI18n: () => ({ locale: ref('en') }), noteUnavailable, useSysStatus, fetchPublicStatus,
     useState: () => state,
     useRuntimeConfig: () => ({ public: { apiBase: 'http://api' } }),
     $fetch: fetch,
   })) vi.stubGlobal(name, value)
+  fetch.mockResolvedValueOnce({ read_only: true }) // 掛載一律抓一次（公告），之後的斷言只看到期複查
   mounted = mount(SystemBanner)
+  fetch.mockClear()
 })
 
 afterEach(() => {

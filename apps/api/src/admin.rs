@@ -1,4 +1,4 @@
-//! 營運後台：STAFF 守衛 + 清單/使用者搜尋 + system-flags + 簡易統計。
+//! 營運後台：STAFF 守衛 + 清單/使用者搜尋 + system-flags + 系統公告 + 簡易統計。
 //! 檢舉佇列與下架在 reports.rs（同樣使用 `Staff`）。
 use crate::{error::AppError, session::CurrentUser, AppState};
 use axum::{
@@ -27,6 +27,8 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/audit-logs", get(list_audit_logs))
         .route("/admin/system-flags", get(list_flags))
         .route("/admin/system-flags/{key}", put(set_flag))
+        .route("/admin/notices", get(list_notices).post(create_notice))
+        .route("/admin/notices/{id}/disable", post(disable_notice))
         .route("/admin/notifications/requeue", post(requeue_notifications))
         .route("/admin/stats", get(stats))
         .route("/admin/analytics", get(analytics))
@@ -703,6 +705,138 @@ async fn set_flag(
     Ok(Json(
         json!({ "key": key, "value": v, "updated_at": updated_at }),
     ))
+}
+
+/// 公告列轉 JSON（level 轉 text）；$1 為 NULL 列全部（新到舊最多 100），否則只取該筆
+const NOTICE_SQL: &str = "SELECT to_jsonb(t) FROM (SELECT id, title, body, level::text AS level, locale, starts_at, ends_at, disabled_at, created_at FROM system_notices WHERE $1::uuid IS NULL OR id = $1 ORDER BY created_at DESC LIMIT 100) t";
+
+async fn list_notices(
+    State(st): State<AppState>,
+    _s: Staff<ADMIN>,
+) -> Result<Json<Value>, AppError> {
+    let rows: Vec<(Value,)> = sqlx::query_as(NOTICE_SQL)
+        .bind(None::<Uuid>)
+        .fetch_all(&st.pool)
+        .await?;
+    Ok(Json(
+        json!({ "data": rows.into_iter().map(|r| r.0).collect::<Vec<_>>() }),
+    ))
+}
+
+#[derive(Deserialize)]
+struct NoticeIn {
+    title: String,
+    body: Option<String>,
+    level: Option<String>,
+    locale: Option<String>,
+    starts_at: Option<chrono::DateTime<chrono::Utc>>,
+    ends_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+async fn create_notice(
+    State(st): State<AppState>,
+    Staff(sid): Staff<ADMIN>,
+    Json(b): Json<NoticeIn>,
+) -> Result<(StatusCode, Json<Value>), AppError> {
+    let title = b.title.trim();
+    if title.is_empty() || title.chars().count() > 80 {
+        return Err(AppError::invalid("/title", "INVALID", "title 須為 1–80 字"));
+    }
+    let body = b.body.unwrap_or_default();
+    if body.chars().count() > 500 {
+        return Err(AppError::invalid("/body", "INVALID", "body 最多 500 字"));
+    }
+    let level = b.level.unwrap_or_else(|| "info".into());
+    if !["info", "warning", "critical"].contains(&level.as_str()) {
+        return Err(AppError::invalid(
+            "/level",
+            "INVALID",
+            "level 須為 info / warning / critical",
+        ));
+    }
+    if b.locale
+        .as_deref()
+        .is_some_and(|l| !["zh-Hant", "en", "vi", "id"].contains(&l))
+    {
+        return Err(AppError::invalid(
+            "/locale",
+            "INVALID",
+            "locale 不在支援的語系內",
+        ));
+    }
+    let now = chrono::Utc::now();
+    let starts_at = b.starts_at.unwrap_or(now);
+    if let Some(e) = b.ends_at {
+        if e <= starts_at || e <= now {
+            return Err(AppError::invalid(
+                "/ends_at",
+                "INVALID",
+                "ends_at 須晚於 starts_at 且在未來",
+            ));
+        }
+    }
+    let mut tx = st.pool.begin().await?;
+    let (id,): (Uuid,) = sqlx::query_as(
+        "INSERT INTO system_notices (title, body, level, locale, starts_at, ends_at, created_by)
+         VALUES ($1, $2, $3::notice_level, $4, $5, $6, $7) RETURNING id",
+    )
+    .bind(title)
+    .bind(&body)
+    .bind(&level)
+    .bind(&b.locale)
+    .bind(starts_at)
+    .bind(b.ends_at)
+    .bind(sid)
+    .fetch_one(&mut *tx)
+    .await?;
+    audit(
+        &mut *tx,
+        sid,
+        "system_notice.create",
+        "system_notices",
+        Some(id),
+        json!({ "level": level, "locale": b.locale, "starts_at": starts_at, "ends_at": b.ends_at }),
+    )
+    .await?;
+    let (v,): (Value,) = sqlx::query_as(NOTICE_SQL)
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok((StatusCode::CREATED, Json(v)))
+}
+
+/// 冪等：已停用的不改 disabled_at
+async fn disable_notice(
+    State(st): State<AppState>,
+    Staff(sid): Staff<ADMIN>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, AppError> {
+    let mut tx = st.pool.begin().await?;
+    let found = sqlx::query(
+        "UPDATE system_notices SET disabled_at = COALESCE(disabled_at, now()) WHERE id = $1",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    if found.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    audit(
+        &mut *tx,
+        sid,
+        "system_notice.disable",
+        "system_notices",
+        Some(id),
+        json!({}),
+    )
+    .await?;
+    let (v,): (Value,) = sqlx::query_as(NOTICE_SQL)
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Json(v))
 }
 
 /// 最簡統計：直接聚合現有表，不引入第三方。

@@ -1,5 +1,5 @@
 //! GET /public/wishlists/{slug}（契約第 5 章；訪客視角，可被 CDN 快取，只出 public 內容）
-//! GET /public/status（前端維護橫幅用；只回唯讀旗標，可被 CDN 快取 30 秒）
+//! GET /public/status（前端維護橫幅用：唯讀旗標、功能開關與生效中的系統公告，可被 CDN 快取 30 秒）
 //! GET /restricted/wishlists/{slug}（好友 / 指定 / 擁有者，依 ws_session，永遠 no-store）
 use crate::{error::AppError, AppState};
 use axum::{
@@ -39,11 +39,39 @@ async fn status(State(st): State<AppState>) -> Result<Response, AppError> {
         m.extend(["cvs_code", "cvs_barcode", "atm"]);
         m
     });
+    let notices = active_notices(&st.pool).await?;
     Ok((
         [(header::CACHE_CONTROL, "public, max-age=30")],
-        Json(json!({ "read_only": read_only, "orgs_enabled": cfg.orgs_enabled, "topup_methods": topup_methods })),
+        Json(json!({ "read_only": read_only, "orgs_enabled": cfg.orgs_enabled, "topup_methods": topup_methods, "notices": notices })),
     )
         .into_response())
+}
+
+/// 生效中的系統公告（#96）：嚴重度高者優先，最多 5 則。micro_cache 開時程序內快取 10 秒
+/// （/public/status 原本靠旗標快取不碰 DB；公告新增/停用晚 10 秒生效可接受，CDN 本來就快取 30 秒）。
+async fn active_notices(pool: &sqlx::PgPool) -> Result<Value, sqlx::Error> {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    static CACHE: Mutex<Option<(Instant, Value)>> = Mutex::new(None);
+    let cache = crate::config::get().micro_cache;
+    if let (true, Some((at, v))) = (cache, CACHE.lock().unwrap().as_ref()) {
+        if at.elapsed() < Duration::from_secs(10) {
+            return Ok(v.clone());
+        }
+    }
+    let (notices,): (Value,) = sqlx::query_as(
+        "SELECT COALESCE(jsonb_agg(n ORDER BY lv DESC, starts_at DESC), '[]'::jsonb) FROM (
+           SELECT level AS lv, starts_at, jsonb_build_object('id', id, 'title', title, 'body', body, 'level', level,
+                    'locale', locale, 'starts_at', starts_at, 'ends_at', ends_at) AS n
+           FROM system_notices
+           WHERE disabled_at IS NULL AND starts_at <= now() AND (ends_at IS NULL OR ends_at > now())
+           ORDER BY level DESC, starts_at DESC LIMIT 5) t")
+        .fetch_one(pool)
+        .await?;
+    if cache {
+        *CACHE.lock().unwrap() = Some((Instant::now(), notices.clone()));
+    }
+    Ok(notices)
 }
 
 const EXPLORE_PAGE: i64 = 24;

@@ -330,7 +330,7 @@ async fn orgs_gate(
     next.run(req).await
 }
 
-/// system_flags.read_only = true → 非安全方法回 503 READ_ONLY_MODE（退訂 POST 放行：保護性的使用者操作，且只寫退訂偏好；admin system-flags、登出、登入與兩步驟驗證除外：否則 staff 登出後無法登入來關閉唯讀）
+/// system_flags.read_only = true → 非安全方法回 503 READ_ONLY_MODE（退訂 POST 放行：保護性的使用者操作，且只寫退訂偏好；admin system-flags 與 notices（維護時要能發公告說明）、登出、登入與兩步驟驗證除外：否則 staff 登出後無法登入來關閉唯讀）
 async fn read_only(
     axum::extract::State(st): axum::extract::State<AppState>,
     req: axum::extract::Request,
@@ -340,6 +340,7 @@ async fn read_only(
     let p = req.uri().path();
     let safe = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS)
         || p.starts_with("/api/v1/admin/system-flags")
+        || p.starts_with("/api/v1/admin/notices")
         || p.starts_with("/api/v1/auth/mfa/")
         || matches!(
             p,

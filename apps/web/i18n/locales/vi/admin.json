@@ -128,6 +128,31 @@
         "disputed_topups": "Tranh chấp {n}",
         "open_debts": "Nợ chưa trả {n}",
         "open_reports": "{n} chờ xử lý"
+      },
+      "notices": {
+        "title": "Thông báo hệ thống",
+        "empty": "Chưa có thông báo",
+        "allLocales": "Mọi ngôn ngữ",
+        "disable": "Tắt",
+        "confirmDisable": "Tắt thông báo \"{title}\"? Không thể hoàn tác.",
+        "fTitle": "Tiêu đề (tối đa 80 ký tự)",
+        "fBody": "Nội dung (tối đa 500 ký tự, văn bản thuần)",
+        "fLevel": "Mức độ",
+        "fLocale": "Ngôn ngữ",
+        "fStarts": "Bắt đầu (trống = ngay)",
+        "fEnds": "Kết thúc (trống = không giới hạn)",
+        "create": "Đăng thông báo",
+        "levels": {
+          "info": "Thông tin",
+          "warning": "Cảnh báo",
+          "critical": "Khẩn cấp (không thể đóng)"
+        },
+        "states": {
+          "scheduled": "Đã lên lịch",
+          "active": "Đang hiển thị",
+          "ended": "Đã kết thúc",
+          "disabled": "Đã tắt"
+        }
       }
     },
     "audit": {
