@@ -19,6 +19,7 @@ LEDGER_TEST = "wallet_and_ledger_enforce_nonnegative_balance_and_append_only"
 CDN_TEST = "privacy_archive_and_moderation_send_cdn_purge"
 # path, enclosing Rust function (None for SQL), exact old text, replacement, binary, test
 CASES = {
+    "notify-bundle-lease": (API + "notify.rs", "handle", "AND (n.lease_until IS NULL OR n.lease_until <= now() OR n.lease_id = $7)", "", "notify_foundation", "bundling_skips_rows_leased_by_another_worker"),
     "cdn-private": (API + "wishlists.rs", "update", "crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);", "", "cdn_invalidation", CDN_TEST),
     "cdn-archive": (API + "wishlists.rs", "archive", "crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);", "", "cdn_invalidation", CDN_TEST),
     "user-suspend-reports-open-only": (API + "admin.rs", "update_user", "WHERE reported_user_id = $1 AND status = 'open'", "WHERE reported_user_id = $1", "report_console", "suspending_user_actions_only_their_open_reports"),
@@ -225,6 +226,7 @@ FAILURE_MARKERS.update({
     "birthday-nudge-once": "birthday nudge queued twice",
     "debt-offset-return-path": "returned points must offset the charge-back debt",
     "charge-back-idempotent": "charge_back must be idempotent",
+    "notify-bundle-lease": "別人租約中的列不可被合併",
     "claims-reconciliation": "claims reconciliation accepted a drifted cache",
     "wallet-reconciliation": "wallet reconciliation accepted a drifted balance",
     "contribution-reconciliation": "contribution reconciliation accepted a drifted cache",

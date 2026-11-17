@@ -388,6 +388,9 @@ async fn moderate(
         json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len()}),
     )
     .await?;
+    // 上下架都會改變公開頁的事件名稱 / 連結：所有上線據點一併推進 updated_at（ETag 依此）並清快取，不只剛暫停的
+    let touched: Vec<String> = sqlx::query_scalar("UPDATE wishlists SET updated_at=now() WHERE event_id=$1 AND type='relief' AND status='active' RETURNING slug::text")
+        .bind(id).fetch_all(&mut *tx).await?;
     let ev = event_slugs(&mut *tx, &[id]).await?;
     // 下架暫停了據點，所屬組織頁（只列上線據點）也要清
     let orgs: Vec<String> = if hide {
@@ -397,7 +400,7 @@ async fn moderate(
         vec![]
     };
     tx.commit().await?;
-    crate::cdn::purge_wishlists(slugs);
+    crate::cdn::purge_wishlists(touched);
     crate::cdn::purge_events(ev);
     orgs.into_iter().for_each(crate::cdn::purge_org);
     Ok(Json(

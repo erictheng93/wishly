@@ -182,3 +182,19 @@ async fn address_and_close_friends_are_not_leaked(pool: PgPool) {
     );
     assert_eq!(logs(&pool, "close_friends.remove").await, vec![json!({})]);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn patch_archive_uses_permanent_actions(pool: PgPool) {
+    let me = user(&pool, "甲").await;
+    let wl = wishlist(&pool, me.id, ListOpts::default()).await;
+    let url = format!("/wishlists/{}", wl.id);
+    let tk = ck(&me.token);
+    let patch = |b: Value| call(&pool, "PATCH", &url, &tk, Some(b));
+    let (s, _, b) = patch(json!({ "status": "archived" })).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(logs(&pool, "wishlist.archive").await.len(), 1);
+    let (s, _, b) = patch(json!({ "status": "closed" })).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(logs(&pool, "wishlist.unarchive").await.len(), 1);
+    assert!(logs(&pool, "wishlist.update").await.is_empty());
+}

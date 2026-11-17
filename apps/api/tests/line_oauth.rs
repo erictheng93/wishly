@@ -32,7 +32,7 @@ async fn line_login_with_mock_provider(pool: PgPool) {
     let (st, h, _) = call_app(
         &app,
         "GET",
-        "/auth/oauth/line/start?redirect=/lists",
+        "/auth/oauth/line/start?redirect=/lists&locale=vi",
         &[],
         None,
     )
@@ -122,6 +122,12 @@ async fn line_login_with_mock_provider(pool: PgPool) {
     assert_eq!(st, 200);
     assert_eq!(me["display_name"], "LINE小明");
     assert_eq!(me["identities"][0]["provider"], "line");
+    // 開戶語言取自 start 的 locale（介面語言），不是 Accept-Language
+    let loc: String = sqlx::query_scalar("SELECT locale FROM users WHERE display_name='LINE小明'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(loc, "vi");
     // 第二次登入是同一 user
     let n: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM auth_identities WHERE provider='line' AND provider_uid='U-mock-123'",

@@ -247,14 +247,61 @@ pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Res
         .map_err(|e| e.to_string())
 }
 
+/// 送出佇列的待寄工作
+enum Job {
+    Mail(Outbound),
+    Push(Uuid, String, String),
+}
+
+/// 佇列容量 40：寄送端滿載時最壞排空時間約 (40+5)×15s/5 ≈ 135 秒，遠小於 6 分鐘租約，
+/// 排進佇列的信在租約到期前一定寄完（或失敗退避）；塞不進去的信不處理，租約到期後會被重新領取。
+const SEND_QUEUE: usize = 40;
+
 pub fn spawn_worker(pool: PgPool) {
+    // 寄送由獨立的長駐 task 負責，SMTP 卡住不會拖慢下一輪站內信掃描
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Job>(SEND_QUEUE);
+    let p = pool.clone();
+    tokio::spawn(async move {
+        let jobs =
+            futures_util::stream::unfold(
+                &mut rx,
+                |rx| async move { rx.recv().await.map(|j| (j, rx)) },
+            );
+        futures_util::StreamExt::for_each_concurrent(jobs, SEND_CONCURRENCY, |j| {
+            let p = &p;
+            async move {
+                match j {
+                    Job::Mail(o) => {
+                        if let Err(e) = deliver(p, o).await {
+                            tracing::warn!(error = %e, "notify deliver");
+                        }
+                    }
+                    Job::Push(u, title, path) => crate::push::deliver(p, u, &title, &path).await,
+                }
+            }
+        })
+        .await;
+    });
     tokio::spawn(async move {
         let mut idle = 1; // 秒
         loop {
             // 沒東西可寄就逐步放慢到 5 秒一次（閒置時每秒一次輪詢占了背景往返的九成）；一有工作立刻回到每秒
-            idle = match tick(&pool).await {
-                Ok(0) => (idle + 1).min(5),
-                Ok(_) => 1,
+            idle = match tick_db(&pool, chrono::Utc::now()).await {
+                Ok((0, ..)) => (idle + 1).min(5),
+                Ok((_, out, pushes)) => {
+                    for o in out {
+                        // 站內信已寫入；信留在 pending，租約到期後重新領取，不會重複站內信
+                        if tx.try_send(Job::Mail(o)).is_err() {
+                            tracing::warn!("notify send queue full, mail deferred to lease expiry");
+                        }
+                    }
+                    for (u, t, path) in pushes {
+                        if tx.try_send(Job::Push(u, t, path)).is_err() {
+                            tracing::warn!("notify send queue full, push dropped");
+                        }
+                    }
+                    1
+                }
                 Err(e) => {
                     tracing::warn!(error = %e, "notify worker");
                     idle
@@ -575,15 +622,29 @@ pub async fn tick_at(
     pool: &PgPool,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Result<usize, sqlx::Error> {
-    // 1. 領取：租約須大於一批 20 封 × 15 秒的寄送上限
+    let (n, out, pushes) = tick_db(pool, now).await?;
+    tokio::join!(send_all(pool, out), push_all(pool, pushes));
+    Ok(n)
+}
+
+type PushJob = (Uuid, String, String);
+
+/// DB 階段：領取到站內信 / 排程做完，回傳領取筆數與待寄的 email、推播（不含寄送）。
+async fn tick_db(
+    pool: &PgPool,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<(usize, Vec<Outbound>, Vec<PushJob>), sqlx::Error> {
+    // 1. 領取：租約 6 分鐘（lease_until），須大於寄送佇列排空上限；合併不會動別的 worker 持有租約的列
+    let tok = Uuid::new_v4();
     let rows: Vec<PendingNotification> = sqlx::query_as(
-        "UPDATE notifications SET attempts = attempts + 1, scheduled_at = now() + interval '6 minutes'
+        "UPDATE notifications SET attempts = attempts + 1, scheduled_at = now() + interval '6 minutes',
+                lease_id = $1, lease_until = now() + interval '6 minutes'
           WHERE id IN (SELECT id FROM notifications WHERE status = 'pending' AND scheduled_at <= now()
                         ORDER BY scheduled_at LIMIT 20 FOR UPDATE SKIP LOCKED)
          RETURNING id, user_id, guest_id, channel::text, kind, payload, attempts, inbox_at IS NOT NULL")
-        .fetch_all(pool).await?;
+        .bind(tok).fetch_all(pool).await?;
     if rows.is_empty() {
-        return Ok(0);
+        return Ok((0, Vec::new(), Vec::new()));
     }
     let n = rows.len();
     let mut bundled = std::collections::HashSet::new();
@@ -593,10 +654,9 @@ pub async fn tick_at(
         if bundled.contains(&row.0) {
             continue;
         }
-        out.extend(handle(pool, now, row, &mut bundled, &mut pushes).await?);
+        out.extend(handle(pool, now, tok, row, &mut bundled, &mut pushes).await?);
     }
-    tokio::join!(send_all(pool, out), push_all(pool, pushes));
-    Ok(n)
+    Ok((n, out, pushes))
 }
 
 async fn send_all(pool: &PgPool, out: Vec<Outbound>) {
@@ -626,12 +686,25 @@ async fn push_all(pool: &PgPool, pushes: Vec<(Uuid, String, String)>) {
 async fn handle(
     pool: &PgPool,
     now: chrono::DateTime<chrono::Utc>,
+    tok: Uuid,
     (id, uid, gid, channel, kind, mut payload, attempts, has_inbox): PendingNotification,
     bundled: &mut std::collections::HashSet<Uuid>,
     pushes: &mut Vec<(Uuid, String, String)>,
 ) -> Result<Option<Outbound>, sqlx::Error> {
     macro_rules! done {
         ($st:expr, $err:expr) => {{
+            // 主列取消：先前併入它的成員沒有人會寄，放回 pending 由各自重驗
+            if $st == "cancelled"
+                && payload["more_items"]
+                    .as_array()
+                    .is_some_and(|a| !a.is_empty())
+            {
+                sqlx::query(
+                    "UPDATE notifications SET status = 'pending', sent_at = NULL, last_error = NULL, scheduled_at = now()
+                      WHERE last_error = 'bundled:' || $1::text AND status = 'sent' AND kind = $2
+                        AND user_id IS NOT DISTINCT FROM $3 AND guest_id IS NOT DISTINCT FROM $4")
+                .bind(id).bind(&kind).bind(uid).bind(gid).execute(pool).await?;
+            }
             set_status(pool, id, $st, $err).await?;
             return Ok(None);
         }};
@@ -830,6 +903,7 @@ async fn handle(
                   AND n.kind = $3 AND n.status = 'pending' AND n.id <> $4 AND (n.inbox_at IS NOT NULL) = $5
                   AND (n.kind <> 'claim.item_changed' OR n.payload->>'item_id' = $6)
                   AND n.scheduled_at <= now() + interval '6 hours'
+                  AND (n.lease_until IS NULL OR n.lease_until <= now() OR n.lease_id = $7)
                   AND CASE n.kind
                         WHEN 'claim.purchase_reminder' THEN EXISTS (
                           SELECT 1 FROM claims c WHERE c.id = (n.payload->>'claim_id')::uuid
@@ -843,7 +917,7 @@ async fn handle(
                UPDATE notifications SET status = 'sent', sent_at = now(), last_error = 'bundled:' || $4::text
                  FROM m WHERE notifications.id = m.id RETURNING notifications.id)
              SELECT m.id, m.title FROM m JOIN u ON u.id = m.id")
-            .bind(uid).bind(gid).bind(&kind).bind(id).bind(has_inbox).bind(payload["item_id"].as_str()).fetch_all(pool).await?;
+            .bind(uid).bind(gid).bind(&kind).bind(id).bind(has_inbox).bind(payload["item_id"].as_str()).bind(tok).fetch_all(pool).await?;
         bundled.extend(merged.iter().map(|(i, _)| *i));
         // 品項變更併的是同一品項，不需要「共 N 件」
         if !merged.is_empty() && kind != "claim.item_changed" {

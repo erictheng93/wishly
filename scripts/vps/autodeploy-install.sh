@@ -18,6 +18,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/wishly-autodeploy.sh
+TimeoutStartSec=5min
 UNIT
 
 cat >/etc/systemd/system/wishly-autodeploy.timer <<'UNIT'

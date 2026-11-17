@@ -913,8 +913,13 @@ async fn update(
         return Err(stale());
     }
     if let Some(d) = audit_changed(&audit_before, &w_snap(&w)) {
-        crate::orgs::audit_user(&mut *tx, u.id, "wishlist.update", "wishlists", Some(id), d)
-            .await?;
+        // 封存 / 取消封存要永久保留，不可落入一年後清除的 wishlist.update
+        let action = match (old_status.as_str(), w.status.as_str()) {
+            (o, "archived") if o != "archived" => "wishlist.archive",
+            ("archived", n) if n != "archived" => "wishlist.unarchive",
+            _ => "wishlist.update",
+        };
+        crate::orgs::audit_user(&mut *tx, u.id, action, "wishlists", Some(id), d).await?;
     }
     if old_status != "active" && w.status == "active" {
         crate::support::notify_targets(&mut tx, id).await?;
@@ -943,6 +948,18 @@ async fn update(
             ))
             .execute(&mut *tx)
             .await?;
+        if w.site_address != old_addr {
+            // 只記「有變更」，絕不記地址
+            crate::orgs::audit_user(
+                &mut *tx,
+                u.id,
+                "wishlist.shipping_address.update",
+                "wishlists",
+                Some(id),
+                json!({ "changed": true }),
+            )
+            .await?;
+        }
     }
     if w.status == "archived" {
         release_pledged(&mut tx, &[id]).await?;

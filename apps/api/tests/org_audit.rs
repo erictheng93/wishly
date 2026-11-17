@@ -127,3 +127,27 @@ async fn scope_roles_and_masking(pool: PgPool) {
     let raw = v.to_string();
     assert!(!raw.contains("actor_id") && !raw.contains(&st.id.to_string()));
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn invite_email_hidden_from_coordinator(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let c = user(&pool, "C").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    member(&pool, o, c.id, "coordinator").await;
+    log(
+        &pool,
+        "user",
+        Some(a.id),
+        "org.invite.create",
+        "org_invite",
+        Some(Uuid::new_v4()),
+        json!({"org_id":o,"email":"invitee@example.com","role":"volunteer"}),
+    )
+    .await;
+    let (_, v) = get_logs(&pool, o, &c.token).await;
+    let d = &v["data"][0]["diff"];
+    assert!(d.get("email").is_none() && d["role"] == "volunteer", "{v}");
+    let (_, v) = get_logs(&pool, o, &a.token).await;
+    assert_eq!(v["data"][0]["diff"]["email"], "invitee@example.com");
+}

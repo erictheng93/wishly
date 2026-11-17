@@ -1271,6 +1271,8 @@ struct StartQ {
     app_challenge: Option<String>,
     /// 原生殼綁定：由 POST /auth/oauth/{provider}/link-ticket 取得的一次性 ticket
     ticket: Option<String>,
+    /// 目前介面語言（zh-Hant/en/vi/id）；整頁導向時 Accept-Language 是瀏覽器的、不是介面語言
+    locale: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1284,6 +1286,9 @@ struct OAuthState {
     session_hash: Option<String>,
     #[serde(default)]
     app_challenge: Option<String>,
+    /// 開戶時的通知語言（已驗證的 users.locale 值）；舊 cookie 無此欄位 → 退回 Accept-Language
+    #[serde(default)]
+    locale: Option<String>,
 }
 
 /// 原生殼 deep link 基底（App 註冊的 scheme）；結果以 ?code= 或 ?error= 附帶。
@@ -1442,6 +1447,11 @@ async fn oauth_start(
             link_user,
             session_hash,
             app_challenge,
+            locale: q
+                .locale
+                .as_deref()
+                .filter(|l| ["zh-Hant", "en", "vi", "id"].contains(l))
+                .map(|l| crate::notify::Lang::parse(l).code().to_string()),
         })
         .unwrap(),
     );
@@ -1647,15 +1657,25 @@ async fn oauth_callback(
             Err(error) => return Ok(fail(oauth_error(error))),
         }
     }
-    let uid = match upsert_identity(
-        &st.pool,
-        &provider,
-        &sub,
-        email.as_deref(),
-        &name,
-        picture.as_deref(),
-    )
-    .await
+    // 開戶語言以發起登入時的介面語言為準（upsert_identity 讀 request_lang）
+    let lang = s
+        .locale
+        .as_deref()
+        .map(crate::notify::Lang::parse)
+        .unwrap_or_else(crate::notify::request_lang);
+    let uid = match crate::notify::REQUEST_LANG
+        .scope(
+            lang,
+            upsert_identity(
+                &st.pool,
+                &provider,
+                &sub,
+                email.as_deref(),
+                &name,
+                picture.as_deref(),
+            ),
+        )
+        .await
     {
         Ok((uid, _)) => uid,
         Err(error) => return Ok(fail(oauth_error(error))),
@@ -1864,6 +1884,7 @@ mod tests {
                 link_user: None,
                 session_hash: None,
                 app_challenge: None,
+                locale: None,
             })
             .unwrap(),
         );
