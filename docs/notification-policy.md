@@ -8,6 +8,7 @@
 - 站內通知不受安靜時段、Email 延後或 Email 開關影響，寫入後立即提示前端，不需重新整理。
 - 帳務、安全與期限類不可關閉。送禮進度、社交與生日可分別關閉站內或 Email（`inbox_gifts`、`email_gifts`、`inbox_social`、`email_social`，缺鍵視為開啟）。
 - `wishlist.supported`（有人把你的清單設為支持對象）屬社交類、只留站內，只發給個人清單擁有者或組織的 owner / coordinator。
+- 組織通知（`org.review`、`org.permit_*`、`org.event_hidden`、`org.event_restored`）發給組織的 owner 與 coordinator（未停用、帳號未刪除），volunteer 不收；`org.invite` 只寄受邀者。`org.event_restored` 在事件取消下架、因下架而暫停的據點自動恢復營運時發，payload 帶恢復數。
 
 ## Email 判斷標準
 
@@ -28,7 +29,7 @@
 | 安全 | `auth.password_changed`、`auth.new_device`（驗證碼登入只進站內）、`auth.mfa_enabled`、`auth.mfa_reset`、`auth.recovery_regenerated`、`auth.identity_linked`、`auth.identity_unlinked` |
 | 帳號處分 | `account.suspended`、`account.restored` |
 | 金流 | `topup.credited`、`cash_refund.updated`、`wallet.frozen`、`wallet.unfrozen`、`wallet.chargeback`、`order.failed`、`order.partial_refund`、`funding.expired`、`funding.released`、`item.removed` |
-| 組織與治理 | `org.invite`、`org.review`、`org.permit_reviewed`、`org.permit_rejected`、`org.permit_revoked`、`org.permit_expiring`、`org.permit_expired`、`org.event_hidden`、`wishlist.moderated` |
+| 組織與治理 | `org.invite`、`org.review`、`org.permit_reviewed`、`org.permit_rejected`、`org.permit_revoked`、`org.permit_expiring`、`org.permit_expired`、`org.event_hidden`、`org.event_restored`、`wishlist.moderated` |
 | 緊急期限 | `site.paused`、`wishlist.closing` |
 | 營運 | `staff.digest`（依營運角色只列負責件數：moderator 檢舉 / 組織 / 許可、finance 現金退款 / 訂單、寄送失敗只給 admin，admin 全部；support 不寄） |
 

@@ -80,7 +80,12 @@ async function applyPermit(pid: string) {
         <ul class="c-list oh-list">
           <li v-for="e in events" :key="e.id">
             <strong>{{ e.name }}</strong>
+            <span v-if="e.moderation_status === 'hidden'" class="c-badge hidden">{{ $t('org.console.eventHidden') }}</span>
             <span class="c-mute">{{ e.occurred_on }}　{{ (e.counties ?? []).join('、') }}</span>
+            <span v-if="e.moderation_status === 'hidden' && e.moderation_reason" class="c-mute">{{ $t('org.console.eventHiddenReason', { reason: e.moderation_reason }) }}</span>
+            <span v-if="canEdit && e.created_by_org === id && e.moderation_status !== 'hidden'" class="oh-acts">
+              <NuxtLink :to="`/orgs/${id}/events/${e.id}/edit`">{{ $t('org.console.edit') }}</NuxtLink>
+            </span>
           </li>
         </ul>
       </section>
@@ -94,6 +99,7 @@ async function applyPermit(pid: string) {
             <strong>{{ s.title }}</strong>
             <CreatorStatusBadge v-if="s.site_status" :v="s.site_status" :label="$t(`org.relief.siteStatus.${s.site_status}`)" />
             <span class="c-mute">{{ s.site_address }}</span>
+            <span v-if="s.paused_reason" class="c-mute oh-why">{{ $t(`org.console.pausedReason.${s.paused_reason}`) }}</span>
             <span class="oh-acts">
               <NuxtLink v-if="canEdit" :to="`/lists/${s.id}/edit`">{{ $t('org.console.edit') }}</NuxtLink>
               <NuxtLink :to="`/orgs/${id}/sites/${s.id}/receipts`">{{ $t('org.console.receipts') }}</NuxtLink>
@@ -163,6 +169,7 @@ async function applyPermit(pid: string) {
 .oh-list li>strong{font-size:16px;grid-column:1}
 .oh-list li>.c-mute{grid-column:1/-1;font:500 12px/1.5 var(--mono);letter-spacing:.03em}
 .oh-list li>.c-badge{grid-column:2;justify-self:start}
+.oh-list li>.oh-why{color:var(--red-text)}
 .oh-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;margin-top:2px}
 .oh-acts a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px 0 0;margin-right:12px;border-right:1px solid var(--line);font-size:14px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:4px}
 .oh-acts a:last-child{border-right:0}

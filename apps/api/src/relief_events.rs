@@ -1,5 +1,5 @@
 //! 災害事件：建立、查重、編輯、合併與下架（spec 2026-10-27-org-relief-registration-design）。
-//! 鎖序：relief_events（依 id 由小到大）→ wishlists。
+//! 鎖序：relief_events（依 id 由小到大）→ wishlists；取消下架會恢復據點，先鎖 organizations（FOR SHARE）。
 use crate::{
     admin::{audit, Staff, MODERATOR},
     error::AppError,
@@ -150,7 +150,7 @@ async fn create(
     Ok((StatusCode::CREATED, Json(v)))
 }
 
-/// 本組織建立的事件，或有本組織據點的事件；不含已被合併者
+/// 本組織建立的事件，或有本組織據點的事件；不含已被合併者。下架原因只給組織成員看（J 也用於公開端點，不含 reason）
 async fn list(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -160,7 +160,7 @@ async fn list(
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT {J} FROM relief_events WHERE merged_into IS NULL AND (created_by_org = $1
+        "SELECT {J} || jsonb_build_object('moderation_reason', moderation_reason) FROM relief_events WHERE merged_into IS NULL AND (created_by_org = $1
            OR EXISTS (SELECT 1 FROM wishlists w WHERE w.event_id = relief_events.id AND w.org_id = $1)) ORDER BY created_at DESC, id")))
         .bind(org)
         .fetch_all(&st.pool).await?))
@@ -279,12 +279,14 @@ async fn merge(
             "不可合併到已下架的事件",
         ));
     }
-    let slugs: Vec<String> =
-        sqlx::query_scalar("UPDATE wishlists SET event_id=$2 WHERE event_id=$1 RETURNING slug")
-            .bind(id)
-            .bind(b.into)
-            .fetch_all(&mut *tx)
-            .await?;
+    // 換到新事件：舊事件下架留下的暫停標記作廢（新事件未下架，組織可自行恢復），以免日後新事件取消下架時誤恢復
+    let slugs: Vec<String> = sqlx::query_scalar(
+        "UPDATE wishlists SET event_id=$2, event_paused_at=NULL WHERE event_id=$1 RETURNING slug",
+    )
+    .bind(id)
+    .bind(b.into)
+    .fetch_all(&mut *tx)
+    .await?;
     sqlx::query("UPDATE relief_events SET merged_into=$2 WHERE id=$1")
         .bind(id)
         .bind(b.into)
@@ -340,6 +342,12 @@ async fn moderate(
         ));
     }
     let mut tx = st.pool.begin().await?;
+    // 取消下架會恢復據點（trigger 重驗組織與許可）：鎖序 organizations → relief_events → wishlists，
+    // 先鎖住事件下所有據點的組織，與撤銷認證 / 許可審核互斥
+    if !hide {
+        sqlx::query("SELECT id FROM organizations WHERE id IN (SELECT org_id FROM wishlists WHERE event_id = $1 AND type = 'relief') ORDER BY id FOR SHARE")
+            .bind(id).fetch_all(&mut *tx).await?;
+    }
     sqlx::query_scalar::<_, Uuid>("SELECT id FROM relief_events WHERE id=$1 FOR UPDATE")
         .bind(id)
         .fetch_optional(&mut *tx)
@@ -347,21 +355,50 @@ async fn moderate(
         .ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE relief_events SET moderation_status=$2::moderation_status, moderation_reason=$3 WHERE id=$1")
         .bind(id).bind(&b.moderation_status).bind(if hide { reason.clone() } else { None }).execute(&mut *tx).await?;
-    // 只暫停仍 active 的據點；已暫停 / 已關閉的不重複通知
+    // 只暫停仍 active 的據點並標記 event_paused_at；已暫停 / 已關閉的不重複通知，取消下架時也不恢復
     let paused: Vec<(String, Uuid, Option<Uuid>)> = if hide {
-        sqlx::query_as("UPDATE wishlists SET site_status='paused' WHERE event_id=$1 AND type='relief' AND status='active' AND site_status IS DISTINCT FROM 'paused' AND site_status IS DISTINCT FROM 'closed' RETURNING slug, id, org_id").bind(id).fetch_all(&mut *tx).await?
+        sqlx::query_as("UPDATE wishlists SET site_status='paused', event_paused_at=now() WHERE event_id=$1 AND type='relief' AND status='active' AND site_status IS DISTINCT FROM 'paused' AND site_status IS DISTINCT FROM 'closed' RETURNING slug::text, id, org_id").bind(id).fetch_all(&mut *tx).await?
     } else {
         vec![]
     };
+    // 取消下架：恢復因下架而暫停、仍暫停中、組織仍 verified、許可仍核准且在效期內（台北日期）的據點。
+    // 條件與 trigger wishlists_relief_publish 相同，先在 SQL 濾掉會被擋的列，不讓整筆交易失敗
+    let restored: Vec<(String, Uuid, Option<Uuid>)> = if hide {
+        vec![]
+    } else {
+        sqlx::query_as(
+            "UPDATE wishlists w SET site_status='active', event_paused_at=NULL
+               FROM organizations o, org_permits p
+              WHERE w.event_id=$1 AND w.type='relief' AND w.event_paused_at IS NOT NULL
+                AND w.status='active' AND w.site_status='paused' AND w.deleted_at IS NULL
+                AND o.id=w.org_id AND o.verification_status='verified'
+                AND p.id=w.permit_id AND p.org_id=w.org_id AND p.status='approved'
+                AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN p.valid_from AND p.valid_to
+             RETURNING w.slug::text, w.id, w.org_id",
+        )
+        .bind(id)
+        .fetch_all(&mut *tx)
+        .await?
+    };
+    if !hide {
+        // 其餘維持暫停、標記清除（比照 org_admin::restore）；唯獨等待恢復認證的草稿據點（revoke_paused_at）保留，
+        // 由 restore 在事件已恢復時一併恢復營運
+        sqlx::query("UPDATE wishlists SET event_paused_at=NULL WHERE event_id=$1 AND event_paused_at IS NOT NULL AND revoke_paused_at IS NULL")
+            .bind(id).execute(&mut *tx).await?;
+    }
     let slugs: Vec<String> = paused.iter().map(|p| p.0.clone()).collect();
     if !paused.is_empty() {
         let ids: Vec<Uuid> = paused.iter().map(|p| p.1).collect();
         crate::notify::enqueue_site_paused(&mut *tx, &ids).await?;
+    }
+    // 通知各組織的管理者：下架（org.event_hidden）或恢復（org.event_restored，帶恢復數）
+    let changed = if hide { &paused } else { &restored };
+    if !changed.is_empty() {
         let title: String = sqlx::query_scalar("SELECT name FROM relief_events WHERE id = $1")
             .bind(id)
             .fetch_one(&mut *tx)
             .await?;
-        let mut orgs_seen: Vec<Uuid> = paused.iter().filter_map(|p| p.2).collect();
+        let mut orgs_seen: Vec<Uuid> = changed.iter().filter_map(|p| p.2).collect();
         orgs_seen.sort();
         orgs_seen.dedup();
         for o in orgs_seen {
@@ -370,13 +407,19 @@ async fn moderate(
                     .bind(o)
                     .fetch_one(&mut *tx)
                     .await?;
-            crate::notify::enqueue_org_owners(
-                &mut *tx,
-                o,
-                "org.event_hidden",
-                json!({"org_id": o, "display_name": dn, "event_title": title, "reason": reason}),
-            )
-            .await?;
+            let (kind, payload) = if hide {
+                (
+                    "org.event_hidden",
+                    json!({"org_id": o, "display_name": dn, "event_title": title, "reason": reason}),
+                )
+            } else {
+                let n = changed.iter().filter(|p| p.2 == Some(o)).count();
+                (
+                    "org.event_restored",
+                    json!({"org_id": o, "display_name": dn, "event_title": title, "restored": n}),
+                )
+            };
+            crate::notify::enqueue_org_owners(&mut *tx, o, kind, payload).await?;
         }
     }
     audit(
@@ -385,15 +428,15 @@ async fn moderate(
         "relief_event.moderate",
         "relief_event",
         Some(id),
-        json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len()}),
+        json!({"status": b.moderation_status, "reason": reason, "paused": slugs.len(), "restored": restored.len()}),
     )
     .await?;
     // 上下架都會改變公開頁的事件名稱 / 連結：所有上線據點一併推進 updated_at（ETag 依此）並清快取，不只剛暫停的
     let touched: Vec<String> = sqlx::query_scalar("UPDATE wishlists SET updated_at=now() WHERE event_id=$1 AND type='relief' AND status='active' RETURNING slug::text")
         .bind(id).fetch_all(&mut *tx).await?;
     let ev = event_slugs(&mut *tx, &[id]).await?;
-    // 下架暫停了據點，所屬組織頁（只列上線據點）也要清
-    let orgs: Vec<String> = if hide {
+    // 下架暫停 / 取消下架恢復了據點，所屬組織頁（只列上線據點）也要清；恢復的據點已在 touched 內
+    let orgs: Vec<String> = if hide || !restored.is_empty() {
         sqlx::query_scalar("SELECT DISTINCT o.slug::text FROM organizations o JOIN wishlists w ON w.org_id = o.id WHERE w.event_id = $1 AND w.type = 'relief'")
             .bind(id).fetch_all(&mut *tx).await?
     } else {
@@ -419,7 +462,7 @@ pub(crate) async fn event_slugs<'e, E: sqlx::PgExecutor<'e>>(
         .await
 }
 
-/// 許可過期（台北日期）的上線據點暫停，並通知該許可所屬組織的 owner（每組織每許可一封：只對本次剛暫停的據點發，之後不再命中）。
+/// 許可過期（台北日期）的上線據點暫停，並通知該許可所屬組織的 owner 與 coordinator（每組織每許可一封：只對本次剛暫停的據點發，之後不再命中）。
 pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let rows: Vec<(String, Uuid, Uuid)> = sqlx::query_as(
@@ -432,7 +475,7 @@ pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Erro
                            jsonb_build_object('org_id', o.id, 'display_name', o.display_name, 'permit_no', pm.permit_no)
                       FROM (SELECT DISTINCT org_id, permit_id FROM p) d
                       JOIN organizations o ON o.id = d.org_id JOIN org_permits pm ON pm.id = d.permit_id
-                      JOIN org_members m ON m.org_id = o.id AND m.role = 'owner' AND m.disabled_at IS NULL
+                      JOIN org_members m ON m.org_id = o.id AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL
                       JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL)
          SELECT slug, event_id, id FROM p")
         .fetch_all(&mut *tx).await?;
@@ -451,7 +494,7 @@ pub async fn permit_expiry_tick(pool: &sqlx::PgPool) -> Result<usize, sqlx::Erro
     Ok(n)
 }
 
-/// 許可到期前 14 / 7 天（台北日期）提醒 owner：只對仍有未結束據點使用、且組織沒有更晚到期的已核准許可的情況發。
+/// 許可到期前 14 / 7 天（台北日期）提醒 owner 與 coordinator：只對仍有未結束據點使用、且組織沒有更晚到期的已核准許可的情況發。
 /// 以 reminded_days 條件式 UPDATE 認領門檻（同一語句寫通知），重跑 / 多實例不重發。
 pub async fn permit_reminder_tick(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
     let r = sqlx::query(
@@ -469,7 +512,7 @@ pub async fn permit_reminder_tick(pool: &sqlx::PgPool) -> Result<u64, sqlx::Erro
          SELECT m.user_id, 'email'::notification_channel, 'org.permit_expiring',
                 jsonb_build_object('org_id', c.org_id, 'display_name', c.display_name, 'permit_no', c.permit_no,
                                    'valid_to', c.valid_to, 'days', c.reminded_days)
-           FROM c JOIN org_members m ON m.org_id = c.org_id AND m.role = 'owner' AND m.disabled_at IS NULL
+           FROM c JOIN org_members m ON m.org_id = c.org_id AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL
            JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL")
         .execute(pool).await?;
     Ok(r.rows_affected())

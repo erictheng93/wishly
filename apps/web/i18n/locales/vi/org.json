@@ -100,7 +100,14 @@
       },
       "permitNote": "Ghi chú xét duyệt: {note}",
       "permitApply": "Dùng cho {n} điểm có giấy phép không hợp lệ",
-      "permitApplied": "Đã chuyển {n} điểm sang giấy phép này. Hãy mở lại các điểm đang tạm dừng trong trang chỉnh sửa."
+      "permitApplied": "Đã chuyển {n} điểm sang giấy phép này. Hãy mở lại các điểm đang tạm dừng trong trang chỉnh sửa.",
+      "eventHidden": "Đã bị gỡ",
+      "eventHiddenReason": "Lý do gỡ: {reason}",
+      "pausedReason": {
+        "revoked": "Xác minh tổ chức đã bị thu hồi",
+        "event_hidden": "Sự kiện đã bị gỡ",
+        "permit": "Giấy phép chưa được duyệt hoặc đã hết hạn"
+      }
     },
     "members": {
       "title": "Thành viên & lời mời",
@@ -219,7 +226,10 @@
       "stNoPermitLink": "Đến mục giấy phép quyên góp",
       "permitLabel": "Giấy phép quyên góp",
       "permitExpiredOpt": "hết hạn",
-      "permitResumeHint": "Chọn giấy phép còn hiệu lực để mở lại điểm đang tạm dừng"
+      "permitResumeHint": "Chọn giấy phép còn hiệu lực để mở lại điểm đang tạm dừng",
+      "evEditTitle": "Sửa sự kiện cứu trợ",
+      "evSave": "Lưu",
+      "evSaving": "Đang lưu…"
     },
     "audit": {
       "link": "Nhật ký kiểm tra",

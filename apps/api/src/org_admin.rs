@@ -1,4 +1,4 @@
-//! 平台審核：組織、許可（含撤銷）。供 staff 使用，審核結果寄 `org.review` 通知給 owner。
+//! 平台審核：組織、許可（含撤銷）。供 staff 使用，審核結果寄 `org.review` 通知給 owner 與 coordinator。
 use crate::{
     admin::{audit, limit, page, PageQ, Staff, MODERATOR},
     error::AppError,
@@ -210,7 +210,8 @@ async fn review(
         sqlx::query("UPDATE wishlists SET revoke_paused_at = NULL WHERE org_id = $1 AND revoke_paused_at IS NOT NULL")
             .bind(id).execute(&mut *tx).await?;
     }
-    // 撤銷：已上線的救災據點降為草稿（觸發器只擋 status='active'，降級不受限）；revoke_paused_at 標記供 7 天內恢復
+    // 撤銷：已上線的救災據點降為草稿（觸發器只擋 status='active'，降級不受限）；revoke_paused_at 標記供 7 天內恢復。
+    // event_paused_at 保留：事件取消下架時略過這些草稿，留給 restore 一併恢復營運
     let slugs: Vec<String> = if status == "verified" {
         let down: Vec<(String, Uuid)> = sqlx::query_as("UPDATE wishlists SET status = 'draft', revoke_paused_at = now() WHERE type = 'relief' AND org_id = $1 AND status = 'active' RETURNING slug, id")
             .bind(id).fetch_all(&mut *tx).await?;
@@ -232,7 +233,7 @@ async fn review(
                  SELECT m.user_id, 'email'::notification_channel, 'org.review',
                         jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'decision', $3::text, 'note', $4::text, 'revoked', $5::bool)
                    FROM org_members m JOIN users u ON u.id = m.user_id
-                  WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
+                  WHERE m.org_id = $1 AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
         .bind(id).bind(&display_name).bind(new_status).bind(&b.note).bind(status == "verified" && new_status == "rejected").execute(&mut *tx).await?;
     audit(&mut *tx, sid, "org.review", "organizations", Some(id),
           json!({ "decision": b.decision, "from": status, "to": new_status, "note": b.note, "flagged_fields": flagged })).await?;
@@ -308,7 +309,9 @@ async fn restore(
         .filter(|c| c.2.is_none())
         .map(|c| c.0)
         .collect();
-    sqlx::query("UPDATE wishlists SET status = 'active' WHERE id = ANY($1) AND revoke_paused_at IS NOT NULL AND status = 'draft'")
+    // 撤銷前已因事件下架而暫停（event_paused_at）、事件之後已取消下架者（上面已確認事件可用）：一併恢復營運
+    sqlx::query("UPDATE wishlists SET status = 'active', site_status = CASE WHEN event_paused_at IS NOT NULL THEN 'active' ELSE site_status END, event_paused_at = NULL
+                  WHERE id = ANY($1) AND revoke_paused_at IS NOT NULL AND status = 'draft'")
         .bind(&ok).execute(&mut *tx).await?;
     sqlx::query("UPDATE wishlists SET revoke_paused_at = NULL WHERE org_id = $1 AND revoke_paused_at IS NOT NULL")
         .bind(id).execute(&mut *tx).await?;
@@ -324,7 +327,7 @@ async fn restore(
                 .map(|r| json!({ "slug": c.1.trim(), "reason": r }))
         })
         .collect();
-    // 沿用 org.review（decision=verified）通知 owner；備註帶恢復原因
+    // 沿用 org.review（decision=verified）通知 owner 與 coordinator；備註帶恢復原因
     crate::notify::enqueue_org_owners(&mut *tx, id, "org.review",
         json!({"org_id": id, "display_name": display_name, "decision": "verified", "note": reason, "revoked": false})).await?;
     audit(
@@ -410,17 +413,17 @@ async fn review_permit(
                      SELECT m.user_id, 'email'::notification_channel, 'org.permit_revoked',
                             jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
                        FROM org_members m JOIN users u ON u.id = m.user_id
-                      WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
+                      WHERE m.org_id = $1 AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
             .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
         slugs
     } else {
-        // 送審中的許可被退件：同樣通知 owner（帶備註），不必回狀態頁才知道
+        // 送審中的許可被退件：同樣通知 owner 與 coordinator（帶備註），不必回狀態頁才知道
         if new_status == "rejected" {
             sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
                          SELECT m.user_id, 'email'::notification_channel, 'org.permit_rejected',
                                 jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
                            FROM org_members m JOIN users u ON u.id = m.user_id
-                          WHERE m.org_id = $1 AND m.role = 'owner' AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
+                          WHERE m.org_id = $1 AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
                 .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
         }
         vec![]

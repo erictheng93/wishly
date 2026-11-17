@@ -373,7 +373,7 @@ async fn delete_me(
                        AND NOT EXISTS (SELECT 1 FROM org_members m JOIN users mu ON mu.id = m.user_id AND mu.deleted_at IS NULL AND mu.blocked_at IS NULL
                                         WHERE m.org_id = w.org_id AND m.disabled_at IS NULL AND m.role IN ('owner', 'coordinator'))
                      ORDER BY w.id FOR UPDATE OF w)
-         UPDATE wishlists SET status = 'closed', site_status = 'closed', closed_at = COALESCE(wishlists.closed_at, now())
+         UPDATE wishlists SET status = 'closed', site_status = 'closed', event_paused_at = NULL, closed_at = COALESCE(wishlists.closed_at, now())
            FROM o WHERE wishlists.id = o.id RETURNING wishlists.id, wishlists.slug::text, o.status = 'active'")
         .bind(&site_orgs).fetch_all(&mut *tx).await?;
     for (w, slug, _) in &closed {

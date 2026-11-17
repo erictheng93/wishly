@@ -870,12 +870,13 @@ async fn enqueue_helpers(pool: PgPool) {
     notify::enqueue_org_owners(&pool, o, "org.permit_reviewed", json!({"org_id": o}))
         .await
         .unwrap();
-    let got: Vec<Uuid> =
+    let mut got: Vec<Uuid> =
         sqlx::query_scalar("SELECT user_id FROM notifications WHERE kind='org.permit_reviewed'")
             .fetch_all(&pool)
             .await
             .unwrap();
-    assert_eq!(got, vec![owner.id]);
+    got.sort();
+    assert_eq!(got, want, "組織通知發給 owner 與 coordinator");
     // 據點暫停：認領者每人一筆
     let sit: Uuid = sqlx::query_scalar("INSERT INTO wishlist_items(wishlist_id,title,qty_needed,category,urgency) VALUES($1,'物資',5,'water','high') RETURNING id")
         .bind(site.id).fetch_one(&pool).await.unwrap();

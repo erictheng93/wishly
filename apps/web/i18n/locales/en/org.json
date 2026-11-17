@@ -100,7 +100,14 @@
       },
       "permitNote": "Review note: {note}",
       "permitApply": "Use for {n} site(s) with an invalid permit",
-      "permitApplied": "Switched {n} site(s) to this permit. Resume paused sites from their edit page."
+      "permitApplied": "Switched {n} site(s) to this permit. Resume paused sites from their edit page.",
+      "eventHidden": "Taken down",
+      "eventHiddenReason": "Takedown reason: {reason}",
+      "pausedReason": {
+        "revoked": "Organization verification revoked",
+        "event_hidden": "Event taken down",
+        "permit": "Permit not approved or expired"
+      }
     },
     "members": {
       "title": "Members & invites",
@@ -219,7 +226,10 @@
       "stNoPermitLink": "Go to fundraising permits",
       "permitLabel": "Fundraising permit",
       "permitExpiredOpt": "expired",
-      "permitResumeHint": "Switch to a valid permit to resume a paused site"
+      "permitResumeHint": "Switch to a valid permit to resume a paused site",
+      "evEditTitle": "Edit relief event",
+      "evSave": "Save",
+      "evSaving": "Saving…"
     },
     "audit": {
       "link": "Audit log",

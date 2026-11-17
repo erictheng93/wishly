@@ -100,7 +100,14 @@
       },
       "permitNote": "審核意見：{note}",
       "permitApply": "換用到 {n} 個失效據點",
-      "permitApplied": "已將 {n} 個據點換成此許可；已暫停的據點請到編輯頁恢復營運"
+      "permitApplied": "已將 {n} 個據點換成此許可；已暫停的據點請到編輯頁恢復營運",
+      "eventHidden": "已下架",
+      "eventHiddenReason": "下架原因：{reason}",
+      "pausedReason": {
+        "revoked": "組織認證已撤銷",
+        "event_hidden": "所屬事件已下架",
+        "permit": "勸募許可未核准或已到期"
+      }
     },
     "members": {
       "title": "成員與邀請",
@@ -219,7 +226,10 @@
       "stNoPermitLink": "前往勸募許可",
       "permitLabel": "勸募許可",
       "permitExpiredOpt": "已到期",
-      "permitResumeHint": "改選有效的許可後，已暫停的據點即可恢復營運"
+      "permitResumeHint": "改選有效的許可後，已暫停的據點即可恢復營運",
+      "evEditTitle": "編輯救災事件",
+      "evSave": "儲存",
+      "evSaving": "儲存中…"
     },
     "audit": {
       "link": "稽核紀錄",
