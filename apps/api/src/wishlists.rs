@@ -657,7 +657,7 @@ const ICOLS: &str = "id, wishlist_id, title, description, brand, spec, image_key
   funding_mode::text AS funding_mode, priority::text AS priority, qty_needed, qty_claimed, sort_order, created_at, updated_at,
   target_points, pledged_points, funding_status::text AS funding_status, funding_deadline, fulfillment_type::text AS fulfillment_type,
   price_snapshot_amount, expired_at, (SELECT po.status::text FROM purchase_orders po WHERE po.item_id = wishlist_items.id) AS order_status,
-  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id) AS qty_received, support_wishlist_id";
+  category, urgency, (SELECT COALESCE(SUM(r.qty), 0)::bigint FROM receipts r WHERE r.item_id = wishlist_items.id AND r.voided_at IS NULL) AS qty_received, support_wishlist_id";
 
 impl I {
     fn json(&self, locked: bool) -> Value {

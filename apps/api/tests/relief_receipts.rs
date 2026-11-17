@@ -218,3 +218,130 @@ async fn support_item_not_receivable_nor_listed(pool: PgPool) {
     .await;
     assert_eq!(v["items"].as_array().unwrap().len(), 1);
 }
+
+async fn list_site(pool: &PgPool, f: &Fx, tok: &str) -> Value {
+    call(
+        pool,
+        "GET",
+        &format!("/orgs/{}/sites/{}/receipts", f.org, f.site.id),
+        &ck(tok),
+        None,
+    )
+    .await
+    .2
+}
+async fn void_call(
+    pool: &PgPool,
+    org: Uuid,
+    rid: &str,
+    tok: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let (s, _, v) = call(
+        pool,
+        "POST",
+        &format!("/orgs/{org}/receipts/{rid}/void"),
+        &ck(tok),
+        Some(body),
+    )
+    .await;
+    (s, v)
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn unverified_org_rejects_record(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    sqlx::query(
+        "UPDATE organizations SET verification_status='rejected', verified_at=NULL WHERE id=$1",
+    )
+    .bind(f.org)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, _, v) = rec(&pool, &f, 1, Uuid::new_v4()).await;
+    assert_eq!(
+        (s, v["code"].as_str().unwrap()),
+        (StatusCode::CONFLICT, "ORG_NOT_VERIFIED")
+    );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn void_permissions_total_and_audit(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let other = user(&pool, "他人").await;
+    member(&pool, f.org, other.id, "volunteer").await;
+    let coord = user(&pool, "協調").await;
+    member(&pool, f.org, coord.id, "coordinator").await;
+    rec(&pool, &f, 5, Uuid::new_v4()).await;
+    rec(&pool, &f, 7, Uuid::new_v4()).await;
+    let v = list_site(&pool, &f, &f.vol.token).await;
+    let e = &v["items"][0]["entries"];
+    let (id7, id5) = (e[0]["id"].as_str().unwrap(), e[1]["id"].as_str().unwrap());
+    assert_eq!(e[0]["can_void"], true);
+    assert_eq!(
+        list_site(&pool, &f, &other.token).await["items"][0]["entries"][0]["can_void"],
+        false
+    );
+    // 他人 volunteer 不行；原因必填
+    let (s, _) = void_call(&pool, f.org, id7, &other.token, json!({"reason": "打錯"})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = void_call(&pool, f.org, id7, &f.vol.token, json!({"reason": "  "})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = void_call(
+        &pool,
+        f.org,
+        id7,
+        &f.vol.token,
+        json!({"reason": "字".repeat(201)}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // 本人可作廢；重複作廢 409
+    let (s, _) = void_call(&pool, f.org, id7, &f.vol.token, json!({"reason": "打錯"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = void_call(&pool, f.org, id7, &f.vol.token, json!({"reason": "再一次"})).await;
+    assert_eq!(
+        (s, v["code"].as_str().unwrap()),
+        (StatusCode::CONFLICT, "ALREADY_VOIDED")
+    );
+    // coordinator 可作廢他人的；組織撤銷後仍可更正
+    sqlx::query(
+        "UPDATE organizations SET verification_status='rejected', verified_at=NULL WHERE id=$1",
+    )
+    .bind(f.org)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, _) = void_call(&pool, f.org, id5, &coord.token, json!({"reason": "重複"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let v = list_site(&pool, &f, &f.vol.token).await;
+    assert_eq!(v["items"][0]["total"], 0);
+    assert_eq!(v["site"]["org_status"], "rejected");
+    assert_eq!(v["items"][0]["entries"][0]["void_reason"], "打錯");
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM audit_logs WHERE action='receipt.void'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 2);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn void_other_org_404(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let g = fx(&pool, "active").await;
+    rec(&pool, &g, 3, Uuid::new_v4()).await;
+    let rid: Uuid = sqlx::query_scalar("SELECT id FROM receipts WHERE wishlist_id=$1")
+        .bind(g.site.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, _) = void_call(
+        &pool,
+        f.org,
+        &rid.to_string(),
+        &f.vol.token,
+        json!({"reason": "x"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}

@@ -268,7 +268,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     <CreatorSheet :open="!!rcpt" :title="$t('org.relief.receiptTitle')" @close="rcpt = null">
       <form v-if="rcpt" @submit.prevent="saveReceipt">
         <p class="rc-head"><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
-        <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
+        <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k" :style="e.voided_at ? 'text-decoration:line-through' : ''">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</li></ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
         <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>

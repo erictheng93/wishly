@@ -3,9 +3,9 @@
 use crate::{
     error::AppError,
     idempotency,
-    orgs::{audit_user, require_role},
+    orgs::{audit_user, member_role, require_role},
     session::CurrentUser,
-    AppState,
+    validate, AppState,
 };
 use axum::{
     body::Bytes,
@@ -24,6 +24,7 @@ const MAX_QTY: i32 = 100_000;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/orgs/{id}/receipts", post(record))
+        .route("/orgs/{id}/receipts/{receipt_id}/void", post(void))
         .route("/orgs/{id}/sites/{wishlist_id}/receipts", get(list))
 }
 
@@ -77,11 +78,20 @@ async fn record(
     {
         return Ok(resp(s as u16, &b, true));
     }
-    let site: (Uuid, String) = sqlx::query_as(
-        "SELECT w.id, w.site_status FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
+    // 順便讀組織狀態（不加鎖：本模組不參與鎖序，撤銷與登記競態時以讀到的為準）
+    let site: (Uuid, String, String) = sqlx::query_as(
+        "SELECT w.id, w.site_status, o.verification_status::text FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
+         JOIN organizations o ON o.id = w.org_id
          WHERE i.id = $1 AND i.deleted_at IS NULL AND w.type = 'relief' AND w.org_id = $2 AND w.deleted_at IS NULL
            AND i.funding_mode <> 'support'")
         .bind(req.item_id).bind(org).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    if site.2 != "verified" {
+        return Err(AppError::problem(
+            409,
+            "ORG_NOT_VERIFIED",
+            "組織目前不是已驗證狀態，無法登記實收",
+        ));
+    }
     if site.1 == "closed" {
         return Err(AppError::problem(
             409,
@@ -113,20 +123,88 @@ async fn list(
     me: CurrentUser,
     Path((org, wid)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Value>, AppError> {
-    require_role(&st.pool, org, me.id, "volunteer").await?;
+    let role = require_role(&st.pool, org, me.id, "volunteer").await?;
+    let coord = role != "volunteer";
     let site: Value = sqlx::query_scalar(
-        "SELECT jsonb_build_object('id', id, 'title', title, 'slug', slug::text, 'site_status', site_status, 'site_address', site_address)
-           FROM wishlists WHERE id=$1 AND org_id=$2 AND type='relief' AND deleted_at IS NULL")
+        "SELECT jsonb_build_object('id', w.id, 'title', w.title, 'slug', w.slug::text, 'site_status', w.site_status, 'site_address', w.site_address, 'org_status', o.verification_status::text)
+           FROM wishlists w JOIN organizations o ON o.id = w.org_id
+          WHERE w.id=$1 AND w.org_id=$2 AND w.type='relief' AND w.deleted_at IS NULL")
         .bind(wid).bind(org).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
     let items: Vec<Value> = sqlx::query_scalar(
         "SELECT jsonb_build_object('item_id', i.id, 'title', i.title, 'qty_needed', i.qty_needed, 'category', i.category, 'urgency', i.urgency,
                 'total', COALESCE(r.total, 0), 'entries', COALESCE(r.entries, '[]'::jsonb))
            FROM wishlist_items i
-           LEFT JOIN LATERAL (SELECT sum(x.qty)::bigint AS total, jsonb_agg(jsonb_build_object(
-                'qty', x.qty, 'note', x.note, 'recorded_by_name', u.display_name, 'created_at', x.created_at)
+           LEFT JOIN LATERAL (SELECT COALESCE(sum(x.qty) FILTER (WHERE x.voided_at IS NULL), 0)::bigint AS total, jsonb_agg(jsonb_build_object(
+                'id', x.id, 'qty', x.qty, 'note', x.note, 'recorded_by_name', u.display_name, 'created_at', x.created_at,
+                'voided_at', x.voided_at, 'void_reason', x.void_reason,
+                'can_void', x.voided_at IS NULL AND ($2 OR x.recorded_by = $3))
                 ORDER BY x.created_at DESC, x.id DESC) AS entries
               FROM receipts x JOIN users u ON u.id = x.recorded_by WHERE x.item_id = i.id) r ON true
           WHERE i.wishlist_id = $1 AND i.deleted_at IS NULL AND i.funding_mode <> 'support' ORDER BY i.sort_order, i.id")
-        .bind(wid).fetch_all(&st.pool).await?;
+        .bind(wid).bind(coord).bind(me.id).fetch_all(&st.pool).await?;
     Ok(Json(json!({ "site": site, "items": items })))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VoidReq {
+    reason: String,
+}
+
+/// 作廢實收（更正帳目）：登記者本人或 coordinator 以上；組織非 verified、據點已結束時仍可作廢。
+async fn void(
+    State(st): State<AppState>,
+    me: CurrentUser,
+    Path((org, rid)): Path<(Uuid, Uuid)>,
+    Json(req): Json<VoidReq>,
+) -> Result<Json<Value>, AppError> {
+    let role = member_role(&st.pool, org, me.id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let reason = validate::text(&req.reason, "/reason", false)?;
+    if reason.is_empty() || reason.chars().count() > 200 {
+        return Err(AppError::invalid(
+            "/reason",
+            "RANGE",
+            "原因必填，至多 200 字",
+        ));
+    }
+    let mut tx = st.pool.begin().await?;
+    let r: (Uuid, Uuid, i32, Uuid) = sqlx::query_as(
+        "SELECT r.wishlist_id, r.item_id, r.qty, r.recorded_by FROM receipts r JOIN wishlists w ON w.id = r.wishlist_id
+          WHERE r.id = $1 AND w.org_id = $2")
+        .bind(rid).bind(org).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    if role == "volunteer" && r.3 != me.id {
+        return Err(AppError::problem(
+            403,
+            "ORG_ROLE_REQUIRED",
+            "此操作需要更高的組織角色",
+        ));
+    }
+    // 條件式 UPDATE 一次完成，並行重複作廢只有一個成功
+    let done: Option<(chrono::DateTime<chrono::Utc>,)> = sqlx::query_as(
+        "UPDATE receipts SET voided_at = now(), voided_by = $2, void_reason = $3
+          WHERE id = $1 AND voided_at IS NULL RETURNING voided_at",
+    )
+    .bind(rid)
+    .bind(me.id)
+    .bind(&reason)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((voided_at,)) = done else {
+        return Err(AppError::problem(409, "ALREADY_VOIDED", "此實收紀錄已作廢"));
+    };
+    audit_user(
+        &mut *tx,
+        me.id,
+        "receipt.void",
+        "receipt",
+        Some(rid),
+        json!({"org_id": org, "wishlist_id": r.0, "item_id": r.1, "qty": r.2, "reason": reason}),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Json(
+        json!({"id": rid, "voided_at": voided_at, "void_reason": reason}),
+    ))
 }
