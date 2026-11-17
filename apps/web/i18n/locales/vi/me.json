@@ -1,5 +1,37 @@
 {
   "me": {
+    "support": {
+      "title": "Hỗ trợ",
+      "intro": "Gặp sự cố hoặc muốn khiếu nại? Hãy điền biểu mẫu bên dưới, chúng tôi sẽ trả lời sớm nhất có thể.",
+      "email": "Email liên hệ",
+      "emailHint": "Chúng tôi sẽ trả lời qua địa chỉ này.",
+      "emailRequired": "Vui lòng nhập email liên hệ",
+      "category": "Chủ đề",
+      "categories": {
+        "account": "Tài khoản và đăng nhập",
+        "wishlist": "Danh sách",
+        "payment": "Thanh toán và nạp điểm",
+        "wallet": "Ví điểm",
+        "other": "Khác"
+      },
+      "wishlistRef": "Đã đính kèm danh sách liên quan.",
+      "body": "Mô tả vấn đề",
+      "placeholder": "Cho chúng tôi biết chuyện gì đã xảy ra và bạn cần hỗ trợ gì",
+      "bodyRequired": "Vui lòng mô tả vấn đề",
+      "submit": "Gửi",
+      "submitting": "Đang gửi…",
+      "sent": "Chúng tôi đã nhận yêu cầu của bạn và sẽ thông báo khi có phản hồi.",
+      "sentGuest": "Chúng tôi đã nhận yêu cầu của bạn và sẽ trả lời qua email.",
+      "emailAlt": "Bạn cũng có thể gửi email trực tiếp cho bộ phận hỗ trợ: ",
+      "mine": "Yêu cầu hỗ trợ của tôi",
+      "empty": "Chưa có yêu cầu hỗ trợ nào.",
+      "status": {
+        "open": "Đang xử lý",
+        "closed": "Đã trả lời"
+      },
+      "createdAt": "Đã gửi {time}",
+      "reply": "Phản hồi của bộ phận hỗ trợ"
+    },
     "home": {
       "seoTitle": "Wishly {'|'} Danh sách ước nguyện và chia sẻ quà tặng",
       "seoDesc": "Tạo danh sách ước nguyện và chia sẻ bằng một liên kết. Dù là tặng quà, sinh nhật hay đám cưới, bạn bè chỉ cần mở liên kết để xem, đăng nhập là có thể đăng ký tặng quà, không trùng lặp, không bán lố.",

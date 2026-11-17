@@ -51,6 +51,8 @@ export default defineNuxtConfig({
     '/u/**': { headers: { 'X-Robots-Tag': 'noindex' } },
     // 連結頁：SSR（OG 預覽），不收錄、不在 LOCALIZABLE／sitemap
     '/l/**': { headers: { 'X-Robots-Tag': 'noindex' } },
+    // 客服表單：未登入也可用（靠 cookie 判斷登入，只在 client 渲染），不收錄、不在 LOCALIZABLE／sitemap
+    '/support': { ssr: false, headers: { 'X-Robots-Tag': 'noindex' } },
     // 測試用：NUXT_API_PROXY=<後端網址> 時，同網域的 /api/v1/** 代理到該後端（只有 npm run deploy:preview 會設）。
     // 為什麼：Pages 與臨時通道是不同網站，cookie 會被當第三方擋掉；同源代理後 cookie 是第一方。
     ...(process.env.NUXT_API_PROXY ? { '/api/v1/**': { proxy: `${process.env.NUXT_API_PROXY.replace(/\/$/, '')}/api/v1/**` } } : {}),

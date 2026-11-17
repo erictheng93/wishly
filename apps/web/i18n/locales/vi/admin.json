@@ -1,5 +1,35 @@
 {
   "admin": {
+    "support": {
+      "title": "Yêu cầu hỗ trợ",
+      "statusLabel": "Trạng thái",
+      "status": {
+        "open": "Chờ trả lời",
+        "closed": "Đã đóng"
+      },
+      "kind": {
+        "member": "Thành viên",
+        "guest": "Chưa đăng nhập"
+      },
+      "userId": "ID tài khoản",
+      "wishlist": "Danh sách liên quan",
+      "topup": "Giao dịch nạp liên quan",
+      "createdAt": "Đã gửi",
+      "handledAt": "Đã đóng",
+      "handledBy": "Người xử lý",
+      "reply": "Trả lời / ghi chú xử lý",
+      "mailto": "Trả lời qua email",
+      "action": "Trả lời và đóng",
+      "confirmMember": "Sau khi trả lời, yêu cầu sẽ được đóng và thành viên nhận thông báo trong ứng dụng.",
+      "confirmGuest": "Hệ thống không gửi email cho yêu cầu chưa đăng nhập. Hãy trả lời {email} từ hộp thư hỗ trợ trước, sau đó ghi lại cách xử lý tại đây và đóng yêu cầu.",
+      "replyLabel": "Nội dung trả lời",
+      "done": "Đã đóng",
+      "stale": "Yêu cầu này đã được người khác xử lý. Danh sách đã được cập nhật.",
+      "empty": "Không có yêu cầu",
+      "loading": "Đang tải…",
+      "loadMore": "Tải thêm",
+      "retry": "Thử lại"
+    },
     "index": {
       "roles": { "label": "Vai trò nhân viên", "admin": "Quản trị viên", "finance": "Tài chính", "moderator": "Kiểm duyệt", "support": "Hỗ trợ" },
       "title": "Bảng điều khiển vận hành",
@@ -31,7 +61,8 @@
         "orgs": "Duyệt tổ chức và giấy phép",
         "events": "Quản lý sự kiện cứu trợ",
         "finance": "Tài chính",
-        "reports": "Xử lý báo cáo"
+        "reports": "Xử lý báo cáo",
+        "support": "Yêu cầu hỗ trợ"
       },
       "tabsLabel": "Chức năng quản trị",
       "tabs": {
@@ -127,7 +158,8 @@
         "requested_refunds": "Hoàn tiền chờ duyệt {n}",
         "disputed_topups": "Tranh chấp {n}",
         "open_debts": "Nợ chưa trả {n}",
-        "open_reports": "{n} chờ xử lý"
+        "open_reports": "{n} chờ xử lý",
+        "open_support_requests": "{n} chờ trả lời"
       },
       "notices": {
         "title": "Thông báo hệ thống",

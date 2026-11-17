@@ -1,5 +1,35 @@
 {
   "admin": {
+    "support": {
+      "title": "Support requests",
+      "statusLabel": "Status",
+      "status": {
+        "open": "Awaiting reply",
+        "closed": "Closed"
+      },
+      "kind": {
+        "member": "Member",
+        "guest": "Signed out"
+      },
+      "userId": "Account ID",
+      "wishlist": "Related list",
+      "topup": "Related top-up",
+      "createdAt": "Sent",
+      "handledAt": "Closed",
+      "handledBy": "Handled by",
+      "reply": "Reply / notes",
+      "mailto": "Reply by email",
+      "action": "Reply and close",
+      "confirmMember": "Replying closes the request. The member gets an in-app notification.",
+      "confirmGuest": "The system does not email signed-out requests. Reply to {email} from the support mailbox first, then record what you did here and close it.",
+      "replyLabel": "Reply",
+      "done": "Closed",
+      "stale": "Someone else already handled this request. The list has been refreshed.",
+      "empty": "No requests",
+      "loading": "Loading…",
+      "loadMore": "Load more",
+      "retry": "Retry"
+    },
     "index": {
       "roles": { "label": "Staff roles", "admin": "Admin", "finance": "Finance", "moderator": "Moderator", "support": "Support" },
       "title": "Operations console",
@@ -31,7 +61,8 @@
         "orgs": "Org and permit review",
         "events": "Disaster events",
         "finance": "Finance",
-        "reports": "Report review"
+        "reports": "Report review",
+        "support": "Support requests"
       },
       "tabsLabel": "Console sections",
       "tabs": {
@@ -127,7 +158,8 @@
         "requested_refunds": "Refunds requested {n}",
         "disputed_topups": "Disputes {n}",
         "open_debts": "Open debts {n}",
-        "open_reports": "{n} open"
+        "open_reports": "{n} open",
+        "open_support_requests": "{n} awaiting reply"
       },
       "notices": {
         "title": "System notices",

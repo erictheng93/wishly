@@ -855,6 +855,7 @@ pub async fn stats_json(pool: &mut sqlx::PgConnection) -> Result<Value, sqlx::Er
            'disputed_topups', (SELECT count(*) FROM topups WHERE status = 'disputed'),
            'open_debts', (SELECT count(*) FROM wallet_debts WHERE status = 'open'),
            'open_reports', (SELECT count(*) FROM content_reports WHERE status = 'open'),
+           'open_support_requests', (SELECT count(*) FROM support_requests WHERE status = 'open'),
            'staff_mfa', (SELECT count(*) FROM users WHERE is_staff AND totp_enabled_at IS NOT NULL AND deleted_at IS NULL AND blocked_at IS NULL),
            'notifications_by_status', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT status::text s, count(*) n FROM notifications GROUP BY 1) t),
            'audit_last_7d', (SELECT COALESCE(jsonb_object_agg(a, n), '{}') FROM (SELECT action a, count(*) n FROM audit_logs WHERE created_at > now() - interval '7 days' GROUP BY 1) t),

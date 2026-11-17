@@ -1,5 +1,37 @@
 {
   "me": {
+    "support": {
+      "title": "客服",
+      "intro": "遇到問題或需要申訴，填寫下方表單，我們會盡快回覆。",
+      "email": "聯絡 Email",
+      "emailHint": "我們會寄信到這個信箱回覆你。",
+      "emailRequired": "請填寫聯絡 Email",
+      "category": "問題類型",
+      "categories": {
+        "account": "帳號與登入",
+        "wishlist": "清單",
+        "payment": "付款與儲值",
+        "wallet": "點數錢包",
+        "other": "其他"
+      },
+      "wishlistRef": "已附上相關清單。",
+      "body": "問題描述",
+      "placeholder": "請描述發生了什麼事，以及希望我們怎麼協助",
+      "bodyRequired": "請填寫問題描述",
+      "submit": "送出",
+      "submitting": "送出中…",
+      "sent": "已收到你的客服請求，回覆後會通知你。",
+      "sentGuest": "已收到你的客服請求，我們會以 Email 回覆。",
+      "emailAlt": "也可以直接寫信給客服：",
+      "mine": "我的客服請求",
+      "empty": "還沒有客服請求。",
+      "status": {
+        "open": "處理中",
+        "closed": "已回覆"
+      },
+      "createdAt": "送出時間 {time}",
+      "reply": "客服回覆"
+    },
     "home": {
       "seoTitle": "Wishly 心願同步｜心願清單與心願分享",
       "seoDesc": "建立心願清單，用一個連結分享。送禮、生日、婚禮，朋友打開連結就能瀏覽，登入會員就能認領要送的禮物，不重複、不超賣。",

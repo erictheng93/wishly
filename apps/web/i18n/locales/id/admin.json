@@ -1,5 +1,35 @@
 {
   "admin": {
+    "support": {
+      "title": "Permintaan dukungan",
+      "statusLabel": "Status",
+      "status": {
+        "open": "Menunggu balasan",
+        "closed": "Selesai"
+      },
+      "kind": {
+        "member": "Anggota",
+        "guest": "Belum masuk"
+      },
+      "userId": "ID akun",
+      "wishlist": "Wishlist terkait",
+      "topup": "Isi ulang terkait",
+      "createdAt": "Dikirim",
+      "handledAt": "Diselesaikan",
+      "handledBy": "Ditangani oleh",
+      "reply": "Balasan / catatan",
+      "mailto": "Balas lewat email",
+      "action": "Balas dan selesaikan",
+      "confirmMember": "Setelah dibalas, permintaan selesai dan anggota mendapat notifikasi di aplikasi.",
+      "confirmGuest": "Sistem tidak mengirim email untuk permintaan tanpa akun. Balas ke {email} dari kotak surat dukungan dulu, lalu catat penanganannya di sini dan selesaikan.",
+      "replyLabel": "Isi balasan",
+      "done": "Selesai",
+      "stale": "Permintaan ini sudah ditangani orang lain. Daftar sudah diperbarui.",
+      "empty": "Tidak ada permintaan",
+      "loading": "Memuat…",
+      "loadMore": "Muat lagi",
+      "retry": "Coba lagi"
+    },
     "index": {
       "roles": { "label": "Peran staf", "admin": "Admin", "finance": "Keuangan", "moderator": "Moderator", "support": "Dukungan" },
       "title": "Panel admin operasional",
@@ -31,7 +61,8 @@
         "orgs": "Tinjau organisasi dan izin",
         "events": "Kelola peristiwa bencana",
         "finance": "Keuangan",
-        "reports": "Penanganan laporan"
+        "reports": "Penanganan laporan",
+        "support": "Permintaan dukungan"
       },
       "tabsLabel": "Fitur panel admin",
       "tabs": {
@@ -127,7 +158,8 @@
         "requested_refunds": "Pengembalian diminta {n}",
         "disputed_topups": "Sengketa {n}",
         "open_debts": "Utang terbuka {n}",
-        "open_reports": "{n} menunggu"
+        "open_reports": "{n} menunggu",
+        "open_support_requests": "{n} menunggu balasan"
       },
       "notices": {
         "title": "Pengumuman sistem",

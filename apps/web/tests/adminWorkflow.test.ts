@@ -262,8 +262,10 @@ it('檢舉頁：下架清單需理由並呼叫下架端點；已下架或已停�
 })
 
 it('首頁待處理檢舉數連到檢舉頁', async () => {
-  api.mockImplementation(async (url: string) => url === '/admin/stats' ? { staff_mfa: 2, open_reports: 4 } : { data: [] })
+  api.mockImplementation(async (url: string) => url === '/admin/stats' ? { staff_mfa: 2, open_reports: 4, open_support_requests: 7 } : { data: [] })
   const el = show(Index); await settle()
+  expect(el.querySelector('[data-testid="todo-open_support_requests"]')!.textContent).toContain('7')
+  expect(el.querySelector('[data-testid="todo-open_support_requests"]')!.closest('a')!.getAttribute('href')).toBe('/admin/support')
   expect(el.querySelector('[data-testid="stat-open_reports"] a')?.getAttribute('href')).toBe('/admin/reports')
   expect(el.querySelector('[data-testid="todo-open_reports"]')!.closest('a')!.getAttribute('href')).toBe('/admin/reports')
 })

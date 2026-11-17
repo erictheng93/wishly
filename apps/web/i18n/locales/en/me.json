@@ -1,5 +1,37 @@
 {
   "me": {
+    "support": {
+      "title": "Support",
+      "intro": "Having a problem or want to appeal a decision? Fill in the form below and we will reply as soon as we can.",
+      "email": "Contact email",
+      "emailHint": "We will reply to this address.",
+      "emailRequired": "Enter a contact email",
+      "category": "Topic",
+      "categories": {
+        "account": "Account and sign-in",
+        "wishlist": "Lists",
+        "payment": "Payments and top-ups",
+        "wallet": "Points wallet",
+        "other": "Other"
+      },
+      "wishlistRef": "The related list is attached.",
+      "body": "Describe the issue",
+      "placeholder": "Tell us what happened and how we can help",
+      "bodyRequired": "Describe the issue",
+      "submit": "Send",
+      "submitting": "Sending…",
+      "sent": "We received your request. We will notify you when we reply.",
+      "sentGuest": "We received your request and will reply by email.",
+      "emailAlt": "You can also email support directly: ",
+      "mine": "My support requests",
+      "empty": "No support requests yet.",
+      "status": {
+        "open": "In progress",
+        "closed": "Replied"
+      },
+      "createdAt": "Sent {time}",
+      "reply": "Support reply"
+    },
     "home": {
       "seoTitle": "Wishly {'|'} Wishlists and gift sharing",
       "seoDesc": "Build a wishlist and share it with one link. For gifts, birthdays and weddings: friends open the link to browse, then sign in to claim a gift to give. No duplicates, no overselling.",

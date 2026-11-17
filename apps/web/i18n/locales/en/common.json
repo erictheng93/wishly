@@ -33,6 +33,7 @@
     "support": "Contact support: ",
     "supportSubject": "Wishly support",
     "supportBody": "Account ID: {id}\n\nDescribe the issue:\n",
+    "supportForm": "or use the support form",
     "notifications": "Notifications",
     "unreadCount": "{n} unread",
     "close": "Close"

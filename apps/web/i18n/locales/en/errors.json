@@ -28,6 +28,7 @@
     "BUSY": "The system is busy. Please try again later.",
     "IMAGE_REMOVED": "This image has been removed. Please upload it again.",
     "CAPTCHA_REQUIRED": "Please complete human verification and try again.",
+    "SUPPORT_OPEN_LIMIT": "You have too many unanswered support requests. Please wait for a reply before sending another.",
     "CAPTCHA_UNAVAILABLE": "The human verification service is temporarily unavailable. Please try again later.",
     "CLAIM_ALREADY_EXISTS": "You have already claimed this item. Edit your existing claim.",
     "CONTRIBUTION_LOCKED": "This contribution is locked and can no longer be withdrawn.",
