@@ -37,28 +37,35 @@ fi
 
 # Dokploy 的 application.deploy 只是排進佇列，部署之後仍可能失敗，所以不能在請求成功時就當作已部署。
 # 以 deployment.all 找 title 為「autodeploy <digest>」最新的一筆，看到 done 才寫 deployed-digest。
+# 只認本次觸發（pending-digest 記的時間）之後建立的紀錄：latest 退回舊 digest（A → B → A）時，
+# 歷史上 A 的 done 不代表現在跑的是 A。
 dk() { printf 'x-api-key: %s\n' "$DOKPLOY_API_KEY" | curl -fsS --connect-timeout 10 --max-time 30 -H @- "$@"; }
 trigger() {
   echo "觸發 Dokploy 部署：${last} -> ${digest}"
+  local at
+  at=$(date +%s) # 送出前取時間，部署紀錄的 createdAt 一定不早於它
   dk -o /dev/null -H 'Content-Type: application/json' -X POST \
     -d "{\"applicationId\":\"$DOKPLOY_APP_ID\",\"title\":\"autodeploy ${digest}\"}" \
     "$DOKPLOY_URL/api/application.deploy"
-  echo "$digest $(date +%s)" >"$STATE_DIR/pending-digest"
+  echo "$digest $at" >"$STATE_DIR/pending-digest"
 }
-# 印出該 digest 最新一筆部署的 status（createdAt 為 ISO 字串，可直接字串比大小）；沒有就印 none。
+{ read -r p_digest p_at <"$STATE_DIR/pending-digest"; } 2>/dev/null || true
+[ "${p_digest:-}" = "$digest" ] || p_at= # 沒有這個 digest 的觸發紀錄：一律當作 none
+# 印出該 digest 在本次觸發之後最新一筆部署的 status（createdAt 為 UTC ISO 字串，可直接字串比大小）；沒有就印 none。
 status=$(dk "$DOKPLOY_URL/api/deployment.all?applicationId=$DOKPLOY_APP_ID" |
   python3 -I -c '
 import json, sys
-t = "autodeploy " + sys.argv[1]
-d = [x for x in json.load(sys.stdin) if x.get("title") == t]
-print(max(d, key=lambda x: str(x.get("createdAt")))["status"] if d else "none")' "$digest")
+from datetime import datetime, timezone
+t, at = "autodeploy " + sys.argv[1], sys.argv[2]
+since = datetime.fromtimestamp(int(at), timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") if at else None
+d = [x for x in json.load(sys.stdin) if since and x.get("title") == t and str(x.get("createdAt")) >= since]
+print(max(d, key=lambda x: str(x.get("createdAt")))["status"] if d else "none")' "$digest" "${p_at:-}")
 echo "digest ${digest} 的部署狀態：${status}"
 case "$status" in
   done) echo "$digest" >"$STATE_DIR/deployed-digest"; rm -f "$STATE_DIR/pending-digest" ;;
   none | error | cancelled)
     # 同一 digest 距上次觸發未滿 10 分鐘就等：尚未出現紀錄，或壞映像失敗時不要每分鐘重部署
-    { read -r p_digest p_at <"$STATE_DIR/pending-digest"; } 2>/dev/null || true
-    if [ "${p_digest:-}" = "$digest" ] && [ $(($(date +%s) - ${p_at:-0})) -lt 600 ]; then
+    if [ -n "${p_at:-}" ] && [ $(($(date +%s) - p_at)) -lt 600 ]; then
       echo "距上次觸發未滿 10 分鐘，等待"
     else
       trigger
