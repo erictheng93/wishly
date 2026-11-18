@@ -4,6 +4,7 @@
       "title": "客服工單",
       "statusLabel": "狀態",
       "status": {
+        "all": "全部",
         "open": "待回覆",
         "closed": "已結案"
       },
@@ -14,6 +15,13 @@
       "userId": "帳號 ID",
       "wishlist": "相關清單",
       "topup": "相關儲值",
+      "blocked": "已停權",
+      "walletFrozen": "錢包凍結",
+      "userReports": "檢舉與處置",
+      "userTopups": "儲值紀錄",
+      "wishlistHidden": "已下架",
+      "wishlistReports": "檢舉與處置",
+      "topupLink": "金流交易明細",
       "createdAt": "送出時間",
       "handledAt": "結案時間",
       "handledBy": "處理人",

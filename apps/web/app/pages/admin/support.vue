@@ -8,7 +8,16 @@ useHead({ title: () => t('admin.support.title') })
 const { api } = useApi()
 const { user: me } = useAuth()
 const canReply = computed(() => hasStaffRole(me.value, 'support'))
-const status = ref<'open' | 'closed'>(useRoute().query.status === 'closed' ? 'closed' : 'open')
+// 脈絡連結只給進得了目標頁的角色（檢舉頁 moderator、金流頁 finance），避免點進去被擋
+const canMod = computed(() => hasStaffRole(me.value, 'moderator'))
+const canFinance = computed(() => hasStaffRole(me.value, 'finance'))
+// 檢舉頁的「對象」檢視（附解除停權 / 恢復清單）；已處置的看 actioned，否則看 open
+const reportsOf = (kind: 'user' | 'wishlist', id: string, label: string, acted: boolean) =>
+  ({ path: '/admin/reports', query: { status: acted ? 'actioned' : 'open', view: 'rows', target_kind: kind, target_id: id, target_label: label } })
+const topupsOf = (uid: string) => ({ path: '/admin/finance', query: { tab: 'transactions', user_id: uid } })
+// 預設待回覆（營運先看要處理的）；?status=all|closed 可直接開其他檢視
+const qs = useRoute().query.status
+const status = ref<'all' | 'open' | 'closed'>(qs === 'all' || qs === 'closed' ? qs : 'open')
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), loading = ref(false)
 const err = ref(''), msg = ref('')
 
@@ -44,7 +53,7 @@ async function submit() {
     <CreatorHeader :title="$t('admin.support.title')" back="/admin" />
     <label class="c-field c-narrow"><span>{{ $t('admin.support.statusLabel') }}</span>
       <select v-model="status" :disabled="loading" data-testid="status">
-        <option v-for="s in ['open', 'closed']" :key="s" :value="s">{{ $t(`admin.support.status.${s}`) }}</option>
+        <option v-for="s in ['all', 'open', 'closed']" :key="s" :value="s">{{ $t(`admin.support.status.${s}`) }}</option>
       </select>
     </label>
     <p v-if="err" class="c-err" role="alert">{{ err }} <button class="c-btn" @click="load()">{{ $t('admin.support.retry') }}</button></p>
@@ -56,14 +65,36 @@ async function submit() {
         <strong class="c-grow">{{ r.user?.display_name ?? r.contact_email }}</strong>
         <span class="c-badge">{{ $t(`admin.support.kind.${r.kind}`) }}</span>
         <span class="c-badge">{{ $t(`me.support.categories.${r.category}`) }}</span>
+        <span v-if="status === 'all'" class="c-badge" data-testid="row-status">{{ $t(`admin.support.status.${r.status}`) }}</span>
       </div>
-      <div v-if="r.user" class="c-mute admin-id">{{ $t('admin.support.userId') }}：{{ r.user.id }}<span v-if="r.user.handle">・@{{ r.user.handle }}</span></div>
+      <template v-if="r.user">
+        <div class="c-mute admin-id">{{ $t('admin.support.userId') }}：{{ r.user.id }}<span v-if="r.user.handle">・@{{ r.user.handle }}</span></div>
+        <div class="c-row wrap c-mt">
+          <span v-if="r.user.blocked" class="c-badge hidden" data-testid="blocked">{{ $t('admin.support.blocked') }}</span>
+          <span v-if="r.user.wallet?.status === 'frozen'" class="c-badge hidden" data-testid="frozen">{{ $t('admin.support.walletFrozen') }}</span>
+          <NuxtLink v-if="canMod" class="c-btn small" data-testid="user-reports" :to="reportsOf('user', r.user.id, r.user.display_name, r.user.blocked)">{{ $t('admin.support.userReports') }}</NuxtLink>
+          <NuxtLink v-if="canFinance" class="c-btn small" data-testid="user-topups" :to="topupsOf(r.user.id)">{{ $t('admin.support.userTopups') }}</NuxtLink>
+        </div>
+      </template>
       <a v-else :href="mailto(r)" class="c-btn small c-mt" data-testid="mailto"><UiIcon name="mail" />{{ $t('admin.support.mailto') }}</a>
       <p class="sp-text">{{ r.body }}</p>
       <dl class="c-dl">
         <dt>{{ $t('admin.support.createdAt') }}</dt><dd>{{ fmtTime(r.created_at) }}</dd>
-        <template v-if="r.wishlist_id"><dt>{{ $t('admin.support.wishlist') }}</dt><dd class="admin-id">{{ r.wishlist_id }}</dd></template>
-        <template v-if="r.topup_id"><dt>{{ $t('admin.support.topup') }}</dt><dd class="admin-id">{{ r.topup_id }}</dd></template>
+        <template v-if="r.wishlist">
+          <dt>{{ $t('admin.support.wishlist') }}</dt>
+          <dd data-testid="wishlist">{{ r.wishlist.title }} <span class="admin-id">/s/{{ r.wishlist.slug }}</span>
+            <span v-if="r.wishlist.moderation_status === 'hidden'" class="c-badge hidden" data-testid="wl-hidden">{{ $t('admin.support.wishlistHidden') }}</span>
+            <NuxtLink v-if="canMod" data-testid="wl-reports" :to="reportsOf('wishlist', r.wishlist.id, r.wishlist.title, r.wishlist.moderation_status === 'hidden')">{{ $t('admin.support.wishlistReports') }}</NuxtLink>
+          </dd>
+        </template>
+        <template v-else-if="r.wishlist_id"><dt>{{ $t('admin.support.wishlist') }}</dt><dd class="admin-id">{{ r.wishlist_id }}</dd></template>
+        <template v-if="r.topup">
+          <dt>{{ $t('admin.support.topup') }}</dt>
+          <dd data-testid="topup"><span class="admin-id">{{ r.topup.merchant_trade_no }}</span> <span class="c-badge" :class="r.topup.status">{{ $t(`admin.topups.status.${r.topup.status}`, r.topup.status) }}</span>
+            <NuxtLink v-if="canFinance" data-testid="topup-link" :to="topupsOf(r.topup.user_id)">{{ $t('admin.support.topupLink') }}</NuxtLink>
+          </dd>
+        </template>
+        <template v-else-if="r.topup_id"><dt>{{ $t('admin.support.topup') }}</dt><dd class="admin-id">{{ r.topup_id }}</dd></template>
         <template v-if="r.handled_at"><dt>{{ $t('admin.support.handledAt') }}</dt><dd>{{ fmtTime(r.handled_at) }}</dd></template>
         <template v-if="r.handled_by"><dt>{{ $t('admin.support.handledBy') }}</dt><dd>{{ r.handled_by.display_name }}</dd></template>
         <template v-if="r.reply"><dt>{{ $t('admin.support.reply') }}</dt><dd class="sp-text">{{ r.reply }}</dd></template>

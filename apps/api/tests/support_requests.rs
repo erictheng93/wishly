@@ -384,3 +384,222 @@ async fn check_constraint_deletion_and_retention(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 0);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn admin_list_status_all(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let admin = staff(&pool, "admin").await;
+    let mut ids = vec![];
+    for i in 0..3 {
+        let (_, _, v) = create(&pool, &a.token, req("other", &format!("#{i}"))).await;
+        ids.push(v["id"].as_str().unwrap().to_string());
+    }
+    // 中間那張結案
+    let (st, _, _) = call(
+        &pool,
+        "PATCH",
+        &format!("/admin/support-requests/{}", ids[1]),
+        &ck(&admin.token),
+        Some(json!({"reply":"ok"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+    let get = |path: String| {
+        let pool = pool.clone();
+        let tok = admin.token.clone();
+        async move { call(&pool, "GET", &path, &ck(&tok), None).await }
+    };
+    // 新到舊、兩種狀態都有；limit=2 分頁，游標接續
+    let (st, _, p1) = get("/admin/support-requests?status=all&limit=2".into()).await;
+    assert_eq!(st, StatusCode::OK, "{p1}");
+    let got: Vec<(&str, &str)> = p1["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| (r["id"].as_str().unwrap(), r["status"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        got,
+        [(ids[2].as_str(), "open"), (ids[1].as_str(), "closed")]
+    );
+    let cur = p1["next_cursor"].as_str().expect("有下一頁").to_string();
+    let (_, _, p2) = get(format!(
+        "/admin/support-requests?status=all&limit=2&cursor={cur}"
+    ))
+    .await;
+    let rest: Vec<&str> = p2["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(rest, [ids[0].as_str()]);
+    assert!(p2["next_cursor"].is_null());
+    // 省略仍是 open（由舊到新）；無效值 422
+    let (_, _, d) = get("/admin/support-requests".into()).await;
+    let open: Vec<&str> = d["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(open, [ids[0].as_str(), ids[2].as_str()]);
+    let (st, _, _) = get("/admin/support-requests?status=ALL".into()).await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// 某人的 support.new 筆數
+async fn support_new(pool: &PgPool, id: Uuid) -> i64 {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM notifications WHERE kind = 'support.new' AND user_id = $1",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn new_request_notifies_support_staff_once_until_read(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let admin = staff(&pool, "admin").await;
+    let sup = staff(&pool, "sup").await;
+    let fin = staff(&pool, "fin").await;
+    let gone = staff(&pool, "gone").await;
+    set_roles(&pool, sup.id, &["support"]).await;
+    set_roles(&pool, fin.id, &["finance"]).await;
+    set_roles(&pool, gone.id, &["support"]).await;
+    sqlx::query("UPDATE users SET blocked_at = now() WHERE id = $1")
+        .bind(gone.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (st, _, _) = create(&pool, &a.token, req("account", "祕密內文")).await;
+    assert_eq!(st, StatusCode::CREATED);
+    for (u, n) in [
+        (admin.id, 1),
+        (sup.id, 1),
+        (fin.id, 0),
+        (gone.id, 0),
+        (a.id, 0),
+    ] {
+        assert_eq!(support_new(&pool, u).await, n, "{u}");
+    }
+    // 未登入工單：上一則還在 outbox（尚未寫站內）也算未讀，不重複
+    let (st, _, _) = create_public(
+        &pool,
+        "10.5.0.1",
+        json!({"email":"guest@example.com","category":"other","body":"訪客內文"}),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED);
+    assert_eq!(support_new(&pool, sup.id).await, 1);
+    // 進站內後仍未讀：不重複
+    wishly_api::notify::tick_at(&pool, common::noon())
+        .await
+        .unwrap();
+    let (inbox, link): (bool, Option<String>) = sqlx::query_as(
+        "SELECT inbox_at IS NOT NULL, inbox_link FROM notifications WHERE kind = 'support.new' AND user_id = $1")
+        .bind(sup.id).fetch_one(&pool).await.unwrap();
+    assert_eq!((inbox, link.as_deref()), (true, Some("/admin/support")));
+    create(&pool, &a.token, req("other", "第二筆")).await;
+    assert_eq!(support_new(&pool, sup.id).await, 1);
+    // support 讀過後，下一張工單會再通知他；admin 還沒讀，不再新增
+    let (st, _, _) = call(
+        &pool,
+        "POST",
+        "/me/notifications/read-all",
+        &ck(&sup.token),
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{st}");
+    let (st, _, _) = create_public(
+        &pool,
+        "10.5.0.2",
+        json!({"email":"g2@example.com","category":"other","body":"x"}),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED);
+    assert_eq!(support_new(&pool, sup.id).await, 2);
+    assert_eq!(support_new(&pool, admin.id).await, 1);
+
+    // payload 不含內文、Email、提出者
+    let payloads: Vec<String> =
+        sqlx::query_scalar("SELECT payload::text FROM notifications WHERE kind = 'support.new'")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(payloads.iter().all(|p| p == "{}"), "{payloads:?}");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn admin_list_context(pool: PgPool) {
+    let a = user(&pool, "a").await;
+    let fin = staff(&pool, "fin").await;
+    set_roles(&pool, fin.id, &["finance"]).await;
+    let wl = wishlist(&pool, a.id, ListOpts::default()).await;
+    let tp = topup_credit(&pool, a.id, 100).await;
+    let (st, _, t1) = create(
+        &pool,
+        &a.token,
+        Some(json!({"category":"wishlist","body":"x","wishlist_id": wl.id, "topup_id": tp})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{t1}");
+    let (_, _, t2) = create(&pool, &a.token, req("account", "y")).await;
+    // 送出後才被停權、錢包凍結、清單下架
+    sqlx::query("UPDATE users SET blocked_at = now() WHERE id = $1")
+        .bind(a.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE point_wallets SET status = 'frozen' WHERE user_id = $1")
+        .bind(a.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE wishlists SET moderation_status = 'hidden', moderation_reason = 'x' WHERE id = $1",
+    )
+    .bind(wl.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (st, _, v) = call(
+        &pool,
+        "GET",
+        "/admin/support-requests",
+        &ck(&fin.token),
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    let rows = v["data"].as_array().unwrap();
+    let r1 = rows.iter().find(|r| r["id"] == t1["id"]).unwrap();
+    assert_eq!(r1["user"]["blocked"], true);
+    assert_eq!(r1["user"]["wallet"]["status"], "frozen");
+    assert_eq!(r1["wishlist"]["id"], json!(wl.id));
+    assert_eq!(r1["wishlist"]["slug"].as_str(), Some(wl.slug.as_str()));
+    assert_eq!(r1["wishlist"]["moderation_status"], "hidden");
+    assert!(r1["wishlist"]["title"].is_string());
+    let trade: String = sqlx::query_scalar("SELECT merchant_trade_no FROM topups WHERE id = $1")
+        .bind(tp)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(r1["topup"]["merchant_trade_no"], json!(trade));
+    assert_eq!(r1["topup"]["user_id"], json!(a.id));
+    assert_eq!(r1["topup"]["status"], "paid");
+    let r2 = rows.iter().find(|r| r["id"] == t2["id"]).unwrap();
+    assert!(r2["wishlist"].is_null() && r2["topup"].is_null());
+    assert_eq!(r2["user"]["blocked"], true);
+    // 仍不含會員 Email
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(!v.to_string().contains(&email));
+}

@@ -4,6 +4,7 @@
       "title": "Permintaan dukungan",
       "statusLabel": "Status",
       "status": {
+        "all": "Semua",
         "open": "Menunggu balasan",
         "closed": "Selesai"
       },
@@ -14,6 +15,13 @@
       "userId": "ID akun",
       "wishlist": "Wishlist terkait",
       "topup": "Isi ulang terkait",
+      "blocked": "Ditangguhkan",
+      "walletFrozen": "Dompet dibekukan",
+      "userReports": "Laporan & tindakan",
+      "userTopups": "Riwayat isi ulang",
+      "wishlistHidden": "Diturunkan",
+      "wishlistReports": "Laporan & tindakan",
+      "topupLink": "Transaksi keuangan",
       "createdAt": "Dikirim",
       "handledAt": "Diselesaikan",
       "handledBy": "Ditangani oleh",

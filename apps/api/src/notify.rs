@@ -392,6 +392,7 @@ pub fn category(kind: &str) -> Category {
                 | "wishlist.moderated"
                 | "report.resolved"
                 | "support.replied"
+                | "support.new"
                 | "order.failed"
                 | "order.partial_refund"
                 | "funding.expired"
@@ -448,7 +449,8 @@ pub fn email_tier(kind: &str) -> EmailTier {
         "claim.purchase_reminder"
         | "claim.list_closed"
         | "claim.cancelled_by_owner"
-        | "claim.item_removed" => EmailTier::Daytime,
+        | "claim.item_removed"
+        | "support.new" => EmailTier::Daytime,
         _ if category(kind) == Category::Account => EmailTier::Immediate,
         _ => EmailTier::Optional,
     }
@@ -511,6 +513,7 @@ pub const KINDS: &[&str] = &[
     "wishlist.moderated",
     "report.resolved",
     "support.replied",
+    "support.new",
     "account.suspended",
     "account.restored",
     "staff.digest",
@@ -567,6 +570,7 @@ pub fn inbox_link(kind: &str, payload: &Value) -> String {
         | "account.restored" => "/settings".into(),
         "report.resolved" => "/me/notifications".into(),
         "support.replied" => "/support".into(),
+        "support.new" => "/admin/support".into(),
         "auth.mfa_reset" | "staff.digest" => "/admin".into(),
         "org.permit_revoked"
         | "org.permit_rejected"
@@ -1950,6 +1954,16 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 format!("Tim dukungan sudah membalas permintaanmu. Lihat balasannya di halaman dukungan.\n{base}/support\n"),
             ),
         ),
+        // 給營運（support / admin）：payload 為空，不帶工單內文、Email 與提出者身分
+        "support.new" => (
+            l.pick("【Wishly】有新的客服請求".into(), "[Wishly] New support request".into(), "[Wishly] Có yêu cầu hỗ trợ mới".into(), "[Wishly] Ada permintaan dukungan baru".into()),
+            l.pick(
+                format!("有新的客服請求等待處理，請到後台查看。\n{base}/admin/support\n"),
+                format!("A new support request is waiting. See it in the admin console.\n{base}/admin/support\n"),
+                format!("Có yêu cầu hỗ trợ mới đang chờ xử lý. Xem trong trang quản trị.\n{base}/admin/support\n"),
+                format!("Ada permintaan dukungan baru yang menunggu. Lihat di konsol admin.\n{base}/admin/support\n"),
+            ),
+        ),
         "wishlist.supported" => {
             let who = payload["supporter_name"].as_str().unwrap_or_default();
             (
@@ -2084,6 +2098,7 @@ mod tests {
             "wishlist.moderated",
             "report.resolved",
             "support.replied",
+            "support.new",
             "order.failed",
             "order.partial_refund",
             "funding.expired",
@@ -2144,6 +2159,7 @@ mod tests {
             "claim.list_closed",
             "claim.cancelled_by_owner",
             "claim.item_removed",
+            "support.new",
         ] {
             assert_eq!(email_tier(k), Daytime, "{k}");
             assert_eq!(category(k), Category::Account, "{k}：不可關閉");

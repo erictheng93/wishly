@@ -53,6 +53,17 @@ fn open_limit() -> AppError {
     )
 }
 
+// 新工單通知營運（`support.new`）：與 INSERT 同一句（CTE `r` 為新工單，沒插入就不通知），純 INSERT 不加鎖。
+// 收件人：未停權、未刪除且有 support 或 admin 角色。防洪：他已有一則未讀的 `support.new` 就不再新增——
+// 未讀＝已進站內未讀（inbox_at 有值、read_at 空），或還在 outbox 等 worker 寫站內（pending）；已取消從未進站內的不算。
+// 併發送出時 NOT EXISTS 看不到彼此，偶爾多一則，可接受。
+const NOTIFY_STAFF: &str = "n AS (INSERT INTO notifications (user_id, channel, kind, payload)
+    SELECT u.id, 'email'::notification_channel, 'support.new', '{}'::jsonb FROM users u
+     WHERE EXISTS (SELECT 1 FROM r) AND u.staff_roles && '{admin,support}'::text[]
+       AND u.blocked_at IS NULL AND u.deleted_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM notifications o WHERE o.user_id = u.id AND o.kind = 'support.new' AND o.read_at IS NULL
+                         AND (o.inbox_at IS NOT NULL OR o.status = 'pending')))";
+
 // 使用者看得到的欄位：不含 handled_by（不洩漏營運身分）
 const MINE: &str = "jsonb_build_object('id', id, 'category', category, 'body', body, 'wishlist_id', wishlist_id, 'topup_id', topup_id,
     'status', status, 'reply', reply, 'handled_at', handled_at, 'created_at', created_at)";
@@ -90,10 +101,11 @@ async fn create(
     ratelimit::check_pool(&st.pool, &format!("support_user:{}", u.id), 10, 3600).await?;
     // shortcut: 計數與 INSERT 同一句但非鎖定，同一人併發送出可能略超過上限（每小時 10 筆的限流兜底）；這只是防灌單，不需精確
     let row: Option<Value> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "INSERT INTO support_requests (user_id, category, body, wishlist_id, topup_id)
+        "WITH r AS (INSERT INTO support_requests (user_id, category, body, wishlist_id, topup_id)
          SELECT $1, $2, $3, $4, $5
           WHERE (SELECT count(*) FROM support_requests WHERE user_id = $1 AND status = 'open') < $6
-         RETURNING {MINE}"
+         RETURNING *), {NOTIFY_STAFF}
+         SELECT {MINE} FROM r"
     )))
     .bind(u.id)
     .bind(&b.category)
@@ -138,12 +150,13 @@ async fn create_public(
     ratelimit::check_pool(&st.pool, &format!("support_ip:{ip}"), 30, 3600).await?;
     crate::auth::require_captcha(b.turnstile_token.as_deref(), &ip).await?;
     // shortcut: 同上，併發可能略超過上限，由每 IP 限流兜底
-    let id: Option<Uuid> = sqlx::query_scalar(
-        "INSERT INTO support_requests (contact_email, category, body)
+    let id: Option<Uuid> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "WITH r AS (INSERT INTO support_requests (contact_email, category, body)
          SELECT $1, $2, $3
           WHERE (SELECT count(*) FROM support_requests WHERE contact_email = $1 AND status = 'open') < $4
-         RETURNING id",
-    )
+         RETURNING id), {NOTIFY_STAFF}
+         SELECT id FROM r"
+    )))
     .bind(&email)
     .bind(&b.category)
     .bind(&body)
@@ -158,14 +171,21 @@ async fn create_public(
         .into_response())
 }
 
-// 後台：會員工單帶使用者 id / 名稱 / handle（不帶 Email）；匿名工單只帶 contact_email（唯一聯絡方式）
+// 後台：會員工單帶使用者 id / 名稱 / handle 與處理申訴要的狀態（停權、錢包；不帶 Email、IP）；匿名工單只帶 contact_email（唯一聯絡方式）。
+// 參照的清單 / 儲值單一併帶脈絡（同一句 LEFT JOIN）：清單標題、slug、下架狀態；儲值單的特店訂單編號、狀態與所屬使用者（金流後台依使用者篩選）
 const ADMIN_SQL: &str = "SELECT r.id, jsonb_build_object('id', r.id, 'kind', CASE WHEN r.user_id IS NULL THEN 'guest' ELSE 'member' END,
-    'user', CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object('id', u.id, 'handle', u.handle, 'display_name', u.display_name) END,
+    'user', CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object('id', u.id, 'handle', u.handle, 'display_name', u.display_name,
+      'blocked', u.blocked_at IS NOT NULL, 'wallet', CASE WHEN pw.id IS NULL THEN NULL ELSE jsonb_build_object('id', pw.id, 'status', pw.status) END) END,
     'contact_email', r.contact_email, 'category', r.category, 'body', r.body, 'wishlist_id', r.wishlist_id, 'topup_id', r.topup_id,
+    'wishlist', CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'title', w.title, 'slug', w.slug::text, 'moderation_status', w.moderation_status) END,
+    'topup', CASE WHEN t.id IS NULL THEN NULL ELSE jsonb_build_object('id', t.id, 'merchant_trade_no', t.merchant_trade_no, 'status', t.status, 'user_id', tw.user_id) END,
     'status', r.status, 'reply', r.reply, 'handled_at', r.handled_at,
     'handled_by', CASE WHEN h.id IS NULL THEN NULL ELSE jsonb_build_object('id', h.id, 'display_name', h.display_name) END,
     'created_at', r.created_at)
-  FROM support_requests r LEFT JOIN users u ON u.id = r.user_id LEFT JOIN users h ON h.id = r.handled_by";
+  FROM support_requests r LEFT JOIN users u ON u.id = r.user_id LEFT JOIN users h ON h.id = r.handled_by
+  LEFT JOIN point_wallets pw ON pw.user_id = r.user_id
+  LEFT JOIN wishlists w ON w.id = r.wishlist_id
+  LEFT JOIN topups t ON t.id = r.topup_id LEFT JOIN point_wallets tw ON tw.id = t.wallet_id";
 
 #[derive(Deserialize)]
 struct ListQ {
@@ -180,15 +200,23 @@ async fn list(
     Query(q): Query<ListQ>,
 ) -> Result<Response, AppError> {
     // open 依先來後到處理；closed 看最近處理的（id 為 uuid v7，即建立順序）
+    // all：不分狀態，新到舊（同 closed 方向）
     let (status, cmp, dir) = match q.status.as_deref().unwrap_or("open") {
-        "open" => ("open", ">", "ASC"),
-        "closed" => ("closed", "<", "DESC"),
-        _ => return Err(AppError::invalid("/status", "INVALID", "open | closed")),
+        "open" => (Some("open"), ">", "ASC"),
+        "closed" => (Some("closed"), "<", "DESC"),
+        "all" => (None, "<", "DESC"),
+        _ => {
+            return Err(AppError::invalid(
+                "/status",
+                "INVALID",
+                "open | closed | all",
+            ))
+        }
     };
     let lim = q.limit.unwrap_or(20).clamp(1, 100);
     let mut tx = crate::staff_db::begin_read(&st.pool).await?;
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "{ADMIN_SQL} WHERE r.status = $1 AND ($2::uuid IS NULL OR r.id {cmp} $2) ORDER BY r.id {dir} LIMIT $3"
+        "{ADMIN_SQL} WHERE ($1::text IS NULL OR r.status = $1) AND ($2::uuid IS NULL OR r.id {cmp} $2) ORDER BY r.id {dir} LIMIT $3"
     )))
     .bind(status)
     .bind(q.cursor)
