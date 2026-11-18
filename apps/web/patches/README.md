@@ -12,3 +12,13 @@
 `tests/dependencySecurity.test.ts` 保留 node-forge 的惡意簽章回歸測試，對 listhen 實際使用的副本驗證，上游若退版會立即失敗。braces 的回歸測試隨公告撤銷一併刪除。
 
 之後若再需要修補間接依賴，優先等上游修補版或用 `overrides` 指定已發布版本；真的要 fork 時，應把原始碼放進本 repo（`file:` 來源），不要依賴外部 git repo。
+
+## 限期例外：picomatch ReDoS（GHSA-fc5q-39xc-vjpf）
+
+[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)（high，影響 `picomatch <=4.0.7`）。npm 上最新版就是 4.0.7，上游尚無修補版，無法靠升版或 `overrides` 解決；picomatch 又被 vite、nuxt、@nuxtjs/i18n、vue-tsc 等大量連動，`npm audit` 因此報約 50 個 high。
+
+風險可接受：picomatch 只在建置時比對專案內的 glob 樣式，不處理外部輸入，Cloudflare Pages 的產物不含它。
+
+處理：`scripts/audit-dependencies.mjs` 的 `EXEMPTIONS` 只放這一筆，**2026-12-18 到期**（過期後完全不套用，CI 會回到失敗）。只有 npm 原本失敗、且所有 high/critical 都能由這則公告（含遞移相依）解釋時才豁免；另有任何其他 high/critical 仍然失敗。`npm-audit.json` 仍是 npm 原始輸出。
+
+移除條件：上游發布修補版後升版（`npm update picomatch` 或相依鏈），並刪除 `EXEMPTIONS` 這一筆。
