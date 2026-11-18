@@ -27,7 +27,7 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 argon2 = "0.5"
-jsonwebtoken = "10"
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 chacha20poly1305 = "0.10"
 p256 = { version = "0.14", features = ["ecdh", "ecdsa"] }
 hkdf = "0.12"
