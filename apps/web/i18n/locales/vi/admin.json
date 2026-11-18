@@ -4,6 +4,7 @@
       "title": "Yêu cầu hỗ trợ",
       "statusLabel": "Trạng thái",
       "status": {
+        "all": "Tất cả",
         "open": "Chờ trả lời",
         "closed": "Đã đóng"
       },
@@ -14,6 +15,13 @@
       "userId": "ID tài khoản",
       "wishlist": "Danh sách liên quan",
       "topup": "Giao dịch nạp liên quan",
+      "blocked": "Đã bị đình chỉ",
+      "walletFrozen": "Ví bị đóng băng",
+      "userReports": "Báo cáo & xử lý",
+      "userTopups": "Lịch sử nạp",
+      "wishlistHidden": "Đã gỡ",
+      "wishlistReports": "Báo cáo & xử lý",
+      "topupLink": "Giao dịch tài chính",
       "createdAt": "Đã gửi",
       "handledAt": "Đã đóng",
       "handledBy": "Người xử lý",

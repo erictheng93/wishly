@@ -17,6 +17,7 @@ const stubs = {
   SupportLink: { template: '<a data-testid="support-link" />' },
   Turnstile: { props: ['modelValue'], emits: ['update:modelValue'], setup: (_: any, { emit }: any) => () => h('button', { type: 'button', class: 'ts', onClick: () => emit('update:modelValue', 'tok') }) },
   UiIcon: { template: '<i />' },
+  NuxtLink: { props: ['to'], setup: (p: any, { slots, attrs }: any) => () => h('a', { ...attrs, href: typeof p.to === 'string' ? p.to : `${p.to.path}?${new URLSearchParams(p.to.query)}` }, slots.default?.()) },
   CreatorConfirm: {
     props: ['open', 'title', 'text', 'error', 'disabled', 'busy'], emits: ['ok', 'close'],
     setup: (p: any, { slots, emit }: any) => () => p.open ? h('div', { class: 'confirm' }, [p.text, p.error, slots.default?.(), h('button', { class: 'ok', disabled: p.disabled || p.busy, onClick: () => emit('ok') }, 'ok')]) : null,
@@ -127,4 +128,77 @@ it('後台：匿名工單顯示 mailto，只有 support / admin 看得到回覆�
   el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
   expect(api).toHaveBeenCalledWith('/admin/support-requests/g', { method: 'PATCH', body: { reply: '已回信' } })
   expect(el.querySelector('[data-kind="guest"]')?.getAttribute('data-status')).toBe('closed')
+})
+
+it('後台：狀態篩選三個選項、預設待回覆，切到全部帶 status=all 並標示每列狀態', async () => {
+  api.mockImplementation(async (_: string, opts: any) => opts.query.status === 'all'
+    ? { data: [{ id: 'c', kind: 'guest', status: 'closed', category: 'other', body: 'x', user: null, contact_email: 'a@example.com', reply: '好了', handled_at: 't', handled_by: { id: 's', display_name: '客服甲' } },
+      { id: 'o', kind: 'guest', status: 'open', category: 'other', body: 'y', user: null, contact_email: 'b@example.com' }] }
+    : { data: [] })
+  user.value = { staff_roles: ['support'] }
+  const el = show(AdminSupport); await settle()
+  const sel = el.querySelector<HTMLSelectElement>('[data-testid="status"]')!
+  expect([...sel.options].map(o => o.value)).toEqual(['all', 'open', 'closed'])
+  expect([...sel.options].map(o => o.textContent)).toEqual(['全部', '待回覆', '已結案'])
+  expect(sel.value).toBe('open')
+  expect(api).toHaveBeenLastCalledWith('/admin/support-requests', { query: { status: 'open', limit: 20, cursor: undefined } })
+  sel.value = 'all'; sel.dispatchEvent(new Event('change')); await settle()
+  expect(api).toHaveBeenLastCalledWith('/admin/support-requests', { query: { status: 'all', limit: 20, cursor: undefined } })
+  expect([...el.querySelectorAll('[data-testid="row-status"]')].map(b => b.textContent)).toEqual(['已結案', '待回覆'])
+  expect(el.querySelector('[data-status="closed"]')?.textContent).toContain('客服甲')
+  expect([...el.querySelectorAll('[data-status="open"] button')].some(b => b.textContent?.includes('回覆並結案'))).toBe(true)
+  expect([...el.querySelectorAll('[data-status="closed"] button')].some(b => b.textContent?.includes('回覆並結案'))).toBe(false)
+})
+
+it('後台：?status=all 直接開全部檢視', async () => {
+  route.query = { status: 'all' }
+  api.mockResolvedValue({ data: [] })
+  user.value = { staff_roles: ['support'] }
+  const el = show(AdminSupport); await settle()
+  expect(el.querySelector<HTMLSelectElement>('[data-testid="status"]')!.value).toBe('all')
+  expect(api).toHaveBeenCalledWith('/admin/support-requests', { query: { status: 'all', limit: 20, cursor: undefined } })
+})
+
+it('後台：顯示停權 / 凍結與清單、儲值脈絡，連結依角色顯示', async () => {
+  const rows = [{
+    id: 'm', kind: 'member', status: 'open', category: 'wishlist', body: '申訴', contact_email: null,
+    user: { id: 'u1', handle: 'h', display_name: '會員甲', blocked: true, wallet: { id: 'w', status: 'frozen' } },
+    wishlist_id: 'l1', wishlist: { id: 'l1', title: '生日清單', slug: 'abcdefghij', moderation_status: 'hidden' },
+    topup_id: 't1', topup: { id: 't1', merchant_trade_no: 'WS123', status: 'disputed', user_id: 'u1' },
+  }, { id: 'n', kind: 'member', status: 'open', category: 'other', body: '一般', contact_email: null,
+    user: { id: 'u2', handle: null, display_name: '會員乙', blocked: false, wallet: null }, wishlist_id: null, wishlist: null, topup_id: null, topup: null }]
+  api.mockResolvedValue({ data: rows })
+  const q = (el: Element, s: string) => el.querySelector(`[data-testid="${s}"]`)
+
+  // support：只看得到標記與文字，沒有進不去的連結
+  user.value = { staff_roles: ['support'] }
+  let el = show(AdminSupport); await settle()
+  expect(q(el, 'blocked')).not.toBeNull()
+  expect(q(el, 'frozen')).not.toBeNull()
+  expect(q(el, 'wl-hidden')).not.toBeNull()
+  expect(q(el, 'wishlist')?.textContent).toContain('生日清單')
+  expect(q(el, 'topup')?.textContent).toContain('WS123')
+  for (const s of ['user-reports', 'user-topups', 'wl-reports', 'topup-link']) expect(q(el, s)).toBeNull()
+  // 沒停權、沒錢包的會員不顯示標記
+  expect(el.querySelectorAll('[data-testid="blocked"], [data-testid="frozen"]').length).toBe(2)
+
+  // moderator：檢舉頁對象檢視（已處置看 actioned）；沒有金流連結
+  user.value = { staff_roles: ['moderator'] }
+  el = show(AdminSupport); await settle()
+  expect(q(el, 'user-reports')?.getAttribute('href')).toBe('/admin/reports?status=actioned&view=rows&target_kind=user&target_id=u1&target_label=%E6%9C%83%E5%93%A1%E7%94%B2')
+  expect(q(el, 'wl-reports')?.getAttribute('href')).toContain('target_kind=wishlist&target_id=l1')
+  expect(q(el, 'user-topups')).toBeNull()
+  expect(q(el, 'topup-link')).toBeNull()
+
+  // finance：金流交易明細依使用者篩選；沒有檢舉連結
+  user.value = { staff_roles: ['finance'] }
+  el = show(AdminSupport); await settle()
+  expect(q(el, 'topup-link')?.getAttribute('href')).toBe('/admin/finance?tab=transactions&user_id=u1')
+  expect(q(el, 'user-topups')?.getAttribute('href')).toBe('/admin/finance?tab=transactions&user_id=u1')
+  expect(q(el, 'user-reports')).toBeNull()
+
+  // admin：全部都有
+  user.value = { staff_roles: ['admin'] }
+  el = show(AdminSupport); await settle()
+  for (const s of ['user-reports', 'user-topups', 'wl-reports', 'topup-link']) expect(q(el, s)).not.toBeNull()
 })
