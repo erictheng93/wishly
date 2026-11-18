@@ -45,9 +45,9 @@ class AutodeployTests(unittest.TestCase):
         self.env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", CURL_LOG=str(self.log),
                         WISHLY_AUTODEPLOY_ENV=str(env_file), WISHLY_AUTODEPLOY_STATE=str(self.state))
 
-    def run_once(self, digest, deploy_exit=0, status=None):
+    def run_once(self, digest, deploy_exit=0, status=None, created="2999-01-01T00:00:00.000Z"):
         self.log.unlink(missing_ok=True)
-        deployments = [] if status is None else [{"title": f"autodeploy {digest}", "status": status, "createdAt": "2026-11-06T01:00:00Z"}]
+        deployments = [] if status is None else [{"title": f"autodeploy {digest}", "status": status, "createdAt": created}]
         env = dict(self.env, FAKE_DIGEST=digest, FAKE_DEPLOY_EXIT=str(deploy_exit), FAKE_DEPLOYMENTS=json.dumps(deployments))
         result = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
@@ -93,6 +93,22 @@ class AutodeployTests(unittest.TestCase):
         self.assertEqual(self.deploys(calls), [])
         self.assertEqual(self.recorded(), "sha256:bbb")
         self.assertFalse((self.state / "pending-digest").exists())
+
+    def test_rollback_to_previously_deployed_digest_redeploys(self):
+        # A → B → A：歷史上 A 的 done 不能當成這次已部署
+        old = "2020-01-01T00:00:00.000Z"
+        (self.state).mkdir()
+        (self.state / "deployed-digest").write_text("sha256:bbb\n")
+        result, calls = self.run_once("sha256:aaa", status="done", created=old)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.deploys(calls)), 1)
+        self.assertEqual(self.recorded(), "sha256:bbb")
+        result, calls = self.run_once("sha256:aaa", status="done", created=old)  # 新紀錄尚未出現：等待
+        self.assertEqual(self.deploys(calls), [])
+        self.assertEqual(self.recorded(), "sha256:bbb")
+        result, calls = self.run_once("sha256:aaa", status="done")
+        self.assertEqual(self.deploys(calls), [])
+        self.assertEqual(self.recorded(), "sha256:aaa")
 
     def test_failed_deploy_is_retried_on_next_run(self):
         self.run_once("sha256:aaa")
