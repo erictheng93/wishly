@@ -241,6 +241,7 @@ impl Config {
         let need = |k: &str| var(k).ok_or_else(|| format!("production 需設定 {k}"));
         need("CF_ACCOUNT_ID")?;
         need("CF_EMAIL_API_TOKEN")?;
+        c.cloudflare_url("")?; // 設錯就啟動失敗，不等到第一封信才發現
         need("MAIL_FROM")?;
         need("APP_URL")?;
         need("API_BASE_URL")?;
@@ -267,6 +268,21 @@ impl Config {
             region: var("S3_REGION").unwrap_or_else(|| "us-east-1".into()),
         };
         Ok(c)
+    }
+
+    /// Cloudflare 請求帶有 bearer token；只有 dev/test 的本機 mock 可用 HTTP。
+    pub(crate) fn cloudflare_url(&self, path: &str) -> Result<reqwest::Url, String> {
+        let url = reqwest::Url::parse(&format!("{}{path}", self.cf_api_base.trim_end_matches('/')))
+            .map_err(|_| "CF_API_BASE 不是有效網址")?;
+        if url.scheme() == "https"
+            || (!self.is_prod
+                && url.scheme() == "http"
+                && matches!(url.host_str(), Some("127.0.0.1" | "[::1]")))
+        {
+            Ok(url)
+        } else {
+            Err("CF_API_BASE 必須使用 HTTPS".into())
+        }
     }
 
     /// TRUSTED_PROXY=cloudflare 但綁定到非回送位址 → API 可能被直接存取，CF-Connecting-IP 可被偽造。

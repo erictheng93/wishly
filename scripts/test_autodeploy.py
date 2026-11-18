@@ -10,13 +10,14 @@ import unittest
 SCRIPT = Path(__file__).with_name("vps") / "wishly-autodeploy.sh"
 SECRETS = {"GHCR_TOKEN": "ghp_secret_pat", "DOKPLOY_API_KEY": "dokploy_secret_key"}
 
-# Fake curl: answers the three endpoints from env, logs argv and stdin of every call.
+# Fake curl: answers the three endpoints from env, records arguments and checks the expected header in memory.
 FAKE_CURL = r'''#!/usr/bin/env python3
 import json, os, sys
 stdin = sys.stdin.read() if not sys.stdin.isatty() else ""
 url = next(a for a in sys.argv[1:] if a.startswith("http"))
+has_api_key = ("x-api-key: " + os.environ["EXPECT_API_KEY"]) in stdin.splitlines()
 with open(os.environ["CURL_LOG"], "a") as log:
-    log.write(json.dumps({"argv": sys.argv[1:], "stdin": stdin, "url": url}) + "\n")
+    log.write(json.dumps({"argv": sys.argv[1:], "has_api_key": has_api_key, "url": url}) + "\n")
 if "/token" in url:
     print('{"token":"bearer-xyz"}')
 elif "/manifests/latest" in url:
@@ -30,7 +31,9 @@ elif "/api/deployment.all" in url:
 
 class AutodeployTests(unittest.TestCase):
     def setUp(self):
-        self.dir = Path(tempfile.mkdtemp())
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        self.dir = Path(temp_dir.name)
         bin_dir = self.dir / "bin"
         bin_dir.mkdir()
         (bin_dir / "curl").write_text(FAKE_CURL)
@@ -38,11 +41,14 @@ class AutodeployTests(unittest.TestCase):
         for name in ("curl", "flock"):
             (bin_dir / name).chmod(0o755)
         env_file = self.dir / "autodeploy.env"
+        # 機密只放設定檔，與正式環境相同（腳本以 source 讀入）；環境變數不提供，確保測到這條路徑。
         env_file.write_text(f"GHCR_USER=bot\nGHCR_TOKEN={SECRETS['GHCR_TOKEN']}\n"
                             f"DOKPLOY_API_KEY={SECRETS['DOKPLOY_API_KEY']}\nDOKPLOY_APP_ID=app-123\n")
         self.state = self.dir / "state"
         self.log = self.dir / "curl.log"
-        self.env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}", CURL_LOG=str(self.log),
+        base = {k: v for k, v in os.environ.items() if k not in SECRETS}
+        self.env = dict(base, PATH=f"{bin_dir}:{os.environ['PATH']}", CURL_LOG=str(self.log),
+                        EXPECT_API_KEY=SECRETS["DOKPLOY_API_KEY"],  # 只給假 curl 比對用，腳本不讀
                         WISHLY_AUTODEPLOY_ENV=str(env_file), WISHLY_AUTODEPLOY_STATE=str(self.state))
 
     def run_once(self, digest, deploy_exit=0, status=None, created="2999-01-01T00:00:00.000Z"):
@@ -73,7 +79,7 @@ class AutodeployTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         [deploy] = self.deploys(calls)
         self.assertEqual(deploy["url"], "http://localhost:3000/api/application.deploy")
-        self.assertIn("x-api-key: " + SECRETS["DOKPLOY_API_KEY"], deploy["stdin"])
+        self.assertTrue(deploy["has_api_key"])
         body = json.loads(deploy["argv"][deploy["argv"].index("-d") + 1])
         self.assertEqual(body["applicationId"], "app-123")
         self.assertEqual(self.recorded(), "sha256:aaa")  # 只請求部署，尚未確認 done

@@ -25,6 +25,7 @@ pub async fn purge(cfg: &Config, urls: &[String]) -> Result<(), String> {
 
 static PURGE_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
     reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(10))
         .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
         .build()
@@ -35,10 +36,7 @@ async fn purge_body(cfg: &Config, body: &serde_json::Value) -> Result<(), String
     let (Some(zone), Some(tok)) = (&cfg.cf_zone_id, &cfg.cf_purge_token) else {
         return Ok(());
     };
-    let url = format!(
-        "{}/zones/{zone}/purge_cache",
-        cfg.cf_api_base.trim_end_matches('/')
-    );
+    let url = cfg.cloudflare_url(&format!("/zones/{zone}/purge_cache"))?;
     let r = PURGE_CLIENT
         .post(url)
         .bearer_auth(tok)
