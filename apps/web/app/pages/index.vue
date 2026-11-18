@@ -106,7 +106,7 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
         </div>
 
         <div v-if="signedIn" class="l-mine l-spec">
-          <div class="l-spec-head" aria-hidden="true"><span>MEMBER FILE</span><span>No.0001</span></div>
+          <div class="l-spec-head" aria-hidden="true"><span>MEMBER FILE</span></div>
           <div class="l-mine-top"><span>{{ user ? $t('me.home.mineTitle', { name }) : $t('me.home.myLists') }}</span><NuxtLink to="/dashboard">{{ $t('me.home.mineAll') }}<UiIcon name="arrow-right" :size="16" /></NuxtLink></div>
           <p v-if="mineErr" class="l-mine-msg" role="alert">{{ $t('me.home.mineErr') }} <button type="button" class="g-btn sm ghost" @click="loadMine">{{ $t('lists.common.retry') }}</button></p>
           <ul v-else-if="!mine" role="status" :aria-label="$t('lists.common.loading')">
@@ -123,11 +123,15 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
             </li>
           </ul>
           <NuxtLink to="/lists/new" class="l-mine-new"><UiIcon name="plus" :size="14" />{{ $t('lists.dashboard.create') }}</NuxtLink>
-          <div class="l-bc" aria-hidden="true"><Code39Barcode value="WISHLY0001" /><span>WISHLY-0001</span></div>
+          <!-- QR 指向自己的個人頁：給朋友掃了就能看清單、加好友 -->
+          <div class="l-qr">
+            <CreatorQr :text="user ? siteUrl + profilePath(user) : ''" :size="96" :label="$t('common.profile')" :download="false" />
+            <NuxtLink v-if="user" :to="profilePath(user)">{{ $t('common.profile') }}<small v-if="user.handle">@{{ user.handle }}</small></NuxtLink>
+          </div>
         </div>
-        <!-- 假卡片：純示意，不取後端資料；做成「標本籤」：吊孔、編號、條碼 -->
+        <!-- 假卡片：純示意，不取後端資料；做成「標本籤」：吊孔 -->
         <div v-else class="l-demo l-spec" role="img" :aria-label="$t('me.home.demoAria')">
-          <div class="l-spec-head" aria-hidden="true"><span>SPECIMEN LABEL</span><span>No.0427</span></div>
+          <div class="l-spec-head" aria-hidden="true"><span>SPECIMEN LABEL</span></div>
           <div class="l-demo-top"><span>{{ $t('me.home.demoTitle') }}</span><span class="g-mute">{{ $t('me.home.demoCount') }}</span></div>
           <ul>
             <li class="g-card g-item">
@@ -155,7 +159,6 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
               </div>
             </li>
           </ul>
-          <div class="l-bc" aria-hidden="true"><Code39Barcode value="WISHLY0427" /><span>WISHLY-0427</span></div>
         </div>
       </section>
 
@@ -276,10 +279,6 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
 .l-spec{position:relative;box-sizing:border-box;width:100%;max-width:470px;margin:0 auto;border:1px solid var(--ink-line);background:var(--card);box-shadow:12px 12px 0 var(--bg-alt),12px 12px 0 1px var(--line);animation:rise .7s .2s var(--ease) both}
 .l-spec::before{content:"";position:absolute;left:50%;top:-1px;width:44px;height:14px;margin-left:-22px;background:var(--bg);border:1px solid var(--ink-line);border-top:0;border-radius:0 0 22px 22px!important;z-index:1}
 .l-spec-head{display:flex;justify-content:space-between;align-items:center;padding:26px 20px 12px;font:700 12px/1 var(--mono);letter-spacing:.16em;color:var(--mute);background:var(--hatch)}
-.l-spec-head span:last-child{color:var(--red-text)}
-.l-bc{padding:14px 20px 18px;border-top:1px solid var(--ink-line);text-align:center}
-.l-bc svg{height:44px!important;margin:0 auto;border:1px solid var(--line)}
-.l-bc span{display:block;margin-top:6px;font:600 11px/1 var(--mono);letter-spacing:.3em;color:var(--mute)}
 .l-demo{pointer-events:none;user-select:none}
 .l-demo ul{margin:0;padding:0 20px 6px;list-style:none}
 .l-demo-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink-line);font-weight:800;font-size:19px;letter-spacing:.02em}
@@ -312,6 +311,12 @@ useHead({ script: () => homeLd(siteUrl, faq.value).map(ldScript) })
 .l-mine-t{flex:1;min-width:0;color:var(--fg);font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .l-mine .g-bar{margin:8px 0 0}
 .l-mine-vis{flex:none;font:600 11px/20px var(--mono);padding:0 6px;border:1px solid var(--line);color:var(--mute);letter-spacing:.1em}
+.l-mine-new{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;margin:0 16px 16px;border:1px solid var(--line);color:var(--fg);font-weight:700;font-size:14px}
+.l-mine-new:hover{border-color:var(--ink-line)}
+.l-qr{display:flex;align-items:center;gap:20px;padding:16px 20px 20px;border-top:1px solid var(--ink-line)}
+.l-qr .c-qr{flex:none;margin:0}
+.l-qr a{min-width:0;color:var(--fg);font-weight:800}
+.l-qr small{display:block;margin-top:6px;font:600 11px/1.4 var(--mono);color:var(--mute);overflow-wrap:anywhere}
 .l-mine-msg{padding:20px 16px;color:var(--mute);text-align:center}
 /* 窄螢幕：頁首只留 Logo、語言切換與登入鈕／身分晶片（開始建立、我的清單在 Hero 已有；四個入口移到 .l-local），收緊字距與間距讓 CTA 不折行。
    完整導覽實測需 ~800px（id 最長、zh-Hant ~580px），斷點留約 100px 給登入後的名稱晶片與字型差異；導覽或文案變長要重量 */
