@@ -1,4 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 
@@ -8,7 +11,7 @@ const forge = createRequire(require.resolve('listhen'))('node-forge')
 
 describe('GHSA-86w9-cpqp-85rv', () => {
   const keys = generateKeyPairSync('rsa', {
-    modulusLength: 1024,
+    modulusLength: 2048,
     publicExponent: 3,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -57,5 +60,36 @@ describe('GHSA-86w9-cpqp-85rv', () => {
     certificate.sign(privateKey, forge.md.sha256.create())
     const parsed = forge.pki.certificateFromPem(forge.pki.certificateToPem(certificate))
     expect(parsed.verify(parsed)).toBe(true)
+  })
+})
+
+// package.json 的 override 鍵是 archiver@8.0.0：archiver 一升版就不再套用，這裡會先失敗。
+describe('archiver → readdir-glob → minimatch override', () => {
+  it('readdir-glob resolves a patched minimatch', () => {
+    const entry = createRequire(require.resolve('readdir-glob')).resolve('minimatch')
+    const root = entry.slice(0, entry.lastIndexOf('/minimatch/') + '/minimatch/'.length)
+    const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+    expect(Number(version.split('.')[0])).toBeGreaterThanOrEqual(11)
+  })
+
+  it('still zips by glob with the overridden readdir-glob', async () => {
+    const { ZipArchive } = await import('archiver')
+    const dir = mkdtempSync(join(tmpdir(), 'wishly-zip-'))
+    try {
+      mkdirSync(join(dir, 'sub'))
+      for (const f of ['a.txt', 'b.md', 'sub/c.txt']) writeFileSync(join(dir, f), f)
+      const zip = new ZipArchive()
+      const chunks: Buffer[] = []
+      zip.on('data', (c: Buffer) => chunks.push(c))
+      const done = new Promise((resolve, reject) => zip.on('end', resolve).on('error', reject))
+      zip.glob('**/*.txt', { cwd: dir })
+      await zip.finalize()
+      await done
+      const out = Buffer.concat(chunks).toString('latin1') // 檔名在 zip 標頭中未壓縮
+      expect(out).toContain('a.txt')
+      expect(out).toContain('sub/c.txt')
+      expect(out).not.toContain('b.md')
+    }
+    finally { rmSync(dir, { recursive: true, force: true }) }
   })
 })

@@ -36,6 +36,7 @@ fn production_fails_closed() {
         "CF_ZONE_ID",
         "CF_CACHE_PURGE_TOKEN",
         "CDN_PURGE",
+        "CF_API_BASE",
     ];
     for k in all {
         std::env::remove_var(k);
@@ -101,6 +102,10 @@ fn production_fails_closed() {
     assert_eq!(c.s3.public_url("a/b.jpg"), "https://cdn.x.tw/a/b.jpg");
     assert_eq!(c.bind, "127.0.0.1:8080"); // 預設回送
     assert!(c.bind_warning().is_none());
+    // CF_API_BASE 帶 bearer token：production 連本機 HTTP 也不放行
+    std::env::set_var("CF_API_BASE", "http://127.0.0.1:9");
+    assert!(Config::try_from_env().unwrap_err().contains("HTTPS"));
+    std::env::remove_var("CF_API_BASE");
     std::env::set_var("TRUSTED_PROXY", "cloudflare");
     std::env::set_var("BIND", "0.0.0.0:8080");
     // 經 Cloudflare：公開清單會被邊緣快取，必須能清除
@@ -184,7 +189,9 @@ fn client_ip_trust() {
 async fn cloudflare_email_request_format() {
     let seen: Arc<Mutex<Vec<(String, String, Value)>>> = Default::default();
     let s2 = seen.clone();
-    let mock = Router::new().route("/accounts/acct1/email/sending/send", post(move |h: HeaderMap, Json(b): Json<Value>| {
+    let mock = Router::new().route("/redirect/accounts/acct1/email/sending/send", post(|| async {
+        axum::response::Redirect::temporary("/accounts/acct1/email/sending/send")
+    })).route("/accounts/acct1/email/sending/send", post(move |h: HeaderMap, Json(b): Json<Value>| {
         let s = s2.clone();
         async move {
             let auth = h["authorization"].to_str().unwrap().to_string();
@@ -202,6 +209,24 @@ async fn cloudflare_email_request_format() {
     c.cf_email_api_token = Some("secret-token".into());
     c.cf_api_base = format!("http://{addr}");
     c.mail_from = "Wishly <no-reply@wishly.tw>".into();
+    c.is_prod = true;
+    assert!(
+        wishly_api::notify::send_mail(&c, "u@example.com", "主旨", "內文")
+            .await
+            .unwrap_err()
+            .contains("HTTPS")
+    );
+    assert!(seen.lock().unwrap().is_empty());
+    c.is_prod = false;
+    c.cf_api_base = format!("http://{addr}/redirect");
+    assert!(
+        wishly_api::notify::send_mail(&c, "u@example.com", "主旨", "內文")
+            .await
+            .unwrap_err()
+            .contains("307")
+    );
+    assert!(seen.lock().unwrap().is_empty());
+    c.cf_api_base = format!("http://{addr}");
     wishly_api::notify::send_mail(&c, "u@example.com", "主旨", "內文")
         .await
         .unwrap();
@@ -311,6 +336,13 @@ async fn cloudflare_purge_request_format() {
     c.cf_zone_id = Some("zone1".into());
     c.cf_purge_token = Some("purge-secret".into());
     let urls = vec!["https://api.x.tw/api/v1/public/wishlists/abc".to_string()];
+    c.is_prod = true;
+    assert!(wishly_api::cdn::purge(&c, &urls)
+        .await
+        .unwrap_err()
+        .contains("HTTPS"));
+    assert!(seen.lock().unwrap().is_empty());
+    c.is_prod = false;
     wishly_api::cdn::purge(&c, &urls).await.unwrap();
     c.cf_zone_id = Some("other".into());
     let e = wishly_api::cdn::purge(&c, &urls).await.unwrap_err();

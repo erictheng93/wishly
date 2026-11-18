@@ -6,6 +6,8 @@ on:
   schedule:
     # Recheck the advisory database weekly even when the lockfile is unchanged.
     - cron: "0 1 * * 1"
+permissions:
+  contents: read
 # PR 連推只跑最新一次；main 每個 commit 各自一組（group 含 sha），不會互相取消。
 # PR job 只碰 runner 內的 service container 與 artifact，不推映像、不寫外部服務、不存快取，中途取消不留髒資料。
 concurrency:
@@ -248,6 +250,7 @@ jobs:
             apps/web/test-results/
           retention-days: 7
   ci-ok:
+    permissions: {}
     # 唯一需要設為 required 的檢查：被跳過（純文件）視為通過，任何失敗或取消視為失敗。
     if: always() && github.event_name != 'schedule'
     needs: [changes, api-lint, api-test, mutate, image, web, web-audit, e2e]

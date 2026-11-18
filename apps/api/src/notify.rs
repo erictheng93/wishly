@@ -200,6 +200,7 @@ pub async fn enqueue_purchase_reminders<'e, E: sqlx::PgExecutor<'e>>(
 
 static CF_MAIL_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
     reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(15))
         .pool_max_idle_per_host(0) // 維持原行為（每次新連線）；只省下憑證載入。測試跨 runtime 時閒置連線會失效
         .build()
@@ -210,10 +211,7 @@ static CF_MAIL_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLoc
 /// （production 啟動時強制要求）；否則 dev 走 SMTP → Mailpit。錯誤字串不含 token。
 pub async fn send_mail(cfg: &Config, to: &str, subject: &str, body: &str) -> Result<(), String> {
     if let (Some(acct), Some(tok)) = (&cfg.cf_account_id, &cfg.cf_email_api_token) {
-        let url = format!(
-            "{}/accounts/{acct}/email/sending/send",
-            cfg.cf_api_base.trim_end_matches('/')
-        );
+        let url = cfg.cloudflare_url(&format!("/accounts/{acct}/email/sending/send"))?;
         let r = CF_MAIL_CLIENT
             .post(url).bearer_auth(tok)
             .json(&serde_json::json!({ "from": cfg.mail_from, "to": to, "subject": subject, "text": body }))

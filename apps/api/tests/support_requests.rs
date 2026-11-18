@@ -336,7 +336,7 @@ async fn check_constraint_deletion_and_retention(pool: PgPool) {
     for (uid, email) in [(None, None), (Some(a.id), Some("x@example.com"))] {
         let r = sqlx::query("INSERT INTO support_requests (user_id, contact_email, category, body) VALUES ($1, $2, 'other', 'x')")
             .bind(uid).bind(email).execute(&pool).await;
-        assert!(r.is_err(), "{uid:?} {email:?}");
+        assert!(r.is_err(), "exactly one requester must be present");
     }
 
     // 保留期：closed 且處理超過 365 天者刪除；open 與較新的保留

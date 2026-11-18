@@ -301,9 +301,7 @@ async fn send_one(
         B64.decode(p256dh).map_err(|e| e.to_string())?,
         B64.decode(auth).map_err(|e| e.to_string())?,
     );
-    let mut salt = [0u8; 16];
-    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut salt);
-    let body = encrypt(&ua, &auth, plain, &random_key(), salt)?;
+    let body = encrypt(&ua, &auth, plain, &random_key(), rand::random())?;
     let r = c
         .post(url)
         .header("Authorization", v.authorization(&aud))

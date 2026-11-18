@@ -11,7 +11,8 @@ import { ecpayPaid } from './ecpay-sim.mjs'
 expect.configure({ timeout: 10000 })
 const run = recorder('donor')
 const T = uid() // 本次執行的唯一標記（標題、探索頁過濾用）
-const ECPAY = 'https://payment-stage.ecpay.com.tw/**'
+const isEcpay = url => url.origin === 'https://payment-stage.ecpay.com.tw'
+const isEcpayPost = req => req.method() === 'POST' && isEcpay(new URL(req.url()))
 const LINE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari Line/14.5.0'
 const S = {} // 跨步驟共用狀態
 
@@ -866,10 +867,10 @@ await run.step('D-52', '/me/topup 前端驗證：金額低於 100、超過 50,00
 
 await run.step('D-53', '儲值 NT$1,000（信用卡）：建單 → 以隱藏表單 POST 導向綠界（攔截），DB 有待付款單', async ({ note }) => {
   const p = S.pm
-  await p.route(ECPAY, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1>stub ecpay</h1>' }))
+  await p.route(isEcpay, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1>stub ecpay</h1>' }))
   await p.getByRole('button', { name: '1,000', exact: true }).click()
   await expect(p.getByTestId('summary')).toContainText('儲值 NT$ 1,000，入帳 1,000 點')
-  const nav = p.waitForRequest(r => r.url().startsWith('https://payment-stage.ecpay.com.tw') && r.method() === 'POST')
+  const nav = p.waitForRequest(isEcpayPost)
   await p.getByRole('button', { name: '前往付款' }).click()
   const req = await nav
   const f = Object.fromEntries(new URLSearchParams(req.postData() ?? ''))
@@ -883,7 +884,7 @@ await run.step('D-54', '付款完成（綠界通知，替身）→ 回到 /me/to
   const p = S.pm
   const r = await ecpayPaid(S.tradeNo)
   note(`平台外：ecpayPaid(${S.tradeNo}) → ${r.status} ${r.text}`)
-  await p.unroute(ECPAY)
+  await p.unroute(isEcpay)
   await p.goto('/me/topup'); await hyd(p)
   await expect(p.locator('article[data-status="paid"]')).toBeVisible()
   await expect(p.getByText('目前餘額 1,000 點', { exact: true })).toBeVisible()
@@ -896,12 +897,12 @@ await run.step('D-54', '付款完成（綠界通知，替身）→ 回到 /me/to
 
 await run.step('D-55', '儲值選超商代碼 → 取號中（待綠界 /info 通知）→ 取消待付款訂單', async ({ note }) => {
   const p = S.pm
-  await p.route(ECPAY, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1>stub ecpay</h1>' }))
+  await p.route(isEcpay, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1>stub ecpay</h1>' }))
   await p.goto('/me/topup'); await hyd(p)
   await p.getByRole('button', { name: '500', exact: true }).click()
   await p.getByRole('radio', { name: /超商代碼/ }).check()
-  await Promise.all([p.waitForRequest(r => r.url().startsWith('https://payment-stage.ecpay.com.tw')), p.getByRole('button', { name: '前往付款' }).click()])
-  await p.unroute(ECPAY)
+  await Promise.all([p.waitForRequest(isEcpayPost), p.getByRole('button', { name: '前往付款' }).click()])
+  await p.unroute(isEcpay)
   await p.goto('/me/topup'); await hyd(p)
   const art = p.locator('article[data-status="pending"]').first()
   await expect(art).toBeVisible()
