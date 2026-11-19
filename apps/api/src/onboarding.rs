@@ -11,6 +11,8 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// 步驟順序即導覽順序；前端以第一個未完成的步驟為「目前步驟」
+/// 調整順序時要同步改前端 `TOUR_STEPS`（`apps/web/app/composables/useOnboarding.ts`），
+/// 並檢查依賴順序的 e2e：`flow-f24-onboarding`、`login-page`、`identity-settings`
 const STEPS: [&str; 5] = ["wishlist", "item", "publish", "profile", "give"];
 
 async fn status(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, AppError> {
