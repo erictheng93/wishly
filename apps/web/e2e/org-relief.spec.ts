@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { loginBrowser, registerUser, sql, uid } from './helpers'
+import { loginBrowser, memberClaim, registerUser, sql, uid } from './helpers'
 
 // 已審核組織 + 有效許可 + 既有事件 → 查重命中選既有事件 → 建據點 → 加 critical 品項 → 發布 → 公開頁可見
 // （後端救災 API 合併後才跑得過）
@@ -45,5 +45,26 @@ test('救災：建立據點、加急缺品項、發布後公開頁可見', async
   await pub.goto(`/s/${slug}`)
   await expect(pub.getByText(title)).toBeVisible()
   await expect(pub.getByText('瓶裝水')).toBeVisible()
-  await ctx.close()
+  const wid = new URL(p.url()).pathname.split('/')[2]!
+  const itemId = sql(`SELECT id FROM wishlist_items WHERE wishlist_id = '${wid}' AND title = '瓶裝水'`)
+  const donor = await registerUser({ tag: 'reliefdonor' })
+  const { claim } = await memberClaim(itemId, 1, donor)
+  const donorPage = await browser.newPage()
+  try {
+    await loginBrowser(donorPage.context(), donor)
+    await donorPage.goto('/me/claims')
+    const reference = donorPage.getByText(claim.id, { exact: true })
+    await expect(reference).toBeVisible()
+    await p.goto(`/orgs/${orgId}/sites/${wid}/receipts`)
+    await p.getByRole('button', { name: '登記實收' }).click()
+    await p.getByLabel('認領編號（選填）', { exact: false }).fill(await reference.innerText())
+    await p.getByRole('dialog').getByRole('button', { name: '登記', exact: true }).click()
+    await expect(p.getByRole('dialog')).toHaveCount(0)
+    await donorPage.reload()
+    await expect(donorPage.getByText('據點已確認收到物資')).toBeVisible()
+    await expect(p.getByText(donor.name, { exact: true })).toHaveCount(0)
+  } finally {
+    await donorPage.close()
+    await ctx.close()
+  }
 })

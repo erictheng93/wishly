@@ -480,6 +480,8 @@ pub const KINDS: &[&str] = &[
     "funding.expired",
     "funding.released",
     "item.removed",
+    "claim.thank_you",
+    "claim.receipt_received",
     "claim.confirmation",
     "claim.item_removed",
     "claim.item_changed",
@@ -521,6 +523,10 @@ pub const KINDS: &[&str] = &[
 pub fn inbox_link(kind: &str, payload: &Value) -> String {
     let org = payload["org_id"].as_str().unwrap_or("");
     match kind {
+        "claim.thank_you" | "claim.receipt_received" => match payload["claim_id"].as_str() {
+            Some(id) => format!("/me/claims?claim={id}"),
+            None => "/me/claims".into(),
+        },
         "claim.confirmation"
         | "claim.cancelled_by_owner"
         | "claim.purchase_reminder"
@@ -769,6 +775,13 @@ async fn handle(
             }
             None => None,
         };
+    if kind == "claim.receipt_received" {
+        let active: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM receipts WHERE id=($1->>'receipt_id')::uuid AND voided_at IS NULL)")
+            .bind(&payload).fetch_one(pool).await?;
+        if !active {
+            done!("cancelled", "receipt voided");
+        }
+    }
     // 3. 寄前重驗
     if kind == "claim.purchase_reminder" {
         // 寄送當下：認領仍待購且期限沒變才寄；清單已結束（Q14）時改用不提「延長」的文案
@@ -1383,7 +1396,11 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         );
     }
     let base = app;
-    let manage = format!("{base}/me/claims");
+    let manage = if matches!(kind, "claim.thank_you" | "claim.receipt_received") {
+        format!("{base}{}", inbox_link(kind, payload))
+    } else {
+        format!("{base}/me/claims")
+    };
     let dash = format!("{base}/dashboard");
     let item = payload
         .get("item_title")
@@ -1399,6 +1416,22 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
         });
     let wallet = format!("{base}/me/wallet");
     let (subject, body) = match kind {
+        "claim.thank_you" => (
+            l.pick(format!("【Wishly】你收到一張《{item}》的謝卡"), format!("[Wishly] A thank-you card for {item}"), format!("[Wishly] Thiệp cảm ơn cho {item}"), format!("[Wishly] Kartu terima kasih untuk {item}")),
+            l.pick(format!("《{title}》的受贈者送來一張謝卡。請到「我的送禮」閱讀。\n{manage}"),format!("The recipient of your gift for {title} sent you a card. Read it in My gifts.\n{manage}"),format!("Người nhận quà trong {title} đã gửi thiệp cho bạn. Xem trong Quà của tôi.\n{manage}"),format!("Penerima hadiah untuk {title} mengirimkan kartu. Baca di Hadiah saya.\n{manage}")),
+        ),
+        "claim.receipt_received" => (
+            l.pick(
+                format!("【Wishly】《{item}》實收登記更新"), format!("[Wishly] Receipt update for {item}"),
+                format!("[Wishly] Cập nhật tiếp nhận {item}"), format!("[Wishly] Pembaruan penerimaan {item}"),
+            ),
+            l.pick(
+                format!("《{title}》已登記你認捐的「{item}」。請到「我的送禮」查看最新實收狀態。\n{manage}"),
+                format!("{title} recorded the {item} you pledged. Check My gifts for the latest receipt status.\n{manage}"),
+                format!("{title} đã ghi nhận món {item} bạn đóng góp. Xem trạng thái tiếp nhận mới nhất trong Quà của tôi.\n{manage}"),
+                format!("{title} telah mencatat {item} yang kamu sumbangkan. Lihat status penerimaan terbaru di Hadiah saya.\n{manage}"),
+            ),
+        ),
         "crowdfund.funded" => (
             l.pick(format!("【Wishly】《{item}》集資達標了"), format!("[Wishly] \"{item}\" has reached its goal"), format!("[Wishly] \"{item}\" đã đạt mục tiêu góp quà"), format!("[Wishly] Patungan \"{item}\" sudah mencapai target")),
             l.pick(
@@ -1465,15 +1498,20 @@ pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (Str
                 ),
             )
         }
-        "claim.cancelled_by_owner" => (
-            l.pick(format!("【Wishly】你對「{item}」的認領已被取消"), format!("[Wishly] Your claim on \"{item}\" was cancelled"), format!("[Wishly] Lượt nhận \"{item}\" của bạn đã bị hủy"), format!("[Wishly] Klaimmu atas \"{item}\" dibatalkan")),
-            l.pick(
-                format!("清單《{title}》的建立者取消了你對「{item}」的認領。若你已經買了，請自行處理這份禮物。\n我的送禮：{manage}\n"),
-                format!("The owner of list \"{title}\" cancelled your claim on \"{item}\". If you've already bought it, please handle the gift yourself.\nMy gifts: {manage}\n"),
-                format!("Chủ danh sách \"{title}\" đã hủy lượt nhận \"{item}\" của bạn. Nếu bạn đã mua, vui lòng tự xử lý món quà.\nQuà tôi tặng: {manage}\n"),
-                format!("Pemilik wishlist \"{title}\" membatalkan klaimmu atas \"{item}\". Kalau kamu sudah membelinya, mohon urus hadiahnya sendiri.\nHadiah dariku: {manage}\n"),
-            ),
-        ),
+        "claim.cancelled_by_owner" => {
+            let reason = payload["reason"].as_str().map(|r| {
+                l.pick(format!("原因：{r}\n"), format!("Reason: {r}\n"), format!("Lý do: {r}\n"), format!("Alasan: {r}\n"))
+            }).unwrap_or_default();
+            (
+                l.pick(format!("【Wishly】你對「{item}」的認領已被取消"), format!("[Wishly] Your claim on \"{item}\" was cancelled"), format!("[Wishly] Lượt nhận \"{item}\" của bạn đã bị hủy"), format!("[Wishly] Klaimmu atas \"{item}\" dibatalkan")),
+                l.pick(
+                    format!("清單《{title}》的建立者取消了你對「{item}」的認領。若你已經買了，請自行處理這份禮物。\n{reason}我的送禮：{manage}\n"),
+                    format!("The owner of list \"{title}\" cancelled your claim on \"{item}\". If you've already bought it, please handle the gift yourself.\n{reason}My gifts: {manage}\n"),
+                    format!("Chủ danh sách \"{title}\" đã hủy lượt nhận \"{item}\" của bạn. Nếu bạn đã mua, vui lòng tự xử lý món quà.\n{reason}Quà tôi tặng: {manage}\n"),
+                    format!("Pemilik wishlist \"{title}\" membatalkan klaimmu atas \"{item}\". Kalau kamu sudah membelinya, mohon urus hadiahnya sendiri.\n{reason}Hadiah dariku: {manage}\n"),
+                ),
+            )
+        }
         // 寄給擁有者：不提是誰取消，也不帶品項名稱
         "claim.cancelled_by_donor" => (
             l.pick(format!("【Wishly】《{title}》有一份禮物取消了"), format!("[Wishly] A gift on \"{title}\" was cancelled"), format!("[Wishly] Một món quà trong \"{title}\" đã bị hủy"), format!("[Wishly] Satu hadiah di \"{title}\" dibatalkan")),

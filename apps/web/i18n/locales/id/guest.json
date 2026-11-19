@@ -68,6 +68,7 @@
       "confirm": "Konfirmasi patungan {pts}"
     },
     "card": {
+      "referencePrice": "Harga referensi NT$ {amount}",
       "priority": "Prioritas {level}",
       "prio": {
         "high": "Tinggi"

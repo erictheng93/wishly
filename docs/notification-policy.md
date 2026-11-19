@@ -37,6 +37,8 @@
 
 `claim.purchase_reminder`、`claim.list_closed`、`claim.cancelled_by_owner`、`claim.item_removed`、`support.new`。
 
+`claim.cancelled_by_owner` 的收件人是該筆認領的捐助者。管理者選填的取消原因只隨通知送出；稽核紀錄只記「有填原因」，不存原文。
+
 `support.new`（有新的客服工單，#92）發給未停權、未刪除且有 `support` 或 `admin` 角色的營運，在建立工單的同一句 SQL 寫入；歸類為帳號類（不可關閉），站內立即出現、連到 `/admin/support`，Email 白天才寄（工單不是安全事件，等到 09:00 不會有損失，但營運人員要知道有待辦）。防洪：某位營運已有一則未讀的 `support.new`（已進站內未讀，或仍在 outbox 尚未寫站內）就不再新增，讀過後下一張工單才再通知；併發送出時偶爾多一則。payload 為空，不含工單內文、Email 與提出者身分。
 
 `claim.purchase_reminder` 每筆認領只寄一封，在截止前 24 小時（2026-11 起拿掉 3 天前那封，避免一週內連收兩封提醒）。期限早於下一個 09:00 時立刻寄。
@@ -45,9 +47,15 @@
 
 | 對象 | kind |
 |---|---|
-| 捐助者 | `claim.expired`、`order.delivered` |
+| 捐助者 | `claim.expired`、`order.delivered`、`claim.thank_you`、`claim.receipt_received` |
 | 擁有者 | `owner.delivered`、`owner.order_failed`、`event.summary` |
 | 社交 | `friend.request`、`birthday.friend`、`birthday.nudge` |
+
+#### 謝卡與物資實收回饋（#101）
+
+- `claim.thank_you` 屬送禮類，會員依 Gifts 設定接收站內與 Email 通知。信件和推播只提示有新謝卡，從連結開啟該筆「我的送禮」閱讀全文。
+- `claim.receipt_received` 同屬送禮類。志工登記實收時，只有附上捐助者提供的認領編號、品項與整筆數量吻合才通知該會員。備註限組織內部；作廢後尚未寄送的通知會取消，「我的送禮」以有效收據即時顯示實收狀態。
+- 舊訪客可持原有訪客憑證在「我的送禮」閱讀謝卡與查詢實收，這兩種通知都不寄到舊訪客自行填寫的信箱。
 
 ### 第四級：會員不寄，只留站內（`InAppOnly`）
 

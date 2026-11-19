@@ -903,6 +903,11 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
     put_addr(&pool, &t, wid).await;
     let item = cf_item(&pool, &t, wid, 1000).await;
     let done = cf_item(&pool, &t, wid, 100).await;
+    sqlx::query("UPDATE wishlist_items SET price_snapshot_amount = 800 WHERE id = $1")
+        .bind(item)
+        .execute(&pool)
+        .await
+        .unwrap();
     // 預設可見度是 private；阿明、路人C 設為公開才會具名
     sqlx::query("UPDATE users SET default_claim_visibility = 'public' WHERE id = ANY($1)")
         .bind(vec![a, c])
@@ -952,6 +957,7 @@ async fn public_page_funding_fields_and_contributors(pool: PgPool) {
             .clone()
     };
     let i = find(item);
+    assert_eq!(i["price_snapshot_amount"], 800);
     assert_eq!(
         (
             i["target_points"].as_i64(),

@@ -68,6 +68,7 @@
       "confirm": "Xác nhận tài trợ {pts}"
     },
     "card": {
+      "referencePrice": "Giá tham khảo NT$ {amount}",
       "priority": "Ưu tiên: {level}",
       "prio": {
         "high": "Cao"

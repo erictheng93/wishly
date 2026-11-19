@@ -1,5 +1,6 @@
 //! 據點實收登記：任何未停用成員（volunteer 起）登記品項實際收到的數量。
-//! 只 INSERT receipts（append-only），不鎖也不動 wishlist_items / claims，因此不參與認捐鎖序。
+//! 未提供認領編號的實收只登記總量；有編號時核對品項與數量，私下通知該捐助者。
+//! 鎖序：wishlist_items（FOR KEY SHARE）→ claims（FOR SHARE，僅有認領編號時）。
 use crate::{
     error::AppError,
     idempotency,
@@ -32,6 +33,7 @@ pub fn routes() -> Router<AppState> {
 #[serde(deny_unknown_fields)]
 struct Req {
     item_id: Uuid,
+    claim_id: Option<Uuid>,
     qty: i32,
     note: Option<String>,
 }
@@ -78,12 +80,13 @@ async fn record(
     {
         return Ok(resp(s as u16, &b, true));
     }
-    // 順便讀組織狀態（不加鎖：本模組不參與鎖序，撤銷與登記競態時以讀到的為準）
+    // 順便讀組織狀態（不鎖組織：撤銷與登記競態時以讀到的為準）。
+    // 品項先取 FOR KEY SHARE（INSERT 的外鍵檢查本來就會取）：之後才鎖 claims，與認捐鎖序 wishlist_items → claims 一致，否則會與改認領的請求死結。
     let site: (Uuid, String, String) = sqlx::query_as(
         "SELECT w.id, w.site_status, o.verification_status::text FROM wishlist_items i JOIN wishlists w ON w.id = i.wishlist_id
          JOIN organizations o ON o.id = w.org_id
          WHERE i.id = $1 AND i.deleted_at IS NULL AND w.type = 'relief' AND w.org_id = $2 AND w.deleted_at IS NULL
-           AND i.funding_mode <> 'support'")
+           AND i.funding_mode <> 'support' FOR KEY SHARE OF i")
         .bind(req.item_id).bind(org).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
     if site.2 != "verified" {
         return Err(AppError::problem(
@@ -99,9 +102,39 @@ async fn record(
             "此據點已結束，無法再登記實收",
         ));
     }
+    let donor: Option<Uuid> = if let Some(claim) = req.claim_id {
+        sqlx::query_scalar(
+            "SELECT c.user_id FROM claims c JOIN wishlist_items i ON i.id=c.item_id
+              JOIN wishlists w ON w.id=i.wishlist_id
+             WHERE c.id=$1 AND c.item_id=$2 AND c.qty=$3 AND i.funding_mode='quantity'
+               AND NOT surprise_locked(w.surprise_mode,w.event_date)
+               AND c.status IN ('reserved','purchased','delivered') FOR SHARE OF c",
+        )
+        .bind(claim)
+        .bind(req.item_id)
+        .bind(req.qty)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| {
+            AppError::invalid("/claim_id", "CLAIM_MISMATCH", "認領編號、品項或數量不符")
+        })?
+    } else {
+        None
+    };
     let (id, created_at): (Uuid, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
-        "INSERT INTO receipts (item_id, wishlist_id, qty, note, recorded_by) VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at")
-        .bind(req.item_id).bind(site.0).bind(req.qty).bind(note).bind(me.id).fetch_one(&mut *tx).await?;
+        "INSERT INTO receipts (item_id, wishlist_id, qty, note, recorded_by, claim_id) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (claim_id) WHERE claim_id IS NOT NULL AND voided_at IS NULL DO NOTHING RETURNING id, created_at")
+        .bind(req.item_id).bind(site.0).bind(req.qty).bind(note).bind(me.id).bind(req.claim_id).fetch_optional(&mut *tx).await?
+        .ok_or_else(|| AppError::problem(409, "CLAIM_ALREADY_RECEIVED", "此認領已登記實收"))?;
+    if let Some(uid) = donor {
+        crate::notify::enqueue(
+            &mut *tx,
+            uid,
+            "claim.receipt_received",
+            json!({"receipt_id":id,"claim_id":req.claim_id,"item_id":req.item_id,"wishlist_id":site.0}),
+        )
+        .await?;
+    }
     audit_user(
         &mut *tx,
         me.id,
@@ -131,7 +164,7 @@ async fn list(
           WHERE w.id=$1 AND w.org_id=$2 AND w.type='relief' AND w.deleted_at IS NULL")
         .bind(wid).bind(org).fetch_optional(&st.pool).await?.ok_or(AppError::NotFound)?;
     let items: Vec<Value> = sqlx::query_scalar(
-        "SELECT jsonb_build_object('item_id', i.id, 'title', i.title, 'qty_needed', i.qty_needed, 'category', i.category, 'urgency', i.urgency,
+        "SELECT jsonb_build_object('item_id', i.id, 'title', i.title, 'funding_mode', i.funding_mode, 'qty_needed', i.qty_needed, 'category', i.category, 'urgency', i.urgency,
                 'total', COALESCE(r.total, 0), 'entries', COALESCE(r.entries, '[]'::jsonb))
            FROM wishlist_items i
            LEFT JOIN LATERAL (SELECT COALESCE(sum(x.qty) FILTER (WHERE x.voided_at IS NULL), 0)::bigint AS total, jsonb_agg(jsonb_build_object(

@@ -1275,15 +1275,21 @@ async fn dashboard(
             Option<String>,
             DateTime<Utc>,
             bool,
+            bool,
+            bool,
         );
         let rows: Vec<ClaimDashboardRow> = sqlx::query_as(
-            "SELECT c.id, c.item_id, CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.claimer_name END, c.qty, c.status::text, c.note, c.created_at, c.is_anonymous FROM claims c JOIN wishlist_items i ON i.id=c.item_id
+            "SELECT c.id, c.item_id, CASE WHEN c.is_anonymous THEN '匿名朋友' ELSE c.claimer_name END, c.qty, c.status::text, c.note, c.created_at, c.is_anonymous,
+                    c.thank_you IS NOT NULL,
+                    c.status = 'delivered' AND c.thank_you IS NULL AND i.deleted_at IS NULL
+                       AND i.funding_mode = 'quantity' AND (c.user_id IS NOT NULL OR c.guest_id IS NOT NULL)
+             FROM claims c JOIN wishlist_items i ON i.id=c.item_id
              WHERE i.wishlist_id=$1 ORDER BY c.id").bind(id).fetch_all(&st.pool).await?;
         Value::Array(
             rows.into_iter()
                 .map(|r| {
                     json!({ "id": r.0, "item_id": r.1,
-            "claimer_name": r.2, "qty": r.3, "status": r.4, "note": r.5, "created_at": r.6, "is_anonymous": r.7 })
+            "claimer_name": r.2, "qty": r.3, "status": r.4, "note": r.5, "created_at": r.6, "is_anonymous": r.7, "thanked": r.8, "can_thank": r.9 })
                 })
                 .collect(),
         )

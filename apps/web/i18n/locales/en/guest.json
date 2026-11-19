@@ -68,6 +68,7 @@
       "confirm": "Confirm contribution {pts}"
     },
     "card": {
+      "referencePrice": "Reference price NT$ {amount}",
       "priority": "Priority: {level}",
       "prio": {
         "high": "High"

@@ -7,22 +7,23 @@ const { api } = useApi()
 const route = useRoute()
 const org = route.params.id as string, wid = route.params.wid as string
 const data = ref<any>(null), loading = ref(true), err = ref('')
-const rcpt = ref<any>(null), rcptKey = ref(''), rcptF = reactive({ qty: 1, note: '' }), rcptBusy = ref(false), rcptErr = ref('')
+const rcpt = ref<any>(null), rcptKey = ref(''), rcptF = reactive({ qty: 1, note: '', claimId: '' }), rcptBusy = ref(false), rcptErr = ref('')
 async function load() {
   try { data.value = await api(`/orgs/${org}/sites/${wid}/receipts`) } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
 }
 onMounted(load)
-function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
+function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptF.claimId = ''; rcptErr.value = '' }
 const overAsk = ref(false)
 // 超收只提示：累計 + 本次 > 需求時先確認，後端不擋
 function submitReceipt() {
+  if (rcptF.claimId.trim() && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(rcptF.claimId.trim())) { rcptErr.value = t('org.relief.receiptClaimInvalid'); return }
   if (rcpt.value.total + Number(rcptF.qty) > rcpt.value.qty_needed) overAsk.value = true
   else saveReceipt()
 }
 async function saveReceipt() {
   overAsk.value = false; rcptBusy.value = true; rcptErr.value = ''
   try {
-    await api(`/orgs/${org}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': rcptKey.value }, noRedirect: true, body: { item_id: rcpt.value.item_id, qty: Number(rcptF.qty), note: rcptF.note || undefined } })
+    await api(`/orgs/${org}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': rcptKey.value }, noRedirect: true, body: { item_id: rcpt.value.item_id, qty: Number(rcptF.qty), note: rcptF.note || undefined, claim_id: rcptF.claimId.trim() || undefined } })
     rcpt.value = null; await load()
   } catch (e: any) { rcptErr.value = errMsg(e); if (e.code !== 'NETWORK') rcptKey.value = crypto.randomUUID() } finally { rcptBusy.value = false }
 }
@@ -67,6 +68,7 @@ async function doVoid() {
           </li>
         </ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
+        <label v-if="rcpt.funding_mode === 'quantity'" class="c-field"><span>{{ $t('org.relief.receiptClaim') }}</span><input v-model.trim="rcptF.claimId" name="claim_id" autocapitalize="none" :spellcheck="false" maxlength="36"><small>{{ $t('org.relief.receiptClaimHint') }}</small></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
         <p v-if="rcptErr" class="c-err c-errbox" role="alert">{{ rcptErr }}</p>
         <button class="c-btn primary block" :disabled="rcptBusy">{{ $t('org.relief.receiptSave') }}</button>

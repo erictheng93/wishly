@@ -24,7 +24,78 @@ use uuid::Uuid;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/items/{id}/claims", post(create))
+        .route("/claims/{id}/thank-you", post(thank_you))
         .route("/claims/{id}", patch(update).delete(cancel))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ThankYouReq {
+    message: String,
+}
+
+async fn thank_you(
+    State(st): State<AppState>,
+    owner: CurrentUser,
+    Path(id): Path<Uuid>,
+    body: Bytes,
+) -> Result<Response, AppError> {
+    let req: ThankYouReq = parse(&body)?;
+    let message = crate::validate::optional_note(Some(&req.message), "/message", 500)?
+        .ok_or_else(|| AppError::invalid("/message", "REQUIRED", "請填寫謝卡內容"))?;
+    let mut tx = st.pool.begin().await?;
+    let (wid, item, donor, locked, delivered, previous): (Uuid, Uuid, Option<Uuid>, bool, bool, Option<String>) =
+        sqlx::query_as(
+            "SELECT w.id, i.id, c.user_id, surprise_locked(w.surprise_mode, w.event_date),
+                    c.status = 'delivered', c.thank_you
+               FROM claims c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
+              WHERE c.id = $1 AND can_manage_wishlist(w.owner_id, w.org_id, $2)
+                AND i.funding_mode = 'quantity' AND i.deleted_at IS NULL AND w.deleted_at IS NULL
+                AND (c.user_id IS NOT NULL OR c.guest_id IS NOT NULL) FOR UPDATE OF c")
+            .bind(id).bind(owner.id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    if locked {
+        return Err(AppError::problem(
+            403,
+            "SURPRISE_LOCKED",
+            "驚喜解鎖後才能寫謝卡",
+        ));
+    }
+    if !delivered {
+        return Err(AppError::problem(
+            409,
+            "CLAIM_NOT_DELIVERED",
+            "物品送達後才能寫謝卡",
+        ));
+    }
+    if let Some(previous) = previous {
+        if previous != message {
+            return Err(AppError::problem(409, "ALREADY_THANKED", "謝卡已送出"));
+        }
+    } else {
+        // Keep the sender's response identical for anonymous donors who blocked them.
+        let muted = match donor {
+            Some(uid) => crate::friends::blocked_between(&mut *tx, owner.id, uid).await?,
+            None => false,
+        };
+        if let Some(uid) = donor.filter(|_| !muted) {
+            crate::notify::enqueue(
+                &mut *tx,
+                uid,
+                "claim.thank_you",
+                json!({"claim_id":id,"item_id":item,"wishlist_id":wid}),
+            )
+            .await?;
+        }
+        sqlx::query("UPDATE claims SET thank_you = $2, thank_you_muted = $3 WHERE id = $1")
+            .bind(id)
+            .bind(message)
+            .bind(muted)
+            .execute(&mut *tx)
+            .await?;
+        crate::dashboard::notify(&mut *tx, wid).await?;
+    }
+    tx.commit().await?;
+    Ok(json_resp(200, &json!({"thanked":true}), false))
 }
 
 /// claims 以別名 `c` 查詢
@@ -353,6 +424,7 @@ async fn diagnose(st: &AppState, item_id: Uuid, want: i32) -> Result<AppError, A
 
 #[derive(Deserialize)]
 struct PatchReq {
+    reason: Option<String>,
     qty: Option<i32>,
     note: Option<String>,
     status: Option<String>,
@@ -428,6 +500,7 @@ async fn cancel(
         actor,
         legacy,
         PatchReq {
+            reason: None,
             qty: None,
             note: None,
             status: Some("cancelled".into()),
@@ -540,6 +613,14 @@ async fn apply(
         ));
     }
 
+    if p.reason.is_some() && (!can_manage || p.status.as_deref() != Some("cancelled")) {
+        return Err(AppError::invalid(
+            "/reason",
+            "NOT_APPLICABLE",
+            "僅清單管理者取消認領時可填原因",
+        ));
+    }
+    let reason = crate::validate::optional_note(p.reason.as_deref(), "/reason", 200)?;
     if p.visibility.is_some() && user_id.is_none() {
         return Err(AppError::invalid(
             "/visibility",
@@ -698,19 +779,20 @@ async fn apply(
         } else {
             "claim.update"
         };
-        audit(
-            &mut tx,
-            actor,
-            action,
-            id,
-            json!({ "status": [cur, new_status], "qty": [old_qty, claim.qty] }),
-        )
-        .await?;
+        let mut diff = json!({ "status": [cur, new_status], "qty": [old_qty, claim.qty] });
+        // 原因是自由填寫的文字（可能含個資），稽核只增不改，所以只記有沒有填；原文只隨通知送出
+        if reason.is_some() {
+            diff["reason"] = json!(true);
+        }
+        audit(&mut tx, actor, action, id, diff).await?;
     }
     let wid = wishlist_of(&mut tx, item_id).await?;
     if cur != "cancelled" && new_status == "cancelled" {
-        let payload = json!({"wishlist_id": wid, "item_id": item_id});
+        let mut payload = json!({"wishlist_id": wid, "item_id": item_id});
         if by_owner {
+            if let Some(reason) = reason {
+                payload["reason"] = json!(reason);
+            }
             if let Some(uid) = user_id {
                 crate::notify::enqueue(&mut *tx, uid, "claim.cancelled_by_owner", payload).await?;
             } else if let Some(gid) = guest_id {
