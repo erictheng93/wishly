@@ -45,12 +45,16 @@ test('擁有者：進度頁標記已送達、取消他人捐助（需確認）�
   // exact：否則會比對到按鈕「標為已送達」而提早通過，下一步 click 時 PATCH 還沒回、×1 列按鈕消失造成版面上移，點到 article
   await expect(rows.filter({ hasText: '×1' }).getByText('已送達', { exact: true })).toBeVisible()
 
-  // 逐次等對話框出現再處理：進度頁會因 SSE 重抓而重繪，用 page.once 可能讓處理器留到下一次
+  // 取消他人認領：sheet 內確認並可填原因
   const cancel = async (accept: boolean) => {
-    // confirm() 開著時 click 不會結束，所以對話框一出現就處理，再等 click 與處理都完成
-    const handled = page.waitForEvent('dialog').then(d => accept ? d.accept() : d.dismiss())
     await rows.filter({ hasText: '×2' }).getByRole('button', { name: '取消認領' }).click()
-    await handled
+    const sheet = page.getByRole('dialog', { name: '取消認領' })
+    await expect(sheet.getByRole('textbox')).toHaveAttribute('maxlength', '200')
+    if (accept) {
+      await sheet.getByRole('textbox').fill('收到同樣的禮物了')
+      await sheet.getByRole('button', { name: '取消認領' }).click()
+    } else await sheet.getByRole('button', { name: '先不取消' }).click()
+    await expect(sheet).toHaveCount(0)
   }
   await cancel(false)
   await expect(rows.filter({ hasText: '×2' }).getByText('已認領')).toBeVisible()
@@ -95,9 +99,8 @@ test('進度頁：SSE 觸發的較早重抓晚到時，不可蓋掉操作後的�
   // 取消後的重抓（操作本身 + 取消觸發的 SSE）都完成之後，才放行較早的那個請求，確保它最後到
   let fresh = 0
   page.on('response', r => { if (r.url().endsWith('/dashboard')) fresh++ })
-  const handled = page.waitForEvent('dialog').then(d => d.accept())
   await row.getByRole('button', { name: '取消認領' }).click()
-  await handled
+  await page.getByRole('dialog', { name: '取消認領' }).getByRole('button', { name: '取消認領' }).click()
   await expect(row.getByText('已取消')).toBeVisible()
   await expect.poll(() => fresh).toBeGreaterThanOrEqual(2)
   await page.waitForTimeout(800) // 沒有更多重抓排程

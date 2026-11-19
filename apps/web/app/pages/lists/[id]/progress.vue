@@ -62,12 +62,18 @@ const fundStatus = (i: any) => deriveDisplayStatus(i, orderByItem.value[i.item_i
 const pct = computed(() => d.value?.totals?.completion_pct ?? 0)
 const busyClaim = ref('')
 const claimErr = ref('')
+const nameOf = (c: any) => c.is_anonymous ? t('lists.progress.anon') : c.claimer_name || t('lists.progress.guest')
+// 取消他人認領：先開 sheet 確認並選填原因（原因會隨通知送給捐助者）
+const cancelling = ref<any>(null), cancelReason = ref('')
+function askCancel(c: any) { cancelReason.value = ''; claimErr.value = ''; cancelling.value = c }
 async function setStatus(c: any, status: 'delivered' | 'cancelled') {
-  // 已送達不可復原（後端不允許退回），兩種操作都先確認
-  if (!confirm(t(status === 'cancelled' ? 'lists.progress.cancelConfirm' : 'lists.progress.deliverConfirm', { name: c.is_anonymous ? t('lists.progress.anon') : c.claimer_name || t('lists.progress.guest') }))) return
+  // 已送達不可復原（後端不允許退回），先確認
+  if (status === 'delivered' && !confirm(t('lists.progress.deliverConfirm', { name: nameOf(c) }))) return
   busyClaim.value = c.id; claimErr.value = ''
-  try { await api(`/claims/${c.id}`, { method: 'PATCH', body: { status } }); await load() }
-  catch (e) { claimErr.value = errMsg(e) } finally { busyClaim.value = '' }
+  try {
+    await api(`/claims/${c.id}`, { method: 'PATCH', body: { status, reason: status === 'cancelled' ? cancelReason.value.trim() || undefined : undefined } })
+    cancelling.value = null; await load()
+  } catch (e) { claimErr.value = errMsg(e) } finally { busyClaim.value = '' }
 }
 </script>
 <template>
@@ -95,7 +101,7 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
 
       <p v-if="!d.totals.item_count" class="x-empty">{{ $t('lists.progress.noItems') }}</p>
       <p v-else-if="!locked && !d.totals.qty_claimed && !d.totals.pledged_points" class="x-empty">{{ $t('lists.progress.nobody') }}</p>
-      <p v-if="claimErr" class="c-err" role="alert">{{ claimErr }}</p>
+      <p v-if="claimErr && !cancelling" class="c-err" role="alert">{{ claimErr }}</p>
 
       <h2 class="c-h2 x-h">{{ $t('lists.progress.itemsTitle') }}</h2>
       <article v-for="(i, n) in d.items" :key="i.item_id" class="c-card pg-item">
@@ -154,9 +160,10 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
           <li class="c-row wrap">
             <span class="c-grow" style="flex-basis:100%">{{ c.is_anonymous ? $t('lists.progress.anon') : c.claimer_name || $t('lists.progress.guest') }} ×{{ c.qty }}<template v-if="c.note"> ・{{ c.note }}</template></span>
             <CreatorStatusBadge :v="c.status" />
+            <CreatorThankYouCard v-if="!locked && (c.can_thank || c.thanked)" :claim-id="c.id" :thanked="c.thanked" />
             <template v-if="c.status === 'reserved' || c.status === 'purchased'">
               <button class="c-btn" :disabled="busyClaim === c.id" @click="setStatus(c, 'delivered')">{{ $t('lists.progress.markDelivered') }}</button>
-              <button class="c-btn danger" :disabled="busyClaim === c.id" @click="setStatus(c, 'cancelled')">{{ $t('lists.progress.cancelClaim') }}</button>
+              <button class="c-btn danger" :disabled="busyClaim === c.id" @click="askCancel(c)">{{ $t('lists.progress.cancelClaim') }}</button>
             </template>
           </li>
         </ul>
@@ -168,6 +175,18 @@ async function setStatus(c: any, status: 'delivered' | 'cancelled') {
       </section>
       <NuxtLink v-if="!d.totals.qty_claimed && !d.totals.pledged_points && !locked" :to="`/lists/${id}/edit`" class="c-btn primary block">{{ $t('lists.progress.shareList') }}</NuxtLink>
     </template>
+    <CreatorSheet :open="!!cancelling" :title="$t('lists.progress.cancelClaim')" @close="cancelling = null">
+      <form v-if="cancelling" @submit.prevent="setStatus(cancelling, 'cancelled')">
+        <p>{{ $t('lists.progress.cancelConfirm', { name: nameOf(cancelling) }) }}</p>
+        <label class="c-field"><span>{{ $t('lists.progress.cancelReason') }}</span>
+          <textarea v-model="cancelReason" name="reason" rows="3" maxlength="200" :disabled="!!busyClaim" /></label>
+        <p v-if="claimErr" class="c-err" role="alert">{{ claimErr }}</p>
+        <div class="c-row">
+          <button type="button" class="c-btn" @click="cancelling = null">{{ $t('lists.progress.cancelKeep') }}</button>
+          <button class="c-btn danger" :disabled="!!busyClaim">{{ $t('lists.progress.cancelClaim') }}</button>
+        </div>
+      </form>
+    </CreatorSheet>
   </main>
 </template>
 <style scoped>

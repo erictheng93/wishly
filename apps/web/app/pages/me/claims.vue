@@ -3,6 +3,8 @@ import '~/assets/guest.css'
 const { t } = useI18n()
 useSeoMeta({ title: () => t('me.claims.title'), robots: 'noindex' })
 const { api } = useGuest()
+const route = useRoute()
+const selectedClaim = computed(() => typeof route.query.claim === 'string' ? route.query.claim : '')
 // 未登入時空狀態要給登入入口（D50：認捐需登入，不能只顯示空清單）
 const { user, fetchMe } = useAuth()
 onMounted(() => { fetchMe().catch(() => {}) })
@@ -20,16 +22,32 @@ const groups = computed(() => {
   return [...m.values()]
 })
 
-async function load() {
-  state.value = 'loading'
+const cursor = ref<string | null>(null), more = ref(false)
+let loadSeq = 0
+async function load(append = false) {
+  if (append && (more.value || !cursor.value)) return
+  const seq = ++loadSeq
+  const params = new URLSearchParams({ limit: '50' })
+  if (selectedClaim.value) params.set('claim_id', selectedClaim.value)
+  if (append && cursor.value) params.set('cursor', cursor.value)
+  more.value = append
+  if (!append) state.value = 'loading'
+  msg.value = ''
   try {
-    const r = await api('/guest/me?limit=100')
-    guest.value = r.guest; rows.value = r.claims; nick.value = r.guest.display_name
+    const r = await api(`/guest/me?${params}`)
+    if (seq !== loadSeq) return
+    cursor.value = r.next_cursor
+    rows.value = append ? [...rows.value, ...r.claims] : r.claims
+    guest.value = r.guest; nick.value = r.guest.display_name
     state.value = rows.value.length ? 'ok' : 'empty'
   } catch (e: any) {
-    if (e.status === 401) { setGuestToken(null); state.value = 'empty' } else state.value = 'error'
-  }
+    if (seq !== loadSeq) return
+    if (e.status === 401) { setGuestToken(null); state.value = 'empty' }
+    else if (append) msg.value = t('me.claims.loadFailed')
+    else state.value = 'error'
+  } finally { if (seq === loadSeq) more.value = false }
 }
+watch(selectedClaim, () => load())
 onMounted(async () => {
   const m = location.hash.match(/^#r=(.+)$/)
   if (m) {
@@ -62,14 +80,15 @@ const wipe = () => {
   <GuestTop />
   <main class="g-wrap">
     <div class="cl-head"><h1>{{ $t('me.claims.title') }}</h1></div>
+    <NuxtLink v-if="selectedClaim" to="/me/claims" class="g-link">{{ $t('me.claims.allGifts') }}</NuxtLink>
     <div v-if="recoverFailed" class="g-banner err" role="alert">{{ $t('me.claims.recoverFailed') }} <SupportLink /></div>
     <div v-if="msg" class="g-banner err" role="alert">{{ msg }}</div>
     <p v-if="state === 'loading'" class="g-mute cl-loading" role="status">{{ $t('me.loading') }}</p>
-    <div v-else-if="state === 'error'" class="g-center cl-state bad"><p>{{ $t('me.claims.loadFailed') }}</p><button class="g-btn" @click="load">{{ $t('me.retry') }}</button></div>
+    <div v-else-if="state === 'error'" class="g-center cl-state bad"><p>{{ $t('me.claims.loadFailed') }}</p><button class="g-btn" @click="load()">{{ $t('me.retry') }}</button></div>
     <div v-else-if="state === 'empty'" class="g-center cl-state">
-      <p>{{ $t('me.claims.empty1') }}</p>
-      <p class="g-mute">{{ $t('me.claims.empty2') }}</p>
-      <NuxtLink v-if="!user" class="g-btn" :to="{ path: '/login', query: { redirect: '/me/claims' } }">{{ $t('me.home.login') }}</NuxtLink>
+      <p>{{ $t(selectedClaim ? 'me.claims.noSuchGift' : 'me.claims.empty1') }}</p>
+      <p v-if="!selectedClaim" class="g-mute">{{ $t('me.claims.empty2') }}</p>
+      <NuxtLink v-if="!user" class="g-btn" :to="{ path: '/login', query: { redirect: route.fullPath.split('#')[0] } }">{{ $t('me.home.login') }}</NuxtLink>
     </div>
     <template v-else>
       <div class="g-card" v-if="guest">
@@ -82,6 +101,10 @@ const wipe = () => {
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
             <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}<span class="g-badge">{{ label(r.claim.status) }}</span></div>
+            <p v-if="r.receipt_received" class="g-mute">{{ $t('org.relief.receiptAcknowledged') }}</p>
+            <p v-else-if="r.wishlist.type === 'relief'" class="g-mute cl-reference">{{ $t('org.relief.donorClaimReference') }}<br><code>{{ r.claim.id }}</code></p>
+            <div v-if="r.thank_you" class="g-banner"><strong>{{ $t('me.claims.thankYouCard') }}</strong>
+              <p class="cl-thanks">{{ r.thank_you }}</p></div>
             <div v-if="r.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(r.item_changed_at) }) }}<button class="g-link" @click="ackChange(r)">{{ $t('me.claims.ackItemChange') }}</button></div>
             <label v-if="r.claim.visibility" class="g-mute g-vis">{{ $t('me.whoSees') }}
               <select :value="r.claim.visibility" @change="setVis(r, $event)"><option value="public">{{ $t('me.vis.public') }}</option><option value="friends">{{ $t('me.vis.friends') }}</option><option value="private">{{ $t('me.vis.private') }}</option></select>
@@ -98,13 +121,15 @@ const wipe = () => {
         </div>
       </section>
       <details v-if="past.length"><summary class="g-mute">{{ $t('me.claims.past', { n: past.length }) }}</summary>
-        <div v-for="r in past" :key="r.claim.id" class="g-mute">{{ r.item.title }} × {{ r.claim.qty }}・{{ label(r.claim.status) }}</div>
+        <div v-for="r in past" :key="r.claim.id" class="g-mute">{{ r.item.title }} × {{ r.claim.qty }}・{{ label(r.claim.status) }}<template v-if="r.receipt_received">・{{ $t('org.relief.receiptAcknowledged') }}</template></div>
       </details>
+      <button v-if="cursor" class="g-btn" :disabled="more" @click="load(true)">{{ $t('me.wallet.loadMore') }}</button>
       <div v-if="!guest?.is_user" class="g-foot"><button class="g-link" @click="wipe">{{ $t('me.claims.wipe') }}</button></div>
     </template>
   </main>
 </template>
 <style scoped>
+.cl-thanks{white-space:pre-wrap;margin:.4em 0 0}
 .cl-head{position:relative;margin:28px 0 24px;padding-bottom:16px;border-bottom:1px solid var(--line);animation:rise .5s var(--ease) both}
 .cl-head::after{content:"";position:absolute;left:0;bottom:-1px;width:48px;height:2px;background:var(--red)}
 .cl-head h1{margin:0;font-size:clamp(30px,4.6vw,44px);font-weight:800;letter-spacing:-.025em;line-height:1.08}
@@ -113,6 +138,7 @@ html:lang(vi) .cl-head h1{line-height:1.22}
 .cl-state p{margin:0;max-width:34em;line-height:1.7;text-wrap:balance}
 .cl-state.bad{border:1px solid var(--bad);background:var(--bad-bg)}
 .cl-loading{display:flex;align-items:center;min-height:72px;margin:0;padding:0 16px;border:1px solid var(--line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
+.cl-reference code{overflow-wrap:anywhere;user-select:all}
 .cl-group{margin-top:36px}
 .cl-h2{display:flex;align-items:baseline;margin:0 0 6px;padding-bottom:10px;border-bottom:1px solid var(--ink-line);font-size:20px}
 .cl-group .g-vis select{min-height:44px;padding:0 10px;border:1px solid var(--line);border-bottom-color:var(--ink-line);background:var(--bg-alt);color:var(--fg);font:inherit}

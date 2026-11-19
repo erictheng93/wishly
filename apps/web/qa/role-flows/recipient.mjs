@@ -435,7 +435,7 @@ await run.step('R-16', '分享頁 /s/[slug]（匿名桌面）：標題、說明�
     const card = anon.locator('li.g-card', { hasText: '奶瓶組' })
     const txt = (await card.innerText()).replace(/\n+/g, ' | ')
     note('奶瓶組卡片：' + txt)
-    for (const k of ['Pigeon', '240ml', '450']) if (!txt.includes(k)) { note(`卡片未顯示「${k}」`); if (k === '450') S.priceHidden = true }
+    for (const value of ['Pigeon', '240ml', '參考價格 NT$ 450']) await expect(card).toContainText(value)
     note('嬰兒推車卡片：' + (await anon.locator('li.g-card', { hasText: '嬰兒推車' }).innerText()).replace(/\n+/g, ' | '))
     const og = await anon.evaluate(() => Object.fromEntries([...document.querySelectorAll('meta[property^="og:"]')].map(m => [m.getAttribute('property'), m.content])))
     note('OG：' + JSON.stringify(og))
@@ -444,7 +444,6 @@ await run.step('R-16', '分享頁 /s/[slug]（匿名桌面）：標題、說明�
     await anon.screenshot({ path: resolve(OUT, 'recipient', 'R-16-desktop.png'), fullPage: true })
     S.coverShown = await anon.locator('img.g-cover').getAttribute('src'); note('封面 src=' + S.coverShown)
   } finally { await anon.context().close() }
-  if (S.priceHidden) throw new Gap('建立者填的「參考價格 NT$450」API 有回傳（public.rs:344 unit_price_amount），但分享頁品項卡沒有顯示價格（components/guest/ItemCard.vue 無 price）；好友動態 /friends 卻有顯示價格')
 }, { page })
 
 await run.step('R-16b', '分享頁 SSR 與瀏覽器的結束時間顯示一致（時區）：不得有 hydration 不一致', async ({ note }) => {
@@ -594,31 +593,42 @@ await run.step('R-24', '取消認領（受捐者代為取消）釋出數量，�
   need('claimB')
   const art = page.locator('article.c-card', { hasText: '奶瓶組' })
   const row = art.locator('li', { hasText: '匿名朋友' })
-  let msg = ''
-  page.once('dialog', d => { msg = d.message(); d.accept() })
+  const reason = '已經收到一組奶瓶'
   await row.getByRole('button', { name: '取消認領' }).click()
+  const sheet = page.getByRole('dialog', { name: '取消認領' })
+  await sheet.getByRole('textbox', { name: /取消原因/ }).fill(reason)
+  await sheet.getByRole('button', { name: '取消認領' }).click()
   await expect(row).toContainText('已取消', { timeout: 10000 })
-  note('confirm：' + msg)
   await expect(art.locator('span', { hasText: /^2 \/ 3$/ })).toBeVisible({ timeout: 10000 })
   note('奶瓶組數量回到 2 / 3')
   const mails = await listMail(S.donorB.email)
   note(`捐助者 B 信箱主旨：${mails.map(m => m.subject).join(' | ')}`)
-  const n = sql(`SELECT count(*) FROM notifications WHERE user_id = (SELECT id FROM users WHERE email = '${q(S.donorB.email)}') AND kind NOT IN ('auth.otp', 'claim.purchase_reminder')`)
-  note('平台外：捐助者 B 的 notifications 佇列筆數（排除 OTP）= ' + n)
+  const n = sql(`SELECT count(*) FROM notifications WHERE user_id = (SELECT id FROM users WHERE email = '${q(S.donorB.email)}') AND kind = 'claim.cancelled_by_owner' AND payload->>'reason' = '${q(reason)}' AND payload->>'item_id' = '${q(S.claimB.item_id)}'`)
+  note('平台外：捐助者 B 的 notifications 佇列筆數（含取消原因）= ' + n)
   const dp = await newPage({ user: S.donorB })
   try { await dp.goto('/me/claims'); await hydrated(dp); const t = (await dp.locator('main').innerText()).replace(/\n+/g, ' | '); note('捐助者 B 「我的送禮」頁：' + t.slice(0, 300)) } finally { await dp.context().close() }
-  note('受捐者取消時 UI 沒有要求填原因（規格 02：owner 取消時 audit 記錄原因）')
-  if (n === '0') throw new Gap('受捐者取消他人認領後，捐助者沒有收到任何通知（規格 02「P1 通知捐助者」；notify.rs 沒有 claim.cancelled_by_owner 類型），且取消介面沒有原因欄位')
+  expect(Number(n)).toBe(1)
+  const auditReason = sql(`SELECT diff->>'reason' FROM audit_logs WHERE action = 'claim.owner_update' AND entity_id = '${q(S.claimB.id)}'`)
+  expect(auditReason).toBe('true') // 稽核只記有填，不存原文
 }, { page })
 
-await run.step('R-25', '「感謝」功能：受捐者端是否有感謝訊息／謝卡入口', async ({ note }) => {
+await run.step('R-25', '受捐者寫謝卡，捐助者在通知中心讀取', async ({ note }) => {
+  need('claimC')
   await page.goto(`/lists/${S.listA}/progress`); await hydrated(page)
-  const body = await page.locator('main').innerText()
-  const hits = (body.match(/感謝|謝卡|謝謝|thank/gi) ?? [])
-  note(`進度頁含「感謝／謝卡」字樣次數 = ${hits.length}`)
-  const codeHits = (await import('node:child_process')).execFileSync('bash', ['-c', `grep -rln "thank\\|感謝\\|謝卡" /home/user/wishly/apps/web/app /home/user/wishly/apps/api/src | head`], { encoding: 'utf8' }).trim()
-  note('程式碼中含 thank／感謝／謝卡 的檔案：' + (codeHits || '(無)'))
-  if (!hits.length) throw new Gap('規格 03 §受捐者旅程「活動日後 驚喜解鎖，查看誰送了什麼，寫謝卡」，但產品沒有任何謝卡／感謝入口；受捐者只能標記已送達')
+  const row = page.locator('article.c-card', { hasText: '尿布' }).locator('li', { hasText: S.donorA.name })
+  await row.getByRole('button', { name: '寫謝卡' }).click()
+  const dialog = page.getByRole('dialog', { name: '寫謝卡' })
+  const message = '謝謝你送的尿布！'
+  await dialog.getByRole('textbox').fill(message)
+  await dialog.getByRole('button', { name: '傳送謝卡' }).click()
+  await expect(row.getByText('謝卡已傳送')).toBeVisible()
+  const donorPage = await newPage({ user: S.donorA })
+  try {
+    await donorPage.goto('/me/notifications?category=gifts'); await hydrated(donorPage)
+    await donorPage.locator('.c-inbox').getByRole('button', { name: /謝卡/ }).click()
+    await expect(donorPage.getByText(message, { exact: true })).toBeVisible()
+  } finally { await donorPage.context().close() }
+  note('已送達的尿布顯示已傳送，捐助者點開送禮通知後可讀到謝卡全文')
 }, { page })
 
 // ---------- E. 眾籌 ----------

@@ -245,6 +245,7 @@ struct It {
     image_status: String,
     product_url: Option<String>,
     unit_price_amount: Option<i64>,
+    price_snapshot_amount: Option<i64>,
     priority: String,
     funding_mode: String,
     qty_needed: i32,
@@ -353,7 +354,7 @@ async fn render(
     }
 
     let items: Vec<It> = sqlx::query_as(
-        sqlx::AssertSqlSafe(format!("SELECT i.id, i.title, i.brand, i.spec, i.image_key, i.image_status::text AS image_status, i.product_url, i.unit_price_amount,
+        sqlx::AssertSqlSafe(format!("SELECT i.id, i.title, i.brand, i.spec, i.image_key, i.image_status::text AS image_status, i.product_url, i.unit_price_amount, i.price_snapshot_amount,
                 i.priority::text AS priority, i.funding_mode::text AS funding_mode, i.qty_needed, i.qty_claimed,
                 i.target_points, i.pledged_points, i.funding_status::text AS funding_status, ({}) AS display_status, i.funding_deadline, i.category, i.urgency,
                 CASE WHEN $2 OR i.funding_mode = 'support' THEN NULL
@@ -458,7 +459,7 @@ async fn render(
         let mut v = json!({
             "id": i.id, "title": i.title, "brand": i.brand, "spec": i.spec,
             "image_url": image_url(i.image_key.as_deref(), &i.image_status),
-            "product_url": i.product_url, "unit_price_amount": i.unit_price_amount, "priority": i.priority,
+            "product_url": i.product_url, "unit_price_amount": i.unit_price_amount, "price_snapshot_amount": i.price_snapshot_amount, "priority": i.priority,
             "category": i.category, "urgency": i.urgency,
             "funding_mode": i.funding_mode, "qty_needed": i.qty_needed, "qty_claimed": i.qty_claimed,
             "qty_remaining": i.qty_needed - i.qty_claimed, "is_fully_claimed": if cf { funded } else { i.qty_claimed >= i.qty_needed },

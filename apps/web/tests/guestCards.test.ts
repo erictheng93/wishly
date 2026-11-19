@@ -39,6 +39,19 @@ it('quantity card exposes inventory, priority and a safe product link and opens 
   expect(fund).not.toHaveBeenCalled()
 })
 
+it.each([
+  [{ ...quantity, unit_price_amount: 1250 }, 'NT$ 1,250'],
+  [{ ...quantity, unit_price_amount: 0 }, 'NT$ 0'],
+  [{ ...crowdfunding, price_snapshot_amount: 450, unit_price_amount: 300 }, 'NT$ 450'],
+  [{ ...crowdfunding, unit_price_amount: 300 }, 'NT$ 300'],
+])('shows the creator’s reference price', (item, amount) => {
+  expect(card(item).textContent).toContain('參考價格 ' + amount)
+})
+
+it('omits the reference price when the creator left it blank', () => {
+  expect(card(quantity).textContent).not.toContain('參考價格')
+})
+
 it('signed-out quantity card shows a login link instead of the claim button', () => {
   const NuxtLink = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: JSON.stringify(props.to) }, slots.default?.()) })
   mounted = mount(ItemCard, { item: quantity, mine: null, masked: false, closed: false, online: true, loginTo: { path: '/login', query: { redirect: '/s/a' } } }, { NuxtLink },

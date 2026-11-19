@@ -68,6 +68,7 @@
       "confirm": "確認贊助 {pts}"
     },
     "card": {
+      "referencePrice": "參考價格 NT$ {amount}",
       "priority": "優先度 {level}",
       "prio": {
         "high": "高"

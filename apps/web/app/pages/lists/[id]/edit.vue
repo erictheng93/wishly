@@ -20,22 +20,23 @@ const meta = reactive<any>({ title: '', description: '', event_date: '', closes_
 const rcptKey = ref('')
 const relief = computed(() => w.value?.type === 'relief')
 // 實收登記：每筆品項一張 sheet；明細來自 GET /orgs/{org}/sites/{id}/receipts
-const receipts = ref<Record<string, any>>({}), rcpt = ref<any>(null), rcptF = reactive({ qty: 1, note: '' }), rcptBusy = ref(false), rcptErr = ref('')
+const receipts = ref<Record<string, any>>({}), rcpt = ref<any>(null), rcptF = reactive({ qty: 1, note: '', claimId: '' }), rcptBusy = ref(false), rcptErr = ref('')
 async function loadReceipts() {
   if (!relief.value) return
   try { receipts.value = Object.fromEntries((await api(`/orgs/${w.value.org_id}/sites/${id}/receipts`)).items.map((r: any) => [r.item_id, r])) } catch { /* 明細失敗不擋編輯 */ }
 }
-function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptErr.value = '' }
+function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptF.claimId = ''; rcptErr.value = '' }
 const overAsk = ref(false)
 // 超收只提示：累計 + 本次 > 需求時先確認，後端不擋（眾籌品項沒有數量需求，不確認）
 function submitReceipt() {
+  if (rcptF.claimId.trim() && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(rcptF.claimId.trim())) { rcptErr.value = t('org.relief.receiptClaimInvalid'); return }
   if (rcpt.value.funding_mode === 'quantity' && (receipts.value[rcpt.value.id]?.total ?? 0) + Number(rcptF.qty) > rcpt.value.qty_needed) overAsk.value = true
   else saveReceipt()
 }
 async function saveReceipt() {
   overAsk.value = false; rcptBusy.value = true; rcptErr.value = ''
   try {
-    await api(`/orgs/${w.value.org_id}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': rcptKey.value }, noRedirect: true, body: { item_id: rcpt.value.id, qty: Number(rcptF.qty), note: rcptF.note || undefined } })
+    await api(`/orgs/${w.value.org_id}/receipts`, { method: 'POST', headers: { 'Idempotency-Key': rcptKey.value }, noRedirect: true, body: { item_id: rcpt.value.id, qty: Number(rcptF.qty), note: rcptF.note || undefined, claim_id: rcptF.claimId.trim() || undefined } })
     rcpt.value = null; await load(true)
   } catch (e: any) { rcptErr.value = errMsg(e); if (e.code !== 'NETWORK') rcptKey.value = crypto.randomUUID() } finally { rcptBusy.value = false }
 }
@@ -276,6 +277,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         <p class="rc-head"><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
         <ul class="c-mute rc-hist"><li v-for="(e, k) in receipts[rcpt.id]?.entries ?? []" :key="k"><span :style="e.voided_at ? 'text-decoration:line-through' : ''">+{{ e.qty }} {{ e.note }} {{ $t('org.relief.receiptBy', { name: e.recorded_by_name, time: fmtTime(e.created_at) }) }}</span><span v-if="e.voided_at">　{{ $t('org.relief.receiptVoided', { reason: e.void_reason }) }}</span></li></ul>
         <label class="c-field"><span>{{ $t('org.relief.receiptQty') }}</span><input v-model="rcptF.qty" name="qty" type="number" inputmode="numeric" min="1" required></label>
+        <label v-if="rcpt.funding_mode === 'quantity'" class="c-field"><span>{{ $t('org.relief.receiptClaim') }}</span><input v-model.trim="rcptF.claimId" name="claim_id" autocapitalize="none" :spellcheck="false" maxlength="36"><small>{{ $t('org.relief.receiptClaimHint') }}</small></label>
         <label class="c-field"><span>{{ $t('org.relief.receiptNote') }}</span><input v-model="rcptF.note" name="note" maxlength="200"></label>
         <p v-if="rcptErr" class="c-err" role="alert">{{ rcptErr }}</p>
         <button class="c-btn primary block" :disabled="rcptBusy">{{ $t('org.relief.receiptSave') }}</button>

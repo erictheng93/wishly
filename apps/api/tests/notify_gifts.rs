@@ -57,14 +57,58 @@ async fn owner_cancel_notifies_donor_and_legacy_guest(pool: PgPool) {
     let o = user(&pool, "o").await;
     let wl = wishlist(&pool, o.id, ListOpts::default()).await;
     let it = item(&pool, wl.id, "奶瓶", 3).await;
-    let (dtok, c) = user_claim(&pool, it, 1).await;
-    let _ = dtok;
+    let (donor, c) = user_claim(&pool, it, 1).await;
+    for (token, reason) in [
+        (&donor, String::from("donor")),
+        (&o.token, "字".repeat(201)),
+    ] {
+        let (status, _, body) = call(
+            &pool,
+            "PATCH",
+            &format!("/claims/{c}"),
+            &ck(token),
+            Some(json!({"status": "cancelled", "reason": reason})),
+        )
+        .await;
+        assert_eq!(
+            status,
+            axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+            "{body}"
+        );
+    }
+    let reason = "Already received one";
+    let (status, _, body) = call(
+        &pool,
+        "PATCH",
+        &format!("/claims/{c}"),
+        &ck(&o.token),
+        Some(json!({"status": "cancelled", "reason": format!(" {reason} ")})),
+    )
+    .await;
+    assert_eq!(status, axum::http::StatusCode::OK, "{body}");
+    let diff: serde_json::Value = sqlx::query_scalar(
+        "SELECT diff FROM audit_logs WHERE action='claim.owner_update' AND entity_id=$1",
+    )
+    .bind(c)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(diff["reason"], true, "稽核只記有填原因，不存原文");
+    let payload: serde_json::Value = sqlx::query_scalar("SELECT n.payload FROM notifications n JOIN claims c ON c.user_id=n.user_id WHERE c.id=$1 AND n.kind='claim.cancelled_by_owner'")
+        .bind(c).fetch_one(&pool).await.unwrap();
+    assert_eq!(payload["reason"], reason);
+    assert!(
+        notify::inbox_body(&notify::render("claim.cancelled_by_owner", "list", &payload).1)
+            .contains(reason)
+    );
     patch(&pool, &o.token, c, "cancelled").await;
     assert_eq!(count(&pool, "claim.cancelled_by_owner", None).await, 1);
     assert_eq!(count(&pool, "claim.cancelled_by_donor", None).await, 0);
 
     let (_, gc) = legacy_guest_claim(&pool, it, 1, Some("g@example.com")).await;
     patch(&pool, &o.token, gc, "cancelled").await;
+    let (_, no_email) = legacy_guest_claim(&pool, it, 1, None).await;
+    patch(&pool, &o.token, no_email, "cancelled").await;
     let g: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='claim.cancelled_by_owner' AND guest_id IS NOT NULL")
         .fetch_one(&pool).await.unwrap();
     assert_eq!(g, 1);

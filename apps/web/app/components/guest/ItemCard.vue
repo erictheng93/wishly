@@ -3,6 +3,7 @@ import '~/assets/guest.css'
 const props = defineProps<{ item: any, mine: any | null, masked: boolean, closed: boolean, online: boolean, loginTo?: any, siteOff?: boolean }>() // loginTo 有值 = 未登入，認捐鈕改為前往登入
 defineEmits<{ claim: [], fund: [], ack: [] }>()
 const crowd = computed(() => props.item.funding_mode === 'crowdfund')
+const referencePrice = computed(() => props.item.price_snapshot_amount ?? props.item.unit_price_amount)
 const namesShown = computed(() => !props.masked && !!(crowd.value ? props.item.contributors?.length : props.item.claimers?.length))
 const supporters = computed(() => !namesShown.value && props.item.supporter_count >= 2 ? props.item.supporter_count : 0)
 const ds = computed(() => deriveDisplayStatus(props.item) ?? '')
@@ -16,6 +17,7 @@ const full = computed(() => crowd.value ? ds.value !== 'open' : props.item.is_fu
     <div class="g-body">
       <div class="g-title">{{ item.title }}<span v-if="item.priority === 'high' && !item.urgency" class="g-badge high">{{ $t('guest.card.priority', { level: $t('guest.card.prio.high') }) }}</span><template v-if="item.urgency"><span class="g-badge">{{ $t('org.relief.category.' + item.category) }}</span><span class="g-badge" :class="item.urgency">{{ $t('org.relief.urgency.' + item.urgency) }}</span></template><span v-if="crowd && ds" class="g-badge" :class="'ds-' + ds">{{ displayStatusLabel(ds) }}</span></div>
       <div v-if="item.brand || item.spec" class="g-mute">{{ [item.brand, item.spec].filter(Boolean).join('・') }}</div>
+      <div v-if="referencePrice != null" class="g-mute">{{ $t('guest.card.referencePrice', { amount: fmtPts(referencePrice) }) }}</div>
       <template v-if="crowd">
         <div class="g-bar" role="progressbar" :aria-valuenow="item.progress_percent ?? 0" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: (item.progress_percent ?? 0) + '%' }" /></div>
         <div v-if="item.pledged_points != null" class="g-mute">{{ $t('guest.card.raised') }} <b class="g-num">{{ fmtPts(item.pledged_points) }} / {{ $t('guest.pts', { n: fmtPts(item.target_points) }) }}</b><template v-if="ds === 'open'">{{ $t('guest.card.leftPts', { n: fmtPts(item.remaining_points) }) }}</template></div>

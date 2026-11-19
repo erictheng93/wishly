@@ -345,3 +345,147 @@ async fn void_other_org_404(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn linked_receipt_notifies_only_its_donor_and_can_be_corrected(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let (token, claim) = user_claim(&pool, f.item, 2).await;
+    let (_, other) = user_claim(&pool, f.item, 2).await;
+    let path = format!("/orgs/{}/receipts", f.org);
+    let body = json!({"item_id": f.item,"qty":2,"claim_id":claim,"note":"internal"});
+    let headers = || [ck(&f.vol.token), idem(Uuid::new_v4())].concat();
+    let wrong = json!({"item_id":f.item,"qty":1,"claim_id":claim});
+    assert_eq!(
+        call(&pool, "POST", &path, &headers(), Some(wrong)).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let h = headers();
+    let (s, _, r) = call(&pool, "POST", &path, &h, Some(body.clone())).await;
+    assert_eq!(s, StatusCode::CREATED, "{r}");
+    assert_eq!(
+        call(&pool, "POST", &path, &h, Some(body.clone())).await.0,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        call(&pool, "POST", &path, &headers(), Some(body.clone()))
+            .await
+            .0,
+        StatusCode::CONFLICT,
+        "同一認領不可重複登記實收"
+    );
+    let uid: Uuid = sqlx::query_scalar("SELECT user_id FROM claims WHERE id=$1")
+        .bind(claim)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let notifications: Vec<(Uuid, Value)> = sqlx::query_as(
+        "SELECT user_id,payload FROM notifications WHERE kind='claim.receipt_received'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        notifications,
+        vec![(
+            uid,
+            json!({"receipt_id":r["id"],"claim_id":claim,"item_id":f.item,"wishlist_id":f.site.id})
+        )]
+    );
+    let (_, _, me) = call(&pool, "GET", "/guest/me", &ck(&token), None).await;
+    assert_eq!(me["claims"][0]["wishlist"]["type"], "relief");
+    assert_eq!(me["claims"][0]["receipt_received"], true);
+    assert!(!me.to_string().contains(&other.to_string()));
+    let rid = r["id"].as_str().unwrap();
+    let void = format!("/orgs/{}/receipts/{rid}/void", f.org);
+    assert_eq!(
+        call(
+            &pool,
+            "POST",
+            &void,
+            &ck(&f.vol.token),
+            Some(json!({"reason":"error"}))
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let (_, _, me) = call(&pool, "GET", "/guest/me", &ck(&token), None).await;
+    assert_eq!(me["claims"][0]["receipt_received"], false);
+    wishly_api::notify::tick_at(&pool, noon()).await.unwrap();
+    let suppressed: bool = sqlx::query_scalar("SELECT inbox_at IS NULL AND status='cancelled' FROM notifications WHERE kind='claim.receipt_received' AND payload->>'receipt_id'=$1")
+        .bind(rid).fetch_one(&pool).await.unwrap();
+    assert!(suppressed);
+
+    assert_eq!(
+        call(&pool, "POST", &path, &headers(), Some(body)).await.0,
+        StatusCode::CREATED
+    );
+}
+
+/// 交易持有指定的鎖時送出帶認領編號的實收登記，等它卡在該交易上；回傳 (交易, 進行中的請求)
+async fn receipt_blocked_on(
+    pool: &PgPool,
+    f: &Fx,
+    claim: Uuid,
+    lock_sql: &str,
+    target: Uuid,
+) -> (
+    sqlx::Transaction<'static, sqlx::Postgres>,
+    tokio::task::JoinHandle<(StatusCode, axum::http::HeaderMap, Value)>,
+) {
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query(sqlx::AssertSqlSafe(lock_sql.to_string()))
+        .bind(target)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    let (p, path) = (pool.clone(), format!("/orgs/{}/receipts", f.org));
+    let headers = [ck(&f.vol.token), idem(Uuid::new_v4())].concat();
+    let body = json!({"item_id": f.item, "qty": 2, "claim_id": claim});
+    let h = tokio::spawn(async move { call(&p, "POST", &path, &headers, Some(body)).await });
+    wait_for_blocked(pool, pid, 1).await;
+    (tx, h)
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn linked_receipt_locks_item_before_claim(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let (_, claim) = user_claim(&pool, f.item, 2).await;
+    // 模擬捐助者改認領：已鎖品項、接著要鎖認領
+    let (mut tx, h) = receipt_blocked_on(
+        &pool,
+        &f,
+        claim,
+        "SELECT 1 FROM wishlist_items WHERE id=$1 FOR UPDATE",
+        f.item,
+    )
+    .await;
+    sqlx::query("SELECT 1 FROM claims WHERE id=$1 FOR UPDATE NOWAIT")
+        .bind(claim)
+        .execute(&mut *tx)
+        .await
+        .expect("實收登記在等品項鎖時已鎖住認領：與認捐鎖序相反，會死結");
+    tx.commit().await.unwrap();
+    assert_eq!(h.await.unwrap().0, StatusCode::CREATED);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn linked_receipt_waits_on_claim_lock_then_sees_cancel(pool: PgPool) {
+    let f = fx(&pool, "active").await;
+    let (_, claim) = user_claim(&pool, f.item, 2).await;
+    let (tx, h) = receipt_blocked_on(
+        &pool,
+        &f,
+        claim,
+        "UPDATE claims SET status='cancelled', cancelled_at=now() WHERE id=$1",
+        claim,
+    )
+    .await;
+    tx.commit().await.unwrap();
+    let (s, _, v) = h.await.unwrap();
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+}
