@@ -14,7 +14,7 @@ async fn revoke(pool: &PgPool, st: &str, o: Uuid) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(st),
-        Some(json!({"decision":"reject","note":"撤銷"})),
+        Some(json!({"decision":"reject","note":"組織資格已失效"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
@@ -169,7 +169,7 @@ async fn restore_rejected_cases(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o2}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject","note":"x"})),
+        Some(json!({"decision":"reject","note":"申請資料不符"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK);

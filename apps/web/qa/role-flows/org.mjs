@@ -487,7 +487,7 @@ try {
     const sp = pages.staff
     const card = await staffOpen(sp, bid)
     await card.getByRole('button', { name: '退件', exact: true }).last().click()
-    await sp.getByRole('dialog').getByLabel('審核備註').fill('立案字號查無資料，退件。')
+    await sp.getByRole('dialog').getByLabel('退件／撤銷原因').fill('立案字號查無資料，退件。')
     await dialogOk(sp, '退件')
     await sp.getByText('已處理').first().waitFor({ timeout: 8000 })
     await bp.reload(); await bp.waitForLoadState('networkidle')
@@ -1347,7 +1347,7 @@ try {
     const sp = pages.staff
     const card = await staffOpen(sp, S.orgId, 'verified')
     await card.getByRole('button', { name: '撤銷組織' }).click()
-    await sp.getByRole('dialog').getByLabel('審核備註').fill('QA 測試：撤銷')
+    await sp.getByRole('dialog').getByLabel('退件／撤銷原因').fill('QA 測試：撤銷')
     await sp.getByRole('dialog').getByRole('button', { name: '撤銷組織', exact: true }).click()
     note('第二層確認文案：' + (await sp.getByRole('dialog').innerText()).replace(/\n/g, ' / ').slice(0, 120))
     await sp.getByRole('dialog').getByRole('button', { name: '撤銷組織', exact: true }).click()

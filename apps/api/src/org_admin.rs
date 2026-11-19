@@ -106,6 +106,7 @@ async fn detail(
 #[derive(Deserialize)]
 struct Review {
     decision: String,
+    expected_status: Option<String>,
     note: Option<String>,
     flagged_fields: Option<Vec<String>>,
 }
@@ -117,6 +118,13 @@ fn review_note(note: Option<&str>, required: bool) -> Result<Option<String>, App
             "/note",
             "REQUIRED",
             "退件／撤銷必須填原因",
+        ));
+    }
+    if required && note.as_deref().is_some_and(|s| s.chars().count() < 5) {
+        return Err(AppError::invalid(
+            "/note",
+            "TOO_SHORT",
+            "退件／撤銷原因至少 5 字",
         ));
     }
     Ok(note)
@@ -155,7 +163,11 @@ async fn review(
         "reject" => matches!(status.as_str(), "pending" | "verified"),
         _ => status == "pending",
     };
-    if !allowed {
+    if !allowed
+        || b.expected_status
+            .as_ref()
+            .is_some_and(|expected| expected != &status)
+    {
         return Err(AppError::problem(
             409,
             "INVALID_STATE",
@@ -252,6 +264,7 @@ async fn review(
 #[derive(Deserialize)]
 struct PermitReview {
     decision: String,
+    expected_status: Option<String>,
     note: Option<String>,
 }
 
@@ -384,7 +397,11 @@ async fn review_permit(
             .fetch_one(&mut *tx)
             .await?;
     // pending 可核准 / 退件；approved 只能撤銷（reject）
-    if !(status == "pending" || (status == "approved" && new_status == "rejected")) {
+    if !(status == "pending" || (status == "approved" && new_status == "rejected"))
+        || b.expected_status
+            .as_ref()
+            .is_some_and(|expected| expected != &status)
+    {
         return Err(AppError::problem(
             409,
             "INVALID_STATE",

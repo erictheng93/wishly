@@ -190,7 +190,7 @@ async fn org_reject_closes_only_open_reports_and_notifies(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st.token),
-        Some(json!({"decision":"reject","note":"假冒"})),
+        Some(json!({"decision":"reject","note":"查證為假冒組織"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
@@ -208,7 +208,7 @@ async fn org_reject_closes_only_open_reports_and_notifies(pool: PgPool) {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(note.as_deref(), Some("假冒"));
+    assert_eq!(note.as_deref(), Some("查證為假冒組織"));
     assert_eq!(
         resolved(&pool).await,
         vec![(a.id, json!({"outcome":"actioned"}))]
@@ -226,7 +226,7 @@ async fn org_reject_before_verified_leaves_reports(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st.token),
-        Some(json!({"decision":"reject","note":"不符"})),
+        Some(json!({"decision":"reject","note":"申請資格不符"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK);

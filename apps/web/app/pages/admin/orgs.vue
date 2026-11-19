@@ -59,12 +59,13 @@ async function download(orgId: string, d: any) {
 }
 
 // 審核動作：kind=org 或 permit；revoke 為已通過 / 已核准者的退件
-type Act = { kind: 'org' | 'permit', id: string, decision: 'approve' | 'needs_changes' | 'reject', revoke: boolean, name: string, step: 1 | 2 }
+type Act = { kind: 'org' | 'permit', id: string, expectedStatus: string, decision: 'approve' | 'needs_changes' | 'reject', revoke: boolean, name: string, step: 1 | 2 }
 const act = ref<Act | null>(null)
 const note = ref(''), flagged = ref<string[]>([]), busy = ref(false), aerr = ref('')
 function open(kind: Act['kind'], target: any, decision: Act['decision']) {
-  const revoke = decision === 'reject' && (kind === 'org' ? target.verification_status === 'verified' : target.status === 'approved')
-  act.value = { kind, id: target.id, decision, revoke, name: kind === 'org' ? target.display_name : target.permit_no, step: 1 }
+  const expectedStatus = kind === 'org' ? target.verification_status : target.status
+  const revoke = decision === 'reject' && (expectedStatus === 'verified' || expectedStatus === 'approved')
+  act.value = { kind, id: target.id, expectedStatus, decision, revoke, name: kind === 'org' ? target.display_name : target.permit_no, step: 1 }
   note.value = ''; flagged.value = []; aerr.value = ''
 }
 const actKey = computed(() => (act.value?.revoke ? 'revoke' : act.value?.decision) ?? '')
@@ -74,14 +75,15 @@ const text = computed(() => {
   if (a.kind === 'permit') return t(`admin.orgs.confirm.permit${a.decision === 'approve' ? 'Approve' : a.revoke ? 'Revoke' : 'Reject'}`, { no: a.name })
   return t(`admin.orgs.confirm.${a.revoke && a.step === 2 ? 'revoke2' : actKey.value}`, { name: a.name, n: detail.value?.org.live_sites ?? 0 })
 })
+const reasonTooShort = computed(() => act.value?.decision === 'reject' && Array.from(note.value.trim()).length < 5)
 async function submit() {
   const a = act.value!
-  if (a.decision === 'reject' && !note.value.trim()) { aerr.value = t('admin.orgs.noteRequired'); return }
+  if (reasonTooShort.value) { aerr.value = t('admin.orgs.noteRequired'); return }
   if (a.revoke && a.kind === 'org' && a.step === 1) { a.step = 2; aerr.value = ''; return } // 撤銷組織：二次確認
   if (a.decision === 'needs_changes' && !flagged.value.length) { aerr.value = t('admin.orgs.flagRequired'); return }
   busy.value = true; aerr.value = ''
   try {
-    const body: any = { decision: a.decision, note: note.value.trim() || undefined }
+    const body: any = { decision: a.decision, expected_status: a.expectedStatus, note: note.value.trim() || undefined }
     if (a.decision === 'needs_changes') body.flagged_fields = flagged.value
     await api(a.kind === 'org' ? `/admin/orgs/${a.id}/review` : `/admin/permits/${a.id}/review`, { method: 'POST', body })
     act.value = null; msg.value = t('admin.orgs.done')
@@ -184,7 +186,7 @@ async function submitRestore() {
     </article>
     <button v-if="cursor" class="c-btn block" :disabled="loading" @click="load(true)">{{ $t('admin.orgs.loadMore') }}</button>
 
-    <CreatorConfirm :open="!!act" :title="title" :text="text" :ok="title" :danger="act?.decision === 'reject'" :busy="busy" :disabled="act?.decision === 'reject' && !note.trim()" :error="aerr" @close="act = null" @ok="submit">
+    <CreatorConfirm :open="!!act" :title="title" :text="text" :ok="title" :danger="act?.decision === 'reject'" :busy="busy" :disabled="reasonTooShort" :error="aerr" @close="act = null" @ok="submit">
       <template v-if="act && !(act.revoke && act.kind === 'org' && act.step === 2)">
         <fieldset v-if="act.decision === 'needs_changes'" class="c-field ao-flags">
           <legend>{{ $t('admin.orgs.flagLabel') }}</legend>

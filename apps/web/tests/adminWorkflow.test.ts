@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import Orgs from '../app/pages/admin/orgs.vue'
 import Index from '../app/pages/admin/index.vue'
+import Analytics from '../app/pages/admin/analytics.vue'
+import { fmtCount } from '../app/utils/analytics'
 import Reports from '../app/pages/admin/reports.vue'
 import Orders from '../app/pages/admin/orders.vue'
 import { ORDER_STATUS, orderActions, fmtPts, fmtTime } from '../app/utils/crowdfund'
@@ -24,9 +26,9 @@ const stubs = {
   },
 }
 const settle = async () => { await flush(); await flush(); await nextTick() }
-function show(c: any) { const m = mount(c, {}, stubs, { fmtTime, fmtPts, ORDER_STATUS, orderActions, label: (m: any, k: string) => m[k] }); mounted.push(m); return m.el }
+function show(c: any) { const m = mount(c, {}, stubs, { fmtCount, fmtTime, fmtPts, ORDER_STATUS, orderActions, label: (m: any, k: string) => m[k] }); mounted.push(m); return m.el }
 beforeEach(() => {
-  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: ref({ staff_roles: ['admin'] }) }), hasStaffRole, STAFF_ROLES, fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
+  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, fmtCount, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: ref({ staff_roles: ['admin'] }) }), hasStaffRole, STAFF_ROLES, fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
   route.query = { view: 'rows' } // 檢舉頁預設依對象；既有逐筆測試明指檢視
 })
 afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset(); replace.mockReset() })
@@ -40,12 +42,33 @@ it('組織撤銷先填理由，第二次確認保留理由；許可直接下載�
   const buttons = [...el.querySelectorAll<HTMLButtonElement>('article button')]
   buttons.at(-1)!.click(); await settle()
   expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
+  await input(el, '.confirm textarea', ' 📄不清楚 ')
+  expect(el.querySelector<HTMLButtonElement>('.confirm .ok')!.disabled).toBe(true)
   await input(el, '.confirm textarea', '資格已失效')
   el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
   expect(el.querySelector('.confirm')?.textContent).toContain('資格已失效')
   expect(el.querySelector('.confirm textarea')).toBeNull()
   el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
-  expect(api).toHaveBeenCalledWith('/admin/orgs/org/review', { method: 'POST', body: { decision: 'reject', note: '資格已失效' } })
+  expect(api).toHaveBeenCalledWith('/admin/orgs/org/review', { method: 'POST', body: { decision: 'reject', expected_status: 'verified', note: '資格已失效' } })
+})
+
+it('許可退件遇到他人先核准時，重新載入許可並要求重新確認', async () => {
+  const org = { id: 'org', display_name: 'Org', verification_status: 'verified' }
+  let status = 'pending'
+  api.mockImplementation(async (url: string) => {
+    if (url === '/admin/orgs') return { data: [org] }
+    if (url.endsWith('/review')) { status = 'approved'; throw Object.assign(new Error(), { code: 'INVALID_STATE' }) }
+    return { org, documents: [], permits: [{ id: 'p', permit_no: 'P-1', status }], members: [] }
+  })
+  const el = show(Orgs); await settle()
+  el.querySelector<HTMLButtonElement>('article button')!.click(); await settle()
+  el.querySelector<HTMLButtonElement>('[data-permit="p"] button.danger')!.click(); await settle()
+  await input(el, '.confirm textarea', '許可字號不符')
+  el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/permits/p/review', { method: 'POST', body: { decision: 'reject', expected_status: 'pending', note: '許可字號不符' } })
+  expect(el.querySelector('.confirm')).toBeNull()
+  expect(el.querySelector('[role="alert"]')?.textContent).toContain('此筆狀態已被他人更新')
+  expect(el.querySelector('[data-permit="p"] button.danger')?.textContent).toContain('撤銷許可')
 })
 
 it('首頁導覽顯示六種待辦數字，包括零', async () => {
@@ -157,7 +180,7 @@ it('組織審核頁：?open= 展開指定組織（不在目前頁也會以詳情
   expect(api).toHaveBeenCalledWith('/admin/orgs/o2')
   expect(el.querySelector('[data-org="o2"]')).not.toBeNull()
   ;[...el.querySelectorAll<HTMLButtonElement>('article button')].at(-1)!.click(); await settle()
-  await input(el, '.confirm textarea', '假冒')
+  await input(el, '.confirm textarea', '查證為假冒組織')
   el.querySelector<HTMLButtonElement>('.confirm .ok')!.click(); await settle()
   expect(el.querySelector('.confirm')!.textContent).toContain('2 個救災據點')
 })
@@ -368,4 +391,28 @@ it('組織檢舉：顯示組織、快照與上線據點數，撤銷改連到組�
   const go = [...el.querySelectorAll('article a')].find(a => a.textContent?.includes('前往組織審核'))!
   expect(go.getAttribute('href')).toContain('/admin/orgs')
   expect(go.getAttribute('href')).toContain(`open=${orgT.id}`)
+})
+
+it('營運分頁依區間載入金額與時數，尚無審核紀錄顯示無資料', async () => {
+  route.query = { tab: 'operations' }
+  api.mockResolvedValue({
+    range: { from: '2026-10-01', to: '2026-10-30', days: 30 }, gross: 1200,
+    refunds: { count: 2, amount: 150 }, chargebacks: { count: 1, amount: 75 },
+    points_issued: 1300, points_spent: 800, avg_delivery_hours: 12.5, avg_org_review_hours: null,
+  })
+  const el = show(Analytics); await settle()
+  expect(api).toHaveBeenCalledWith('/admin/finance/operations', { query: { days: 30 } })
+  expect([...el.querySelectorAll('dd')].map(d => d.textContent)).toEqual(['NT$ 1,200', '1,300', '800', 'NT$ 150', 'NT$ 75', '12.5', '—'])
+  expect(el.textContent).toContain('2 筆')
+  ;[...el.querySelectorAll('button')].find(b => b.textContent?.includes('90'))!.click(); await settle()
+  expect(api).toHaveBeenLastCalledWith('/admin/finance/operations', { query: { days: 90 } })
+})
+
+it('非金流人員造訪營運分頁網址時只查一般分析', async () => {
+  route.query = { tab: 'operations' }
+  vi.stubGlobal('useAuth', () => ({ user: ref({ staff_roles: ['support'] }) }))
+  api.mockReturnValue(new Promise(() => {}))
+  const el = show(Analytics); await settle()
+  expect(api.mock.calls.map(([url]) => url)).toEqual(['/admin/analytics'])
+  expect(el.textContent).not.toContain('營運／金流')
 })
