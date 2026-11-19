@@ -14,7 +14,7 @@ test('個人頁：連結頁匿名可見、偏好僅好友可見', async ({ page,
   await expect(page.getByRole('link', { name: '看我的願望清單' })).toBeVisible()
 
   await page.goto(`/u/${handle}`)
-  await expect(page.getByRole('heading', { name: a.name })).toBeVisible()
+  await expect(page.getByRole('heading', { name: a.name, exact: true })).toBeVisible()
   await expect(page.getByText('手沖咖啡豆')).toHaveCount(0)
 
   // 已登入但非好友：同樣看不到
@@ -22,7 +22,7 @@ test('個人頁：連結頁匿名可見、偏好僅好友可見', async ({ page,
   await loginBrowser(ctx0, c)
   const p0 = await ctx0.newPage()
   await p0.goto(`/u/${handle}`)
-  await expect(p0.getByRole('heading', { name: a.name })).toBeVisible()
+  await expect(p0.getByRole('heading', { name: a.name, exact: true })).toBeVisible()
   await expect(p0.getByText('手沖咖啡豆')).toHaveCount(0)
 
   const inv = await (await a.api.post('friends/invites')).json()

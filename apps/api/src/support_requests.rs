@@ -177,7 +177,7 @@ const ADMIN_SQL: &str = "SELECT r.id, jsonb_build_object('id', r.id, 'kind', CAS
     'user', CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object('id', u.id, 'handle', u.handle, 'display_name', u.display_name,
       'blocked', u.blocked_at IS NOT NULL, 'wallet', CASE WHEN pw.id IS NULL THEN NULL ELSE jsonb_build_object('id', pw.id, 'status', pw.status) END) END,
     'contact_email', r.contact_email, 'category', r.category, 'body', r.body, 'wishlist_id', r.wishlist_id, 'topup_id', r.topup_id,
-    'wishlist', CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'title', w.title, 'slug', w.slug::text, 'moderation_status', w.moderation_status) END,
+    'wishlist', CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'title', w.title, 'slug', w.slug::text, 'moderation_status', w.moderation_status, 'deleted_at', w.deleted_at) END,
     'topup', CASE WHEN t.id IS NULL THEN NULL ELSE jsonb_build_object('id', t.id, 'merchant_trade_no', t.merchant_trade_no, 'status', t.status, 'user_id', tw.user_id) END,
     'status', r.status, 'reply', r.reply, 'handled_at', r.handled_at,
     'handled_by', CASE WHEN h.id IS NULL THEN NULL ELSE jsonb_build_object('id', h.id, 'display_name', h.display_name) END,

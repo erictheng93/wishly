@@ -98,6 +98,7 @@
         "empty": "沒有符合的清單",
         "meta": "{slug}・{email}・被檢舉 {count} 次",
         "publicPage": "公開頁",
+        "deleted": "已刪除",
         "loadMore": "載入更多清單"
       },
       "users": {

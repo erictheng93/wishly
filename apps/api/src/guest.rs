@@ -146,6 +146,7 @@ struct Row {
     receipt_received: bool,
     event_date: Option<chrono::NaiveDate>,
     wl_status: String,
+    wl_deleted: bool,
     item_changed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -176,7 +177,7 @@ async fn me(
         "SELECT {CLAIM_COLS}, i.title AS item_title, i.image_key, i.image_status::text AS image_status,
                 w.slug::text AS slug, w.title AS wl_title, w.type::text AS wl_type, w.event_date, CASE WHEN NOT c.thank_you_muted THEN c.thank_you END AS thank_you,
                 EXISTS (SELECT 1 FROM receipts r WHERE r.claim_id = c.id AND r.voided_at IS NULL) AS receipt_received,
-                CASE WHEN w.status = 'active' AND w.closes_at <= now() THEN 'closed' ELSE w.status::text END AS wl_status,
+                CASE WHEN w.status = 'active' AND w.closes_at <= now() THEN 'closed' ELSE w.status::text END AS wl_status, w.deleted_at IS NOT NULL AS wl_deleted,
                 CASE WHEN c.status IN ('reserved', 'purchased') AND i.content_changed_at > COALESCE(c.item_change_seen_at, c.created_at)
                      THEN i.content_changed_at END AS item_changed_at
          FROM claims c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = i.wishlist_id
@@ -190,7 +191,7 @@ async fn me(
     };
     let claims: Vec<Value> = rows.into_iter().map(|r| json!({
         "claim": r.claim, "thank_you": r.thank_you, "receipt_received": r.receipt_received,
-        "item_changed_at": r.item_changed_at,
+        "item_changed_at": r.item_changed_at, "wishlist_deleted": r.wl_deleted,
         "item": { "id": r.claim.item_id, "title": r.item_title, "image_url": crate::public::image_url(r.image_key.as_deref(), &r.image_status) },
         "wishlist": { "slug": r.slug, "title": r.wl_title, "type": r.wl_type, "event_date": r.event_date, "status": r.wl_status },
     })).collect();

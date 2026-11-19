@@ -98,6 +98,7 @@
         "empty": "Tidak ada wishlist yang cocok",
         "meta": "{slug}・{email}・Dilaporkan {count} kali",
         "publicPage": "Halaman publik",
+        "deleted": "Dihapus",
         "loadMore": "Muat lebih banyak wishlist"
       },
       "users": {

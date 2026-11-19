@@ -904,7 +904,7 @@ async fn update(
                  event_paused_at = CASE WHEN site_status IS DISTINCT FROM $16 OR event_id IS DISTINCT FROM $18 OR status IS DISTINCT FROM $11::wishlist_status THEN NULL ELSE event_paused_at END,
                  owner_id = CASE WHEN $20::bool AND EXISTS (SELECT 1 FROM users o WHERE o.id = wishlists.owner_id AND (o.deleted_at IS NOT NULL OR o.blocked_at IS NOT NULL))
                                  THEN $21 ELSE owner_id END
-                 WHERE id=$1 AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status
+                 WHERE id=$1 AND deleted_at IS NULL AND ($12::timestamptz IS NULL OR updated_at=$12) AND status=$14::wishlist_status
                    AND site_status IS NOT DISTINCT FROM $22 AND event_id IS NOT DISTINCT FROM $23")
         .bind(id).bind(&w.title).bind(&w.description).bind(&w.cover_image_key).bind(&w.cover_image_status).bind(w.event_date).bind(&w.visibility)
         .bind(w.show_claimer_names).bind(w.surprise_mode).bind(w.claim_ttl_hours).bind(&w.status).bind(exp).bind(w.closes_at).bind(&old_status).bind(&w.cover_preset)
@@ -1156,11 +1156,21 @@ pub async fn remind_closing(pool: &PgPool) -> Result<u64, sqlx::Error> {
         .execute(pool).await?.rows_affected())
 }
 
+#[derive(Deserialize)]
+struct DeleteQ {
+    permanent: Option<bool>,
+}
+
+/// DELETE /wishlists/{id}：預設封存；`?permanent=true` 永久刪除（只限已封存的個人清單）。
 async fn archive(
     u: CurrentUser,
     State(st): State<AppState>,
     Path(id): Path<Uuid>,
+    Query(q): Query<DeleteQ>,
 ) -> R<StatusCode> {
+    if q.permanent == Some(true) {
+        return delete_permanent(u, st, id).await;
+    }
     let w = load_owned(&st.pool, id, u.id).await?;
     let mut tx = st.pool.begin().await?;
     // 交易內讀到的舊狀態才準：並行封存 / close_due 已結束的清單不再重給寬限
@@ -1186,6 +1196,149 @@ async fn archive(
     }
     tx.commit().await?;
     crate::cdn::purge_wishlists(vec![w.slug.trim().to_string()]);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// 永久刪除（不可復原）：寫 deleted_at、狀態維持 archived，不實體刪列（捐助、採購單對清單是 RESTRICT）。
+/// 同交易清掉收件資訊、退役封面與品項圖片、撤銷附清單的好友邀請；捐助 / 採購 / 帳本 / 稽核不動。
+/// 鎖序：使用者媒體鎖（media_tx）→ wishlists FOR UPDATE → 讀認領 / 採購 → 物件鎖（request_retire）→ 寫入。
+async fn delete_permanent(u: CurrentUser, st: AppState, id: Uuid) -> R<StatusCode> {
+    let mut tx = uploads::media_tx(&st.pool, u.id).await?;
+    let w = load_owned(&mut *tx, id, u.id).await?;
+    if w.ty == "relief" || w.org_id.is_some() {
+        return Err(AppError::invalid(
+            "/type",
+            "NOT_APPLICABLE",
+            "救災據點與組織清單不提供永久刪除",
+        ));
+    }
+    // 條件同時擋並行的取消封存 / 重複刪除：列鎖後重讀，沒列 = 已不是封存中
+    let locked: Option<String> = sqlx::query_scalar(
+        "SELECT slug::text FROM wishlists WHERE id = $1 AND status = 'archived' AND deleted_at IS NULL FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some(slug) = locked else {
+        let gone: bool =
+            sqlx::query_scalar("SELECT deleted_at IS NOT NULL FROM wishlists WHERE id = $1")
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
+        return Err(if gone {
+            AppError::NotFound
+        } else {
+            AppError::problem(
+                409,
+                "WISHLIST_NOT_ARCHIVED",
+                "只有已封存的清單可以永久刪除，請先封存。",
+            )
+        });
+    };
+    // 封存後不能再認領 / 贊助（兩者都先 FOR SHARE 清單列），所以這兩個數字只會變少，不必再鎖品項。
+    // 採購進行中 = funding_status 'funded'：達標建單（pending）到下單、運送都維持 funded，送達才轉 fulfilled，
+    // 失敗 / 取消會退回 open / expired（orders.rs::patch_order）。pledged 的贊助封存時已退回，這裡是保險。
+    let (claims, orders): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM claims c JOIN wishlist_items i ON i.id = c.item_id
+                  WHERE i.wishlist_id = $1 AND c.status IN ('reserved', 'purchased')),
+                (SELECT count(*) FROM wishlist_items i WHERE i.wishlist_id = $1
+                  AND (i.funding_status = 'funded'
+                       OR EXISTS (SELECT 1 FROM contributions ct WHERE ct.item_id = i.id AND ct.status = 'pledged')))",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if claims > 0 || orders > 0 {
+        let mut errs = vec![];
+        if claims > 0 {
+            errs.push(
+                json!({ "pointer": "/claims", "code": "ACTIVE_CLAIMS", "count": claims,
+                "detail": format!("還有 {claims} 筆進行中的認領，完成或取消後才能刪除。") }),
+            );
+        }
+        if orders > 0 {
+            errs.push(
+                json!({ "pointer": "/orders", "code": "ACTIVE_ORDERS", "count": orders,
+                "detail": format!("還有 {orders} 筆進行中的採購，完成後才能刪除。") }),
+            );
+        }
+        let detail = errs
+            .iter()
+            .filter_map(|e| e["detail"].as_str())
+            .collect::<Vec<_>>()
+            .join("");
+        return Err(AppError::Problem {
+            status: 409,
+            code: if claims > 0 {
+                "WISHLIST_HAS_ACTIVE_CLAIMS"
+            } else {
+                "WISHLIST_HAS_ACTIVE_ORDERS"
+            },
+            detail,
+            errors: Some(Value::Array(errs)),
+            retry_after: None,
+        });
+    }
+    let item_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM wishlist_items WHERE wishlist_id = $1 AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    // 圖片：記進 user_media 後要求退役（retire_media 不把已刪除清單算引用），與刪除同交易提交
+    let media: Vec<String> = sqlx::query_scalar(
+        "SELECT cover_image_key FROM wishlists WHERE id = $1 AND cover_image_key IS NOT NULL
+         UNION SELECT image_key FROM wishlist_items WHERE wishlist_id = $1 AND image_key IS NOT NULL",
+    )
+    .bind(id)
+    .fetch_all(&mut *tx)
+    .await?;
+    let media: Vec<String> = media
+        .into_iter()
+        .filter(|k| uploads::is_user_media(k))
+        .collect();
+    for key in &media {
+        sqlx::query(
+            "INSERT INTO user_media (user_id, object_key) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+        )
+        .bind(u.id)
+        .bind(key)
+        .execute(&mut *tx)
+        .await?;
+    }
+    uploads::request_retire(&mut tx, &media).await?;
+    sqlx::query("DELETE FROM shipping_addresses WHERE wishlist_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "UPDATE friend_invites SET revoked_at = now() WHERE wishlist_id = $1 AND revoked_at IS NULL",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("UPDATE wishlist_items SET image_key = NULL, image_status = 'none' WHERE wishlist_id = $1 AND image_key IS NOT NULL")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE wishlists SET deleted_at = now(), birthday_notify = false, cover_image_key = NULL, cover_image_status = 'none' WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    // 只記標題（截斷）與品項數；不放收件資訊
+    crate::orgs::audit_user(
+        &mut *tx,
+        u.id,
+        "wishlist.delete",
+        "wishlists",
+        Some(id),
+        json!({ "before": { "title": clip(json!(w.title)), "item_count": item_count } }),
+    )
+    .await?;
+    crate::dashboard::notify(&mut *tx, id).await?; // 即時連線收到後關閉
+    tx.commit().await?;
+    uploads::drain_soon(st.pool.clone());
+    crate::cdn::purge_wishlists(vec![slug.trim().to_string()]);
     Ok(StatusCode::NO_CONTENT)
 }
 

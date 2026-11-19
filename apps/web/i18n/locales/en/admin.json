@@ -98,6 +98,7 @@
         "empty": "No matching lists",
         "meta": "{slug}・{email}・reported {count} times",
         "publicPage": "Public page",
+        "deleted": "Deleted",
         "loadMore": "Load more lists"
       },
       "users": {

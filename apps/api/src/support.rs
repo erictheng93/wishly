@@ -67,7 +67,8 @@ pub async fn notify_targets(tx: &mut Tx<'_>, wishlist_id: Uuid) -> Result<(), Ap
                 SELECT m.user_id FROM org_members m
                  WHERE m.org_id = tw.org_id AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL) r
            JOIN users ru ON ru.id = r.uid AND ru.deleted_at IS NULL AND ru.blocked_at IS NULL
-          WHERE NOT EXISTS (SELECT 1 FROM notifications n
+          WHERE tw.deleted_at IS NULL -- 對象已永久刪除：通知連結會指向不存在的清單
+            AND NOT EXISTS (SELECT 1 FROM notifications n
                              WHERE n.user_id = r.uid AND n.kind = 'wishlist.supported'
                                AND n.payload->>'wishlist_id' = tw.id::text
                                AND n.payload->>'supporter_id' = COALESCE(sw.org_id, sw.owner_id)::text

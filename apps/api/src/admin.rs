@@ -196,12 +196,12 @@ async fn list_wishlists(
     let rows: Vec<(Uuid, Value)> = sqlx::query_as(
         "SELECT w.id, jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title, 'status', w.status::text, 'type', w.type::text,
            'owner', jsonb_build_object('id', u.id, 'display_name', u.display_name, 'email', u.email),
-           'moderation_status', w.moderation_status::text,
+           'moderation_status', w.moderation_status::text, 'deleted_at', w.deleted_at,
            'report_count', (SELECT count(*) FROM content_reports r WHERE r.wishlist_id = w.id),
            'open_report_count', (SELECT count(*) FROM content_reports r WHERE r.wishlist_id = w.id AND r.status = 'open'),
            'created_at', w.created_at)
          FROM wishlists w JOIN users u ON u.id = w.owner_id
-         WHERE w.deleted_at IS NULL
+         WHERE true -- 已永久刪除的清單也列出（帶 deleted_at 供後台標示）
            AND ($1::text IS NULL OR w.slug = $1::bpchar OR left(u.email, length($1)) = lower($1))
            AND ($2::text IS NULL OR w.moderation_status::text = $2)
            AND ($3::uuid IS NULL OR w.id > $3)
