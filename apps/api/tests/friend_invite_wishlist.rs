@@ -276,3 +276,25 @@ async fn delete_with_wishlist_id_revokes_only_that_invite(pool: PgPool) {
     assert_eq!(preview(&pool, &t(&i2)).await.0, StatusCode::NOT_FOUND);
     assert_eq!(preview(&pool, &t(&g)).await.0, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn invite_create_rate_limited_per_user(pool: PgPool) {
+    let a = common::user(&pool, "A").await;
+    let b = common::user(&pool, "B").await;
+    for _ in 0..30 {
+        assert_eq!(invite(&pool, &a.token, None).await.0, StatusCode::CREATED);
+    }
+    let (s, h, v) = common::call(
+        &pool,
+        "POST",
+        "/friends/invites",
+        &[common::ck(&a.token), common::idem(Uuid::new_v4())].concat(),
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(v["code"], "RATE_LIMITED");
+    assert!(h.contains_key("retry-after"));
+    // 另一位使用者不受影響
+    assert_eq!(invite(&pool, &b.token, None).await.0, StatusCode::CREATED);
+}

@@ -416,6 +416,8 @@ async fn invite_create(
     State(st): State<AppState>,
     body: Bytes,
 ) -> R<(StatusCode, Json<Value>)> {
+    // 分享面板每次打開都會自動建立附清單的邀請，限流防濫用（比照 friend_req 放最前面）
+    ratelimit::check_pool(&st.pool, &format!("friend_invite:{}", u.id), 30, 3600).await?;
     let wid = if body.iter().all(u8::is_ascii_whitespace) {
         None
     } else {
