@@ -155,6 +155,10 @@ pub async fn cleanup(pool: &PgPool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
     sqlx::query(REPORT_RETENTION_SQL).execute(pool).await?;
+    // 邀請連結過期或撤銷滿 30 天後刪除（附清單的邀請不再互相撤銷，列數會累積）
+    sqlx::query("DELETE FROM friend_invites WHERE LEAST(expires_at, COALESCE(revoked_at, expires_at)) < now() - interval '30 days'")
+        .execute(pool)
+        .await?;
     // 客服工單（含未登入者的 Email）結案一年後刪除；open 不清
     sqlx::query("DELETE FROM support_requests WHERE status = 'closed' AND handled_at < now() - interval '365 days'")
         .execute(pool)
