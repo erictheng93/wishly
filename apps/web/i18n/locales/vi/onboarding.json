@@ -17,13 +17,13 @@
       "wishlist": {
         "title": "Tạo danh sách mong muốn đầu tiên",
         "body": "Tạo một danh sách cho sinh nhật, đám cưới, em bé mới chào đời hay bất kỳ dịp đáng nhớ nào.",
-        "here": "Đặt tên (ví dụ \"Sinh nhật 30 tuổi\") và chọn ảnh bìa. Mặc định chỉ bạn bè mới xem được; ngày và quy tắc có thể đổi sau. Điền xong bấm \"Tạo và thêm món quà\" ở cuối trang.",
+        "here": "Đặt tên (ví dụ \"Sinh nhật 30 tuổi\") và chọn ảnh bìa là có thể tạo. Mặc định chỉ bạn bè mới xem được; ngày, quy tắc và quyền xem có thể chỉnh trong phần cài đặt danh sách ở bước sau. Điền xong bấm \"Tạo và thêm món quà\" ở cuối trang.",
         "cta": "Tạo danh sách"
       },
       "item": {
         "title": "Thêm món bạn muốn",
         "body": "Danh sách đã sẵn sàng, giờ hãy thêm những món bạn muốn nhận.",
-        "here": "Bấm \"Thêm món quà\". Dán liên kết sản phẩm để tự điền tên và hình, rồi nhập số lượng và ghi chú.",
+        "here": "Bấm \"Thêm món quà\" và chỉ cần nhập tên; liên kết sản phẩm, hình ảnh và số lượng là tùy chọn.",
         "cta": "Đi thêm món quà"
       },
       "publish": {
@@ -59,7 +59,7 @@
       "nameHint": "Đây là tên bạn bè sẽ nhìn thấy.",
       "profileHint": "Điền ít nhất một trong mã tài khoản, lời giới thiệu hoặc ngày sinh; có thể sửa sau trong Cài đặt.",
       "profileNeedOne": "Vui lòng điền ít nhất một trong mã tài khoản, lời giới thiệu hoặc ngày sinh",
-      "profileSave": "Lưu và tạo danh sách",
+      "profileSave": "Lưu",
       "profileSaving": "Đang lưu…",
       "skipLead": "Đã biết cách dùng?",
       "skipBtn": "Bỏ qua hướng dẫn",
@@ -71,7 +71,7 @@
     },
     "settings": {
       "title": "Hướng dẫn bắt đầu",
-      "hint": "Đi lại từ đầu: hồ sơ → tạo danh sách → thêm món → đăng → tặng quà.",
+      "hint": "Đi lại từ đầu: tạo danh sách → thêm món → đăng → hồ sơ → tặng quà.",
       "restart": "Bắt đầu lại hướng dẫn"
     }
   }

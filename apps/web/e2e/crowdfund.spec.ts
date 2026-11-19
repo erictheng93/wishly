@@ -53,15 +53,20 @@ test('眾籌完整旅程：收件資訊 → 建立眾籌品項 → 發點 → �
     await op.getByRole('button', { name: '儲存品項' }).click()
   }
   await fillCrowdfund()
-  await expect(op.getByRole('alert')).toContainText('收件資訊')
-  await op.getByRole('button', { name: '填寫收件資訊' }).click()
+  const sheet = op.getByRole('dialog', { name: '新增品項' })
+  await expect(sheet.getByRole('alert')).toContainText('收件資訊')
+  await expect(sheet.getByRole('alert')).toBeInViewport({ ratio: 1 }) // 錯誤訊息不被黏底按鈕列外的捲動藏起來
+  await sheet.getByRole('button', { name: '填寫收件資訊' }).click()
   await op.getByLabel(/收件人/).fill(ADDR.recipient_name)
   await op.getByLabel(/電話/).fill(ADDR.phone)
   await op.getByLabel(/地址/).fill(ADDR.address)
   await op.getByRole('button', { name: '儲存收件資訊' }).click()
-  await expect(op.getByText('已儲存')).toBeVisible()
   await expect(op.getByText('王*米')).toBeVisible() // 只顯示遮罩
-  await fillCrowdfund()
+  // 存好收件資訊後自動回到品項表單，剛才填的草稿還在
+  await expect(sheet).toBeVisible()
+  await expect(sheet.getByLabel('名稱（必填）')).toHaveValue('嬰兒推車')
+  await expect(sheet.getByLabel(/目標點數/)).toHaveValue('1000')
+  await sheet.getByRole('button', { name: '儲存品項' }).click()
   await expect(op.getByRole('button', { name: '儲存品項' })).toBeHidden()
   await op.getByRole('button', { name: '發佈並分享' }).click()
   await expect.poll(async () => (await (await owner.api.get(`wishlists/${list.id}`)).json()).wishlist.status).toBe('active')

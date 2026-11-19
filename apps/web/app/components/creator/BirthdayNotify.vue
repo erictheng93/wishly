@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 生日清單通知開關（new / edit 共用；組織與據點清單不要放這個元件）
+// 生日清單通知開關（編輯頁清單設定用；組織與據點清單不要放這個元件）
 const on = defineModel<boolean>({ required: true })
 const props = defineProps<{ visibility: string }>()
 const { user } = useAuth()

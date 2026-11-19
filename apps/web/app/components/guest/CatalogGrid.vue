@@ -22,12 +22,16 @@ async function open(p: CatalogProduct) {
     lists.value = all
   } catch (e) { if (pick.value) err.value = t('guest.inspire.loadErr') } finally { loading.value = false }
 }
-function choose(id: string) {
-  const p = pick.value!
+// 編輯頁讀 ?add=1 自動開新增品項並預填；沒有清單時經建立頁轉帶過去
+function addQuery(p: CatalogProduct) {
   const query: Record<string, string> = { add: '1', title: p.title, product_url: p.product_url, ref: p.ref }
   if (p.price_amount != null) query.unit_price_amount = String(p.price_amount)
   if (p.brand) query.brand = p.brand.name
   if (p.spec) query.spec = p.spec
+  return query
+}
+function choose(id: string) {
+  const query = addQuery(pick.value!)
   pick.value = null
   return navigateTo({ path: `/lists/${id}/edit`, query })
 }
@@ -111,7 +115,7 @@ function setScope(s: WishScope) { scope.value = s; loadWishes() }
       <p v-else-if="err" class="g-field-err" role="alert">{{ err }}</p>
       <template v-else-if="!lists.length">
         <p class="g-mute">{{ $t('guest.inspire.noLists') }}</p>
-        <NuxtLink to="/lists/new" class="g-btn block">{{ $t('guest.inspire.create') }}</NuxtLink>
+        <NuxtLink :to="{ path: '/lists/new', query: addQuery(pick) }" class="g-btn block">{{ $t('guest.inspire.create') }}</NuxtLink>
       </template>
       <div v-else class="x-lists">
         <button v-for="w in lists" :key="w.id" class="g-btn ghost block" @click="choose(w.id)">{{ w.title }}</button>

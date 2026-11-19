@@ -19,28 +19,11 @@
     },
     "new": {
       "pageTitle": "Create list",
-      "errSurprise": "Surprise mode needs an event date",
-      "errEventDate": "The event date must be after today",
-      "errClose": "The end time must be in the future",
-      "type": "List type",
       "title": "List name ({n} / 100)",
       "titlePh": "e.g. Mia's baby essentials",
-      "desc": "Description (optional)",
-      "event": "Event date (optional)",
-      "closes": "Auto-end time (optional, leave empty for no deadline)",
-      "surprise": "Surprise mode",
-      "surpriseHint": "Until the event date, you only see the progress, not who gave what. Requires an event date.",
-      "showNames": "Show giver nicknames to other visitors",
-      "showNamesHint": "Givers choose for themselves: by default only the giver's friends see the name and others see \"Anonymous\"; givers can also pick public or anonymous.",
       "creating": "Creating…",
       "submit": "Create and add items",
-      "sec": {
-        "basics": "Basics",
-        "cover": "Cover",
-        "dates": "Dates",
-        "rules": "Rules",
-        "access": "Who can see"
-      }
+      "note": "Visibility, dates, surprise mode and more can be set in the list settings on the next step."
     },
     "dashboard": {
       "title": "My lists",
@@ -90,10 +73,8 @@
       "closes": "Auto-end time (optional, leave empty for no deadline)",
       "showNames": "Show giver nicknames to other visitors",
       "showNamesHint": "Givers choose for themselves: by default only the giver's friends see the name and others see \"Anonymous\"; givers can also pick public or anonymous.",
-      "surprise": "Surprise mode: {state}",
       "surpriseLocked": "On (locked until the event date, cannot be turned off)",
       "surpriseUnlocked": "On (unlocked)",
-      "surpriseOff": "Off",
       "saveSettings": "Save settings",
       "unsaved": "Unsaved changes",
       "revert": "Revert",
@@ -117,7 +98,7 @@
       "delForce": "Delete along with claims",
       "shareTitle": "Share your list",
       "draftWarn": "Not published yet. Friends who open it will see that it does not exist.",
-      "external": "Add openExternalBrowser=1 to the link (opens in the default browser from inside LINE)",
+      "external": "Open in the phone browser instead of inside LINE",
       "copied": "Copied ✓",
       "copy": "Copy link",
       "line": "Send via LINE",
@@ -128,7 +109,14 @@
       "invite_selected": "Once they accept, they become your friend and are added to this list's close-friends list. Valid for 7 days and usable by multiple people, so only send it to people you want to share with.",
       "sms": "SMS",
       "supportLine": "Supporting {name} · {points} pts · {qty} items",
-      "supportEnded": "Ended"
+      "supportEnded": "Ended",
+      "surpriseSwitch": "Surprise mode",
+      "surpriseHint": "Until the event date, you only see the progress, not who gave what. Requires an event date.",
+      "errSurprise": "Surprise mode needs an event date",
+      "errEventDate": "The event date must be after today",
+      "needItem": "Add at least 1 item to publish",
+      "privateShare": "This list is private. Change it to public or friends to share it.",
+      "shareLink": "Share link"
     },
     "progress": {
       "pageTitle": "Progress",

@@ -75,7 +75,11 @@
       "supportBad": "Paste a valid list link",
       "supportTarget": "Supporting: {name}",
       "supportEnded": "Their list has ended",
-      "supportNote": "Hand this wish to their list; gifts from friends count toward them."
+      "supportNote": "Hand this wish to their list; gifts from friends count toward them.",
+      "more": "More options",
+      "again": "Add another item after saving",
+      "deadlineRequired": "Funding deadline (Taipei time, required)",
+      "deadlineHintNoEvent": "This list has no event date, so a deadline is required. You can also add an event date in the list settings."
     },
     "otp": {
       "group": "6-digit verification code",

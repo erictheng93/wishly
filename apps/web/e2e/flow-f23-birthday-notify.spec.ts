@@ -1,4 +1,4 @@
-// 流程驗證 F23（D65 生日清單通知）：新增 / 編輯清單的開關、設定頁通知開關、退訂 'b' 權杖。真實 API。
+// 流程驗證 F23（D65 生日清單通知）：清單設定的開關（建立頁只填名稱與封面）、設定頁通知開關、退訂 'b' 權杖。真實 API。
 import { expect, test, type Page } from '@playwright/test'
 import { createHmac } from 'node:crypto'
 import { loginBrowser, registerUser, type User } from './helpers'
@@ -14,26 +14,30 @@ async function member(page: Page, birthday?: { date: string, vis?: string }) {
   await loginBrowser(page.context(), u)
   return u
 }
+/** 建立清單 → 編輯頁打開清單設定；tick 時勾選生日通知並儲存 */
 async function newList(page: Page, title: string, opts: { tick?: boolean } = {}) {
   await page.goto('/lists/new'); await hydrated(page)
   await page.getByLabel(/清單名稱/).fill(title)
-  if (opts.tick) await sw(page).check()
   await page.getByRole('button', { name: '建立並新增品項' }).click()
   await page.waitForURL(/\/lists\/[0-9a-f-]+\/edit/)
   await hydrated(page)
   await openSettings(page)
+  if (opts.tick) {
+    await sw(page).check()
+    await Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), page.getByRole('button', { name: '儲存設定' }).click()])
+  }
   return page.url().match(/lists\/([0-9a-f-]+)\/edit/)![1]!
 }
 
 test('沒填生日：開關停用，顯示原因與「前往設定」連結', async ({ page }) => {
   await member(page)
-  await page.goto('/lists/new'); await hydrated(page)
+  await newList(page, 'bday-none')
   await expect(sw(page)).toBeDisabled()
   await expect(page.getByText('請先在設定填寫生日才能開啟。')).toBeVisible()
   await expect(page.getByRole('link', { name: '前往設定' })).toHaveAttribute('href', '/settings')
 })
 
-test('設定頁填生日後，新增清單勾選 → 建立成功 → 編輯頁顯示已開啟', async ({ page }) => {
+test('設定頁填生日後，清單設定勾選 → 儲存 → 重新整理仍開啟', async ({ page }) => {
   await member(page)
   await page.goto('/settings'); await hydrated(page)
   const bd = page.getByRole('group', { name: '生日（可留空，只記月日）' })
@@ -43,16 +47,18 @@ test('設定頁填生日後，新增清單勾選 → 建立成功 → 編輯頁�
   await form.getByRole('button', { name: '儲存' }).click()
   await expect(form.getByText('已儲存')).toBeVisible()
 
-  await page.goto('/lists/new'); await hydrated(page)
+  await newList(page, 'bday-a')
   await expect(sw(page)).toBeEnabled()
   await expect(page.getByText('會通知你的所有好友。')).toBeVisible()
-  await newList(page, 'bday-a', { tick: true })
+  await sw(page).check()
+  await Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), page.getByRole('button', { name: '儲存設定' }).click()])
+  await page.reload(); await hydrated(page); await openSettings(page)
   await expect(sw(page)).toBeChecked()
 })
 
 test('可見度切 private 自動取消並停用；切摯友說明改摯友版本', async ({ page }) => {
   await member(page, { date: '06-15' })
-  await page.goto('/lists/new'); await hydrated(page)
+  await newList(page, 'bday-vis')
   await sw(page).check()
   await page.getByRole('radio', { name: /私人/ }).check()
   await expect(sw(page)).toBeDisabled()

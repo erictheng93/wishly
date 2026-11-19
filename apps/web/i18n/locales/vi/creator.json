@@ -75,7 +75,11 @@
       "supportBad": "Hãy dán liên kết danh sách hợp lệ",
       "supportTarget": "Ủng hộ: {name}",
       "supportEnded": "Danh sách của họ đã kết thúc",
-      "supportNote": "Chuyển điều ước này sang danh sách của họ; quà của bạn bè sẽ tính cho họ."
+      "supportNote": "Chuyển điều ước này sang danh sách của họ; quà của bạn bè sẽ tính cho họ.",
+      "more": "Tùy chọn khác",
+      "again": "Lưu xong tiếp tục thêm món khác",
+      "deadlineRequired": "Hạn góp quỹ (giờ Đài Bắc, bắt buộc)",
+      "deadlineHintNoEvent": "Danh sách chưa có ngày sự kiện nên cần nhập hạn; bạn cũng có thể thêm ngày sự kiện trong cài đặt danh sách."
     },
     "otp": {
       "group": "Mã xác minh 6 chữ số",

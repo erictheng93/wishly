@@ -6,7 +6,7 @@ watch(visibility, v => { if (v === 'selected') load().catch(() => {}) }, { immed
 </script>
 <template>
   <fieldset class="c-field c-vis">
-    <span>{{ $t('creator.vis.who') }}</span>
+    <legend>{{ $t('creator.vis.who') }}</legend>
     <label v-for="o in VIS_OPTIONS" :key="o.v" class="c-switch">
       <input v-model="visibility" type="radio" name="visibility" :value="o.v">
       <span>{{ o.label }}<br><small class="c-mute">{{ o.desc }}</small></span>
@@ -16,6 +16,7 @@ watch(visibility, v => { if (v === 'selected') load().catch(() => {}) }, { immed
 </template>
 <style scoped>
 .c-vis{border:0;padding:0;margin:0 0 16px;min-width:0}
+.c-vis legend{display:block;padding:0;margin-bottom:8px;font:600 11px/1.4 var(--mono);letter-spacing:.12em;color:var(--mute)}
 .c-vis .c-switch{align-items:flex-start;padding:10px 0;margin:0;border-bottom:1px solid var(--line)}
 .c-vis .c-switch:has(input:checked) span{font-weight:700}
 .c-vis input{margin-top:3px;accent-color:var(--red)}

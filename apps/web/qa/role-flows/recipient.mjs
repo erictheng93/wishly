@@ -49,30 +49,37 @@ async function uiLogout(page) {
   await page.getByRole('button', { name: '登出', exact: true }).click()
   await page.waitForURL(/\/login/)
 }
-/** 新增清單頁；回傳清單 id。o: title,desc,event,closes,surprise,showNames,vis,cover,pick(摯友名稱陣列),ttl,bday */
+/** 新增清單頁只填名稱與封面，其餘到編輯頁「清單設定」儲存；回傳清單 id。o: title,desc,event,closes,surprise,showNames,vis,cover,pick(摯友名稱陣列),ttl,bday */
 async function uiCreateList(page, o) {
   await page.goto('/lists/new'); await hydrated(page)
   await page.getByLabel(/清單名稱/).fill(o.title)
-  if (o.desc) await page.getByLabel('說明（選填）').fill(o.desc)
   if (o.cover) await page.getByRole('radio', { name: new RegExp(o.cover) }).check({ force: true })
-  if (o.event) await page.getByLabel('活動日（選填）').fill(o.event)
-  if (o.closes) await page.getByLabel(/自動結束時間/).fill(o.closes)
-  if (o.ttl) await page.getByLabel('購買期限').selectOption({ label: o.ttl })
-  if (o.surprise) await page.getByLabel('驚喜模式').check()
-  if (o.showNames) await page.getByLabel('顯示送禮者暱稱給其他訪客').check()
-  if (o.vis) await page.getByRole('radio', { name: new RegExp('^' + o.vis) }).check()
-  for (const n of o.pick ?? []) await page.getByLabel(n).check()
-  if (o.bday) await page.getByLabel(/生日前 7 天通知/).check()
   await page.getByRole('button', { name: '建立並新增品項' }).click()
   await page.waitForURL(/\/lists\/[0-9a-f-]+\/edit/)
   await hydrated(page)
-  return page.url().match(/lists\/([0-9a-f-]+)\/edit/)[1]
+  const id = page.url().match(/lists\/([0-9a-f-]+)\/edit/)[1]
+  if (!['desc', 'event', 'closes', 'ttl', 'surprise', 'showNames', 'vis', 'pick', 'bday'].some(k => o[k])) return id
+  await page.getByText('清單設定', { exact: true }).click()
+  const f = page.locator('details', { hasText: '儲存設定' })
+  if (o.desc) await f.getByLabel('說明', { exact: true }).fill(o.desc)
+  if (o.event) await f.getByLabel('活動日', { exact: true }).fill(o.event)
+  if (o.closes) await f.getByLabel(/自動結束時間/).fill(o.closes)
+  if (o.ttl) await f.getByLabel('購買期限').selectOption({ label: o.ttl })
+  if (o.surprise) await f.getByLabel('驚喜模式').check()
+  if (o.showNames) await f.getByLabel('顯示送禮者暱稱給其他訪客').check()
+  if (o.vis) await f.getByRole('radio', { name: new RegExp('^' + o.vis) }).check()
+  for (const n of o.pick ?? []) await f.getByLabel(n).check()
+  if (o.bday) await f.getByLabel(/生日前 7 天通知/).check()
+  await Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), f.getByRole('button', { name: '儲存設定' }).click()])
+  await page.getByText('清單設定', { exact: true }).click() // 收合，之後的步驟會自己打開
+  return id
 }
 /** 在編輯頁新增品項。o: title,brand,spec,url,qty,price,prio(高/中/低),crowd{target,deadline,ref},image */
 async function uiAddItem(page, o) {
   await page.getByRole('button', { name: '新增品項' }).click()
   const d = page.getByRole('dialog', { name: '新增品項' })
   await d.getByLabel('名稱（必填）').fill(o.title)
+  if ((o.brand || o.spec || o.prio) && !(await d.locator('details').evaluate(e => e.open))) await d.getByText('更多選項').click() // 品牌／規格／優先度收在「更多選項」
   if (o.brand) await d.getByLabel('品牌（選填）').fill(o.brand)
   if (o.spec) await d.getByLabel('規格（選填）').fill(o.spec)
   if (o.url) await d.getByLabel('商品網址（選填）').fill(o.url)
@@ -95,8 +102,11 @@ async function publish(page) {
   await page.getByRole('button', { name: '發佈並分享' }).click()
   const dlg = page.getByRole('dialog', { name: '分享你的清單' })
   await expect(dlg).toBeVisible()
-  const url = await dlg.locator('#c-share-input').inputValue()
-  return { dlg, url, slug: url.split('/').pop().split('?')[0] }
+  // 好友／摯友清單剛發佈會自動附上邀請（連結變成 /invite/…），私人清單不顯示連結：slug 一律從 API 讀
+  const input = dlg.locator('#c-share-input')
+  const url = await input.count() ? await input.inputValue() : ''
+  const slug = (await wl(S.api, page.url().match(/lists\/([0-9a-f-]+)\/edit/)[1])).wishlist.slug
+  return { dlg, url, slug }
 }
 const ownerLogin = async (email, password = PASSWORD) => { const a = await apiCtx(); const r = await a.post('auth/login', { data: { email, password } }); if (!r.ok()) throw new Error('api login ' + r.status()); return a }
 const meId = async a => { const j = await (await a.get('me')).json(); return j.user?.id ?? j.id }
@@ -187,30 +197,28 @@ await run.step('R-04', '重複註冊同一 Email：不洩漏帳號存在性，�
 }, { page })
 
 // ---------- B. 建立清單 ----------
-await run.step('R-05', '建立清單頁表單檢查：類型、預設值、驚喜／日期驗證', async ({ note }) => {
+await run.step('R-05', '建立清單頁只填名稱與封面；預設值與驚喜／日期驗證移到清單設定', async ({ note }) => {
   await page.goto('/lists/new'); await hydrated(page)
-  await expect(page.getByRole('radio', { name: '心願清單' })).toBeChecked()
-  const types = await page.getByRole('radio', { name: /清單$|登記|救助/ }).count()
-  note(`清單類型 radio 僅 ${await page.locator('.c-seg input[type=radio]').count()} 個（心願清單）；規格列 personal/registry/relief 三型，UI 只開 personal`)
-  await expect(page.getByRole('radio', { name: /^所有好友/ })).toBeChecked()
-  note('預設可見度＝所有好友（friends）；預設購買期限：' + await page.getByLabel('購買期限').inputValue() + ' 小時')
-  await page.getByLabel(/清單名稱/).fill('驗證用')
-  await page.getByLabel('驚喜模式').check()
-  await page.getByRole('button', { name: '建立並新增品項' }).click()
-  await expect(page.getByRole('alert')).toHaveText('開啟驚喜模式需設定活動日')
-  await page.getByLabel('活動日（選填）').fill(dateIn(0))
-  await page.getByRole('button', { name: '建立並新增品項' }).click()
-  await expect(page.getByRole('alert')).toHaveText('活動日需為今日之後')
-  await page.getByLabel('驚喜模式').uncheck()
-  await page.getByLabel('活動日（選填）').fill('')
-  await page.getByLabel(/自動結束時間/).fill(localIn(-1))
-  const under = await page.getByLabel(/自動結束時間/).evaluate(e => e.validity.rangeUnderflow)
-  note(`自動結束時間填過去：瀏覽器原生 min 驗證 rangeUnderflow = ${under}（JS 的「結束時間需在現在之後」訊息在支援 min 的瀏覽器上不會出現，屬後備）`)
-  expect(under).toBe(true)
-  note('兩種前端驗證訊息（驚喜需活動日、活動日需為今日之後）皆正確')
+  await expect(page.getByRole('radio', { name: '心願清單' })).toHaveCount(0)
+  await expect(page.getByLabel('驚喜模式')).toHaveCount(0)
+  note('建立頁只有清單名稱與封面（類型固定 personal，其餘在清單設定）')
   await page.getByLabel(/清單名稱/).fill('')
   await expect(page.getByRole('button', { name: '建立並新增品項' })).toBeDisabled()
   note('標題空白時送出鈕停用')
+  await page.getByLabel(/清單名稱/).fill('驗證用')
+  await page.getByRole('button', { name: '建立並新增品項' }).click()
+  await page.waitForURL(/\/lists\/[0-9a-f-]+\/edit/); await hydrated(page)
+  await page.getByText('清單設定', { exact: true }).click()
+  const f = page.locator('details', { hasText: '儲存設定' })
+  await expect(f.getByRole('radio', { name: /^所有好友/ })).toBeChecked()
+  note('預設可見度＝所有好友（friends）；預設購買期限：' + await f.getByLabel('購買期限').inputValue() + ' 小時')
+  await f.getByLabel('驚喜模式').check()
+  await f.getByRole('button', { name: '儲存設定' }).click()
+  await expect(f.getByRole('alert')).toHaveText('開啟驚喜模式需設定活動日')
+  await f.getByLabel('活動日', { exact: true }).fill(dateIn(0))
+  await f.getByRole('button', { name: '儲存設定' }).click()
+  await expect(f.getByRole('alert')).toHaveText('活動日需為今日之後')
+  note('兩種前端驗證訊息（驚喜需活動日、活動日需為今日之後）皆正確')
 }, { page })
 
 S.titleA = `滿月寶寶清單 ${tag}`
@@ -278,7 +286,8 @@ await run.step('R-09', '新增眾籌品項：未填收件資訊被擋 → 填寫
   await ship.getByRole('button', { name: '儲存收件資訊' }).click()
   await expect(ship.getByText('已儲存')).toBeVisible()
   note('收件資訊只顯示遮罩：' + (await ship.innerText()).replace(/\n+/g, ' | ').slice(0, 160))
-  d = await uiAddItem(page, { title: '嬰兒推車', crowd: { target: 3000, deadline: localIn(20), ref: 3200 }, prio: '高' })
+  await expect(d).toBeVisible() // 存好收件資訊後自動回到品項表單，草稿還在
+  await expect(d.getByLabel('名稱（必填）')).toHaveValue('嬰兒推車')
   await saveItem(page, d)
   await expect(itemCard(page, '嬰兒推車')).toContainText('心願眾籌 0 / 3,000 點')
   // 目標點數 0 / 負數
@@ -411,10 +420,10 @@ await run.step('R-15', '發佈並分享：分享面板（連結、複製、QR、
   note('QR code 元件可見')
   const hrefs = await dlg.getByRole('link').evaluateAll(a => a.map(x => `${x.textContent.trim()}→${x.getAttribute('href').slice(0, 60)}`))
   note('分享連結：' + hrefs.join(' ; '))
-  await dlg.getByLabel(/openExternalBrowser/).check()
+  await dlg.getByLabel('在 LINE 裡改用手機瀏覽器開啟').check()
   const url2 = await dlg.locator('#c-share-input').inputValue(); note('勾選外部瀏覽器後：' + url2)
   expect(url2).toContain('openExternalBrowser=1')
-  await dlg.getByLabel(/openExternalBrowser/).uncheck()
+  await dlg.getByLabel('在 LINE 裡改用手機瀏覽器開啟').uncheck()
   await expect(dlg.getByText('附上好友邀請')).toHaveCount(0)
   note('公開清單不顯示「附上好友邀請」（只有 friends／selected 才有）')
   await page.screenshot({ path: resolve(OUT, 'recipient', 'R-15-share.png'), fullPage: true })
@@ -777,7 +786,8 @@ await run.step('R-31', '驚喜模式清單 B（活動日 +7 天）：建立、�
   d = await uiAddItem(page, { title: '派對帽', qty: 4 }); await saveItem(page, d); await expect(itemCard(page, '派對帽')).toBeVisible()
   const { dlg, slug } = await publish(page); S.slugB = slug; await closeSheet(dlg)
   await page.getByText('清單設定', { exact: true }).click()
-  await expect(page.getByText('驚喜模式：開啟中（鎖定至活動日，無法關閉）')).toBeVisible()
+  await expect(page.getByText('開啟中（鎖定至活動日，無法關閉）')).toBeVisible()
+  await expect(page.getByLabel('驚喜模式')).toBeDisabled()
   const items = (await wl(S.api, S.listB)).items
   S.itemsB = Object.fromEntries(items.map(i => [i.title, i.id]))
   await claimApi(S.donorA, S.itemsB['派對帽'], { qty: 2 })
@@ -924,15 +934,14 @@ await run.step('R-36', '清單 C（所有好友）：好友看得到、路人看
 
 await run.step('R-37', '清單 D（摯友 selected）：UI 勾選好友 2；好友1 看不到、好友2 看得到；改勾選後即時生效', async ({ note }) => {
   S.titleD = `摯友限定清單 ${tag}`
-  await page.goto('/lists/new'); await hydrated(page)
-  await page.getByLabel(/清單名稱/).fill(S.titleD)
+  S.listD = await uiCreateList(page, { title: S.titleD })
+  await page.getByText('清單設定', { exact: true }).click()
   await page.getByRole('radio', { name: /^摯友/ }).check()
   await expect(page.getByText('選擇摯友（已選 0 位）')).toBeVisible()
   await page.getByLabel(new RegExp(S.fr2.name)).check()
   await expect(page.getByText('選擇摯友（已選 1 位）')).toBeVisible()
-  await page.getByRole('button', { name: '建立並新增品項' }).click()
-  await page.waitForURL(/\/lists\/[0-9a-f-]+\/edit/); await hydrated(page)
-  S.listD = page.url().match(/lists\/([0-9a-f-]+)\/edit/)[1]
+  await Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), page.getByRole('button', { name: '儲存設定' }).click()])
+  await page.getByText('清單設定', { exact: true }).click()
   const d = await uiAddItem(page, { title: '摯友專屬禮', qty: 1 }); await saveItem(page, d); await expect(itemCard(page, '摯友專屬禮')).toBeVisible()
   const { dlg, slug } = await publish(page); S.slugD = slug
   note('selected 面板的邀請說明：' + (await dlg.getByText('附上好友邀請').count() ? '有「附上好友邀請」' : '無'))
