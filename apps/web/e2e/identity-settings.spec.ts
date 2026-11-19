@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { registerUser, newEmail, sql, uid, waitForOtp } from './helpers'
+import { createList, registerUser, newEmail, sql, uid, waitForOtp } from './helpers'
 
 test('註冊入口保留第三方登入與導向', async ({ page }) => {
   await page.goto('/register?redirect=/lists/new')
@@ -47,6 +47,9 @@ test('顯示名稱還是信箱前綴：導覽頁說明用途，儀表板提示�
   sql(`UPDATE users SET display_name='${prefix}' WHERE id='${id}'`)
   await context.addCookies((await user.api.storageState()).cookies)
   await page.goto('/welcome')
+  await expect(page.getByLabel('顯示名稱')).toHaveCount(0) // 第一步是建立清單，個人資料到第 4 步
+  await createList(user, { items: [{ title: '手沖壺' }] }) // 建立 → 加品項 → 發佈（createList 預設發佈）
+  await page.reload()
   await expect(page.getByLabel('顯示名稱')).toHaveValue(prefix)
   await expect(page.getByText('這是朋友會看到的名稱。')).toBeVisible()
 
