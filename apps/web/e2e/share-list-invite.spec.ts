@@ -17,7 +17,8 @@ test('好友限定清單附上邀請連結，對方接受後進入清單', async
   const op = await octx.newPage()
   await op.goto(`/lists/${list.id}/edit`); await hydrated(op)
   await op.getByRole('button', { name: '分享' }).first().click()
-  await op.getByLabel('附上好友邀請').check()
+  // 打開分享面板就自動附上邀請（已發佈、重新載入頁面也一樣）
+  await expect(op.getByLabel('附上好友邀請')).toBeChecked()
   const input = op.locator('#c-share-input')
   await expect(input).toHaveValue(/\/invite\//)
   const url = await input.inputValue()

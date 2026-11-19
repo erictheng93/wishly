@@ -440,9 +440,12 @@ async fn invite_create(
     };
     let (token, h) = new_token();
     let mut tx = st.pool.begin().await?;
-    // 一般邀請與每份清單各一條有效邀請，互不撤銷
-    sqlx::query("UPDATE friend_invites SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL AND wishlist_id IS NOT DISTINCT FROM $2")
-        .bind(u.id).bind(wid).execute(&mut *tx).await?;
+    // 只有不附清單的一般邀請維持「發新的撤銷舊的」；附清單的邀請可並存（舊的照 7 天到期），
+    // 否則再次分享會讓先前貼出去的連結失效
+    if wid.is_none() {
+        sqlx::query("UPDATE friend_invites SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL AND wishlist_id IS NULL")
+            .bind(u.id).execute(&mut *tx).await?;
+    }
     let exp: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("INSERT INTO friend_invites (user_id, token_hash, wishlist_id, expires_at) VALUES ($1, $2, $3, now() + interval '7 days') RETURNING expires_at")
         .bind(u.id).bind(h).bind(wid).fetch_one(&mut *tx).await?;
     tx.commit().await?;

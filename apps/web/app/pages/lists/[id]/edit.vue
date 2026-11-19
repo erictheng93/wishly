@@ -144,8 +144,6 @@ async function publish() {
   pubBusy.value = true; pubErrs.value = []
   if (await patchList({ status: 'active' }, t('lists.edit.published'))) {
     showShare.value = true; tour.refresh()
-    // 只在剛發佈這一次自動附上邀請：每建一張新邀請都會撤銷這份清單先前已分享出去的邀請連結，所以之後手動打開分享不自動重建
-    if (canInvite.value) { inviteOn.value = true; toggleInvite() }
   }
   pubBusy.value = false
 }
@@ -177,6 +175,8 @@ async function copy() {
 const canInvite = computed(() => ['friends', 'selected'].includes(w.value?.visibility) && w.value?.status !== 'draft')
 // 可見度變更 → 舊邀請作廢（後端也會依清單撤銷），重置開關與快取
 watch(() => w.value?.visibility, () => { invite.value = null; inviteOn.value = false; inviteErr.value = '' })
+// 每次打開分享面板都自動附上邀請（附清單的邀請可並存，不會讓舊連結失效）；已有快取就不重建
+watch(showShare, (open) => { if (open && canInvite.value) { inviteOn.value = true; toggleInvite() } })
 async function toggleInvite() {
   inviteErr.value = ''
   if (!inviteOn.value || invite.value) return // 已有快取就不再建新權杖

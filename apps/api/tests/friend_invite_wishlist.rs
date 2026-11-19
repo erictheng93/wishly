@@ -85,10 +85,28 @@ async fn general_and_list_invites_do_not_revoke_each_other(pool: PgPool) {
     assert_eq!(preview(&pool, &token(&g1)).await.0, StatusCode::NOT_FOUND);
     assert_eq!(preview(&pool, &token(&g2)).await.0, StatusCode::OK);
     assert_eq!(preview(&pool, &token(&p1)).await.0, StatusCode::OK);
-    // 再建清單邀請：舊清單邀請失效、一般邀請仍有效
+    // 再建清單邀請：舊清單邀請與一般邀請都仍有效
     let (_, p2) = invite(&pool, &a.token, Some(l.id)).await;
-    assert_eq!(preview(&pool, &token(&p1)).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(preview(&pool, &token(&p1)).await.0, StatusCode::OK);
     assert_eq!(preview(&pool, &token(&p2)).await.0, StatusCode::OK);
+    assert_eq!(preview(&pool, &token(&g2)).await.0, StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn same_list_invites_coexist_and_both_accept(pool: PgPool) {
+    let a = common::user(&pool, "A").await;
+    let b = common::user(&pool, "B").await;
+    let c = common::user(&pool, "C").await;
+    let l = list(&pool, a.id, "friends").await;
+    let (_, p1) = invite(&pool, &a.token, Some(l.id)).await;
+    let (_, p2) = invite(&pool, &a.token, Some(l.id)).await;
+    assert_ne!(token(&p1), token(&p2));
+    assert_eq!(accept(&pool, &b.token, &token(&p1)).await.0, StatusCode::OK);
+    assert_eq!(accept(&pool, &c.token, &token(&p2)).await.0, StatusCode::OK);
+    // 一般邀請仍是新的撤銷舊的
+    let (_, g1) = invite(&pool, &a.token, None).await;
+    let (_, g2) = invite(&pool, &a.token, None).await;
+    assert_eq!(preview(&pool, &token(&g1)).await.0, StatusCode::NOT_FOUND);
     assert_eq!(preview(&pool, &token(&g2)).await.0, StatusCode::OK);
 }
 
