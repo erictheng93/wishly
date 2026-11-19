@@ -22,4 +22,7 @@ dialog.c-sheet h2{padding-bottom:14px;border-bottom:1px solid var(--ink-line);le
 dialog.c-sheet .c-row:last-child{margin-top:8px}
 /* 長表單：操作列黏在面板底部，不必捲到底才找得到「儲存」 */
 dialog.c-sheet form>.c-row:last-child{position:sticky;bottom:0;z-index:1;margin-top:8px;padding:12px 0 calc(4px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
+/* 瀏覽器把必填欄位捲進視窗時，留出黏底按鈕列：實測（4 語系、320×640 / 390×659）列高 61px 且一律單列，
+   加面板下內距 24px，列頂距視窗底 85px（兩者各含一份 safe-area，故 2×）；再留約 19px 餘量 */
+dialog.c-sheet form :is(input,select,textarea){scroll-margin-bottom:calc(104px + 2 * env(safe-area-inset-bottom))}
 </style>

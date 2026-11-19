@@ -1648,6 +1648,7 @@ sequenceDiagram
   X->>A: POST /friends/invites
   A->>D: 撤銷甲舊連結, INSERT friend_invites (token_hash, 7 天)
   A-->>X: 201 (url /invite/token)
+  Note over X,A: 編輯頁分享面板可 DELETE /friends/invites?wishlist_id= 收回該清單所有有效邀請
   Y->>A: GET /friends/invites/{token} (公開預覽 邀請者名稱)
   alt 乙未登入
     Y->>Y: 導向 /login?redirect=/invite/token, 登入後回來
