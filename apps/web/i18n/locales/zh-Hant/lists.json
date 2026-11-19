@@ -40,7 +40,14 @@
       "showArchived": "已封存的清單",
       "backToLists": "返回我的清單",
       "archivedEmpty": "沒有已封存的清單",
-      "unarchive": "取消封存"
+      "unarchive": "取消封存",
+      "purge": "永久刪除",
+      "purgeTitle": "永久刪除清單",
+      "purgeText": "「{title}」將被永久刪除，無法復原：清單、品項、收件資訊與圖片都會被清除。送禮者仍會在自己的「我的捐助」看到紀錄，並標示「清單已刪除」。",
+      "purgeOk": "確認永久刪除",
+      "purgePrompt": "請輸入清單名稱「{title}」以確認",
+      "purgeActiveClaims": "還有 {count} 筆進行中的認領，完成或取消後才能刪除。",
+      "purgeActiveOrders": "還有 {count} 筆進行中的採購，完成後才能刪除。"
     },
     "edit": {
       "pageTitle": "編輯清單",

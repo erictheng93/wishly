@@ -123,6 +123,7 @@ async fn contributions(
               'reallocation_deadline', CASE WHEN i.funding_status = 'expired' THEN i.expired_at + interval '7 days' END,
               'target_points', i.target_points, 'pledged_points', i.pledged_points),
            'wishlist', jsonb_build_object('slug', w.slug, 'title', w.title, 'event_date', w.event_date),
+           'wishlist_deleted', w.deleted_at IS NOT NULL,
            'can_withdraw', c.status = 'pledged' AND (i.funding_status = 'open' OR {window}),
            'can_reallocate', c.status = 'pledged' AND {window})
          FROM contributions c JOIN wishlist_items i ON i.id = c.item_id JOIN wishlists w ON w.id = c.wishlist_id

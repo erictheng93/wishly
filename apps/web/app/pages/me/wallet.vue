@@ -105,7 +105,10 @@ async function reallocate() {
           <div v-else class="c-thumb">{{ $t('me.wallet.noImg') }}</div>
           <div class="c-grow">
             <strong>{{ r.item.title }}</strong>
-            <div class="c-mute"><NuxtLink :to="`/s/${r.wishlist.slug}`">{{ r.wishlist.title }}</NuxtLink></div>
+            <div class="c-mute">
+              <template v-if="r.wishlist_deleted">{{ r.wishlist.title }}　<span class="c-badge" data-testid="list-deleted">{{ $t('me.wallet.listDeleted') }}</span></template>
+              <NuxtLink v-else :to="`/s/${r.wishlist.slug}`">{{ r.wishlist.title }}</NuxtLink>
+            </div>
             <div>{{ $t('me.wallet.pts', { pts: fmtPts(r.contribution.points) }) }}　<span class="c-badge" :class="r.contribution.status">{{ label(CONTRIBUTION_STATUS, r.contribution.status) }}</span>
               <span v-if="r.item.display_status" class="c-badge" :class="r.item.display_status">{{ displayStatusLabel(r.item.display_status) }}</span></div>
           </div>

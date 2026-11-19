@@ -134,6 +134,7 @@ const href = (r: any) => `/u/${(r.user ?? r.wishlist.owner).handle || (r.user ??
       <div v-if="r.wishlist">
         {{ $t('admin.reports.kinds.wishlist') }}：<a :href="`/s/${r.wishlist.slug}`" target="_blank" rel="noopener">{{ r.wishlist.title }}</a>
         <span class="c-badge" :class="{ hidden: r.wishlist.moderation_status === 'hidden' }">{{ r.wishlist.moderation_status === 'hidden' ? $t('admin.reports.stateHidden') : $t('admin.reports.stateOk') }}</span>
+        <span v-if="r.wishlist.deleted_at" class="c-badge">{{ $t('admin.index.lists.deleted') }}</span>
         <div class="c-mute">{{ $t('admin.reports.owner') }}<a :href="href(r)" target="_blank" rel="noopener">{{ r.wishlist.owner.display_name }}</a></div>
       </div>
       <div v-else-if="r.user">

@@ -186,7 +186,7 @@ onMounted(loadStats)
       </div>
       <p v-if="lDone && !lists.length" class="c-center c-mute">{{ $t('admin.index.lists.empty') }}</p>
       <article v-for="w in lists" :key="w.id" class="c-card c-mt12">
-        <div class="c-row"><strong class="c-grow">{{ w.title }}</strong><CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" /></div>
+        <div class="c-row"><strong class="c-grow">{{ w.title }}</strong><span v-if="w.deleted_at" class="c-badge">{{ $t('admin.index.lists.deleted') }}</span><CreatorStatusBadge :v="w.moderation_status === 'hidden' ? 'hidden' : w.status" /></div>
         <div class="c-mute">{{ $t('admin.index.lists.meta', { slug: w.slug, email: maskEmail(w.owner.email || ''), count: w.report_count }) }}</div>
         <div class="c-row c-mt">
           <a :href="`/s/${w.slug}`" target="_blank" rel="noopener" class="c-btn">{{ $t('admin.index.lists.publicPage') }}</a>

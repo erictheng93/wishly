@@ -98,6 +98,7 @@
         "empty": "Không có danh sách phù hợp",
         "meta": "{slug}・{email}・bị báo cáo {count} lần",
         "publicPage": "Trang công khai",
+        "deleted": "Đã xóa",
         "loadMore": "Tải thêm danh sách"
       },
       "users": {

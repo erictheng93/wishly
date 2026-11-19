@@ -272,7 +272,7 @@ async fn create(
 macro_rules! wl_obj {
     () => {
         "CASE WHEN w.id IS NULL THEN NULL ELSE jsonb_build_object('id', w.id, 'slug', w.slug::text, 'title', w.title,
-         'moderation_status', w.moderation_status::text,
+         'moderation_status', w.moderation_status::text, 'deleted_at', w.deleted_at,
          'owner', CASE WHEN ow.id IS NULL THEN NULL ELSE jsonb_build_object('id', ow.id, 'handle', ow.handle, 'display_name', ow.display_name) END) END"
     };
 }

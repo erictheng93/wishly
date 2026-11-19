@@ -96,7 +96,10 @@ const wipe = () => {
         <form v-else class="g-inline" @submit.prevent="saveNick"><input v-model="nick" maxlength="30" required :aria-label="$t('me.claims.nick')"><button class="g-btn sm">{{ $t('me.claims.save') }}</button></form>
       </div>
       <section v-for="g in groups" :key="g.w.slug" class="cl-group">
-        <h2 class="g-h2 cl-h2"><NuxtLink :to="`/s/${g.w.slug}`">{{ g.w.title }}</NuxtLink></h2>
+        <h2 class="g-h2 cl-h2">
+          <template v-if="g.list[0].wishlist_deleted">{{ g.w.title }}<span class="g-badge" data-testid="list-deleted">{{ $t('me.claims.listDeleted') }}</span></template>
+          <NuxtLink v-else :to="`/s/${g.w.slug}`">{{ g.w.title }}</NuxtLink>
+        </h2>
         <div v-for="r in g.list" :key="r.claim.id" class="g-card g-item">
           <img v-if="r.item.image_url" class="g-thumb" :src="r.item.image_url" alt=""><div v-else class="g-thumb">{{ $t('me.claims.noImg') }}</div>
           <div class="g-body">
@@ -121,7 +124,7 @@ const wipe = () => {
         </div>
       </section>
       <details v-if="past.length"><summary class="g-mute">{{ $t('me.claims.past', { n: past.length }) }}</summary>
-        <div v-for="r in past" :key="r.claim.id" class="g-mute">{{ r.item.title }} × {{ r.claim.qty }}・{{ label(r.claim.status) }}<template v-if="r.receipt_received">・{{ $t('org.relief.receiptAcknowledged') }}</template></div>
+        <div v-for="r in past" :key="r.claim.id" class="g-mute">{{ r.item.title }} × {{ r.claim.qty }}・{{ label(r.claim.status) }}<template v-if="r.wishlist_deleted">・{{ $t('me.claims.listDeleted') }}</template><template v-if="r.receipt_received">・{{ $t('org.relief.receiptAcknowledged') }}</template></div>
       </details>
       <button v-if="cursor" class="g-btn" :disabled="more" @click="load(true)">{{ $t('me.wallet.loadMore') }}</button>
       <div v-if="!guest?.is_user" class="g-foot"><button class="g-link" @click="wipe">{{ $t('me.claims.wipe') }}</button></div>

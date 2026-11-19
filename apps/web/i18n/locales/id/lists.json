@@ -40,7 +40,14 @@
       "showArchived": "Wishlist yang diarsipkan",
       "backToLists": "Kembali ke wishlist saya",
       "archivedEmpty": "Tidak ada wishlist yang diarsipkan",
-      "unarchive": "Batalkan arsip"
+      "unarchive": "Batalkan arsip",
+      "purge": "Hapus permanen",
+      "purgeTitle": "Hapus wishlist secara permanen",
+      "purgeText": "\"{title}\" akan dihapus permanen dan tidak bisa dikembalikan: wishlist, item, info pengiriman, dan gambar akan dihapus. Pemberi hadiah tetap melihat catatannya di \"Hadiah saya\", ditandai \"Wishlist dihapus\".",
+      "purgeOk": "Hapus permanen",
+      "purgePrompt": "Ketik nama wishlist \"{title}\" untuk konfirmasi",
+      "purgeActiveClaims": "Masih ada {count} klaim yang berjalan. Selesaikan atau batalkan dulu sebelum menghapus.",
+      "purgeActiveOrders": "Masih ada {count} pembelian yang berjalan. Tunggu sampai selesai sebelum menghapus."
     },
     "edit": {
       "pageTitle": "Ubah wishlist",

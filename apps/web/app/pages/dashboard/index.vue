@@ -8,6 +8,8 @@ const list = ref<any[]>([])
 const cursor = ref<string | null>(null)
 const loading = ref(true), err = ref('')
 const del = ref<any>(null), delBusy = ref(false), delErr = ref('')
+// 永久刪除（僅已封存清單）：需輸入清單名稱才可確認；被進行中的認領 / 採購擋下時在視窗內顯示原因
+const purge = ref<any>(null), purgeWord = ref(''), purgeBusy = ref(false), purgeErr = ref('')
 const archived = ref(false) // 切到已封存列表；一般列表由後端排除已封存，分頁才不會被佔位
 async function load(more = false) {
   loading.value = true; err.value = ''
@@ -21,6 +23,11 @@ async function archive() {
   delBusy.value = true; delErr.value = ''
   try { await api(`/wishlists/${del.value.id}`, { method: 'DELETE' }); del.value = null; await load() }
   catch (e) { delErr.value = errMsg(e) } finally { delBusy.value = false }
+}
+async function purgeList() {
+  purgeBusy.value = true; purgeErr.value = ''
+  try { await api(`/wishlists/${purge.value.id}`, { method: 'DELETE', query: { permanent: true } }); purge.value = null; await load() }
+  catch (e: any) { purgeErr.value = (e.status === 409 && activeBlockMsg(e, t)) || errMsg(e) } finally { purgeBusy.value = false }
 }
 async function unarchive(w: any) {
   err.value = ''
@@ -81,7 +88,10 @@ onMounted(async () => {
       </div>
       <div class="c-row dsh-act">
         <NuxtLink :to="`/lists/${w.id}/progress`" class="c-btn c-grow">{{ $t('lists.common.progress') }}</NuxtLink>
-        <button v-if="w.status === 'archived'" class="c-btn" @click="unarchive(w)">{{ $t('lists.dashboard.unarchive') }}</button>
+        <template v-if="w.status === 'archived'">
+          <button class="c-btn" @click="unarchive(w)">{{ $t('lists.dashboard.unarchive') }}</button>
+          <button class="c-btn danger" data-testid="purge-btn" @click="purge = w; purgeWord = ''; purgeErr = ''">{{ $t('lists.dashboard.purge') }}</button>
+        </template>
         <button v-else class="c-btn danger" @click="del = w; delErr = ''">{{ $t('lists.dashboard.archive') }}</button>
       </div>
     </article>
@@ -89,6 +99,9 @@ onMounted(async () => {
     <button v-if="cursor" class="c-btn block dsh-more" :disabled="loading" @click="load(true)">{{ $t('lists.dashboard.loadMore') }}</button>
     <NuxtLink v-if="list.length && !archived" to="/lists/new" class="c-btn primary c-fab dsh-fab"><UiIcon name="plus" :size="16" />{{ $t('lists.dashboard.newFab') }}</NuxtLink>
     <CreatorConfirm :open="!!del" :title="$t('lists.dashboard.archiveTitle')" :text="$t('lists.dashboard.archiveText', { title: del?.title })" :ok="$t('lists.dashboard.archiveOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
+    <CreatorConfirm :open="!!purge" :title="$t('lists.dashboard.purgeTitle')" :text="$t('lists.dashboard.purgeText', { title: purge?.title })" :ok="$t('lists.dashboard.purgeOk')" danger :busy="purgeBusy" :disabled="purgeWord.trim() !== purge?.title?.trim()" :error="purgeErr" @close="!purgeBusy && (purge = null)" @ok="purgeList">
+      <label class="c-field"><span>{{ $t('lists.dashboard.purgePrompt', { title: purge?.title }) }}</span><input v-model="purgeWord" autocomplete="off"></label>
+    </CreatorConfirm>
   </main>
 </template>
 <style scoped>
