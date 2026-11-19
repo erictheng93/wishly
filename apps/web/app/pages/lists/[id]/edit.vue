@@ -63,7 +63,9 @@ const coverPreset = ref<string | null>(null), coverKey = ref<string | null>(null
 const snap = ref('')
 const snapNow = () => JSON.stringify(meta)
 const dirty = computed(() => !!snap.value && snapNow() !== snap.value)
-function revert() { Object.assign(meta, JSON.parse(snap.value)) }
+function revert() { Object.assign(meta, JSON.parse(snap.value)); surpriseErr.value = '' }
+// 驚喜模式開關或活動日一有變動就清掉舊的錯誤訊息
+watch(() => [meta.surprise_mode, meta.event_date], () => { surpriseErr.value = '' })
 let poll: any
 
 async function load(quiet = false) {
@@ -175,8 +177,9 @@ async function copy() {
 const canInvite = computed(() => ['friends', 'selected'].includes(w.value?.visibility) && w.value?.status !== 'draft')
 // 可見度變更 → 舊邀請作廢（後端也會依清單撤銷），重置開關與快取
 watch(() => w.value?.visibility, () => { invite.value = null; inviteOn.value = false; inviteErr.value = '' })
-// 每次打開分享面板都自動附上邀請（附清單的邀請可並存，不會讓舊連結失效）；已有快取就不重建
-watch(showShare, (open) => { if (open && canInvite.value) { inviteOn.value = true; toggleInvite(true) } })
+// 好友清單每次打開分享面板都自動附上邀請（附清單的邀請可並存，不會讓舊連結失效）；已有快取就不重建
+// 摯友清單不自動附上：接受邀請的人會被加入擁有者的摯友名單，須由使用者手動打開
+watch(showShare, (open) => { if (open && w.value?.visibility === 'friends' && canInvite.value) { inviteOn.value = true; toggleInvite(true) } })
 async function toggleInvite(auto = false) {
   inviteErr.value = ''
   if (!inviteOn.value || invite.value) return // 已有快取就不再建新權杖
@@ -184,6 +187,16 @@ async function toggleInvite(auto = false) {
   try { invite.value = await api('/friends/invites', { method: 'POST', body: { wishlist_id: id } }) }
   catch (e) { inviteOn.value = false; if (!auto) inviteErr.value = errMsg(e) } finally { inviteBusy.value = false }
 }
+// 收回邀請：撤銷這份清單所有有效邀請；面板仍開著時不會自動重建（自動附上只在打開面板時觸發）
+const revokeAsk = ref(false), revokeBusy = ref(false), revokeErr = ref(''), revokedOk = ref(false)
+async function revokeInvites() {
+  revokeBusy.value = true; revokeErr.value = ''
+  try {
+    await api(`/friends/invites?wishlist_id=${encodeURIComponent(String(id))}`, { method: 'DELETE' })
+    invite.value = null; inviteOn.value = false; inviteErr.value = ''; revokedOk.value = true; revokeAsk.value = false
+  } catch (e) { revokeErr.value = errMsg(e) } finally { revokeBusy.value = false }
+}
+watch(showShare, () => { revokedOk.value = false; revokeErr.value = '' })
 const shareText = computed(() => `${w.value?.title ?? ''} ${shareUrl.value}`)
 async function nativeShare() {
   try { await navigator.share({ title: w.value?.title ?? '', text: w.value?.title ?? '', url: shareUrl.value }) }
@@ -308,6 +321,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     </CreatorSheet>
     <CreatorConfirm :open="overAsk" :title="$t('org.relief.receiptOverTitle')" :text="$t('org.relief.receiptOverText', { n: rcpt?.qty_needed })" :ok="$t('org.relief.receiptSave')" @close="overAsk = false" @ok="saveReceipt" />
     <CreatorConfirm :open="!!del" :title="$t('lists.edit.delTitle')" :text="$t('lists.edit.delText', { title: del?.title })" :ok="del?.force ? $t('lists.edit.delForce') : $t('lists.edit.delOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="remove(!!del?.force)" />
+    <CreatorConfirm :open="revokeAsk" :title="$t('lists.edit.revokeTitle')" :text="$t('lists.edit.revokeText')" :ok="$t('lists.edit.revoke')" danger :busy="revokeBusy" :error="revokeErr" @close="revokeAsk = false" @ok="revokeInvites" />
     <CreatorSheet :open="showShare" :title="$t('lists.edit.shareTitle')" @close="showShare = false">
       <p v-if="w?.status === 'draft'" class="c-err">{{ $t('lists.edit.draftWarn') }}</p>
       <p class="c-mute">{{ visDesc(w?.visibility) }}</p>
@@ -320,6 +334,8 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         <label class="c-switch"><input v-model="inviteOn" type="checkbox" :disabled="inviteBusy" @change="toggleInvite()"><span>{{ $t('lists.edit.invite') }}</span></label>
         <p class="c-mute">{{ $t(`lists.edit.invite_${w.visibility}`) }}</p>
         <p v-if="inviteErr" class="c-err" role="alert">{{ inviteErr }}</p>
+        <button type="button" class="c-btn c-mb" :disabled="revokeBusy" @click="revokeAsk = true">{{ $t('lists.edit.revoke') }}</button>
+        <p v-if="revokedOk" class="c-mute" role="status">{{ $t('lists.edit.revokeDone') }}</p>
       </template>
       <div class="c-row wrap">
         <button v-if="canNativeShare" class="c-btn primary c-grow" @click="nativeShare">{{ $t('lists.edit.nativeShare') }}</button>

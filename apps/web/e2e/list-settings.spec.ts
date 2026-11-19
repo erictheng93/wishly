@@ -51,3 +51,17 @@ test('清單設定：有變更才出現底部儲存列、可還原；封面選�
     await expect(bar).toBeHidden()
   })
 })
+
+test('驚喜模式沒設活動日的錯誤：把開關關回去就消失', async ({ page }) => {
+  const u = await signInPage(page, { tag: 'surprise-err' })
+  const list = await createList(u)
+  await page.goto(`/lists/${list.id}/edit`)
+  await page.getByText('清單設定', { exact: true }).click()
+  const sw = page.getByLabel('驚喜模式', { exact: false }).first()
+  await sw.check()
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  const err = page.getByText('開啟驚喜模式需設定活動日')
+  await expect(err).toBeVisible()
+  await sw.uncheck()
+  await expect(err).toBeHidden()
+})

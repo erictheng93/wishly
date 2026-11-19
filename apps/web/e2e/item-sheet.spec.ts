@@ -38,6 +38,21 @@ test.describe('手機 390×659', () => {
     expect(a.y + a.height).toBeLessThanOrEqual(bar.y) // 在按鈕列上方，沒被蓋住
     await u.api.dispose()
   })
+
+  test('眾籌品項沒填截止時間：必填欄位被捲進視窗後完整可見、在黏底按鈕列上方', async ({ page }) => {
+    const u = await registerUser({ tag: 'isheet-req' })
+    const id = await draftList(u) // 沒有活動日：眾籌的截止時間必填
+    const sheet = await openNew(page, u, id)
+    await sheet.getByLabel('名稱（必填）').fill('嬰兒推車')
+    await sheet.getByRole('radio', { name: '心願眾籌' }).check()
+    await sheet.getByLabel(/目標點數/).fill('1000')
+    await sheet.getByRole('button', { name: '儲存品項' }).click()
+    const closes = sheet.getByLabel(/募集截止/)
+    await expect(closes).toBeInViewport({ ratio: 1 })
+    const c = (await closes.boundingBox())!, bar = (await sheet.getByRole('button', { name: '儲存品項' }).boundingBox())!
+    expect(c.y + c.height).toBeLessThanOrEqual(bar.y)
+    await u.api.dispose()
+  })
 })
 
 test.describe('手機 390×844 建立頁', () => {
