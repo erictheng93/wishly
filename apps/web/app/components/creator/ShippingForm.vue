@@ -40,11 +40,11 @@ async function save() {
     <button v-if="hasDefault && !cur?.has_shipping_address" type="button" class="c-btn block" :disabled="busy" @click="useDefault">{{ $t('creator.shipping.useDefault') }}</button>
     <form @submit.prevent="save">
       <label class="c-field"><span>{{ $t('creator.shipping.recipientLabel') }}</span><input v-model="f.recipient_name" maxlength="50" required autocomplete="name"></label>
-      <small v-if="errs.recipient_name" class="c-err" role="alert">{{ errs.recipient_name }}</small>
+      <small v-if="errs.recipient_name" class="c-err c-fielderr" role="alert">{{ errs.recipient_name }}</small>
       <label class="c-field"><span>{{ $t('creator.shipping.phoneLabel') }}</span><input v-model="f.phone" type="tel" maxlength="20" minlength="6" required autocomplete="tel"></label>
-      <small v-if="errs.phone" class="c-err" role="alert">{{ errs.phone }}</small>
+      <small v-if="errs.phone" class="c-err c-fielderr" role="alert">{{ errs.phone }}</small>
       <label class="c-field"><span>{{ $t('creator.shipping.addressLabel') }}</span><input v-model="f.address" maxlength="200" minlength="5" required autocomplete="street-address"></label>
-      <small v-if="errs.address" class="c-err" role="alert">{{ errs.address }}</small>
+      <small v-if="errs.address" class="c-err c-fielderr" role="alert">{{ errs.address }}</small>
       <p v-if="cur?.has_shipping_address" class="c-mute c-small">{{ $t('creator.shipping.privacy') }}</p>
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
       <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
@@ -52,3 +52,7 @@ async function save() {
     </form>
   </div>
 </template>
+<style scoped>
+/* 錯誤在 label 之外（不併入欄位名稱）：抵銷 label 的 18px 下邊距，貼近自己的輸入框，與下一欄保持原間距 */
+.c-fielderr{display:block;margin:-12px 0 18px}
+</style>

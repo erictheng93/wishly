@@ -22,6 +22,7 @@ const to = computed(() => safeRedirect(shown.value?.link, '/me/notifications'))
 .c-toast{pointer-events:auto;display:flex;align-items:flex-start;width:360px;max-width:100%;background:var(--card);position:relative;border:1px solid var(--ink-line);box-shadow:6px 6px 0 var(--bg-alt),6px 6px 0 1px var(--line);animation:rise .22s var(--ease)}
 .c-toast::before{content:"";position:absolute;left:14px;top:16px;width:7px;height:7px;background:var(--red)}
 .c-toast a{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding:10px 4px 10px 28px;color:var(--fg);font-size:14px}
+.c-toast a b{overflow-wrap:anywhere}
 .c-toast a span{color:var(--mute);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .c-toast button{flex:none;width:44px;height:44px;border:0;background:none;color:var(--mute);cursor:pointer;display:grid;place-items:center}
 </style>

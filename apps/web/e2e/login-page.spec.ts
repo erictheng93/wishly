@@ -51,7 +51,7 @@ test('驗證碼登入保留 redirect：從分享頁來的人回到原頁', async
   await user.api.dispose()
 })
 
-test('新信箱用驗證碼開戶：進導覽頁、名稱預填信箱前綴，跳過後儀表板提示改名', async ({ page }) => {
+test('新信箱用驗證碼開戶：進導覽頁、名稱預設為信箱前綴，跳過後儀表板提示改名', async ({ page }) => {
   const email = newEmail('new')
   const prefix = email.split('@')[0]!
   resetOtpLimits()
@@ -62,8 +62,11 @@ test('新信箱用驗證碼開戶：進導覽頁、名稱預填信箱前綴，�
   await page.getByRole('button', { name: '寄送驗證碼' }).click()
   await page.getByLabel('第 1 碼').fill(await waitForOtp(email, /登入/))
   await expect(page).toHaveURL(/\/welcome/)
-  await expect(page.getByLabel('顯示名稱')).toHaveValue(prefix)
-  await expect(page.getByText('這是朋友會看到的名稱。')).toBeVisible()
+  // 新導覽順序：第一步是建立清單，個人資料表單到第 4 步才展開（名稱預填由 identity-settings 測試涵蓋）
+  await expect(page.getByRole('link', { name: '建立心願清單' })).toBeVisible()
+  await expect(page.getByLabel('顯示名稱')).toHaveCount(0)
+  const me = await (await page.context().request.get(`${API}/api/v1/me`, { headers: { Origin: WEB } })).json()
+  expect(me.display_name).toBe(prefix)
 
   const r = await page.context().request.patch(`${API}/api/v1/me/onboarding`, { data: { done: true }, headers: { Origin: WEB } })
   expect(r.ok()).toBe(true)
