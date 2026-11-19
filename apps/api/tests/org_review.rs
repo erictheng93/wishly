@@ -102,7 +102,7 @@ async fn reject_sets_resubmit_after_30d(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject","note":"不符"})),
+        Some(json!({"decision":"reject","note":"申請資格不符"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
@@ -120,7 +120,7 @@ async fn reject_sets_resubmit_after_30d(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject","note":"原因"})),
+        Some(json!({"decision":"reject","note":"申請資格不符"})),
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
@@ -145,7 +145,7 @@ async fn revoke_demotes_active_sites_and_purges(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject","note":"撤銷"})),
+        Some(json!({"decision":"reject","note":"組織資格已失效"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
@@ -173,7 +173,7 @@ async fn review_notifies_owners(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject","note":"x"})),
+        Some(json!({"decision":"reject","note":"申請資料不符"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
@@ -194,7 +194,7 @@ async fn non_staff_forbidden(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o}/review"),
         &ck(&token),
-        Some(json!({"decision":"reject","note":"原因"})),
+        Some(json!({"decision":"reject","note":"申請資格不符"})),
     )
     .await;
     assert_eq!(
@@ -347,7 +347,7 @@ async fn revoke_approved_permit_pauses_sites(pool: PgPool) {
         "POST",
         &format!("/admin/permits/{p}/review"),
         &ck(&st),
-        Some(json!({"decision":"reject","note":"過期"})),
+        Some(json!({"decision":"reject","note":"許可已經過期"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
@@ -453,7 +453,7 @@ async fn list_pending_permits_filter(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
-async fn rejection_requires_nonblank_note_for_org_and_permit(pool: PgPool) {
+async fn rejection_requires_five_character_note_for_org_and_permit(pool: PgPool) {
     let owner = user(&pool, "owner").await;
     let st = staff(&pool, "staff").await;
     for status in ["pending", "verified"] {
@@ -476,6 +476,7 @@ async fn rejection_requires_nonblank_note_for_org_and_permit(pool: PgPool) {
             for body in [
                 json!({"decision":"reject"}),
                 json!({"decision":"reject","note":" \n "}),
+                json!({"decision":"reject","note":" 文件不全 "}),
             ] {
                 let (s, _, b) = call(&pool, "POST", &uri, &ck(&st.token), Some(body)).await;
                 assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{b}");
@@ -484,4 +485,63 @@ async fn rejection_requires_nonblank_note_for_org_and_permit(pool: PgPool) {
         }
         assert_eq!(org_status(&pool, o).await, status);
     }
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn stale_pending_rejection_cannot_revoke_after_approval(pool: PgPool) {
+    let owner = user(&pool, "owner").await;
+    let st = staff(&pool, "staff").await;
+    let o = common::org(&pool, owner.id, "pending").await;
+    let p = common::permit(&pool, o, "pending", 30).await;
+    for (uri, update, id) in [
+        (
+            format!("/admin/permits/{p}/review"),
+            "UPDATE org_permits SET status='approved' WHERE id=$1",
+            p,
+        ),
+        (
+            format!("/admin/orgs/{o}/review"),
+            "UPDATE organizations SET verification_status='verified', verified_at=now() WHERE id=$1",
+            o,
+        ),
+    ] {
+        let mut approval = pool.begin().await.unwrap();
+        let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+            .fetch_one(&mut *approval)
+            .await
+            .unwrap();
+        sqlx::query(update)
+            .bind(id)
+            .execute(&mut *approval)
+            .await
+            .unwrap();
+        let (db, token) = (pool.clone(), st.token.clone());
+        let rejection = tokio::spawn(async move {
+            call(
+                &db,
+                "POST",
+                &uri,
+                &ck(&token),
+                Some(json!({
+                    "decision": "reject", "expected_status": "pending", "note": "申請資格不符"
+                })),
+            )
+            .await
+        });
+        common::wait_for_blocked(&pool, blocker, 1).await;
+        approval.commit().await.unwrap();
+        let (s, _, b) = rejection.await.unwrap();
+        assert_eq!(
+            (s, b["code"].as_str()),
+            (StatusCode::CONFLICT, Some("INVALID_STATE")),
+            "{b}"
+        );
+    }
+    assert_eq!(org_status(&pool, o).await, "verified");
+    let permit: String = sqlx::query_scalar("SELECT status FROM org_permits WHERE id=$1")
+        .bind(p)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(permit, "approved");
 }

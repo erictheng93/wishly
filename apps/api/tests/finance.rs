@@ -528,7 +528,7 @@ async fn gross_agrees_across_endpoints(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn all_endpoints_require_staff(pool: PgPool) {
     let u = user(&pool, "一般").await;
-    for ep in ["overview", "payers", "channels", "risk"] {
+    for ep in ["overview", "payers", "channels", "risk", "operations"] {
         let path = format!("/admin/finance/{ep}?days=7");
         let (st, ..) = call(&pool, "GET", &path, &ck(&u.token), None).await;
         assert_eq!(st, StatusCode::FORBIDDEN, "{ep}");
@@ -567,4 +567,77 @@ async fn dispute_win_counts_once_and_not_as_chargeback(pool: PgPool) {
         ),
         (Some(1), Some(100))
     );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn operations_uses_event_dates_and_excludes_reversals(pool: PgPool) {
+    let support = staff(&pool, "客服").await;
+    sqlx::query("UPDATE users SET staff_roles = '{support}' WHERE id = $1")
+        .bind(support.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (status, ..) = call(
+        &pool,
+        "GET",
+        "/admin/finance/operations",
+        &ck(&support.token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let u = user(&pool, "甲").await;
+    grant(&pool, u.id, 500).await;
+    let topup = topup_credit(&pool, u.id, 100).await;
+    set_status(&pool, topup, "charged_back").await;
+    let w = wallet_of(&pool, u.id).await;
+    sqlx::query(
+        "INSERT INTO point_ledger(wallet_id, delta, balance_after, entry_type, created_at)
+                 VALUES ($1, -30, 570, 'pledge', now()), ($1, 30, 600, 'release', now()),
+                        ($1, 200, 800, 'grant', now() - interval '12 days')",
+    )
+    .bind(w)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO cash_refund_requests(wallet_id, amount, status, completed_at)
+                 VALUES ($1, 10, 'completed', now()), ($1, 20, 'requested', NULL)",
+    )
+    .bind(w)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let wl = common::wishlist(&pool, u.id, common::ListOpts::default()).await;
+    let i = common::crowdfund_item(&pool, wl.id, 100).await;
+    sqlx::query("INSERT INTO purchase_orders(item_id, fulfillment_type, amount, shipping_address_snapshot,
+                   status, merchant_order_id, placed_at, delivered_at)
+                 VALUES ($1, 'concierge', 100, '', 'delivered', 'PO-1', now() - interval '10 days', now() - interval '8 days')")
+        .bind(i).execute(&pool).await.unwrap();
+    let o = common::org(&pool, u.id, "verified").await;
+    sqlx::query(r#"INSERT INTO audit_logs(actor_type, action, entity, entity_id, created_at, diff)
+                 VALUES ('user', 'org.submit', 'organizations', $1, now() - interval '15 days', NULL),
+                        ('staff', 'org.review', 'organizations', $1, now() - interval '13 days', '{"from":"pending"}'),
+                        ('user', 'org.submit', 'organizations', $1, now() - interval '1 day', NULL),
+                        ('staff', 'org.review', 'organizations', $1, now(), '{"from":"pending"}')"#)
+        .bind(o).execute(&pool).await.unwrap();
+
+    let b = get(&pool, "operations", 7).await;
+    assert_eq!(b["range"]["days"], 7);
+    assert_eq!(b["gross"], 100);
+    assert_eq!(b["refunds"], serde_json::json!({"count": 1, "amount": 10}));
+    assert_eq!(
+        b["chargebacks"],
+        serde_json::json!({"count": 1, "amount": 100})
+    );
+    assert_eq!(b["points_issued"], 600);
+    assert_eq!(b["points_spent"], 30);
+    assert_eq!(b["avg_delivery_hours"], Value::Null);
+    assert_eq!(b["avg_org_review_hours"].as_f64(), Some(24.0));
+
+    let b = get(&pool, "operations", 30).await;
+    assert_eq!(b["points_issued"], 800);
+    assert_eq!(b["avg_delivery_hours"].as_f64(), Some(48.0));
+    assert_eq!(b["avg_org_review_hours"].as_f64(), Some(36.0));
 }

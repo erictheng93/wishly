@@ -332,6 +332,14 @@
       "hideAddress": "Sembunyikan informasi penerima"
     },
     "analytics": {
+      "ops": {
+        "activity": "Aktivitas pengguna",
+        "title": "Operasional dan keuangan",
+        "issued": "Poin yang diterbitkan (hibah dan isi ulang)",
+        "spent": "Poin untuk kontribusi (sebelum pengembalian dana)",
+        "avg_delivery_hours": "Rata-rata waktu pemesanan hingga pengantaran (jam)",
+        "avg_org_review_hours": "Rata-rata waktu pengajuan hingga keputusan organisasi (jam)"
+      },
       "title": "Analitik data",
       "rangeLabel": "Rentang statistik",
       "days": "{n} hari",
@@ -632,7 +640,7 @@
         "permits": "Izin penggalangan dana"
       },
       "flagRequired": "Pilih minimal satu bagian",
-      "noteRequired": "Alasan penolakan / pencabutan (wajib)",
+      "noteRequired": "Alasan penolakan / pencabutan (minimal 5 karakter)",
       "restore": {
         "notice": "Dicabut. Verifikasi dapat dipulihkan hingga {date}",
         "button": "Pulihkan verifikasi",

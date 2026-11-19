@@ -332,6 +332,14 @@
       "hideAddress": "隱藏收件資訊"
     },
     "analytics": {
+      "ops": {
+        "activity": "使用者活動",
+        "title": "營運／金流",
+        "issued": "發放點數（贈點與儲值）",
+        "spent": "認捐消耗點數（退款前）",
+        "avg_delivery_hours": "下單至送達平均時數",
+        "avg_org_review_hours": "組織送審至審結平均時數"
+      },
       "title": "數據分析",
       "rangeLabel": "統計區間",
       "days": "{n} 天",
@@ -632,7 +640,7 @@
         "permits": "勸募許可"
       },
       "flagRequired": "請至少勾選一個欄位",
-      "noteRequired": "退件／撤銷原因（必填）",
+      "noteRequired": "退件／撤銷原因（至少 5 字）",
       "restore": {
         "notice": "已撤銷・可於 {date} 前恢復認證",
         "button": "恢復認證",

@@ -332,6 +332,14 @@
       "hideAddress": "Hide shipping details"
     },
     "analytics": {
+      "ops": {
+        "activity": "User activity",
+        "title": "Operations & finance",
+        "issued": "Points issued (grants and top-ups)",
+        "spent": "Points spent on pledges (before refunds)",
+        "avg_delivery_hours": "Average order-to-delivery time (hours)",
+        "avg_org_review_hours": "Average submission-to-review time (hours)"
+      },
       "title": "Analytics",
       "rangeLabel": "Range",
       "days": "{n} d",
@@ -632,7 +640,7 @@
         "permits": "Fundraising permits"
       },
       "flagRequired": "Select at least one field",
-      "noteRequired": "Rejection / revocation reason (required)",
+      "noteRequired": "Rejection / revocation reason (at least 5 characters)",
       "restore": {
         "notice": "Revoked. Verification can be restored until {date}",
         "button": "Restore verification",

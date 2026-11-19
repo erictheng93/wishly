@@ -332,6 +332,14 @@
       "hideAddress": "Ẩn thông tin nhận hàng"
     },
     "analytics": {
+      "ops": {
+        "activity": "Hoạt động người dùng",
+        "title": "Vận hành và tài chính",
+        "issued": "Điểm đã phát hành (tặng và nạp)",
+        "spent": "Điểm đã cam kết (trước hoàn tiền)",
+        "avg_delivery_hours": "Thời gian trung bình từ đặt đến giao hàng (giờ)",
+        "avg_org_review_hours": "Thời gian trung bình từ nộp hồ sơ tổ chức đến xét duyệt (giờ)"
+      },
       "title": "Phân tích dữ liệu",
       "rangeLabel": "Khoảng thống kê",
       "days": "{n} ngày",
@@ -632,7 +640,7 @@
         "permits": "Giấy phép gây quỹ"
       },
       "flagRequired": "Hãy chọn ít nhất một mục",
-      "noteRequired": "Lý do từ chối / thu hồi (bắt buộc)",
+      "noteRequired": "Lý do từ chối / thu hồi (ít nhất 5 ký tự)",
       "restore": {
         "notice": "Đã thu hồi. Có thể khôi phục xác minh đến {date}",
         "button": "Khôi phục xác minh",

@@ -20,6 +20,7 @@ type R<T> = Result<T, AppError>;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/finance/overview", get(overview))
+        .route("/admin/finance/operations", get(operations))
         .route("/admin/finance/payers", get(payers))
         .route("/admin/finance/channels", get(channels))
         .route("/admin/finance/risk", get(risk))
@@ -116,6 +117,47 @@ async fn overview(
     respond(&st.pool, "overview", days, sql).await
 }
 
+/// 實收按入帳日，現金退款按完成日，拒付按最終狀態更新日。
+const SETTLEMENT_CTES: &str = "gross AS (SELECT COALESCE(sum(t.amount), 0)::bigint AS g FROM topups t, rg WHERE t.paid_at >= rg.cur_start),
+         rf AS (SELECT count(*) AS c, COALESCE(sum(c.amount), 0)::bigint AS a
+                FROM cash_refund_requests c, rg WHERE c.status = 'completed' AND c.completed_at >= rg.cur_start),
+         cb AS (SELECT count(*) AS c, COALESCE(sum(t.amount), 0)::bigint AS a
+                FROM topups t, rg WHERE t.status = 'charged_back' AND t.updated_at >= rg.cur_start)";
+
+async fn operations(
+    State(st): State<AppState>,
+    _s: Staff<FINANCE>,
+    Query(q): Query<DaysQ>,
+) -> R<Response> {
+    let days = parse_days(&q)?;
+    let sql = format!(
+        "WITH {RANGE_CTE}, {SETTLEMENT_CTES},
+         points AS (
+           SELECT COALESCE(sum(delta) FILTER (WHERE entry_type IN ('grant', 'topup') AND delta > 0), 0) issued,
+                  COALESCE(-sum(delta) FILTER (WHERE entry_type = 'pledge' AND delta < 0), 0) spent
+           FROM point_ledger, rg WHERE created_at BETWEEN rg.cur_start AND now()),
+         -- 每次審核配對該次送審；退補後重送另計，撤銷／恢復不算審核。
+         reviews AS (
+           SELECT rv.created_at - (
+             SELECT max(sub.created_at) FROM audit_logs sub
+             WHERE sub.entity = 'organizations' AND sub.entity_id = rv.entity_id
+               AND sub.action = 'org.submit' AND sub.created_at <= rv.created_at) AS elapsed
+           FROM audit_logs rv, rg WHERE rv.entity = 'organizations' AND rv.action = 'org.review'
+             AND rv.diff->>'from' = 'pending' AND rv.created_at BETWEEN rg.cur_start AND now())
+         SELECT jsonb_build_object(
+           'range', jsonb_build_object('from', rg.d0, 'to', rg.today, 'days', $1),
+           'gross', gross.g, 'refunds', jsonb_build_object('count', rf.c, 'amount', rf.a),
+           'chargebacks', jsonb_build_object('count', cb.c, 'amount', cb.a),
+           'points_issued', points.issued, 'points_spent', points.spent,
+           'avg_delivery_hours', (SELECT extract(epoch FROM avg(delivered_at - placed_at)) / 3600
+                                  FROM purchase_orders WHERE status = 'delivered' AND placed_at <= delivered_at
+                                    AND delivered_at BETWEEN rg.cur_start AND now()),
+           'avg_org_review_hours', (SELECT extract(epoch FROM avg(elapsed)) / 3600 FROM reviews))
+         FROM rg, gross, rf, cb, points"
+    );
+    respond(&st.pool, "operations", days, sql).await
+}
+
 /// 付費用戶：以錢包為單位，金額與筆數只算區間內。
 async fn payers(
     State(st): State<AppState>,
@@ -194,11 +236,7 @@ async fn risk(
     let days = parse_days(&q)?;
     let sql = format!(
         "WITH {RANGE_CTE},
-         gross AS (SELECT COALESCE(sum(t.amount), 0)::bigint AS g FROM topups t, rg WHERE t.paid_at >= rg.cur_start),
-         rf AS (SELECT count(*) AS c, COALESCE(sum(c.amount), 0)::bigint AS a
-                FROM cash_refund_requests c, rg WHERE c.status = 'completed' AND c.completed_at >= rg.cur_start),
-         cb AS (SELECT count(*) AS c, COALESCE(sum(t.amount), 0)::bigint AS a
-                FROM topups t, rg WHERE t.status = 'charged_back' AND t.updated_at >= rg.cur_start),
+         {SETTLEMENT_CTES},
          lot AS (SELECT COALESCE(sum(remaining_points) FILTER (WHERE cash_refundable), 0)::bigint AS r,
                         COALESCE(sum(remaining_points) FILTER (WHERE NOT cash_refundable), 0)::bigint AS n FROM point_lots),
          pl AS (SELECT COALESCE(sum(points - refunded_points), 0)::bigint AS p FROM contributions WHERE status = 'pledged')

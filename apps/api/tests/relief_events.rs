@@ -440,7 +440,7 @@ async fn unhide_restores_only_sites_paused_by_takedown(pool: PgPool) {
         "POST",
         &format!("/admin/orgs/{o2}/review"),
         &ck(&st.token),
-        Some(json!({"decision":"reject","note":"撤銷"})),
+        Some(json!({"decision":"reject","note":"組織資格已失效"})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");

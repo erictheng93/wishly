@@ -232,7 +232,7 @@ if (want('B')) {
     note(`待審 ${ids.length} 筆；A 排在 B 前面（submitted_at 升冪）`)
     const opts = await lp.getByLabel('狀態').locator('option').allInnerTexts(); note(`狀態篩選：${opts.join('／')}`)
     await cardA.getByRole('button', { name: '檢視' }).click()
-    for (const s of ['組織全名', '統一編號', '主管機關', '立案文件', '勸募許可', S.orgA.permits[0].no, S.orgA.permits[1].no, '成員', 'owner', '0223456789']) await expect(cardA).toContainText(s)
+    for (const s of ['組織全名', '統一編號', '主管機關', '立案文件', '勸募許可', S.orgA.permits[0].no, S.orgA.permits[1].no, '成員', '擁有者', '0223456789']) await expect(cardA).toContainText(s)
     note('詳情顯示：全部申請欄位（含解密後的聯絡電話）、立案文件、2 張許可、成員（owner）。')
   }, { page: lp })
 
@@ -289,10 +289,10 @@ if (want('B')) {
     await expect(card.locator(`[data-permit="${S.orgA.permits[0].id}"]`)).toHaveAttribute('data-status', 'approved')
     S.t15 = nowMs()
     await p2.getByRole('button', { name: '退件', exact: true }).click()
-    await dlg(lp).getByLabel(/審核備註/).fill('許可文件模糊無法辨識，請重新上傳')
+    await dlg(lp).getByRole('textbox').fill('許可文件模糊無法辨識，請重新上傳')
     await dlg(lp).getByRole('button', { name: '退件', exact: true }).click()
     await expect(card.locator(`[data-permit="${S.orgA.permits[1].id}"]`)).toHaveAttribute('data-status', 'rejected')
-    await expect(card.locator(`[data-permit="${S.orgA.permits[1].id}"]`).getByRole('button')).toHaveCount(0)
+    await expect(card.locator(`[data-permit="${S.orgA.permits[1].id}"]`).locator('button.danger, button.primary')).toHaveCount(0) // 只剩下載
     ok(sql(`SELECT review_note FROM org_permits WHERE id='${S.orgA.permits[1].id}'`).includes('模糊'), '退件備註未存')
     note('許可 1 → 已核准；許可 2 → 已退件且不再有動作按鈕；退件備註已存入 DB。')
   }, { page: lp })
@@ -329,7 +329,7 @@ if (want('B')) {
     if (await cardB.getByRole('button', { name: '檢視' }).count()) await cardB.getByRole('button', { name: '檢視' }).click()
     await expect(cardB).toContainText('勸募許可')
     await cardB.getByRole('button', { name: '退件', exact: true }).last().click()
-    await dlg(lp).getByLabel(/審核備註/).fill('立案資料與主管機關登記不符')
+    await dlg(lp).getByRole('textbox').fill('立案資料與主管機關登記不符')
     await dlg(lp).getByRole('button', { name: '退件', exact: true }).click()
     await expect(lp.getByRole('status').filter({ hasText: '已處理' })).toBeVisible()
     const m = await waitForMail(S.orgB.owner.email, { subject: /未通過審核/, after: S.t18 })
@@ -464,7 +464,7 @@ if (want('D')) {
     const p1 = card.locator(`[data-permit="${S.orgA.permits[0].id}"]`)
     await p1.getByRole('button', { name: '撤銷許可' }).click()
     await expect(dlg(lp)).toContainText('使用此許可的上線據點會被暫停')
-    await dlg(lp).getByLabel(/審核備註/).fill('許可已被主管機關廢止')
+    await dlg(lp).getByRole('textbox').fill('許可已被主管機關廢止')
     await dlg(lp).getByRole('button', { name: '撤銷許可' }).click()
     await expect(card.locator(`[data-permit="${S.orgA.permits[0].id}"]`)).toHaveAttribute('data-status', 'rejected')
     const s2 = sql(`SELECT site_status FROM wishlists WHERE id='${S.s2.id}'`)
@@ -480,27 +480,35 @@ if (want('D')) {
     S.t31 = nowMs()
     const card = lp.locator(`article[data-org="${S.orgA.id}"]`)
     await card.getByRole('button', { name: '撤銷組織' }).click()
-    await dlg(lp).getByRole('button', { name: '撤銷組織', exact: true }).click()
+    const reason = '主管機關要求重新核對立案資料'
+    const confirm = dlg(lp).getByRole('button', { name: '撤銷組織', exact: true })
+    await expect(confirm).toBeDisabled()
+    await dlg(lp).getByRole('textbox').fill(reason)
+    await confirm.click()
     await expect(dlg(lp)).toContainText('再次確認')
-    note('第一段確認後出現「再次確認：撤銷後所有公開據點都會立即下架」。')
-    await dlg(lp).getByLabel(/審核備註/).count().then(n => note(`第二段是否仍有備註欄：${n ? '有' : '沒有'}（第一段才填備註，理由在第二段不可補）`))
+    await expect(dlg(lp)).toContainText(reason)
     await dlg(lp).getByRole('button', { name: '撤銷組織', exact: true }).click()
     await expect(lp.getByRole('status').filter({ hasText: '已處理' })).toBeVisible()
     const st = sql(`SELECT string_agg(status::text, ',') FROM wishlists WHERE org_id='${S.orgA.id}' AND type='relief'`)
     const pages = [await webStatus(`/s/${S.s1.slug}`), await webStatus(`/s/${S.s2.slug}`), await webStatus(`/o/${S.orgA.slug}`)]
     const m = await waitForMail(S.orgA.owner.email, { subject: /驗證已撤銷/, after: S.t31 })
+    ok(m.text.includes(reason), '撤銷通知信缺少確認時的原因')
     note(`據點狀態 ${st}；公開頁（據點1、據點2、組織）→ ${pages.join(',')}；信：「${m.subject}」`)
     ok(pages.every(s => s === 404 || s === 410), '撤銷後公開頁仍可見')
   }, { page: lp })
 
-  await run.step('P-32', '誤撤銷的復原路徑：已退件的組織在後台沒有任何「恢復」動作', async ({ note }) => {
+  await run.step('P-32', '誤撤銷後填寫原因並恢復組織認證', async ({ note }) => {
     await sel(lp, '狀態', '已退件')
     const card = await findCard(lp, () => lp.locator(`article[data-org="${S.orgA.id}"]`))
     await card.getByRole('button', { name: '檢視' }).click()
-    const btns = await card.getByRole('button').allInnerTexts()
-    const days = sql(`SELECT round(extract(epoch FROM (resubmit_after - now()))/86400) FROM organizations WHERE id='${S.orgA.id}'`)
-    note(`已退件組織卡片可用按鈕：${btns.join('、')}；resubmit_after ≈ +${days} 天`)
-    throw new Gap('撤銷組織 = status 轉 rejected 並鎖 30 天，後台沒有「撤銷撤銷 / 重新核准」；org_admin.rs review 的 reject 只允許 pending|verified，也無 verified 回復路徑。誤撤銷只能用 SQL 補救，且據點已被降為 draft。')
+    await card.getByRole('button', { name: '恢復認證' }).click()
+    const confirm = dlg(lp).getByRole('button', { name: '恢復認證' })
+    await expect(confirm).toBeDisabled()
+    await dlg(lp).getByLabel(/恢復原因/).fill('主管機關已確認立案資料正確')
+    await confirm.click()
+    await expect(lp.getByRole('status').filter({ hasText: '已恢復認證' })).toBeVisible()
+    ok(sql(`SELECT verification_status = 'verified' AND resubmit_after IS NULL FROM organizations WHERE id='${S.orgA.id}'`) === 't', '認證或重送期限未恢復')
+    note('恢復後組織通過驗證，30 天重送限制已解除。')
   }, { page: lp })
 }
 
@@ -1091,21 +1099,23 @@ if (want('I')) {
     note(`UI ${JSON.stringify(a)}；DB ${JSON.stringify(db)}（頁面載入至此之間可能有其他 agent 寫入，容許 ≤3 差）`)
     for (const k of Object.keys(db)) ok(Math.abs(a[k] - db[k]) <= 3, `${k} UI ${a[k]} 與 DB ${db[k]} 差太多`)
     const nu = await registerApi({ name: `KPI新人${T}`, tag: 'kpi' }); await makeList(nu, `KPI清單${T}`)
+    await sleep(61000) // 統計有 60 秒伺服器快取（staff_db::cached）
     await lp.getByRole('button', { name: '更新統計' }).click(); await lp.waitForTimeout(1000)
     const b = await read()
     note(`新增 1 位用戶與 1 份清單後更新統計：users ${a.users} → ${b.users}、wishlists ${a.wishlists} → ${b.wishlists}`)
     ok(b.users >= a.users + 1 && b.wishlists >= a.wishlists + 1, '更新統計沒有反映新資料')
     await lp.locator('details summary').click()
     note(`展開明細：${(await lp.locator('details').innerText()).replace(/\s+/g, ' ').slice(0, 160)}…`)
-    const missing = []; const txt = await bodyText(lp)
-    for (const w of ['待審組織', '待處理採購', '待審退款', '爭議中', '營收', '儲值']) if (!txt.includes(w)) missing.push(w)
-    note(`首頁 KPI 沒有出現的營運待辦指標：${missing.join('、')}`)
-    S.kpiMissing = missing
   }, { page: lp })
 
-  await run.step('P-81', '待辦總覽缺口：首頁不顯示待審組織／待處理採購單／待審退款／爭議儲值的數量', async () => {
-    if ((S.kpiMissing ?? []).length) throw new Gap(`首頁 KPI 只有 使用者／清單／使用中／已下架／待處理檢舉 五項（admin.rs stats_json）。待審組織、待處理採購單、待審現金退款、爭議中儲值、未結欠款都要點進各頁才知道有沒有事，沒有紅點或計數。目前 DB：待審組織 ${sql(`SELECT count(*) FROM organizations WHERE verification_status='pending'`)}、待下單 ${sql(`SELECT count(*) FROM purchase_orders WHERE status='pending'`)}、待審退款 ${sql(`SELECT count(*) FROM cash_refund_requests WHERE status='requested'`)}、爭議中 ${sql(`SELECT count(*) FROM topups WHERE status='disputed'`)}。`)
-  })
+  await run.step('P-81', '待辦導覽磚顯示六項佇列筆數', async () => {
+    const stats = await must(await lp.request.get(`${API}/api/v1/admin/stats`), '讀取後台待辦')
+    for (const key of ['pending_orgs', 'pending_permits', 'pending_orders', 'requested_refunds', 'disputed_topups', 'open_debts']) {
+      const badge = lp.getByTestId(`todo-${key}`)
+      await expect(badge).toBeVisible()
+      ok(Number((await badge.innerText()).match(/\d+/)?.[0]) === stats[key], `${key} 筆數與統計 API 不符`)
+    }
+  }, { page: lp })
 
   await run.step('P-82', '數據分析 /admin/analytics：各區間可切換；總覽數字與資料庫（排除 staff／已刪除）一致；小樣本以 <5 隱藏', async ({ note }) => {
     await lp.goto('/admin/analytics'); await lp.waitForLoadState('networkidle')
@@ -1115,14 +1125,19 @@ if (want('I')) {
     for (const n of [7, 90, 365, 30]) { await lp.getByRole('button', { name: `${n} 天` }).click(); await lp.waitForTimeout(700); await expect(lp.getByText(new RegExp(`（${n} 天）`))).toBeVisible() }
     note(`DB 一般用戶數 ${db}；UI 總覽使用者「${tiles[0].replace(/\s+/g, ' ')}」；區間 7／90／365／30 天皆可切換。`)
     const body = await bodyText(lp)
-    note(`頁面含「<5」遮罩：${body.includes('<5')}；含金流／訂單／組織相關指標：${/儲值|營收|採購|組織|退款/.test(body)}`)
-    S.analyticsHasFinance = /儲值|營收|採購單|組織|退款/.test(body)
+    note(`頁面含「<5」遮罩：${body.includes('<5')}`)
     const claimsToday = await lp.getByRole('heading').allInnerTexts(); note(`頁面區塊：${claimsToday.join('、')}`)
   }, { page: lp })
 
-  await run.step('P-83', '數據缺口：分析頁沒有金流（儲值／退款／拒付）、採購履約、組織審核、客服處理時效等營運指標', async () => {
-    if (!S.analyticsHasFinance) throw new Gap('admin.rs analytics 只含使用者成長、清單、送禮（claims）、信任（檢舉／登入失敗）與分布；沒有儲值金額、點數發放／消耗、退款與拒付、採購單週期（下單→送達天數）、組織審核等待時間等金流／營運指標，金流對帳要靠 SQL。')
-  })
+  await run.step('P-83', '營運／金流分頁顯示所選區間的統計', async ({ note }) => {
+    const response = lp.waitForResponse(r => r.url().includes('/admin/finance/operations?days=30'))
+    await lp.getByRole('button', { name: '營運／金流' }).click()
+    const metrics = await must(await response, '讀取營運／金流分析')
+    const panel = lp.getByRole('region', { name: '營運／金流' })
+    await expect(panel).toBeVisible()
+    note(await panel.innerText())
+    ok(metrics.range.days === 30, '營運分析時間區間不符')
+  }, { page: lp })
 
   await run.step('P-84', '稽核紀錄：以自己的 UUID 過濾看到剛才的操作；動作／對象／日期過濾；展開操作內容', async ({ note }) => {
     await lp.goto('/admin/audit'); await lp.waitForLoadState('networkidle')

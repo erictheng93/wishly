@@ -4,18 +4,49 @@ definePageMeta({ middleware: 'staff' })
 const { t } = useI18n()
 useHead({ title: () => t('admin.analytics.title') })
 const { api } = useApi()
+const route = useRoute(), router = useRouter()
+const { user } = useAuth()
+const canFinance = computed(() => hasStaffRole(user.value, 'finance'))
+const operations = computed(() => canFinance.value && route.query.tab === 'operations')
+function selectOperations(show: boolean) {
+  router.replace({ query: { ...route.query, tab: show ? 'operations' : undefined } })
+}
 const RANGES = [7, 30, 90, 365]
 const days = ref(30)
 const data = ref<any>(null), busy = ref(false), err = ref('')
-async function load() {
-  if (busy.value) return
-  busy.value = true; err.value = ''
-  try { data.value = await api('/admin/analytics', { query: { days: days.value } }) }
-  catch (e) { err.value = errMsg(e) } finally { busy.value = false }
+type Operations = {
+  range: { from: string; to: string; days: number }
+  gross: number
+  refunds: { count: number; amount: number }
+  chargebacks: { count: number; amount: number }
+  points_issued: number
+  points_spent: number
+  avg_delivery_hours: number | null
+  avg_org_review_hours: number | null
 }
-watch(days, load)
+const ops = ref<Operations | null>(null)
+let sequence = 0
+async function load() {
+  const request = ++sequence
+  busy.value = true; err.value = ''
+  const query = { days: days.value }
+  try {
+    if (operations.value) {
+      const result = await api('/admin/finance/operations', { query })
+      if (request === sequence) ops.value = result
+    } else {
+      const result = await api('/admin/analytics', { query })
+      if (request === sequence) data.value = result
+    }
+  } catch (e) { if (request === sequence) err.value = errMsg(e) }
+  finally { if (request === sequence) busy.value = false }
+}
+watch([days, operations], load)
 onMounted(load)
 
+const money = (n: number) => t('admin.finance.money', { n: fmtCount(n) })
+const durations = ['avg_delivery_hours', 'avg_org_review_hours'] as const
+const losses = ['refunds', 'chargebacks'] as const
 const TILES = computed(() => {
   const d = data.value
   return d ? [
@@ -62,17 +93,38 @@ const profile = computed(() => {
 <template>
   <main class="c-page c-admin">
     <CreatorHeader :title="$t('admin.analytics.title')" back="/admin" />
+    <nav v-if="canFinance" class="c-tabs" :aria-label="$t('admin.analytics.title')">
+      <button class="c-btn" :class="{ on: !operations }" :aria-pressed="!operations" @click="selectOperations(false)">{{ $t('admin.analytics.ops.activity') }}</button>
+      <button class="c-btn" :class="{ on: operations }" :aria-pressed="operations" @click="selectOperations(true)">{{ $t('admin.analytics.ops.title') }}</button>
+    </nav>
     <div class="an-range">
       <div class="k-seg" role="group" :aria-label="$t('admin.analytics.rangeLabel')">
         <button v-for="n in RANGES" :key="n" class="c-btn" :class="{ on: days === n }" :aria-pressed="days === n" :disabled="busy" @click="days = n">{{ $t('admin.analytics.days', { n }) }}</button>
       </div>
       <button class="c-btn" :disabled="busy" @click="load">{{ busy ? $t('admin.analytics.refreshing') : $t('admin.analytics.refresh') }}</button>
     </div>
-    <p class="c-mute">{{ $t('admin.analytics.privacy') }}</p>
+    <p v-if="!operations" class="c-mute">{{ $t('admin.analytics.privacy') }}</p>
     <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-    <p v-if="!data && busy" class="c-mute">{{ $t('admin.analytics.loading') }}</p>
+    <p v-if="busy && !(operations ? ops : data)" class="c-mute">{{ $t('admin.analytics.loading') }}</p>
 
-    <template v-if="data">
+    <section v-if="operations && ops" class="c-card" :aria-label="$t('admin.analytics.ops.title')">
+      <h2 class="c-h2">{{ $t('admin.analytics.ops.title') }}</h2>
+      <p class="c-mute">{{ $t('admin.analytics.range', ops.range, ops.range.days) }}</p>
+      <dl class="an-tiles k-kpis">
+        <div><dt>{{ $t('admin.finance.kpi.gross') }}</dt><dd>{{ money(ops.gross) }}</dd></div>
+        <div><dt>{{ $t('admin.analytics.ops.issued') }}</dt><dd>{{ fmtCount(ops.points_issued) }}</dd></div>
+        <div><dt>{{ $t('admin.analytics.ops.spent') }}</dt><dd>{{ fmtCount(ops.points_spent) }}</dd></div>
+        <div v-for="key in losses" :key="key">
+          <dt>{{ $t(`admin.finance.risk.${key}`) }}</dt><dd>{{ money(ops[key].amount) }}</dd>
+          <small class="c-mute">{{ $t('admin.finance.risk.cnt', { n: fmtCount(ops[key].count) }) }}</small>
+        </div>
+        <div v-for="key in durations" :key="key">
+          <dt>{{ $t(`admin.analytics.ops.${key}`) }}</dt>
+          <dd>{{ ops[key] == null ? '—' : fmtCount(Math.round(ops[key]! * 10) / 10) }}</dd>
+        </div>
+      </dl>
+    </section>
+    <template v-if="!operations && data">
       <p class="c-mute">{{ $t('admin.analytics.range', { from: data.range.from, to: data.range.to, days: data.range.days }, data.range.days) }}</p>
       <section class="c-card an-kpi-card" :aria-label="$t('admin.analytics.overview')">
         <dl class="an-tiles k-kpis">
