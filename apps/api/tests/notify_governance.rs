@@ -96,7 +96,7 @@ async fn site_pause_paths_notify_donors_and_owners(pool: PgPool) {
                 "POST",
                 &format!("/admin/permits/{p}/review"),
                 &ck(&tk),
-                Some(json!({"decision": d, "note": "n"})),
+                Some(json!({"decision": d, "note": "審核測試原因"})),
             )
             .await
         }
