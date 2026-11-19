@@ -176,13 +176,13 @@ const canInvite = computed(() => ['friends', 'selected'].includes(w.value?.visib
 // 可見度變更 → 舊邀請作廢（後端也會依清單撤銷），重置開關與快取
 watch(() => w.value?.visibility, () => { invite.value = null; inviteOn.value = false; inviteErr.value = '' })
 // 每次打開分享面板都自動附上邀請（附清單的邀請可並存，不會讓舊連結失效）；已有快取就不重建
-watch(showShare, (open) => { if (open && canInvite.value) { inviteOn.value = true; toggleInvite() } })
-async function toggleInvite() {
+watch(showShare, (open) => { if (open && canInvite.value) { inviteOn.value = true; toggleInvite(true) } })
+async function toggleInvite(auto = false) {
   inviteErr.value = ''
   if (!inviteOn.value || invite.value) return // 已有快取就不再建新權杖
   inviteBusy.value = true
   try { invite.value = await api('/friends/invites', { method: 'POST', body: { wishlist_id: id } }) }
-  catch (e) { inviteOn.value = false; inviteErr.value = errMsg(e) } finally { inviteBusy.value = false }
+  catch (e) { inviteOn.value = false; if (!auto) inviteErr.value = errMsg(e) } finally { inviteBusy.value = false }
 }
 const shareText = computed(() => `${w.value?.title ?? ''} ${shareUrl.value}`)
 async function nativeShare() {
@@ -317,7 +317,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       <input id="c-share-input" class="c-input c-mb" :value="shareUrl" readonly :aria-label="$t('lists.edit.shareLink')" @focus="($event.target as HTMLInputElement).select()">
       <label class="c-switch"><input v-model="external" type="checkbox"><span>{{ $t('lists.edit.external') }}</span></label>
       <template v-if="canInvite">
-        <label class="c-switch"><input v-model="inviteOn" type="checkbox" :disabled="inviteBusy" @change="toggleInvite"><span>{{ $t('lists.edit.invite') }}</span></label>
+        <label class="c-switch"><input v-model="inviteOn" type="checkbox" :disabled="inviteBusy" @change="toggleInvite()"><span>{{ $t('lists.edit.invite') }}</span></label>
         <p class="c-mute">{{ $t(`lists.edit.invite_${w.visibility}`) }}</p>
         <p v-if="inviteErr" class="c-err" role="alert">{{ inviteErr }}</p>
       </template>
