@@ -1,4 +1,4 @@
-//! 新手導覽（D66）：個人資料 → 建立清單 → 加品項 → 發佈（受捐人）→ 捐助（捐助人）。
+//! 新手導覽（D66）：建立清單 → 加品項 → 發佈（受捐人）→ 個人資料 → 捐助（捐助人）。
 //! 步驟完成與否一律由既有資料推導，換裝置也一致；只存「完成 / 跳過」的時間（users.onboarding_done_at）。
 use crate::{error::AppError, session::CurrentUser, AppState};
 use axum::{extract::State, routing::get, Json, Router};
@@ -11,7 +11,7 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// 步驟順序即導覽順序；前端以第一個未完成的步驟為「目前步驟」
-const STEPS: [&str; 5] = ["profile", "wishlist", "item", "publish", "give"];
+const STEPS: [&str; 5] = ["wishlist", "item", "publish", "profile", "give"];
 
 async fn status(u: CurrentUser, State(st): State<AppState>) -> Result<Json<Value>, AppError> {
     Ok(Json(load(&st.pool, u.id).await?))
@@ -39,7 +39,7 @@ async fn load(pool: &sqlx::PgPool, uid: Uuid) -> Result<Value, AppError> {
     .fetch_optional(pool)
     .await?
     .ok_or(AppError::Unauthorized)?;
-    let flags = [profile, wishlist, item, publish, give];
+    let flags = [wishlist, item, publish, profile, give];
     Ok(json!({
         "done": done,
         "steps": STEPS.iter().zip(flags).map(|(k, v)| json!({ "key": k, "done": v })).collect::<Vec<_>>(),

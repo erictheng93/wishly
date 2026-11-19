@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '~/assets/creator-pages.css'
-// 新手導覽總覽（D66）：第 1 步個人資料就地填寫，之後的步驟帶到各自的頁面，頁面上方由 OnboardingGuide 接手說明
+// 新手導覽總覽（D66）：個人資料（第 4 步）輪到時就地填寫，其他步驟帶到各自的頁面，頁面上方由 OnboardingGuide 接手說明
 definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('onboarding.welcome.pageTitle') })
@@ -12,7 +12,7 @@ const cur = computed(() => state.value?.current ?? null)
 const stepDone = (k: TourStep) => !!state.value?.steps.find(s => s.key === k)?.done
 const pad = (n: number) => String(n).padStart(2, '0')
 
-// 第 1 步：個人資料（欄位與設定頁相同，至少填一項才算完成）
+// 個人資料步驟（欄位與設定頁相同，至少填一項才算完成）
 const name = ref(''), handle = ref(''), bio = ref(''), bMonth = ref(''), bDay = ref('')
 const bDays = computed(() => daysInMonth(bMonth.value))
 const hBad = computed(() => !!handle.value && !isValidHandle(handle.value))
@@ -26,8 +26,6 @@ async function saveProfile() {
   try {
     user.value = await api('/me', { method: 'PATCH', body: { display_name: name.value.trim() || undefined, handle: handle.value || null, bio: bio.value.trim() || null, birthday } })
     await refresh()
-    // 填完個人資料直接帶到建立清單（使用者要求的「一步一步」）
-    if (cur.value === 'wishlist') await navigateTo(tourTarget('wishlist'))
   } catch (e: any) { err.value = apiErrMsg(e) } finally { busy.value = false }
 }
 

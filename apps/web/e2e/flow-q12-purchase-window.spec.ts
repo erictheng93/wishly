@@ -8,16 +8,20 @@ test('擁有者設定購買期限 14 天並保存', async ({ page }) => {
   await loginBrowser(page.context(), owner)
   await page.goto('/lists/new'); await hydrated(page)
   await page.getByLabel(/清單名稱/).fill('Q12 期限清單')
+  await page.getByRole('button', { name: '建立並新增品項' }).click()
+  await page.waitForURL(/\/lists\/[^/]+\/edit/); await hydrated(page)
+  const id = page.url().match(/\/lists\/([^/]+)\/edit/)![1]
+  // 建立頁不再有購買期限，後端預設 7 天；在清單設定改
+  await page.getByText('清單設定').click()
   const ttl = page.getByLabel('購買期限')
   await expect(ttl.locator('option:checked')).toHaveText('7 天（預設）')
   await ttl.selectOption({ label: '14 天' })
-  await page.getByRole('button', { name: '建立並新增品項' }).click()
-  await page.waitForURL(/\/lists\/[^/]+\/edit/)
-  const id = page.url().match(/\/lists\/([^/]+)\/edit/)![1]
+  await Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), page.getByRole('button', { name: '儲存設定' }).click()])
   const w = await (await owner.api.get(`wishlists/${id}`)).json()
   expect(w.wishlist.claim_ttl_hours).toBe(336)
 
-  // 清單設定表單讀回同一個值
+  // 重新整理後清單設定表單讀回同一個值
+  await page.reload(); await hydrated(page)
   await page.getByText('清單設定').click()
   await expect(page.getByRole('combobox', { name: '購買期限' }).locator('option:checked')).toHaveText('14 天')
   await owner.api.dispose()

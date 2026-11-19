@@ -75,7 +75,11 @@
       "supportBad": "Tempel tautan daftar yang valid",
       "supportTarget": "Mendukung: {name}",
       "supportEnded": "Daftar mereka telah berakhir",
-      "supportNote": "Serahkan harapan ini ke daftar mereka; hadiah teman dihitung untuk mereka."
+      "supportNote": "Serahkan harapan ini ke daftar mereka; hadiah teman dihitung untuk mereka.",
+      "more": "Opsi lainnya",
+      "again": "Tambah barang lain setelah menyimpan",
+      "deadlineRequired": "Batas penggalangan (waktu Taipei, wajib)",
+      "deadlineHintNoEvent": "Wishlist ini tidak punya hari acara, jadi batas wajib diisi; kamu juga bisa menambahkan hari acara di pengaturan daftar."
     },
     "otp": {
       "group": "Kode verifikasi 6 digit",

@@ -31,31 +31,19 @@ async fn steps_follow_the_users_own_data(pool: PgPool) {
     let me = user(&pool, "新手").await;
     let b = current(&pool, &me.token).await;
     assert_eq!(b["done"], false);
-    assert_eq!(b["current"], "profile");
+    assert_eq!(b["current"], "wishlist");
     assert_eq!(
         steps(&b)
             .iter()
             .map(|(k, _)| k.as_str())
             .collect::<Vec<_>>(),
-        ["profile", "wishlist", "item", "publish", "give"]
+        ["wishlist", "item", "publish", "profile", "give"]
     );
     assert!(b["wishlist_id"].is_null());
     let (_, _, m) = call(&pool, "GET", "/me", &ck(&me.token), None).await;
     assert_eq!(m["onboarding_done"], false);
 
-    // 1. 個人資料：填任一欄（代號 / 自介 / 生日）即算完成
-    let (s, _, _) = call(
-        &pool,
-        "PATCH",
-        "/me",
-        &ck(&me.token),
-        Some(json!({ "bio": "喜歡咖啡" })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(current(&pool, &me.token).await["current"], "wishlist");
-
-    // 2. 建立清單（草稿）→ 帶出清單 id 給「加品項」用
+    // 1. 建立清單（草稿）→ 帶出清單 id 給「加品項」用
     let wl = wishlist(
         &pool,
         me.id,
@@ -69,7 +57,7 @@ async fn steps_follow_the_users_own_data(pool: PgPool) {
     assert_eq!(b["current"], "item");
     assert_eq!(b["wishlist_id"], wl.id.to_string());
 
-    // 3. 品項：已刪除的不算
+    // 2. 品項：已刪除的不算
     let it = item(&pool, wl.id, "咖啡豆", 1).await;
     sqlx::query("UPDATE wishlist_items SET deleted_at = now() WHERE id = $1")
         .bind(it)
@@ -80,12 +68,24 @@ async fn steps_follow_the_users_own_data(pool: PgPool) {
     item(&pool, wl.id, "手沖壺", 1).await;
     assert_eq!(current(&pool, &me.token).await["current"], "publish");
 
-    // 4. 發佈（成為受捐人）
+    // 3. 發佈（成為受捐人）
     sqlx::query("UPDATE wishlists SET status = 'active' WHERE id = $1")
         .bind(wl.id)
         .execute(&pool)
         .await
         .unwrap();
+    assert_eq!(current(&pool, &me.token).await["current"], "profile");
+
+    // 4. 個人資料：填任一欄（代號 / 自介 / 生日）即算完成
+    let (s, _, _) = call(
+        &pool,
+        "PATCH",
+        "/me",
+        &ck(&me.token),
+        Some(json!({ "bio": "喜歡咖啡" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
     assert_eq!(current(&pool, &me.token).await["current"], "give");
 
     // 5. 捐助別人的品項（成為捐助人）
@@ -120,7 +120,7 @@ async fn skip_and_restart(pool: PgPool) {
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["done"], true);
-    assert_eq!(b["current"], "profile", "跳過不會把步驟標成完成");
+    assert_eq!(b["current"], "wishlist", "跳過不會把步驟標成完成");
     let first: Option<chrono::DateTime<chrono::Utc>> =
         sqlx::query_scalar("SELECT onboarding_done_at FROM users WHERE id = $1")
             .bind(me.id)
@@ -177,7 +177,7 @@ async fn org_sites_do_not_count_and_login_required(pool: PgPool) {
     let other = user(&pool, "乙").await;
     wishlist(&pool, other.id, ListOpts::default()).await;
     let b = current(&pool, &me.token).await;
-    assert_eq!(steps(&b)[1], ("wishlist".to_string(), false));
+    assert_eq!(steps(&b)[0], ("wishlist".to_string(), false));
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

@@ -15,8 +15,17 @@ const pubBusy = ref(false), pubErrs = ref<string[]>([])
 const canNativeShare = ref(false), invite = ref<any>(null), inviteOn = ref(false), inviteBusy = ref(false), inviteErr = ref('')
 const external = ref(false), copied = ref(false), showShare = ref(false)
 const addrOpen = ref(false), addrEl = ref<HTMLElement>()
-function openAddress() { sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
-const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168, birthday_notify: false })
+// fromItem：從品項表單過來填收件資訊，存好後自動回到品項表單（草稿由 ItemSheet 保留）
+let fromItem = false
+function openAddress(item = false) { fromItem = item; sheet.value = false; addrOpen.value = true; nextTick(() => addrEl.value?.scrollIntoView({ block: 'center' })) }
+// ShippingForm 掛載時也會 emit 一次目前狀態，所以只認「沒有 → 有」的轉變
+function shippingSaved(r: any) {
+  const had = w.value.has_shipping_address
+  w.value.has_shipping_address = !!r.has_shipping_address
+  if (!had && r.has_shipping_address && fromItem) { fromItem = false; sheet.value = true }
+}
+const meta = reactive<any>({ title: '', description: '', event_date: '', closes_at: '', show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168, birthday_notify: false, surprise_mode: false })
+const surpriseErr = ref('')
 const rcptKey = ref('')
 const relief = computed(() => w.value?.type === 'relief')
 // 實收登記：每筆品項一張 sheet；明細來自 GET /orgs/{org}/sites/{id}/receipts
@@ -63,7 +72,7 @@ async function load(quiet = false) {
     const r = await api(`/wishlists/${id}`)
     w.value = r.wishlist; items.value = r.items
     if (!quiet || !dirty.value) { // 背景重載（圖片輪詢、品項儲存後）不蓋掉還沒存的設定
-      Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours, birthday_notify: !!r.wishlist.birthday_notify })
+      Object.assign(meta, { title: r.wishlist.title, description: r.wishlist.description ?? '', event_date: r.wishlist.event_date ?? '', closes_at: toLocalInput(r.wishlist.closes_at), show_claimer_names: r.wishlist.show_claimer_names, visibility: r.wishlist.visibility, claim_ttl_hours: r.wishlist.claim_ttl_hours, birthday_notify: !!r.wishlist.birthday_notify, surprise_mode: !!r.wishlist.surprise_mode })
       coverPreset.value = r.wishlist.cover_preset ?? null; coverKey.value = null
       snap.value = snapNow()
     }
@@ -91,7 +100,7 @@ const shareUrl = computed(() => {
 })
 function openItem(i: any = null, p: ItemPrefill = {}) { editing.value = i; prefill.value = p; sheet.value = true }
 const tour = useOnboarding()
-async function saved() { sheet.value = false; await load(true); tour.refresh() }
+async function saved(keepOpen = false) { if (!keepOpen) sheet.value = false; await load(true); tour.refresh() }
 async function patchList(body: any, ok = t('lists.edit.saved')) {
   msg.value = ''; err.value = ''; stale.value = false
   try { w.value = await api(`/wishlists/${id}`, { method: 'PATCH', body: { ...body, expected_updated_at: w.value?.updated_at } }); msg.value = ok; return true }
@@ -106,10 +115,17 @@ async function patchList(body: any, ok = t('lists.edit.saved')) {
   }
 }
 async function saveMeta() {
+  surpriseErr.value = ''
+  const surprise = !relief.value && meta.surprise_mode !== !!w.value?.surprise_mode // 只有變更才送
+  if (surprise && meta.surprise_mode) {
+    if (!meta.event_date) { surpriseErr.value = t('lists.edit.errSurprise'); return }
+    if (meta.event_date <= taipeiToday()) { surpriseErr.value = t('lists.edit.errEventDate'); return }
+  }
   const body: any = { title: meta.title.trim(), description: meta.description || null, event_date: meta.event_date || null, closes_at: closesAtChange(meta.closes_at, w.value?.closes_at), claim_ttl_hours: meta.claim_ttl_hours }
   if (!relief.value) body.show_claimer_names = meta.show_claimer_names
   if (!relief.value && !w.value?.org_id && meta.birthday_notify !== !!w.value?.birthday_notify) body.birthday_notify = meta.birthday_notify
   if (!relief.value) body.visibility = meta.visibility // 救災據點的可見性由後端固定
+  if (surprise) body.surprise_mode = meta.surprise_mode
   // 封面互斥；沒動就不送
   if (coverKey.value) Object.assign(body, { cover_image_key: coverKey.value, cover_preset: null })
   else if (coverPreset.value !== (w.value?.cover_preset ?? null)) Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
@@ -126,7 +142,11 @@ watch([coverPreset, coverKey], async () => {
 })
 async function publish() {
   pubBusy.value = true; pubErrs.value = []
-  if (await patchList({ status: 'active' }, t('lists.edit.published'))) { showShare.value = true; tour.refresh() }
+  if (await patchList({ status: 'active' }, t('lists.edit.published'))) {
+    showShare.value = true; tour.refresh()
+    // 只在剛發佈這一次自動附上邀請：每建一張新邀請都會撤銷這份清單先前已分享出去的邀請連結，所以之後手動打開分享不自動重建
+    if (canInvite.value) { inviteOn.value = true; toggleInvite() }
+  }
   pubBusy.value = false
 }
 async function remove(force = false) {
@@ -187,13 +207,12 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     <template v-if="w">
       <div v-if="hidden" class="c-card bad c-err" role="alert">{{ $t('lists.edit.hidden', { reason: w.moderation_reason ? $t('lists.common.reasonSuffix', { reason: w.moderation_reason }) : '' }) }} <SupportLink :topic="w.title" /></div>
       <p v-if="closed" class="c-mute">{{ $t('lists.edit.closedMsg', { state: w.status === 'closed' ? $t('lists.edit.stateClosed') : $t('lists.edit.stateArchived') }) }} <button v-if="w.status === 'archived'" class="c-btn" @click="patchList({ status: 'closed' })">{{ $t('lists.edit.unarchive') }}</button></p>
-      <ul v-if="pubErrs.length" class="c-err"><li v-for="x in pubErrs" :key="x">{{ x }}</li></ul>
+      <ul v-if="pubErrs.length" class="c-err" role="alert"><li v-for="x in pubErrs" :key="x">{{ x }}</li></ul>
 
       <div class="c-split"><div>
       <p v-if="!items.length && !loading" class="x-empty">{{ $t('lists.edit.noItems') }}</p>
       <div class="c-grid">
       <article v-for="(i, k) in items" :key="i.id" class="c-card ed-item">
-        <span class="ed-n" aria-hidden="true">{{ String(k + 1).padStart(2, '0') }}</span>
         <div class="c-row">
           <img v-if="i.image_url" class="c-thumb" :src="i.image_url" alt="">
           <div v-else-if="i.image_status === 'pending'" class="c-thumb">{{ $t('lists.edit.processing') }}</div>
@@ -234,7 +253,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       </section>
       <details v-if="!relief" ref="addrEl" class="c-card ed-side" :open="addrOpen" @toggle="addrOpen = ($event.target as HTMLDetailsElement).open">
         <summary>{{ $t('lists.edit.shipSummary') }}<span v-if="w.has_shipping_address" class="c-badge active">{{ $t('lists.edit.filled') }}</span><UiIcon class="ed-plus" name="plus" :size="18" /></summary>
-        <CreatorShippingForm :wishlist-id="id" @saved="w.has_shipping_address = !!$event.has_shipping_address" />
+        <CreatorShippingForm :wishlist-id="id" @saved="shippingSaved" />
       </details>
 
       <!-- 封存後只能取消封存（後端拒絕其他修改），不顯示設定與分享 -->
@@ -250,7 +269,10 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
           <label v-if="!relief" class="c-switch"><input v-model="meta.show_claimer_names" type="checkbox"><span>{{ $t('lists.edit.showNames') }}<br><small class="c-mute">{{ $t('lists.edit.showNamesHint') }}</small></span></label>
           <CreatorVisibilityPicker v-if="!relief" v-model:visibility="meta.visibility" />
           <CreatorBirthdayNotify v-if="!relief && !w.org_id" v-model="meta.birthday_notify" :visibility="meta.visibility" />
-          <p class="c-mute">{{ $t('lists.edit.surprise', { state: w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseOff') }) }}</p>
+          <template v-if="!relief">
+            <label class="c-switch"><input v-model="meta.surprise_mode" type="checkbox" :disabled="w.surprise_locked"><span>{{ $t('lists.edit.surpriseSwitch') }}<br><small class="c-mute">{{ w.surprise_mode ? (w.surprise_locked ? $t('lists.edit.surpriseLocked') : $t('lists.edit.surpriseUnlocked')) : $t('lists.edit.surpriseHint') }}</small></span></label>
+            <p v-if="surpriseErr" class="c-err" role="alert">{{ surpriseErr }}</p>
+          </template>
           <p v-if="msg" class="c-ok" role="status">{{ msg }}</p>
           <button class="c-btn block" :disabled="coverBusy">{{ $t('lists.edit.saveSettings') }}</button>
         </form>
@@ -261,17 +283,18 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
       </details>
       </aside></div>
 
-      <div class="c-bottom"><div v-if="dirty" class="ed-dirty">
+      <div v-if="dirty || w.status !== 'archived'" class="c-bottom"><div v-if="dirty" class="ed-dirty">
         <span class="c-grow" role="status">{{ $t('lists.edit.unsaved') }}</span>
         <button type="button" class="c-btn" @click="revert">{{ $t('lists.edit.revert') }}</button>
         <button form="ed-settings" class="c-btn primary" :disabled="coverBusy">{{ $t('lists.edit.saveShort') }}</button>
       </div><div v-else>
+        <span v-if="w.status === 'draft' && !items.length" class="c-mute c-small ed-why">{{ $t('lists.edit.needItem') }}</span>
         <button v-if="w.status === 'draft'" class="c-btn primary c-grow" :disabled="pubBusy || !items.length" @click="publish">{{ pubBusy ? $t('lists.edit.publishing') : $t('lists.edit.publish') }}</button>
         <button v-else-if="w.status !== 'archived'" class="c-btn primary c-grow" :disabled="hidden" @click="showShare = true">{{ $t('lists.edit.share') }}</button>
       </div></div>
     </template>
 
-    <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" :relief="relief" @close="sheet = false" @saved="saved" @reload="saved" @address="openAddress" />
+    <CreatorItemSheet :open="sheet" :wishlist-id="id" :item="editing" :prefill="prefill" :relief="relief" :event-date="w?.event_date" :has-address="!!w?.has_shipping_address" @close="sheet = false" @saved="saved" @reload="saved()" @address="openAddress(true)" />
     <CreatorSheet :open="!!rcpt" :title="$t('org.relief.receiptTitle')" @close="rcpt = null">
       <form v-if="rcpt" @submit.prevent="submitReceipt">
         <p class="rc-head"><strong>{{ rcpt.title }}</strong><span class="c-mute">　{{ $t('org.relief.receiptTotal', { n: receipts[rcpt.id]?.total ?? 0 }) }}</span></p>
@@ -288,7 +311,10 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
     <CreatorSheet :open="showShare" :title="$t('lists.edit.shareTitle')" @close="showShare = false">
       <p v-if="w?.status === 'draft'" class="c-err">{{ $t('lists.edit.draftWarn') }}</p>
       <p class="c-mute">{{ visDesc(w?.visibility) }}</p>
-      <input id="c-share-input" class="c-input c-mb" :value="shareUrl" readonly @focus="($event.target as HTMLInputElement).select()">
+      <!-- 私人清單只有自己看得到，不給連結、QR 與分享按鈕 -->
+      <p v-if="w?.visibility === 'private'">{{ $t('lists.edit.privateShare') }}</p>
+      <template v-else>
+      <input id="c-share-input" class="c-input c-mb" :value="shareUrl" readonly :aria-label="$t('lists.edit.shareLink')" @focus="($event.target as HTMLInputElement).select()">
       <label class="c-switch"><input v-model="external" type="checkbox"><span>{{ $t('lists.edit.external') }}</span></label>
       <template v-if="canInvite">
         <label class="c-switch"><input v-model="inviteOn" type="checkbox" :disabled="inviteBusy" @change="toggleInvite"><span>{{ $t('lists.edit.invite') }}</span></label>
@@ -306,15 +332,15 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
         <a class="c-btn c-grow" :href="`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`" target="_blank" rel="noopener">Facebook</a>
       </div>
       <CreatorQr :text="shareUrl" :size="180" />
+      </template>
       <button class="c-btn block c-mt" @click="showShare = false">{{ $t('lists.common.close') }}</button>
     </CreatorSheet>
   </main>
 </template>
 <style scoped>
 .ed-item{padding:16px 16px 14px 16px}
-.ed-n{position:absolute;top:14px;right:16px;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--mute)}
 .ed-item .c-thumb{width:72px;height:72px}
-.ed-item .c-grow strong{font-size:17px;line-height:1.3;display:block;padding-right:36px}
+.ed-item .c-grow strong{font-size:17px;line-height:1.3;display:block}
 .ed-act{flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px dashed var(--line);margin-top:14px}
 /* ↑ ↓ 併成一組方塊靠左；編輯／刪除靠右、不撐滿；刪除無框紅字 */
 .ed-act>.c-btn:nth-child(-n+2){flex:none;width:44px;padding:0}
@@ -333,6 +359,7 @@ const closed = computed(() => w.value && ['closed', 'archived'].includes(w.value
 .ed-dirty{align-items:center}
 .ed-dirty>span{font:600 12px/1.3 var(--mono);letter-spacing:.06em;color:var(--red-text)}
 .ed-dirty>.c-btn{flex:none}
+.ed-why{flex:none;align-self:center;max-width:45%}
 .rc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--ink-line)}
 .rc-hist{list-style:none;padding:0;margin:0 0 18px;font:500 12px/1.5 var(--mono)}
 .rc-hist li{padding:8px 0;border-bottom:1px dotted var(--line);overflow-wrap:anywhere}

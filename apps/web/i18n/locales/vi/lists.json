@@ -19,28 +19,11 @@
     },
     "new": {
       "pageTitle": "Tạo danh sách",
-      "errSurprise": "Bật chế độ bất ngờ cần đặt ngày sự kiện",
-      "errEventDate": "Ngày sự kiện phải sau hôm nay",
-      "errClose": "Thời gian kết thúc phải sau thời điểm hiện tại",
-      "type": "Loại danh sách",
       "title": "Tên danh sách ({n} / 100)",
       "titlePh": "VD: Danh sách đồ sơ sinh của Mai",
-      "desc": "Mô tả (tùy chọn)",
-      "event": "Ngày sự kiện (tùy chọn)",
-      "closes": "Thời gian tự động kết thúc (tùy chọn, để trống nếu không giới hạn)",
-      "surprise": "Chế độ bất ngờ",
-      "surpriseHint": "Trước ngày sự kiện, bạn chỉ thấy tiến độ, không thấy ai tặng gì. Cần đặt ngày sự kiện.",
-      "showNames": "Hiện biệt danh người tặng cho khách khác",
-      "showNamesHint": "Người tặng tự quyết định: mặc định chỉ bạn bè của họ thấy tên, người khác thấy \"Ẩn danh\"; họ cũng có thể chọn công khai hoặc ẩn danh.",
       "creating": "Đang tạo…",
       "submit": "Tạo và thêm món quà",
-      "sec": {
-        "basics": "Thông tin cơ bản",
-        "cover": "Ảnh bìa",
-        "dates": "Ngày",
-        "rules": "Quy tắc",
-        "access": "Ai có thể xem"
-      }
+      "note": "Chế độ hiển thị, ngày, chế độ bất ngờ… có thể chỉnh trong phần cài đặt danh sách ở bước tiếp theo."
     },
     "dashboard": {
       "title": "Danh sách của tôi",
@@ -90,10 +73,8 @@
       "closes": "Thời gian tự động kết thúc (tùy chọn, để trống nếu không giới hạn)",
       "showNames": "Hiện biệt danh người tặng cho khách khác",
       "showNamesHint": "Người tặng tự quyết định: mặc định chỉ bạn bè của họ thấy tên, người khác thấy \"Ẩn danh\"; họ cũng có thể chọn công khai hoặc ẩn danh.",
-      "surprise": "Chế độ bất ngờ: {state}",
       "surpriseLocked": "Đang bật (khóa đến ngày sự kiện, không thể tắt)",
       "surpriseUnlocked": "Đang bật (đã mở khóa)",
-      "surpriseOff": "Chưa bật",
       "saveSettings": "Lưu cài đặt",
       "unsaved": "Có thay đổi chưa lưu",
       "revert": "Hoàn tác",
@@ -117,7 +98,7 @@
       "delForce": "Xóa cùng các lượt nhận tặng",
       "shareTitle": "Chia sẻ danh sách của bạn",
       "draftWarn": "Chưa đăng. Bạn bè mở ra sẽ thấy danh sách không tồn tại.",
-      "external": "Thêm openExternalBrowser=1 vào liên kết (mở bằng trình duyệt mặc định khi ở trong LINE)",
+      "external": "Mở bằng trình duyệt điện thoại thay vì trong LINE",
       "copied": "Đã sao chép ✓",
       "copy": "Sao chép liên kết",
       "line": "Gửi qua LINE",
@@ -128,7 +109,14 @@
       "invite_selected": "Khi họ chấp nhận, họ sẽ thành bạn của bạn và được tự động thêm vào danh sách bạn thân của danh sách này. Có hiệu lực 7 ngày, nhiều người dùng được, chỉ gửi cho người bạn muốn chia sẻ.",
       "sms": "Tin nhắn SMS",
       "supportLine": "Ủng hộ {name} · {points} điểm · {qty} món",
-      "supportEnded": "Đã kết thúc"
+      "supportEnded": "Đã kết thúc",
+      "surpriseSwitch": "Chế độ bất ngờ",
+      "surpriseHint": "Trước ngày sự kiện, bạn chỉ thấy tiến độ, không thấy ai tặng gì. Cần đặt ngày sự kiện.",
+      "errSurprise": "Bật chế độ bất ngờ cần đặt ngày sự kiện",
+      "errEventDate": "Ngày sự kiện phải sau hôm nay",
+      "needItem": "Thêm ít nhất 1 món để đăng",
+      "privateShare": "Đây là danh sách riêng tư. Đổi sang công khai hoặc bạn bè để chia sẻ.",
+      "shareLink": "Liên kết chia sẻ"
     },
     "progress": {
       "pageTitle": "Tiến độ hoàn thành",

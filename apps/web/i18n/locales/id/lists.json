@@ -19,28 +19,11 @@
     },
     "new": {
       "pageTitle": "Buat wishlist",
-      "errSurprise": "Mode kejutan memerlukan tanggal acara",
-      "errEventDate": "Tanggal acara harus setelah hari ini",
-      "errClose": "Waktu penutupan harus setelah sekarang",
-      "type": "Jenis wishlist",
       "title": "Nama wishlist ({n} / 100)",
       "titlePh": "Contoh: Wishlist persiapan lahiran Ai",
-      "desc": "Deskripsi (opsional)",
-      "event": "Tanggal acara (opsional)",
-      "closes": "Waktu penutupan otomatis (opsional, kosongkan = tanpa batas)",
-      "surprise": "Mode kejutan",
-      "surpriseHint": "Sebelum tanggal acara, kamu hanya melihat progres, tidak melihat siapa memberi apa. Perlu mengatur tanggal acara.",
-      "showNames": "Tampilkan nama panggilan pemberi hadiah ke pengunjung lain",
-      "showNamesHint": "Pemberi memilih sendiri: secara default hanya teman pemberi yang melihat nama, yang lain melihat \"Anonim\"; pemberi juga bisa memilih publik atau anonim.",
       "creating": "Membuat…",
       "submit": "Buat dan tambah barang",
-      "sec": {
-        "basics": "Info dasar",
-        "cover": "Sampul",
-        "dates": "Tanggal",
-        "rules": "Aturan",
-        "access": "Siapa yang bisa melihat"
-      }
+      "note": "Visibilitas, tanggal, mode kejutan, dan lainnya bisa diatur di pengaturan daftar pada langkah berikutnya."
     },
     "dashboard": {
       "title": "Wishlist saya",
@@ -90,10 +73,8 @@
       "closes": "Waktu penutupan otomatis (opsional, kosongkan = tanpa batas)",
       "showNames": "Tampilkan nama panggilan pemberi hadiah ke pengunjung lain",
       "showNamesHint": "Pemberi memilih sendiri: secara default hanya teman pemberi yang melihat nama, yang lain melihat \"Anonim\"; pemberi juga bisa memilih publik atau anonim.",
-      "surprise": "Mode kejutan: {state}",
       "surpriseLocked": "Aktif (terkunci sampai tanggal acara, tidak bisa dimatikan)",
       "surpriseUnlocked": "Aktif (sudah terbuka)",
-      "surpriseOff": "Tidak aktif",
       "saveSettings": "Simpan pengaturan",
       "unsaved": "Ada perubahan belum disimpan",
       "revert": "Batalkan",
@@ -117,7 +98,7 @@
       "delForce": "Hapus beserta klaimnya",
       "shareTitle": "Bagikan wishlist-mu",
       "draftWarn": "Belum dipublikasikan, teman yang membukanya akan melihat halaman tidak ditemukan.",
-      "external": "Tambahkan openExternalBrowser=1 ke tautan (di LINE akan dibuka di browser default)",
+      "external": "Buka di browser ponsel, bukan di dalam LINE",
       "copied": "Tersalin ✓",
       "copy": "Salin tautan",
       "line": "Kirim lewat LINE",
@@ -128,7 +109,14 @@
       "invite_selected": "Setelah menerima, mereka menjadi temanmu dan otomatis masuk ke daftar teman dekat untuk daftar ini. Berlaku 7 hari dan bisa dipakai banyak orang, jadi kirim hanya ke orang yang kamu mau.",
       "sms": "SMS",
       "supportLine": "Mendukung {name} · {points} poin · {qty} barang",
-      "supportEnded": "Berakhir"
+      "supportEnded": "Berakhir",
+      "surpriseSwitch": "Mode kejutan",
+      "surpriseHint": "Sebelum tanggal acara, kamu hanya melihat progres, tidak melihat siapa memberi apa. Perlu mengatur tanggal acara.",
+      "errSurprise": "Mode kejutan memerlukan tanggal acara",
+      "errEventDate": "Tanggal acara harus setelah hari ini",
+      "needItem": "Tambahkan minimal 1 barang untuk menerbitkan",
+      "privateShare": "Wishlist ini privat. Ubah ke publik atau teman agar bisa dibagikan.",
+      "shareLink": "Tautan berbagi"
     },
     "progress": {
       "pageTitle": "Progres",

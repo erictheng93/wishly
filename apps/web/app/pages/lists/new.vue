@@ -4,25 +4,22 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('lists.new.pageTitle') })
 const { api } = useApi()
-const f = reactive({ type: 'personal', title: '', description: '', event_date: '', closes_at: '', surprise_mode: false, show_claimer_names: false, visibility: 'friends', claim_ttl_hours: 168 as number | null, birthday_notify: false })
+const route = useRoute()
+// 建立只要名稱與封面；可見性（預設 friends）、日期、驚喜模式等由後端給預設值，下一步在清單設定調整
+const title = ref('')
 const cover = ref<string | null>(null), coverPreset = ref<string | null>(DEFAULT_COVER)
-const upBusy = ref(false), busy = ref(false), err = ref(''), dateErr = ref('')
-const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)
-const nowLocal = toLocalInput(new Date().toISOString())
+const upBusy = ref(false), busy = ref(false), err = ref('')
 async function submit() {
-  err.value = dateErr.value = ''
-  if (f.surprise_mode && !f.event_date) { dateErr.value = t('lists.new.errSurprise'); return }
-  if (f.surprise_mode && f.event_date <= today) { dateErr.value = t('lists.new.errEventDate'); return }
-  if (f.closes_at && f.closes_at <= toLocalInput(new Date().toISOString())) { dateErr.value = t('lists.new.errClose'); return }
+  err.value = ''
   busy.value = true
   try {
-    const body: any = { type: f.type, title: f.title.trim(), description: f.description || null, event_date: f.event_date || null, closes_at: fromLocalInput(f.closes_at), visibility: f.visibility, surprise_mode: f.surprise_mode, show_claimer_names: f.show_claimer_names, claim_ttl_hours: f.claim_ttl_hours, birthday_notify: f.birthday_notify }
+    const body: any = { type: 'personal', title: title.value.trim() }
     // 封面互斥：上傳照片就清 preset，選預設圖就清 key
     if (cover.value) Object.assign(body, { cover_image_key: cover.value, cover_preset: null })
     else Object.assign(body, { cover_preset: coverPreset.value, cover_image_key: null })
     const w = await api('/wishlists', { method: 'POST', body })
     useOnboarding().refresh() // 新手導覽：建立清單完成
-    await navigateTo(`/lists/${w.id}/edit`)
+    await navigateTo({ path: `/lists/${w.id}/edit`, query: route.query }) // 保留靈感頁帶來的 ?add=1 預填
   } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
 }
 </script>
@@ -30,51 +27,14 @@ async function submit() {
   <main class="c-page">
     <CreatorHeader :title="$t('lists.new.pageTitle')" back="/dashboard" />
     <form class="ln" @submit.prevent="submit">
-      <section class="ln-sec"><h2 class="ln-h">1　{{ $t('lists.new.sec.basics') }}</h2><div class="ln-body">
-      <div class="c-field"><span>{{ $t('lists.new.type') }}</span>
-        <!-- 類型決定行為（relief 需據點、組織），目前只開放 personal；開放新類型時在此加選項 -->
-        <div class="c-seg">
-          <label><input v-model="f.type" type="radio" value="personal"><span>{{ $t('lists.common.personal') }}</span></label>
-        </div>
-      </div>
-      <label class="c-field"><span>{{ $t('lists.new.title', { n: f.title.length }) }}</span><input v-model="f.title" maxlength="100" required :placeholder="$t('lists.new.titlePh')"></label>
-      <label class="c-field"><span>{{ $t('lists.new.desc') }}</span><textarea v-model="f.description" rows="2" maxlength="300" /></label>
-      </div></section>
-      <section class="ln-sec"><h2 class="ln-h">2　{{ $t('lists.new.sec.cover') }}</h2><div class="ln-body">
+      <label class="c-field"><span>{{ $t('lists.new.title', { n: title.length }) }}</span><input v-model="title" maxlength="100" required :placeholder="$t('lists.new.titlePh')"></label>
       <CreatorCoverPicker v-model:preset="coverPreset" v-model:image-key="cover" @busy="upBusy = $event" />
-      </div></section>
-      <section class="ln-sec"><h2 class="ln-h">3　{{ $t('lists.new.sec.dates') }}</h2><div class="ln-body">
-      <label class="c-field"><span>{{ $t('lists.new.event') }}</span><input v-model="f.event_date" type="date" :min="today"></label>
-      <label class="c-field"><span>{{ $t('lists.new.closes') }}</span><input v-model="f.closes_at" type="datetime-local" :min="nowLocal"></label>
-      <p v-if="dateErr" class="c-err" role="alert">{{ dateErr }}</p>
-      <CreatorTtlPicker v-model="f.claim_ttl_hours" />
-      </div></section>
-      <section class="ln-sec"><h2 class="ln-h">4　{{ $t('lists.new.sec.rules') }}</h2><div class="ln-body">
-      <label class="c-switch"><input v-model="f.surprise_mode" type="checkbox"><span>{{ $t('lists.new.surprise') }}<br><small class="c-mute">{{ $t('lists.new.surpriseHint') }}</small></span></label>
-      <label class="c-switch"><input v-model="f.show_claimer_names" type="checkbox"><span>{{ $t('lists.new.showNames') }}<br><small class="c-mute">{{ $t('lists.new.showNamesHint') }}</small></span></label>
-      </div></section>
-      <section class="ln-sec"><h2 class="ln-h">5　{{ $t('lists.new.sec.access') }}</h2><div class="ln-body">
-      <CreatorVisibilityPicker v-model:visibility="f.visibility" />
-      <CreatorBirthdayNotify v-model="f.birthday_notify" :visibility="f.visibility" />
-      </div></section>
-      <div class="ln-go">
+      <p class="c-mute c-small">{{ $t('lists.new.note') }}</p>
       <p v-if="err" class="c-err" role="alert">{{ err }}</p>
-      <button class="c-btn primary block" :disabled="busy || upBusy || !f.title.trim()">{{ busy ? $t('lists.new.creating') : $t('lists.new.submit') }}</button>
-      </div>
+      <button class="c-btn primary block" :disabled="busy || upBusy || !title.trim()">{{ busy ? $t('lists.new.creating') : $t('lists.new.submit') }}</button>
     </form>
   </main>
 </template>
 <style scoped>
-.ln-sec{display:block;padding:20px 0 6px;border-top:1px solid var(--ink-line);animation:rise .5s var(--ease) both}
-.ln-h{margin:0 0 16px;font-size:14px;font-weight:700;line-height:1.3;letter-spacing:.04em;color:var(--red-text)}
-.ln-sec:first-of-type{border-top:0;padding-top:4px}
-.ln-sec:nth-of-type(2){animation-delay:.05s}.ln-sec:nth-of-type(3){animation-delay:.1s}.ln-sec:nth-of-type(4){animation-delay:.15s}
-.ln-go{padding-top:20px;border-top:1px solid var(--ink-line);margin-top:8px}
-@media (min-width:768px){
-  .ln-sec{display:grid;grid-template-columns:180px minmax(0,1fr);gap:0 40px}
-  .ln-body{max-width:560px;grid-column:2}
-  .ln-h{grid-column:1}
-}
-.ln-body .c-switch{align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);margin:0}
-.ln-body .c-switch input{margin-top:3px}
+.ln{max-width:560px}
 </style>

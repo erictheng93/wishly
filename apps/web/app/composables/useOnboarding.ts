@@ -1,10 +1,10 @@
 import { stripLocale } from '~/utils/localized'
-// 新手導覽（D66）：個人資料 → 建立清單 → 加品項 → 發佈（受捐人）→ 捐助（捐助人）。
+// 新手導覽（D66）：建立清單 → 加品項 → 發佈（受捐人）→ 個人資料 → 捐助（捐助人）。
 // 步驟完成與否由後端從資料推導（GET /me/onboarding）；這裡只決定「目前步驟要帶去哪、在哪一頁顯示提示」
-export type TourStep = 'profile' | 'wishlist' | 'item' | 'publish' | 'give'
+export type TourStep = 'wishlist' | 'item' | 'publish' | 'profile' | 'give'
 export interface TourState { done: boolean; current: TourStep | null; wishlist_id: string | null; steps: { key: TourStep; done: boolean }[] }
 
-export const TOUR_STEPS: TourStep[] = ['profile', 'wishlist', 'item', 'publish', 'give']
+export const TOUR_STEPS: TourStep[] = ['wishlist', 'item', 'publish', 'profile', 'give']
 
 /** 目前步驟要去的頁面；加品項 / 發佈帶到後端挑的清單，沒有可用的清單就去建一份 */
 export function tourTarget(step: TourStep | null, wishlistId?: string | null): string {

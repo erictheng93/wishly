@@ -1,4 +1,4 @@
-// 流程驗證 F24（D66 新手導覽）：新帳號 → /welcome 填個人資料 → 建立清單 → 加品項 → 發佈 → 捐助 → 完成；可跳過、可在設定重新開始。真實 API。
+// 流程驗證 F24（D66 新手導覽）：新帳號 → 建立清單 → 加品項 → 發佈 → /welcome 填個人資料 → 捐助 → 完成；可跳過、可在設定重新開始。真實 API。
 import { expect, test } from '@playwright/test'
 import { createList, loginBrowser, registerUser } from './helpers'
 import { hydrated } from './support/hydrate'
@@ -11,20 +11,17 @@ test('一步一步走完：受捐人 → 捐助人', async ({ page }) => {
   const u = await registerUser({ tag: 'tour', onboarding: true })
   await loginBrowser(page.context(), u)
 
-  await test.step('第一次進儀表板被帶到導覽頁，先填個人資料', async () => {
+  await test.step('第一次進儀表板被帶到導覽頁，先建清單', async () => {
     await page.goto('/dashboard')
     await expect(page).toHaveURL(/\/welcome$/)
     await hydrated(page)
     await expect(page.getByRole('heading', { name: '歡迎使用 Wishly' })).toBeVisible()
-    await page.getByRole('button', { name: '儲存並建立清單' }).click()
-    await expect(page.getByRole('alert')).toHaveText('請至少填寫帳號代號、自我介紹或生日其中一項')
-    await page.getByLabel(/自我介紹/).fill('喜歡咖啡')
-    await page.getByRole('button', { name: '儲存並建立清單' }).click()
+    await page.getByRole('link', { name: '建立心願清單' }).click()
   })
 
   await test.step('建立清單：導覽條說明怎麼填', async () => {
     await expect(page).toHaveURL(/\/lists\/new$/)
-    await expect(guide(page)).toContainText('新手導覽 2 / 5')
+    await expect(guide(page)).toContainText('新手導覽 1 / 5')
     await expect(guide(page)).toContainText('建立第一份心願清單')
     await hydrated(page)
     await page.getByLabel(/清單名稱/).fill('我的生日願望')
@@ -39,7 +36,17 @@ test('一步一步走完：受捐人 → 捐助人', async ({ page }) => {
     await page.reload(); await hydrated(page)
     await expect(guide(page)).toContainText('發佈清單，成為受捐人')
     await page.getByRole('button', { name: '發佈並分享' }).click()
-    await expect(guide(page)).toContainText('送出一份祝福，成為捐助人')
+    await expect(guide(page)).toContainText('完善個人資料')
+  })
+
+  await test.step('補個人資料：儲存後留在本頁，下一步變捐助', async () => {
+    await page.goto('/welcome'); await hydrated(page)
+    await page.getByRole('button', { name: '儲存' }).click()
+    await expect(page.getByRole('alert')).toHaveText('請至少填寫帳號代號、自我介紹或生日其中一項')
+    await page.getByLabel(/自我介紹/).fill('喜歡咖啡')
+    await page.getByRole('button', { name: '儲存' }).click()
+    await expect(page).toHaveURL(/\/welcome$/)
+    await expect(page.getByRole('link', { name: '去探索清單' })).toBeVisible()
   })
 
   await test.step('到別人的清單認捐，成為捐助人', async () => {

@@ -17,13 +17,13 @@
       "wishlist": {
         "title": "Create your first wishlist",
         "body": "Make a wishlist for a birthday, wedding, new baby or any moment worth celebrating.",
-        "here": "Give it a name (e.g. \"My 30th birthday\") and pick a cover. Visibility defaults to friends only; dates and rules can be changed later. Then tap \"Create and add items\" at the bottom.",
+        "here": "Give it a name (e.g. \"My 30th birthday\") and pick a cover, and you can create it. Visibility defaults to friends only; dates, rules and visibility can be adjusted in the list settings in the next step. Then tap \"Create and add items\" at the bottom.",
         "cta": "Create a wishlist"
       },
       "item": {
         "title": "Add the things you want",
         "body": "Your list is ready. Now add the things you'd love to receive.",
-        "here": "Tap \"Add item\". Paste a product link to fill in the name and image automatically, then set the quantity and notes.",
+        "here": "Tap \"Add item\" and just enter a name; the product link, image and quantity are optional.",
         "cta": "Go add items"
       },
       "publish": {
@@ -59,7 +59,7 @@
       "nameHint": "This is the name your friends will see.",
       "profileHint": "Fill in at least one of handle, bio or birthday. You can change them later in Settings.",
       "profileNeedOne": "Please fill in at least one of handle, bio or birthday",
-      "profileSave": "Save and create a list",
+      "profileSave": "Save",
       "profileSaving": "Saving…",
       "skipLead": "Already know your way around?",
       "skipBtn": "Skip the tour",
@@ -71,7 +71,7 @@
     },
     "settings": {
       "title": "Getting started tour",
-      "hint": "Walk through it again: profile → create a list → add items → publish → give.",
+      "hint": "Walk through it again: create a list → add items → publish → profile → give.",
       "restart": "Restart tour"
     }
   }

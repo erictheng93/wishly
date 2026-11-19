@@ -30,15 +30,19 @@ test('創建者旅程：註冊 → 建清單 → 新增品項 → 發佈 → 分
 
   await test.step('建立清單', async () => {
     await page.getByRole('link', { name: '建立清單' }).click()
-    // 類型只剩「心願清單」（禮物登記已合併）
-    await expect(page.getByRole('radio', { name: '心願清單' })).toBeChecked()
-    await expect(page.getByRole('radio', { name: '禮物登記' })).toHaveCount(0)
+    // 建立頁只填名稱與封面，其餘設定在編輯頁
+    await expect(page.getByRole('radio', { name: '心願清單' })).toHaveCount(0)
     await page.getByLabel(/清單名稱/).fill(title)
-    await page.getByRole('radio', { name: /^公開/ }).check() // 預設是僅好友；下面要用未登入訪客開分享連結
     await page.getByRole('button', { name: '建立並新增品項' }).click()
     await expect(page).toHaveURL(/\/lists\/[^/]+\/edit$/)
     await expect(page.getByText('還沒有品項，先新增第一個吧')).toBeVisible()
     await expect(page.getByRole('button', { name: '發佈並分享' })).toBeDisabled() // 沒有品項不能發佈
+    await expect(page.getByText('先新增 1 個品項才能發佈')).toBeVisible()
+    // 預設是僅好友；下面要用未登入訪客開分享連結，所以在清單設定改成公開
+    await page.getByText('清單設定', { exact: true }).click()
+    await page.getByRole('radio', { name: /^公開/ }).check()
+    await Promise.all([page.waitForResponse(r => r.request().method() === 'PATCH' && r.ok()), page.getByRole('button', { name: '儲存設定' }).click()])
+    await page.getByText('清單設定', { exact: true }).click() // 收合，下面的步驟會再打開
   })
 
   await test.step('新增品項', async () => {

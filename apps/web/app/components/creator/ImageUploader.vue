@@ -6,7 +6,7 @@ const { api } = useApi()
 const { t } = useI18n()
 const MAX = 5 * 1024 * 1024
 const preview = ref<string | null>(null)
-const state = ref<'idle' | 'uploading' | 'done' | 'fail'>('idle')
+const state = ref<'idle' | 'uploading' | 'done' | 'fail'>(props.modelValue ? 'done' : 'idle') // 重新掛載時（還原草稿）仍提示已上傳
 const msg = ref('')
 const last = shallowRef<File | null>(null)
 
