@@ -1,0 +1,259 @@
+[
+  {
+    "verdict": "confirmed",
+    "fingerprint": "wishly.api.topup.check_mac_case_sensitivity",
+    "title": "Incomplete Case-Sensitivity Handling in Payment MAC Calculation Filter",
+    "description": "The ECPay payment gateway integration in topup.rs performs parameter filtering for CheckMacValue with a strict case-sensitive check, while parameter sorting is case-insensitive. Casing variations in incoming webhook requests bypass parameter exclusion and corrupt SHA-256 MAC calculation.",
+    "root_cause": "In apps/api/src/topup.rs, check_mac() filters parameters using .filter(|(k, _)| k != \"CheckMacValue\"), which is strictly case-sensitive. While parameters are subsequently sorted case-insensitively using k.to_lowercase(), any casing variation of CheckMacValue (such as checkmacvalue, Checkmacvalue, or CHECKMACVALUE) bypasses the exclusion filter and is incorrectly included in the SHA-256 MAC calculation payload. Furthermore, param(&params, \"CheckMacValue\") in verified_form() uses exact case matching, which fails to find any case-varied parameter in the incoming webhook form.",
+    "intended_behavior": "The CheckMacValue parameter exclusion and lookup should be case-insensitive, ensuring that any casing variation of CheckMacValue is excluded from MAC calculation and correctly extracted from webhook payloads.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/api/src/topup.rs",
+        "line": 505,
+        "scope": "webhook",
+        "description": "Receives URL-encoded form payload containing payment notification parameters from the payment provider."
+      },
+      {
+        "kind": "propagation",
+        "file": "apps/api/src/topup.rs",
+        "line": 487,
+        "scope": "verified_form",
+        "description": "Extracts CheckMacValue using case-sensitive lookup and passes params to check_mac for validation."
+      },
+      {
+        "kind": "sink",
+        "file": "apps/api/src/topup.rs",
+        "line": 132,
+        "scope": "check_mac",
+        "description": "Filters parameters with k != \"CheckMacValue\" without case-insensitive matching, allowing case variations into MAC digest calculation."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "apps/api/src/topup.rs",
+        "line": 132,
+        "description": "Filter uses strictly case-sensitive inequality check: k != \"CheckMacValue\"."
+      },
+      {
+        "file": "apps/api/src/topup.rs",
+        "line": 497,
+        "description": "param() lookup uses exact case string equality: n == k."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "network_routing",
+        "description": "Incoming HTTP POST webhook received at /api/v1/topups/webhook/{provider}."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "External client or payment gateway webhook sending payment notification parameters with varied key casing.",
+      "payloads": [
+        "MerchantID=2000132&MerchantTradeNo=TX12345&RtnCode=1&TradeAmt=100&checkmacvalue=TEST_MAC_VALUE"
+      ],
+      "instructions": [
+        "Submit a form-urlencoded POST request to /api/v1/topups/webhook/ecpay with lowercase checkmacvalue parameter name.",
+        "Observe that checkmacvalue is not excluded and is concatenated into MAC calculation payload HashKey=...&checkmacvalue=...&HashIV=...",
+        "Observe signature verification failure (401 UNAUTHORIZED) due to checkmacvalue being included in calculated hash."
+      ],
+      "observed_result": "Signature verification fails with 401 UNAUTHORIZED due to checkmacvalue being included in the calculated hash."
+    },
+    "remediation": {
+      "strategy": "Use case-insensitive comparison (!k.eq_ignore_ascii_case(\"CheckMacValue\")) in check_mac() and case-insensitive lookup in param() when extracting CheckMacValue.",
+      "code_changes": [
+        {
+          "file_name": "apps/api/src/topup.rs",
+          "fixed_code": "let mut p: Vec<&(String, String)> = params.iter().filter(|(k, _)| !k.eq_ignore_ascii_case(\"CheckMacValue\")).collect();"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Payment gateways, HTTP serializers, or reverse proxies commonly alter parameter casing in HTTP POST requests, or attackers can intentionally send lowercase keys."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Payment confirmation notifications fail MAC validation, resulting in topup failures or denial of service on payment confirmation callbacks."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Confirmed via source code inspection in topup.rs showing case-sensitive string matching against case-insensitive ECPay parameter specification."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "wishly.api.uploads.unbounded_s3_streaming_dos",
+    "title": "Unbounded In-Memory Buffer in Media Upload Confirmation Handler",
+    "description": "In the upload confirmation endpoint, the S3 GET response is read directly into memory via res.bytes().await if the Content-Length header is omitted or chunked, creating a denial-of-service vector through excessive memory allocation.",
+    "root_cause": "In apps/api/src/uploads.rs confirm(), the server checks object size with res.content_length().is_some_and(|l| l as usize > MAX_BYTES). If upstream S3 or object storage returns a response without Content-Length or uses chunked transfer encoding, this check evaluates to false. Subsequently, res.bytes().await reads the entire response body into heap memory without an upper bound limit, unlike avatar_bytes() which streams chunks and enforces MAX_BYTES dynamically.",
+    "intended_behavior": "The confirm handler should stream chunks and enforce the 5MB size limit progressively during transfer, aborting the connection if total bytes exceed MAX_BYTES.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/api/src/uploads.rs",
+        "line": 916,
+        "scope": "confirm",
+        "description": "Receives confirm request with object_key from authenticated user."
+      },
+      {
+        "kind": "propagation",
+        "file": "apps/api/src/uploads.rs",
+        "line": 950,
+        "scope": "confirm",
+        "description": "Inspects res.content_length() which is None for chunked transfer or omitted length headers, bypassing the MAX_BYTES check."
+      },
+      {
+        "kind": "sink",
+        "file": "apps/api/src/uploads.rs",
+        "line": 958,
+        "scope": "confirm",
+        "description": "Invokes res.bytes().await without streaming limits, buffering arbitrary payload into server memory."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "apps/api/src/uploads.rs",
+        "line": 950,
+        "description": "Size check only runs when Content-Length is Some: res.content_length().is_some_and(|l| l as usize > MAX_BYTES)."
+      },
+      {
+        "file": "apps/api/src/uploads.rs",
+        "line": 958,
+        "description": "Unbounded buffering into memory: let bytes = res.bytes().await."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "authentication_level",
+        "description": "Requires an authenticated user session to obtain presigned upload URL and trigger confirm."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Authenticated user uploading oversized object to S3 incoming folder.",
+      "payloads": [
+        "POST /api/v1/uploads/confirm with JSON body {\"object_key\": \"covers/<uuid>.jpg\"}"
+      ],
+      "instructions": [
+        "Request presigned upload URL via /api/v1/uploads/presign.",
+        "Upload large file (e.g. 100MB+) to S3 incoming key using chunked transfer encoding.",
+        "Call POST /api/v1/uploads/confirm with the corresponding object_key.",
+        "Observe backend process allocating full file size in memory before image decoder validation."
+      ],
+      "observed_result": "Server process memory usage spikes proportional to uploaded file size, risking out-of-memory termination."
+    },
+    "remediation": {
+      "strategy": "Adopt the chunked streaming pattern used in avatar_bytes() to stream S3 GET responses and enforce the 5MB MAX_BYTES threshold incrementally as chunks arrive.",
+      "code_changes": [
+        {
+          "file_name": "apps/api/src/uploads.rs",
+          "fixed_code": "let mut bytes = Vec::new(); while let Some(chunk) = res.chunk().await.map_err(|_| AppError::problem(502, \"UPSTREAM_ERROR\", \"儲存服務暫時無法使用\"))? { if bytes.len() + chunk.len() > MAX_BYTES { return Err(AppError::invalid(\"/object_key\", \"IMAGE_REJECTED\", \"檔案超過 5 MB\")); } bytes.extend_from_slice(&chunk); }"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "An authenticated user can easily generate a presigned PUT URL and upload an arbitrarily large file to S3 before calling the confirm endpoint."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Triggering unbounded memory allocation in the API process can lead to memory exhaustion, Linux OOM killer termination, and Denial of Service for all concurrent users."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Verified in source code contrasting confirm() implementation against avatar_bytes() in the same module."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "wishly.web.native_client.unrestricted_external_navigation",
+    "title": "Inconsistent Protocol Scheme Handling in Native Client External Navigation",
+    "description": "The desktop client intercepts target=_blank links and passes them directly to the native opener plugin without frontend protocol validation, creating discrepancies with Tauri capability allowlists and inconsistent handling between web and desktop platforms.",
+    "root_cause": "In apps/web/app/plugins/native.client.ts, the global link interceptor for a[target=\"_blank\"] forwards any non-origin URL to openExternal(a.href). While the native Tauri capabilities file (apps/web/src-tauri/capabilities/default.json) limits opener:allow-open-url to https, mailto, sms, and line schemes, standard http: links and custom scheme navigation in non-Tauri / hybrid web environments lack consistent validation before invocation, leading to unhandled runtime errors on valid http links or unexpected external protocol handlers.",
+    "intended_behavior": "External URLs should be validated against an explicit scheme allowlist (e.g. https:, http:, mailto:, sms:, line:) before being forwarded to openExternal, with graceful error handling if an unsupported scheme is encountered.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "apps/web/app/plugins/native.client.ts",
+        "line": 14,
+        "scope": "document.addEventListener",
+        "description": "Intercepts click events on external target=_blank anchor tags."
+      },
+      {
+        "kind": "propagation",
+        "file": "apps/web/app/plugins/native.client.ts",
+        "line": 17,
+        "scope": "click handler",
+        "description": "Passes raw anchor href to openExternal without scheme allowlist validation."
+      },
+      {
+        "kind": "sink",
+        "file": "apps/web/app/utils/native.ts",
+        "line": 48,
+        "scope": "openExternal",
+        "description": "Dispatches URL to Tauri opener plugin or window.open."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "apps/web/app/plugins/native.client.ts",
+        "line": 17,
+        "description": "openExternal is called directly on arbitrary a.href without frontend scheme sanitization."
+      },
+      {
+        "file": "apps/web/src-tauri/capabilities/default.json",
+        "line": 12,
+        "description": "Opener allowlist permits https://*, mailto:*, sms:*, line://* but omits http://*."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "User clicks an external link rendered in the web or desktop application."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "User providing an external item link or wishlist note containing an unallowed or unusual URI scheme.",
+      "payloads": [
+        "<a href=\"http://example.org\" target=\"_blank\">",
+        "<a href=\"javascript:...\" target=\"_blank\">"
+      ],
+      "instructions": [
+        "Render an item link with http:// URL in the desktop client.",
+        "Click the link.",
+        "Observe unhandled plugin permission error from Tauri plugin-opener."
+      ],
+      "observed_result": "Link opening fails in desktop client due to strict capabilities mismatch, with no graceful fallback or prior scheme validation."
+    },
+    "remediation": {
+      "strategy": "Sanitize and validate URL schemes in native.client.ts and native.ts before dispatching to openExternal, and align Tauri opener capabilities with permitted application protocols.",
+      "code_changes": [
+        {
+          "file_name": "apps/web/app/plugins/native.client.ts",
+          "fixed_code": "const ALLOWED_SCHEMES = ['https:', 'http:', 'mailto:', 'sms:', 'line:']; if (ALLOWED_SCHEMES.includes(u.protocol)) void openExternal(a.href);"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Requires user interaction clicking external links with non-https schemes."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Desktop client rejects http links causing navigation failures, or inconsistent scheme handling across web/desktop targets."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Verified frontend link handler and Tauri capabilities configuration in src-tauri."
+    }
+  }
+]

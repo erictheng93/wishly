@@ -1161,7 +1161,7 @@ struct DeleteQ {
     permanent: Option<bool>,
 }
 
-/// DELETE /wishlists/{id}：預設封存；`?permanent=true` 永久刪除（只限已封存的個人清單）。
+/// DELETE /wishlists/{id}：預設封存；`?permanent=true` 永久刪除（只限草稿或已封存的個人清單）。
 async fn archive(
     u: CurrentUser,
     State(st): State<AppState>,
@@ -1199,7 +1199,7 @@ async fn archive(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// 永久刪除（不可復原）：寫 deleted_at、狀態維持 archived，不實體刪列（捐助、採購單對清單是 RESTRICT）。
+/// 永久刪除（不可復原）：寫 deleted_at、狀態定為 archived（草稿直接刪時一併改成 archived，維持「已刪除 ⇒ archived」），不實體刪列（捐助、採購單對清單是 RESTRICT）。
 /// 同交易清掉收件資訊、退役封面與品項圖片、撤銷附清單的好友邀請；捐助 / 採購 / 帳本 / 稽核不動。
 /// 鎖序：使用者媒體鎖（media_tx）→ wishlists FOR UPDATE → 讀認領 / 採購 → 物件鎖（request_retire）→ 寫入。
 async fn delete_permanent(u: CurrentUser, st: AppState, id: Uuid) -> R<StatusCode> {
@@ -1212,9 +1212,9 @@ async fn delete_permanent(u: CurrentUser, st: AppState, id: Uuid) -> R<StatusCod
             "救災據點與組織清單不提供永久刪除",
         ));
     }
-    // 條件同時擋並行的取消封存 / 重複刪除：列鎖後重讀，沒列 = 已不是封存中
+    // 條件同時擋並行的取消封存 / 重複刪除：列鎖後重讀，沒列 = 已不是封存 / 草稿
     let locked: Option<String> = sqlx::query_scalar(
-        "SELECT slug::text FROM wishlists WHERE id = $1 AND status = 'archived' AND deleted_at IS NULL FOR UPDATE",
+        "SELECT slug::text FROM wishlists WHERE id = $1 AND status IN ('archived', 'draft') AND deleted_at IS NULL FOR UPDATE",
     )
     .bind(id)
     .fetch_optional(&mut *tx)
@@ -1231,7 +1231,7 @@ async fn delete_permanent(u: CurrentUser, st: AppState, id: Uuid) -> R<StatusCod
             AppError::problem(
                 409,
                 "WISHLIST_NOT_ARCHIVED",
-                "只有已封存的清單可以永久刪除，請先封存。",
+                "只有草稿或已封存的清單可以永久刪除，請先封存。",
             )
         });
     };
@@ -1321,7 +1321,7 @@ async fn delete_permanent(u: CurrentUser, st: AppState, id: Uuid) -> R<StatusCod
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("UPDATE wishlists SET deleted_at = now(), birthday_notify = false, cover_image_key = NULL, cover_image_status = 'none' WHERE id = $1")
+    sqlx::query("UPDATE wishlists SET deleted_at = now(), status = 'archived', closed_at = coalesce(closed_at, now()), birthday_notify = false, cover_image_key = NULL, cover_image_status = 'none' WHERE id = $1")
         .bind(id)
         .execute(&mut *tx)
         .await?;

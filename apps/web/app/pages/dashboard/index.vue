@@ -92,6 +92,7 @@ onMounted(async () => {
           <button class="c-btn" @click="unarchive(w)">{{ $t('lists.dashboard.unarchive') }}</button>
           <button class="c-btn danger" data-testid="purge-btn" @click="purge = w; purgeWord = ''; purgeErr = ''">{{ $t('lists.dashboard.purge') }}</button>
         </template>
+        <button v-else-if="w.status === 'draft'" class="c-btn danger" data-testid="purge-btn" @click="purge = w; purgeWord = ''; purgeErr = ''">{{ $t('lists.dashboard.purge') }}</button>
         <button v-else class="c-btn danger" @click="del = w; delErr = ''">{{ $t('lists.dashboard.archive') }}</button>
       </div>
     </article>
@@ -99,8 +100,8 @@ onMounted(async () => {
     <button v-if="cursor" class="c-btn block dsh-more" :disabled="loading" @click="load(true)">{{ $t('lists.dashboard.loadMore') }}</button>
     <NuxtLink v-if="list.length && !archived" to="/lists/new" class="c-btn primary c-fab dsh-fab"><UiIcon name="plus" :size="16" />{{ $t('lists.dashboard.newFab') }}</NuxtLink>
     <CreatorConfirm :open="!!del" :title="$t('lists.dashboard.archiveTitle')" :text="$t('lists.dashboard.archiveText', { title: del?.title })" :ok="$t('lists.dashboard.archiveOk')" danger :busy="delBusy" :error="delErr" @close="del = null" @ok="archive" />
-    <CreatorConfirm :open="!!purge" :title="$t('lists.dashboard.purgeTitle')" :text="$t('lists.dashboard.purgeText', { title: purge?.title })" :ok="$t('lists.dashboard.purgeOk')" danger :busy="purgeBusy" :disabled="purgeWord.trim() !== purge?.title?.trim()" :error="purgeErr" @close="!purgeBusy && (purge = null)" @ok="purgeList">
-      <label class="c-field"><span>{{ $t('lists.dashboard.purgePrompt', { title: purge?.title }) }}</span><input v-model="purgeWord" autocomplete="off"></label>
+    <CreatorConfirm :open="!!purge" :title="$t('lists.dashboard.purgeTitle')" :text="$t(purge?.status === 'draft' ? 'lists.dashboard.purgeDraftText' : 'lists.dashboard.purgeText', { title: purge?.title })" :ok="$t('lists.dashboard.purgeOk')" danger :busy="purgeBusy" :disabled="purge?.status !== 'draft' && purgeWord.trim() !== purge?.title?.trim()" :error="purgeErr" @close="!purgeBusy && (purge = null)" @ok="purgeList">
+      <label v-if="purge?.status !== 'draft'" class="c-field"><span>{{ $t('lists.dashboard.purgePrompt', { title: purge?.title }) }}</span><input v-model="purgeWord" autocomplete="off"></label>
     </CreatorConfirm>
   </main>
 </template>

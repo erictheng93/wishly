@@ -44,6 +44,7 @@
       "purge": "Hapus permanen",
       "purgeTitle": "Hapus wishlist secara permanen",
       "purgeText": "\"{title}\" akan dihapus permanen dan tidak bisa dikembalikan: wishlist, item, info pengiriman, dan gambar akan dihapus. Pemberi hadiah tetap melihat catatannya di \"Hadiah saya\", ditandai \"Wishlist dihapus\".",
+      "purgeDraftText": "Draf \"{title}\" akan dihapus permanen dan tidak bisa dikembalikan: wishlist, item, dan gambar akan dihapus.",
       "purgeOk": "Hapus permanen",
       "purgePrompt": "Ketik nama wishlist \"{title}\" untuk konfirmasi",
       "purgeActiveClaims": "Masih ada {count} klaim yang berjalan. Selesaikan atau batalkan dulu sebelum menghapus.",
