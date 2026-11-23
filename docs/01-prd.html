@@ -6,7 +6,7 @@
 <title>Wishly PRD 產品需求文件</title>
 <style>
 :root{--bg:#ffffff;--fg:#1f2328;--muted:#59636e;--border:#d1d9e0;--accent:#0b7a75;--accent-soft:#e6f4f3;--warn:#b35900;--code-bg:#f6f8fa;--blue:#0a5cad;--blue-soft:#e3effb;--gray-soft:#eceff2;--zebra:#f6f8fa}
-@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--border:#3d444d;--accent:#3fb8b1;--accent-soft:#12302f;--warn:#e3963e;--code-bg:#161b22;--blue:#6cb2f5;--blue-soft:#14283f;--gray-soft:#21262d;--zebra:#131920}}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#9198a1;--border:#3d444d;--accent:#3fb8b1;--on-accent:#0d1117;--accent-soft:#12302f;--warn:#e3963e;--code-bg:#161b22;--blue:#6cb2f5;--blue-soft:#14283f;--gray-soft:#21262d;--zebra:#131920}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.75 system-ui,"Noto Sans TC","PingFang TC",sans-serif}
 header.top{border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-left:240px}
@@ -29,8 +29,8 @@ th{background:var(--accent-soft);white-space:nowrap}
 tbody tr:nth-child(even){background:var(--zebra)}
 code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:.88em;font-family:ui-monospace,Menlo,monospace}
 .badge{display:inline-block;padding:0 8px;border-radius:10px;font-size:.78rem;font-weight:700;line-height:1.6;white-space:nowrap}
-.p0{background:var(--accent);color:#fff}.p1{background:var(--blue-soft);color:var(--blue);border:1px solid var(--blue)}.p2{background:var(--gray-soft);color:var(--muted);border:1px solid var(--border)}
-.callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:10px 16px;margin:14px 0;border-radius:0 6px 6px 0}
+.p0{background:var(--accent);color:var(--on-accent,#fff)}.p1{background:var(--blue-soft);color:var(--blue);border:1px solid var(--blue)}.p2{background:var(--gray-soft);color:var(--muted);border:1px solid var(--border)}
+.callout{border:1px solid var(--accent);background:var(--accent-soft);padding:10px 16px;margin:14px 0;border-radius:0}
 .callout.warn{border-color:var(--warn);background:var(--code-bg)}
 .callout.warn b.h{color:var(--warn)}
 .story{border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin:10px 0}
