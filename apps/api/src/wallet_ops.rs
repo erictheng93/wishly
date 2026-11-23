@@ -57,7 +57,7 @@ fn json_resp(status: u16, body: &Value, replay: bool) -> Response {
 }
 
 fn parse(b: &[u8]) -> R<Value> {
-    serde_json::from_slice(b).map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))
+    crate::error::json_body(b, || AppError::invalid("/", "INVALID", "請求內容格式錯誤"))
 }
 
 fn text_field(b: &Value, key: &str, required: bool) -> R<Option<String>> {

@@ -18,7 +18,7 @@ describe('relief utils', () => {
 
 describe('救災值的 i18n 標籤', () => {
   const groups = { hazard: HAZARDS, category: CATEGORIES, urgency: URGENCIES, siteStatus: ['active', 'paused', 'closed'] }
-  for (const loc of ['zh-Hant', 'en', 'vi', 'id']) {
+  for (const loc of ['zh-Hant', 'zh-Hans', 'en', 'vi', 'id']) {
     it(`${loc} 每個值都有字串標籤`, () => {
       const r = JSON.parse(readFileSync(fileURLToPath(new URL(`../i18n/locales/${loc}/org.json`, import.meta.url)), 'utf8')).org.relief
       for (const [g, vals] of Object.entries(groups)) for (const v of vals) expect(typeof r[g][v], `${g}.${v}`).toBe('string')

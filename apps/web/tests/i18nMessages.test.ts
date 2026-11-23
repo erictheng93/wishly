@@ -36,6 +36,14 @@ describe('i18n 語系訊息', () => {
     expect(readdirSync(root).flatMap(l => readdirSync(join(root, l)).flatMap(f => dotted(JSON.parse(readFileSync(join(root, l, f), 'utf8')), `${l}/${f}`)))).toEqual([])
   })
 
+  // 各語系逐檔的 key 集合都要與 zh-Hant 完全相同（漏翻會顯示 key 名）
+  it('每個語系的 key 集合與 zh-Hant 相同', () => {
+    const keys = (locale: string) => Object.fromEntries(readdirSync(join(root, locale)).map(f => [f, [...messages(JSON.parse(readFileSync(join(root, locale, f), 'utf8')))].map(([k]) => k).sort()]))
+    const base = keys('zh-Hant')
+    expect(readdirSync(root).sort()).toEqual(['en', 'id', 'vi', 'zh-Hans', 'zh-Hant'])
+    for (const l of readdirSync(root)) expect(keys(l), l).toEqual(base)
+  })
+
   // 刻意的複數「{n} item | {n} items」：每段都有插值才放行
   it('沒有未跳脫的 |（字面請寫 {\'|\'}）', () => {
     const stray = (v: string) => { const s = v.replaceAll("{'|'}", ''); return s.includes('|') && !s.split('|').every(p => p.includes('{')) }

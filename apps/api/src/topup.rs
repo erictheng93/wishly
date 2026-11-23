@@ -292,8 +292,9 @@ async fn create(
 ) -> Result<Response, AppError> {
     let cfg = ecpay()?;
     let key = idempotency::key(&headers)?;
-    let b: Value = serde_json::from_slice(&body)
-        .map_err(|_| AppError::problem(400, "BAD_REQUEST", "請求內容必須是 JSON"))?;
+    let b: Value = crate::error::json_body(&body, || {
+        AppError::problem(400, "BAD_REQUEST", "請求內容必須是 JSON")
+    })?;
     let amount = b
         .get("amount")
         .and_then(Value::as_i64)

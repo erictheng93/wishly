@@ -1,3 +1,4 @@
+import { apiLocale } from '../utils/localized'
 import { apiErrMsg, problemDetail } from '../utils/errors'
 import { noteUnavailable } from './useSysStatus'
 // 創建者端 API 客戶端：cookie（ws_session）驗證；原生殼改用 Bearer（見 utils/native.ts）、RFC 9457 錯誤正規化
@@ -21,7 +22,7 @@ export function useApi() {
     const t = useNuxtApp().$i18n.t
     const { noRedirect, ...rest } = opts
     try {
-      return await $fetch(path, { baseURL: base, credentials: 'include', ...rest, headers: { 'Accept-Language': useNuxtApp().$i18n.locale.value === 'zh-Hant' ? 'zh-TW' : useNuxtApp().$i18n.locale.value, ...nativeHeaders(), ...rest.headers } }) as T
+      return await $fetch(path, { baseURL: base, credentials: 'include', ...rest, headers: { 'Accept-Language': apiLocale(useNuxtApp().$i18n.locale.value), ...nativeHeaders(), ...rest.headers } }) as T
     } catch (e: any) {
       const status = e.statusCode || e.status || 0
       const d = e.data && typeof e.data === 'object' ? e.data : {}

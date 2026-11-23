@@ -530,3 +530,31 @@ async fn locale_set_at_signup_only(pool: PgPool) {
         .unwrap();
     assert_eq!(login("en-US,en;q=0.9").await, "id");
 }
+
+/// 簡體介面：PATCH /me 接受 zh-CN（不接受 zh-Hans，那是介面語言代碼），開戶 Accept-Language zh-Hans 也得 zh-CN
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn locale_zh_cn_accepted(pool: PgPool) {
+    let common::TestUser { id, token } = common::user(&pool, "甲").await;
+    let patch = |v: &'static str| {
+        let (pool, token) = (pool.clone(), token.clone());
+        async move {
+            common::call(
+                &pool,
+                "PATCH",
+                "/me",
+                &common::ck(&token),
+                Some(json!({ "locale": v })),
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(patch("zh-CN").await, 200);
+    let loc: String = sqlx::query_scalar("SELECT locale FROM users WHERE id=$1")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(loc, "zh-CN");
+    assert_eq!(patch("zh-XX").await, 422);
+}

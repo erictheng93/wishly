@@ -1,0 +1,53 @@
+{
+  "id": "/",
+  "name": "Wishly 心愿清单",
+  "short_name": "Wishly",
+  "description": "创建心愿清单、用链接分享，朋友无需账号即可浏览、登录后即可捐助，不重复送礼。",
+  "lang": "zh-Hans-CN",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#c8102e",
+  "categories": [
+    "lifestyle",
+    "shopping"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "我的清单",
+      "short_name": "清单",
+      "url": "/dashboard?source=shortcut"
+    },
+    {
+      "name": "创建清单",
+      "short_name": "创建",
+      "url": "/lists/new?source=shortcut"
+    }
+  ]
+}

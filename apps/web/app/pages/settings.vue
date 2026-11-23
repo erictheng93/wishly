@@ -120,7 +120,7 @@ function device(ua?: string | null) {
   const pick = (t: [RegExp, string][]) => t.find(([r]) => r.test(ua))?.[1]
   return [pick(BROWSER), pick(OS)].filter(Boolean).join('・') || ua.slice(0, 60)
 }
-const when = (d: string) => new Date(d).toLocaleString(locale.value === 'zh-Hant' ? 'zh-TW' : locale.value, { dateStyle: 'medium', timeStyle: 'short' })
+const when = (d: string) => new Date(d).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' })
 const acts = ref<any[]>([]), actNext = ref<string | null>(null), actErr = ref('')
 async function loadActivity(more = false) {
   try {
@@ -172,8 +172,8 @@ async function setMailPref(key: 'email_gifts' | 'email_social' | 'inbox_gifts' |
   nBusy.value = true; nErr.value = ''
   try { user.value = await api('/me', { method: 'PATCH', body: { notification_prefs: { [key]: on } } }) } catch (e: any) { nErr.value = apiErrMsg(e) } finally { nBusy.value = false }
 }
-// 通知語言（users.locale，後端寄信 / 站內信用）與介面語言分開；值用後端的 zh-TW / en / vi / id
-const notifyLangs = computed(() => locales.value.map((l: any) => ({ code: l.code === 'zh-Hant' ? 'zh-TW' : l.code, name: l.name ?? l.code })))
+// 通知語言（users.locale，後端寄信 / 站內信用）與介面語言分開；值用後端的 zh-TW / zh-CN / en / vi / id（utils/localized 的 apiLocale）
+const notifyLangs = computed(() => locales.value.map((l: any) => ({ code: apiLocale(l.code), name: l.name ?? l.code })))
 async function setNotifyLang(v: string) {
   nBusy.value = true; nErr.value = ''
   try { user.value = await api('/me', { method: 'PATCH', body: { locale: v } }) } catch (e: any) { nErr.value = apiErrMsg(e) } finally { nBusy.value = false }

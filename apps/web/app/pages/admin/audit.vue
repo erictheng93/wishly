@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 definePageMeta({ middleware: 'staff' })
-const { t, locale } = useI18n()
+const { t } = useI18n()
 useHead({ title: () => t('admin.audit.title') })
 const { api } = useApi()
 const filters = reactive({ actor_id: '', action: '', entity: '', entity_id: '', request_id: '', from: '', to: '' })
 const rows = ref<any[]>([]), cursor = ref<string | null>(null), busy = ref(false), err = ref(''), done = ref(false)
 const fields = computed<Record<string, string>>(() => ({ actor_id: t('admin.audit.fields.actorId'), action: t('admin.audit.fields.action'), entity: t('admin.audit.fields.entity'), entity_id: t('admin.audit.fields.entityId'), request_id: t('admin.audit.fields.requestId'), from: t('admin.audit.fields.from'), to: t('admin.audit.fields.to') }))
-const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
+const dl = computed(() => intlLocale())
 async function load(more = false) {
   if (busy.value) return
   busy.value = true; err.value = ''

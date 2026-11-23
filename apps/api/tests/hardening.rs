@@ -448,3 +448,15 @@ async fn surprise_off_allowed_without_event_date_but_not_with_future_date(pool: 
         .unwrap();
     assert!(!on);
 }
+
+// ---------- 手動解析的 JSON 本文上限 ----------
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn oversized_json_body_is_rejected_with_413(pool: PgPool) {
+    let owner = user(&pool, "u").await;
+    let (_, _, it) = fixture(&pool, owner.id).await;
+    let me = user(&pool, "小明").await;
+    let big = json!({"qty": 1, "message": "x".repeat(70 * 1024)});
+    let (s, _, b) = claim(&pool, it, Uuid::new_v4(), ck(&me.token), big).await;
+    assert_eq!(s, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(b["code"], "PAYLOAD_TOO_LARGE");
+}
