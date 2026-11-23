@@ -442,6 +442,16 @@ async fn invite_create(
     };
     let (token, h) = new_token();
     let mut tx = st.pool.begin().await?;
+    // 與 delete_permanent 同序（wishlists → friend_invites）：鎖住清單並重驗，避免刪除後留下未撤銷的邀請
+    if let Some(w) = wid {
+        sqlx::query_scalar::<_, i32>(
+            "SELECT 1 FROM wishlists WHERE id = $1 AND deleted_at IS NULL FOR SHARE",
+        )
+        .bind(w)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    }
     // 只有不附清單的一般邀請維持「發新的撤銷舊的」；附清單的邀請可並存（舊的照 7 天到期），
     // 否則再次分享會讓先前貼出去的連結失效
     if wid.is_none() {

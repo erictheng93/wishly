@@ -1617,6 +1617,20 @@ async fn address_from_default(
     let w = load_owned(&st.pool, id, u.id).await?;
     check_address_target(&w)?;
     let mut tx = st.pool.begin().await?;
+    // 與 delete_permanent 同序（wishlists → shipping_addresses）：鎖住清單並重驗，避免已刪除的清單被寫回收件資訊
+    let (st_now, gone): (String, bool) = sqlx::query_as(
+        "SELECT status::text, deleted_at IS NOT NULL FROM wishlists WHERE id = $1 FOR SHARE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if gone {
+        return Err(AppError::NotFound);
+    }
+    if matches!(st_now.as_str(), "closed" | "archived") {
+        return Err(closed());
+    }
     let n = sqlx::query("INSERT INTO shipping_addresses (wishlist_id, recipient_name_enc, phone_enc, address_enc)
                          SELECT $1, recipient_name_enc, phone_enc, address_enc FROM user_addresses WHERE user_id = $2 AND kind = 'shipping'
                          ON CONFLICT (wishlist_id) DO UPDATE SET recipient_name_enc = EXCLUDED.recipient_name_enc, phone_enc = EXCLUDED.phone_enc, address_enc = EXCLUDED.address_enc")
@@ -1666,6 +1680,20 @@ async fn address_put(
     check_address_target(&w)?;
     let (name, phone, addr) = address_fields(m, true)?;
     let mut tx = st.pool.begin().await?;
+    // 與 delete_permanent 同序（wishlists → shipping_addresses）：鎖住清單並重驗，避免已刪除的清單被寫回收件資訊
+    let (st_now, gone): (String, bool) = sqlx::query_as(
+        "SELECT status::text, deleted_at IS NOT NULL FROM wishlists WHERE id = $1 FOR SHARE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    if gone {
+        return Err(AppError::NotFound);
+    }
+    if matches!(st_now.as_str(), "closed" | "archived") {
+        return Err(closed());
+    }
     save_address(&mut *tx, id, &name, &phone, &addr).await?;
     // 收件資訊內容一律不進稽核
     crate::orgs::audit_user(

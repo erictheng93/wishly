@@ -693,3 +693,121 @@ async fn funding_tick_skips_deleted_lists(pool: PgPool) {
             .unwrap();
     assert_eq!(fs, "open", "背景工作不可再處理已刪除清單");
 }
+
+// ---- 刪除與「寫入子表」的競態：寫入端須在交易內鎖清單（FOR SHARE）並重驗 ----
+
+fn ship_body() -> Value {
+    json!({"recipient_name": "王小米", "phone": "0912345678", "address": "台北市大安區某路 1 號"})
+}
+
+type Racer = (&'static str, String, Option<Value>);
+
+/// 三個寫入端；from-default 需先有帳號預設收件地址
+async fn racers(pool: &PgPool, o: &TestUser, w: Uuid) -> Vec<Racer> {
+    let sealed = |s: &str| wishly_api::sealed::seal(s.as_bytes());
+    sqlx::query("INSERT INTO user_addresses (user_id, kind, recipient_name_enc, phone_enc, address_enc) VALUES ($1, 'shipping', $2, $3, $4)")
+        .bind(o.id).bind(sealed("王小米")).bind(sealed("0912345678")).bind(sealed("台北市大安區某路 1 號")).execute(pool).await.unwrap();
+    vec![
+        (
+            "PUT",
+            format!("/wishlists/{w}/shipping-address"),
+            Some(ship_body()),
+        ),
+        (
+            "POST",
+            format!("/wishlists/{w}/shipping-address/from-default"),
+            None,
+        ),
+        (
+            "POST",
+            "/friends/invites".to_string(),
+            Some(json!({ "wishlist_id": w })),
+        ),
+    ]
+}
+
+async fn leftovers(pool: &PgPool, w: Uuid) -> (i64, i64) {
+    let a = sqlx::query_scalar("SELECT count(*) FROM shipping_addresses WHERE wishlist_id=$1")
+        .bind(w)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let i = sqlx::query_scalar(
+        "SELECT count(*) FROM friend_invites WHERE wishlist_id=$1 AND revoked_at IS NULL",
+    )
+    .bind(w)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    (a, i)
+}
+
+fn draft_opts() -> ListOpts {
+    ListOpts {
+        status: Some("draft"),
+        visibility: Some("friends"),
+        ..Default::default()
+    }
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn address_and_invite_writers_404_on_deleted_draft(pool: PgPool) {
+    let o = user(&pool, "o").await;
+    let w = wishlist(&pool, o.id, draft_opts()).await;
+    let reqs = racers(&pool, &o, w.id).await;
+    assert_eq!(
+        del(&pool, w.id, &o.token, true).await.0,
+        StatusCode::NO_CONTENT
+    );
+    for (m, uri, body) in reqs {
+        let h = [ck(&o.token), idem(Uuid::new_v4())].concat();
+        let (s, _, b) = call(&pool, m, &uri, &h, body).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{m} {uri}: {b}");
+    }
+    assert_eq!(leftovers(&pool, w.id).await, (0, 0));
+}
+
+/// 另一交易先持有清單列鎖並完成「刪除」：請求必須卡住等鎖，放行後 404、不留子表資料
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn address_and_invite_writers_wait_for_list_lock_then_404(pool: PgPool) {
+    let o = user(&pool, "o").await;
+    let w = wishlist(&pool, o.id, draft_opts()).await;
+    for (m, uri, body) in racers(&pool, &o, w.id).await {
+        let mut held = pool.begin().await.unwrap();
+        sqlx::query("SELECT 1 FROM wishlists WHERE id=$1 FOR UPDATE")
+            .bind(w.id)
+            .execute(&mut *held)
+            .await
+            .unwrap();
+        let app = test_app(&pool);
+        let h = [ck(&o.token), idem(Uuid::new_v4())].concat();
+        let mut req = tokio::spawn(async move { call_app(&app, m, &uri, &h, body).await });
+        let early = tokio::time::timeout(std::time::Duration::from_millis(600), &mut req).await;
+        assert!(early.is_err(), "{m} 應卡在清單列鎖上: {early:?}");
+        sqlx::query("DELETE FROM shipping_addresses WHERE wishlist_id=$1")
+            .bind(w.id)
+            .execute(&mut *held)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE friend_invites SET revoked_at = now() WHERE wishlist_id=$1")
+            .bind(w.id)
+            .execute(&mut *held)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE wishlists SET deleted_at = now(), status = 'archived' WHERE id=$1")
+            .bind(w.id)
+            .execute(&mut *held)
+            .await
+            .unwrap();
+        held.commit().await.unwrap();
+        let (s, _, b) = req.await.unwrap();
+        assert_eq!(s, StatusCode::NOT_FOUND, "{m} 不可寫回已刪除的清單: {b}");
+        assert_eq!(leftovers(&pool, w.id).await, (0, 0));
+        // 還原給下一個寫入端
+        sqlx::query("UPDATE wishlists SET deleted_at = NULL, status = 'draft' WHERE id=$1")
+            .bind(w.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+}
