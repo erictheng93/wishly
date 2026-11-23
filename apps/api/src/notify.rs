@@ -1188,7 +1188,8 @@ impl Lang {
     fn pick(self, zh: String, en: String, vi: String, id: String) -> String {
         match self {
             Lang::Zh => zh,
-            Lang::Hans => Lang::to_hans(&zh),
+            // Hans 由 render_lang 在填入原值前後統一轉換（保護使用者原文），不會走到這裡
+            Lang::Hans => zh,
             Lang::En => en,
             Lang::Vi => vi,
             Lang::Id => id,
@@ -1223,7 +1224,44 @@ fn taipei(payload: &Value, key: &str) -> Option<String> {
         })
 }
 
+fn collect_strs(v: &Value, out: &mut Vec<String>) {
+    match v {
+        Value::String(s) => out.push(s.clone()),
+        Value::Array(a) => a.iter().for_each(|x| collect_strs(x, out)),
+        Value::Object(o) => o.values().for_each(|x| collect_strs(x, out)),
+        _ => {}
+    }
+}
+
+/// 繁中 → 簡中，但 title / payload 的使用者原文（許可字號、清單標題、組織名…）原樣保留
+fn to_hans_protected(text: &str, vals: &[String]) -> String {
+    let mut t = text.to_string();
+    for (i, v) in vals.iter().enumerate() {
+        t = t.replace(v.as_str(), &format!("\u{E000}{i}\u{E001}"));
+    }
+    let mut t = Lang::to_hans(&t);
+    for (i, v) in vals.iter().enumerate() {
+        t = t.replace(&format!("\u{E000}{i}\u{E001}"), v);
+    }
+    t
+}
+
 pub fn render_lang(lang: Lang, kind: &str, title: &str, payload: &Value) -> (String, String) {
+    if lang != Lang::Hans {
+        return render_inner(lang, kind, title, payload);
+    }
+    let (s, b) = render_inner(Lang::Zh, kind, title, payload);
+    let mut vals = vec![title.to_string()];
+    collect_strs(payload, &mut vals);
+    // 純 ASCII 不受轉換影響，且不保護才不會比對到佔位符裡的數字（例 "12"）
+    // shortcut: 長度 < 2 的值不保護、會被轉換，若出現單字使用者內容被改的回報再處理
+    vals.retain(|v| v.chars().count() >= 2 && !v.is_ascii());
+    vals.sort_by(|a, b| b.chars().count().cmp(&a.chars().count()).then(a.cmp(b)));
+    vals.dedup();
+    (to_hans_protected(&s, &vals), to_hans_protected(&b, &vals))
+}
+
+fn render_inner(lang: Lang, kind: &str, title: &str, payload: &Value) -> (String, String) {
     let l = lang;
     let app = crate::config::get().app_url.clone();
     if kind == "auth.password_changed" {
@@ -2114,6 +2152,31 @@ mod tests {
         }
         assert_eq!(Lang::Hans.code(), "zh-CN");
         assert_eq!(Lang::parse(Lang::Hans.code()), Lang::Hans);
+    }
+
+    #[test]
+    fn hans_render_keeps_user_text() {
+        let p = json!({"permit_no": "衛部救字第123號"});
+        let (s, b) = render_lang(Lang::Hans, "org.permit_expiring", "", &p);
+        let all = format!("{s}{b}");
+        assert!(all.contains("衛部救字第123號"), "{all}");
+        assert!(!all.contains("卫部救字") && !all.contains("勸募"), "{all}");
+        let (s, b) = render_lang(Lang::Hans, "org.permit_expiring", "寶寶清單", &p);
+        assert!(
+            s.contains("衛部救字第123號") || b.contains("衛部救字第123號"),
+            "{s}{b}"
+        );
+        // 數字字串不可破壞佔位符：12 個較長的值讓許可字號排在第 12 號，再放一個 "12"
+        let mut m: serde_json::Map<String, Value> = (0..12)
+            .map(|i| (format!("k{i}"), json!(format!("長長長長長長長長{i:02}"))))
+            .collect();
+        m.insert("permit_no".into(), json!("衛部救字第123號"));
+        m.insert("n".into(), json!("12"));
+        let (_, b) = render_lang(Lang::Hans, "org.permit_expiring", "", &Value::Object(m));
+        assert!(b.contains("衛部救字第123號"), "{b}");
+        let (s, b) = render_lang(Lang::Hans, "claim.thank_you", "寶寶清單", &json!({}));
+        let all = format!("{s}{b}");
+        assert!(all.contains("寶寶清單") && all.contains("谢卡"), "{all}");
     }
 
     #[test]
