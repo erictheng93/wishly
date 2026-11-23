@@ -161,6 +161,7 @@
       "loginToView": "Sign in to view",
       "addFriend": "Go to {name}'s page to add as a friend",
       "sendFriendRequest": "Send a friend request to {name}",
+      "acceptFriendRequest": "Accept {name}'s friend request",
       "friendRequestSent": "Friend request sent. You can view this list once they accept.",
       "noJs": "JavaScript is required to give a gift; you can still view the list.",
       "offline": "You are offline. Showing the last loaded content; giving is paused.",

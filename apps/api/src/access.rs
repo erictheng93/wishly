@@ -62,7 +62,26 @@ pub async fn check_wishlist(
             deny("LOGIN_REQUIRED", "此清單僅限特定對象，請先登入").await
         }
         "friends" if are_friends(pool, w.owner_id, viewer.unwrap()).await? => Ok(()),
-        "friends" => deny("FRIENDS_ONLY", "此清單僅限好友查看").await,
+        "friends" => {
+            // 供前端顯示「已送出 / 接受邀請」而非重複要求送出；viewer 必為 Some（None 已在上方回 LOGIN_REQUIRED）
+            let v = viewer.unwrap();
+            let req: Option<bool> = sqlx::query_scalar(
+                "SELECT from_user = $1 FROM friend_requests WHERE (from_user = $1 AND to_user = $2) OR (from_user = $2 AND to_user = $1) LIMIT 1",
+            )
+            .bind(v)
+            .bind(w.owner_id)
+            .fetch_optional(pool)
+            .await?;
+            let req = req.map(|o| if o { "outgoing" } else { "incoming" });
+            deny_with(
+                pool,
+                w,
+                "FRIENDS_ONLY",
+                "此清單僅限好友查看",
+                json!({ "request": req }),
+            )
+            .await
+        }
         "selected" => {
             let ok: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = $1 AND c.friend_id = $2)")
                 .bind(w.owner_id).bind(viewer.unwrap()).fetch_one(pool).await?;
@@ -82,6 +101,16 @@ async fn deny(
     code: &'static str,
     detail: &str,
 ) -> Result<(), AppError> {
+    deny_with(pool, w, code, detail, json!({})).await
+}
+
+async fn deny_with(
+    pool: &sqlx::PgPool,
+    w: &ListAccess<'_>,
+    code: &'static str,
+    detail: &str,
+    more: serde_json::Value,
+) -> Result<(), AppError> {
     let owner: Option<(String, Option<String>)> =
         sqlx::query_as("SELECT display_name, handle FROM users WHERE id = $1")
             .bind(w.owner_id)
@@ -92,8 +121,14 @@ async fn deny(
         status: 403,
         code,
         detail: detail.into(),
-        extra: json!({
-        "visibility": w.visibility, "owner": { "id": w.owner_id, "display_name": name, "handle": handle } }),
+        extra: {
+            let mut e = json!({
+            "visibility": w.visibility, "owner": { "id": w.owner_id, "display_name": name, "handle": handle } });
+            e.as_object_mut()
+                .unwrap()
+                .extend(more.as_object().cloned().unwrap_or_default());
+            e
+        },
     })
 }
 

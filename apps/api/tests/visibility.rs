@@ -126,6 +126,33 @@ async fn friends_list(pool: PgPool) {
         (s, v["code"].as_str()),
         (StatusCode::FORBIDDEN, Some("FRIENDS_ONLY"))
     );
+    assert!(v["request"].is_null());
+    // 路人送出邀請後重開：outgoing；主人先邀請另一人：incoming
+    let to = json!({ "to": c.owner.id });
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        "/friends/requests",
+        &ck(&c.stranger.token),
+        Some(to),
+    )
+    .await;
+    assert!(s.is_success(), "{b}");
+    let (_, _, v) = get(&pool, &slug, &ck(&c.stranger.token)).await;
+    assert_eq!(v["request"], "outgoing");
+    let other = user(&pool, "另一人").await;
+    let to = json!({ "to": other.id });
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        "/friends/requests",
+        &ck(&c.owner.token),
+        Some(to),
+    )
+    .await;
+    assert!(s.is_success(), "{b}");
+    let (_, _, v) = get(&pool, &slug, &ck(&other.token)).await;
+    assert_eq!(v["request"], "incoming");
     for t in [&c.friend.token, &c.owner.token] {
         let (s, h, v) = get(&pool, &slug, &ck(t)).await;
         assert_eq!(s, StatusCode::OK);

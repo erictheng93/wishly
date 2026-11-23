@@ -3141,7 +3141,7 @@ request_id（選填，uuid，0059；找出同一請求寫下的所有紀錄）</
 <h4 id="vis-matrix">清單可見性矩陣</h4>
 <div class="tw"><table><thead><tr><th><code>visibility</code></th><th>誰能看（公開頁 / SSE / 捐助 / 認捐 / 檢舉）</th><th>無權時</th><th>列於擁有者個人頁</th><th>CDN 快取</th></tr></thead><tbody>
 <tr><td><code>public</code></td><td>任何人（<strong>不再限 relief</strong>）</td><td>—</td><td>是（slug 連結）；另列於探索頁 <code>GET /public/wishlists</code></td><td>可（<code>public, s-maxage=10</code>）</td></tr>
-<tr><td><code>friends</code>（預設）</td><td>擁有者的所有好友（需登入）；擁有者本人</td><td>未登入 403 <code>LOGIN_REQUIRED</code>；非好友 403 <code>FRIENDS_ONLY</code></td><td>僅對好友與本人</td><td>不可（<code>private, no-store</code>）</td></tr>
+<tr><td><code>friends</code>（預設）</td><td>擁有者的所有好友（需登入）；擁有者本人</td><td>未登入 403 <code>LOGIN_REQUIRED</code>；非好友 403 <code>FRIENDS_ONLY</code>（body 另帶 <code>request</code>：<code>"outgoing"</code> 已送出邀請 / <code>"incoming"</code> 對方已邀請你 / <code>null</code>）</td><td>僅對好友與本人</td><td>不可（<code>private, no-store</code>）</td></tr>
 <tr><td><code>selected</code>（摯友）</td><td><code>wishlist_allowed_users</code> 名單內的登入者（從好友中勾選的摯友）；擁有者本人</td><td>未登入 403 <code>LOGIN_REQUIRED</code>；不在名單 403 <code>NOT_ALLOWED</code></td><td>僅對名單內的人與本人</td><td>不可</td></tr>
 <tr><td><code>private</code></td><td>僅擁有者</td><td>404 <code>NOT_FOUND</code>（不洩漏存在）；另不可被捐助 / 認捐</td><td>否</td><td>—</td></tr>
 </tbody></table></div>
