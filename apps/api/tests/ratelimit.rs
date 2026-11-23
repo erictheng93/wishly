@@ -218,14 +218,22 @@ async fn cooldown_waits_on_key_lock_then_sees_committed_hit(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn cooldown_holds_across_fixed_window_boundary(pool: PgPool) {
     // 上一次通過在「上一個 60 秒視窗」的最後一秒：距現在 < 60 秒，但固定視窗會當成不同視窗
-    sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('cd', to_timestamp(floor(extract(epoch FROM now()) / 60) * 60 - 1), 1)")
+    // cd_fixed 只驗固定視窗對齊（check_pool 會寫入本視窗列，所以不與 cd 共用 key）
+    sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('cd_fixed', to_timestamp(floor(extract(epoch FROM now()) / 60) * 60 - 1), 1)")
         .execute(&pool)
         .await
         .unwrap();
     assert!(
-        ratelimit::check_pool(&pool, "cd", 1, 60).await.is_ok(),
+        ratelimit::check_pool(&pool, "cd_fixed", 1, 60)
+            .await
+            .is_ok(),
         "固定視窗在邊界另一側會放行"
     );
+    // cd 驗 cooldown：夾在 now() - 55 秒內；視窗最後 5 秒可能不跨邊界，但 cooldown 斷言仍成立
+    sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('cd', GREATEST(to_timestamp(floor(extract(epoch FROM now()) / 60) * 60 - 1), now() - interval '55 seconds'), 1)")
+        .execute(&pool)
+        .await
+        .unwrap();
     assert!(ratelimit::cooldown(&pool, "cd", 60).await.is_err());
     // 通過後再要即被擋；超過間隔才再放行
     ratelimit::cooldown(&pool, "other", 60).await.unwrap();
@@ -257,7 +265,8 @@ async fn anonymous_report_dedupe_holds_across_day_boundary(pool: PgPool) {
     let post = || common::call(&pool, "POST", &uri, &[], Some(json!({"reason": "scam"})));
     assert_eq!(post().await.0, StatusCode::CREATED);
     // 把第一次通過挪到「上一個 UTC 日」的最後一秒：距現在 < 24 小時，但固定視窗會當成不同視窗
-    sqlx::query("UPDATE rate_limits SET window_start = to_timestamp(floor(extract(epoch FROM now()) / 86400) * 86400 - 1) WHERE key LIKE 'report_wl:%'")
+    // 視窗最後 5 秒可能不跨邊界，但 cooldown 斷言仍成立（GREATEST 夾在間隔內）
+    sqlx::query("UPDATE rate_limits SET window_start = GREATEST(to_timestamp(floor(extract(epoch FROM now()) / 86400) * 86400 - 1), now() - interval '86395 seconds') WHERE key LIKE 'report_wl:%'")
         .execute(&pool)
         .await
         .unwrap();
