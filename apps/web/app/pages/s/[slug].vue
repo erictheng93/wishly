@@ -224,8 +224,8 @@ function dismissHint() { setPref('ws_hint_dismissed', '1'); lineHint.value = fal
         <p class="g-mute">{{ apiErrMsg({ code: gate.code, status: 403 }) }}<template v-if="gate.owner">{{ $t('guest.slug.owner', { name: gate.owner.display_name }) }}</template></p>
         <NuxtLink v-if="gate.code === 'LOGIN_REQUIRED'" class="g-btn" :to="{ path: '/login', query: { redirect: `/s/${slug}` } }">{{ $t('guest.slug.loginToView') }}</NuxtLink>
         <template v-else-if="gate.code === 'FRIENDS_ONLY' && gate.owner?.id">
-          <button class="g-btn" :disabled="friendReq !== 'idle'" @click="sendFriendRequest">{{ $t('guest.slug.sendFriendRequest', { name: gate.owner.display_name }) }}</button>
-          <p v-if="friendReq === 'sent'" role="status">{{ $t('guest.slug.friendRequestSent') }}</p>
+          <button class="g-btn" :disabled="friendReq !== 'idle' || gate.request === 'outgoing'" @click="sendFriendRequest">{{ $t(gate.request === 'incoming' ? 'guest.slug.acceptFriendRequest' : 'guest.slug.sendFriendRequest', { name: gate.owner.display_name }) }}</button>
+          <p v-if="friendReq === 'sent' || gate.request === 'outgoing'" role="status">{{ $t('guest.slug.friendRequestSent') }}</p>
           <p v-if="friendErr" class="g-banner err" role="alert">{{ friendErr }}</p>
           <p v-if="gate.owner.handle"><NuxtLink class="g-link" :to="`/u/${gate.owner.handle}`">{{ $t('guest.slug.addFriend', { name: gate.owner.display_name }) }}</NuxtLink></p>
         </template>

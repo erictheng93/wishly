@@ -161,6 +161,7 @@
       "loginToView": "Masuk untuk melihat",
       "addFriend": "Buka halaman {name} untuk berteman",
       "sendFriendRequest": "Kirim permintaan pertemanan ke {name}",
+      "acceptFriendRequest": "Terima permintaan pertemanan dari {name}",
       "friendRequestSent": "Permintaan pertemanan terkirim, setelah diterima kamu bisa melihat wishlist ini",
       "noJs": "Perlu JavaScript untuk kasih hadiah; kamu tetap bisa melihat isi wishlist",
       "offline": "Sedang offline, yang tampil adalah isi terakhir yang dimuat, fitur kasih hadiah dijeda.",

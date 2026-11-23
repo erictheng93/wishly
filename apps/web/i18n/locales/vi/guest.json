@@ -161,6 +161,7 @@
       "loginToView": "Đăng nhập để xem",
       "addFriend": "Đến trang của {name} để kết bạn",
       "sendFriendRequest": "Gửi lời mời kết bạn đến {name}",
+      "acceptFriendRequest": "Chấp nhận lời mời kết bạn của {name}",
       "friendRequestSent": "Đã gửi lời mời kết bạn. Bạn có thể xem danh sách này sau khi họ chấp nhận.",
       "noJs": "Cần bật JavaScript để tặng quà; bạn vẫn có thể xem danh sách.",
       "offline": "Bạn đang ngoại tuyến. Đang hiển thị nội dung tải lần trước, tạm dừng tặng quà.",
