@@ -1,0 +1,41 @@
+{
+  "common": {
+    "language": "语言",
+    "explore": "探索",
+    "myClaims": "我的送礼",
+    "back": "返回",
+    "profile": "个人页",
+    "friendRequests": "{n} 则好友申请",
+    "friends": "好友",
+    "mainMenu": "主菜单",
+    "myLists": "我的清单",
+    "points": "点数",
+    "settings": "设置",
+    "accountMenu": "账号菜单",
+    "admin": "后台",
+    "theme": {
+      "auto": "自动",
+      "light": "浅色",
+      "dark": "深色",
+      "label": "主题：{mode}（点击切换）",
+      "title": "主题：{mode}"
+    },
+    "inspire": "灵感",
+    "brands": "品牌馆",
+    "sys": {
+      "busy": "系统目前较繁忙，部分操作可能失败，请稍候再试。",
+      "readOnly": "系统维护中，目前只能浏览，暂时无法添加或修改。",
+      "busyTitle": "系统繁忙",
+      "busyDesc": "目前使用的人比较多，请稍候几秒再刷新。",
+      "reload": "刷新",
+      "dismiss": "关闭公告"
+    },
+    "support": "联系客服：",
+    "supportSubject": "Wishly 客服",
+    "supportBody": "账号 ID：{id}\n\n问题描述：\n",
+    "supportForm": "或填写客服表单",
+    "notifications": "通知",
+    "unreadCount": "{n} 则未读",
+    "close": "关闭"
+  }
+}

@@ -6,7 +6,7 @@ import { CreatorApiError, errMsg, useApi } from '../app/composables/useApi'
 import { setGuestToken, useGuest } from '../app/composables/useGuest'
 import { apiErrMsg } from '../app/utils/errors'
 
-const messages = Object.fromEntries(['en', 'vi', 'zh-Hant'].map(locale => [locale,
+const messages = Object.fromEntries(['en', 'vi', 'zh-Hant', 'zh-Hans'].map(locale => [locale,
   Object.assign({}, ...readdirSync(`i18n/locales/${locale}`).map(file => JSON.parse(readFileSync(`i18n/locales/${locale}/${file}`, 'utf8')))),
 ]))
 const i18n = createI18n({ legacy: false, locale: 'en', fallbackLocale: false, messages }).global
@@ -90,6 +90,18 @@ it('resolves messages from the current locale on each call', () => {
   expect(apiErrMsg({ status: 500, code: 'INTERNAL_ERROR', detail: 'secret database error' })).not.toContain('secret')
 })
 
+// 後端 detail 是繁中：zh-Hans 走前端 errors.json（與 en / vi 同路徑），並以 zh-CN 送 Accept-Language
+it('zh-Hans translates backend errors instead of showing the Traditional Chinese detail', async () => {
+  i18n.locale.value = 'zh-Hans'
+  fetch.mockRejectedValue({ statusCode: 409, response: { status: 409 }, data: { code: 'INVALID_STATE_TRANSITION', detail: '不允許的狀態轉換' } })
+  const error = await useApi().api('/claims/claim', { method: 'PATCH' }).catch(e => e)
+  expect(fetch.mock.calls[0]![1].headers['Accept-Language']).toBe('zh-CN')
+  expect(error.detail).toBe(i18n.t('errors.INVALID_STATE_TRANSITION'))
+  expect(error.detail).not.toBe('不允許的狀態轉換')
+  expect(errMsg(error)).toBe(error.detail)
+  expect(apiErrMsg({ status: 422, code: 'VALIDATION_FAILED', errors: [{ pointer: '/phone', code: 'FORMAT', detail: '電話只能包含數字' }] })).not.toContain('電話')
+})
+
 it('preserves specific Traditional Chinese creator limits instead of replacing them with HTTP fallbacks', async () => {
   i18n.locale.value = 'zh-Hant'
   fetch.mockRejectedValue({ statusCode: 429, response: { status: 429 }, data: { code: 'RATE_LIMITED', detail: '匯出每日最多 3 次' } })
@@ -99,12 +111,12 @@ it('preserves specific Traditional Chinese creator limits instead of replacing t
 })
 
 // 503 有兩種來源：一般壅塞（SERVICE_UNAVAILABLE）與人機驗證服務連不上（CAPTCHA_UNAVAILABLE），文案不可混用
-it.each(['zh-Hant', 'en', 'vi'])('%s: generic 503 is "busy", only CAPTCHA_UNAVAILABLE mentions verification', locale => {
+it.each(['zh-Hant', 'zh-Hans', 'en', 'vi'])('%s: generic 503 is "busy", only CAPTCHA_UNAVAILABLE mentions verification', locale => {
   i18n.locale.value = locale
   const busy = apiErrMsg({ status: 503, code: 'SERVICE_UNAVAILABLE' })
   const captcha = apiErrMsg({ status: 503, code: 'CAPTCHA_UNAVAILABLE', detail: '人機驗證服務暫時無法使用' })
   expect(busy).toBe(i18n.t('errors.SERVICE_UNAVAILABLE'))
-  expect(busy).not.toMatch(/驗證|verification|xác minh/i)
+  expect(busy).not.toMatch(/驗證|验证|verification|xác minh/i)
   expect(captcha).toBe(i18n.t('errors.CAPTCHA_UNAVAILABLE'))
   expect(captcha).not.toBe(busy)
 })

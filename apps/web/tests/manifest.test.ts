@@ -3,7 +3,8 @@ import { expect, it } from 'vitest'
 
 const load = (f: string) => JSON.parse(readFileSync(`${process.cwd()}/public/${f}`, 'utf8'))
 const base = load('manifest.webmanifest')
-const variants = { en: 'manifest.en.webmanifest', vi: 'manifest.vi.webmanifest', id: 'manifest.id.webmanifest' }
+// 語系碼 → manifest 的 lang
+const variants = { en: 'en', vi: 'vi', id: 'id', 'zh-Hans': 'zh-Hans-CN' }
 
 // 翻譯欄位與 lang 以外必須完全一致，否則各語系安裝出的 App 會不同
 const strip = (m: any) => {
@@ -12,7 +13,8 @@ const strip = (m: any) => {
   return rest
 }
 
-for (const [lang, file] of Object.entries(variants)) {
+for (const [code, lang] of Object.entries(variants)) {
+  const file = `manifest.${code}.webmanifest`
   it(`${file} 與預設 manifest 只差翻譯欄位`, () => {
     const m = load(file)
     expect(m.lang).toBe(lang)

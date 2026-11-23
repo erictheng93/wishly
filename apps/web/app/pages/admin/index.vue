@@ -3,7 +3,7 @@ import '~/assets/console.css' // 後台台帳／KPI 樣式（.c-admin、.k-）
 definePageMeta({ middleware: 'staff' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('admin.index.title') })
-const dl = computed(() => (locale.value === 'zh-Hant' ? 'zh-TW' : locale.value))
+const dl = computed(() => intlLocale())
 const { api } = useApi()
 const { user: me } = useAuth()
 const isAdmin = computed(() => hasStaffRole(me.value, 'admin'))
@@ -244,7 +244,7 @@ onMounted(loadStats)
           <select v-model="nf.level" :disabled="noticeBusy"><option v-for="l in ['info', 'warning', 'critical']" :key="l" :value="l">{{ $t(`admin.index.notices.levels.${l}`) }}</option></select>
         </label>
         <label class="c-field"><span>{{ $t('admin.index.notices.fLocale') }}</span>
-          <select v-model="nf.locale" :disabled="noticeBusy"><option value="">{{ $t('admin.index.notices.allLocales') }}</option><option v-for="l in ['zh-Hant', 'en', 'vi', 'id']" :key="l" :value="l">{{ l }}</option></select>
+          <select v-model="nf.locale" :disabled="noticeBusy"><option value="">{{ $t('admin.index.notices.allLocales') }}</option><option v-for="l in ['zh-Hant', 'zh-Hans', 'en', 'vi', 'id']" :key="l" :value="l">{{ l }}</option></select>
         </label>
         <label class="c-field"><span>{{ $t('admin.index.notices.fStarts') }}</span><input v-model="nf.starts" type="datetime-local" :disabled="noticeBusy"></label>
         <label class="c-field"><span>{{ $t('admin.index.notices.fEnds') }}</span><input v-model="nf.ends" type="datetime-local" :disabled="noticeBusy"></label>
