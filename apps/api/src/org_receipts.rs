@@ -58,8 +58,9 @@ async fn record(
 ) -> Result<Response, AppError> {
     require_role(&st.pool, org, me.id, "volunteer").await?;
     let key = idempotency::key(&headers)?;
-    let req: Req = serde_json::from_slice(&body)
-        .map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))?;
+    let req: Req = crate::error::json_body(&body, || {
+        AppError::invalid("/", "INVALID", "請求內容格式錯誤")
+    })?;
     if !(1..=MAX_QTY).contains(&req.qty) {
         return Err(AppError::invalid(
             "/qty",

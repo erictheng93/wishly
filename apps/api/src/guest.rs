@@ -205,8 +205,9 @@ async fn update_me(
     GuestAuth(gid): GuestAuth,
     body: axum::body::Bytes,
 ) -> Result<Response, AppError> {
-    let v: Value = serde_json::from_slice(&body)
-        .map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))?;
+    let v: Value = crate::error::json_body(&body, || {
+        AppError::invalid("/", "INVALID", "請求內容格式錯誤")
+    })?;
     let name = match v.get("display_name") {
         None | Some(Value::Null) => None,
         Some(Value::String(s)) => {
@@ -311,8 +312,9 @@ async fn recover(
     State(st): State<AppState>,
     body: axum::body::Bytes,
 ) -> Result<Response, AppError> {
-    let v: Value = serde_json::from_slice(&body)
-        .map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))?;
+    let v: Value = crate::error::json_body(&body, || {
+        AppError::invalid("/", "INVALID", "請求內容格式錯誤")
+    })?;
     let tok = v
         .get("token")
         .and_then(Value::as_str)

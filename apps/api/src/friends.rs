@@ -421,9 +421,10 @@ async fn invite_create(
     let wid = if body.iter().all(u8::is_ascii_whitespace) {
         None
     } else {
-        serde_json::from_slice::<InviteBody>(&body)
-            .map_err(|_| AppError::problem(400, "BAD_REQUEST", "body 格式錯誤"))?
-            .wishlist_id
+        crate::error::json_body::<InviteBody>(&body, || {
+            AppError::problem(400, "BAD_REQUEST", "body 格式錯誤")
+        })?
+        .wishlist_id
     };
     let list = match wid {
         None => None,
