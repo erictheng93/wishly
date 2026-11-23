@@ -44,6 +44,7 @@
       "purge": "Xóa vĩnh viễn",
       "purgeTitle": "Xóa vĩnh viễn danh sách",
       "purgeText": "\"{title}\" sẽ bị xóa vĩnh viễn và không thể khôi phục: danh sách, các mục, thông tin nhận hàng và hình ảnh đều bị xóa. Người tặng vẫn thấy hồ sơ của mình trong \"Quà của tôi\", kèm nhãn \"Danh sách đã xóa\".",
+      "purgeDraftText": "Bản nháp \"{title}\" sẽ bị xóa vĩnh viễn và không thể khôi phục: danh sách, các mục và hình ảnh đều bị xóa.",
       "purgeOk": "Xóa vĩnh viễn",
       "purgePrompt": "Nhập tên danh sách \"{title}\" để xác nhận",
       "purgeActiveClaims": "Còn {count} lượt nhận đang xử lý. Hãy hoàn tất hoặc hủy trước khi xóa.",

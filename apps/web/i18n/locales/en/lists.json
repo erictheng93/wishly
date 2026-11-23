@@ -44,6 +44,7 @@
       "purge": "Delete permanently",
       "purgeTitle": "Delete list permanently",
       "purgeText": "\"{title}\" will be permanently deleted and this can't be undone: the list, its items, shipping details and images will be erased. Gifters will still see their records under \"My gifts\", marked \"List deleted\".",
+      "purgeDraftText": "The draft \"{title}\" will be permanently deleted and this can't be undone: the list, its items and images will be erased.",
       "purgeOk": "Delete permanently",
       "purgePrompt": "Type the list name \"{title}\" to confirm",
       "purgeActiveClaims": "{count} claim(s) are still in progress. Complete or cancel them before deleting.",

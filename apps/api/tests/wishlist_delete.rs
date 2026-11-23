@@ -1,4 +1,4 @@
-//! 永久刪除清單：DELETE /wishlists/{id}?permanent=true（只限已封存的個人清單；寫 deleted_at，不實體刪列）。
+//! 永久刪除清單：DELETE /wishlists/{id}?permanent=true（只限草稿或已封存的個人清單；寫 deleted_at，不實體刪列）。
 mod common;
 use axum::http::StatusCode;
 use common::*;
@@ -169,7 +169,7 @@ async fn plain_delete_still_archives(pool: PgPool) {
 #[sqlx::test(migrations = "../../db/migrations")]
 async fn permanent_delete_requires_archived(pool: PgPool) {
     let o = user(&pool, "o").await;
-    for st in ["draft", "active", "closed"] {
+    for st in ["active", "closed"] {
         let w = wishlist(
             &pool,
             o.id,
@@ -184,6 +184,58 @@ async fn permanent_delete_requires_archived(pool: PgPool) {
         assert_eq!(b["code"], "WISHLIST_NOT_ARCHIVED", "{b}");
         assert_eq!(row(&pool, w.id).await, (st.to_string(), false));
     }
+}
+
+/// 從未發佈的草稿可直接永久刪除（不必先封存）；刪除後狀態定為 archived，圖片照常退役。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn draft_can_be_deleted_directly(pool: PgPool) {
+    let o = user(&pool, "o").await;
+    let w = wishlist(
+        &pool,
+        o.id,
+        ListOpts {
+            status: Some("draft"),
+            ..Default::default()
+        },
+    )
+    .await;
+    let (cover, img) = (
+        format!("covers/{}.jpg", Uuid::new_v4()),
+        format!("items/{}.png", Uuid::new_v4()),
+    );
+    sqlx::query("UPDATE wishlists SET cover_image_key=$2, cover_image_status='ready' WHERE id=$1")
+        .bind(w.id)
+        .bind(&cover)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let it = item(&pool, w.id, "奶瓶", 1).await;
+    sqlx::query("UPDATE wishlist_items SET image_key=$2, image_status='ready' WHERE id=$1")
+        .bind(it)
+        .bind(&img)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, b) = del(&pool, w.id, &o.token, true).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{b}");
+    assert_eq!(row(&pool, w.id).await, ("archived".into(), true));
+    let closed: bool =
+        sqlx::query_scalar("SELECT closed_at IS NOT NULL FROM wishlists WHERE id=$1")
+            .bind(w.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(closed);
+    for k in [&cover, &img] {
+        let retiring: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM user_media WHERE user_id=$1 AND object_key=$2 AND (retire_requested_at IS NOT NULL OR deleted_at IS NOT NULL))")
+            .bind(o.id).bind(k).fetch_one(&pool).await.unwrap();
+        assert!(retiring, "{k} 須進入退役流程");
+    }
+    assert_eq!(
+        del(&pool, w.id, &o.token, true).await.0,
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
