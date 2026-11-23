@@ -28,7 +28,7 @@ const stubs = {
 const settle = async () => { await flush(); await flush(); await nextTick() }
 function show(c: any) { const m = mount(c, {}, stubs, { fmtCount, fmtTime, fmtPts, ORDER_STATUS, orderActions, label: (m: any, k: string) => m[k] }); mounted.push(m); return m.el }
 beforeEach(() => {
-  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, fmtCount, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: ref({ staff_roles: ['admin'] }) }), hasStaffRole, STAFF_ROLES, fmtTime: (v: any) => v, errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
+  for (const [k, v] of Object.entries({ ORDER_STATUS, orderActions, fmtPts, fmtCount, computed, nextTick, onMounted, reactive, ref, watch, definePageMeta: () => {}, useHead: () => {}, useApi: () => ({ api }), useAuth: () => ({ user: ref({ staff_roles: ['admin'] }) }), hasStaffRole, STAFF_ROLES, fmtTime: (v: any) => v, intlLocale: () => 'zh-TW', errMsg: (e: any) => e.message, maskEmail, useRoute: () => route, useRouter: () => ({ replace }) })) vi.stubGlobal(k, v)
   route.query = { view: 'rows' } // 檢舉頁預設依對象；既有逐筆測試明指檢視
 })
 afterEach(() => { mounted.splice(0).forEach(m => m.unmount()); vi.unstubAllGlobals(); api.mockReset(); replace.mockReset() })

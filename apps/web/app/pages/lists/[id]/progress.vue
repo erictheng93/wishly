@@ -3,7 +3,7 @@ import '~/assets/creator-pages.css'
 definePageMeta({ middleware: 'auth' })
 const { t, locale } = useI18n()
 useHead({ title: () => t('lists.progress.pageTitle') })
-const dl = computed(() => ({ en: 'en', vi: 'vi', id: 'id' } as Record<string, string>)[locale.value] ?? 'zh-TW')
+const dl = computed(() => ({ 'zh-Hans': 'zh-CN', en: 'en', vi: 'vi', id: 'id' } as Record<string, string>)[locale.value] ?? 'zh-TW')
 const id = useRoute().params.id as string
 const { api } = useApi()
 const d = ref<any>(null)

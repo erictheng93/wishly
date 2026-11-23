@@ -73,7 +73,7 @@ if (data.value) {
     // 預設封面用同名 PNG（scripts/cover-og.mjs 產生），LINE/FB 不支援 SVG
     ogImage: () => data.value?.cover_image_url ?? (data.value?.cover_preset ? `${origin}${coverSrc(data.value).replace(/\.svg$/, '.png')}` : `${origin}/og-default.png`),
     ogImageWidth: 1200, ogImageHeight: 630,
-    ogType: 'website', ogUrl: () => `${origin}/s/${slug}`, ogLocale: () => ({ 'zh-Hant': 'zh_TW', en: 'en_US', vi: 'vi_VN' } as Record<string, string>)[String(locale.value)], twitterCard: 'summary_large_image',
+    ogType: 'website', ogUrl: () => `${origin}/s/${slug}`, ogLocale: () => ({ 'zh-Hant': 'zh_TW', 'zh-Hans': 'zh_CN', en: 'en_US', vi: 'vi_VN', id: 'id_ID' } as Record<string, string>)[String(locale.value)], twitterCard: 'summary_large_image',
   })
 } else useSeoMeta({ title: () => data.value?.title ?? (st.value === 403 ? t('guest.slug.titleForbidden') : gone.value ? t('guest.slug.titleGone') : failed.value ? t('guest.slug.titleFailed') : t('guest.slug.titleNotFound')), robots: 'noindex' }) // 受限清單 client 重抓成功後標題改成清單名
 

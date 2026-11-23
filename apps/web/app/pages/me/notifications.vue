@@ -2,7 +2,7 @@
 import '~/assets/creator-pages.css'
 import { safeRedirect } from '~/utils/redirect'
 definePageMeta({ middleware: 'auth' })
-const { t, locale } = useI18n()
+const { t } = useI18n()
 useHead({ title: () => t('me.notifications.title') })
 const { api } = useApi()
 const { unread, version } = useInbox()
@@ -31,7 +31,7 @@ async function readAll() {
   err.value = ''
   try { await api('/me/notifications/read-all', { method: 'POST' }); const now = new Date().toISOString(); items.value.forEach(n => { n.read_at ||= now }); unread.value = 0 } catch (e) { err.value = errMsg(e) }
 }
-const when = (iso: string) => new Date(iso).toLocaleString(locale.value === 'zh-Hant' ? 'zh-TW' : locale.value, { dateStyle: 'short', timeStyle: 'short' })
+const when = (iso: string) => new Date(iso).toLocaleString(intlLocale(), { dateStyle: 'short', timeStyle: 'short' })
 const pick = (c: string) => router.replace({ query: c === 'all' ? {} : { category: c } })
 // 切分頁重抓；收到即時更新時，只要還沒載入更多就悄悄重抓第一頁（版本號由 useInbox.refresh 遞增）
 watch(cat, () => load())

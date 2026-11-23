@@ -300,9 +300,10 @@ pub(crate) fn rate_limited(secs: i64) -> AppError {
 }
 
 async fn send_mail(to: String, code: String, subject: String, lang: crate::notify::Lang) {
-    use crate::notify::Lang::*;
+    use crate::notify::Lang::{self, *};
     let body = match lang {
         Zh => format!("您的驗證碼是 {code}，10 分鐘內有效。若非本人操作請忽略此信。"),
+        Hans => Lang::to_hans(&format!("您的驗證碼是 {code}，10 分鐘內有效。若非本人操作請忽略此信。")),
         En => format!("Your verification code is {code}. It is valid for 10 minutes. If this wasn't you, please ignore this email."),
         Vi => format!("Mã xác minh của bạn là {code}, có hiệu lực trong 10 phút. Nếu không phải bạn yêu cầu, vui lòng bỏ qua email này."),
         Id => format!("Kode verifikasimu adalah {code}, berlaku selama 10 menit. Kalau bukan kamu yang meminta, abaikan saja email ini."),
@@ -401,11 +402,11 @@ pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
     use crate::notify::Lang::*;
     let lang = crate::notify::request_lang();
     let subject = match (purpose, lang) {
-        ("register", Zh) => "Wishly 註冊驗證碼",
-        ("reset", Zh) => "Wishly 重設密碼驗證碼",
-        ("link", Zh) => "Wishly 綁定 Email 驗證碼",
-        ("reauth", Zh) => "Wishly 身分確認驗證碼",
-        (_, Zh) => "Wishly 登入驗證碼",
+        ("register", Zh | Hans) => "Wishly 註冊驗證碼",
+        ("reset", Zh | Hans) => "Wishly 重設密碼驗證碼",
+        ("link", Zh | Hans) => "Wishly 綁定 Email 驗證碼",
+        ("reauth", Zh | Hans) => "Wishly 身分確認驗證碼",
+        (_, Zh | Hans) => "Wishly 登入驗證碼",
         ("register", En) => "Wishly sign-up verification code",
         ("reset", En) => "Wishly password reset verification code",
         ("link", En) => "Wishly email linking verification code",
@@ -422,12 +423,12 @@ pub(crate) fn send_otp(email: &str, code: String, purpose: &str) {
         ("reauth", Id) => "Kode konfirmasi identitas Wishly",
         (_, Id) => "Kode verifikasi masuk Wishly",
     };
-    tokio::spawn(send_mail(
-        email.to_string(),
-        code,
-        subject.to_string(),
-        lang,
-    )); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
+    let subject = if lang == Hans {
+        crate::notify::Lang::to_hans(subject)
+    } else {
+        subject.to_string()
+    };
+    tokio::spawn(send_mail(email.to_string(), code, subject, lang)); // 寄信失敗不影響回應（避免帳號列舉與外部依賴）
 }
 
 /// 匿名 OTP 請求的閘門（不論帳號是否存在都計數，不洩漏帳號）：
@@ -1132,11 +1133,11 @@ async fn patch_me(
         .await?;
     }
     if let Some(v) = &p.locale {
-        if !["zh-TW", "en", "vi", "id"].contains(&v.as_str()) {
+        if !["zh-TW", "zh-CN", "en", "vi", "id"].contains(&v.as_str()) {
             return Err(AppError::invalid(
                 "/locale",
                 "ENUM",
-                "只能是 zh-TW / en / vi / id",
+                "只能是 zh-TW / zh-CN / en / vi / id",
             ));
         }
         sqlx::query("UPDATE users SET locale=$2 WHERE id=$1")
@@ -1450,7 +1451,7 @@ async fn oauth_start(
             locale: q
                 .locale
                 .as_deref()
-                .filter(|l| ["zh-Hant", "en", "vi", "id"].contains(l))
+                .filter(|l| ["zh-Hant", "zh-Hans", "en", "vi", "id"].contains(l))
                 .map(|l| crate::notify::Lang::parse(l).code().to_string()),
         })
         .unwrap(),

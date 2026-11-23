@@ -34,6 +34,7 @@ hkdf = "0.12"
 aes-gcm = "0.10"
 # 低規主機：glibc malloc 在 JSON 序列化的大量小配置上占 API 約 15% CPU，且長時間運行碎片化較重
 mimalloc = { version = "0.1", default-features = false }
+zhconv = "0.4.2"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

@@ -1,0 +1,221 @@
+{
+  "creator": {
+    "nudge": {
+      "later": "之后再说",
+      "email": {
+        "title": "绑定 Email，账号更有保障",
+        "body": "绑定后，LINE 或 Google 无法使用时也能用验证码登录，还能收到通知邮件。",
+        "link": "前往绑定"
+      },
+      "name": {
+        "title": "设置你的显示名称",
+        "body": "朋友会看到这个名称。它目前取自你的 Email，建议换成大家熟悉的名字。",
+        "link": "修改名称"
+      },
+      "handle": {
+        "title": "设置账号代号，拥有个人页网址",
+        "body": "设了代号，就有一个能分享给任何人的个人页网址，朋友也更容易搜索到你。",
+        "link": "设置代号"
+      }
+    },
+    "confirm": {
+      "cancel": "取消",
+      "busy": "处理中…",
+      "ok": "确认"
+    },
+    "image": {
+      "typeError": "图片限 JPG、PNG、WebP",
+      "tooBig": "图片需在 5 MB 以内",
+      "uploadFail": "上传失败",
+      "cover": "封面图片（选填）",
+      "item": "图片（选填）",
+      "pick": "选择图片",
+      "uploading": "上传中…",
+      "done": "已上传，位置等隐藏信息（EXIF）已移除；处理完成后才会公开显示",
+      "retry": "重新上传",
+      "hint": "JPG・PNG・WebP，5 MB 以内，请勿含个人信息"
+    },
+    "itemSheet": {
+      "titleEdit": "编辑品项",
+      "titleNew": "添加品项",
+      "name": "名称（必填）",
+      "namePh": "例如：奶瓶",
+      "brand": "品牌（选填）",
+      "spec": "规格（选填）",
+      "url": "商品网址（选填）",
+      "mode": "获取方式",
+      "modeQty": "直接送礼",
+      "modeCrowd": "心愿众筹",
+      "modeLocked": "已有人认领或赞助，无法切换获取方式。",
+      "targetPoints": "目标点数（必填，1 点 = NT$1）",
+      "raisedSuffix": "（已募 {n}）",
+      "deadline": "募集截止（台北时间，选填）",
+      "deadlineHint": "留空则使用活动日 23:59；清单没有活动日时必须填写。",
+      "refPrice": "商品参考价格（新台币 NT$，选填）",
+      "crowdNote": "达标后由平台代购寄出，点数不会转成现金给你。需要先填写清单的收件信息。",
+      "fundLocked": "已达标或截止，目标与期限无法修改。",
+      "qty": "需要数量",
+      "claimedSuffix": "（已认领 {n}）",
+      "unitPrice": "参考价格（新台币 NT$，选填）",
+      "priority": "优先度",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "cancel": "取消",
+      "save": "保存品项",
+      "saving": "保存中…",
+      "reload": "重新加载",
+      "fillAddress": "填写收件信息",
+      "errName": "请输入品项名称",
+      "errTarget": "请输入目标点数（正整数）",
+      "errStale": "这个品项已在其他地方被修改，请重新加载",
+      "errAddr": "众筹品项需要先填写收件信息，达标后平台才知道要寄到哪里。",
+      "modeSupport": "支持一份清单",
+      "supportLink": "对方清单的分享链接",
+      "supportBad": "请粘贴有效的清单链接",
+      "supportTarget": "支持：{name}",
+      "supportEnded": "对方清单已结束",
+      "supportNote": "把这个心愿交给对方的清单，朋友的赠礼会算在对方身上。",
+      "more": "更多选项",
+      "again": "保存后继续添加下一个",
+      "deadlineRequired": "募集截止（台北时间，必填）",
+      "deadlineHintNoEvent": "清单没有活动日，请填写截止时间；也可以先到清单设置加上活动日。"
+    },
+    "otp": {
+      "group": "6 位数验证码",
+      "cell": "第 {n} 位"
+    },
+    "password": {
+      "show": "显示",
+      "hide": "隐藏"
+    },
+    "qr": {
+      "label": "分享链接 QR code",
+      "download": "下载 QR"
+    },
+    "shipping": {
+      "intro": "心愿众筹达标后，由平台代购并寄到这里。只有你与负责下单的运营人员看得到，朋友永远看不到。",
+      "recipient": "收件人",
+      "phone": "电话",
+      "address": "地址",
+      "empty": "尚未填写。含众筹品项的清单必须先填写才能发布。",
+      "recipientLabel": "收件人（1–50 字符）",
+      "phoneLabel": "电话（6–20 位，可含 + - 与空白）",
+      "addressLabel": "地址（5–200 字符）",
+      "privacy": "为了保护隐私，修改时需重新输入完整内容。",
+      "saved": "已保存",
+      "saving": "保存中…",
+      "update": "更新收件信息",
+      "save": "保存收件信息",
+      "useDefault": "使用默认收件地址",
+      "useDefaultFailed": "无法填入默认收件地址"
+    },
+    "status": {
+      "draft": "草稿",
+      "active": "进行中",
+      "closed": "已结束",
+      "archived": "已封存",
+      "hidden": "已下架",
+      "ok": "正常",
+      "pending": "图片处理中",
+      "ready": "图片就绪",
+      "rejected": "图片未通过",
+      "reserved": "已认领",
+      "purchased": "已购买",
+      "delivered": "已送达",
+      "cancelled": "已取消",
+      "open": "待处理",
+      "actioned": "已处理",
+      "dismissed": "已驳回"
+    },
+    "vis": {
+      "public": {
+        "label": "公开",
+        "desc": "任何人都能看（含访客），会列在探索页与你的个人页。"
+      },
+      "friends": {
+        "label": "所有好友",
+        "desc": "只有你的好友能开，对方需要登录。"
+      },
+      "selected": {
+        "label": "挚友",
+        "desc": "只有你的挚友名单能开，对方需要登录。"
+      },
+      "private": {
+        "label": "私人",
+        "desc": "只有你自己看得到，朋友打开会显示找不到。"
+      },
+      "who": "谁可以看这份清单",
+      "loading": "加载好友中…",
+      "noFriendsPre": "还没有好友。先到 ",
+      "noFriendsPost": " 邀请朋友，再回来勾选。",
+      "closeCount": "已设 {n} 位挚友",
+      "manage": "管理挚友名单"
+    },
+    "analytics": {
+      "funnel": {
+        "signed_up": "注册",
+        "created_list": "创建清单",
+        "published_list": "发布清单",
+        "received_claim": "有人来送"
+      },
+      "retention": {
+        "d1": "次日留存（第 1 天）",
+        "d7": "第 7–13 天",
+        "d30": "第 30–59 天"
+      },
+      "claimStatus": {
+        "reserved": "已认领",
+        "purchased": "已购买",
+        "delivered": "已送达",
+        "cancelled": "已取消",
+        "expired": "已逾期"
+      },
+      "reason": {
+        "scam": "疑似诈骗",
+        "inappropriate": "不当内容",
+        "copyright": "侵害著作权",
+        "personal_info": "泄露个人信息",
+        "other": "其他"
+      },
+      "wishlistType": {
+        "personal": "心愿清单",
+        "registry": "礼物登记（旧类型）",
+        "relief": "救助"
+      },
+      "wishlistVisibility": {
+        "public": "公开",
+        "friends": "好友",
+        "selected": "指定好友",
+        "private": "私人"
+      },
+      "shareLevel": {
+        "public": "公开",
+        "friends": "好友",
+        "private": "私人"
+      },
+      "device": {
+        "mobile": "手机",
+        "tablet": "平板",
+        "desktop": "电脑"
+      },
+      "viewOther": {
+        "direct": "直接打开",
+        "unknown": "未知"
+      }
+    },
+    "bday": {
+      "label": "生日前 7 天通知看得到这份清单的朋友",
+      "who": {
+        "friends": "会通知你的所有好友。",
+        "selected": "只会通知你在这份清单勾选的挚友。"
+      },
+      "block": {
+        "required": "请先在设置填写生日才能打开。",
+        "private": "你的生日可见度为「只有自己」，请先在设置调整。",
+        "listPrivate": "私人清单不会通知任何人，请先改成其他可见度。"
+      },
+      "goSettings": "前往设置"
+    }
+  }
+}

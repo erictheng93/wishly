@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { isLocalizable, localizedPath, stripLocale } from '../app/utils/localized'
+import { apiLocale, isLocalizable, localizedPath, stripLocale } from '../app/utils/localized'
 
 it('只有可收錄的公開頁加語系前綴', () => {
   for (const p of ['/', '/explore', '/inspire', '/inspire/birthday', '/brands', '/brands/x', '/s/abc', '/e', '/e/x', '/org', '/o/x', '/terms', '/privacy']) expect(isLocalizable(p), p).toBe(true)
@@ -15,4 +15,19 @@ it('localizedPath / stripLocale', () => {
   expect(stripLocale('/vi')).toBe('/')
   expect(stripLocale('/videos')).toBe('/videos') // 前綴要整段相符
   expect(stripLocale('/id/e')).toBe('/e')
+})
+
+it('zh-Hans 前綴一律小寫，大小寫混用的網址也能去前綴', () => {
+  expect(localizedPath('/s/abc', 'zh-Hans')).toBe('/zh-hans/s/abc')
+  expect(localizedPath('/', 'zh-Hans')).toBe('/zh-hans')
+  expect(localizedPath('/zh-hans/s/abc', 'zh-Hant')).toBe('/s/abc')
+  expect(stripLocale('/zh-Hans/explore')).toBe('/explore')
+  expect(stripLocale('/zh-hans')).toBe('/')
+  expect(stripLocale('/zh-hansx')).toBe('/zh-hansx')
+})
+
+it('apiLocale：中文送地區碼', () => {
+  expect(apiLocale('zh-Hant')).toBe('zh-TW')
+  expect(apiLocale('zh-Hans')).toBe('zh-CN')
+  expect(apiLocale('vi')).toBe('vi')
 })

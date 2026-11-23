@@ -1131,12 +1131,14 @@ fn at_str(l: Lang, at: Option<String>) -> String {
     }
 }
 
-/// 信件語言。DB `users.locale` 與 Accept-Language 都以 zh-TW / en / vi / id 為準，其他值一律退回繁中。
+/// 信件語言。DB `users.locale` 與 Accept-Language 都以 zh-TW / zh-CN / en / vi / id 為準，其他值一律退回繁中。
 /// `users.locale` 只在開戶（auth.rs）與設定頁 PATCH /me 寫入，介面語言不同步過來。
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Lang {
     #[default]
     Zh,
+    /// 簡體：由繁中文案執行期轉換（zhconv，大陸用詞），不另存字串
+    Hans,
     En,
     Vi,
     Id,
@@ -1152,14 +1154,32 @@ impl Lang {
         } else if t.starts_with("id") || t == "in" || t.starts_with("in-") {
             // "in" 是 Indonesian 的舊 ISO 639-1 代碼
             Lang::Id
+        } else if matches!(t.as_str(), "zh-cn" | "zh-sg" | "zh-my") || t.starts_with("zh-hans") {
+            Lang::Hans
         } else {
             Lang::Zh
         }
+    }
+    /// 繁中 → 簡中（大陸用詞）
+    pub fn to_hans(zh: &str) -> String {
+        // zhconv 的 ZhCN 詞表不含這幾個常見用語，先在繁中端換成大陸慣用詞再轉字
+        const TERMS: [(&str, &str); 4] = [
+            ("登入", "登錄"),
+            ("設定", "設置"),
+            ("裝置", "設備"),
+            ("信箱", "郵箱"),
+        ];
+        let mut t = zh.to_string();
+        for (a, b) in TERMS {
+            t = t.replace(a, b);
+        }
+        zhconv::zhconv(&t, zhconv::Variant::ZhCN)
     }
     /// 寫進 users.locale 的值
     pub fn code(self) -> &'static str {
         match self {
             Lang::Zh => "zh-TW",
+            Lang::Hans => "zh-CN",
             Lang::En => "en",
             Lang::Vi => "vi",
             Lang::Id => "id",
@@ -1168,6 +1188,7 @@ impl Lang {
     fn pick(self, zh: String, en: String, vi: String, id: String) -> String {
         match self {
             Lang::Zh => zh,
+            Lang::Hans => Lang::to_hans(&zh),
             Lang::En => en,
             Lang::Vi => vi,
             Lang::Id => id,
@@ -2067,6 +2088,51 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn lang_parse_chinese_variants() {
+        for t in [
+            "zh-CN",
+            "zh-cn",
+            "zh-SG",
+            "zh-MY",
+            "zh-Hans",
+            "zh-Hans-CN",
+            "zh-hans-sg",
+        ] {
+            assert_eq!(Lang::parse(t), Lang::Hans, "{t}");
+        }
+        for t in [
+            "zh-TW",
+            "zh-HK",
+            "zh-MO",
+            "zh-Hant",
+            "zh-Hant-TW",
+            "zh",
+            "xx",
+            "",
+        ] {
+            assert_eq!(Lang::parse(t), Lang::Zh, "{t}");
+        }
+        assert_eq!(Lang::Hans.code(), "zh-CN");
+        assert_eq!(Lang::parse(Lang::Hans.code()), Lang::Hans);
+    }
+
+    #[test]
+    fn hans_render_is_simplified_and_keeps_brand() {
+        let p = json!({});
+        let (s, b) = render_lang(Lang::Hans, "auth.password_changed", "", &p);
+        assert!(s.contains("【Wishly】密码已变更"), "{s}");
+        assert!(
+            b.contains("账号") && b.contains("设置") && b.contains("登录") && b.contains("设备"),
+            "{b}"
+        );
+        assert!(
+            !b.contains('帳') && !b.contains('設') && !b.contains('裝'),
+            "{b}"
+        );
+        assert!(Lang::to_hans("LINE 登入").contains("LINE"));
+    }
+
+    #[test]
     fn quiet_hours_taipei() {
         // 台北 21:00 = UTC 13:00；09:00 = UTC 01:00
         let q = |h, m| quiet_until(Utc.with_ymd_and_hms(2026, 10, 31, h, m, 0).unwrap());
@@ -2098,7 +2164,7 @@ mod tests {
         let p = json!({"givers": 2, "amount": 100, "debt": 5, "status": "completed", "from_name": "A", "hidden": true});
         let fallback = |l| render_lang(l, "no.such.kind", "", &p).0;
         for kind in KINDS {
-            for l in [Lang::Zh, Lang::En, Lang::Vi, Lang::Id] {
+            for l in [Lang::Zh, Lang::Hans, Lang::En, Lang::Vi, Lang::Id] {
                 let (s, b) = render_lang(l, kind, "T", &p);
                 assert_ne!(s, fallback(l), "{kind} {l:?} 落到預設主旨");
                 assert!(!b.trim().is_empty(), "{kind} {l:?}");
@@ -2113,7 +2179,7 @@ mod tests {
         let p = json!({"givers": 2, "amount": 100, "debt": 5, "status": "completed", "from_name": "A", "hidden": true,
                        "unsubscribe_url": "https://x.test/api/v1/unsubscribe?token=t"});
         for kind in KINDS {
-            for l in [Lang::Zh, Lang::En, Lang::Vi, Lang::Id] {
+            for l in [Lang::Zh, Lang::Hans, Lang::En, Lang::Vi, Lang::Id] {
                 let b = inbox_body(&render_lang(l, kind, "T", &p).1);
                 assert!(!b.is_empty() && !b.contains("://"), "{kind} {l:?}: {b:?}");
             }
