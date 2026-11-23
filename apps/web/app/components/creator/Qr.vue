@@ -1,12 +1,22 @@
 <script setup lang="ts">
-import { renderSVG } from 'uqr'
+import { encode, renderSVG } from 'uqr'
 // download=false：內容是機密（如 TOTP 金鑰）時不提供存檔
 const props = withDefaults(defineProps<{ text: string, size?: number, label?: string, download?: boolean }>(), { size: 200, download: true })
 const svg = computed(() => props.text ? renderSVG(props.text, { ecc: 'M', border: 2 }) : '')
+// 存成 PNG：SVG 在手機相簿、LINE 等多半打不開；QR 只有黑白，PNG 無損且比 JPG 銳利
 function save() {
-  const url = URL.createObjectURL(new Blob([svg.value], { type: 'image/svg+xml' }))
-  const a = Object.assign(document.createElement('a'), { href: url, download: 'wishly-qr.svg' })
-  a.click(); URL.revokeObjectURL(url)
+  const { size, data } = encode(props.text, { ecc: 'M', border: 4 })
+  const px = Math.ceil(1024 / size)
+  const canvas = Object.assign(document.createElement('canvas'), { width: size * px, height: size * px })
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#000'
+  data.forEach((row, y) => row.forEach((on, x) => on && ctx.fillRect(x * px, y * px, px, px)))
+  canvas.toBlob((blob) => {
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    Object.assign(document.createElement('a'), { href: url, download: 'wishly-qr.png' }).click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }, 'image/png')
 }
 </script>
 <template>
