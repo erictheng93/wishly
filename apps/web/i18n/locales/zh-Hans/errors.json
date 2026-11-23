@@ -110,7 +110,7 @@
     "WALLET_FROZEN": "钱包已冻结，请联系客服",
     "WISHLIST_CLOSED": "清单已结束或封存，无法执行此操作",
     "WISHLIST_NOT_PUBLISHABLE": "清单尚有未完成的必填内容，请补齐后再发布",
-    "WISHLIST_NOT_ARCHIVED": "只有已封存的清单才能永久删除",
+    "WISHLIST_NOT_ARCHIVED": "只有草稿或已封存的清单才能永久删除",
     "WISHLIST_HAS_ACTIVE_CLAIMS": "还有进行中的认领，完成或取消后才能删除",
     "WISHLIST_HAS_ACTIVE_ORDERS": "还有进行中的采购，完成后才能删除",
     "EXTENSION_USED": "购买期限只能延长一次",

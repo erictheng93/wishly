@@ -44,6 +44,7 @@
       "purge": "永久删除",
       "purgeTitle": "永久删除清单",
       "purgeText": "「{title}」将被永久删除，无法恢复：清单、品项、收件信息与图片都会被清除。送礼者仍会在自己的「我的捐助」看到记录，并标示「清单已删除」。",
+      "purgeDraftText": "草稿「{title}」将被永久删除，无法恢复：清单、品项与图片都会被清除。",
       "purgeOk": "确认永久删除",
       "purgePrompt": "请输入清单名称「{title}」以确认",
       "purgeActiveClaims": "还有 {count} 个进行中的认领，完成或取消后才能删除。",
