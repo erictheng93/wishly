@@ -161,6 +161,7 @@
       "loginToView": "登录后查看",
       "addFriend": "前往 {name} 的页面加好友",
       "sendFriendRequest": "发送好友邀请给 {name}",
+      "acceptFriendRequest": "接受 {name} 的好友邀请",
       "friendRequestSent": "已发送好友邀请，对方接受后就能看到这份清单",
       "noJs": "需要 JavaScript 才能送礼；你仍可查看清单内容",
       "offline": "目前离线，显示的是上次加载的内容，送礼功能暂停。",
