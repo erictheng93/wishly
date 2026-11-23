@@ -132,7 +132,7 @@ fn clean(s: Option<&str>, ptr: &str, multi: bool) -> Result<Option<String>, AppE
 }
 
 fn parse<T: DeserializeOwned>(b: &[u8]) -> Result<T, AppError> {
-    serde_json::from_slice(b).map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))
+    crate::error::json_body(b, || AppError::invalid("/", "INVALID", "請求內容格式錯誤"))
 }
 
 fn no_store(status: StatusCode) -> axum::http::response::Builder {

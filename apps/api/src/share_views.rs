@@ -197,7 +197,8 @@ async fn record(
         return Ok(StatusCode::NO_CONTENT);
     }
     // 各欄位獨立解析：一個壞欄位不影響其他
-    let b: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
+    let b: serde_json::Value =
+        crate::error::json_body(&body, || AppError::NotFound).unwrap_or_default();
     let visitor_id = b["visitor_id"]
         .as_str()
         .and_then(|v| uuid::Uuid::parse_str(v).ok());
