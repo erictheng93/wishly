@@ -238,3 +238,28 @@ async fn cooldown_holds_across_fixed_window_boundary(pool: PgPool) {
     .unwrap();
     ratelimit::cooldown(&pool, "other", 60).await.unwrap();
 }
+
+/// 回歸：匿名檢舉「同清單同 IP 24 小時 1 筆」不可因 86400 秒固定視窗（epoch 對齊）在 UTC 午夜被繞過。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn anonymous_report_dedupe_holds_across_day_boundary(pool: PgPool) {
+    let owner = common::user(&pool, "O").await;
+    let l = common::wishlist(
+        &pool,
+        owner.id,
+        common::ListOpts {
+            visibility: Some("public"),
+            ..Default::default()
+        },
+    )
+    .await;
+    common::item(&pool, l.id, "x", 1).await;
+    let uri = format!("/public/wishlists/{}/reports", l.slug);
+    let post = || common::call(&pool, "POST", &uri, &[], Some(json!({"reason": "scam"})));
+    assert_eq!(post().await.0, StatusCode::CREATED);
+    // 把第一次通過挪到「上一個 UTC 日」的最後一秒：距現在 < 24 小時，但固定視窗會當成不同視窗
+    sqlx::query("UPDATE rate_limits SET window_start = to_timestamp(floor(extract(epoch FROM now()) / 86400) * 86400 - 1) WHERE key LIKE 'report_wl:%'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(post().await.0, StatusCode::TOO_MANY_REQUESTS);
+}
