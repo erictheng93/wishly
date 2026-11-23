@@ -39,7 +39,7 @@ pub const C_JSON: &str = "jsonb_build_object('id', c.id, 'item_id', c.item_id, '
     'created_at', c.created_at, 'updated_at', c.updated_at)";
 
 fn parse<T: serde::de::DeserializeOwned>(b: &[u8]) -> Result<T, AppError> {
-    serde_json::from_slice(b).map_err(|_| AppError::invalid("/", "INVALID", "請求內容格式錯誤"))
+    crate::error::json_body(b, || AppError::invalid("/", "INVALID", "請求內容格式錯誤"))
 }
 
 fn json_resp(status: u16, body: &Value, replay: bool) -> Response {

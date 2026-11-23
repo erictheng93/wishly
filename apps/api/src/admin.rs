@@ -756,7 +756,7 @@ async fn create_notice(
     }
     if b.locale
         .as_deref()
-        .is_some_and(|l| !["zh-Hant", "en", "vi", "id"].contains(&l))
+        .is_some_and(|l| !["zh-Hant", "zh-Hans", "en", "vi", "id"].contains(&l))
     {
         return Err(AppError::invalid(
             "/locale",

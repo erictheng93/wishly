@@ -51,6 +51,20 @@ impl AppError {
     }
 }
 
+/// 手動解析的 JSON 請求本文上限（這些端點的合法本文都遠小於此）
+pub const MAX_JSON_BODY: usize = 64 * 1024;
+
+/// 先擋超長本文（413）再解析；格式錯誤沿用各處自己的 `bad` 錯誤
+pub fn json_body<T: serde::de::DeserializeOwned>(
+    b: &[u8],
+    bad: impl FnOnce() -> AppError,
+) -> Result<T, AppError> {
+    if b.len() > MAX_JSON_BODY {
+        return Err(AppError::problem(413, "PAYLOAD_TOO_LARGE", "請求內容過大"));
+    }
+    serde_json::from_slice(b).map_err(|_| bad())
+}
+
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
         AppError::Db(e)

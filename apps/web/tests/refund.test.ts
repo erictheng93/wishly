@@ -125,14 +125,14 @@ describe('後台動作對應', () => {
 describe('現金退款 i18n 完整性', () => {
   const root = `${process.cwd()}/i18n/locales`
   const load = (loc: string, f: string) => JSON.parse(readFileSync(`${root}/${loc}/${f}.json`, 'utf8'))
-  const locales = ['zh-Hant', 'en', 'vi']
+  const locales = ['zh-Hant', 'zh-Hans', 'en', 'vi']
   const flat = (o: any, p = ''): Record<string, string> =>
     Object.fromEntries(Object.entries(o).flatMap(([k, v]) => typeof v === 'string' ? [[p + k, v]] : Object.entries(flat(v, `${p}${k}.`))))
   const all = (loc: string) => ({ ...flat(load(loc, 'me')), ...flat(load(loc, 'admin')) })
   const scoped = (loc: string) => Object.fromEntries(Object.entries(all(loc)).filter(([k]) => /^(me\.refund\.|me\.frozenBanner|me\.wallet\.refund|admin\.(cashRefunds|walletDebts|topups)\.|admin\.index\.nav\.(cashRefunds|walletDebts|topups))/.test(k)))
   const params = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort()
 
-  it('en / vi 與 zh-Hant 的 key 集合相同', () => {
+  it('zh-Hans / en / vi 與 zh-Hant 的 key 集合相同', () => {
     const base = Object.keys(scoped('zh-Hant')).sort()
     expect(base.length).toBeGreaterThan(100)
     for (const loc of locales.slice(1)) expect(Object.keys(scoped(loc)).sort(), loc).toEqual(base)

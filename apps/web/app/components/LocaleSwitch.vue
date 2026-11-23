@@ -9,7 +9,7 @@ async function change(code: any) {
 }
 const list = computed(() => locales.value.map(l => (typeof l === 'string' ? { code: l, name: l } : l)))
 // 窄手機頁首放不下「Tiếng Việt」「Bahasa Indonesia」：可見文字改短代碼，原生 select 透明覆蓋其上（鍵盤、讀屏、選單行為不變）
-const SHORT: Record<string, string> = { 'zh-Hant': '中', en: 'EN', vi: 'VI', id: 'ID' }
+const SHORT: Record<string, string> = { 'zh-Hant': '中', 'zh-Hans': '简', en: 'EN', vi: 'VI', id: 'ID' }
 const cur = computed(() => list.value.find(l => l.code === locale.value) ?? { code: locale.value, name: locale.value })
 </script>
 <template>
