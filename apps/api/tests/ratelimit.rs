@@ -186,3 +186,55 @@ async fn cleanup_removes_old_rows(pool: PgPool) {
     );
     common::assert_all_reconciled(&pool).await;
 }
+
+/// 並行的 cooldown 必須排隊：fixture 交易持同一把鎖並寫入未提交的通過紀錄，cooldown 要卡住，
+/// 提交後才看得到那列而回 429；沒有鎖就會讀不到未提交列而直接放行（mutant otp-cooldown-lock）。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cooldown_waits_on_key_lock_then_sees_committed_hit(pool: PgPool) {
+    let mut fx = pool.begin().await.unwrap();
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('cooldown:k', 0))")
+        .execute(&mut *fx)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('k', now(), 1)")
+        .execute(&mut *fx)
+        .await
+        .unwrap();
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *fx)
+        .await
+        .unwrap();
+    let p = pool.clone();
+    let h = tokio::spawn(async move { ratelimit::cooldown(&p, "k", 60).await });
+    common::wait_for_blocked(&pool, pid, 1).await;
+    fx.commit().await.unwrap();
+    assert!(
+        h.await.unwrap().is_err(),
+        "cooldown 沒有等鎖，放行了並行請求"
+    );
+}
+
+/// 回歸：固定視窗以 epoch 對齊，跨過 60 秒邊界的兩次請求會各算一次；cooldown 必須仍擋下。
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn cooldown_holds_across_fixed_window_boundary(pool: PgPool) {
+    // 上一次通過在「上一個 60 秒視窗」的最後一秒：距現在 < 60 秒，但固定視窗會當成不同視窗
+    sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ('cd', to_timestamp(floor(extract(epoch FROM now()) / 60) * 60 - 1), 1)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        ratelimit::check_pool(&pool, "cd", 1, 60).await.is_ok(),
+        "固定視窗在邊界另一側會放行"
+    );
+    assert!(ratelimit::cooldown(&pool, "cd", 60).await.is_err());
+    // 通過後再要即被擋；超過間隔才再放行
+    ratelimit::cooldown(&pool, "other", 60).await.unwrap();
+    assert!(ratelimit::cooldown(&pool, "other", 60).await.is_err());
+    sqlx::query(
+        "UPDATE rate_limits SET window_start = now() - interval '61 seconds' WHERE key='other'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    ratelimit::cooldown(&pool, "other", 60).await.unwrap();
+}

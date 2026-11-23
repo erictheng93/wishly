@@ -71,6 +71,34 @@ pub async fn check_pool(
     verdict(hit(pool, HIT_SQL_ASYNC, key, limit, window_secs).await?)
 }
 
+/// 真正的滑動冷卻：距上一次通過不足 `gap_secs` 就回 429。固定視窗（`check`）以 epoch 對齊，
+/// 兩次請求跨過視窗邊界時會各算一次而都通過，無法保證「N 秒間隔」。
+/// 以 advisory lock 串行化同一鍵的並行請求；通過時以 now() 為 window_start 記一列（沿用 2 天清除）。
+pub async fn cooldown(pool: &sqlx::PgPool, key: &str, gap_secs: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(format!("cooldown:{key}"))
+        .execute(&mut *tx)
+        .await?;
+    let wait: Option<i64> = sqlx::query_scalar(
+        "SELECT ceil(extract(epoch FROM max(window_start) + make_interval(secs => $2) - now()))::bigint
+           FROM rate_limits WHERE key = $1 AND window_start > now() - make_interval(secs => $2)",
+    )
+    .bind(key)
+    .bind(gap_secs as f64)
+    .fetch_one(&mut *tx)
+    .await?;
+    if let Some(retry) = wait {
+        return verdict((false, retry.max(1)));
+    }
+    sqlx::query("INSERT INTO rate_limits (key, window_start, count) VALUES ($1, now(), 1)")
+        .bind(key)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 /// 不報錯版本：超限回 false（用於「超限就略過副作用」，如不寄信）
 pub async fn allow<'e>(
     pool: impl sqlx::PgExecutor<'e>,

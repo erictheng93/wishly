@@ -443,7 +443,7 @@ pub(crate) async fn otp_gate(
     if !crate::ratelimit::allow_pool(pool, &format!("otp_soft:{purpose}:{email}"), 3, 3600).await? {
         require_captcha(turnstile_token, ip).await?;
     }
-    crate::ratelimit::check_pool(pool, &format!("otp_gap:{purpose}:{ip}:{email}"), 1, 60).await
+    crate::ratelimit::cooldown(pool, &format!("otp_gap:{purpose}:{ip}:{email}"), 60).await
 }
 
 /// Turnstile 驗證；缺 / 錯 token 回 403 CAPTCHA_REQUIRED（前端據此顯示人機驗證）。
