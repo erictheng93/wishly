@@ -110,7 +110,7 @@
     "WALLET_FROZEN": "Your wallet is frozen. Please contact support.",
     "WISHLIST_CLOSED": "This list is closed or archived. This action is no longer available.",
     "WISHLIST_NOT_PUBLISHABLE": "Complete the required list details before publishing.",
-    "WISHLIST_NOT_ARCHIVED": "Only archived lists can be permanently deleted.",
+    "WISHLIST_NOT_ARCHIVED": "Only draft or archived lists can be permanently deleted.",
     "WISHLIST_HAS_ACTIVE_CLAIMS": "There are claims still in progress. Complete or cancel them before deleting.",
     "WISHLIST_HAS_ACTIVE_ORDERS": "There are purchase orders still in progress. Wait until they finish before deleting.",
     "EXTENSION_USED": "The purchase deadline can only be extended once.",

@@ -99,7 +99,7 @@ CASES = {
     "receipt-claim-for-share": (API + "org_receipts.rs", "record", " FOR SHARE OF c", "", "relief_receipts", "linked_receipt_waits_on_claim_lock_then_sees_cancel"),
     "receipt-claim-on-conflict": (API + "org_receipts.rs", "record", "ON CONFLICT (claim_id) WHERE claim_id IS NOT NULL AND voided_at IS NULL DO NOTHING ", "", "relief_receipts", "linked_receipt_notifies_only_its_donor_and_can_be_corrected"),
     "thank-you-claim-lock": (API + "claims.rs", "thank_you", " FOR UPDATE OF c", "", "owner_claim_actions", "thank_you_waits_on_claim_lock_and_never_overwrites"),
-    "wishlist-delete-archived-only": (API + "wishlists.rs", "delete_permanent", "WHERE id = $1 AND status = 'archived' AND deleted_at IS NULL FOR UPDATE", "WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", "wishlist_delete", "permanent_delete_requires_archived"),
+    "wishlist-delete-archived-only": (API + "wishlists.rs", "delete_permanent", "WHERE id = $1 AND status IN ('archived', 'draft') AND deleted_at IS NULL FOR UPDATE", "WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", "wishlist_delete", "permanent_delete_requires_archived"),
     "wishlist-delete-active-claims": (API + "wishlists.rs", "delete_permanent", "c.status IN ('reserved', 'purchased')", "c.status IN ('reserved')", "wishlist_delete", "active_claims_block_delete_until_finished"),
     "wishlist-delete-active-orders": (API + "wishlists.rs", "delete_permanent", "AND (i.funding_status = 'funded'", "AND (false", "wishlist_delete", "active_purchase_blocks_delete_until_delivered"),
     "login-cleared-filter": (API + "auth_ext.rs", "login_failure_counts", "AND cleared_at IS NULL AND", "AND", "account_security", "login_success_clears_lockout_but_keeps_failures_for_analytics"),
