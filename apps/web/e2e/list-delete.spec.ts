@@ -30,6 +30,28 @@ test('封存 → 已封存檢視 → 輸入清單名稱才能永久刪除；卡�
   await expect(page.locator('article.c-card', { hasText: list.title })).toHaveCount(0)
 })
 
+test('草稿清單：卡片只有「永久刪除」沒有封存；視窗免輸入名稱，確認後清單消失', async ({ page }) => {
+  const owner = await registerUser({ tag: 'purge' })
+  const list = await createList(owner, { items: [{ title: '奶瓶' }], publish: false })
+  await loginBrowser(page.context(), owner)
+
+  await page.goto('/dashboard')
+  const card = page.locator('article.c-card', { hasText: list.title })
+  await expect(card.getByTestId('purge-btn')).toBeVisible()
+  await expect(card.getByRole('button', { name: '封存' })).toHaveCount(0)
+  await card.getByTestId('purge-btn').click()
+  const dlg = page.getByRole('dialog', { name: '永久刪除清單' })
+  await expect(dlg.getByRole('textbox')).toHaveCount(0)
+  const ok = dlg.getByRole('button', { name: '確認永久刪除' })
+  await expect(ok).toBeEnabled()
+  await ok.click()
+  await expect(dlg).toHaveCount(0)
+  await expect(card).toHaveCount(0)
+  await page.getByRole('button', { name: '已封存的清單' }).click()
+  await expect(page.locator('article.c-card', { hasText: list.title })).toHaveCount(0)
+  expect((await owner.api.get(`wishlists/${list.id}`)).status()).toBe(404)
+})
+
 test('有進行中的認領時永久刪除：視窗內顯示原因與數量，清單仍在', async ({ page }) => {
   const owner = await registerUser({ tag: 'purge' })
   const list = await createList(owner, { items: [{ title: '尿布', qty: 3 }] })
