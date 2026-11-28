@@ -177,9 +177,8 @@ async fn invite_create(
     crate::ratelimit::check_pool(&st.pool, &format!("org-invite:{}", u.id), 30, 3600).await?;
     let (token, h) = new_token();
     let url = format!("{}/org/invite/{token}", crate::auth::app_url());
-    let mut tx = crate::begin_contended(&st.pool).await?;
-    // 先鎖組織（鎖序 organizations → org_members / org_invites），與 accept / update_member 序列化
-    lock_org(&mut tx, id).await?;
+    // 刻意不鎖組織：並行重邀最多留下兩張有效邀請，accept 會重驗
+    let mut tx = st.pool.begin().await?;
     let existing: Option<Uuid> =
         sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL")
             .bind(&email)
