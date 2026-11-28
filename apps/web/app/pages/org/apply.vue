@@ -83,10 +83,9 @@ async function next() {
 }
 async function upload(kind: 'registration' | 'permit', file: File | undefined) {
   if (!file) return null
-  if (file.size > 10 * 1024 * 1024) { err.value = t('org.apply.fileBig'); return null }
-  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) { err.value = t('org.apply.fileType'); return null }
-  // File 不會被 ofetch 序列化；走 api() 才有錯誤正規化與 401 導向
-  return await api<any>(`/orgs/${org.value.id}/documents`, { method: 'POST', query: { kind }, body: file, headers: { 'Content-Type': file.type } })
+  const bad = docFileError(file)
+  if (bad) { err.value = t(bad); return null }
+  return await uploadOrgDoc(api, org.value.id, kind, file)
 }
 const onFile = (kind: 'registration' | 'permit', e: Event) => {
   const input = e.target as HTMLInputElement
@@ -97,12 +96,10 @@ const onFile = (kind: 'registration' | 'permit', e: Event) => {
 }
 const delDoc = (id: string) => run(async () => { await api(`/orgs/${org.value.id}/documents/${id}`, { method: 'DELETE' }); await reload() })
 const addPermit = () => run(async () => {
-  const d = await upload('permit', permitFile.value ?? undefined)
-  if (!d) return
-  try { await api(`/orgs/${org.value.id}/permits`, { method: 'POST', body: { ...permit, document_id: d.id } }) } catch (e) {
-    await api(`/orgs/${org.value.id}/documents/${d.id}`, { method: 'DELETE' }).catch(() => {}) // 不留孤兒文件
-    throw e
-  }
+  const file = permitFile.value
+  const bad = file && docFileError(file)
+  if (!file || bad) { if (bad) err.value = t(bad); return }
+  await addPermitWithDoc(api, org.value.id, permit, file)
   Object.assign(permit, { permit_no: '', valid_from: '', valid_to: '' }); permitFile.value = null; permitKey.value++
   await reload()
 })

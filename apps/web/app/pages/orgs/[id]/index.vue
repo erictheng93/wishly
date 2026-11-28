@@ -48,20 +48,12 @@ onMounted(async () => {
   } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
   if (location.hash === '#permits') nextTick(() => document.getElementById('permits')?.scrollIntoView()) // 區塊載入後才渲染，瀏覽器原生錨點跳不到
 })
-// 與 org/apply.vue 的 upload / addPermit 相同；已上線組織刪文件會 409，故清理失敗要吞掉
-async function upload(file: File) {
-  if (file.size > 10 * 1024 * 1024) throw new Error(t('org.apply.fileBig'))
-  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error(t('org.apply.fileType'))
-  return await api<any>(`/orgs/${id}/documents`, { method: 'POST', query: { kind: 'permit' }, body: file, headers: { 'Content-Type': file.type } })
-}
 async function addPermit() {
   err.value = msg.value = ''; busy.value = true
   try {
-    const d = await upload(permitFile.value!)
-    try { await api(`/orgs/${id}/permits`, { method: 'POST', body: { ...permit, document_id: d.id } }) } catch (e) {
-      await api(`/orgs/${id}/documents/${d.id}`, { method: 'DELETE' }).catch(() => {})
-      throw e
-    }
+    const bad = docFileError(permitFile.value!)
+    if (bad) { err.value = t(bad); return }
+    await addPermitWithDoc(api, id, permit, permitFile.value!)
     Object.assign(permit, { permit_no: '', valid_from: '', valid_to: '' }); permitFile.value = null
     await loadPermits(); msg.value = t('org.console.permitSaved')
   } catch (e) { err.value = errMsg(e) } finally { busy.value = false }
