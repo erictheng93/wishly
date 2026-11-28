@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 全站線條圖示：取代 ‹ ☀ ▾ ＋ → 等 Unicode 字元（各平台字形、粗細不一，螢幕閱讀器還會念出「左箭頭」）。
 // 一律 1.5px 線寬、currentColor、裝飾用（aria-hidden）；按鈕的名稱由按鈕自己的文字或 aria-label 提供。
-type IconName = 'back' | 'chevron-down' | 'arrow-right' | 'arrow-up' | 'arrow-down' | 'plus' | 'minus' | 'sun' | 'moon' | 'auto' | 'line' | 'google' | 'mail' | 'refresh' | 'instagram' | 'threads' | 'youtube' | 'facebook' | 'tiktok' | 'x' | 'github' | 'link'
+type IconName = 'back' | 'chevron-down' | 'arrow-right' | 'arrow-up' | 'arrow-down' | 'plus' | 'minus' | 'check' | 'sun' | 'moon' | 'auto' | 'line' | 'google' | 'mail' | 'refresh' | 'instagram' | 'threads' | 'youtube' | 'facebook' | 'tiktok' | 'x' | 'github' | 'link'
 const props = withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 20 })
 const PATHS: Record<IconName, string> = {
   back: 'M15 5l-7 7 7 7',
@@ -11,6 +11,7 @@ const PATHS: Record<IconName, string> = {
   'arrow-down': 'M12 4v16M6 14l6 6 6-6',
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
   refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4',
   // 外部連結的網站示意（單色線條，不用官方標誌）
   instagram: 'M4 4h16v16H4zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM16.5 7.5h.01',

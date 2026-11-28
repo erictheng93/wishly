@@ -13,6 +13,7 @@
     "prep3": "Số giấy phép vận động quyên góp",
     "cta": "Đăng ký làm tổ chức công ích →",
     "loginHint": "Tổ chức công ích? Đăng ký tại đây",
+    "menuApply": "Đăng ký tổ chức phi lợi nhuận",
     "personal": "Cá nhân",
     "switchTitle": "Chuyển danh tính",
     "badge": "Chế độ tổ chức",
@@ -37,6 +38,8 @@
       "permitNo": "Số giấy phép",
       "validFrom": "Có hiệu lực từ",
       "validTo": "Có hiệu lực đến",
+      "permitPending": "Tệp giấy phép chưa được thêm. Hãy bấm \"Thêm giấy phép\" trước",
+      "docsRequired": "Tải lên ít nhất 1 giấy đăng ký và thêm ít nhất 1 giấy phép",
       "addPermit": "Thêm giấy phép",
       "remove": "Xóa",
       "agree": "Tôi cam đoan thông tin là đúng và đồng ý điều khoản tổ chức",
@@ -78,6 +81,12 @@
     },
     "console": {
       "title": "Bảng điều khiển tổ chức",
+      "nextTitle": "Bước tiếp theo",
+      "next": {
+        "event": "Tạo sự kiện cứu trợ",
+        "site": "Tạo điểm tiếp nhận",
+        "live": "Đưa điểm tiếp nhận lên hoạt động"
+      },
       "members": "Thành viên & lời mời",
       "events": "Sự kiện cứu trợ",
       "sites": "Điểm tiếp nhận",

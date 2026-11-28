@@ -11,6 +11,10 @@ const canEdit = computed(() => role.value === 'owner' || role.value === 'coordin
 const org = ref<any>(null), sites = ref<any[]>([]), events = ref<any[]>([])
 // 撤銷 / 退件後新增會被後端以 ORG_NOT_VERIFIED 擋下：直接說明原因並隱藏新增入口
 const verified = computed(() => org.value?.verification_status === 'verified')
+// 「接下來」：只給有權新增的角色；「讓據點上線」連到第一個未上線據點的編輯頁，尚無據點時連到新增據點
+const steps = computed(() => nextSteps(events.value, sites.value))
+const showNext = computed(() => canEdit.value && verified.value && steps.value.some(s => !s.done))
+const nextTo = (k: string) => k === 'event' ? `/orgs/${id}/events/new` : k === 'site' || !sites.value.length ? `/orgs/${id}/sites/new` : `/lists/${(sites.value.find(s => s.status !== 'active') ?? sites.value[0]).id}/edit`
 const loading = ref(true), err = ref(''), msg = ref(''), busy = ref(false)
 const permits = ref<any[]>([])
 const permit = reactive({ permit_no: '', valid_from: '', valid_to: '' })
@@ -82,6 +86,18 @@ async function applyPermit(pid: string) {
         <NuxtLink :to="`/orgs/${id}/members`" class="c-btn">{{ $t('org.console.members') }}</NuxtLink>
         <NuxtLink v-if="canEdit" :to="`/orgs/${id}/audit`" class="c-btn">{{ $t('org.audit.link') }}</NuxtLink>
       </nav>
+
+      <!-- 通過審核後的下一步：由本頁已載入的事件與據點推導，三步都完成就不顯示 -->
+      <section v-if="showNext" class="c-card oh-sec">
+        <h2 class="c-h2">{{ $t('org.console.nextTitle') }}</h2>
+        <ul class="c-list oh-list oh-next">
+          <li v-for="s in steps" :key="s.key" :class="{ done: s.done }">
+            <UiIcon v-if="s.done" name="check" :size="16" class="oh-tick" />
+            <strong v-if="s.done">{{ $t(`org.console.next.${s.key}`) }}</strong>
+            <NuxtLink v-else :to="nextTo(s.key)" class="oh-go">{{ $t(`org.console.next.${s.key}`) }}<UiIcon name="arrow-right" :size="14" /></NuxtLink>
+          </li>
+        </ul>
+      </section>
 
       <section class="c-card oh-sec">
         <h2 class="c-h2">{{ $t('org.console.events') }}<b class="oh-count" aria-hidden="true">{{ String(events.length).padStart(2, '0') }}</b></h2>
@@ -184,6 +200,13 @@ async function applyPermit(pid: string) {
 
 .oh-list li>.oh-apply{grid-column:1/-1;justify-self:start}
 .oh-msg{margin-top:12px}
+.oh-next li{grid-template-columns:auto 1fr;min-height:44px}
+.oh-next li>strong,.oh-next li>.oh-go{grid-column:2}
+.oh-next li:not(.done)>.oh-go{grid-column:1/-1}
+.oh-next li>strong{font-size:15px}
+.oh-next li.done>strong{color:var(--mute);text-decoration:line-through;text-decoration-thickness:1px}
+.oh-tick{color:var(--ok)}
+.oh-go{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:14px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:4px}
 .oh-nav{margin-bottom:8px}
 .oh-nav .c-btn{min-height:44px}
 /* 區塊：墨線＋小標＋右側計數，不用卡中卡 */

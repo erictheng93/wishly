@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { editable, stepOf, taxIdOk } from '../app/utils/org'
+import { editable, nextSteps, permitStepError, stepOf, taxIdOk } from '../app/utils/org'
 
 const base = { legal_name: 'a', display_name: 'a', org_type: 'association', tax_id: '04595257', registration_no: 'x', authority: 'y',
   rep_name: 'r', contact_name: 'c', contact_phone: '0912', public_email: 'a@b.c' }
@@ -25,5 +25,23 @@ describe('org utils', () => {
     const documents = [{ kind: 'registration' }, { kind: 'permit' }]
     expect(stepOf({ ...base, documents })).toBe(3)
     expect(stepOf({ ...base, documents }, [{ id: 'p' }])).toBe(4)
+  })
+})
+
+describe('申請第 3 步與接下來', () => {
+  const doc = { documents: [{ kind: 'registration' }] }
+  it('permitStepError', () => {
+    expect(permitStepError(doc, [{}], false)).toBeNull()
+    expect(permitStepError(doc, [], false)).toBe('org.apply.docsRequired')
+    expect(permitStepError({ documents: [{ kind: 'permit' }] }, [{}], false)).toBe('org.apply.docsRequired')
+    expect(permitStepError(null, [], false)).toBe('org.apply.docsRequired')
+    expect(permitStepError(doc, [{}], true)).toBe('org.apply.permitPending')
+  })
+  it('nextSteps', () => {
+    const done = (e: unknown[], s: any[]) => nextSteps(e, s).map(x => x.done)
+    expect(done([], [])).toEqual([false, false, false])
+    expect(done([{}], [{ status: 'draft', site_status: 'active' }])).toEqual([true, true, false])
+    expect(done([{}], [{ status: 'active', site_status: 'paused' }])).toEqual([true, true, false])
+    expect(done([{}], [{ status: 'active', site_status: 'active' }])).toEqual([true, true, true])
   })
 })

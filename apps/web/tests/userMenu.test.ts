@@ -14,6 +14,8 @@ beforeEach(() => {
     computed, onBeforeUnmount, onMounted, ref, useId, watch, profilePath,
     profilePath, useRoute: () => route,
     useFriendRequests: () => ({ count: ref(0) }),
+    useRuntimeConfig: () => ({ public: { apiBase: '' } }),
+    fetchPublicStatus: () => Promise.resolve({ orgs_enabled: false }),
     useOrgMode: () => ({ current: ref(null), orgs: ref([]), switchTo: () => {} }),
     useAuth: () => ({ user: ref({ display_name: '小華', handle: 'hua', is_staff: true }), logout: vi.fn() }),
   })) vi.stubGlobal(name, value)

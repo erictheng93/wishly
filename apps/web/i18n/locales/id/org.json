@@ -13,6 +13,7 @@
     "prep3": "Nomor izin penggalangan dana",
     "cta": "Daftar sebagai organisasi nirlaba →",
     "loginHint": "Organisasi nirlaba? Daftar di sini",
+    "menuApply": "Daftar sebagai organisasi nirlaba",
     "personal": "Pribadi",
     "switchTitle": "Ganti identitas",
     "badge": "Mode organisasi",
@@ -37,6 +38,8 @@
       "permitNo": "Nomor izin",
       "validFrom": "Berlaku mulai",
       "validTo": "Berlaku sampai",
+      "permitPending": "Berkas izin belum ditambahkan. Tekan \"Tambah izin\" dulu",
+      "docsRequired": "Unggah minimal 1 dokumen registrasi dan tambahkan minimal 1 izin",
       "addPermit": "Tambah izin",
       "remove": "Hapus",
       "agree": "Saya menyatakan data benar dan menyetujui ketentuan organisasi",
@@ -78,6 +81,12 @@
     },
     "console": {
       "title": "Konsol organisasi",
+      "nextTitle": "Langkah berikutnya",
+      "next": {
+        "event": "Buat peristiwa bantuan",
+        "site": "Buat titik",
+        "live": "Aktifkan sebuah titik"
+      },
       "members": "Anggota & undangan",
       "events": "Peristiwa bantuan",
       "sites": "Lokasi",

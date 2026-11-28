@@ -13,6 +13,7 @@
     "prep3": "劝募许可字号",
     "cta": "申请成为公益组织 →",
     "loginHint": "公益组织？从这里申请",
+    "menuApply": "还没有组织？申请成为公益组织",
     "personal": "个人",
     "switchTitle": "切换身份",
     "badge": "组织模式",
@@ -37,6 +38,8 @@
       "permitNo": "许可字号",
       "validFrom": "有效期间起",
       "validTo": "有效期间迄",
+      "permitPending": "许可文件还没添加，请先按“添加许可”",
+      "docsRequired": "请至少上传 1 份登记证文件，并添加 1 笔许可",
       "addPermit": "添加许可",
       "remove": "删除",
       "agree": "我保证资料真实，并同意组织条款",
@@ -78,6 +81,12 @@
     },
     "console": {
       "title": "组织后台",
+      "nextTitle": "接下来",
+      "next": {
+        "event": "创建救灾事件",
+        "site": "创建据点",
+        "live": "让据点上线"
+      },
       "members": "成员与邀请",
       "events": "救灾事件",
       "sites": "据点",

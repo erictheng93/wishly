@@ -81,6 +81,12 @@ async function next() {
     step.value++
   })
 }
+// 第 3 步：登記證與許可沒備齊（或許可檔選了卻沒按新增）就停在這裡，不等送出被後端 422 退回
+function next3() {
+  const bad = permitStepError(org.value, permits.value, !!permitFile.value)
+  if (bad) { err.value = t(bad); return }
+  err.value = ''; step.value++
+}
 async function upload(kind: 'registration' | 'permit', file: File | undefined) {
   if (!file) return null
   const bad = docFileError(file)
@@ -178,7 +184,7 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 
       <div class="c-row ap-nav">
         <button v-if="step > 1" type="button" class="c-btn" @click="step--">{{ $t('org.apply.prev') }}</button>
-        <button v-if="step < 4" type="button" class="c-btn primary" :disabled="busy || (step < 3 && !stepOk)" @click="step === 1 ? next() : step++">{{ $t('org.apply.next') }}</button>
+        <button v-if="step < 4" type="button" class="c-btn primary" :disabled="busy || (step < 3 && !stepOk)" @click="step === 1 ? next() : step === 3 ? next3() : step++">{{ $t('org.apply.next') }}</button>
       </div>
     </template>
 
