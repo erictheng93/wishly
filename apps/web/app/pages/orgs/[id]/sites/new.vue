@@ -12,6 +12,13 @@ onMounted(async () => {
   try {
     const [ev, pm] = await Promise.all([api(`/orgs/${id}/events`), api(`/orgs/${id}/permits`)])
     events.value = ev.filter((e: any) => e.moderation_status !== 'hidden' && !e.merged_into) // 下架 / 已合併的事件後端會 422
+    // 查重帶來的事件可能是別的組織建立的，不在本組織清單；用公開端點補進選項（不存在 / 下架 / 已合併時不預選）
+    if (f.event_id && !events.value.some((e: any) => e.id === f.event_id)) {
+      const slug = useRoute().query.event_slug as string | undefined
+      const pub = slug ? await api(`/public/relief-events/${encodeURIComponent(slug)}`).catch(() => null) : null
+      if (pub?.event?.id === f.event_id) events.value.push(pub.event)
+      else f.event_id = ''
+    }
     const today = taipeiToday()
     permits.value = pm.filter((p: any) => p.status === 'approved' && p.valid_from <= today && p.valid_to >= today)
     if (permits.value.length === 1) f.permit_id = permits.value[0].id

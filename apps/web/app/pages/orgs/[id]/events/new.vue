@@ -67,7 +67,7 @@ async function submit() {
       <article v-for="e in similar" :key="e.id" class="c-card">
         <strong>{{ e.name }}</strong>
         <div class="c-mute">{{ e.occurred_on }} · {{ (e.counties ?? []).join(' / ') }}</div>
-        <NuxtLink :to="`/orgs/${id}/sites/new?event=${e.id}`" class="c-btn primary c-mt">{{ $t('org.relief.useThis') }}</NuxtLink>
+        <NuxtLink :to="`/orgs/${id}/sites/new?event=${e.id}&event_slug=${e.slug}`" class="c-btn primary c-mt">{{ $t('org.relief.useThis') }}</NuxtLink>
       </article>
       <button type="button" class="c-btn block" @click="dismissed = true">{{ $t('org.relief.noneOfThese') }}</button>
     </section>
