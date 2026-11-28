@@ -24,7 +24,7 @@ test('救災：建立據點、加急缺品項、發布後公開頁可見', async
   await p.getByRole('link', { name: '用這個事件建立據點' }).first().click()
 
   const title = `E2E 據點 ${uid()}`
-  // 並行負載下預選的事件偶爾沒套上（事件與許可選項非同步載入），明確選一次
+  // 查重（/relief-events/similar）會列出所有組織的同縣市同日事件；並行時 .first() 常是別組織的事件，不在本組織選單內，預選就空白。明確選本組織的事件
   await p.locator('select[name=event_id]').selectOption({ index: 1 })
   await p.locator('select[name=permit_id]').selectOption({ index: 1 })
   await p.locator('input[name=title]').fill(title)

@@ -81,10 +81,14 @@ async function next() {
     step.value++
   })
 }
+// 錯誤顯示在頁面最上方、按鈕在最下方：步驟 3 設完錯誤後把它捲入視野
+function showErr() {
+  nextTick(() => document.querySelector('.ap > [role=alert]')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
+}
 // 第 3 步：登記證與許可沒備齊（或許可檔選了卻沒按新增）就停在這裡，不等送出被後端 422 退回
 function next3() {
   const bad = permitStepError(org.value, permits.value, !!permitFile.value)
-  if (bad) { err.value = t(bad); return }
+  if (bad) { err.value = t(bad); showErr(); return }
   err.value = ''; step.value++
 }
 async function upload(kind: 'registration' | 'permit', file: File | undefined) {

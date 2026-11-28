@@ -67,15 +67,21 @@ test('申請精靈第 3 步：沒有文件停在第 3 步；選了許可檔沒�
   await expect(p.getByText('步驟 3/4')).toBeVisible()
 
   // 沒有任何文件
+  await p.setViewportSize({ width: 390, height: 844 })
   await p.getByRole('button', { name: '下一步' }).click()
-  await expect(p.getByText('請至少上傳 1 份登記證文件，並新增 1 筆許可')).toBeVisible()
+  const docsErr = p.getByText('請至少上傳 1 份登記證文件，並新增 1 筆許可')
+  await expect(docsErr).toBeVisible()
+  // 錯誤在頁面最上方、按鈕在最下方：手機視窗內（非 fullPage）必須看得到錯誤
+  await expect(docsErr).toBeInViewport()
+  await p.waitForTimeout(600) // 等捲動結束再截圖
+  await p.screenshot({ path: `${SHOTS}/apply-step3-error-viewport-390.png` })
   await expect(p.getByText('步驟 3/4')).toBeVisible()
   await shot(p, 'apply-step3-docs-required')
 
   // 選了許可檔但沒按新增
   await p.locator('input[type=file]').last().setInputFiles({ name: 'permit.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') })
   await p.getByRole('button', { name: '下一步' }).click()
-  await expect(p.getByText('許可檔案還沒新增，請先按「新增許可」')).toBeVisible()
+  await expect(p.getByText('許可檔案還沒新增，請先按「新增許可」')).toBeInViewport()
   await shot(p, 'apply-step3-permit-pending')
   await ctx.close()
 })

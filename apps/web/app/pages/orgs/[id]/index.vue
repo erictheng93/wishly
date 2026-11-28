@@ -200,10 +200,11 @@ async function applyPermit(pid: string) {
 
 .oh-list li>.oh-apply{grid-column:1/-1;justify-self:start}
 .oh-msg{margin-top:12px}
-.oh-next li{grid-template-columns:auto 1fr;min-height:44px}
-.oh-next li>strong,.oh-next li>.oh-go{grid-column:2}
-.oh-next li:not(.done)>.oh-go{grid-column:1/-1}
-.oh-next li>strong{font-size:15px}
+/* 與 .oh-list li（含 768px 以上的三欄規則）同為 .oh-list 下，加 .oh-list 提高權重，否則勾與文字會被排到不同列 */
+.oh-list.oh-next li{grid-template-columns:auto 1fr;min-height:44px}
+.oh-list.oh-next li>strong,.oh-list.oh-next li>.oh-go{grid-column:2}
+.oh-list.oh-next li:not(.done)>.oh-go{grid-column:1/-1}
+.oh-list.oh-next li>strong{font-size:15px}
 .oh-next li.done>strong{color:var(--mute);text-decoration:line-through;text-decoration-thickness:1px}
 .oh-tick{color:var(--ok)}
 .oh-go{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:14px;font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:4px}

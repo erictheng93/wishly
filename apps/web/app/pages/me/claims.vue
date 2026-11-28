@@ -143,8 +143,9 @@ html:lang(vi) .cl-head h1{line-height:1.22}
 .cl-state p{margin:0;max-width:34em;line-height:1.7;text-wrap:balance}
 .cl-state.bad{border:1px solid var(--bad);background:var(--bad-bg)}
 .cl-qr{margin:6px 0}
-.cl-qr summary{cursor:pointer;text-align:left}
-.cl-qr :deep(.c-qr){align-items:flex-start;margin:12px 0 18px 8px}
+.cl-qr summary{display:flex;justify-content:flex-start;padding:0;list-style:none}
+.cl-qr summary::-webkit-details-marker{display:none}
+.cl-qr :deep(.c-qr){align-items:flex-start;margin:12px 0 18px 0}
 .cl-loading{display:flex;align-items:center;min-height:72px;margin:0;padding:0 16px;border:1px solid var(--line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
 .cl-reference code{overflow-wrap:anywhere;user-select:all}
 .cl-group{margin-top:36px}
