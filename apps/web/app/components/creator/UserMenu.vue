@@ -3,6 +3,10 @@ const { user, logout, logoutFailed } = useAuth()
 const myPage = computed(() => user.value ? profilePath(user.value) : '/settings')
 const { count } = useFriendRequests()
 const { current, orgs, switchTo } = useOrgMode()
+// 申請入口：功能開啟且尚未屬於任何組織才顯示（已屬於者用上方的切換身分）；與 useOrgsEnabled 共用 /public/status
+const orgsOn = ref(false)
+const { public: { apiBase } } = useRuntimeConfig()
+onMounted(() => { fetchPublicStatus(apiBase).then((s) => { orgsOn.value = s.orgs_enabled === true }, () => {}) })
 const open = ref(false)
 const root = ref<HTMLElement>()
 const trigger = ref<HTMLButtonElement>()
@@ -35,6 +39,7 @@ watch(() => useRoute().fullPath, () => { open.value = false })
         <button type="button" :aria-pressed="current === null" @click="switchTo(null)">{{ $t('org.personal') }}</button>
         <button v-for="o in orgs" :key="o.id" type="button" :aria-pressed="current === o.id" @click="switchTo(o.id)">{{ o.name }}</button>
       </template>
+      <NuxtLink v-else-if="orgsOn" to="/org">{{ $t('org.menuApply') }}</NuxtLink>
       <NuxtLink to="/friends"><span>{{ $t('common.friends') }}<CreatorCountBadge :n="count" /></span></NuxtLink>
       <NuxtLink to="/me/wallet">{{ $t('common.points') }}</NuxtLink>
       <NuxtLink to="/settings">{{ $t('common.settings') }}</NuxtLink>

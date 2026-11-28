@@ -81,12 +81,21 @@ async function next() {
     step.value++
   })
 }
+// 錯誤顯示在頁面最上方、按鈕在最下方：步驟 3 設完錯誤後把它捲入視野
+function showErr() {
+  nextTick(() => document.querySelector('.ap > [role=alert]')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
+}
+// 第 3 步：登記證與許可沒備齊（或許可檔選了卻沒按新增）就停在這裡，不等送出被後端 422 退回
+function next3() {
+  const bad = permitStepError(org.value, permits.value, !!permitFile.value)
+  if (bad) { err.value = t(bad); showErr(); return }
+  err.value = ''; step.value++
+}
 async function upload(kind: 'registration' | 'permit', file: File | undefined) {
   if (!file) return null
-  if (file.size > 10 * 1024 * 1024) { err.value = t('org.apply.fileBig'); return null }
-  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) { err.value = t('org.apply.fileType'); return null }
-  // File 不會被 ofetch 序列化；走 api() 才有錯誤正規化與 401 導向
-  return await api<any>(`/orgs/${org.value.id}/documents`, { method: 'POST', query: { kind }, body: file, headers: { 'Content-Type': file.type } })
+  const bad = docFileError(file)
+  if (bad) { err.value = t(bad); return null }
+  return await uploadOrgDoc(api, org.value.id, kind, file)
 }
 const onFile = (kind: 'registration' | 'permit', e: Event) => {
   const input = e.target as HTMLInputElement
@@ -97,12 +106,10 @@ const onFile = (kind: 'registration' | 'permit', e: Event) => {
 }
 const delDoc = (id: string) => run(async () => { await api(`/orgs/${org.value.id}/documents/${id}`, { method: 'DELETE' }); await reload() })
 const addPermit = () => run(async () => {
-  const d = await upload('permit', permitFile.value ?? undefined)
-  if (!d) return
-  try { await api(`/orgs/${org.value.id}/permits`, { method: 'POST', body: { ...permit, document_id: d.id } }) } catch (e) {
-    await api(`/orgs/${org.value.id}/documents/${d.id}`, { method: 'DELETE' }).catch(() => {}) // 不留孤兒文件
-    throw e
-  }
+  const file = permitFile.value
+  const bad = file && docFileError(file)
+  if (!file || bad) { if (bad) err.value = t(bad); return }
+  await addPermitWithDoc(api, org.value.id, permit, file)
   Object.assign(permit, { permit_no: '', valid_from: '', valid_to: '' }); permitFile.value = null; permitKey.value++
   await reload()
 })
@@ -181,7 +188,7 @@ const withdraw = () => run(async () => { await api(`/orgs/${org.value.id}/withdr
 
       <div class="c-row ap-nav">
         <button v-if="step > 1" type="button" class="c-btn" @click="step--">{{ $t('org.apply.prev') }}</button>
-        <button v-if="step < 4" type="button" class="c-btn primary" :disabled="busy || (step < 3 && !stepOk)" @click="step === 1 ? next() : step++">{{ $t('org.apply.next') }}</button>
+        <button v-if="step < 4" type="button" class="c-btn primary" :disabled="busy || (step < 3 && !stepOk)" @click="step === 1 ? next() : step === 3 ? next3() : step++">{{ $t('org.apply.next') }}</button>
       </div>
     </template>
 

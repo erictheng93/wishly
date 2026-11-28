@@ -4,14 +4,24 @@ definePageMeta({ middleware: 'auth' })
 const { t } = useI18n()
 useHead({ title: () => t('org.console.receipts') })
 const { api } = useApi()
-const route = useRoute()
+const route = useRoute(), router = useRouter()
 const org = route.params.id as string, wid = route.params.wid as string
 const data = ref<any>(null), loading = ref(true), err = ref('')
 const rcpt = ref<any>(null), rcptKey = ref(''), rcptF = reactive({ qty: 1, note: '', claimId: '' }), rcptBusy = ref(false), rcptErr = ref('')
 async function load() {
   try { data.value = await api(`/orgs/${org}/sites/${wid}/receipts`) } catch (e) { err.value = errMsg(e) } finally { loading.value = false }
 }
-onMounted(load)
+// 掃捐助者 QR 進來：?claim=&item=&qty= 自動開啟對應品項並預填，志工仍須自己按送出；處理完拿掉 query 避免重新整理又跳一次
+const scanErr = ref('')
+async function applyScan() {
+  const p = receiptPrefill(route.query)
+  if (!p) return
+  await router.replace({ query: {} })
+  const it = p === 'invalid' ? null : data.value?.items?.find((i: any) => i.item_id === p.item && i.funding_mode === 'quantity')
+  if (p === 'invalid' || !it) { scanErr.value = t('org.relief.receiptScanInvalid'); return }
+  openReceipt(it); rcptF.claimId = p.claim; rcptF.qty = p.qty
+}
+onMounted(async () => { await load(); if (data.value) await applyScan() })
 function openReceipt(i: any) { rcptKey.value = crypto.randomUUID(); rcpt.value = i; rcptF.qty = 1; rcptF.note = ''; rcptF.claimId = ''; rcptErr.value = '' }
 const overAsk = ref(false)
 // 超收只提示：累計 + 本次 > 需求時先確認，後端不擋
@@ -42,6 +52,7 @@ async function doVoid() {
   <main class="c-page rc">
     <CreatorHeader :title="data?.site?.title || $t('org.console.receipts')" :back="`/orgs/${org}`" />
     <p v-if="err" class="c-err c-errbox" role="alert">{{ err }}</p>
+    <p v-if="scanErr" class="c-err c-errbox" role="alert" data-testid="scan-err">{{ scanErr }}</p>
     <p v-if="loading" class="c-mute" role="status">{{ $t('org.apply.loading') }}</p>
     <template v-else-if="data">
       <p class="c-mute rc-site"><CreatorStatusBadge v-if="data.site.site_status" :v="data.site.site_status" :label="$t(`org.relief.siteStatus.${data.site.site_status}`)" />　{{ data.site.site_address }}</p>

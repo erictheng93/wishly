@@ -68,3 +68,41 @@ test('救災：建立據點、加急缺品項、發布後公開頁可見', async
     await ctx.close()
   }
 })
+
+// 查重會列出別的組織建立的事件；A 組織點「用這個事件建立據點」要能預選並建成（多組織共用同一災害事件）
+test('救災：用別的組織建立的事件建立據點', async ({ browser }) => {
+  const mkOrg = async (tag: string) => {
+    const u = await registerUser({ tag })
+    const userId = (await (await u.api.get('me')).json()).id as string
+    const name = `E2E 救災組織 ${uid()}`
+    const org = sql(`INSERT INTO organizations (slug, legal_name, display_name, org_type, tax_id, registration_no, authority, rep_name, contact_name, contact_phone_enc, public_email, verification_status, verified_at, created_by)
+      VALUES (substr(md5(random()::text), 1, 10), '${name}', '${name}', 'association', lpad((floor(random()*1e8))::text, 8, '0'), 'R-1', '內政部', '王', '王', '\\x00', 'o@example.com', 'verified', now(), '${userId}') RETURNING id`).split('\n')[0]
+    sql(`INSERT INTO org_members (org_id, user_id, role) VALUES ('${org}', '${userId}', 'owner')`)
+    sql(`INSERT INTO org_permits (org_id, permit_no, valid_from, valid_to, status) VALUES ('${org}', 'P-${uid()}', current_date - 1, current_date + 90, 'approved')`)
+    return { u, org }
+  }
+  const a = await mkOrg('xeva')
+  const b = await mkOrg('xevb')
+  const evName = `E2E 他組織颱風 ${uid()}`
+  const evId = sql(`INSERT INTO relief_events (slug, name, hazard_type, counties, occurred_on, created_by_org) VALUES (substr(md5(random()::text), 1, 10), '${evName}', 'typhoon', ARRAY['澎湖縣'], current_date, '${b.org}') RETURNING id`).split('\n')[0]
+
+  const ctx = await browser.newContext()
+  await loginBrowser(ctx, a.u)
+  const p = await ctx.newPage()
+  try {
+    await p.goto(`/orgs/${a.org}/events/new`)
+    await p.locator('select[name=county]').selectOption('澎湖縣')
+    await p.locator('input[name=occurred_on]').fill(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }))
+    const card = p.locator('article', { hasText: evName })
+    await expect(card).toBeVisible()
+    await card.getByRole('link', { name: '用這個事件建立據點' }).click()
+    await expect(p.locator('select[name=event_id]')).toHaveValue(evId)
+    await p.locator('select[name=permit_id]').selectOption({ index: 1 })
+    await p.locator('input[name=title]').fill(`E2E 據點 ${uid()}`)
+    await p.locator('input[name=site_address]').fill('澎湖縣馬公市中正路 1 號')
+    await p.locator('input[name=recipient_name]').fill('王小明')
+    await p.locator('input[name=recipient_phone]').fill('0912345678')
+    await p.getByRole('button', { name: '建立據點' }).click()
+    await expect(p).toHaveURL(/\/lists\/[0-9a-f-]+\/edit$/)
+  } finally { await ctx.close() }
+})

@@ -4,7 +4,7 @@
 export const INDEX_MIN_ITEMS = 3
 
 // 只放創建者 / 帳號相關路徑；/s、/e、/o、/explore 等公開頁要讓爬蟲進
-const DISALLOW = ['/dashboard', '/lists', '/me', '/settings', '/welcome', '/friends', '/invite', '/u/', '/admin', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite', '/orgs', '/unsubscribe', '/api/']
+const DISALLOW = ['/dashboard', '/lists', '/me', '/settings', '/welcome', '/friends', '/invite', '/u/', '/admin', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite', '/orgs', '/receive', '/unsubscribe', '/api/']
 
 export function robotsTxt(siteUrl: string, indexable: boolean): string {
   if (!indexable) return 'User-agent: *\nDisallow: /\n'
