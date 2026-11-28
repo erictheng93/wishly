@@ -140,7 +140,6 @@ async fn invite_expired_or_cancelled(pool: PgPool) {
     member(&pool, o, a.id, "owner").await;
     verify(&pool, b.id, "b@x.com").await;
     let (_, v1) = invite(&pool, o, &a.token, "b@x.com", "volunteer").await;
-    let (_, v2) = invite(&pool, o, &a.token, "b@x.com", "volunteer").await;
     let (s, _, _) = call(
         &pool,
         "DELETE",
@@ -154,6 +153,7 @@ async fn invite_expired_or_cancelled(pool: PgPool) {
         accept(&pool, &b.token, &token_of(&v1)).await.0,
         StatusCode::GONE
     );
+    let (_, v2) = invite(&pool, o, &a.token, "b@x.com", "volunteer").await;
     sqlx::query("UPDATE org_invites SET expires_at=now()-interval '1 second' WHERE id=$1")
         .bind(v2["id"].as_str().unwrap().parse::<Uuid>().unwrap())
         .execute(&pool)
@@ -190,11 +190,59 @@ async fn disabled_member_can_rejoin_via_invite(pool: PgPool) {
     );
     let (role, off): (String, bool) = sqlx::query_as("SELECT role::text, disabled_at IS NOT NULL FROM org_members WHERE org_id=$1 AND user_id=$2").bind(o).bind(b.id).fetch_one(&pool).await.unwrap();
     assert_eq!((role.as_str(), off), ("coordinator", false));
-    let (_, v) = invite(&pool, o, &a.token, "b@x.com", "coordinator").await;
+    let (s, v) = invite(&pool, o, &a.token, "b@x.com", "coordinator").await;
     assert_eq!(
-        accept(&pool, &b.token, &token_of(&v)).await.1["code"],
-        "ALREADY_MEMBER"
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ALREADY_MEMBER"))
     );
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn invite_active_member_is_rejected_without_mail(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, v) = invite(&pool, o, &a.token, &email, "volunteer").await;
+    assert_eq!(
+        (s, v["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ALREADY_MEMBER"))
+    );
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM notifications WHERE kind='org.invite'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
+async fn reinvite_same_email_invalidates_old_invite(pool: PgPool) {
+    let a = user(&pool, "A").await;
+    let b = user(&pool, "B").await;
+    let o = org(&pool, a.id, "verified").await;
+    member(&pool, o, a.id, "owner").await;
+    verify(&pool, b.id, "b@x.com").await;
+    let (_, v1) = invite(&pool, o, &a.token, "b@x.com", "volunteer").await;
+    let (_, v2) = invite(&pool, o, &a.token, "b@x.com", "volunteer").await;
+    assert_eq!(
+        accept(&pool, &b.token, &token_of(&v1)).await.0,
+        StatusCode::GONE
+    );
+    assert_eq!(
+        accept(&pool, &b.token, &token_of(&v2)).await.0,
+        StatusCode::OK
+    );
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM notifications WHERE kind='org.invite' AND status='pending'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1);
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]

@@ -177,7 +177,33 @@ async fn invite_create(
     crate::ratelimit::check_pool(&st.pool, &format!("org-invite:{}", u.id), 30, 3600).await?;
     let (token, h) = new_token();
     let url = format!("{}/org/invite/{token}", crate::auth::app_url());
-    let mut tx = st.pool.begin().await?;
+    let mut tx = crate::begin_contended(&st.pool).await?;
+    // 先鎖組織（鎖序 organizations → org_members / org_invites），與 accept / update_member 序列化
+    lock_org(&mut tx, id).await?;
+    let existing: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL")
+            .bind(&email)
+            .fetch_optional(&mut *tx)
+            .await?;
+    // 判定與 accept 一致：有列且未停用才算成員（email 以 users 或已驗證身分比對）；停用者可重新邀請
+    let active: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM org_members WHERE org_id=$1 AND disabled_at IS NULL AND user_id IN (
+           SELECT id FROM users WHERE email=$2 AND deleted_at IS NULL
+           UNION SELECT user_id FROM auth_identities
+             WHERE (provider='email' AND provider_uid=$2) OR (provider='google' AND email=$2)))",
+    )
+    .bind(id)
+    .bind(&email)
+    .fetch_one(&mut *tx)
+    .await?;
+    if active {
+        return Err(AppError::problem(409, "ALREADY_MEMBER", "此人已是組織成員"));
+    }
+    // 同信箱的舊邀請失效（沿用取消機制 cancelled_at），連同尚未寄出的邀請信一併取消，只留新的一筆
+    sqlx::query("UPDATE org_invites SET cancelled_at=now() WHERE org_id=$1 AND email=$2 AND cancelled_at IS NULL AND accepted_at IS NULL AND expires_at > now()")
+        .bind(id).bind(&email).execute(&mut *tx).await?;
+    sqlx::query("UPDATE notifications SET status='cancelled' WHERE kind='org.invite' AND status='pending' AND payload->>'org_id'=$1::text AND (user_id=$2 OR payload->>'to'=$3)")
+        .bind(id).bind(existing).bind(&email).execute(&mut *tx).await?;
     let invite: Uuid = sqlx::query_scalar(
         "INSERT INTO org_invites (org_id, email, role, handle, token_hash, invited_by, expires_at)
         VALUES ($1,$2,$3::org_role,$4,$5,$6, now() + interval '7 days') RETURNING id",
@@ -190,11 +216,6 @@ async fn invite_create(
     .bind(u.id)
     .fetch_one(&mut *tx)
     .await?;
-    let existing: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL")
-            .bind(&email)
-            .fetch_optional(&mut *tx)
-            .await?;
     let name: String = sqlx::query_scalar("SELECT display_name FROM organizations WHERE id=$1")
         .bind(id)
         .fetch_one(&mut *tx)
