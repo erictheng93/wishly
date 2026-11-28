@@ -181,7 +181,8 @@ async fn review(
     };
     if new_status == "verified" {
         let ok: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM org_permits WHERE org_id = $1 AND status = 'approved')",
+            "SELECT EXISTS (SELECT 1 FROM org_permits WHERE org_id = $1 AND status = 'approved'
+                           AND (now() AT TIME ZONE 'Asia/Taipei')::date BETWEEN valid_from AND valid_to)",
         )
         .bind(id)
         .fetch_one(&mut *tx)
@@ -190,7 +191,7 @@ async fn review(
             return Err(AppError::problem(
                 409,
                 "PERMIT_REQUIRED",
-                "需至少一張已核准的勸募許可",
+                "需至少一張已核准且仍在效期內的勸募許可",
             ));
         }
     }
@@ -236,18 +237,14 @@ async fn review(
     };
     // 撤銷時才需要清事件頁與組織頁
     let (ev, org_slug): (Vec<String>, Option<String>) = if status == "verified" {
-        (sqlx::query_scalar("SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.org_id = $1")
-            .bind(id).fetch_all(&mut *tx).await?,
-         sqlx::query_scalar("SELECT slug::text FROM organizations WHERE id = $1").bind(id).fetch_optional(&mut *tx).await?)
+        sqlx::query_as("SELECT ARRAY(SELECT DISTINCT e.slug::text FROM relief_events e JOIN wishlists w ON w.event_id = e.id WHERE w.type = 'relief' AND w.org_id = $1),
+                               (SELECT slug::text FROM organizations WHERE id = $1)")
+            .bind(id).fetch_one(&mut *tx).await?
     } else {
         (vec![], None)
     };
-    sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
-                 SELECT m.user_id, 'email'::notification_channel, 'org.review',
-                        jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'decision', $3::text, 'note', $4::text, 'revoked', $5::bool)
-                   FROM org_members m JOIN users u ON u.id = m.user_id
-                  WHERE m.org_id = $1 AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
-        .bind(id).bind(&display_name).bind(new_status).bind(&b.note).bind(status == "verified" && new_status == "rejected").execute(&mut *tx).await?;
+    crate::notify::enqueue_org_owners(&mut *tx, id, "org.review",
+        json!({"org_id": id, "display_name": display_name, "decision": new_status, "note": b.note, "revoked": status == "verified" && new_status == "rejected"})).await?;
     audit(&mut *tx, sid, "org.review", "organizations", Some(id),
           json!({ "decision": b.decision, "from": status, "to": new_status, "note": b.note, "flagged_fields": flagged })).await?;
     tx.commit().await?;
@@ -427,22 +424,14 @@ async fn review_permit(
             &paused.iter().map(|p| p.1).collect::<Vec<_>>(),
         )
         .await?;
-        sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
-                     SELECT m.user_id, 'email'::notification_channel, 'org.permit_revoked',
-                            jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
-                       FROM org_members m JOIN users u ON u.id = m.user_id
-                      WHERE m.org_id = $1 AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
-            .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
+        crate::notify::enqueue_org_owners(&mut *tx, org_id, "org.permit_revoked",
+            json!({"org_id": org_id, "display_name": display_name, "permit_no": permit_no, "note": b.note})).await?;
         slugs
     } else {
         // 送審中的許可被退件：同樣通知 owner 與 coordinator（帶備註），不必回狀態頁才知道
         if new_status == "rejected" {
-            sqlx::query("INSERT INTO notifications (user_id, channel, kind, payload)
-                         SELECT m.user_id, 'email'::notification_channel, 'org.permit_rejected',
-                                jsonb_build_object('org_id', $1::uuid, 'display_name', $2::text, 'permit_no', $3::text, 'note', $4::text)
-                           FROM org_members m JOIN users u ON u.id = m.user_id
-                          WHERE m.org_id = $1 AND m.role IN ('owner', 'coordinator') AND m.disabled_at IS NULL AND u.deleted_at IS NULL")
-                .bind(org_id).bind(&display_name).bind(&permit_no).bind(&b.note).execute(&mut *tx).await?;
+            crate::notify::enqueue_org_owners(&mut *tx, org_id, "org.permit_rejected",
+                json!({"org_id": org_id, "display_name": display_name, "permit_no": permit_no, "note": b.note})).await?;
         }
         vec![]
     };
