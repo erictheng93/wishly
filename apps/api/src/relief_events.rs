@@ -401,12 +401,15 @@ async fn moderate(
         let mut orgs_seen: Vec<Uuid> = changed.iter().filter_map(|p| p.2).collect();
         orgs_seen.sort();
         orgs_seen.dedup();
+        let names: std::collections::HashMap<Uuid, String> =
+            sqlx::query_as("SELECT id, display_name FROM organizations WHERE id = ANY($1)")
+                .bind(&orgs_seen)
+                .fetch_all(&mut *tx)
+                .await?
+                .into_iter()
+                .collect();
         for o in orgs_seen {
-            let dn: String =
-                sqlx::query_scalar("SELECT display_name FROM organizations WHERE id = $1")
-                    .bind(o)
-                    .fetch_one(&mut *tx)
-                    .await?;
+            let dn = names.get(&o).cloned().unwrap_or_default();
             let (kind, payload) = if hide {
                 (
                     "org.event_hidden",

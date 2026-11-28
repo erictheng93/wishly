@@ -64,6 +64,38 @@ async fn approve_requires_approved_permit(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../db/migrations")]
+async fn approve_rejects_expired_permit(pool: PgPool) {
+    let TestUser { id: owner, .. } = user(&pool, "owner").await;
+    let TestUser { token: st, .. } = staff(&pool, "staff").await;
+    let o = common::org(&pool, owner, "pending").await;
+    common::permit(&pool, o, "approved", -1).await;
+    let uri = format!("/admin/orgs/{o}/review");
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        &uri,
+        &ck(&st),
+        Some(json!({"decision":"approve"})),
+    )
+    .await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::CONFLICT, Some("PERMIT_REQUIRED")),
+        "{b}"
+    );
+    common::permit(&pool, o, "approved", 30).await;
+    let (s, _, b) = call(
+        &pool,
+        "POST",
+        &uri,
+        &ck(&st),
+        Some(json!({"decision":"approve"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+}
+
+#[sqlx::test(migrations = "../../db/migrations")]
 async fn needs_changes_sets_flagged_fields(pool: PgPool) {
     let TestUser { id: owner, .. } = user(&pool, "owner").await;
     let TestUser { token: st, .. } = staff(&pool, "staff").await;
