@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { editable, nextSteps, permitStepError, stepOf, taxIdOk } from '../app/utils/org'
+import { editable, nextSteps, receiptPrefill, receiptQrUrl, permitStepError, stepOf, taxIdOk } from '../app/utils/org'
 
 const base = { legal_name: 'a', display_name: 'a', org_type: 'association', tax_id: '04595257', registration_no: 'x', authority: 'y',
   rep_name: 'r', contact_name: 'c', contact_phone: '0912', public_email: 'a@b.c' }
@@ -43,5 +43,25 @@ describe('申請第 3 步與接下來', () => {
     expect(done([{}], [{ status: 'draft', site_status: 'active' }])).toEqual([true, true, false])
     expect(done([{}], [{ status: 'active', site_status: 'paused' }])).toEqual([true, true, false])
     expect(done([{}], [{ status: 'active', site_status: 'active' }])).toEqual([true, true, true])
+  })
+
+  it('nextSteps：只有據點（掛在他組織事件下）也算已選定事件', () => {
+    expect(nextSteps([], [{ status: 'draft', site_status: 'active' }])[0]!.done).toBe(true)
+    expect(nextSteps([], [])[0]!.done).toBe(false)
+  })
+
+  const C = '0b8f6c2e-1a2b-4c3d-8e4f-5a6b7c8d9e0f', I = '1c9a7d3f-2b3c-4d4e-9f50-6b7c8d9e0f1a'
+  it('receiptQrUrl 與 receiptPrefill 可往返', () => {
+    const u = new URL(receiptQrUrl('https://wishly.tw', 'abc1234567', C, I, 3))
+    expect(u.origin + u.pathname).toBe('https://wishly.tw/receive')
+    expect(u.searchParams.get('list')).toBe('abc1234567')
+    expect(receiptPrefill(Object.fromEntries(u.searchParams))).toEqual({ claim: C, item: I, qty: 3 })
+  })
+  it('receiptPrefill：無參數 null、格式錯 invalid', () => {
+    expect(receiptPrefill({})).toBeNull()
+    expect(receiptPrefill({ claim: 'x', item: I, qty: '1' })).toBe('invalid')
+    expect(receiptPrefill({ claim: C, item: I, qty: '0' })).toBe('invalid')
+    expect(receiptPrefill({ claim: C, item: I })).toBe('invalid')
+    expect(receiptPrefill({ claim: [C], item: I, qty: '1' })).toBe('invalid')
   })
 })

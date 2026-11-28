@@ -106,6 +106,8 @@ const wipe = () => {
             <div class="g-title">{{ r.item.title }} × {{ r.claim.qty }}<span class="g-badge">{{ label(r.claim.status) }}</span></div>
             <p v-if="r.receipt_received" class="g-mute">{{ $t('org.relief.receiptAcknowledged') }}</p>
             <p v-else-if="r.wishlist.type === 'relief'" class="g-mute cl-reference">{{ $t('org.relief.donorClaimReference') }}<br><code>{{ r.claim.id }}</code></p>
+            <details v-if="!r.receipt_received && r.wishlist.type === 'relief'" class="cl-qr" data-testid="claim-qr"><summary class="g-link">{{ $t('org.relief.donorClaimQr') }}</summary>
+              <CreatorQr :text="receiptQrUrl(siteOrigin(), r.wishlist.slug, r.claim.id, r.item.id, r.claim.qty)" :size="180" :download="false" :label="$t('org.relief.donorClaimQr')" /></details>
             <div v-if="r.thank_you" class="g-banner"><strong>{{ $t('me.claims.thankYouCard') }}</strong>
               <p class="cl-thanks">{{ r.thank_you }}</p></div>
             <div v-if="r.item_changed_at" class="g-banner js-item-changed" role="status">{{ $t('me.claims.itemChanged', { time: fmtTime(r.item_changed_at) }) }}<button class="g-link" @click="ackChange(r)">{{ $t('me.claims.ackItemChange') }}</button></div>
@@ -140,6 +142,9 @@ html:lang(vi) .cl-head h1{line-height:1.22}
 .cl-state{display:grid;justify-items:center;gap:10px;margin:8px 0 0;padding:44px 20px;text-align:center;border:1px dashed var(--line);background:var(--hatch)}
 .cl-state p{margin:0;max-width:34em;line-height:1.7;text-wrap:balance}
 .cl-state.bad{border:1px solid var(--bad);background:var(--bad-bg)}
+.cl-qr{margin:6px 0}
+.cl-qr summary{cursor:pointer;text-align:left}
+.cl-qr :deep(.c-qr){align-items:flex-start;margin:12px 0 18px 8px}
 .cl-loading{display:flex;align-items:center;min-height:72px;margin:0;padding:0 16px;border:1px solid var(--line);background:var(--hatch);font:600 12px/1.4 var(--mono);letter-spacing:.14em}
 .cl-reference code{overflow-wrap:anywhere;user-select:all}
 .cl-group{margin-top:36px}

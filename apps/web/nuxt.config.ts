@@ -47,7 +47,7 @@ export default defineNuxtConfig({
   },
   // 創建者頁面靠 cookie 驗證，只在 client 渲染；/s/** 維持 SSR（OG 預覽）
   routeRules: {
-    ...Object.fromEntries(['/dashboard/**', '/lists/**', '/me/wallet', '/me/topup', '/me/refund', '/me/claims', '/me/notifications', '/settings', '/welcome', '/friends', '/invite/**', '/admin/**', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite/**', '/orgs/**'].map(r => [r, { ssr: false }])),
+    ...Object.fromEntries(['/dashboard/**', '/lists/**', '/me/wallet', '/me/topup', '/me/refund', '/me/claims', '/me/notifications', '/settings', '/welcome', '/friends', '/invite/**', '/admin/**', '/login', '/register', '/forgot-password', '/org/apply', '/org/invite/**', '/orgs/**', '/receive'].map(r => [r, { ssr: false }])),
     // 個人頁一律 noindex（F22）；SSR 只為連結預覽（OG）；互動內容在 ClientOnly，另加回應標頭
     '/u/**': { headers: { 'X-Robots-Tag': 'noindex' } },
     // 連結頁：SSR（OG 預覽），不收錄、不在 LOCALIZABLE／sitemap
